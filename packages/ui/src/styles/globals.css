@@ -1,0 +1,171 @@
+@import "tailwindcss";
+@source "../../../apps/**/*.{ts,tsx}";
+@source "../../../components/**/*.{ts,tsx}";
+@source "../**/*.{ts,tsx}";
+
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Brutalist — high-contrast utility */
+  --background: #f5f5f5;
+  --foreground: #0a0a0a;
+
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+
+  /* Primary — hard black */
+  --primary: #0a0a0a;
+  --primary-foreground: #f5f5f5;
+
+  --secondary: #eaeaea;
+  --secondary-foreground: #0a0a0a;
+
+  --muted: #efefef;
+  --muted-foreground: #3a3a3a;
+
+  /* Accent — acid green */
+  --accent: #b7ff00;
+  --accent-foreground: #0a0a0a;
+
+  --destructive: #ff2b2b;
+  --destructive-foreground: #ffffff;
+
+  /* Borders */
+  --border: #0a0a0a;
+  --input: #ffffff;
+  --ring: #0a0a0a;
+
+  /* Charts */
+  --chart-1: #0a0a0a;
+  --chart-2: #ff2b2b;
+  --chart-3: #b7ff00;
+  --chart-4: #0ea5e9;
+  --chart-5: #7c7c7c;
+
+  /* Sidebar */
+  --sidebar: #f5f5f5;
+  --sidebar-foreground: #0a0a0a;
+  --sidebar-primary: #0a0a0a;
+  --sidebar-primary-foreground: #f5f5f5;
+  --sidebar-accent: #eaeaea;
+  --sidebar-accent-foreground: #0a0a0a;
+  --sidebar-border: #0a0a0a;
+  --sidebar-ring: #0a0a0a;
+
+  /* Border radius — sharp */
+  --radius: 0.25rem;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #f5f5f5;
+
+  --card: #121212;
+  --card-foreground: #f5f5f5;
+
+  --popover: #121212;
+  --popover-foreground: #f5f5f5;
+
+  --primary: #f5f5f5;
+  --primary-foreground: #0a0a0a;
+
+  --secondary: #1a1a1a;
+  --secondary-foreground: #f5f5f5;
+
+  --muted: #1a1a1a;
+  --muted-foreground: #bfbfbf;
+
+  --accent: #b7ff00;
+  --accent-foreground: #0a0a0a;
+
+  --destructive: #ff2b2b;
+  --destructive-foreground: #ffffff;
+
+  --border: #f5f5f5;
+  --input: #0a0a0a;
+  --ring: #f5f5f5;
+
+  --chart-1: #f5f5f5;
+  --chart-2: #ff2b2b;
+  --chart-3: #b7ff00;
+  --chart-4: #38bdf8;
+  --chart-5: #bfbfbf;
+
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-primary: #f5f5f5;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #1a1a1a;
+  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-border: #f5f5f5;
+  --sidebar-ring: #f5f5f5;
+}
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+  --font-mono: var(--font-mono);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+}
+
+@layer utilities {
+  /* Adaptive brutalist card border: 2px solid border + offset shadow,
+     both driven by --color-border so they flip automatically in dark mode. */
+  .panel-card {
+    border: 2px solid var(--color-border);
+    box-shadow: 4px 4px 0 0 var(--color-border);
+  }
+}

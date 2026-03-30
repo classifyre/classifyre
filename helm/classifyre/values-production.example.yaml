@@ -1,0 +1,49 @@
+# Production example values
+# Use this as the baseline for real Kubernetes deployments.
+# Demo/test profiles such as values-vps.yaml intentionally keep different tradeoffs.
+
+serviceAccount:
+  create: true
+  automount: true
+
+rbac:
+  create: true
+
+api:
+  maskedConfigEncryption:
+    existingSecret: classifyre-api-secrets
+    secretKey: CLASSIFYRE_MASKED_CONFIG_KEY
+
+  cliJobs:
+    enabled: true
+    cleanupPolicy: always
+
+frontend:
+  service:
+    type: ClusterIP
+
+ingress:
+  enabled: true
+  className: nginx
+  host: classifyre.example.com
+  tls:
+    - hosts:
+        - classifyre.example.com
+      secretName: classifyre-tls
+
+postgres:
+  mode: external
+  connection:
+    sslMode: require
+  external:
+    host: postgres.example.internal
+    port: 5432
+    database: classifyre
+    username: classifyre
+    existingSecret: classifyre-db
+    existingSecretPasswordKey: password
+
+networkPolicy:
+  enabled: true
+  ingressNamespaceSelector:
+    kubernetes.io/metadata.name: ingress-nginx

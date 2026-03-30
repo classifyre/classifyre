@@ -1,0 +1,141 @@
+/* Shared Nextra skin for docs/blog driven by Classifyre tokens */
+
+/* Force Nextra primary palette to Classifyre acid-green instead of default blue */
+:root {
+  --nextra-primary-hue: 77deg;
+  --nextra-primary-saturation: 100%;
+  --nextra-primary-lightness: 50%;
+}
+
+.dark {
+  --nextra-primary-hue: 77deg;
+  --nextra-primary-saturation: 100%;
+  --nextra-primary-lightness: 52%;
+}
+
+.nextra-nav-container,
+.nextra-nav-container_blur,
+.nextra-navbar,
+.nextra-navbar-blur,
+.nextra-sidebar,
+.nextra-sidebar-container,
+.nextra-sidebar-footer,
+.nextra-toc {
+  border-color: var(--border) !important;
+}
+
+.nextra-nav-container,
+.nextra-nav-container_blur,
+.nextra-navbar,
+.nextra-navbar-blur {
+  border-bottom-width: 2px !important;
+  background: linear-gradient(90deg, var(--background) 0%, var(--muted) 100%) !important;
+}
+
+.nextra-sidebar,
+.nextra-sidebar-container {
+  border-right-width: 2px !important;
+}
+
+a {
+  cursor: pointer;
+}
+
+.nextra-card {
+  border: 2px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  background: var(--card) !important;
+  box-shadow: 4px 4px 0 0 var(--border) !important;
+}
+
+.nextra-content :where(h1, h2, h3, h4),
+.nx-prose :where(h1, h2, h3, h4) {
+  font-family: var(--font-serif), sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nextra-content a,
+.nx-prose a {
+  color: var(--foreground);
+  font-weight: 700;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.nextra-content a:hover,
+.nx-prose a:hover {
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+
+/* Left sidebar: no underline, but green hover/active surfaces */
+.nextra-sidebar a {
+  color: var(--foreground) !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nextra-sidebar a:hover {
+  color: var(--accent-foreground) !important;
+  background: color-mix(in oklab, var(--accent) 92%, transparent) !important;
+  box-shadow: 0 0 0 1px var(--border);
+  text-decoration: none !important;
+}
+
+.nextra-sidebar li.active > a,
+.nextra-sidebar a[aria-current="page"] {
+  background: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+  border: 2px solid var(--border);
+  text-decoration: none !important;
+}
+
+/* Right TOC links: no underline, only green hover/active treatment */
+.nextra-toc a {
+  color: var(--foreground) !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nextra-toc a:hover {
+  color: var(--accent-foreground) !important;
+  background: color-mix(in oklab, var(--accent) 92%, transparent) !important;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.nextra-toc a[aria-current="true"],
+.nextra-toc a[aria-current="location"],
+.nextra-toc a[data-current] {
+  background: color-mix(in oklab, var(--accent) 90%, transparent) !important;
+  color: var(--accent-foreground) !important;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-decoration: none !important;
+}
+
+/* Bottom prev/next navigation links */
+.nextra-content div[class*="x:mb-8"][class*="x:border-t"][class*="x:pt-8"] > a {
+  color: var(--foreground) !important;
+  cursor: pointer !important;
+  text-decoration-line: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nextra-content div[class*="x:mb-8"][class*="x:border-t"][class*="x:pt-8"] > a:hover {
+  color: var(--accent-foreground) !important;
+  background: color-mix(in oklab, var(--accent) 92%, transparent) !important;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+article img {
+  border: 2px solid var(--border);
+  box-shadow: 4px 4px 0 0 var(--border);
+}

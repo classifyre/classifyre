@@ -1,0 +1,76 @@
+api:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+  image:
+    repository: classifyre-all-in-one
+    tag: dev
+    pullPolicy: IfNotPresent
+
+  workingDir: /app/api
+  startCommand: node /app/api/dist/src/main.js
+
+  migration:
+    enabled: true
+    script: prisma migrate deploy --schema /app/api/prisma/schema.prisma
+
+  podSecurityContext: {}
+  containerSecurityContext: {}
+
+  cliJobs:
+    enabled: true
+    image:
+      repository: classifyre-all-in-one
+      tag: dev
+      pullPolicy: IfNotPresent
+    workDir: /app/apps/cli
+    uvCache:
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+      size: 5Gi
+    playwrightCache:
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+      size: 5Gi
+
+  runnerLogs:
+    enabled: true
+    accessModes:
+      - ReadWriteOnce
+    size: 5Gi
+
+frontend:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+  image:
+    repository: classifyre-all-in-one
+    tag: dev
+    pullPolicy: IfNotPresent
+
+  startCommand: node /app/web/apps/web/server.js
+
+  podSecurityContext: {}
+  containerSecurityContext: {}
+
+ingress:
+  enabled: false
+
+postgres:
+  mode: embedded
+  embedded:
+    database: classifyre
+    username: postgres
+    password: postgres
+    persistence:
+      enabled: false
+
+priorityClasses:
+  create: false
+
+networkPolicy:
+  enabled: false

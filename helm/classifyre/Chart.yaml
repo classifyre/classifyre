@@ -1,0 +1,14 @@
+apiVersion: v2
+name: classifyre
+description: Production-ready Helm chart for Classifyre (web, api, and Kubernetes CLI jobs)
+type: application
+version: 0.2.24
+appVersion: "0.2.24"
+keywords:
+  - classifyre
+  - nestjs
+  - nextjs
+  - kubernetes
+home: https://github.com/unstructured/classifyre
+maintainers:
+  - name: Classifyre Team

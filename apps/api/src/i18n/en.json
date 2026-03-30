@@ -1,0 +1,18 @@
+{
+  "errors": {
+    "asset": {
+      "notFound": "Asset with ID {{id}} not found"
+    },
+    "source": {
+      "notFound": "Source with ID {{id}} not found",
+      "invalidCron": "Invalid cron expression.",
+      "noFile": "No file uploaded.",
+      "timezoneEmpty": "timezone cannot be empty"
+    },
+    "validation": {
+      "runnerIdRequired": "runnerId is required",
+      "assetsArray": "assets must be an array",
+      "seenHashesArray": "seenHashes must be an array"
+    }
+  }
+}

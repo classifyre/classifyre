@@ -1,0 +1,305 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "classifyre.api.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if not .Values.api.autoscaling.enabled }}
+  replicas: {{ .Values.api.replicaCount }}
+  {{- end }}
+  {{- with .Values.api.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "classifyre.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "classifyre.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+        {{- with .Values.api.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- if .Values.api.cliJobs.enabled }}
+        checksum/cli-job-template: {{ include (print $.Template.BasePath "/api-cli-job-template-configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.api.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "classifyre.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      {{- with .Values.api.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      {{- if ne .Values.api.terminationGracePeriodSeconds nil }}
+      terminationGracePeriodSeconds: {{ .Values.api.terminationGracePeriodSeconds }}
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.api.migration.enabled }}
+      initContainers:
+        - name: prisma-migrate
+          image: {{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          {{- with .Values.api.migration.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command:
+            - /bin/sh
+            - -lc
+          args:
+            - >-
+              set -eu;
+              {{- if .Values.api.workingDir }}
+              cd {{ .Values.api.workingDir | quote }};
+              {{- end }}
+              if [ -d "/app/node_modules" ] && [ ! -e "/node_modules" ]; then
+                ln -s /app/node_modules /node_modules;
+              fi;
+              if [ -z "${DATABASE_URL:-}" ] || [ "${DATABASE_URL}" = "postgresql://postgres@127.0.0.1:5432/classifyre" ]; then
+                export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}";
+              fi;
+              {{ .Values.api.migration.script }}
+          env:
+            - name: DB_HOST
+              value: {{ include "classifyre.databaseHost" . | quote }}
+            - name: DB_PORT
+              value: {{ include "classifyre.databasePort" . | quote }}
+            - name: DB_NAME
+              value: {{ include "classifyre.databaseName" . | quote }}
+            - name: DB_USER
+              value: {{ include "classifyre.databaseUser" . | quote }}
+            - name: DB_SSLMODE
+              value: {{ include "classifyre.databaseSslMode" . | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.databaseSecretName" . }}
+                  key: {{ include "classifyre.databasePasswordKey" . }}
+            - name: CLASSIFYRE_MASKED_CONFIG_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
+                  key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
+            {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.databaseSecretName" . }}
+                  key: {{ .Values.postgres.external.existingSecretUrlKey }}
+            {{- end }}
+      {{- end }}
+      containers:
+        - name: api
+          image: {{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          {{- if .Values.api.command }}
+          command:
+            {{- toYaml .Values.api.command | nindent 12 }}
+          {{- else }}
+          command:
+            - /bin/sh
+            - -lc
+          {{- end }}
+          {{- if .Values.api.args }}
+          args:
+            {{- toYaml .Values.api.args | nindent 12 }}
+          {{- else if not .Values.api.command }}
+          args:
+            - >-
+              set -eu;
+              {{- if .Values.api.workingDir }}
+              cd {{ .Values.api.workingDir | quote }};
+              {{- end }}
+              if [ -d "/app/node_modules" ] && [ ! -e "/node_modules" ]; then
+                ln -s /app/node_modules /node_modules;
+              fi;
+              if [ -z "${DATABASE_URL:-}" ] || [ "${DATABASE_URL}" = "postgresql://postgres@127.0.0.1:5432/classifyre" ]; then
+                export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}";
+              fi;
+              exec {{ .Values.api.startCommand }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.api.service.port }}
+              protocol: TCP
+          env:
+            - name: DB_HOST
+              value: {{ include "classifyre.databaseHost" . | quote }}
+            - name: DB_PORT
+              value: {{ include "classifyre.databasePort" . | quote }}
+            - name: DB_NAME
+              value: {{ include "classifyre.databaseName" . | quote }}
+            - name: DB_USER
+              value: {{ include "classifyre.databaseUser" . | quote }}
+            - name: DB_SSLMODE
+              value: {{ include "classifyre.databaseSslMode" . | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.databaseSecretName" . }}
+                  key: {{ include "classifyre.databasePasswordKey" . }}
+            - name: CLASSIFYRE_MASKED_CONFIG_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
+                  key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
+            {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.databaseSecretName" . }}
+                  key: {{ .Values.postgres.external.existingSecretUrlKey }}
+            {{- end }}
+            {{- range $key, $value := .Values.api.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- if .Values.api.cliJobs.enabled }}
+            - name: K8S_JOBS_ENABLED
+              value: {{ ternary "1" "0" .Values.api.cliJobs.enabled | quote }}
+            - name: K8S_JOBS_NAMESPACE
+              value: {{ default .Release.Namespace .Values.api.cliJobs.namespace | quote }}
+            - name: K8S_CLI_JOB_TEMPLATE_PATH
+              value: /etc/classifyre/cli-job-template/job-template.json
+            - name: K8S_CLI_JOB_WAIT_TIMEOUT_SECONDS
+              value: {{ .Values.api.cliJobs.waitTimeoutSeconds | quote }}
+            - name: K8S_CLI_JOB_POLL_INTERVAL_MS
+              value: {{ .Values.api.cliJobs.pollIntervalMs | quote }}
+            - name: K8S_CLI_JOB_CLEANUP_POLICY
+              value: {{ .Values.api.cliJobs.cleanupPolicy | quote }}
+            - name: K8S_CLI_JOB_WORKDIR
+              value: {{ .Values.api.cliJobs.workDir | quote }}
+            {{- end }}
+            {{- with .Values.api.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.api.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if or .Values.api.cliJobs.enabled .Values.api.runnerLogs.enabled }}
+          volumeMounts:
+            {{- if .Values.api.cliJobs.enabled }}
+            - name: cli-job-template
+              mountPath: /etc/classifyre/cli-job-template
+              readOnly: true
+            {{- end }}
+            {{- if .Values.api.runnerLogs.enabled }}
+            - name: runner-logs
+              mountPath: {{ .Values.api.runnerLogs.mountPath | quote }}
+            {{- end }}
+          {{- end }}
+          {{- with .Values.api.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.api.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.api.livenessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.api.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.api.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.api.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.api.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.api.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.api.readinessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.api.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.api.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.api.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.api.readinessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.api.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.api.startupProbe.path }}
+              port: http
+            periodSeconds: {{ .Values.api.startupProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.api.startupProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.api.startupProbe.failureThreshold }}
+          {{- end }}
+          {{- with .Values.api.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.api.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- if or .Values.api.cliJobs.enabled .Values.api.runnerLogs.enabled }}
+      volumes:
+        {{- if .Values.api.cliJobs.enabled }}
+        - name: cli-job-template
+          configMap:
+            name: {{ include "classifyre.api.fullname" . }}-cli-job-template
+        {{- end }}
+        {{- if .Values.api.runnerLogs.enabled }}
+        - name: runner-logs
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-runner-logs" (include "classifyre.fullname" .)) .Values.api.runnerLogs.existingClaim }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.api.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.api.affinity }}
+      affinity:
+        {{- toYaml .Values.api.affinity | nindent 8 }}
+      {{- else }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- include "classifyre.selectorLabels" . | nindent 20 }}
+                    app.kubernetes.io/component: api
+                topologyKey: kubernetes.io/hostname
+      {{- end }}
+      {{- if .Values.api.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.api.topologySpreadConstraints | nindent 8 }}
+      {{- else }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "classifyre.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: api
+      {{- end }}

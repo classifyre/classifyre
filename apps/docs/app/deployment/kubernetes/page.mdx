@@ -1,0 +1,391 @@
+---
+sidebarTitle: Kubernetes
+title: Kubernetes Deployment
+description: Helm-based deployment patterns, image tags, PostgreSQL modes, and secrets for Classifyre.
+---
+
+import { Callout, Steps, Tabs } from "nextra/components"
+import { HelmValuesTable } from "../../../components/helm-values-table"
+
+# Kubernetes Deployment
+
+The official Classifyre Helm chart deploys the API, web UI, database migrations, and CLI scan jobs to any Kubernetes cluster. It is the recommended path for production workloads.
+
+**Supports**
+
+- k3s, K3d, kind, EKS, GKE, AKS, and any conformant cluster
+- External PostgreSQL, embedded single-pod PostgreSQL, or [CloudNativePG](https://cloudnative-pg.io/)
+- Horizontal autoscaling (HPA) for API and web deployments
+- OCI Helm registry — no `helm repo add` needed
+
+---
+
+## Prerequisites
+
+- Kubernetes ≥ 1.26
+- Helm ≥ 3.8
+- An ingress controller (nginx is the default `ingress.className`)
+- A PostgreSQL 14+ database (or use the embedded option for demos)
+
+---
+
+## Images
+
+All images are published to GHCR alongside each release.
+
+| Component | Image |
+|---|---|
+| API (NestJS backend) | `ghcr.io/classifyre/unstructured/api` |
+| Web (Next.js frontend) | `ghcr.io/classifyre/unstructured/web` |
+| CLI (Python scan worker) | `ghcr.io/classifyre/unstructured/cli` |
+
+### Available tags
+
+Every GitHub release publishes the following tags simultaneously:
+
+| Tag | Example | Meaning | Recommended for |
+|---|---|---|---|
+| `{major}.{minor}.{patch}` | `0.1.2` | Exact release | **Production** |
+| `{major}.{minor}` | `0.1` | Latest patch in 0.1.x | Opt-in to patches |
+| `{major}` | `0` | Latest minor in 0.x | Not recommended |
+| `latest` | - | Latest stable release | Demos / quick evals |
+| `main` | - | Latest commit on `main` | CI / development |
+
+All images are multi-arch: `linux/amd64` + `linux/arm64`.
+
+When you install the chart at a specific version and leave image tags empty, the chart defaults every image to its own `appVersion` automatically — no manual tag management needed.
+
+```bash
+# Pull a specific version
+docker pull ghcr.io/classifyre/unstructured/api:0.1.8
+```
+
+---
+
+## Helm Chart
+
+The chart is published as an OCI artifact:
+
+```
+oci://ghcr.io/classifyre/unstructured/charts/classifyre
+```
+
+Helm 3.8+ supports OCI natively, so there is no `helm repo add` step.
+
+```bash
+# Inspect available versions
+helm show chart oci://ghcr.io/classifyre/unstructured/charts/classifyre
+
+# Pull chart locally to inspect values before installing
+helm pull oci://ghcr.io/classifyre/unstructured/charts/classifyre --version 0.1.8 --untar
+```
+
+---
+
+## Quick start
+
+<Tabs items={["k3s / k3d (minimal)", "Production (external DB)", "CloudNativePG"]}>
+<Tabs.Tab>
+
+<Steps>
+
+### Create a namespace
+
+```bash
+kubectl create namespace classifyre
+```
+
+### Install the chart
+
+```bash
+helm install classifyre \
+  oci://ghcr.io/classifyre/unstructured/charts/classifyre \
+  --namespace classifyre \
+  --version 0.1.8 \
+  --set postgres.mode=embedded \
+  --set postgres.embedded.password=changeme \
+  --set ingress.host=classifyre.local
+```
+
+Helm uses the chart `appVersion` (`0.1.8`) as the image tag automatically — no extra `--set` needed.
+
+### Verify rollout
+
+```bash
+kubectl -n classifyre rollout status deployment/classifyre-api
+kubectl -n classifyre rollout status deployment/classifyre-web
+```
+
+### Open the UI
+
+Add `classifyre.local` to your `/etc/hosts` pointing at the cluster IP, then open **http://classifyre.local** in your browser.
+
+</Steps>
+
+<Callout type="warning">
+  The embedded PostgreSQL option uses a single pod with a `ReadWriteOnce` PVC. It has no replication or automated backups. Use it for local dev and demos only.
+</Callout>
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+<Steps>
+
+### Create a namespace and secret
+
+```bash
+kubectl create namespace classifyre
+
+kubectl create secret generic classifyre-pg \
+  --namespace classifyre \
+  --from-literal=password=<your-pg-password>
+```
+
+### Create a values file
+
+```yaml filename="values-prod.yaml"
+ingress:
+  host: classifyre.example.com
+  tls:
+    - secretName: classifyre-tls
+      hosts:
+        - classifyre.example.com
+
+postgres:
+  mode: external
+  connection:
+    sslMode: require
+  external:
+    host: pg.example.com
+    port: 5432
+    database: classifyre
+    username: classifyre
+    existingSecret: classifyre-pg
+    existingSecretPasswordKey: password
+
+api:
+  maskedConfigEncryption:
+    value: ""          # leave empty — chart auto-generates and persists a key
+```
+
+### Install
+
+```bash
+helm install classifyre \
+  oci://ghcr.io/classifyre/unstructured/charts/classifyre \
+  --namespace classifyre \
+  --version 0.1.8 \
+  -f values-prod.yaml
+```
+
+</Steps>
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+<Steps>
+
+### Install the CloudNativePG operator
+
+```bash
+helm upgrade --install cnpg cloudnative-pg \
+  --repo https://cloudnative-pg.github.io/charts \
+  --namespace cnpg-system --create-namespace
+```
+
+### Configure Classifyre for CNPG
+
+```yaml filename="values-cnpg.yaml"
+ingress:
+  host: classifyre.example.com
+
+postgres:
+  mode: cnpg
+  cnpg:
+    clusterName: classifyre-cnpg
+    instances: 3
+    database: classifyre
+    user: classifyre
+    appPassword: <choose-a-password>
+    storage:
+      size: 50Gi
+      storageClassName: fast-ssd
+```
+
+### Install
+
+```bash
+helm install classifyre \
+  oci://ghcr.io/classifyre/unstructured/charts/classifyre \
+  --namespace classifyre --create-namespace \
+  --version 0.1.8 \
+  -f values-cnpg.yaml
+```
+
+CNPG provisions a 3-instance cluster with synchronous replication and automated failover.
+
+</Steps>
+
+</Tabs.Tab>
+</Tabs>
+
+---
+
+## Encryption key
+
+Classifyre encrypts connector credentials (API tokens, passwords) at rest using `CLASSIFYRE_MASKED_CONFIG_KEY`.
+
+**By default** the chart auto-generates a 32-character key on first install and stores it in a Kubernetes Secret. Subsequent `helm upgrade` runs look up the existing secret and reuse the same key — so credentials stay readable across upgrades.
+
+<Callout type="warning">
+  **Do not delete the secret.** If the secret is deleted, the key is lost and all stored connector credentials become permanently unreadable. You must re-enter them.
+</Callout>
+
+To supply your own key (useful when migrating from Docker or another cluster):
+
+```yaml
+api:
+  maskedConfigEncryption:
+    value: "your-exactly-32-character-key-here"
+    autoGenerate: false
+```
+
+Or reference an existing Kubernetes Secret:
+
+```yaml
+api:
+  maskedConfigEncryption:
+    existingSecret: "my-classifyre-secrets"
+    secretKey: CLASSIFYRE_MASKED_CONFIG_KEY
+    autoGenerate: false
+```
+
+---
+
+## Database migrations
+
+Migrations run automatically as an init container in each API pod on every startup. You never need to run them manually. The init container uses the same image as the API and runs:
+
+```
+npx prisma migrate deploy
+```
+
+This is idempotent — if migrations are already applied, the init container exits immediately and the API starts normally.
+
+---
+
+## Ingress
+
+The chart creates three ingress rules on a single host using the nginx ingress controller:
+
+| Path | Target |
+|---|---|
+| `/` | Web UI |
+| `/api/*` | REST API |
+| `/socket.io/*` | WebSocket |
+
+The default class is `nginx`. Change it with:
+
+```yaml
+ingress:
+  className: traefik   # or any other installed controller
+```
+
+### TLS
+
+Add cert-manager annotations to get automatic certificates:
+
+```yaml
+ingress:
+  host: classifyre.example.com
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    - secretName: classifyre-tls
+      hosts:
+        - classifyre.example.com
+```
+
+---
+
+## Upgrading
+
+```bash
+# Pull the latest chart information
+helm show chart oci://ghcr.io/classifyre/unstructured/charts/classifyre --version 0.2.0
+
+# Upgrade in place — migrations run automatically
+helm upgrade classifyre \
+  oci://ghcr.io/classifyre/unstructured/charts/classifyre \
+  --namespace classifyre \
+  --version 0.2.0 \
+  -f values-prod.yaml
+```
+
+The upgrade is rolling — pods are replaced one at a time. The API and web deployments each have a `minAvailable: 1` PodDisruptionBudget so at least one pod stays up during the rollout.
+
+---
+
+## Scaling
+
+Horizontal autoscaling is enabled by default for both the API and web deployments:
+
+```yaml
+api:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+```
+
+CLI scan jobs are ephemeral Kubernetes Jobs — they scale naturally since each scan spawns its own job and the cluster schedules them as capacity allows. Tune their resources with `api.cliJobs.resources`.
+
+---
+
+## Storage
+
+The chart provisions three PVCs by default.
+
+| PVC | Purpose | Default size |
+|---|---|---|
+| `runner-logs` | Scan execution logs (mounted in API pods) | 20 Gi |
+| `uv-cache` | Python package cache shared across CLI jobs | 20 Gi |
+| `playwright-cache` | Playwright browser binaries for CLI jobs | 10 Gi |
+
+All three require `ReadWriteMany` access mode. On clusters without a `ReadWriteMany` storage class (e.g. bare k3s), set a compatible `storageClassName` or point them at an existing NFS/CSI-backed PVC:
+
+```yaml
+api:
+  runnerLogs:
+    storageClassName: nfs-client
+  cliJobs:
+    uvCache:
+      storageClassName: nfs-client
+    playwrightCache:
+      storageClassName: nfs-client
+```
+
+---
+
+## Uninstalling
+
+```bash
+helm uninstall classifyre --namespace classifyre
+```
+
+PVCs are **not** deleted automatically. To remove them:
+
+```bash
+kubectl -n classifyre delete pvc --all
+```
+
+<Callout type="warning">
+  Deleting PVCs removes the encryption key secret and all scan logs. Export anything you need first.
+</Callout>
+
+---
+
+## All values
+
+<HelmValuesTable />

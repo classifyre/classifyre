@@ -1,0 +1,101 @@
+{{- if .Values.networkPolicy.enabled }}
+# API NetworkPolicy
+# Ingress: allows same-namespace pods (web → API) plus an optional ingress-controller namespace.
+# Egress: DNS, PostgreSQL, and the Kubernetes API server (required for CLI job management).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "classifyre.api.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "classifyre.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Same-namespace pods (web → API, health checks from within the namespace)
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.api.service.port }}
+    {{- if .Values.networkPolicy.ingressNamespaceSelector }}
+    # Ingress controller namespace (set networkPolicy.ingressNamespaceSelector to match your controller)
+    - from:
+        - namespaceSelector: {{ .Values.networkPolicy.ingressNamespaceSelector | toJson }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.api.service.port }}
+    {{- end }}
+  egress:
+    # DNS — required for all outbound name resolution
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # PostgreSQL
+    - ports:
+        - protocol: TCP
+          port: {{ include "classifyre.databasePort" . | int }}
+    # Kubernetes API server — required for CLI job creation/management
+    - ports:
+        - protocol: TCP
+          port: 443
+    # Same-namespace pods — required when postgres.mode=embedded (API → embedded postgres pod)
+    - to:
+        - podSelector: {}
+---
+# Web NetworkPolicy
+# Ingress: allows same-namespace pods plus an optional ingress-controller namespace.
+# Egress: DNS and the API service.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "classifyre.web.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "classifyre.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Same-namespace pods
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.frontend.service.port }}
+    {{- if .Values.networkPolicy.ingressNamespaceSelector }}
+    # Ingress controller namespace
+    - from:
+        - namespaceSelector: {{ .Values.networkPolicy.ingressNamespaceSelector | toJson }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.frontend.service.port }}
+    {{- end }}
+  egress:
+    # DNS
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # API service
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "classifyre.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: api
+      ports:
+        - protocol: TCP
+          port: {{ .Values.api.service.port }}
+{{- end }}

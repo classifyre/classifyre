@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "Severity": {
+      "description": "Severity level of finding",
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "info"
+      ],
+      "title": "Severity",
+      "type": "string"
+    }
+  },
+  "description": "Configuration for detector",
+  "properties": {
+    "enabled_patterns": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "List of enabled pattern names",
+      "title": "Enabled Patterns"
+    },
+    "severity_threshold": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Severity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Minimum severity to report"
+    },
+    "confidence_threshold": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": 0.7,
+      "description": "Minimum confidence to report (0-1)",
+      "title": "Confidence Threshold"
+    },
+    "max_findings": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Maximum number of findings to return",
+      "title": "Max Findings"
+    }
+  },
+  "title": "DetectorConfig",
+  "type": "object",
+  "$schema": "http://json-schema.org/draft/2020-12/schema"
+}

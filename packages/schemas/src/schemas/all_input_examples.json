@@ -1,0 +1,1604 @@
+{
+  "WORDPRESS": [
+    {
+      "name": "Extract posts and pages from public WordPress site",
+      "description": "Extract blog posts and pages from a public WordPress site without authentication",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "37 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "WORDPRESS",
+        "required": {
+          "url": "https://example.com"
+        },
+        "masked": {},
+        "optional": {
+          "content": {
+            "fetch_posts": true,
+            "fetch_pages": true
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 100
+        },
+        "detectors": [
+          {
+            "type": "BROKEN_LINKS",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Extract only blog posts",
+      "description": "Extract only blog posts, excluding pages",
+      "schedule": {
+        "enabled": true,
+        "preset": "daily",
+        "cron": "22 9 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "WORDPRESS",
+        "required": {
+          "url": "https://blog.example.com"
+        },
+        "masked": {},
+        "optional": {
+          "content": {
+            "fetch_posts": true,
+            "fetch_pages": false
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 200
+        }
+      }
+    },
+    {
+      "name": "Full scan with authentication for private content",
+      "description": "Scan all posts and pages including drafts using WordPress application password authentication",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "14 0 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "WORDPRESS",
+        "required": {
+          "url": "https://example.com"
+        },
+        "masked": {
+          "username": "admin",
+          "application_password": "your-application-password"
+        },
+        "optional": {
+          "content": {
+            "fetch_posts": true,
+            "fetch_pages": true,
+            "post_status": [
+              "publish",
+              "draft"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "ALL"
+        }
+      }
+    }
+  ],
+  "SLACK": [
+    {
+      "name": "Extract public channels with bot token",
+      "description": "Fetch messages from all public channels using a bot token",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "45 7 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SLACK",
+        "required": {
+          "workspace": "acme"
+        },
+        "masked": {
+          "bot_token": "xoxb-your-bot-token"
+        },
+        "optional": {
+          "channels": {
+            "channel_types": [
+              "public_channel"
+            ],
+            "exclude_archived": true
+          },
+          "ingestion": {
+            "rate_limit_delay_seconds": 1
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 500
+        }
+      }
+    },
+    {
+      "name": "Extract private channels and DMs with user token",
+      "description": "Fetch messages from private channels and DMs using a user token",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "18 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SLACK",
+        "required": {
+          "workspace": "acme"
+        },
+        "masked": {
+          "user_token": "xoxp-your-user-token"
+        },
+        "optional": {
+          "channels": {
+            "channel_types": [
+              "private_channel",
+              "mpim",
+              "im"
+            ],
+            "exclude_archived": true
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 200
+        }
+      }
+    },
+    {
+      "name": "Extract specific channels in a date range",
+      "description": "Fetch messages for specific channels within a date range and include thread replies for detectors",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekly",
+        "cron": "52 1 * * 0",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SLACK",
+        "required": {
+          "workspace": "acme"
+        },
+        "masked": {
+          "token": "xoxb-or-xoxp-token",
+          "token_type": "bot"
+        },
+        "optional": {
+          "channels": {
+            "channel_ids": [
+              "C1234567890",
+              "C0987654321"
+            ]
+          },
+          "time_range": {
+            "oldest": "2025-01-01T00:00:00Z",
+            "latest": "2025-02-01T00:00:00Z"
+          },
+          "ingestion": {
+            "batch_size": 200,
+            "include_thread_replies": true
+          }
+        },
+        "sampling": {
+          "strategy": "ALL"
+        }
+      }
+    }
+  ],
+  "SITEMAP": [
+    {
+      "name": "Website content index scan",
+      "description": "Ingest website pages from a sitemap with related media lineage",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "28 0 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SITEMAP",
+        "required": {
+          "sitemap_url": "https://example.com/sitemap.xml"
+        },
+        "optional": {
+          "crawl": {
+            "max_nested_sitemaps": 50
+          },
+          "assets": {
+            "fetch_related_assets": true,
+            "include_external_links": false
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 25
+        }
+      }
+    },
+    {
+      "name": "Website index scan (validation run)",
+      "description": "Start with a 10-page cap to validate parsing and extraction quality",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekly",
+        "cron": "41 1 * * 0",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SITEMAP",
+        "required": {
+          "sitemap_url": "https://www.example.com/sitemap.xml"
+        },
+        "optional": {
+          "crawl": {
+            "crawl_page_timeout_ms": 120000,
+            "request_timeout_seconds": 30
+          },
+          "assets": {
+            "fetch_related_assets": true
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 10
+        }
+      }
+    },
+    {
+      "name": "Full website crawl with link integrity detectors",
+      "description": "Run broken-link checks across all sitemap pages and their extracted links",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "7 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SITEMAP",
+        "required": {
+          "sitemap_url": "https://example.com/sitemap.xml"
+        },
+        "sampling": {
+          "strategy": "ALL"
+        },
+        "detectors": [
+          {
+            "type": "BROKEN_LINKS",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
+  "S3_COMPATIBLE_STORAGE": [
+    {
+      "name": "S3-compatible blob scan (latest files)",
+      "description": "Scan object metadata and file previews from an S3-compatible bucket using endpoint_url for MinIO/R2/B2",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "9 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "S3_COMPATIBLE_STORAGE",
+        "required": {
+          "bucket": "customer-exports"
+        },
+        "masked": {
+          "aws_access_key_id": "minio-access-key",
+          "aws_secret_access_key": "minio-secret-key"
+        },
+        "optional": {
+          "connection": {
+            "endpoint_url": "https://storage.example.internal",
+            "region_name": "us-east-1",
+            "max_object_bytes": 5242880
+          },
+          "scope": {
+            "prefix": "daily/",
+            "include_extensions": [
+              ".csv",
+              ".parquet",
+              ".pdf"
+            ],
+            "include_content_preview": true
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 100
+        }
+      }
+    },
+    {
+      "name": "Backblaze B2 S3 endpoint scan",
+      "description": "Scan objects from Backblaze B2 via S3-compatible endpoint and region settings",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "14 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "S3_COMPATIBLE_STORAGE",
+        "required": {
+          "bucket": "b2-random-archive-bucket"
+        },
+        "masked": {
+          "aws_access_key_id": "b2-key-id-7f3c9a4d1e",
+          "aws_secret_access_key": "b2-secret-key-Qx7mN2kL9pV4sT1w"
+        },
+        "optional": {
+          "connection": {
+            "endpoint_url": "https://s3.us-west-002.backblazeb2.com",
+            "region_name": "us-west-002",
+            "verify_ssl": true,
+            "request_timeout_seconds": 30
+          },
+          "scope": {
+            "include_content_preview": true
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 100
+        }
+      }
+    }
+  ],
+  "AZURE_BLOB_STORAGE": [
+    {
+      "name": "Azure Blob container validation scan",
+      "description": "Validate Azure Blob extraction with a low random sample and connection string auth",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekly",
+        "cron": "17 3 * * 0",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "AZURE_BLOB_STORAGE",
+        "required": {
+          "account_url": "https://acmestorage.blob.core.windows.net",
+          "container": "finance-archive"
+        },
+        "masked": {
+          "azure_connection_string": "DefaultEndpointsProtocol=https;AccountName=acmestorage;AccountKey=<key>;EndpointSuffix=core.windows.net"
+        },
+        "optional": {
+          "scope": {
+            "prefix": "2026/",
+            "exclude_extensions": [
+              ".png",
+              ".jpg"
+            ],
+            "include_empty_objects": false
+          },
+          "connection": {
+            "request_timeout_seconds": 45,
+            "max_keys_per_page": 250
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 25
+        }
+      }
+    }
+  ],
+  "GOOGLE_CLOUD_STORAGE": [
+    {
+      "name": "GCS full bucket sweep",
+      "description": "Scan all objects in a GCS bucket using Application Default Credentials",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "26 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "GOOGLE_CLOUD_STORAGE",
+        "required": {
+          "bucket": "prod-data-lake"
+        },
+        "masked": {},
+        "optional": {
+          "connection": {
+            "project_id": "acme-prod"
+          },
+          "scope": {
+            "prefix": "exports/"
+          }
+        },
+        "sampling": {
+          "strategy": "ALL"
+        }
+      }
+    }
+  ],
+  "POSTGRESQL": [
+    {
+      "name": "Scan a single PostgreSQL database with random row sampling",
+      "description": "Extract table assets from one database and sample random rows for detector content",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "33 14 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "POSTGRESQL",
+        "required": {
+          "host": "localhost",
+          "port": 5432
+        },
+        "masked": {
+          "username": "postgres",
+          "password": "test"
+        },
+        "optional": {
+          "scope": {
+            "database": "postgres"
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 20,
+          "max_columns": 20,
+          "max_cell_chars": 512
+        }
+      }
+    },
+    {
+      "name": "Scan all databases with latest-row sampling",
+      "description": "Enumerate all visible databases and prioritize latest records when sampling detector payloads",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "56 0 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "POSTGRESQL",
+        "required": {
+          "host": "localhost",
+          "port": 5432
+        },
+        "masked": {
+          "username": "postgres",
+          "password": "test"
+        },
+        "optional": {
+          "scope": {
+            "include_all_databases": true,
+            "maintenance_database": "app"
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 30,
+          "order_by_column": "updated_at",
+          "fallback_to_random": true
+        }
+      }
+    },
+    {
+      "name": "Scan selected schemas with detector pipeline",
+      "description": "Limit extraction scope to business schemas and run secrets + PII detectors on sampled rows",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "22 7 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "POSTGRESQL",
+        "required": {
+          "host": "localhost",
+          "port": 5432
+        },
+        "masked": {
+          "username": "postgres",
+          "password": "test"
+        },
+        "optional": {
+          "scope": {
+            "database": "postgres",
+            "include_schemas": [
+              "public",
+              "analytics"
+            ],
+            "exclude_schemas": [
+              "information_schema",
+              "pg_catalog",
+              "pg_toast"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 15,
+          "max_total_chars": 15000
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          },
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
+  "MYSQL": [
+    {
+      "name": "Scan a single MySQL database with random row sampling",
+      "description": "Extract table assets from one MySQL database and sample random rows for detector content",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "11 11 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MYSQL",
+        "required": {
+          "host": "localhost",
+          "port": 3306
+        },
+        "masked": {
+          "username": "root",
+          "password": "example"
+        },
+        "optional": {
+          "scope": {
+            "database": "app_db"
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 20,
+          "max_columns": 20,
+          "max_cell_chars": 512
+        }
+      }
+    },
+    {
+      "name": "Scan all MySQL databases with latest-row sampling",
+      "description": "Enumerate visible MySQL databases and prioritize latest records when sampling detector payloads",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "43 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MYSQL",
+        "required": {
+          "host": "localhost",
+          "port": 3306
+        },
+        "masked": {
+          "username": "root",
+          "password": "example"
+        },
+        "optional": {
+          "scope": {
+            "include_all_databases": true,
+            "exclude_databases": [
+              "information_schema",
+              "mysql",
+              "performance_schema",
+              "sys"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 30,
+          "order_by_column": "updated_at",
+          "fallback_to_random": true
+        }
+      }
+    },
+    {
+      "name": "Scan selected MySQL tables with detector pipeline",
+      "description": "Limit extraction to selected tables and run secrets + PII detectors on sampled rows",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "37 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MYSQL",
+        "required": {
+          "host": "localhost",
+          "port": 3306
+        },
+        "masked": {
+          "username": "root",
+          "password": "example"
+        },
+        "optional": {
+          "scope": {
+            "database": "analytics",
+            "include_tables": [
+              "analytics.customers",
+              "analytics.orders"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 15,
+          "max_total_chars": 15000
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          },
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
+  "MSSQL": [
+    {
+      "name": "Scan one MSSQL database with random sampling",
+      "description": "Extract tables and views from one SQL Server database with detector-friendly row sampling",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "19 10 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MSSQL",
+        "required": {
+          "host": "my-msql.database.com",
+          "port": 1433
+        },
+        "masked": {
+          "username": "test",
+          "password": "password"
+        },
+        "optional": {
+          "connection": {
+            "auth_mode": "CUSTOM",
+            "is_aws_rds": false
+          },
+          "scope": {
+            "database": "msdb",
+            "include_tables": true,
+            "include_views": true
+          },
+          "extraction": {
+            "include_table_lineage": true,
+            "include_view_lineage": true,
+            "include_view_column_lineage": true,
+            "include_stored_procedures": true,
+            "include_stored_procedures_code": true,
+            "include_jobs": true
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 25,
+          "max_columns": 20,
+          "max_cell_chars": 512
+        }
+      }
+    },
+    {
+      "name": "Scan all MSSQL databases with latest-row sampling",
+      "description": "Enumerate visible SQL Server databases and prioritize latest records where possible",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "15 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MSSQL",
+        "required": {
+          "host": "my-msql.database.com",
+          "port": 1433
+        },
+        "masked": {
+          "username": "db_reader",
+          "password": "password"
+        },
+        "optional": {
+          "connection": {
+            "auth_mode": "LDAP",
+            "ldap_domain": "TestCompany",
+            "is_aws_rds": true
+          },
+          "scope": {
+            "include_all_databases": true,
+            "exclude_databases": [
+              "master",
+              "tempdb"
+            ],
+            "include_tables": true,
+            "include_views": true
+          },
+          "extraction": {
+            "include_table_lineage": true,
+            "include_view_lineage": true,
+            "include_view_column_lineage": true,
+            "include_query_lineage": true,
+            "max_queries_to_extract": 1000,
+            "min_query_calls": 5,
+            "query_exclude_patterns": [
+              "%sys.%",
+              "%tempdb.%",
+              "%INFORMATION_SCHEMA%"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 30,
+          "order_by_column": "updated_at",
+          "fallback_to_random": true
+        }
+      }
+    }
+  ],
+  "ORACLE": [
+    {
+      "name": "Scan Oracle service with table and view lineage",
+      "description": "Extract Oracle tables and views for one service name and include view lineage links",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "12 13 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "ORACLE",
+        "required": {
+          "host": "some-test-company.example.com",
+          "port": 1523,
+          "service_name": "TEST_PDB"
+        },
+        "masked": {
+          "username": "test",
+          "password": "test"
+        },
+        "optional": {
+          "scope": {
+            "include_tables": true,
+            "include_views": true,
+            "include_view_lineage": true,
+            "include_view_column_lineage": true
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 25,
+          "max_columns": 20,
+          "max_cell_chars": 512
+        }
+      }
+    },
+    {
+      "name": "Scan selected Oracle objects with latest sampling",
+      "description": "Target specific Oracle schema objects and prioritize latest rows for detector payloads",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "4 0 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "ORACLE",
+        "required": {
+          "host": "some-test-company.example.com",
+          "port": 1523,
+          "service_name": "TEST_PDB"
+        },
+        "masked": {
+          "username": "test",
+          "password": "test"
+        },
+        "optional": {
+          "scope": {
+            "include_tables": true,
+            "include_views": false,
+            "include_objects": [
+              "HR.EMPLOYEES",
+              "HR.DEPARTMENTS"
+            ],
+            "table_limit": 100
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 20,
+          "order_by_column": "LAST_UPDATE_DATE",
+          "fallback_to_random": true
+        }
+      }
+    }
+  ],
+  "HIVE": [
+    {
+      "name": "Scan Hive default database via LDAP",
+      "description": "Extract Hive tables and views from one database using LDAP authentication settings",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "21 7 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "HIVE",
+        "required": {
+          "host": "some-test-company.example.com",
+          "port": 10000
+        },
+        "masked": {
+          "username": "hive",
+          "password": "hive"
+        },
+        "optional": {
+          "connection": {
+            "scheme": "hive",
+            "connect_args": {
+              "auth": "LDAP"
+            }
+          },
+          "scope": {
+            "database": "default",
+            "include_tables": true,
+            "include_views": true
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 25,
+          "max_columns": 20,
+          "max_cell_chars": 512
+        }
+      }
+    },
+    {
+      "name": "Scan all Hive databases with latest sampling",
+      "description": "Enumerate visible Hive databases and prioritize latest records when possible",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "44 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "HIVE",
+        "required": {
+          "host": "some-test-company.example.com",
+          "port": 10000
+        },
+        "masked": {
+          "username": "hive",
+          "password": "hive"
+        },
+        "optional": {
+          "connection": {
+            "scheme": "hive+https"
+          },
+          "scope": {
+            "include_all_databases": true,
+            "exclude_databases": [
+              "information_schema"
+            ],
+            "include_tables": true,
+            "include_views": false
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 30,
+          "order_by_column": "updated_at",
+          "fallback_to_random": true
+        }
+      }
+    }
+  ],
+  "DATABRICKS": [
+    {
+      "name": "Databricks Unity Catalog with PAT token",
+      "description": "Extract Unity Catalog tables and lineage with PAT authentication and optional notebook/pipeline metadata",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "26 0 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "DATABRICKS",
+        "required": {
+          "auth_mode": "PAT_TOKEN",
+          "workspace_url": "https://adb-3018287583848948.8.azuredatabricks.net",
+          "warehouse_id": "85a0db1067b31560"
+        },
+        "masked": {
+          "token": "dapi533087dfbc1a9b17eaa95bbe01440726-2"
+        },
+        "optional": {
+          "scope": {
+            "include_catalogs": [
+              "main"
+            ]
+          },
+          "extraction": {
+            "include_table_lineage": true,
+            "include_column_lineage": false,
+            "include_notebooks": true,
+            "include_pipelines": true
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 20,
+          "max_columns": 20,
+          "max_cell_chars": 512
+        }
+      }
+    },
+    {
+      "name": "Databricks Unity Catalog with service principal",
+      "description": "Use service principal auth for scheduled Databricks ingestion with recency-focused sampling",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "8 15 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "DATABRICKS",
+        "required": {
+          "auth_mode": "SERVICE_PRINCIPAL",
+          "workspace_url": "https://adb-3018287583848948.8.azuredatabricks.net",
+          "warehouse_id": "85a0db1067b31560",
+          "client_id": "service-principal-client-id"
+        },
+        "masked": {
+          "client_secret": "service-principal-client-secret"
+        },
+        "optional": {
+          "scope": {
+            "include_catalogs": [
+              "main",
+              "finance"
+            ],
+            "include_hive_metastore": false
+          },
+          "extraction": {
+            "include_table_lineage": true,
+            "include_column_lineage": true,
+            "include_notebooks": false,
+            "include_pipelines": false
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 30,
+          "order_by_column": "updated_at",
+          "fallback_to_random": true
+        }
+      }
+    }
+  ],
+  "SNOWFLAKE": [
+    {
+      "name": "Snowflake key pair authentication with lineage",
+      "description": "Extract Snowflake tables/views using key pair auth with table and view lineage enabled",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "31 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SNOWFLAKE",
+        "required": {
+          "authentication_type": "KEY_PAIR_AUTHENTICATOR",
+          "account_id": "ORGNAME-ACCOUNT_DEV"
+        },
+        "masked": {
+          "username": "some_user",
+          "private_key": "-----BEGIN PRIVATE KEY-----\\nMIIE...\\n-----END PRIVATE KEY-----"
+        },
+        "optional": {
+          "connection": {
+            "role": "some_role",
+            "warehouse": "compute_wh"
+          },
+          "scope": {
+            "database": "ANALYTICS",
+            "include_tables": true,
+            "include_views": true
+          },
+          "extraction": {
+            "start_time": "2025-01-01T00:00:00.000Z",
+            "include_table_lineage": true,
+            "include_view_lineage": true
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 20,
+          "max_columns": 20,
+          "max_cell_chars": 512
+        }
+      }
+    },
+    {
+      "name": "Snowflake password auth with latest sampling",
+      "description": "Extract scoped Snowflake objects with default username/password authentication",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "3 12 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SNOWFLAKE",
+        "required": {
+          "authentication_type": "DEFAULT_AUTHENTICATOR",
+          "account_id": "xy12345.us-east-2.aws"
+        },
+        "masked": {
+          "username": "snowflake_reader",
+          "password": "example-password"
+        },
+        "optional": {
+          "connection": {
+            "warehouse": "compute_wh"
+          },
+          "scope": {
+            "database": "ANALYTICS",
+            "include_schemas": [
+              "PUBLIC"
+            ],
+            "include_tables": true,
+            "include_views": false
+          },
+          "extraction": {
+            "include_table_lineage": true,
+            "include_view_lineage": false
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 30,
+          "order_by_column": "UPDATED_AT",
+          "fallback_to_random": true
+        }
+      }
+    }
+  ],
+  "MONGODB": [
+    {
+      "name": "MongoDB Atlas document scan",
+      "description": "Extract MongoDB collections from Atlas with SCRAM authentication and random document sampling",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "34 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MONGODB",
+        "required": {
+          "deployment": "ATLAS",
+          "cluster_host": "finanzen.rtlj1gu.mongodb.net"
+        },
+        "masked": {
+          "username": "OstapBender_db_user",
+          "password": "masked-db-password"
+        },
+        "optional": {
+          "connection": {
+            "auth_mechanism": "SCRAM-SHA-256",
+            "app_name": "finanzen"
+          },
+          "scope": {
+            "database": "finanzen",
+            "include_all_databases": false,
+            "include_collections": [
+              "transactions",
+              "users"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 30
+        }
+      }
+    },
+    {
+      "name": "MongoDB on-prem latest-doc scan",
+      "description": "Scan an on-prem MongoDB deployment and prioritize newest documents per collection",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "24 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MONGODB",
+        "required": {
+          "deployment": "ON_PREM",
+          "host": "some-test-company.example.com",
+          "port": 27017
+        },
+        "masked": {
+          "username": "mongo_reader",
+          "password": "masked-reader-password"
+        },
+        "optional": {
+          "connection": {
+            "auth_mechanism": "SCRAM-SHA-256",
+            "auth_source": "admin",
+            "tls": false
+          },
+          "scope": {
+            "database": "analytics",
+            "exclude_collections": [
+              "system.profile"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 25
+        }
+      }
+    },
+    {
+      "name": "MongoDB Atlas all-databases scan with secrets detection",
+      "description": "Scan every database in an Atlas cluster for secrets and sensitive data using random document sampling",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "0 3 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MONGODB",
+        "required": {
+          "deployment": "ATLAS",
+          "cluster_host": "bigfree.zaz2dbb.mongodb.net"
+        },
+        "masked": {
+          "username": "classifyre_scanner",
+          "password": "masked-atlas-password"
+        },
+        "optional": {
+          "connection": {
+            "app_name": "BIGFREE"
+          },
+          "scope": {
+            "include_all_databases": true,
+            "exclude_databases": ["admin", "config", "local"]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 20
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
+  "POWERBI": [
+    {
+      "name": "PowerBI service principal tenant scan",
+      "description": "Extract PowerBI workspaces, datasets, reports, and dashboards using service principal auth",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "52 11 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "POWERBI",
+        "required": {
+          "auth_mode": "SERVICE_PRINCIPAL",
+          "tenant_id": "11bb8523-44f1-4e22-a058-81f49f3fe8e8",
+          "client_id": "49eaace0-dde1-41f9-9c1a-0db63adfd779"
+        },
+        "masked": {
+          "client_secret": "masked-client-secret"
+        },
+        "optional": {
+          "extraction": {
+            "extract_ownership": true,
+            "extract_workspaces_to_containers": true,
+            "extract_datasets_to_containers": true,
+            "extract_dashboards": true,
+            "extract_dataset_schema": true
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 100,
+          "order_by_column": "modifiedDateTime"
+        }
+      }
+    },
+    {
+      "name": "PowerBI access token workspace scan",
+      "description": "Use a short-lived delegated token and limit ingestion to selected workspaces",
+      "schedule": {
+        "enabled": true,
+        "preset": "daily",
+        "cron": "40 9 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "POWERBI",
+        "required": {
+          "auth_mode": "ACCESS_TOKEN"
+        },
+        "masked": {
+          "access_token": "masked-access-token"
+        },
+        "optional": {
+          "scope": {
+            "workspace_names": [
+              "Finance",
+              "Risk"
+            ]
+          },
+          "extraction": {
+            "extract_reports": true,
+            "extract_dashboards": true,
+            "extract_dataset_schema": false
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 40
+        }
+      }
+    }
+  ],
+  "TABLEAU": [
+    {
+      "name": "Tableau Cloud PAT scan",
+      "description": "Extract Tableau Cloud workbooks and datasources using personal access token auth",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "29 16 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "TABLEAU",
+        "required": {
+          "auth_mode": "PERSONAL_ACCESS_TOKEN",
+          "connect_uri": "https://test-company.online.tableau.com",
+          "site": "some_test_company",
+          "token_name": "some_token"
+        },
+        "masked": {
+          "token_value": "masked-token-value"
+        },
+        "optional": {
+          "extraction": {
+            "ingest_tags": true,
+            "ingest_owner": true,
+            "extract_usage_stats": true
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 50,
+          "order_by_column": "updated_at"
+        }
+      }
+    },
+    {
+      "name": "Tableau Server username/password scan",
+      "description": "Extract selected Tableau Server projects using username/password auth",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "17 0 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "TABLEAU",
+        "required": {
+          "auth_mode": "USERNAME_PASSWORD",
+          "connect_uri": "https://tableau.company.internal",
+          "site": ""
+        },
+        "masked": {
+          "username": "svc_tableau",
+          "password": "masked-password"
+        },
+        "optional": {
+          "scope": {
+            "project_names": [
+              "Finance",
+              "Operations"
+            ],
+            "include_workbooks": true,
+            "include_datasources": true
+          }
+        },
+        "sampling": {
+          "strategy": "ALL"
+        }
+      }
+    }
+  ],
+  "CONFLUENCE": [
+    {
+      "name": "Confluence pages for selected engineering spaces",
+      "description": "Ingest Confluence Cloud pages for specific spaces with comments and attachments enabled",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "12 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "CONFLUENCE",
+        "required": {
+          "base_url": "https://acme.atlassian.net",
+          "account_email": "platform-bot@acme.com"
+        },
+        "masked": {
+          "api_token": "your-atlassian-api-token"
+        },
+        "optional": {
+          "connection": {
+            "request_timeout_seconds": 30,
+            "max_retries": 3
+          },
+          "scope": {
+            "spaces": {
+              "keys": [
+                "ENG",
+                "PLATFORM"
+              ],
+              "status": "current"
+            }
+          },
+          "content": {
+            "include_footer_comments": true,
+            "include_inline_comments": true,
+            "include_attachments": true,
+            "include_linked_file_assets": true,
+            "attachment_max_bytes": 5242880
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 100
+        }
+      }
+    },
+    {
+      "name": "Confluence knowledge base full crawl",
+      "description": "Scan all pages in current knowledge-base spaces and run broken-link checks",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekly",
+        "cron": "5 2 * * 0",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "CONFLUENCE",
+        "required": {
+          "base_url": "https://acme.atlassian.net",
+          "account_email": "security-bot@acme.com"
+        },
+        "masked": {
+          "api_token": "your-atlassian-api-token"
+        },
+        "optional": {
+          "scope": {
+            "spaces": {
+              "type": "knowledge_base",
+              "status": "current"
+            }
+          },
+          "content": {
+            "include_footer_comments": true,
+            "include_inline_comments": false,
+            "include_attachments": true
+          }
+        },
+        "sampling": {
+          "strategy": "ALL"
+        },
+        "detectors": [
+          {
+            "type": "BROKEN_LINKS",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
+  "JIRA": [
+    {
+      "name": "Jira project issues with project scope",
+      "description": "Ingest Jira issues for selected projects with comments and attachments enabled",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "15 10 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "JIRA",
+        "required": {
+          "base_url": "https://acme.atlassian.net",
+          "account_email": "platform-bot@acme.com"
+        },
+        "masked": {
+          "api_token": "your-atlassian-api-token"
+        },
+        "optional": {
+          "connection": {
+            "request_timeout_seconds": 30,
+            "max_retries": 3
+          },
+          "scope": {
+            "project_keys": [
+              "PLAT",
+              "SEC"
+            ]
+          },
+          "content": {
+            "include_comments": true,
+            "include_attachments": true,
+            "attachment_max_bytes": 5242880
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 150
+        }
+      }
+    },
+    {
+      "name": "Jira tenant-wide latest issue scan",
+      "description": "Scan all visible Jira issues and rely on sampling to limit each run",
+      "schedule": {
+        "enabled": true,
+        "preset": "daily",
+        "cron": "40 7 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "JIRA",
+        "required": {
+          "base_url": "https://acme.atlassian.net",
+          "account_email": "security-bot@acme.com"
+        },
+        "masked": {
+          "api_token": "your-atlassian-api-token"
+        },
+        "optional": {
+          "content": {
+            "include_comments": true,
+            "include_attachments": false
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 50
+        }
+      }
+    }
+  ],
+  "SERVICEDESK": [
+    {
+      "name": "Service Desk requests scoped to selected desks",
+      "description": "Ingest customer requests for selected service desks with comments and attachments enabled",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "20 9 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SERVICEDESK",
+        "required": {
+          "base_url": "https://acme.atlassian.net",
+          "account_email": "support-bot@acme.com"
+        },
+        "masked": {
+          "api_token": "your-atlassian-api-token"
+        },
+        "optional": {
+          "scope": {
+            "service_desk_ids": [
+              1,
+              2
+            ],
+            "request_status": "OPEN_REQUESTS"
+          },
+          "content": {
+            "include_comments": true,
+            "include_attachments": true
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "limit": 100
+        }
+      }
+    },
+    {
+      "name": "Service Desk tenant-wide random sampling",
+      "description": "Scan all visible service desk requests and control volume with random sampling",
+      "schedule": {
+        "enabled": true,
+        "preset": "daily",
+        "cron": "50 6 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SERVICEDESK",
+        "required": {
+          "base_url": "https://acme.atlassian.net",
+          "account_email": "security-bot@acme.com"
+        },
+        "masked": {
+          "api_token": "your-atlassian-api-token"
+        },
+        "optional": {
+          "content": {
+            "include_comments": true,
+            "include_attachments": false
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "limit": 60
+        }
+      }
+    }
+  ]
+}

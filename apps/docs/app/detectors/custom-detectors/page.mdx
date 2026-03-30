@@ -1,0 +1,365 @@
+---
+title: Custom Detectors
+sidebarTitle: Custom Detectors
+description: Build your own detectors using regex rules, keyword lists, few-shot classifiers, or named entity extraction. No ML expertise required.
+---
+
+import { Callout, Steps, Tabs } from "nextra/components"
+
+# Custom Detectors
+
+Custom detectors let you define exactly what to look for — pattern by pattern, label by label — without writing code. Three execution methods cover different use cases. You can combine them or add a structured extraction layer on top of any method.
+
+---
+
+## Methods at a glance
+
+| Method | What it does | When to use |
+|---|---|---|
+| `RULESET` | Matches text using regex patterns and keyword lists | Known, deterministic patterns — IBANs, internal codes, compliance phrases |
+| `CLASSIFIER` | Classifies text into your custom labels using a language model | Subjective or semantic categories — tone, risk, promotional content |
+| `ENTITY` | Extracts named entities from text using GLiNER | Domain-specific entities — regulatory IDs, custom person types, product codes |
+
+---
+
+## RULESET
+
+A ruleset detector matches text without any ML model. It runs regex and keyword rules and fires a finding when a match is found. Rules are evaluated on every scanned asset. Confidence is fixed (regex: 0.93, keyword: 0.82), so `confidence_threshold` acts as a gate — keep it below those values (default 0.7 works fine).
+
+### Regex rules
+
+```json
+{
+  "method": "RULESET",
+  "ruleset": {
+    "regex_rules": [
+      {
+        "id": "iban_de",
+        "name": "German IBAN",
+        "pattern": "\\bDE\\d{20}\\b",
+        "flags": "i",
+        "severity": "high"
+      },
+      {
+        "id": "sku_internal",
+        "name": "Internal SKU",
+        "pattern": "\\bINT-[A-Z]{2,4}-\\d{4,6}\\b",
+        "severity": "medium"
+      }
+    ]
+  }
+}
+```
+
+**Fields:**
+
+| Field | Required | Description |
+|---|---|---|
+| `id` | Yes | Stable identifier — appears in finding metadata and `finding_type` |
+| `name` | Yes | Human-readable label shown in the UI |
+| `pattern` | Yes | Python-compatible regex. Max 512 chars, no recursive patterns |
+| `flags` | No | `i` = case-insensitive, `m` = multiline, `s` = dotall |
+| `severity` | No | `critical`, `high`, `medium`, `low`, `info` — defaults to `medium` |
+
+<Callout type="info">
+  When `de` is in the detector's `languages` list, the engine also runs detection on a compound-split variant of the content — long German compound words (16+ chars) are split at known boundaries before matching. This catches things like `Datenschutzbeauftragter` → `Datenschutz beauftragter`.
+</Callout>
+
+### Keyword rules
+
+```json
+{
+  "method": "RULESET",
+  "ruleset": {
+    "keyword_rules": [
+      {
+        "id": "data_protection_terms",
+        "name": "Data Protection Terms",
+        "keywords": ["Datenschutzbeauftragter", "DSGVO", "Datenschutzfolgeabschätzung"],
+        "case_sensitive": false,
+        "severity": "low"
+      }
+    ]
+  }
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `id` | Yes | Stable identifier |
+| `name` | Yes | Display name |
+| `keywords` | Yes | List of literal strings to match (at least one) |
+| `case_sensitive` | No | Default `false` |
+| `severity` | No | Defaults to `low` |
+
+### Safety limits
+
+Patterns are validated before compilation. A rule is silently skipped if:
+- Pattern is longer than 512 characters
+- Pattern contains recursive constructs (`(?R`, `(?0`, `(?P>`)
+- Pattern has more than 4 `.*` sequences
+- Pattern has nested quantifiers that could cause catastrophic backtracking
+
+---
+
+## CLASSIFIER
+
+A classifier detector assigns your text to one or more custom labels using a language model. It works in two modes depending on how many training examples you have provided.
+
+### How it picks a model (training strategy)
+
+| Condition | Model used | Notes |
+|---|---|---|
+| All labels have ≥ `min_examples_per_label` accepted examples | **SetFit** (`paraphrase-multilingual-MiniLM-L12-v2`) | Trained once on first scan, cached locally by example fingerprint |
+| Not enough examples for any label | **Zero-shot** (`mDeBERTa-v3-base-mnli-xnli`) | Uses `hypothesis_template` to infer — no training needed |
+
+The default threshold is **8 examples per label**. Once you reach it for every label, SetFit is used and the model is retrained whenever the examples change.
+
+<Callout type="info">
+  **Zero-shot first, SetFit later.** You can deploy a CLASSIFIER detector immediately with zero examples — it will use the zero-shot model. As you accumulate confirmed findings from scans, run **Train** to bake them into a SetFit model that is faster and more accurate for your specific domain.
+</Callout>
+
+### Minimal zero-shot setup
+
+```json
+{
+  "method": "CLASSIFIER",
+  "classifier": {
+    "labels": [
+      { "id": "risk_term", "name": "Risk Term", "description": "Legal or compliance risk wording" },
+      { "id": "neutral",   "name": "Neutral",   "description": "Ordinary business language" }
+    ],
+    "hypothesis_template": "This text contains {}.",
+    "zero_shot_model": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"
+  }
+}
+```
+
+The `{}` in `hypothesis_template` is replaced with the label **name** at inference time. A good template makes a difference. Compare:
+
+| Template | Label substituted | Effective hypothesis |
+|---|---|---|
+| `"This text contains {}."` | `"Risk Term"` | *This text contains Risk Term.* |
+| `"This text is {}."` | `"promotional content"` | *This text is promotional content.* |
+| `"This document discusses {}."` | `"financial advice"` | *This document discusses financial advice.* |
+
+Write the template so the completed sentence is a natural, true description of content you **do** want to flag.
+
+### Label fields
+
+| Field | Required | Description |
+|---|---|---|
+| `id` | Yes | Stable snake_case identifier — referenced in training examples and finding metadata |
+| `name` | Yes | Human-readable name — used by the zero-shot model as the candidate label |
+| `description` | No | Longer hint — useful for documenting intent, not used by models |
+
+<Callout type="warning">
+  Training example `label` values must match the label **`id`**, not the `name`. If you change a label's `id`, existing training examples referencing the old ID are no longer counted toward that label.
+</Callout>
+
+---
+
+## Training a CLASSIFIER
+
+Training resolves the detector's strategy to `SETFIT` or `ZERO_SHOT` based on how many accepted examples exist per label. It does not run the ML training itself — the actual SetFit training happens inside the CLI scan job on first use. The API training step **commits the current example set** and computes a deterministic fingerprint used to invalidate the cached model when examples change.
+
+### Ways to add training examples
+
+**1. From confirmed scan findings** — the most natural workflow. Run a scan, review findings, mark correct ones as Resolved and incorrect ones as False Positive. Then click Train in the UI. The API collects all Resolved findings for this detector as positive examples.
+
+**2. Upload a file** — supported formats: `.csv`, `.tsv`, `.txt`, `.json`. The file parser auto-detects column headers. A two-column CSV with `text,label` header is the simplest format:
+
+```
+text,label
+"This lease agreement contains force majeure waivers.",risk_term
+"Meeting notes from the Q2 planning session.",neutral
+"The liability clause contradicts applicable law.",risk_term
+"We shipped 50 units to warehouse B.",neutral
+```
+
+**3. Paste inline** — plain text, one example per line, with the label as the last token:
+
+```
+This agreement limits damages to direct losses only. risk_term
+Weekly status update for the engineering team. neutral
+```
+
+### How many examples do you need?
+
+| Goal | Minimum | Better |
+|---|---|---|
+| Switch from zero-shot to SetFit | 8 per label | 20–30 per label |
+| Good accuracy on short texts | 15 per label | 40+ per label |
+| Good accuracy on long documents | 20 per label | 50+ per label |
+
+The 8-example threshold is the default `min_examples_per_label`. You can lower it, but SetFit trains better with more examples. If accuracy matters, aim for 20+ per label with varied phrasing.
+
+### Training strategy in findings
+
+After running Train, the training run record shows the resolved strategy:
+
+| `strategy` value | Meaning |
+|---|---|
+| `SETFIT` | Enough labeled examples — SetFit model will be trained on first scan |
+| `ZERO_SHOT` | Not enough labeled examples — mDeBERTa zero-shot is used at runtime |
+| `RULESET` | Detector uses the ruleset method, no training needed |
+| `ENTITY` | Detector uses the entity method, no training needed |
+
+---
+
+## ENTITY
+
+An entity detector extracts named spans from text using [GLiNER](https://github.com/urchade/GLiNER) — a generalist NER model that handles any label you give it without fine-tuning.
+
+```json
+{
+  "method": "ENTITY",
+  "entity": {
+    "entity_labels": [
+      "vendor name",
+      "contractor",
+      "Auftragnehmer",
+      "IBAN",
+      "regulatory fine amount"
+    ],
+    "model": "urchade/gliner_multi-v2.1"
+  }
+}
+```
+
+Entity labels are free-form strings in any language — GLiNER uses the label text itself as the semantic description. More descriptive labels give better results than short ones.
+
+| Good label | Less good label |
+|---|---|
+| `"German supervisory authority"` | `"authority"` |
+| `"regulatory fine amount in euros"` | `"fine"` |
+| `"IBAN bank account number"` | `"IBAN"` |
+| `"internal employee ID"` | `"ID"` |
+
+Findings include `start`/`end` character offsets in the original content and an `entity_label` field in the metadata.
+
+**No training required.** GLiNER generalizes from the label text — just describe what you want to find.
+
+---
+
+## Extractor (structured output)
+
+Any method can have an optional `extractor` block that runs **after** detection fires. Instead of just flagging content, the extractor pulls structured fields out of it and attaches them to the finding as `extracted_data`.
+
+```json
+{
+  "method": "CLASSIFIER",
+  "classifier": { "..." },
+  "extractor": {
+    "enabled": true,
+    "fields": [
+      {
+        "name": "contract_party",
+        "description": "The contracting party mentioned",
+        "type": "string",
+        "entity_label": "contracting party",
+        "min_confidence": 0.4
+      },
+      {
+        "name": "effective_date",
+        "description": "Contract effective date",
+        "type": "string",
+        "regex_pattern": "(?P<value>\\d{1,2}\\.\\d{1,2}\\.\\d{4})",
+        "aggregate": "first"
+      }
+    ],
+    "content_limit": 4000
+  }
+}
+```
+
+### Extractor fields
+
+| Field | Description |
+|---|---|
+| `name` | Output key in `extracted_data` |
+| `description` | Human hint for the GLiNER extraction |
+| `type` | `string`, `number`, `boolean`, `list[string]`, `list[number]` |
+| `entity_label` | GLiNER label — used when no `regex_pattern` is set |
+| `regex_pattern` | Python regex with a `(?P<value>...)` named capture group |
+| `regex_flags` | `i`, `m`, `s` — defaults to `i` |
+| `aggregate` | `first`, `last`, `list`, `join`, `count` — how multiple matches are combined |
+| `min_confidence` | Minimum GLiNER confidence for this field (0–1, default 0.4) |
+| `required` | If `true`, the entire extraction is dropped when this field is empty |
+
+`content_limit` controls how many characters of the original document are passed to the extractor. The classifier `matched_content` is capped at 320 chars — for deeper extraction you need more context. Default is 4000.
+
+---
+
+## Complete example: CLASSIFIER + extractor
+
+```json
+{
+  "custom_detector_key": "contract_risk_de",
+  "name": "DACH Contract Risk",
+  "method": "CLASSIFIER",
+  "languages": ["de", "en"],
+  "confidence_threshold": 0.7,
+  "classifier": {
+    "labels": [
+      { "id": "risk_term",  "name": "Risk Term",  "description": "Legal or compliance risk wording" },
+      { "id": "neutral",    "name": "Neutral",     "description": "Ordinary business language" }
+    ],
+    "hypothesis_template": "This text contains {}.",
+    "min_examples_per_label": 8,
+    "zero_shot_model": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli",
+    "setfit_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "training_examples": []
+  },
+  "extractor": {
+    "enabled": true,
+    "fields": [
+      {
+        "name": "risk_clause",
+        "description": "The specific legal clause that triggered detection",
+        "type": "string",
+        "entity_label": "legal risk clause",
+        "min_confidence": 0.35,
+        "aggregate": "join"
+      }
+    ],
+    "content_limit": 4000
+  }
+}
+```
+
+---
+
+## Choosing the right method
+
+```
+Is the pattern deterministic and expressible as a regex or keyword list?
+  → RULESET
+
+Is the content subjective, contextual, or semantic?
+  → CLASSIFIER
+
+  Do you have labeled examples, or can you collect them through scan feedback?
+    → Yes → CLASSIFIER, accumulate examples, then Train for SetFit
+    → No  → CLASSIFIER with zero_shot_model and good hypothesis_template
+
+Do you need to extract specific named spans (people, IDs, amounts)?
+  → ENTITY
+
+Do you need structured fields pulled out when detection fires?
+  → Add an extractor block to any of the above
+```
+
+---
+
+## Common pitfalls
+
+**Classifier label IDs in training examples must match exactly.** Training examples reference label IDs, not names. A mismatch means those examples are silently ignored when counting coverage.
+
+**Zero-shot accuracy depends on label names.** The zero-shot model scores each label name against the content via a natural language hypothesis. Vague names like `"bad"` or `"other"` perform poorly. Use descriptive names like `"passive-aggressive workplace communication"`.
+
+**SetFit requires at least 2 labels with enough examples.** A classifier with a single label cannot train SetFit — you need at least two distinct labels with `min_examples_per_label` examples each.
+
+**RULESET confidence is fixed, not learned.** Regex matches come in at 0.93 and keyword matches at 0.82. If you set `confidence_threshold` above 0.93, regex findings will also be filtered out.
+
+**Entity labels are semantic descriptions, not ontology nodes.** GLiNER uses the label string as a natural language prompt. `"IBAN bank account number"` works better than `"IBAN"` because it gives the model more context.

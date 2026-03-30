@@ -1,0 +1,65 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "globalEnv": ["API_URL", "INTERNAL_API_URL", "NEXT_PUBLIC_API_URL"],
+  "tasks": {
+    "prisma:generate": {
+      "cache": true,
+      "outputs": [
+        "node_modules/.prisma/client/**",
+        "node_modules/@prisma/client/**"
+      ]
+    },
+    "build": {
+      "dependsOn": ["^build", "prisma:generate"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "out/**", ".venv/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint", "prisma:generate"]
+    },
+    "codegen": {
+      "cache": false
+    },
+    "check-types": {
+      "dependsOn": ["^check-types", "prisma:generate"]
+    },
+    "dev": {
+      "dependsOn": ["prisma:generate"],
+      "cache": false,
+      "persistent": true
+    },
+    "test": {
+      "cache": false
+    },
+    "test:e2e": {
+      "cache": false,
+      "dependsOn": ["build"]
+    },
+    "docker:build": {
+      "cache": false
+    },
+    "docker:build:multiarch": {
+      "cache": false
+    },
+    "helm:lint": {
+      "cache": false
+    },
+    "helm:docs": {
+      "cache": false
+    },
+    "helm:docs:check": {
+      "cache": false
+    },
+    "helm:snapshot": {
+      "cache": false
+    },
+    "helm:snapshot:check": {
+      "cache": false
+    },
+    "helm:test": {
+      "cache": false,
+      "dependsOn": ["helm:lint", "helm:docs:check", "helm:snapshot:check"]
+    }
+  }
+}

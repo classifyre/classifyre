@@ -1,0 +1,120 @@
+name: Release Chart
+
+# Use this workflow when you need to fix/update the Helm chart without
+# bumping the app version or rebuilding Docker images.
+#
+# It bumps Chart.yaml `version` only — `appVersion` (and all images) stay as-is.
+# The updated chart is published to GHCR as an OCI artifact.
+#
+# Tag convention: chart-v<version>  (e.g. chart-v1.0.1)
+# This is distinct from app release tags (v<version>) so the two streams
+# are easy to tell apart in git history.
+
+on:
+  workflow_dispatch:
+    inputs:
+      chart-version:
+        description: "New chart version (major.minor.patch)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish-chart:
+    name: Publish chart update
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate version and check for conflicts
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.chart-version }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${INPUT_VERSION#v}"
+          if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must match major.minor.patch"
+            exit 1
+          fi
+
+          TAG="chart-v${VERSION}"
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} already exists locally"
+            exit 1
+          fi
+          if git ls-remote --tags origin "${TAG}" | grep -q "${TAG}$"; then
+            echo "::error::Tag ${TAG} already exists on origin"
+            exit 1
+          fi
+
+          CHART_FILE="helm/classifyre/Chart.yaml"
+          current=$(grep -m1 "^version:" "${CHART_FILE}" | awk '{print $2}')
+          if [ "${current}" = "${VERSION}" ]; then
+            echo "::error::Chart is already at version ${VERSION}"
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "current_version=${current}" >> "${GITHUB_OUTPUT}"
+
+      - name: Update Chart.yaml version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Bump `version` only — `appVersion` (the deployed image tag) is intentionally left unchanged.
+          sed -i "s/^version:.*/version: ${VERSION}/" helm/classifyre/Chart.yaml
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint chart
+        run: helm lint helm/classifyre
+
+      - name: Commit and tag
+        id: commit
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add helm/classifyre/Chart.yaml
+          git commit -m "chore(helm): ${TAG}"
+          git tag "${TAG}"
+          git push origin HEAD:main
+          git push origin "${TAG}"
+
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Package and push chart
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO: ghcr.io/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          helm package helm/classifyre
+          helm push "classifyre-${VERSION}.tgz" "oci://${REPO}/charts"
+          echo "Published oci://${REPO}/charts/classifyre:${VERSION}"

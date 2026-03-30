@@ -1,0 +1,12 @@
+Patient Intake Notes
+====================
+
+Name: John Doe
+Email: john.doe@example.com
+Secondary Email: j.doe+alerts@corp-example.org
+Phone: +1 (415) 555-0132
+SSN: 123-45-6789
+Credit Card: 4111 1111 1111 1111
+Home IP: 203.0.113.42
+
+This document intentionally contains synthetic PII-like values for integration testing.

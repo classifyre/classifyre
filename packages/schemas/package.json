@@ -1,0 +1,30 @@
+{
+  "name": "@workspace/schemas",
+  "version": "0.2.24",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./source-docs": "./src/source-docs.ts",
+    "./detector-docs": "./src/detector-docs.ts",
+    "./assistant": "./src/assistant.ts",
+    "./package.json": "./package.json",
+    "./all_input_sources": "./src/schemas/all_input_sources.json",
+    "./all_detectors": "./src/schemas/all_detectors.json",
+    "./single_asset_scan_results": "./src/schemas/single_asset_scan_results.json",
+    "./all_input_examples": "./src/schemas/all_input_examples.json",
+    "./all_detectors_examples": "./src/schemas/all_detectors_examples.json",
+    "./assistant_knowledge": "./src/schemas/assistant_knowledge.json",
+    "./assistant_contexts": "./src/schemas/assistant_contexts.json"
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "scripts": {
+    "validate-examples": "uv run python scripts/validate_examples.py",
+    "codegen": "bun run validate-examples"
+  }
+}

@@ -1,0 +1,75 @@
+---
+sidebarTitle: Get Started
+icon: ChevronRightIcon
+title: Get Started
+description: Install, run, and export the docs app with Nextra Docs Theme.
+---
+
+import { Steps } from "nextra/components"
+import { Badge, Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components"
+
+# Get Started
+
+Nextra Docs Theme gives this app a production-grade docs shell with:
+
+- top navigation
+- searchable content
+- sidebar navigation
+- table of contents
+
+<Badge variant="secondary">Theme: nextra-theme-docs</Badge>
+
+<Steps>
+
+### Install
+
+Use Bun in the monorepo root:
+
+```sh
+bun install
+```
+
+Then verify docs dependencies:
+
+```sh
+bun --filter @classifyre/docs run lint
+bun --filter @classifyre/docs run check-types
+```
+
+### Run docs locally
+
+```sh
+bun --filter @classifyre/docs run dev
+```
+
+Docs run on `http://localhost:3002` during development.
+
+Production exports target `/docs` by default so they can be mounted inside the web bundle.
+
+### Export static docs
+
+```sh
+bun --filter @classifyre/docs run build
+```
+
+This generates static output in `apps/docs/out`.
+
+### Sync into web bundle
+
+```sh
+bun run docs:sync
+```
+
+The sync script copies docs export into `apps/web/public/docs`.
+
+</Steps>
+
+<Card className="panel-card mt-8">
+  <CardHeader>
+    <CardTitle>Why this setup</CardTitle>
+  </CardHeader>
+  <CardContent>
+    We keep docs as a dedicated app for clean ownership while publishing it through
+    the existing web deployment under `/docs`.
+  </CardContent>
+</Card>

@@ -1,0 +1,24 @@
+{{- $validPostgresModes := list "external" "cnpg" "embedded" -}}
+{{- if not (has .Values.postgres.mode $validPostgresModes) -}}
+{{- fail (printf "postgres.mode must be one of: %s" (join ", " $validPostgresModes)) -}}
+{{- end -}}
+
+{{- $validCleanupPolicies := list "none" "failed" "always" -}}
+{{- if not (has .Values.api.cliJobs.cleanupPolicy $validCleanupPolicies) -}}
+{{- fail (printf "api.cliJobs.cleanupPolicy must be one of: %s" (join ", " $validCleanupPolicies)) -}}
+{{- end -}}
+
+{{- if not .Values.api.maskedConfigEncryption.secretKey -}}
+{{- fail "api.maskedConfigEncryption.secretKey must not be empty" -}}
+{{- end -}}
+
+{{- if and (not .Values.api.maskedConfigEncryption.existingSecret) (not .Values.api.maskedConfigEncryption.autoGenerate) (not .Values.api.maskedConfigEncryption.value) -}}
+{{- fail "api.maskedConfigEncryption requires either existingSecret, value, or autoGenerate=true" -}}
+{{- end -}}
+
+{{- if and .Values.ingress.enabled (empty .Values.ingress.host) -}}
+{{- fail "ingress.host is required when ingress.enabled=true" -}}
+{{- end -}}
+
+{{- /* Production reminder: when postgres.mode=external, set postgres.connection.sslMode to
+     "require" or "verify-full". The default "disable" is intentional for embedded/local installs. */ -}}

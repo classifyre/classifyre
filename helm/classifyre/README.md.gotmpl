@@ -1,0 +1,68 @@
+{{ template "chart.header" . }}
+
+{{ template "chart.description" . }}
+
+## Purpose
+
+This chart deploys Classifyre API and Web services with Kubernetes-native CLI job execution.
+
+## Production Guidance
+
+1. Use dedicated images for API, Web, and CLI jobs.
+2. Prefer `postgres.mode=external` or `postgres.mode=cnpg` for production environments.
+3. Treat `postgres.mode=embedded` as local/dev convenience.
+4. Pin image tags to immutable versions (avoid `latest`).
+5. Configure ingress TLS, resource requests/limits, and scheduling policy per environment.
+6. Configure `CLASSIFYRE_MASKED_CONFIG_KEY` through Helm-managed or existing Kubernetes Secret.
+
+## Masked Config Encryption Key (Production)
+
+The API requires `CLASSIFYRE_MASKED_CONFIG_KEY` to encrypt/decrypt source `masked` fields.
+
+### Option A: Existing Secret (recommended)
+
+```bash
+kubectl -n classifyre create secret generic classifyre-api-secrets \
+  --from-literal=CLASSIFYRE_MASKED_CONFIG_KEY="$(openssl rand -base64 32)"
+
+helm upgrade --install classifyre ./helm/classifyre \
+  -n classifyre \
+  --set api.maskedConfigEncryption.existingSecret='classifyre-api-secrets' \
+  --set api.maskedConfigEncryption.secretKey='CLASSIFYRE_MASKED_CONFIG_KEY'
+```
+
+### Option B: Chart-managed Secret
+
+- Set `api.maskedConfigEncryption.value` explicitly, or
+- Leave `api.maskedConfigEncryption.autoGenerate=true` (default) to generate a random key.
+
+The chart uses `lookup` to reuse an existing generated key on upgrades.
+
+## Quick Start (External Postgres)
+
+```bash
+kubectl create namespace classifyre
+kubectl -n classifyre create secret generic classifyre-db --from-literal=password='<db-password>'
+
+helm upgrade --install classifyre ./helm/classifyre \
+  -n classifyre \
+  --set postgres.mode=external \
+  --set postgres.external.host='<db-host>' \
+  --set postgres.external.port=5432 \
+  --set postgres.external.database='classifyre' \
+  --set postgres.external.username='classifyre' \
+  --set postgres.external.existingSecret='classifyre-db' \
+  --set postgres.external.existingSecretPasswordKey='password'
+```
+
+## Quick Start (CloudNativePG)
+
+```bash
+helm upgrade --install classifyre ./helm/classifyre \
+  -n classifyre \
+  --create-namespace \
+  --set postgres.mode=cnpg \
+  --set postgres.cnpg.appPassword='<app-password>'
+```
+
+{{ template "chart.valuesSection" . }}

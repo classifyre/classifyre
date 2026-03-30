@@ -1,0 +1,32 @@
+---
+title: Docker Bundle
+description: How docs are bundled into the existing web image with no new pod.
+---
+
+import { Badge, Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components"
+
+# Docker Bundle
+
+<Badge variant="secondary">No extra deployment</Badge>
+
+The docs app is exported as static files and copied into the existing web app
+public directory:
+
+- source: `apps/docs/out/docs/*`
+- target: `apps/web/public/docs/*`
+
+This keeps runtime topology unchanged:
+
+- no new web pod
+- no extra service
+- docs available under `/docs`
+
+<Card className="panel-card mt-8">
+  <CardHeader>
+    <CardTitle>Build flow</CardTitle>
+  </CardHeader>
+  <CardContent>
+    CI runs `bun run docs:bundle`, which builds docs and syncs artifacts before
+    web dist upload.
+  </CardContent>
+</Card>

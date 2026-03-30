@@ -1,0 +1,73 @@
+api:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+  image:
+    repository: localhost:5000/unstructured/api
+    tag: main
+    pullPolicy: IfNotPresent
+
+  workingDir: /app/api
+  startCommand: node dist/src/main.js
+
+  migration:
+    enabled: true
+    script: prisma migrate deploy --schema /app/api/prisma/schema.prisma
+
+  cliJobs:
+    enabled: true
+    image:
+      repository: localhost:5000/unstructured/cli
+      tag: main
+      pullPolicy: IfNotPresent
+    workDir: /app/apps/cli
+    uvCache:
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+      size: 5Gi
+    playwrightCache:
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+      size: 5Gi
+
+  runnerLogs:
+    enabled: true
+    accessModes:
+      - ReadWriteOnce
+    size: 5Gi
+
+frontend:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+  image:
+    repository: localhost:5000/unstructured/web
+    tag: main
+    pullPolicy: IfNotPresent
+
+  startCommand: node /app/apps/web/server.js
+
+  podSecurityContext: {}
+  containerSecurityContext: {}
+
+ingress:
+  enabled: false
+
+postgres:
+  mode: embedded
+  embedded:
+    database: classifyre
+    username: postgres
+    password: postgres
+    persistence:
+      enabled: false
+
+priorityClasses:
+  create: false
+
+networkPolicy:
+  enabled: false

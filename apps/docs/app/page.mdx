@@ -1,0 +1,113 @@
+---
+title: Classifyre Docs
+description: Core documentation for setup, bundling, and SEO strategy.
+---
+
+import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Separator } from "@workspace/ui/components"
+
+# Classifyre Docs
+
+<Badge variant="secondary">Static Export · Nextra Docs Theme</Badge>
+
+This docs app is statically exported and bundled into the existing `@classifyre/web`
+image under `/docs` with no extra deployment.
+
+<Separator className="my-8" />
+
+<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+  <Card className="panel-card">
+    <CardHeader>
+      <CardTitle>Get Started</CardTitle>
+      <CardDescription>Install and run docs locally with Nextra.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <Button asChild variant="secondary" className="w-full">
+        <a href="get-started/">Open page</a>
+      </Button>
+    </CardContent>
+  </Card>
+
+  <Card className="panel-card">
+    <CardHeader>
+      <CardTitle>Docker Bundle</CardTitle>
+      <CardDescription>How docs land in the existing web bundle.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <Button asChild variant="secondary" className="w-full">
+        <a href="docker-bundle/">Open page</a>
+      </Button>
+    </CardContent>
+  </Card>
+
+  <Card className="panel-card">
+    <CardHeader>
+      <CardTitle>SEO & Sitemap</CardTitle>
+      <CardDescription>Robots, sitemap, and structured metadata shape.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <Button asChild variant="secondary" className="w-full">
+        <a href="seo-sitemap/">Open page</a>
+      </Button>
+    </CardContent>
+  </Card>
+
+  <Card className="panel-card">
+    <CardHeader>
+      <CardTitle>Kubernetes Deployment</CardTitle>
+      <CardDescription>Helm-based install patterns, images, secrets, and production modes.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <Button asChild variant="secondary" className="w-full">
+        <a href="deployment/kubernetes/">Open page</a>
+      </Button>
+    </CardContent>
+  </Card>
+
+  <Card className="panel-card">
+    <CardHeader>
+      <CardTitle>Chart Publishing</CardTitle>
+      <CardDescription>Release workflow, chart-only publishing, and version/tag conventions.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <Button asChild variant="secondary" className="w-full">
+        <a href="deployment/publishing/">Open page</a>
+      </Button>
+    </CardContent>
+  </Card>
+
+  <Card className="panel-card">
+    <CardHeader>
+      <CardTitle>Sources Reference</CardTitle>
+      <CardDescription>Auto-generated source schema table, JSON, and examples.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <Button asChild variant="secondary" className="w-full">
+        <a href="sources/">Open page</a>
+      </Button>
+    </CardContent>
+  </Card>
+
+  <Card className="panel-card">
+    <CardHeader>
+      <CardTitle>MCP Server</CardTitle>
+      <CardDescription>Bearer token auth, client setup, and capability map.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <Button asChild variant="secondary" className="w-full">
+        <a href="mcp-server/">Open page</a>
+      </Button>
+    </CardContent>
+  </Card>
+
+  <Card className="panel-card">
+    <CardHeader>
+      <CardTitle>Semantic Layer</CardTitle>
+      <CardDescription>Business glossary, governed metrics, dimensions, and query engine.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <Button asChild variant="secondary" className="w-full">
+        <a href="semantic-layer/">Open page</a>
+      </Button>
+    </CardContent>
+  </Card>
+</div>

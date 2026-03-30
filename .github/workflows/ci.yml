@@ -1,0 +1,319 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.event_name == 'workflow_call' && format('ci-gate-{0}', github.run_id) || format('{0}-{1}-{2}', github.workflow, github.event_name, github.ref) }}
+  cancel-in-progress: true
+
+env:
+  DOCKER_PLATFORMS: linux/amd64,linux/arm64
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Remove local Python virtualenvs
+        run: rm -rf apps/cli/.venv packages/schemas/.venv
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            apps/cli/pyproject.toml
+            apps/cli/uv.lock
+            packages/schemas/pyproject.toml
+            packages/schemas/uv.lock
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate code
+        run: bun run codegen
+
+      - name: Verify generated files are committed
+        run: |
+          if ! git diff --quiet -- \
+            packages/api-client/src/generated \
+            apps/cli/src/models/generated_input.py \
+            apps/cli/src/models/generated_detectors.py \
+            apps/cli/src/models/generated_single_asset_scan_results.py; then
+            echo "::error::Generated files are out of date. Run 'bun run codegen' and commit changes."
+            git status --short -- \
+              packages/api-client/src/generated \
+              apps/cli/src/models/generated_input.py \
+              apps/cli/src/models/generated_detectors.py \
+              apps/cli/src/models/generated_single_asset_scan_results.py
+            git diff --stat -- \
+              packages/api-client/src/generated \
+              apps/cli/src/models/generated_input.py \
+              apps/cli/src/models/generated_detectors.py \
+              apps/cli/src/models/generated_single_asset_scan_results.py
+            exit 1
+          fi
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Build
+        run: bun run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
+      - name: Install Playwright browsers
+        run: cd apps/web && bunx playwright install --with-deps chromium
+
+      - name: Unit tests
+        run: bun run test
+
+      - name: Stage CI artifacts
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          # Ensure static docs are exported and synced into web public assets.
+          bun run docs:bundle
+
+          mkdir -p /tmp/api-dist /tmp/codegen /tmp/web-dist/standalone /tmp/web-dist/static /tmp/web-dist/public
+          cp -r apps/api/dist/. /tmp/api-dist/
+          cp -r packages/api-client/src/generated/. /tmp/codegen/
+
+          # Resolve bun's .bun/ symlinks before upload.
+          # upload-artifact excludes dotfile dirs (.bun/) which makes bun's
+          # node_modules/ symlinks dangling in the downloaded artifact.
+          # cp -rL follows symlinks, producing real directories instead.
+          cp -rL apps/web/.next/standalone/. /tmp/web-dist/standalone/
+          cp -r apps/web/.next/static/. /tmp/web-dist/static/
+
+
+          # Preserve public/ dir: upload-artifact excludes dotfiles like .gitkeep
+          # which makes empty dirs disappear; marker is removed in the Dockerfile.
+          touch /tmp/web-dist/public/_ci_dir_marker
+          cp -r apps/web/public/. /tmp/web-dist/public/ 2>/dev/null || true
+
+      - name: Upload api build
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-build
+          path: /tmp/api-dist
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload codegen
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: codegen
+          path: /tmp/codegen
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload web dist
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: /tmp/web-dist
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  docker:
+    name: Build ${{ matrix.name }} (linux/amd64,linux/arm64)
+    needs: [validate]
+    if: github.event_name != 'workflow_call' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: all-in-one
+            image: ghcr.io/${{ github.repository }}
+            target: runtime
+          - name: web
+            image: ghcr.io/${{ github.repository }}/web
+            target: web-final
+          - name: api
+            image: ghcr.io/${{ github.repository }}/api
+            target: api-final
+          - name: cli
+            image: ghcr.io/${{ github.repository }}/cli
+            target: cli-final
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download api build
+        uses: actions/download-artifact@v4
+        with:
+          name: api-build
+          path: api-dist
+
+      - name: Download codegen
+        uses: actions/download-artifact@v4
+        with:
+          name: codegen
+          path: codegen
+
+      - name: Download web dist
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web-dist
+
+      - name: Free disk space for all-in-one build
+        if: matrix.name == 'all-in-one'
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/lib/android
+          docker system prune -af || true
+          df -h
+
+      - name: Set up QEMU
+        # Skip QEMU when running locally with act: Docker Desktop uses Rosetta 2
+        # for linux/amd64 builds on Apple Silicon, which is stable. Installing
+        # QEMU binfmt handlers overrides Rosetta 2 and causes bun (in api-builder)
+        # to SIGSEGV inside linux/amd64 containers on an arm64 host.
+        if: ${{ !env.ACT }}
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64,amd64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # GHCR_PAT: optional classic PAT with write:packages scope.
+          # Set in .secrets for local act runs when the gh OAuth token lacks write:packages.
+          # Real GitHub Actions uses GITHUB_TOKEN (auto-provisioned with packages:write).
+          password: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tag
+        id: tag
+        run: echo "value=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract metadata
+        id: meta
+        if: ${{ !env.ACT }}
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ matrix.image }}
+          tags: |
+            type=raw,value=${{ steps.tag.outputs.value }},enable=${{ !startsWith(github.ref, 'refs/tags/') }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Extract metadata (act fallback)
+        id: meta_act
+        if: ${{ env.ACT }}
+        run: |
+          echo "tags=${{ matrix.image }}:${{ steps.tag.outputs.value }}" >> "$GITHUB_OUTPUT"
+          echo "labels=" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          platforms: ${{ env.DOCKER_PLATFORMS }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags || steps.meta_act.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels || steps.meta_act.outputs.labels }}
+          build-contexts: |
+            api-dist=${{ github.workspace }}/api-dist
+            codegen=${{ github.workspace }}/codegen
+            web-dist=${{ github.workspace }}/web-dist
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:build-cache-${{ matrix.name }}
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:build-cache-${{ matrix.name }},mode=max,image-manifest=true
+
+  cleanup:
+    name: Delete branch images
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete branch container images
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          REPO="${{ github.event.repository.name }}"
+          BRANCH_TAG="${{ github.head_ref }}"
+          BRANCH_TAG="${BRANCH_TAG//\//-}"
+
+          # Skip cleanup for fork PRs — head_ref from a fork can collide with
+          # long-lived tags (e.g. a fork branch named 'main' would delete the
+          # shared production image tag used for normal builds/releases).
+          if [[ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
+            echo "Skipping cleanup: PR is from a fork (head ref: ${BRANCH_TAG})"
+            exit 0
+          fi
+
+          # Guard against accidental deletion of protected long-lived tags in
+          # case a same-repo branch name ever collides with one.
+          PROTECTED_TAGS="main master latest"
+          for protected in $PROTECTED_TAGS; do
+            if [[ "${BRANCH_TAG}" == "${protected}" ]]; then
+              echo "Skipping cleanup: BRANCH_TAG '${BRANCH_TAG}' matches protected tag '${protected}'"
+              exit 0
+            fi
+          done
+
+          delete_tag() {
+            local pkg_raw="$1"
+            local pkg_enc
+            pkg_enc=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))" <<< "${pkg_raw}")
+
+            local ids
+            ids=$(gh api "/users/${OWNER}/packages/container/${pkg_enc}/versions" \
+              --jq ".[] | select((.metadata.container.tags // []) | index(\"${BRANCH_TAG}\") != null) | .id" 2>/dev/null || true)
+
+            for id in $ids; do
+              if gh api --method DELETE "/users/${OWNER}/packages/container/${pkg_enc}/versions/${id}"; then
+                echo "Deleted ${pkg_raw}:${BRANCH_TAG}"
+              fi
+            done
+          }
+
+          delete_tag "${REPO}"
+          delete_tag "${REPO}/web"
+          delete_tag "${REPO}/api"
+          delete_tag "${REPO}/cli"

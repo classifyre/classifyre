@@ -1,0 +1,142 @@
+{{- if .Values.api.cliJobs.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "classifyre.api.fullname" . }}-cli-job-template
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+data:
+  job-template.json: |
+    {
+      "apiVersion": "batch/v1",
+      "kind": "Job",
+      "spec": {
+        "backoffLimit": {{ .Values.api.cliJobs.backoffLimit }},
+        "activeDeadlineSeconds": {{ .Values.api.cliJobs.activeDeadlineSeconds }},
+        "ttlSecondsAfterFinished": {{ .Values.api.cliJobs.ttlSecondsAfterFinished }},
+        "template": {
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/name": "{{ include "classifyre.name" . }}",
+              "app.kubernetes.io/instance": "{{ .Release.Name }}",
+              "app.kubernetes.io/managed-by": "{{ .Release.Service }}",
+              "app.kubernetes.io/component": "cli-job"
+            }
+          },
+          "spec": {
+            "restartPolicy": "Never",
+            "serviceAccountName": "{{ default (include "classifyre.serviceAccountName" .) .Values.api.cliJobs.serviceAccountName }}",
+            "automountServiceAccountToken": {{ .Values.api.cliJobs.automountServiceAccountToken }},
+            "imagePullSecrets": {{ .Values.imagePullSecrets | toJson }},
+            "priorityClassName": {{ .Values.api.cliJobs.priorityClassName | quote }},
+            "nodeSelector": {{ .Values.api.cliJobs.nodeSelector | toJson }},
+            "tolerations": {{ .Values.api.cliJobs.tolerations | toJson }},
+            "affinity": {{ .Values.api.cliJobs.affinity | toJson }},
+            "securityContext": {{ .Values.api.cliJobs.podSecurityContext | toJson }},
+            "containers": [
+              {
+                "name": "cli",
+                "image": "{{ .Values.api.cliJobs.image.repository }}:{{ .Values.api.cliJobs.image.tag | default .Chart.AppVersion }}",
+                "imagePullPolicy": "{{ .Values.api.cliJobs.image.pullPolicy }}",
+                "resources": {{ .Values.api.cliJobs.resources | toJson }},
+                "securityContext": {{ .Values.api.cliJobs.containerSecurityContext | toJson }},
+                "env": [
+                  {
+                    "name": "CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS",
+                    "value": "{{ ternary "1" "0" .Values.api.cliJobs.autoInstallOptionalDeps }}"
+                  },
+                  {
+                    "name": "CLASSIFYRE_OUTPUT_REST_URL",
+                    "value": "http://{{ include "classifyre.api.fullname" . }}:{{ .Values.api.service.port }}"
+                  },
+                  {
+                    "name": "CLASSIFYRE_OUTPUT_BATCH_SIZE",
+                    "value": "20"
+                  },
+                  {
+                    "name": "CRAWL4_AI_BASE_DIRECTORY",
+                    "value": "/tmp"
+                  },
+                  {
+                    "name": "HOME",
+                    "value": "/tmp"
+                  }
+                  {{- if .Values.api.cliJobs.uvCache.enabled }},
+                  {
+                    "name": "UV_CACHE_DIR",
+                    "value": "{{ .Values.api.cliJobs.uvCache.mountPath }}"
+                  }
+                  {{- end }}
+                  {{- if .Values.api.cliJobs.playwrightCache.enabled }},
+                  {
+                    "name": "PLAYWRIGHT_BROWSERS_PATH",
+                    "value": "{{ .Values.api.cliJobs.playwrightCache.mountPath }}"
+                  }
+                  {{- end }}
+                  {{- range .Values.api.cliJobs.extraEnv }},
+                  {{ . | toJson }}
+                  {{- end }}
+                ],
+                "volumeMounts": [
+                  {{- $hasPrev := false -}}
+                  {{- if .Values.api.cliJobs.uvCache.enabled }}
+                  {
+                    "name": "uv-cache",
+                    "mountPath": "{{ .Values.api.cliJobs.uvCache.mountPath }}"
+                  }
+                  {{- $hasPrev = true -}}
+                  {{- end }}
+                  {{- if .Values.api.cliJobs.playwrightCache.enabled }}
+                  {{- if $hasPrev }},{{- end }}
+                  {
+                    "name": "playwright-cache",
+                    "mountPath": "{{ .Values.api.cliJobs.playwrightCache.mountPath }}"
+                  }
+                  {{- $hasPrev = true -}}
+                  {{- end }}
+                  {{- if .Values.api.runnerLogs.enabled }}
+                  {{- if $hasPrev }},{{- end }}
+                  {
+                    "name": "runner-logs",
+                    "mountPath": "{{ .Values.api.runnerLogs.mountPath }}"
+                  }
+                  {{- end }}
+                ]
+              }
+            ],
+            "volumes": [
+              {{- $hasPrevVol := false -}}
+              {{- if .Values.api.cliJobs.uvCache.enabled }}
+              {
+                "name": "uv-cache",
+                "persistentVolumeClaim": {
+                  "claimName": "{{ default (printf "%s-cli-uv-cache" (include "classifyre.fullname" .)) .Values.api.cliJobs.uvCache.existingClaim }}"
+                }
+              }
+              {{- $hasPrevVol = true -}}
+              {{- end }}
+              {{- if .Values.api.cliJobs.playwrightCache.enabled }}
+              {{- if $hasPrevVol }},{{- end }}
+              {
+                "name": "playwright-cache",
+                "persistentVolumeClaim": {
+                  "claimName": "{{ default (printf "%s-cli-playwright-cache" (include "classifyre.fullname" .)) .Values.api.cliJobs.playwrightCache.existingClaim }}"
+                }
+              }
+              {{- $hasPrevVol = true -}}
+              {{- end }}
+              {{- if .Values.api.runnerLogs.enabled }}
+              {{- if $hasPrevVol }},{{- end }}
+              {
+                "name": "runner-logs",
+                "persistentVolumeClaim": {
+                  "claimName": "{{ default (printf "%s-runner-logs" (include "classifyre.fullname" .)) .Values.api.runnerLogs.existingClaim }}"
+                }
+              }
+              {{- end }}
+            ]
+          }
+        }
+      }
+    }
+{{- end }}

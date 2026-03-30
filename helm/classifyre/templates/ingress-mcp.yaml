@@ -1,0 +1,40 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "classifyre.fullname" . }}-mcp
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "classifyre.api.fullname" . }}
+                port:
+                  number: {{ .Values.api.service.port }}
+          - path: /api/mcp
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "classifyre.api.fullname" . }}
+                port:
+                  number: {{ .Values.api.service.port }}
+{{- end }}

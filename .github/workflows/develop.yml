@@ -1,0 +1,79 @@
+name: Develop
+
+# Triggered after the CI workflow completes successfully on the develop branch.
+# CI (ci.yml) already runs on every push and builds/pushes the :develop Docker
+# image. This workflow runs afterwards and deploys it to the classifyre-develop
+# namespace on the VPS.
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [develop]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (default: develop)"
+        required: false
+        default: "develop"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-develop:
+    name: Deploy to develop
+    runs-on: ubuntu-latest
+    # For workflow_run: only deploy when CI succeeded.
+    # For workflow_dispatch: always run.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    env:
+      HELM_RELEASE_NAME: classifyre-develop
+      HELM_NAMESPACE: classifyre-develop
+      HELM_VALUES_FILE: ./helm/classifyre/values-vps-develop.yaml
+      IMAGE_TAG: ${{ inputs.image_tag || 'develop' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # For workflow_run, check out the develop branch HEAD, not the CI run's commit.
+          ref: develop
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Configure kubeconfig
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.kube
+          printf '%s' "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Verify cluster access
+        run: kubectl cluster-info
+
+      - name: Deploy develop with Helm
+        run: |
+          set -euo pipefail
+
+          helm upgrade --install "${HELM_RELEASE_NAME}" ./helm/classifyre \
+            --namespace "${HELM_NAMESPACE}" \
+            --create-namespace \
+            -f "${HELM_VALUES_FILE}" \
+            --set api.image.tag="${IMAGE_TAG}" \
+            --set api.cliJobs.image.tag="${IMAGE_TAG}" \
+            --set frontend.image.tag="${IMAGE_TAG}" \
+            --wait \
+            --timeout 15m
+
+      - name: Show rollout status
+        run: |
+          set -euo pipefail
+          kubectl -n "${HELM_NAMESPACE}" get deploy,pods,svc
+          helm status "${HELM_RELEASE_NAME}" -n "${HELM_NAMESPACE}"

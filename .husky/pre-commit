@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+# Verify i18n translation files are in sync (same keys, same order) before every commit.
+# Fails fast if any language file is missing a key, has an extra key, or keys are out of order.
+
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+CLASSIFYRE="$REPO_ROOT"
+
+echo "Checking i18n key parity (web)..."
+cd "$CLASSIFYRE/apps/web"
+node_modules/.bin/jest lib/i18n-keys.spec.ts --no-coverage --silent
+echo "Web i18n OK"
+
+echo "Checking i18n key parity (api)..."
+cd "$CLASSIFYRE/apps/api"
+npx jest src/i18n/i18n-keys.spec.ts --no-coverage --silent
+echo "API i18n OK"

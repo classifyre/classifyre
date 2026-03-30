@@ -1,0 +1,86 @@
+---
+title: Notifications
+sidebarTitle: Notifications
+description: How Classifyre alerts you to scan failures, anomalies, and new sources — and what to do when you see one.
+---
+
+import { NotificationCenter, SeverityBadge } from "@workspace/ui/components"
+import { Badge, Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components"
+import { NOTIFICATION_EVENTS } from "@workspace/ui/mocks/notification-events"
+
+# Notifications
+
+Classifyre is quiet by default. If you're not hearing from it, everything is running normally. Notifications only appear when something genuinely needs your attention — a scan failing, unusual activity, or a milestone worth knowing about.
+
+## The Bell
+
+The notification bell lives in the top-right corner of the app. A red badge shows how many unread notifications you have. Click it to see your latest alerts.
+
+<div className="my-8 flex flex-col gap-6 rounded-lg border-2 border-border bg-muted/30 p-6 sm:flex-row sm:items-start">
+  <div className="flex flex-col items-start gap-2">
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Live preview</p>
+    <NotificationCenter />
+    <p className="text-xs text-muted-foreground">Click the bell above to open it</p>
+  </div>
+  <div className="flex flex-col gap-3 text-sm">
+    <div>
+      <p className="font-semibold">Badge number</p>
+      <p className="text-muted-foreground">How many unread notifications you have. Disappears when everything is read.</p>
+    </div>
+    <div>
+      <p className="font-semibold">Coloured background</p>
+      <p className="text-muted-foreground">Unread items are highlighted based on severity — red for high, yellow for medium, and so on.</p>
+    </div>
+    <div>
+      <p className="font-semibold">Mark all read</p>
+      <p className="text-muted-foreground">Clears the badge and marks every item as read in one click.</p>
+    </div>
+  </div>
+</div>
+
+## What Triggers a Notification
+
+Only five events send a notification. Everything else is intentionally silent — a successful scan with no anomalies produces no noise.
+
+<div className="my-8 flex flex-col gap-4">
+  {NOTIFICATION_EVENTS.map((ev) => (
+    <Card key={ev.event} className="panel-card">
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <SeverityBadge severity={ev.severity.toLowerCase()} />
+          <Badge variant="outline" className="font-mono text-xs">{ev.type}</Badge>
+        </div>
+        <CardTitle className="mt-2 text-base">{ev.label}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">{ev.description}</p>
+        <blockquote>{ev.guidance}</blockquote>
+      </CardContent>
+    </Card>
+  ))}
+</div>
+
+## Severity Levels
+
+Each notification has a severity that reflects how urgently it needs your attention.
+
+| Level | Colour | What it signals | Events |
+|---|---|---|---|
+| **High** | Orange–red | Needs attention soon | Scan Failed, Findings Spike |
+| **Medium** | Yellow | Worth investigating | Large Drop in Findings |
+| **Info** | Grey | Good news or FYI | Scan Recovered, First Scan Complete |
+
+High-severity notifications are also marked as **Important** automatically, so they stay visible even after you read them. You can toggle the Important flag on any notification manually.
+
+## The Notifications Page
+
+The bell shows your most recent alerts. For the full history — with filtering by severity, type, and read status — open the **Notifications** page from the sidebar.
+
+From there you can:
+
+- Filter by severity, type, or source
+- Mark a subset as read using the active filters
+- Dismiss notifications you no longer need
+- Pin notifications as Important to keep them accessible
+
+Notifications are stored indefinitely and are not automatically deleted, so you can always look back at when a source first failed or when an anomaly was detected.

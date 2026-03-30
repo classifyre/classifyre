@@ -1,0 +1,194 @@
+---
+title: Governed Metrics
+description: Centrally defined metric definitions with governance, certification, and dimension controls.
+---
+
+import { Badge } from "@workspace/ui/components"
+
+# Governed Metrics
+
+<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+  Configuration Guide
+</Badge>
+
+Governed metrics ensure that key business numbers are calculated the same way everywhere.
+Whether a metric appears on a dashboard, is returned by the API, or is queried by an MCP
+tool, the definition is the same.
+
+## Metric Types
+
+### SIMPLE
+
+Performs a single aggregation over findings or assets.
+
+```json
+{
+  "aggregation": "COUNT",
+  "entity": "finding",
+  "filters": {
+    "statuses": ["OPEN"]
+  }
+}
+```
+
+**Supported aggregations:** `COUNT`, `COUNT_DISTINCT`, `SUM`, `AVG`, `MIN`, `MAX`
+
+**Supported entities:** `finding`, `asset`
+
+For aggregations other than `COUNT`, a `field` parameter is required:
+
+```json
+{
+  "aggregation": "AVG",
+  "entity": "finding",
+  "field": "confidence"
+}
+```
+
+### RATIO
+
+Divides a numerator by a denominator. Each side can be an inline definition or
+a reference to another metric by slug.
+
+```json
+{
+  "numerator": {
+    "aggregation": "COUNT",
+    "entity": "finding",
+    "filters": { "statuses": ["FALSE_POSITIVE"] }
+  },
+  "denominator": {
+    "aggregation": "COUNT",
+    "entity": "finding"
+  }
+}
+```
+
+If the denominator evaluates to zero, the result is `null` (not infinity).
+
+### DERIVED
+
+Combines other metrics using an arithmetic formula. Input metrics are evaluated
+first, then slugs (with hyphens replaced by underscores) are substituted into
+the formula.
+
+```json
+{
+  "formula": "open_findings * 100 / total_findings",
+  "inputs": ["open-findings", "total-findings"]
+}
+```
+
+### TREND
+
+Compares a base metric across two time windows to calculate period-over-period
+change as a ratio.
+
+```json
+{
+  "baseMetricSlug": "total-findings",
+  "compareWindow": "7d",
+  "currentWindow": "7d"
+}
+```
+
+**Supported window formats:** `Nd` (days), `Nh` (hours), `Nw` (weeks), `Nm` (months)
+
+The result is `(current - previous) / |previous|`. A value of `0.12` means +12% change.
+
+## Governance Lifecycle
+
+```
+DRAFT  ──[certify]──>  ACTIVE  ──[deprecate]──>  DEPRECATED
+```
+
+| Status | Meaning |
+|---|---|
+| **DRAFT** | In development. Can be edited freely. Not guaranteed to be stable. |
+| **ACTIVE** | Certified for production use. Carries `certifiedBy` and `certifiedAt` metadata. |
+| **DEPRECATED** | No longer recommended. Kept for backwards compatibility. |
+
+### Certifying a Metric
+
+```bash
+POST /semantic/metrics/:slug/certify
+Content-Type: application/json
+
+{
+  "certifiedBy": "security-team-lead"
+}
+```
+
+This sets the status to `ACTIVE`, records the certifier, and timestamps the certification.
+
+## Allowed Dimensions
+
+Each metric definition declares which dimensions can slice it:
+
+```json
+{
+  "allowedDimensions": ["severity", "detectorType", "status", "category"]
+}
+```
+
+**Available dimensions:**
+
+| Dimension | Groups By |
+|---|---|
+| `severity` | Finding severity (CRITICAL, HIGH, MEDIUM, LOW, INFO) |
+| `detectorType` | Detector type enum |
+| `status` | Finding status (OPEN, RESOLVED, etc.) |
+| `findingType` | Finding type string |
+| `category` | Finding category |
+
+When querying with a dimension, the result includes both the scalar value and
+a `breakdown` array sorted by count descending.
+
+## Display Configuration
+
+| Field | Purpose | Examples |
+|---|---|---|
+| `format` | How to format the number | `number`, `percentage`, `duration` |
+| `unit` | Label shown next to the value | `findings`, `%`, `score` |
+| `color` | Optional hex color for UI rendering | `#ef4444` |
+
+## Creating a Metric
+
+Navigate to **Semantic Layer > Metrics > New** in the web app, or use the API:
+
+```bash
+curl -X POST /semantic/metrics \
+  -H "Content-Type: application/json" \
+  -d '{
+    "slug": "false-positive-rate",
+    "displayName": "False Positive Rate",
+    "description": "Percentage of findings marked as false positive",
+    "type": "RATIO",
+    "definition": {
+      "numerator": {
+        "aggregation": "COUNT",
+        "entity": "finding",
+        "filters": { "statuses": ["FALSE_POSITIVE"] }
+      },
+      "denominator": {
+        "aggregation": "COUNT",
+        "entity": "finding"
+      }
+    },
+    "allowedDimensions": ["detectorType", "category"],
+    "format": "percentage",
+    "unit": "%"
+  }'
+```
+
+## Default Metrics
+
+| Metric | Type | What It Measures |
+|---|---|---|
+| **Total Findings** | SIMPLE | Count of all findings |
+| **Open Findings** | SIMPLE | Count of findings with OPEN status |
+| **False Positive Rate** | RATIO | FALSE_POSITIVE count / total count |
+| **Resolution Rate** | RATIO | RESOLVED count / total count |
+| **Scan Coverage** | RATIO | Distinct assets with findings / total assets |
+| **Average Confidence** | SIMPLE | Mean confidence score across findings |
+| **Weekly Finding Trend** | TREND | Week-over-week change in total findings |

@@ -1,0 +1,26 @@
+{
+  "source.create": {
+    "title": "Source Setup Assistant",
+    "summary": "Guide source creation, patch source fields, and confirm source creation or connection testing.",
+    "supportedOperations": [
+      "create_source",
+      "test_source_connection"
+    ]
+  },
+  "source.edit": {
+    "title": "Source Edit Assistant",
+    "summary": "Refine an existing source, patch source fields, and confirm updates or connection tests.",
+    "supportedOperations": [
+      "update_source",
+      "test_source_connection"
+    ]
+  },
+  "detector.create": {
+    "title": "Detector Studio Assistant",
+    "summary": "Brainstorm detector structure, patch detector fields, and confirm detector creation or training.",
+    "supportedOperations": [
+      "create_custom_detector",
+      "train_custom_detector"
+    ]
+  }
+}

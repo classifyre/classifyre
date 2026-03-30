@@ -1,0 +1,670 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Source {
+  id                  String         @id @default(uuid())
+  name                String
+  type                AssetType
+  sourceCategory      SourceCategory @default(UNSTRUCTURED) @map("source_category")
+  config              Json
+  runnerStatus        RunnerStatus?  @default(PENDING) @map("runner_status")
+  consecutiveFailures Int            @default(0) @map("consecutive_failures")
+  lastRunStatus       RunnerStatus?  @map("last_run_status")
+  lastRunAt           DateTime?      @map("last_run_at")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+  currentRunnerId     String?        @map("current_runner_id")
+  scheduleEnabled     Boolean        @default(false) @map("schedule_enabled")
+  scheduleCron        String?        @map("schedule_cron")
+  scheduleTimezone    String?        @default("UTC") @map("schedule_timezone")
+  scheduleNextAt      DateTime?      @map("schedule_next_at")
+  assets          Asset[]
+  findings        Finding[]
+  customDetectorFeedback CustomDetectorFeedback[]
+  customDetectorTrainingRuns CustomDetectorTrainingRun[]
+  runners         Runner[]
+  notifications   Notification[]
+  customDetectorExtractions CustomDetectorExtraction[]
+
+  @@index([currentRunnerId])
+  @@index([scheduleEnabled])
+  @@map("sources")
+}
+
+model Asset {
+  id            String      @id @default(uuid())
+  hash          String
+  checksum      String
+  name          String
+  externalUrl   String      @map("external_url")
+  links         Json        @default("[]") @db.JsonB
+  assetType     AssetContentType @map("asset_type")
+  sourceType    AssetType   @map("source_type")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  sourceId      String      @map("source_id")
+  lastScannedAt DateTime?   @map("last_scanned_at")
+  runnerId      String?     @map("runner_id")
+  status        AssetStatus @default(NEW)
+  runner        Runner?     @relation(fields: [runnerId], references: [id])
+  source        Source      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  findings      Finding[]
+  customDetectorExtractions CustomDetectorExtraction[]
+
+  @@index([hash])
+  @@index([sourceType])
+  @@index([assetType])
+  @@index([externalUrl])
+  @@index([runnerId])
+  @@index([lastScannedAt])
+  @@index([sourceId])
+  @@index([status])
+  @@unique([sourceId, hash])
+  @@map("assets")
+}
+
+model Finding {
+  id                String        @id @default(uuid())
+  detectionIdentity String        @unique @map("detection_identity") @db.VarChar(64)
+
+  assetId           String        @map("asset_id")
+  sourceId          String        @map("source_id")
+  runnerId          String?       @map("runner_id")
+  detectorType      DetectorType  @map("detector_type")
+  findingType       String        @map("finding_type")
+  category          String
+  severity          Severity
+  confidence        Decimal       @db.Decimal(3, 2)
+  matchedContent    String        @map("matched_content") @db.Text
+  redactedContent   String?       @map("redacted_content") @db.Text
+  contextBefore     String?       @map("context_before") @db.Text
+  contextAfter      String?       @map("context_after") @db.Text
+  location          Json?         @db.JsonB
+  customDetectorId  String?       @map("custom_detector_id")
+  customDetectorKey String?       @map("custom_detector_key")
+  customDetectorName String?      @map("custom_detector_name")
+
+  status            FindingStatus @default(OPEN)
+  resolutionReason  String?       @map("resolution_reason") @db.Text
+  comment           String?       @db.Text
+
+  history           Json          @default("[]") @db.JsonB
+
+  detectedAt        DateTime      @map("detected_at")
+  firstDetectedAt   DateTime?     @map("first_detected_at")
+  lastDetectedAt    DateTime?     @map("last_detected_at")
+  resolvedAt        DateTime?     @map("resolved_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  asset  Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  customDetector CustomDetector? @relation(fields: [customDetectorId], references: [id], onDelete: SetNull)
+  customDetectorFeedback CustomDetectorFeedback[]
+  notifications Notification[]
+  extraction CustomDetectorExtraction?
+
+  @@index([assetId])
+  @@index([sourceId])
+  @@index([runnerId])
+  @@index([detectorType])
+  @@index([customDetectorId])
+  @@index([customDetectorKey])
+  @@index([findingType])
+  @@index([severity])
+  @@index([status])
+  @@index([detectionIdentity, status])
+  @@index([firstDetectedAt])
+  @@index([lastDetectedAt])
+  @@index([resolvedAt])
+  @@index([assetId, lastDetectedAt(sort: Desc)])
+  @@index([assetId, status, severity, detectorType, findingType])
+  @@map("findings")
+}
+
+model CustomDetectorExtraction {
+  id                String   @id @default(uuid())
+
+  findingId         String   @unique @map("finding_id")
+  customDetectorId  String?  @map("custom_detector_id")
+  customDetectorKey String   @map("custom_detector_key")
+  sourceId          String   @map("source_id")
+  assetId           String   @map("asset_id")
+  runnerId          String?  @map("runner_id")
+
+  extractionMethod  String   @map("extraction_method")
+  detectorVersion   Int      @default(1) @map("detector_version")
+  fieldCount        Int      @default(0) @map("field_count")
+  populatedFields   String[] @default([]) @map("populated_fields")
+  extractedData     Json     @db.JsonB @map("extracted_data")
+
+  extractedAt       DateTime @map("extracted_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  finding        Finding         @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  source         Source          @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  asset          Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  customDetector CustomDetector? @relation(fields: [customDetectorId], references: [id], onDelete: SetNull)
+
+  @@index([customDetectorKey])
+  @@index([customDetectorId])
+  @@index([sourceId])
+  @@index([assetId])
+  @@index([runnerId])
+  @@map("custom_detector_extractions")
+}
+
+model CustomDetectorFeedback {
+  id                 String       @id @default(uuid())
+  customDetectorId   String?      @map("custom_detector_id")
+  sourceId           String       @map("source_id")
+  customDetectorKey  String       @map("custom_detector_key")
+  customDetectorName String?      @map("custom_detector_name")
+  findingId          String?      @map("finding_id")
+  findingType        String?      @map("finding_type")
+  label              String?
+  matchedContent     String       @map("matched_content") @db.Text
+  status             FindingStatus
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  customDetector CustomDetector? @relation(fields: [customDetectorId], references: [id], onDelete: SetNull)
+  source  Source  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  finding Finding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+
+  @@index([customDetectorId])
+  @@index([sourceId, customDetectorKey])
+  @@index([findingId])
+  @@index([status])
+  @@map("custom_detector_feedback")
+}
+
+model CustomDetector {
+  id                  String                      @id @default(uuid())
+  key                 String                      @unique
+  name                String
+  description         String?                     @db.Text
+  method              CustomDetectorMethod
+  config              Json                        @db.JsonB
+  isActive            Boolean                     @default(true) @map("is_active")
+  version             Int                         @default(1)
+  lastTrainedAt       DateTime?                   @map("last_trained_at")
+  lastTrainingSummary Json?                       @map("last_training_summary") @db.JsonB
+  createdAt           DateTime                    @default(now()) @map("created_at")
+  updatedAt           DateTime                    @updatedAt @map("updated_at")
+
+  findings            Finding[]
+  feedback            CustomDetectorFeedback[]
+  trainingRuns        CustomDetectorTrainingRun[]
+  extractions         CustomDetectorExtraction[]
+  testScenarios       CustomDetectorTestScenario[]
+
+  @@index([method])
+  @@index([isActive])
+  @@map("custom_detectors")
+}
+
+model CustomDetectorTrainingRun {
+  id                String                       @id @default(uuid())
+  customDetectorId  String                       @map("custom_detector_id")
+  sourceId          String?                      @map("source_id")
+  status            CustomDetectorTrainingStatus @default(PENDING)
+  strategy          String?                      @map("strategy")
+  startedAt         DateTime                     @default(now()) @map("started_at")
+  completedAt       DateTime?                    @map("completed_at")
+  durationMs        Int?                         @map("duration_ms")
+  trainedExamples   Int?                         @map("trained_examples")
+  positiveExamples  Int?                         @map("positive_examples")
+  negativeExamples  Int?                         @map("negative_examples")
+  metrics           Json?                        @db.JsonB
+  modelArtifactPath String?                      @map("model_artifact_path")
+  configHash        String?                      @map("config_hash")
+  errorMessage      String?                      @map("error_message") @db.Text
+  createdAt         DateTime                     @default(now()) @map("created_at")
+  updatedAt         DateTime                     @updatedAt @map("updated_at")
+
+  customDetector    CustomDetector               @relation(fields: [customDetectorId], references: [id], onDelete: Cascade)
+  source            Source?                      @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([customDetectorId, createdAt(sort: Desc)])
+  @@index([sourceId])
+  @@index([status])
+  @@map("custom_detector_training_runs")
+}
+
+model CustomDetectorTestScenario {
+  id              String   @id @default(uuid())
+  detectorId      String   @map("detector_id")
+  detector        CustomDetector @relation(fields: [detectorId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?  @db.Text
+  inputText       String   @map("input_text") @db.Text
+  expectedOutcome Json     @map("expected_outcome") @db.JsonB
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  results         CustomDetectorTestResult[]
+
+  @@index([detectorId])
+  @@map("custom_detector_test_scenarios")
+}
+
+model CustomDetectorTestResult {
+  id              String            @id @default(uuid())
+  scenarioId      String            @map("scenario_id")
+  scenario        CustomDetectorTestScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  detectorId      String            @map("detector_id")
+  status          TestResultStatus
+  actualOutput    Json              @map("actual_output") @db.JsonB
+  errorMessage    String?           @map("error_message") @db.Text
+  durationMs      Int?              @map("duration_ms")
+  detectorVersion Int               @map("detector_version")
+  triggeredBy     TestTrigger       @map("triggered_by")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  @@index([scenarioId, createdAt(sort: Desc)])
+  @@index([detectorId, createdAt(sort: Desc)])
+  @@map("custom_detector_test_results")
+}
+
+model Runner {
+  id              String       @id @default(uuid())
+  sourceId        String       @map("source_id")
+  triggeredAt     DateTime     @default(now()) @map("triggered_at")
+  triggeredBy     String?      @map("triggered_by")
+  triggerType     TriggerType  @default(MANUAL) @map("trigger_type")
+  executionMode   RunnerExecutionMode? @map("execution_mode")
+  status          RunnerStatus @default(PENDING)
+  startedAt       DateTime?    @map("started_at")
+  completedAt     DateTime?    @map("completed_at")
+  durationMs      Int?         @map("duration_ms")
+  assetsCreated   Int          @default(0) @map("assets_created")
+  assetsUpdated   Int          @default(0) @map("assets_updated")
+  totalFindings   Int          @default(0) @map("total_findings")
+  errorMessage    String?      @map("error_message")
+  errorDetails    Json?        @map("error_details")
+  jobName         String?      @map("job_name")
+  jobNamespace    String?      @map("job_namespace")
+  assetsUnchanged Int          @default(0) @map("assets_unchanged")
+  assetsDeleted   Int          @default(0) @map("assets_deleted")
+  assets          Asset[]
+  source          Source       @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  notifications   Notification[]
+
+  @@index([sourceId])
+  @@index([executionMode])
+  @@index([status])
+  @@index([triggeredAt])
+  @@map("runners")
+}
+
+model Notification {
+  id           String           @id @default(uuid())
+  type         NotificationType
+  event        String?
+  severity     Severity         @default(INFO)
+  title        String
+  message      String
+  actionUrl    String?          @map("action_url")
+  sourceId     String?          @map("source_id")
+  runnerId     String?          @map("runner_id")
+  findingId    String?          @map("finding_id")
+  triggeredBy  String?          @map("triggered_by")
+  isRead       Boolean          @default(false) @map("is_read")
+  readAt       DateTime?        @map("read_at")
+  isImportant  Boolean          @default(false) @map("is_important")
+  metadata     Json?            @db.JsonB
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  source    Source?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  runner    Runner?  @relation(fields: [runnerId], references: [id], onDelete: SetNull)
+  finding   Finding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([event])
+  @@index([severity])
+  @@index([sourceId])
+  @@index([runnerId])
+  @@index([findingId])
+  @@index([isRead])
+  @@index([isImportant])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model InstanceSettings {
+  id         Int              @id @default(1)
+  aiEnabled  Boolean          @default(true) @map("ai_enabled")
+  mcpEnabled Boolean          @default(true) @map("mcp_enabled")
+  language   InstanceLanguage @default(ENGLISH)
+  timezone   String           @default("UTC")
+  timeFormat InstanceTimeFormat @default(TWELVE_HOUR) @map("time_format")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  @@map("instance_settings")
+}
+
+model AiProviderConfig {
+  id        Int            @id @default(1)
+  provider  AiProviderType @default(CLAUDE)
+  model     String         @default("")
+  apiKeyEnc String?        @map("api_key_enc")
+  baseUrl   String?        @map("base_url")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  @@map("ai_provider_config")
+}
+
+enum AiProviderType {
+  OPENAI_COMPATIBLE
+  CLAUDE
+  GEMINI
+}
+
+model McpAccessToken {
+  id          String    @id
+  name        String
+  tokenHash   String    @unique @map("token_hash")
+  tokenPreview String   @map("token_preview")
+  lastUsedAt  DateTime? @map("last_used_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([revokedAt])
+  @@index([lastUsedAt])
+  @@map("mcp_access_tokens")
+}
+
+enum SourceCategory {
+  TABULAR
+  UNSTRUCTURED
+}
+
+enum AssetType {
+  JIRA
+  CONFLUENCE
+  CROWD
+  BITBUCKET
+  SERVICEDESK
+  XRAY
+  GOOGLE_DRIVE
+  GOOGLE_SHEETS
+  GOOGLE_DOCS
+  GOOGLE_SLIDES
+  WORDPRESS
+  SLACK
+  SITEMAP
+  S3_COMPATIBLE_STORAGE
+  AZURE_BLOB_STORAGE
+  GOOGLE_CLOUD_STORAGE
+  POSTGRESQL
+  MYSQL
+  MSSQL
+  ORACLE
+  HIVE
+  DATABRICKS
+  SNOWFLAKE
+  MONGODB
+  POWERBI
+  TABLEAU
+  CUSTOM
+}
+
+enum RunnerStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  ERROR
+}
+
+enum RunnerExecutionMode {
+  LOCAL
+  KUBERNETES
+  EXTERNAL
+}
+
+enum TriggerType {
+  MANUAL
+  SCHEDULED
+  WEBHOOK
+  API
+}
+
+enum NotificationType {
+  SCAN
+  FINDING
+  SOURCE
+  SYSTEM
+}
+
+enum InstanceLanguage {
+  ENGLISH
+  GERMAN
+}
+
+enum InstanceTimeFormat {
+  TWELVE_HOUR
+  TWENTY_FOUR_HOUR
+}
+
+enum DetectorType {
+  SECRETS
+  PII
+  TOXIC
+  NSFW
+  YARA
+  BROKEN_LINKS
+  PROMPT_INJECTION
+  PHISHING_URL
+  SPAM
+  LANGUAGE
+  CODE_SECURITY
+  PLAGIARISM
+  IMAGE_VIOLENCE
+  OCR_PII
+  DEID_SCORE
+  HATE_SPEECH
+  AI_GENERATED
+  CONTENT_QUALITY
+  BIAS
+  DUPLICATE
+  DOMAIN_CLASS
+  CONTENT_TYPE
+  SENSITIVITY_TIER
+  JURISDICTION_TAG
+  CUSTOM
+}
+
+enum CustomDetectorMethod {
+  RULESET
+  CLASSIFIER
+  ENTITY
+}
+
+enum CustomDetectorTrainingStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum TestResultStatus {
+  PASS
+  FAIL
+  ERROR
+}
+
+enum TestTrigger {
+  MANUAL
+  CI
+  ASSISTANT
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+}
+
+enum FindingStatus {
+  OPEN
+  FALSE_POSITIVE
+  RESOLVED
+  IGNORED
+}
+
+enum AssetStatus {
+  NEW
+  UPDATED
+  UNCHANGED
+  DELETED
+}
+
+enum AssetContentType {
+  TXT
+  TABLE
+  IMAGE
+  VIDEO
+  AUDIO
+  URL
+  BINARY
+  OTHER
+}
+
+enum SandboxRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  ERROR
+}
+
+model SandboxRun {
+  id            String           @id @default(uuid())
+  createdAt     DateTime         @default(now()) @map("created_at")
+  fileName      String           @map("file_name")
+  fileType      String           @map("file_type")
+  contentType   AssetContentType @default(OTHER) @map("content_type")
+  fileExtension String           @map("file_extension")
+  fileSizeBytes Int              @map("file_size_bytes")
+  detectors     Json             @db.JsonB
+  findings      Json             @default("[]") @db.JsonB
+  status        SandboxRunStatus @default(PENDING)
+  errorMessage  String?          @map("error_message")
+  durationMs    Int?             @map("duration_ms")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("sandbox_runs")
+}
+
+// ─── SEMANTIC LAYER ──────────────────────────────────────────────
+
+enum MetricType {
+  SIMPLE
+  RATIO
+  DERIVED
+  TREND
+}
+
+enum MetricStatus {
+  DRAFT
+  ACTIVE
+  DEPRECATED
+}
+
+model GlossaryTerm {
+  id            String   @id @default(uuid())
+  displayName   String   @map("display_name")
+  description   String?  @db.Text
+  category      String?
+
+  // Maps business term to technical detection filters (JSONB)
+  // e.g. { detectorTypes: ["SECRETS","PII"], severities: ["CRITICAL","HIGH"],
+  //        findingTypes: ["aws_key"], customDetectorKeys: ["gdpr-scanner"],
+  //        statuses: ["OPEN"] }
+  filterMapping Json     @map("filter_mapping") @db.JsonB
+
+  color         String?
+  icon          String?
+
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  metrics       MetricDefinition[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("glossary_terms")
+}
+
+model MetricDefinition {
+  id                String       @id @default(uuid())
+  displayName       String       @map("display_name")
+  description       String?      @db.Text
+  type              MetricType
+  status            MetricStatus @default(DRAFT)
+
+  // Metric calculation definition (JSONB)
+  // SIMPLE:  { aggregation: "COUNT", entity: "finding", filters: {...} }
+  // RATIO:   { numerator: {...}, denominator: {...} }
+  // DERIVED: { formula: "a * 100 / b", inputs: ["<metric-id-1>","<metric-id-2>"] }
+  // TREND:   { baseMetricId: "<metric-id>", compareWindow: "7d", currentWindow: "7d" }
+  definition        Json         @db.JsonB
+
+  allowedDimensions String[]     @default([]) @map("allowed_dimensions")
+
+  glossaryTermId    String?      @map("glossary_term_id")
+  glossaryTerm      GlossaryTerm? @relation(fields: [glossaryTermId], references: [id], onDelete: SetNull)
+
+  format            String?
+  unit              String?
+  color             String?
+
+  owner             String?
+  certifiedAt       DateTime?    @map("certified_at")
+  certifiedBy       String?      @map("certified_by")
+
+  isActive          Boolean      @default(true) @map("is_active")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  dashboardPlacements MetricDashboardPlacement[]
+
+  @@index([type])
+  @@index([status])
+  @@index([glossaryTermId])
+  @@index([isActive])
+  @@map("metric_definitions")
+}
+
+model MetricDashboardPlacement {
+  id                  String           @id @default(uuid())
+  metricDefinitionId  String           @map("metric_definition_id")
+  metricDefinition    MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Cascade)
+
+  dashboard           String
+  position            Int              @default(0)
+  size                String           @default("md")
+  chartType           String?          @map("chart_type")
+
+  pinnedFilters       Json?            @map("pinned_filters") @db.JsonB
+
+  isVisible           Boolean          @default(true) @map("is_visible")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  @@unique([metricDefinitionId, dashboard])
+  @@index([dashboard])
+  @@map("metric_dashboard_placements")
+}

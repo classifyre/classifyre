@@ -1,0 +1,23 @@
+{{- if eq .Values.postgres.mode "cnpg" }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.postgres.cnpg.clusterName }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+spec:
+  instances: {{ .Values.postgres.cnpg.instances }}
+  imageName: {{ .Values.postgres.cnpg.imageName | quote }}
+  enableSuperuserAccess: false
+  storage:
+    size: {{ .Values.postgres.cnpg.storage.size }}
+    {{- with .Values.postgres.cnpg.storage.storageClassName }}
+    storageClass: {{ . | quote }}
+    {{- end }}
+  bootstrap:
+    initdb:
+      database: {{ .Values.postgres.cnpg.database | quote }}
+      owner: {{ .Values.postgres.cnpg.user | quote }}
+      secret:
+        name: {{ include "classifyre.databaseSecretName" . }}
+{{- end }}

@@ -1,0 +1,324 @@
+---
+title: API Reference
+description: REST API endpoints for the semantic layer — glossary terms, metric definitions, and query engine.
+---
+
+import { Badge } from "@workspace/ui/components"
+
+# Semantic Layer API Reference
+
+<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+  API Docs
+</Badge>
+
+All semantic layer endpoints are under the `/semantic` prefix. The API is
+organized into three groups: glossary management, metric definitions, and
+the query engine.
+
+## Glossary Endpoints
+
+### List Glossary Terms
+
+```http
+GET /semantic/glossary?category=Security&search=threat
+```
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `category` | string | Filter by category |
+| `search` | string | Full-text search on display name and description |
+
+**Response:**
+
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "slug": "security-threats",
+      "displayName": "Security Threats",
+      "description": "...",
+      "category": "Security",
+      "filterMapping": {
+        "detectorTypes": ["SECRETS", "YARA"]
+      },
+      "isActive": true,
+      "createdAt": "2026-01-15T00:00:00Z",
+      "updatedAt": "2026-03-20T00:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Get Glossary Term
+
+```http
+GET /semantic/glossary/:slug
+```
+
+Returns a single term with its associated metrics.
+
+### Create Glossary Term
+
+```http
+POST /semantic/glossary
+Content-Type: application/json
+
+{
+  "slug": "security-threats",
+  "displayName": "Security Threats",
+  "description": "Findings from security-focused detectors",
+  "category": "Security",
+  "filterMapping": {
+    "detectorTypes": ["SECRETS", "YARA", "PROMPT_INJECTION"]
+  },
+  "color": "#ef4444",
+  "icon": "Shield"
+}
+```
+
+### Update Glossary Term
+
+```http
+PUT /semantic/glossary/:slug
+Content-Type: application/json
+
+{
+  "description": "Updated description",
+  "filterMapping": {
+    "detectorTypes": ["SECRETS", "YARA", "PROMPT_INJECTION", "CUSTOM"]
+  }
+}
+```
+
+### Delete Glossary Term
+
+```http
+DELETE /semantic/glossary/:slug
+```
+
+### Preview Matching Findings
+
+```http
+POST /semantic/glossary/:slug/preview
+```
+
+**Response:**
+
+```json
+{
+  "count": 1284
+}
+```
+
+---
+
+## Metric Definition Endpoints
+
+### List Metric Definitions
+
+```http
+GET /semantic/metrics?type=SIMPLE&status=ACTIVE
+```
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `type` | string | Filter by metric type |
+| `status` | string | Filter by status |
+
+### Get Metric Definition
+
+```http
+GET /semantic/metrics/:slug
+```
+
+Returns the full metric definition including governance metadata and glossary term.
+
+### Create Metric Definition
+
+```http
+POST /semantic/metrics
+Content-Type: application/json
+
+{
+  "slug": "false-positive-rate",
+  "displayName": "False Positive Rate",
+  "type": "RATIO",
+  "definition": { ... },
+  "allowedDimensions": ["detectorType"],
+  "format": "percentage",
+  "unit": "%",
+  "glossaryTermSlug": "security-threats"
+}
+```
+
+### Update Metric Definition
+
+```http
+PUT /semantic/metrics/:slug
+Content-Type: application/json
+
+{
+  "description": "Updated description",
+  "allowedDimensions": ["detectorType", "severity"]
+}
+```
+
+### Delete Metric Definition
+
+```http
+DELETE /semantic/metrics/:slug
+```
+
+### Certify Metric
+
+```http
+POST /semantic/metrics/:slug/certify
+Content-Type: application/json
+
+{
+  "certifiedBy": "admin"
+}
+```
+
+Sets status to `ACTIVE` and records certification metadata.
+
+---
+
+## Query Engine Endpoints
+
+### Evaluate a Metric
+
+```http
+POST /semantic/query
+Content-Type: application/json
+
+{
+  "metricSlug": "false-positive-rate",
+  "dimensions": ["detectorType"],
+  "glossaryTermSlug": "security-threats",
+  "from": "2026-01-01T00:00:00Z",
+  "to": "2026-03-26T00:00:00Z"
+}
+```
+
+**Response:**
+
+```json
+{
+  "value": 0.082,
+  "breakdown": [
+    { "dimensionValue": "SECRETS", "value": 12 },
+    { "dimensionValue": "YARA", "value": 8 },
+    { "dimensionValue": "PROMPT_INJECTION", "value": 3 }
+  ]
+}
+```
+
+### Time Series Query
+
+```http
+POST /semantic/query/timeseries
+Content-Type: application/json
+
+{
+  "metricSlug": "total-findings",
+  "granularity": "day",
+  "from": "2026-03-01T00:00:00Z",
+  "to": "2026-03-26T00:00:00Z"
+}
+```
+
+**Supported granularities:** `hour`, `day`, `week`, `month`
+
+**Response:**
+
+```json
+{
+  "timeSeries": [
+    { "timestamp": "2026-03-01T00:00:00Z", "value": 142 },
+    { "timestamp": "2026-03-02T00:00:00Z", "value": 156 },
+    { "timestamp": "2026-03-03T00:00:00Z", "value": 131 }
+  ]
+}
+```
+
+> **Note:** Time series queries currently only support SIMPLE metrics.
+
+### Dashboard Batch Query
+
+```http
+POST /semantic/query/dashboard
+Content-Type: application/json
+
+{
+  "dashboard": "discovery",
+  "from": "2026-03-01T00:00:00Z",
+  "to": "2026-03-26T00:00:00Z"
+}
+```
+
+Evaluates all metrics placed on the specified dashboard. Each metric
+placement can have `pinnedFilters` that are automatically applied.
+
+**Response:**
+
+```json
+{
+  "dashboard": "discovery",
+  "metrics": [
+    {
+      "metricSlug": "total-findings",
+      "displayName": "Total Findings",
+      "value": 3847,
+      "format": "number",
+      "unit": "findings",
+      "size": "md",
+      "position": 0,
+      "chartType": "number"
+    }
+  ]
+}
+```
+
+### Explore Query
+
+```http
+POST /semantic/query/explore
+Content-Type: application/json
+
+{
+  "metricSlug": "total-findings",
+  "dimensions": ["severity"],
+  "glossaryTermSlug": "security-threats"
+}
+```
+
+Same as the evaluate endpoint, but designed for the interactive metric
+explorer UI. Supports combining a glossary term scope with metric
+evaluation and dimension breakdowns.
+
+---
+
+## MCP Tool Integration
+
+The semantic layer is also exposed via MCP tools for AI agent access:
+
+| Tool Name | Description |
+|---|---|
+| `list_glossary_terms` | List business glossary terms and their mappings |
+| `get_glossary_term` | Get a specific glossary term with its filter mapping |
+| `query_metric` | Evaluate a governed metric with optional filters |
+| `query_metric_timeseries` | Evaluate metric as a time series |
+| `list_metrics` | List all governed metric definitions |
+| `explore_by_glossary_term` | Explore detection data through business concepts |
+
+This allows AI assistants to answer questions like:
+- *"What is our false positive rate for PII findings?"*
+- *"Show me the weekly trend of security threats"*
+- *"How many unresolved compliance violations do we have?"*

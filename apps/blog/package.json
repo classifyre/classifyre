@@ -1,0 +1,38 @@
+{
+  "name": "@classifyre/blog",
+  "version": "0.2.24",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack --port 3003",
+    "build": "next build --webpack",
+    "postbuild": "next-sitemap --config next-sitemap.config.js",
+    "start": "next start",
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit",
+    "test": "echo 'No tests configured for @classifyre/blog'",
+    "test:e2e": "echo 'No e2e tests configured for @classifyre/blog'"
+  },
+  "dependencies": {
+    "@workspace/ui": "workspace:*",
+    "gray-matter": "^4.0.3",
+    "next": "^16.0.7",
+    "next-sitemap": "^4.2.3",
+    "nextra": "^4.6.1",
+    "nextra-theme-docs": "^4.6.1",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "rehype-autolink-headings": "^7.1.0",
+    "rehype-slug": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@workspace/eslint-config": "workspace:^",
+    "@workspace/typescript-config": "workspace:*",
+    "@tailwindcss/postcss": "^4.1.17",
+    "eslint": "^9.39.1",
+    "typescript": "^5.9.3"
+  }
+}

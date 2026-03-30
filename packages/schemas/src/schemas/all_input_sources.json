@@ -1,0 +1,4095 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SourceInput",
+  "description": "Merged configuration schema with all source types and common definitions",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/SlackInput"
+    },
+    {
+      "$ref": "#/definitions/SitemapInput"
+    },
+    {
+      "$ref": "#/definitions/S3CompatibleStorageInput"
+    },
+    {
+      "$ref": "#/definitions/AzureBlobStorageInput"
+    },
+    {
+      "$ref": "#/definitions/GoogleCloudStorageInput"
+    },
+    {
+      "$ref": "#/definitions/PostgreSQLInput"
+    },
+    {
+      "$ref": "#/definitions/MySQLInput"
+    },
+    {
+      "$ref": "#/definitions/MSSQLInput"
+    },
+    {
+      "$ref": "#/definitions/OracleInput"
+    },
+    {
+      "$ref": "#/definitions/HiveInput"
+    },
+    {
+      "$ref": "#/definitions/DatabricksInput"
+    },
+    {
+      "$ref": "#/definitions/SnowflakeInput"
+    },
+    {
+      "$ref": "#/definitions/MongoDBInput"
+    },
+    {
+      "$ref": "#/definitions/PowerBIInput"
+    },
+    {
+      "$ref": "#/definitions/TableauInput"
+    },
+    {
+      "$ref": "#/definitions/WordPressInput"
+    },
+    {
+      "$ref": "#/definitions/ConfluenceInput"
+    },
+    {
+      "$ref": "#/definitions/JiraInput"
+    },
+    {
+      "$ref": "#/definitions/ServiceDeskInput"
+    }
+  ],
+  "definitions": {
+    "AssetType": {
+      "type": "string",
+      "enum": [
+        "WORDPRESS",
+        "SLACK",
+        "SITEMAP",
+        "S3_COMPATIBLE_STORAGE",
+        "AZURE_BLOB_STORAGE",
+        "GOOGLE_CLOUD_STORAGE",
+        "POSTGRESQL",
+        "MYSQL",
+        "MSSQL",
+        "ORACLE",
+        "HIVE",
+        "DATABRICKS",
+        "SNOWFLAKE",
+        "MONGODB",
+        "POWERBI",
+        "TABLEAU",
+        "CONFLUENCE",
+        "JIRA",
+        "SERVICEDESK"
+      ],
+      "description": "Type of the asset or source"
+    },
+    "SourceCategory": {
+      "type": "string",
+      "enum": [
+        "TABULAR",
+        "UNSTRUCTURED"
+      ],
+      "description": "Category of the source: TABULAR for structured databases (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake), UNSTRUCTURED for text/web/document sources (WordPress, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk)"
+    },
+    "DetectorType": {
+      "type": "string",
+      "enum": [
+        "SECRETS",
+        "PII",
+        "TOXIC",
+        "NSFW",
+        "YARA",
+        "BROKEN_LINKS",
+        "PROMPT_INJECTION",
+        "PHISHING_URL",
+        "SPAM",
+        "LANGUAGE",
+        "CODE_SECURITY",
+        "PLAGIARISM",
+        "IMAGE_VIOLENCE",
+        "OCR_PII",
+        "DEID_SCORE",
+        "HATE_SPEECH",
+        "AI_GENERATED",
+        "CONTENT_QUALITY",
+        "BIAS",
+        "DUPLICATE",
+        "DOMAIN_CLASS",
+        "CONTENT_TYPE",
+        "SENSITIVITY_TIER",
+        "JURISDICTION_TAG",
+        "CUSTOM"
+      ],
+      "description": "Type of detector for content analysis"
+    },
+    "PostStatus": {
+      "type": "string",
+      "enum": [
+        "publish",
+        "future",
+        "draft",
+        "pending",
+        "private"
+      ],
+      "description": "WordPress post status"
+    },
+    "SlackChannelType": {
+      "type": "string",
+      "enum": [
+        "public_channel",
+        "private_channel",
+        "mpim",
+        "im"
+      ],
+      "description": "Slack conversation types to include"
+    },
+    "SamplingStrategy": {
+      "type": "string",
+      "enum": [
+        "RANDOM",
+        "LATEST",
+        "ALL"
+      ],
+      "description": "Sampling strategy: RANDOM samples items randomly, LATEST prioritises the most recently modified/created items, ALL scans every item with no limit"
+    },
+    "SamplingConfig": {
+      "title": "SamplingConfig",
+      "type": "object",
+      "description": "Controls how much content is extracted from each source. Apply to every source type: for tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake) limit is rows per table; for unstructured/document sources (WordPress, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk) limit is items/pages/documents/assets per run.",
+      "properties": {
+        "strategy": {
+          "$ref": "#/definitions/SamplingStrategy"
+        },
+        "fetch_all_until_first_success": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, force strategy ALL until this source gets its first successful run. After the first successful run, use strategy/limit as configured."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "default": 100,
+          "description": "Maximum number of items to sample per asset (rows for tabular, pages/items for unstructured). Ignored when strategy is ALL."
+        },
+        "order_by_column": {
+          "type": "string",
+          "description": "Column to use for LATEST sampling mode in tabular sources (usually created_at/updated_at). Auto-detected when not set."
+        },
+        "fallback_to_random": {
+          "type": "boolean",
+          "default": true,
+          "description": "Tabular sources only. Fallback to RANDOM ordering when LATEST mode cannot resolve an ordering column."
+        },
+        "max_columns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500,
+          "default": 25,
+          "description": "Tabular sources only. Maximum number of columns to include per sampled row."
+        },
+        "max_cell_chars": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 50000,
+          "default": 512,
+          "description": "Tabular sources only. Maximum characters per cell in detector payload formatting."
+        },
+        "max_total_chars": {
+          "type": "integer",
+          "minimum": 128,
+          "maximum": 500000,
+          "default": 20000,
+          "description": "Tabular sources only. Maximum total formatted payload size sent to detectors per asset."
+        },
+        "include_column_names": {
+          "type": "boolean",
+          "default": true,
+          "description": "Tabular sources only. Include column names in sampled detector payload rows."
+        }
+      },
+      "required": [
+        "strategy"
+      ],
+      "default": {
+        "strategy": "RANDOM",
+        "fetch_all_until_first_success": false,
+        "limit": 100,
+        "fallback_to_random": true,
+        "max_columns": 25,
+        "max_cell_chars": 512,
+        "max_total_chars": 20000,
+        "include_column_names": true
+      },
+      "additionalProperties": false
+    },
+    "Detectors": {
+      "type": "array",
+      "description": "Detectors to run on ingested content",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/definitions/DetectorType"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "config": {
+            "type": "object",
+            "description": "Detector-specific configuration"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": true
+      }
+    },
+    "CustomDetectorSelections": {
+      "type": "array",
+      "description": "Reusable custom detector IDs selected from the custom detector catalog.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "WordPressRequired": {
+      "title": "WordPressRequired",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Base URL of the WordPress site (e.g., https://example.com)"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "WordPressMasked": {
+      "title": "WordPressMasked",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Username for authentication (optional for public content)"
+        },
+        "application_password": {
+          "type": "string",
+          "description": "WordPress application password for authentication (optional)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordPressOptionalContent": {
+      "title": "WordPressOptionalContent",
+      "type": "object",
+      "description": "Content scope and filters for WordPress ingestion.",
+      "properties": {
+        "fetch_posts": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to fetch blog posts"
+        },
+        "fetch_pages": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to fetch pages"
+        },
+        "post_status": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PostStatus"
+          },
+          "default": [
+            "publish"
+          ],
+          "description": "Post status filters (requires authentication for non-public statuses)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordPressOptional": {
+      "title": "WordPressOptional",
+      "type": "object",
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/WordPressOptionalContent"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SlackRequired": {
+      "title": "SlackRequired",
+      "type": "object",
+      "properties": {
+        "workspace": {
+          "type": "string",
+          "description": "Slack workspace name or domain (for display and stable IDs)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SlackMasked": {
+      "title": "SlackMasked",
+      "type": "object",
+      "oneOf": [
+        {
+          "title": "SlackMaskedBotToken",
+          "type": "object",
+          "properties": {
+            "bot_token": {
+              "type": "string",
+              "description": "Slack bot token (starts with xoxb-)"
+            }
+          },
+          "required": [
+            "bot_token"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "title": "SlackMaskedUserToken",
+          "type": "object",
+          "properties": {
+            "user_token": {
+              "type": "string",
+              "description": "Slack user token (starts with xoxp-)"
+            }
+          },
+          "required": [
+            "user_token"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "title": "SlackMaskedToken",
+          "type": "object",
+          "properties": {
+            "token": {
+              "type": "string",
+              "description": "Slack token (bot or user)"
+            },
+            "token_type": {
+              "type": "string",
+              "enum": [
+                "bot",
+                "user"
+              ],
+              "description": "Token type hint"
+            }
+          },
+          "required": [
+            "token"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SlackOptionalChannels": {
+      "title": "SlackOptionalChannels",
+      "type": "object",
+      "description": "Channel discovery and targeting controls.",
+      "properties": {
+        "channel_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SlackChannelType"
+          },
+          "default": [
+            "public_channel"
+          ],
+          "description": "Slack conversation types to include when listing channels"
+        },
+        "channel_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Explicit channel IDs to scan. If provided, channel_types is ignored."
+        },
+        "exclude_archived": {
+          "type": "boolean",
+          "default": true,
+          "description": "Exclude archived channels when listing"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SlackOptionalTimeRange": {
+      "title": "SlackOptionalTimeRange",
+      "type": "object",
+      "description": "Time window filters for message ingestion.",
+      "properties": {
+        "oldest": {
+          "type": "string",
+          "description": "Start of date range (Slack timestamp or ISO 8601)"
+        },
+        "latest": {
+          "type": "string",
+          "description": "End of date range (Slack timestamp or ISO 8601)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SlackOptionalIngestion": {
+      "title": "SlackOptionalIngestion",
+      "type": "object",
+      "description": "Throughput and payload controls for Slack ingestion.",
+      "properties": {
+        "batch_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 200,
+          "description": "Messages per API call (max 200)"
+        },
+        "rate_limit_delay_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1,
+          "description": "Delay between API calls to avoid rate limits"
+        },
+        "include_thread_replies": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include thread replies in fetched content for detectors"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SlackOptional": {
+      "title": "SlackOptional",
+      "type": "object",
+      "properties": {
+        "channels": {
+          "$ref": "#/definitions/SlackOptionalChannels"
+        },
+        "time_range": {
+          "$ref": "#/definitions/SlackOptionalTimeRange"
+        },
+        "ingestion": {
+          "$ref": "#/definitions/SlackOptionalIngestion"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SitemapRequired": {
+      "title": "SitemapRequired",
+      "type": "object",
+      "properties": {
+        "sitemap_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Website sitemap URL (for example, https://example.com/sitemap.xml)"
+        }
+      },
+      "required": [
+        "sitemap_url"
+      ],
+      "additionalProperties": false
+    },
+    "SitemapOptionalCrawl": {
+      "title": "SitemapOptionalCrawl",
+      "type": "object",
+      "description": "Crawl behaviour and request-level limits.",
+      "properties": {
+        "max_nested_sitemaps": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 100,
+          "description": "Maximum number of nested sitemap documents to traverse"
+        },
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "default": 30,
+          "description": "HTTP timeout for sitemap and linked asset requests"
+        },
+        "crawl_page_timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "default": 120000,
+          "description": "Per-page browser timeout in milliseconds"
+        },
+        "user_agent": {
+          "type": "string",
+          "description": "Optional user agent for sitemap and asset HTTP requests"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SitemapOptionalAssets": {
+      "title": "SitemapOptionalAssets",
+      "type": "object",
+      "description": "Related asset extraction and lineage controls.",
+      "properties": {
+        "max_related_assets_per_page": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 40,
+          "description": "Maximum number of non-HTML linked assets to materialize per crawled page"
+        },
+        "max_asset_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "default": 5242880,
+          "description": "Maximum number of bytes to download per linked asset when inferring type/text"
+        },
+        "include_external_links": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include external links in page lineage/hashes"
+        },
+        "fetch_related_assets": {
+          "type": "boolean",
+          "default": true,
+          "description": "Fetch linked media/doc assets and persist them as lineage-linked assets"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SitemapOptional": {
+      "title": "SitemapOptional",
+      "type": "object",
+      "properties": {
+        "crawl": {
+          "$ref": "#/definitions/SitemapOptionalCrawl"
+        },
+        "assets": {
+          "$ref": "#/definitions/SitemapOptionalAssets"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ObjectStorageOptionalScope": {
+      "title": "ObjectStorageOptionalScope",
+      "type": "object",
+      "description": "Object scope and filtering controls.",
+      "properties": {
+        "prefix": {
+          "type": "string",
+          "description": "Object key prefix filter (for example, exports/2026/)"
+        },
+        "include_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional extension allowlist (for example, .pdf, .csv, .parquet)"
+        },
+        "exclude_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional extension denylist"
+        },
+        "include_empty_objects": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include zero-byte objects in extraction results"
+        },
+        "include_object_metadata": {
+          "type": "boolean",
+          "default": true,
+          "description": "Attach provider metadata (etag, size, content-type hints, timestamps) to asset checksums"
+        },
+        "include_content_preview": {
+          "type": "boolean",
+          "default": true,
+          "description": "Download object bytes to infer MIME and extract detector-ready text previews"
+        }
+      },
+      "additionalProperties": false
+    },
+    "S3CompatibleStorageRequired": {
+      "title": "S3CompatibleStorageRequired",
+      "type": "object",
+      "properties": {
+        "bucket": {
+          "type": "string",
+          "description": "Bucket name for AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
+        }
+      },
+      "required": [
+        "bucket"
+      ],
+      "additionalProperties": false
+    },
+    "S3CompatibleStorageMasked": {
+      "title": "S3CompatibleStorageMasked",
+      "type": "object",
+      "description": "Optional static credentials. Leave empty to use ambient AWS credentials chain.",
+      "properties": {
+        "aws_access_key_id": {
+          "type": "string",
+          "description": "S3-compatible access key ID"
+        },
+        "aws_secret_access_key": {
+          "type": "string",
+          "description": "S3-compatible secret access key"
+        },
+        "aws_session_token": {
+          "type": "string",
+          "description": "Optional session token for temporary credentials"
+        }
+      },
+      "additionalProperties": false
+    },
+    "S3CompatibleStorageOptionalConnection": {
+      "title": "S3CompatibleStorageOptionalConnection",
+      "type": "object",
+      "properties": {
+        "region_name": {
+          "type": "string",
+          "description": "Region (recommended for AWS; required by some S3-compatible providers)"
+        },
+        "endpoint_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Custom endpoint URL for MinIO/R2/B2/Garage and other S3-compatible providers"
+        },
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 30,
+          "description": "Network timeout in seconds for list/download operations"
+        },
+        "max_keys_per_page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 200,
+          "description": "Maximum objects requested per provider list API call"
+        },
+        "max_object_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 52428800,
+          "default": 5242880,
+          "description": "Maximum bytes downloaded per object for MIME detection and text extraction"
+        },
+        "verify_ssl": {
+          "type": "boolean",
+          "default": true,
+          "description": "TLS certificate verification toggle"
+        }
+      },
+      "additionalProperties": false
+    },
+    "S3CompatibleStorageOptional": {
+      "title": "S3CompatibleStorageOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/S3CompatibleStorageOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/ObjectStorageOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AzureBlobStorageRequired": {
+      "title": "AzureBlobStorageRequired",
+      "type": "object",
+      "properties": {
+        "account_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Azure Blob account URL (for example, https://<account>.blob.core.windows.net)"
+        },
+        "container": {
+          "type": "string",
+          "description": "Azure Blob container name"
+        }
+      },
+      "required": [
+        "account_url",
+        "container"
+      ],
+      "additionalProperties": false
+    },
+    "AzureBlobStorageMasked": {
+      "title": "AzureBlobStorageMasked",
+      "type": "object",
+      "description": "Optional Azure credentials. Leave empty to use managed identity/default credential chain.",
+      "properties": {
+        "azure_connection_string": {
+          "type": "string",
+          "description": "Azure storage connection string (takes precedence over other auth fields)"
+        },
+        "azure_account_key": {
+          "type": "string",
+          "description": "Azure storage account key"
+        },
+        "azure_sas_token": {
+          "type": "string",
+          "description": "Azure SAS token"
+        },
+        "azure_client_id": {
+          "type": "string",
+          "description": "Azure Entra client ID (service principal auth)"
+        },
+        "azure_client_secret": {
+          "type": "string",
+          "description": "Azure Entra client secret (service principal auth)"
+        },
+        "azure_tenant_id": {
+          "type": "string",
+          "description": "Azure Entra tenant ID (service principal auth)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AzureBlobStorageOptionalConnection": {
+      "title": "AzureBlobStorageOptionalConnection",
+      "type": "object",
+      "properties": {
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 30,
+          "description": "Network timeout in seconds for list/download operations"
+        },
+        "max_keys_per_page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 200,
+          "description": "Maximum blobs requested per list page"
+        },
+        "max_object_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 52428800,
+          "default": 5242880,
+          "description": "Maximum bytes downloaded per blob for MIME detection and text extraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AzureBlobStorageOptional": {
+      "title": "AzureBlobStorageOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/AzureBlobStorageOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/ObjectStorageOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GoogleCloudStorageRequired": {
+      "title": "GoogleCloudStorageRequired",
+      "type": "object",
+      "properties": {
+        "bucket": {
+          "type": "string",
+          "description": "Google Cloud Storage bucket name"
+        }
+      },
+      "required": [
+        "bucket"
+      ],
+      "additionalProperties": false
+    },
+    "GoogleCloudStorageMasked": {
+      "title": "GoogleCloudStorageMasked",
+      "type": "object",
+      "description": "Optional inline service account credentials JSON. Leave empty to use ADC/workload identity.",
+      "properties": {
+        "gcp_credentials_json": {
+          "type": "string",
+          "description": "Google service account credentials JSON as inline string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GoogleCloudStorageOptionalConnection": {
+      "title": "GoogleCloudStorageOptionalConnection",
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "description": "Optional GCP project ID override for auth context and bucket listing"
+        },
+        "gcp_credentials_file": {
+          "type": "string",
+          "description": "Path to Google service account JSON credentials file"
+        },
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 30,
+          "description": "Network timeout in seconds for list/download operations"
+        },
+        "max_keys_per_page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 200,
+          "description": "Maximum objects requested per list page"
+        },
+        "max_object_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 52428800,
+          "default": 5242880,
+          "description": "Maximum bytes downloaded per object for MIME detection and text extraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GoogleCloudStorageOptional": {
+      "title": "GoogleCloudStorageOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/GoogleCloudStorageOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/ObjectStorageOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PostgreSQLSSLMode": {
+      "type": "string",
+      "enum": [
+        "disable",
+        "allow",
+        "prefer",
+        "require",
+        "verify-ca",
+        "verify-full"
+      ],
+      "default": "prefer",
+      "description": "SSL mode for PostgreSQL connection"
+    },
+    "PostgreSQLRequired": {
+      "title": "PostgreSQLRequired",
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "PostgreSQL host"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 5432,
+          "description": "PostgreSQL port"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "additionalProperties": false
+    },
+    "PostgreSQLMasked": {
+      "title": "PostgreSQLMasked",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Database username"
+        },
+        "password": {
+          "type": "string",
+          "description": "Database password"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "PostgreSQLOptionalConnection": {
+      "title": "PostgreSQLOptionalConnection",
+      "type": "object",
+      "description": "Connection tuning and SSL behavior.",
+      "properties": {
+        "ssl_mode": {
+          "$ref": "#/definitions/PostgreSQLSSLMode"
+        },
+        "connect_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120,
+          "default": 10,
+          "description": "Connection timeout in seconds"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PostgreSQLOptionalScope": {
+      "title": "PostgreSQLOptionalScope",
+      "type": "object",
+      "description": "Database, schema, and table selection scope.",
+      "properties": {
+        "database": {
+          "type": "string",
+          "description": "Single database to scan (optional when include_all_databases is true)"
+        },
+        "include_all_databases": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scan all non-template databases visible to this user"
+        },
+        "maintenance_database": {
+          "type": "string",
+          "default": "postgres",
+          "description": "Database used for database enumeration when include_all_databases is true"
+        },
+        "include_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional schema allowlist (exact schema names)"
+        },
+        "exclude_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "information_schema",
+            "pg_catalog",
+            "pg_toast"
+          ],
+          "description": "Schema denylist (exact schema names)"
+        },
+        "include_tables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional table allowlist. Accepted forms: schema.table or database.schema.table"
+        },
+        "table_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of table assets extracted"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PostgreSQLOptional": {
+      "title": "PostgreSQLOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/PostgreSQLOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/PostgreSQLOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MySQLRequired": {
+      "title": "MySQLRequired",
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "MySQL host"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 3306,
+          "description": "MySQL port"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "additionalProperties": false
+    },
+    "MySQLMasked": {
+      "title": "MySQLMasked",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Database username"
+        },
+        "password": {
+          "type": "string",
+          "description": "Database password"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "MySQLOptionalConnection": {
+      "title": "MySQLOptionalConnection",
+      "type": "object",
+      "description": "Connection tuning for MySQL.",
+      "properties": {
+        "connect_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120,
+          "default": 10,
+          "description": "Connection timeout in seconds"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MySQLOptionalScope": {
+      "title": "MySQLOptionalScope",
+      "type": "object",
+      "description": "Database and table selection scope.",
+      "properties": {
+        "database": {
+          "type": "string",
+          "description": "Single database to scan (optional when include_all_databases is true)"
+        },
+        "include_all_databases": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scan all visible databases except excluded system databases"
+        },
+        "exclude_databases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "information_schema",
+            "mysql",
+            "performance_schema",
+            "sys"
+          ],
+          "description": "Database denylist (exact database names)"
+        },
+        "include_tables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional table allowlist. Accepted forms: table or database.table"
+        },
+        "table_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of table assets extracted per database"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MySQLOptional": {
+      "title": "MySQLOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/MySQLOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/MySQLOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MSSQLRequired": {
+      "title": "MSSQLRequired",
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "SQL Server host endpoint"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 1433,
+          "description": "SQL Server TCP port"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "additionalProperties": false
+    },
+    "MSSQLMasked": {
+      "title": "MSSQLMasked",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "SQL Server login username"
+        },
+        "password": {
+          "type": "string",
+          "description": "SQL Server login password"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "MSSQLOptionalConnection": {
+      "title": "MSSQLOptionalConnection",
+      "type": "object",
+      "description": "Connection tuning for SQL Server.",
+      "properties": {
+        "auth_mode": {
+          "type": "string",
+          "enum": [
+            "CUSTOM",
+            "LDAP"
+          ],
+          "default": "CUSTOM",
+          "description": "Authentication mode. CUSTOM uses masked.username as-is, LDAP prefixes username with ldap_domain when provided."
+        },
+        "ldap_domain": {
+          "type": "string",
+          "description": "Optional LDAP/AD domain for LDAP auth mode (for example, CORP or corp.local)."
+        },
+        "is_aws_rds": {
+          "type": "boolean",
+          "description": "Set true for AWS RDS SQL Server, false for on-prem. If unset, runtime auto-detects using host patterns."
+        },
+        "connect_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120,
+          "default": 10,
+          "description": "Connection timeout in seconds"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MSSQLOptionalExtraction": {
+      "title": "MSSQLOptionalExtraction",
+      "type": "object",
+      "description": "Lineage and advanced metadata extraction controls for SQL Server.",
+      "properties": {
+        "include_table_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include table-level lineage links using foreign key metadata."
+        },
+        "include_view_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include view-to-table/view lineage links using SQL Server dependency metadata."
+        },
+        "include_view_column_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable view column lineage extraction when available."
+        },
+        "include_stored_procedures": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include stored procedure metadata extraction."
+        },
+        "include_stored_procedures_code": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include stored procedure source code metadata when available."
+        },
+        "include_jobs": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include SQL Server Agent jobs metadata extraction."
+        },
+        "include_query_lineage": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable query-based lineage extraction from Query Store/DMVs."
+        },
+        "max_queries_to_extract": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 1000,
+          "description": "Maximum number of queries to analyze for query-based lineage."
+        },
+        "min_query_calls": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Minimum execution count for queries to be included in query-based lineage."
+        },
+        "query_exclude_patterns": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "string"
+          },
+          "description": "SQL LIKE patterns used to exclude queries from query-based lineage."
+        },
+        "include_usage_statistics": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable usage statistics extraction from SQL query metadata."
+        }
+      },
+      "additionalProperties": false
+    },
+    "MSSQLOptionalScope": {
+      "title": "MSSQLOptionalScope",
+      "type": "object",
+      "description": "Database, schema, and object selection scope.",
+      "properties": {
+        "database": {
+          "type": "string",
+          "description": "Single database to scan (optional when include_all_databases is true)"
+        },
+        "include_all_databases": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scan all visible databases except excluded system databases"
+        },
+        "exclude_databases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "master",
+            "tempdb",
+            "model"
+          ],
+          "description": "Database denylist (exact database names)"
+        },
+        "include_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional schema allowlist (exact schema names)"
+        },
+        "exclude_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "INFORMATION_SCHEMA",
+            "sys"
+          ],
+          "description": "Schema denylist (exact schema names)"
+        },
+        "include_tables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include table assets in extraction"
+        },
+        "include_views": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include view assets in extraction"
+        },
+        "include_objects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional object allowlist. Accepted forms: schema.object or database.schema.object"
+        },
+        "table_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of table/view assets extracted"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MSSQLOptional": {
+      "title": "MSSQLOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/MSSQLOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/MSSQLOptionalScope"
+        },
+        "extraction": {
+          "$ref": "#/definitions/MSSQLOptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OracleRequired": {
+      "title": "OracleRequired",
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "Oracle host endpoint"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 1521,
+          "description": "Oracle TCP port"
+        },
+        "service_name": {
+          "type": "string",
+          "description": "Oracle service name (for example, TEST_PDB)"
+        }
+      },
+      "required": [
+        "host",
+        "port",
+        "service_name"
+      ],
+      "additionalProperties": false
+    },
+    "OracleMasked": {
+      "title": "OracleMasked",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Oracle login username"
+        },
+        "password": {
+          "type": "string",
+          "description": "Oracle login password"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "OracleOptionalConnection": {
+      "title": "OracleOptionalConnection",
+      "type": "object",
+      "description": "Connection tuning for Oracle.",
+      "properties": {
+        "connect_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120,
+          "default": 10,
+          "description": "Connection timeout in seconds"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OracleOptionalScope": {
+      "title": "OracleOptionalScope",
+      "type": "object",
+      "description": "Schema, object, and lineage extraction scope.",
+      "properties": {
+        "include_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional schema allowlist (exact schema names)"
+        },
+        "exclude_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "SYS",
+            "SYSTEM",
+            "DBSNMP",
+            "WMSYS",
+            "CTXSYS",
+            "XDB",
+            "MDSYS",
+            "ORDSYS",
+            "OUTLN",
+            "ORDDATA"
+          ],
+          "description": "Schema denylist (exact schema names)"
+        },
+        "include_tables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include table assets in extraction"
+        },
+        "include_views": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include view assets in extraction"
+        },
+        "include_view_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Extract coarse lineage links from views to referenced tables/views"
+        },
+        "include_view_column_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable view column lineage collection from Oracle dependency metadata"
+        },
+        "include_objects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional object allowlist. Accepted forms: schema.object or service.schema.object"
+        },
+        "table_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of table/view assets extracted"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OracleOptional": {
+      "title": "OracleOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/OracleOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/OracleOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HiveScheme": {
+      "title": "HiveScheme",
+      "type": "string",
+      "enum": [
+        "hive",
+        "hive+http",
+        "hive+https",
+        "sparksql",
+        "databricks+pyhive"
+      ],
+      "description": "Hive transport and driver scheme"
+    },
+    "HiveRequired": {
+      "title": "HiveRequired",
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "Hive host endpoint"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 10000,
+          "description": "Hive TCP port"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "additionalProperties": false
+    },
+    "HiveMasked": {
+      "title": "HiveMasked",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Hive login username"
+        },
+        "password": {
+          "type": "string",
+          "description": "Hive login password"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "HiveOptionalConnection": {
+      "title": "HiveOptionalConnection",
+      "type": "object",
+      "description": "Hive connection transport and authentication options.",
+      "properties": {
+        "scheme": {
+          "$ref": "#/definitions/HiveScheme"
+        },
+        "connect_args": {
+          "type": "object",
+          "description": "Additional PyHive connection arguments (e.g. auth, kerberos_service_name, http_path).",
+          "default": {},
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "HiveOptionalScope": {
+      "title": "HiveOptionalScope",
+      "type": "object",
+      "description": "Hive database and object selection scope.",
+      "properties": {
+        "database": {
+          "type": "string",
+          "description": "Single Hive database to scan (optional when include_all_databases is true)"
+        },
+        "include_all_databases": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scan all visible Hive databases except excluded system databases"
+        },
+        "exclude_databases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "information_schema",
+            "sys"
+          ],
+          "description": "Database denylist (exact database names)"
+        },
+        "include_tables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include table assets in extraction"
+        },
+        "include_views": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include view assets in extraction"
+        },
+        "include_objects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional object allowlist. Accepted forms: table or database.table"
+        },
+        "table_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of table/view assets extracted per database"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HiveOptional": {
+      "title": "HiveOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/HiveOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/HiveOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DatabricksAuthMode": {
+      "title": "DatabricksAuthMode",
+      "type": "string",
+      "enum": [
+        "PAT_TOKEN",
+        "SERVICE_PRINCIPAL"
+      ],
+      "description": "Databricks authentication mode"
+    },
+    "DatabricksRequiredPat": {
+      "title": "DatabricksRequiredPat",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "PAT_TOKEN"
+        },
+        "workspace_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Databricks workspace URL (for example, https://adb-1234567890123456.7.azuredatabricks.net)"
+        },
+        "warehouse_id": {
+          "type": "string",
+          "description": "Databricks SQL warehouse ID used for sampling queries"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "workspace_url",
+        "warehouse_id"
+      ],
+      "additionalProperties": false
+    },
+    "DatabricksRequiredServicePrincipal": {
+      "title": "DatabricksRequiredServicePrincipal",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "SERVICE_PRINCIPAL"
+        },
+        "workspace_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Databricks workspace URL (for example, https://adb-1234567890123456.7.azuredatabricks.net)"
+        },
+        "warehouse_id": {
+          "type": "string",
+          "description": "Databricks SQL warehouse ID used for sampling queries"
+        },
+        "client_id": {
+          "type": "string",
+          "description": "Databricks service principal client ID"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "workspace_url",
+        "warehouse_id",
+        "client_id"
+      ],
+      "additionalProperties": false
+    },
+    "DatabricksRequired": {
+      "title": "DatabricksRequired",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/DatabricksRequiredPat"
+        },
+        {
+          "$ref": "#/definitions/DatabricksRequiredServicePrincipal"
+        }
+      ]
+    },
+    "DatabricksMaskedPat": {
+      "title": "DatabricksMaskedPat",
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "Databricks personal access token (PAT)"
+        }
+      },
+      "required": [
+        "token"
+      ],
+      "additionalProperties": false
+    },
+    "DatabricksMaskedServicePrincipal": {
+      "title": "DatabricksMaskedServicePrincipal",
+      "type": "object",
+      "properties": {
+        "client_secret": {
+          "type": "string",
+          "description": "Databricks service principal client secret"
+        }
+      },
+      "required": [
+        "client_secret"
+      ],
+      "additionalProperties": false
+    },
+    "DatabricksMasked": {
+      "title": "DatabricksMasked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/DatabricksMaskedPat"
+        },
+        {
+          "$ref": "#/definitions/DatabricksMaskedServicePrincipal"
+        }
+      ]
+    },
+    "DatabricksOptionalConnection": {
+      "title": "DatabricksOptionalConnection",
+      "type": "object",
+      "description": "Databricks API and SQL statement execution tuning options.",
+      "properties": {
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 300,
+          "default": 30,
+          "description": "HTTP timeout for Databricks API calls"
+        },
+        "statement_timeout_seconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 600,
+          "default": 60,
+          "description": "Maximum wait timeout for SQL statement execution"
+        },
+        "max_statement_polls": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120,
+          "default": 30,
+          "description": "Maximum polling attempts when waiting for SQL statement completion"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DatabricksOptionalScope": {
+      "title": "DatabricksOptionalScope",
+      "type": "object",
+      "description": "Databricks Unity Catalog scope filters.",
+      "properties": {
+        "include_catalogs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional catalog allowlist (exact catalog names)"
+        },
+        "exclude_catalogs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Catalog denylist (exact catalog names)"
+        },
+        "include_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional schema allowlist. Accepted forms: schema or catalog.schema"
+        },
+        "exclude_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "information_schema"
+          ],
+          "description": "Schema denylist. Accepted forms: schema or catalog.schema"
+        },
+        "include_tables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional table allowlist. Accepted forms: table, schema.table, or catalog.schema.table"
+        },
+        "table_limit_per_schema": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of Unity Catalog tables extracted per schema"
+        },
+        "include_hive_metastore": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include hive_metastore catalog in extraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DatabricksOptionalExtraction": {
+      "title": "DatabricksOptionalExtraction",
+      "type": "object",
+      "description": "Databricks Unity Catalog extraction feature flags.",
+      "properties": {
+        "include_table_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include table-level lineage links between Unity Catalog tables"
+        },
+        "include_column_lineage": {
+          "type": "boolean",
+          "default": false,
+          "description": "Attempt to fetch column-level lineage metadata"
+        },
+        "include_notebooks": {
+          "type": "boolean",
+          "default": false,
+          "description": "Extract workspace notebook metadata as additional assets"
+        },
+        "include_pipelines": {
+          "type": "boolean",
+          "default": false,
+          "description": "Extract Delta Live Tables pipeline metadata as additional assets"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DatabricksOptional": {
+      "title": "DatabricksOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/DatabricksOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/DatabricksOptionalScope"
+        },
+        "extraction": {
+          "$ref": "#/definitions/DatabricksOptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SnowflakeAuthenticationType": {
+      "title": "SnowflakeAuthenticationType",
+      "type": "string",
+      "enum": [
+        "DEFAULT_AUTHENTICATOR",
+        "EXTERNAL_BROWSER_AUTHENTICATOR",
+        "KEY_PAIR_AUTHENTICATOR",
+        "OAUTH_AUTHENTICATOR_TOKEN"
+      ],
+      "description": "Snowflake authentication type"
+    },
+    "SnowflakeRequiredDefaultAuthenticator": {
+      "title": "SnowflakeRequiredDefaultAuthenticator",
+      "type": "object",
+      "properties": {
+        "authentication_type": {
+          "const": "DEFAULT_AUTHENTICATOR"
+        },
+        "account_id": {
+          "type": "string",
+          "description": "Snowflake account identifier (for example, xy12345.us-east-2.aws or ORGNAME-ACCOUNT_DEV)"
+        }
+      },
+      "required": [
+        "authentication_type",
+        "account_id"
+      ],
+      "additionalProperties": false
+    },
+    "SnowflakeRequiredExternalBrowserAuthenticator": {
+      "title": "SnowflakeRequiredExternalBrowserAuthenticator",
+      "type": "object",
+      "properties": {
+        "authentication_type": {
+          "const": "EXTERNAL_BROWSER_AUTHENTICATOR"
+        },
+        "account_id": {
+          "type": "string",
+          "description": "Snowflake account identifier (for example, xy12345.us-east-2.aws or ORGNAME-ACCOUNT_DEV)"
+        }
+      },
+      "required": [
+        "authentication_type",
+        "account_id"
+      ],
+      "additionalProperties": false
+    },
+    "SnowflakeRequiredKeyPairAuthenticator": {
+      "title": "SnowflakeRequiredKeyPairAuthenticator",
+      "type": "object",
+      "properties": {
+        "authentication_type": {
+          "const": "KEY_PAIR_AUTHENTICATOR"
+        },
+        "account_id": {
+          "type": "string",
+          "description": "Snowflake account identifier (for example, xy12345.us-east-2.aws or ORGNAME-ACCOUNT_DEV)"
+        }
+      },
+      "required": [
+        "authentication_type",
+        "account_id"
+      ],
+      "additionalProperties": false
+    },
+    "SnowflakeRequiredOauthAuthenticatorToken": {
+      "title": "SnowflakeRequiredOauthAuthenticatorToken",
+      "type": "object",
+      "properties": {
+        "authentication_type": {
+          "const": "OAUTH_AUTHENTICATOR_TOKEN"
+        },
+        "account_id": {
+          "type": "string",
+          "description": "Snowflake account identifier (for example, xy12345.us-east-2.aws or ORGNAME-ACCOUNT_DEV)"
+        }
+      },
+      "required": [
+        "authentication_type",
+        "account_id"
+      ],
+      "additionalProperties": false
+    },
+    "SnowflakeRequired": {
+      "title": "SnowflakeRequired",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/SnowflakeRequiredDefaultAuthenticator"
+        },
+        {
+          "$ref": "#/definitions/SnowflakeRequiredExternalBrowserAuthenticator"
+        },
+        {
+          "$ref": "#/definitions/SnowflakeRequiredKeyPairAuthenticator"
+        },
+        {
+          "$ref": "#/definitions/SnowflakeRequiredOauthAuthenticatorToken"
+        }
+      ]
+    },
+    "SnowflakeMaskedDefaultAuthenticator": {
+      "title": "SnowflakeMaskedDefaultAuthenticator",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Snowflake login username"
+        },
+        "password": {
+          "type": "string",
+          "description": "Snowflake login password"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "SnowflakeMaskedExternalBrowserAuthenticator": {
+      "title": "SnowflakeMaskedExternalBrowserAuthenticator",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Snowflake login username"
+        }
+      },
+      "required": [
+        "username"
+      ],
+      "additionalProperties": false
+    },
+    "SnowflakeMaskedKeyPairAuthenticator": {
+      "title": "SnowflakeMaskedKeyPairAuthenticator",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Snowflake login username"
+        },
+        "private_key": {
+          "type": "string",
+          "description": "Snowflake private key PEM content. You can pass escaped newlines (\\n)."
+        },
+        "private_key_password": {
+          "type": "string",
+          "description": "Password for encrypted private key PEM (optional when key is not encrypted)."
+        }
+      },
+      "required": [
+        "username",
+        "private_key"
+      ],
+      "additionalProperties": false
+    },
+    "SnowflakeMaskedOauthAuthenticatorToken": {
+      "title": "SnowflakeMaskedOauthAuthenticatorToken",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Snowflake login username"
+        },
+        "token": {
+          "type": "string",
+          "description": "OAuth bearer token for Snowflake authentication"
+        }
+      },
+      "required": [
+        "username",
+        "token"
+      ],
+      "additionalProperties": false
+    },
+    "SnowflakeMasked": {
+      "title": "SnowflakeMasked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/SnowflakeMaskedDefaultAuthenticator"
+        },
+        {
+          "$ref": "#/definitions/SnowflakeMaskedExternalBrowserAuthenticator"
+        },
+        {
+          "$ref": "#/definitions/SnowflakeMaskedKeyPairAuthenticator"
+        },
+        {
+          "$ref": "#/definitions/SnowflakeMaskedOauthAuthenticatorToken"
+        }
+      ]
+    },
+    "SnowflakeOptionalConnection": {
+      "title": "SnowflakeOptionalConnection",
+      "type": "object",
+      "description": "Snowflake connection and session tuning options.",
+      "properties": {
+        "warehouse": {
+          "type": "string",
+          "description": "Snowflake warehouse to use for metadata and sampling queries"
+        },
+        "role": {
+          "type": "string",
+          "description": "Snowflake role to use for metadata and sampling queries"
+        },
+        "snowflake_domain": {
+          "type": "string",
+          "default": "snowflakecomputing.com",
+          "description": "Snowflake domain suffix (use snowflakecomputing.cn for China regions)."
+        },
+        "connect_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 15,
+          "description": "Connection timeout in seconds"
+        },
+        "connect_args": {
+          "type": "object",
+          "description": "Additional snowflake.connector.connect keyword arguments (advanced usage).",
+          "default": {},
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "SnowflakeOptionalScope": {
+      "title": "SnowflakeOptionalScope",
+      "type": "object",
+      "description": "Database, schema, and object selection scope.",
+      "properties": {
+        "database": {
+          "type": "string",
+          "description": "Single database to scan (optional when include_all_databases is true)"
+        },
+        "include_all_databases": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scan all visible databases except excluded system databases"
+        },
+        "exclude_databases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "SNOWFLAKE",
+            "SNOWFLAKE_SAMPLE_DATA"
+          ],
+          "description": "Database denylist (exact database names)"
+        },
+        "include_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional schema allowlist (exact schema names)"
+        },
+        "exclude_schemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "INFORMATION_SCHEMA"
+          ],
+          "description": "Schema denylist (exact schema names)"
+        },
+        "include_tables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include table assets in extraction"
+        },
+        "include_views": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include view assets in extraction"
+        },
+        "include_objects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional object allowlist. Accepted forms: schema.object or database.schema.object"
+        },
+        "table_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of table/view assets extracted"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SnowflakeOptionalExtraction": {
+      "title": "SnowflakeOptionalExtraction",
+      "type": "object",
+      "description": "Lineage extraction controls for Snowflake metadata ingestion.",
+      "properties": {
+        "start_time": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Optional lineage lower bound timestamp (ISO 8601)."
+        },
+        "include_table_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include table-level lineage links when dependency metadata is accessible."
+        },
+        "include_view_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include view-to-table/view lineage links when dependency metadata is accessible."
+        }
+      },
+      "additionalProperties": false
+    },
+    "SnowflakeOptional": {
+      "title": "SnowflakeOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/SnowflakeOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/SnowflakeOptionalScope"
+        },
+        "extraction": {
+          "$ref": "#/definitions/SnowflakeOptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MongoDBDeployment": {
+      "title": "MongoDBDeployment",
+      "type": "string",
+      "enum": [
+        "ATLAS",
+        "ON_PREM"
+      ],
+      "description": "MongoDB deployment mode"
+    },
+    "MongoDBRequiredAtlas": {
+      "title": "MongoDBRequiredAtlas",
+      "type": "object",
+      "properties": {
+        "deployment": {
+          "const": "ATLAS"
+        },
+        "cluster_host": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Atlas SRV cluster host or full mongodb+srv:// URI (for example, cluster.abc123.mongodb.net or mongodb+srv://cluster.abc123.mongodb.net). If a full URI is supplied, the host is extracted and credentials are discarded — set them in masked fields instead."
+        }
+      },
+      "required": [
+        "deployment",
+        "cluster_host"
+      ],
+      "additionalProperties": false
+    },
+    "MongoDBRequiredOnPrem": {
+      "title": "MongoDBRequiredOnPrem",
+      "type": "object",
+      "properties": {
+        "deployment": {
+          "const": "ON_PREM"
+        },
+        "host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "On-prem MongoDB host endpoint"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 27017,
+          "description": "On-prem MongoDB TCP port"
+        }
+      },
+      "required": [
+        "deployment",
+        "host",
+        "port"
+      ],
+      "additionalProperties": false
+    },
+    "MongoDBRequired": {
+      "title": "MongoDBRequired",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/MongoDBRequiredAtlas"
+        },
+        {
+          "$ref": "#/definitions/MongoDBRequiredOnPrem"
+        }
+      ]
+    },
+    "MongoDBMaskedUsernamePassword": {
+      "title": "MongoDBMaskedUsernamePassword",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "MongoDB login username"
+        },
+        "password": {
+          "type": "string",
+          "description": "MongoDB login password"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "MongoDBMaskedNone": {
+      "title": "MongoDBMaskedNone",
+      "type": "object",
+      "description": "Use when the MongoDB endpoint allows anonymous/no-auth access.",
+      "maxProperties": 0,
+      "additionalProperties": false
+    },
+    "MongoDBMasked": {
+      "title": "MongoDBMasked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/MongoDBMaskedUsernamePassword"
+        },
+        {
+          "$ref": "#/definitions/MongoDBMaskedNone"
+        }
+      ]
+    },
+    "MongoDBAuthMechanism": {
+      "title": "MongoDBAuthMechanism",
+      "type": "string",
+      "enum": [
+        "DEFAULT",
+        "SCRAM-SHA-1",
+        "SCRAM-SHA-256",
+        "MONGODB-AWS",
+        "MONGODB-X509",
+        "GSSAPI",
+        "PLAIN"
+      ],
+      "description": "MongoDB authentication mechanism"
+    },
+    "MongoDBOptionalConnection": {
+      "title": "MongoDBOptionalConnection",
+      "type": "object",
+      "description": "MongoDB connection and authentication tuning options.",
+      "properties": {
+        "auth_mechanism": {
+          "$ref": "#/definitions/MongoDBAuthMechanism"
+        },
+        "auth_source": {
+          "type": "string",
+          "description": "Authentication database/source (for example, admin)"
+        },
+        "app_name": {
+          "type": "string",
+          "description": "MongoDB appName (Atlas and driver telemetry label)"
+        },
+        "tls": {
+          "type": "boolean",
+          "description": "Enable TLS for on-prem connections when required"
+        },
+        "replica_set": {
+          "type": "string",
+          "description": "Replica set name for on-prem deployments"
+        },
+        "direct_connection": {
+          "type": "boolean",
+          "description": "Connect directly to a single host instead of topology discovery"
+        },
+        "connect_timeout_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 120000,
+          "default": 10000,
+          "description": "MongoDB connection timeout in milliseconds"
+        },
+        "options": {
+          "type": "object",
+          "description": "Additional pymongo.MongoClient keyword arguments (advanced usage).",
+          "default": {},
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "MongoDBOptionalScope": {
+      "title": "MongoDBOptionalScope",
+      "type": "object",
+      "description": "MongoDB database and collection selection scope.",
+      "properties": {
+        "database": {
+          "type": "string",
+          "description": "Single database to scan (optional when include_all_databases is true)"
+        },
+        "include_all_databases": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan all visible databases except excluded system databases"
+        },
+        "exclude_databases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "admin",
+            "config",
+            "local"
+          ],
+          "description": "Database denylist (exact database names)"
+        },
+        "include_collections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional collection allowlist. Accepted forms: collection or database.collection"
+        },
+        "exclude_collections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional collection denylist. Accepted forms: collection or database.collection"
+        },
+        "include_system_collections": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include system.* collections when true"
+        },
+        "collection_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of collections extracted per database"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MongoDBOptional": {
+      "title": "MongoDBOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/MongoDBOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/MongoDBOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PowerBIAuthMode": {
+      "title": "PowerBIAuthMode",
+      "type": "string",
+      "enum": [
+        "SERVICE_PRINCIPAL",
+        "ACCESS_TOKEN"
+      ],
+      "description": "PowerBI authentication mode"
+    },
+    "PowerBIRequiredServicePrincipal": {
+      "title": "PowerBIRequiredServicePrincipal",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "SERVICE_PRINCIPAL"
+        },
+        "tenant_id": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F-]{36}$",
+          "description": "Azure tenant identifier"
+        },
+        "client_id": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F-]{36}$",
+          "description": "Azure app client identifier"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "tenant_id",
+        "client_id"
+      ],
+      "additionalProperties": false
+    },
+    "PowerBIRequiredAccessToken": {
+      "title": "PowerBIRequiredAccessToken",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "ACCESS_TOKEN"
+        }
+      },
+      "required": [
+        "auth_mode"
+      ],
+      "additionalProperties": false
+    },
+    "PowerBIRequired": {
+      "title": "PowerBIRequired",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/PowerBIRequiredServicePrincipal"
+        },
+        {
+          "$ref": "#/definitions/PowerBIRequiredAccessToken"
+        }
+      ]
+    },
+    "PowerBIMaskedClientSecret": {
+      "title": "PowerBIMaskedClientSecret",
+      "type": "object",
+      "properties": {
+        "client_secret": {
+          "type": "string",
+          "description": "Azure app client secret for service principal auth"
+        }
+      },
+      "required": [
+        "client_secret"
+      ],
+      "additionalProperties": false
+    },
+    "PowerBIMaskedAccessToken": {
+      "title": "PowerBIMaskedAccessToken",
+      "type": "object",
+      "properties": {
+        "access_token": {
+          "type": "string",
+          "description": "Bearer token for PowerBI API access"
+        }
+      },
+      "required": [
+        "access_token"
+      ],
+      "additionalProperties": false
+    },
+    "PowerBIMasked": {
+      "title": "PowerBIMasked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/PowerBIMaskedClientSecret"
+        },
+        {
+          "$ref": "#/definitions/PowerBIMaskedAccessToken"
+        }
+      ]
+    },
+    "PowerBIOptionalConnection": {
+      "title": "PowerBIOptionalConnection",
+      "type": "object",
+      "description": "PowerBI API endpoint and timeout controls.",
+      "properties": {
+        "authority_url": {
+          "type": "string",
+          "format": "uri",
+          "default": "https://login.microsoftonline.com",
+          "description": "Authority base URL for Microsoft Entra token issuance"
+        },
+        "api_base_url": {
+          "type": "string",
+          "format": "uri",
+          "default": "https://api.powerbi.com/v1.0/myorg",
+          "description": "PowerBI REST API base URL"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 300,
+          "default": 30,
+          "description": "HTTP timeout for PowerBI API calls"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PowerBIOptionalScope": {
+      "title": "PowerBIOptionalScope",
+      "type": "object",
+      "description": "Workspace scope controls for PowerBI ingestion.",
+      "properties": {
+        "workspace_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional allowlist of workspace IDs to scan"
+        },
+        "workspace_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional allowlist of workspace names to scan"
+        },
+        "include_personal_workspaces": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include personal workspaces when true"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PowerBIOptionalExtraction": {
+      "title": "PowerBIOptionalExtraction",
+      "type": "object",
+      "description": "Feature flags that control PowerBI entities to extract.",
+      "properties": {
+        "extract_ownership": {
+          "type": "boolean",
+          "default": false,
+          "description": "Extract workspace/report/dataset owner metadata"
+        },
+        "extract_workspaces_to_containers": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit workspace metadata suitable for container grouping"
+        },
+        "extract_datasets_to_containers": {
+          "type": "boolean",
+          "default": false,
+          "description": "Emit dataset metadata suitable for container grouping"
+        },
+        "extract_dashboards": {
+          "type": "boolean",
+          "default": true,
+          "description": "Extract PowerBI dashboards"
+        },
+        "extract_reports": {
+          "type": "boolean",
+          "default": true,
+          "description": "Extract PowerBI reports"
+        },
+        "extract_dataset_schema": {
+          "type": "boolean",
+          "default": true,
+          "description": "Attempt to extract PowerBI dataset table schema metadata"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PowerBIOptional": {
+      "title": "PowerBIOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/PowerBIOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/PowerBIOptionalScope"
+        },
+        "extraction": {
+          "$ref": "#/definitions/PowerBIOptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TableauAuthMode": {
+      "title": "TableauAuthMode",
+      "type": "string",
+      "enum": [
+        "USERNAME_PASSWORD",
+        "PERSONAL_ACCESS_TOKEN"
+      ],
+      "description": "Tableau authentication mode"
+    },
+    "TableauRequiredUsernamePassword": {
+      "title": "TableauRequiredUsernamePassword",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "USERNAME_PASSWORD"
+        },
+        "connect_uri": {
+          "type": "string",
+          "format": "uri",
+          "description": "Tableau host URL (for example, https://dub01.online.tableau.com)"
+        },
+        "site": {
+          "type": "string",
+          "default": "",
+          "description": "Tableau site content URL. Use empty string for the Default site on Tableau Server."
+        }
+      },
+      "required": [
+        "auth_mode",
+        "connect_uri",
+        "site"
+      ],
+      "additionalProperties": false
+    },
+    "TableauRequiredPersonalAccessToken": {
+      "title": "TableauRequiredPersonalAccessToken",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "PERSONAL_ACCESS_TOKEN"
+        },
+        "connect_uri": {
+          "type": "string",
+          "format": "uri",
+          "description": "Tableau host URL (for example, https://dub01.online.tableau.com)"
+        },
+        "site": {
+          "type": "string",
+          "default": "",
+          "description": "Tableau site content URL. Use empty string for the Default site on Tableau Server."
+        },
+        "token_name": {
+          "type": "string",
+          "description": "Tableau personal access token name"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "connect_uri",
+        "site",
+        "token_name"
+      ],
+      "additionalProperties": false
+    },
+    "TableauRequired": {
+      "title": "TableauRequired",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/TableauRequiredUsernamePassword"
+        },
+        {
+          "$ref": "#/definitions/TableauRequiredPersonalAccessToken"
+        }
+      ]
+    },
+    "TableauMaskedUsernamePassword": {
+      "title": "TableauMaskedUsernamePassword",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Tableau login username"
+        },
+        "password": {
+          "type": "string",
+          "description": "Tableau login password"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "TableauMaskedPersonalAccessToken": {
+      "title": "TableauMaskedPersonalAccessToken",
+      "type": "object",
+      "properties": {
+        "token_value": {
+          "type": "string",
+          "description": "Tableau personal access token value"
+        }
+      },
+      "required": [
+        "token_value"
+      ],
+      "additionalProperties": false
+    },
+    "TableauMasked": {
+      "title": "TableauMasked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/TableauMaskedUsernamePassword"
+        },
+        {
+          "$ref": "#/definitions/TableauMaskedPersonalAccessToken"
+        }
+      ]
+    },
+    "TableauOptionalConnection": {
+      "title": "TableauOptionalConnection",
+      "type": "object",
+      "description": "Tableau API connection and retry settings.",
+      "properties": {
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3,
+          "description": "Maximum retries for transient Tableau API request failures"
+        },
+        "ssl_verify": {
+          "type": [
+            "boolean",
+            "string"
+          ],
+          "default": true,
+          "description": "Verify SSL certificates. Provide a PEM bundle path string for custom certs."
+        },
+        "session_trust_env": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, allow requests session proxy/environment settings"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 300,
+          "default": 30,
+          "description": "HTTP timeout in seconds for Tableau requests"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TableauOptionalScope": {
+      "title": "TableauOptionalScope",
+      "type": "object",
+      "description": "Optional Tableau project/workbook/datasource scope filters.",
+      "properties": {
+        "project_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional Tableau project allowlist (exact names)"
+        },
+        "workbook_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional Tableau workbook allowlist (exact names)"
+        },
+        "datasource_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional Tableau datasource allowlist (exact names)"
+        },
+        "include_workbooks": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include workbook assets in extraction"
+        },
+        "include_datasources": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include datasource assets in extraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TableauOptionalExtraction": {
+      "title": "TableauOptionalExtraction",
+      "type": "object",
+      "description": "Tableau metadata extraction feature flags.",
+      "properties": {
+        "ingest_tags": {
+          "type": "boolean",
+          "default": false,
+          "description": "Extract Tableau tags into asset metadata"
+        },
+        "ingest_owner": {
+          "type": "boolean",
+          "default": false,
+          "description": "Extract Tableau owner metadata into assets"
+        },
+        "extract_usage_stats": {
+          "type": "boolean",
+          "default": false,
+          "description": "Extract Tableau usage statistics when accessible"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TableauOptional": {
+      "title": "TableauOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/TableauOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/TableauOptionalScope"
+        },
+        "extraction": {
+          "$ref": "#/definitions/TableauOptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CoreInput": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/AssetType"
+        },
+        "detectors": {
+          "$ref": "#/definitions/Detectors"
+        },
+        "custom_detectors": {
+          "$ref": "#/definitions/CustomDetectorSelections"
+        },
+        "sampling": {
+          "$ref": "#/definitions/SamplingConfig"
+        }
+      },
+      "required": [
+        "type",
+        "sampling"
+      ]
+    },
+    "SlackInput": {
+      "title": "SlackInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "SLACK"
+            },
+            "required": {
+              "$ref": "#/definitions/SlackRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/SlackMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/SlackOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SitemapInput": {
+      "title": "SitemapInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "SITEMAP"
+            },
+            "required": {
+              "$ref": "#/definitions/SitemapRequired"
+            },
+            "optional": {
+              "$ref": "#/definitions/SitemapOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "S3CompatibleStorageInput": {
+      "title": "S3CompatibleStorageInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "S3_COMPATIBLE_STORAGE"
+            },
+            "required": {
+              "$ref": "#/definitions/S3CompatibleStorageRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/S3CompatibleStorageMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/S3CompatibleStorageOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "AzureBlobStorageInput": {
+      "title": "AzureBlobStorageInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "AZURE_BLOB_STORAGE"
+            },
+            "required": {
+              "$ref": "#/definitions/AzureBlobStorageRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/AzureBlobStorageMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/AzureBlobStorageOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "GoogleCloudStorageInput": {
+      "title": "GoogleCloudStorageInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "GOOGLE_CLOUD_STORAGE"
+            },
+            "required": {
+              "$ref": "#/definitions/GoogleCloudStorageRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/GoogleCloudStorageMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/GoogleCloudStorageOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WordPressInput": {
+      "title": "WordPressInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "WORDPRESS"
+            },
+            "required": {
+              "$ref": "#/definitions/WordPressRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/WordPressMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/WordPressOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PostgreSQLInput": {
+      "title": "PostgreSQLInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "POSTGRESQL"
+            },
+            "required": {
+              "$ref": "#/definitions/PostgreSQLRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/PostgreSQLMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/PostgreSQLOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MySQLInput": {
+      "title": "MySQLInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "MYSQL"
+            },
+            "required": {
+              "$ref": "#/definitions/MySQLRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/MySQLMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/MySQLOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MSSQLInput": {
+      "title": "MSSQLInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "MSSQL"
+            },
+            "required": {
+              "$ref": "#/definitions/MSSQLRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/MSSQLMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/MSSQLOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "OracleInput": {
+      "title": "OracleInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "ORACLE"
+            },
+            "required": {
+              "$ref": "#/definitions/OracleRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/OracleMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/OracleOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "HiveInput": {
+      "title": "HiveInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "HIVE"
+            },
+            "required": {
+              "$ref": "#/definitions/HiveRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/HiveMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/HiveOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "DatabricksInput": {
+      "title": "DatabricksInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "DATABRICKS"
+            },
+            "required": {
+              "$ref": "#/definitions/DatabricksRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/DatabricksMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/DatabricksOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SnowflakeInput": {
+      "title": "SnowflakeInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "SNOWFLAKE"
+            },
+            "required": {
+              "$ref": "#/definitions/SnowflakeRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/SnowflakeMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/SnowflakeOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MongoDBInput": {
+      "title": "MongoDBInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "MONGODB"
+            },
+            "required": {
+              "$ref": "#/definitions/MongoDBRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/MongoDBMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/MongoDBOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PowerBIInput": {
+      "title": "PowerBIInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "POWERBI"
+            },
+            "required": {
+              "$ref": "#/definitions/PowerBIRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/PowerBIMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/PowerBIOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TableauInput": {
+      "title": "TableauInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "TABLEAU"
+            },
+            "required": {
+              "$ref": "#/definitions/TableauRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/TableauMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/TableauOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ConfluenceRequired": {
+      "title": "ConfluenceRequired",
+      "type": "object",
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Confluence Cloud tenant URL (for example, https://your-domain.atlassian.net)"
+        },
+        "account_email": {
+          "type": "string",
+          "format": "email",
+          "description": "Atlassian account email used with API token for Basic authentication"
+        }
+      },
+      "required": [
+        "base_url",
+        "account_email"
+      ],
+      "additionalProperties": false
+    },
+    "ConfluenceMasked": {
+      "title": "ConfluenceMasked",
+      "type": "object",
+      "properties": {
+        "api_token": {
+          "type": "string",
+          "description": "Atlassian API token for Confluence Cloud"
+        }
+      },
+      "required": [
+        "api_token"
+      ],
+      "additionalProperties": false
+    },
+    "ConfluenceOptionalConnection": {
+      "title": "ConfluenceOptionalConnection",
+      "type": "object",
+      "description": "HTTP and retry settings for Confluence API calls.",
+      "properties": {
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "default": 30,
+          "description": "HTTP request timeout for Confluence API calls"
+        },
+        "rate_limit_delay_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Additional delay between API requests to reduce rate-limit pressure"
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3,
+          "description": "Maximum retry attempts for transient API failures and rate limits"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConfluenceOptionalScopeSpaces": {
+      "title": "ConfluenceOptionalScopeSpaces",
+      "type": "object",
+      "description": "Space-level filters passed to Confluence /spaces endpoint.",
+      "properties": {
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 250,
+          "description": "Filter spaces by IDs (up to 250)"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 250,
+          "description": "Filter spaces by keys (up to 250)"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "global",
+            "collaboration",
+            "knowledge_base",
+            "personal",
+            "system",
+            "onboarding",
+            "xflow_sample_space"
+          ],
+          "description": "Filter spaces by space type"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "current",
+            "archived"
+          ],
+          "description": "Filter spaces by status"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 250,
+          "description": "Filter spaces by labels (comma-separated in API request)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConfluenceOptionalScope": {
+      "title": "ConfluenceOptionalScope",
+      "type": "object",
+      "properties": {
+        "spaces": {
+          "$ref": "#/definitions/ConfluenceOptionalScopeSpaces"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConfluenceOptionalContent": {
+      "title": "ConfluenceOptionalContent",
+      "type": "object",
+      "description": "Confluence content extraction controls.",
+      "properties": {
+        "include_footer_comments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include footer comments and aggregate them into a per-page comments asset"
+        },
+        "include_inline_comments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include inline comments and aggregate them into a per-page comments asset"
+        },
+        "include_attachments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include Confluence page attachments as related assets"
+        },
+        "include_linked_file_assets": {
+          "type": "boolean",
+          "default": true,
+          "description": "Materialize linked file-like URLs from page body as related assets"
+        },
+        "attachment_max_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "default": 5242880,
+          "description": "Maximum bytes downloaded per attachment for MIME inference and text extraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConfluenceOptional": {
+      "title": "ConfluenceOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/ConfluenceOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/ConfluenceOptionalScope"
+        },
+        "content": {
+          "$ref": "#/definitions/ConfluenceOptionalContent"
+        }
+      },
+      "additionalProperties": false
+    },
+    "JiraRequired": {
+      "title": "JiraRequired",
+      "type": "object",
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Jira Cloud tenant URL (for example, https://your-domain.atlassian.net)"
+        },
+        "account_email": {
+          "type": "string",
+          "format": "email",
+          "description": "Atlassian account email used with API token for Basic authentication"
+        }
+      },
+      "required": [
+        "base_url",
+        "account_email"
+      ],
+      "additionalProperties": false
+    },
+    "JiraMasked": {
+      "title": "JiraMasked",
+      "type": "object",
+      "properties": {
+        "api_token": {
+          "type": "string",
+          "description": "Atlassian API token for Jira Cloud"
+        }
+      },
+      "required": [
+        "api_token"
+      ],
+      "additionalProperties": false
+    },
+    "JiraOptionalConnection": {
+      "title": "JiraOptionalConnection",
+      "type": "object",
+      "description": "HTTP and retry settings for Jira API calls.",
+      "properties": {
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "default": 30,
+          "description": "HTTP request timeout for Jira API calls"
+        },
+        "rate_limit_delay_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Additional delay between API requests to reduce rate-limit pressure"
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3,
+          "description": "Maximum retry attempts for transient API failures and rate limits"
+        }
+      },
+      "additionalProperties": false
+    },
+    "JiraOptionalScope": {
+      "title": "JiraOptionalScope",
+      "type": "object",
+      "description": "Optional Jira scope filters. When omitted, all visible issues are eligible for sampling.",
+      "properties": {
+        "project_keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 50,
+          "description": "Project keys to include (up to 50)"
+        },
+        "project_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1,
+          "maxItems": 50,
+          "description": "Project IDs to include (up to 50)"
+        },
+        "jql": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Additional JQL filter to combine with project scope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "JiraOptionalContent": {
+      "title": "JiraOptionalContent",
+      "type": "object",
+      "description": "Jira issue content extraction controls.",
+      "properties": {
+        "include_comments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include issue comments and aggregate them into a per-issue comments asset"
+        },
+        "include_attachments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include issue attachments as related assets"
+        },
+        "attachment_max_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "default": 5242880,
+          "description": "Maximum bytes downloaded per attachment for MIME inference and text extraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "JiraOptional": {
+      "title": "JiraOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/JiraOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/JiraOptionalScope"
+        },
+        "content": {
+          "$ref": "#/definitions/JiraOptionalContent"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ServiceDeskRequired": {
+      "title": "ServiceDeskRequired",
+      "type": "object",
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Jira Service Management tenant URL (for example, https://your-domain.atlassian.net)"
+        },
+        "account_email": {
+          "type": "string",
+          "format": "email",
+          "description": "Atlassian account email used with API token for Basic authentication"
+        }
+      },
+      "required": [
+        "base_url",
+        "account_email"
+      ],
+      "additionalProperties": false
+    },
+    "ServiceDeskMasked": {
+      "title": "ServiceDeskMasked",
+      "type": "object",
+      "properties": {
+        "api_token": {
+          "type": "string",
+          "description": "Atlassian API token for Jira Service Management Cloud"
+        }
+      },
+      "required": [
+        "api_token"
+      ],
+      "additionalProperties": false
+    },
+    "ServiceDeskOptionalConnection": {
+      "title": "ServiceDeskOptionalConnection",
+      "type": "object",
+      "description": "HTTP and retry settings for Jira Service Management API calls.",
+      "properties": {
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "default": 30,
+          "description": "HTTP request timeout for Service Desk API calls"
+        },
+        "rate_limit_delay_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Additional delay between API requests to reduce rate-limit pressure"
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3,
+          "description": "Maximum retry attempts for transient API failures and rate limits"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ServiceDeskOptionalScope": {
+      "title": "ServiceDeskOptionalScope",
+      "type": "object",
+      "description": "Optional Service Desk scope filters. When omitted, all visible requests are eligible for sampling.",
+      "properties": {
+        "service_desk_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1,
+          "maxItems": 100,
+          "description": "Service desk IDs to include"
+        },
+        "request_type_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1,
+          "maxItems": 100,
+          "description": "Request type IDs to include"
+        },
+        "request_status": {
+          "type": "string",
+          "description": "Request status filter passed to Service Desk API"
+        },
+        "request_ownership": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Ownership filter values passed to Service Desk API (for example, OWNED_REQUESTS)"
+        },
+        "organization_id": {
+          "type": "integer",
+          "description": "Organization ID used to scope requests"
+        },
+        "search_term": {
+          "type": "string",
+          "description": "Search term filter for request summaries and content"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ServiceDeskOptionalContent": {
+      "title": "ServiceDeskOptionalContent",
+      "type": "object",
+      "description": "Service Desk request extraction controls.",
+      "properties": {
+        "include_comments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include request comments and aggregate them into a per-request comments asset"
+        },
+        "include_attachments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include request attachments as related assets"
+        },
+        "attachment_max_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "default": 5242880,
+          "description": "Maximum bytes downloaded per attachment for MIME inference and text extraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ServiceDeskOptional": {
+      "title": "ServiceDeskOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/ServiceDeskOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/ServiceDeskOptionalScope"
+        },
+        "content": {
+          "$ref": "#/definitions/ServiceDeskOptionalContent"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConfluenceInput": {
+      "title": "ConfluenceInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "CONFLUENCE"
+            },
+            "required": {
+              "$ref": "#/definitions/ConfluenceRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/ConfluenceMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/ConfluenceOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "JiraInput": {
+      "title": "JiraInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "JIRA"
+            },
+            "required": {
+              "$ref": "#/definitions/JiraRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/JiraMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/JiraOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ServiceDeskInput": {
+      "title": "ServiceDeskInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "SERVICEDESK"
+            },
+            "required": {
+              "$ref": "#/definitions/ServiceDeskRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/ServiceDeskMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/ServiceDeskOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

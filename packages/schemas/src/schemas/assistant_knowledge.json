@@ -1,0 +1,1305 @@
+{
+  "sources": {
+    "SLACK": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Pick a short name that makes the workspace obvious to your team.",
+          "suggestions": [
+            "Use the workspace name or domain (example: Acme Slack).",
+            "If you have multiple environments, include prod/dev in the name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Workspace helps stable naming and links, but token auth is what enables ingestion.",
+          "suggestions": [
+            "Set workspace to the short name or domain (example: acme).",
+            "You can still ingest without workspace, but URLs and IDs are cleaner when it is set."
+          ],
+          "questions": [
+            "What is the Slack workspace name or domain?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Choose the token type based on which channels you need.",
+          "suggestions": [
+            "Bot tokens (xoxb-) are best for public channels.",
+            "User tokens (xoxp-) are required for DMs or private channels.",
+            "If you use token + token_type, set token_type to bot or user."
+          ],
+          "questions": [
+            "Do you need private channels/DMs? If yes, use a user token.",
+            "Which token do you want to use?"
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.channels, optional.time_range, and optional.ingestion to tune scope and performance.",
+          "suggestions": [
+            "Use channel_types to discover channels; set channel_ids for an explicit list.",
+            "Use oldest/latest to limit date range in optional.time_range.",
+            "Tune optional.ingestion.batch_size and rate_limit_delay_seconds for API limits.",
+            "Enable optional.ingestion.include_thread_replies for full context (more API calls)."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many messages are fetched per channel each run.",
+          "suggestions": [
+            "Use LATEST to get the most recent messages in each channel.",
+            "Use RANDOM for a broad cross-channel signal.",
+            "Use ALL to ingest every message \u2014 only suitable for small or infrequently updated workspaces."
+          ]
+        }
+      }
+    },
+    "WORDPRESS": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Name it after the site so it is recognizable later.",
+          "suggestions": [
+            "Use the site name or domain (example: Example Blog).",
+            "If you manage multiple sites, include the environment name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "required.url is the only mandatory field for ingestion.",
+          "suggestions": [
+            "Use the full HTTPS URL (example: https://example.com).",
+            "If this is a sub-site, include the subdomain or path."
+          ],
+          "questions": [
+            "What is the WordPress site URL?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Only needed for private or draft content.",
+          "suggestions": [
+            "Public sites can leave masked empty.",
+            "For drafts/private, set masked.username and masked.application_password.",
+            "Application passwords are created in the WordPress user profile."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.content controls extraction scope.",
+          "suggestions": [
+            "Toggle optional.content.fetch_posts / fetch_pages to include or exclude content types.",
+            "Use optional.content.post_status to include drafts or private posts."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many posts and pages are fetched per run.",
+          "suggestions": [
+            "Use LATEST to always fetch the most recently modified content first.",
+            "Use RANDOM for a varied cross-section of your site.",
+            "Use ALL to scan the entire site \u2014 only recommended for small WordPress installs."
+          ]
+        }
+      }
+    },
+    "SITEMAP": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a site-scoped name that signals website index ingestion.",
+          "suggestions": [
+            "Use the domain in the name (example: Classifyre Website Index).",
+            "If you have multiple environments, include prod/staging."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "required.sitemap_url defines discovery entrypoint.",
+          "suggestions": [
+            "Use full HTTPS URLs.",
+            "Nested sitemap indexes are traversed automatically."
+          ],
+          "questions": [
+            "What is the sitemap URL to ingest?"
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.crawl and optional.assets tune coverage, performance, and lineage depth.",
+          "suggestions": [
+            "Enable optional.assets.fetch_related_assets to materialize image/pdf/video lineage assets.",
+            "Use optional.assets.include_external_links for broader lineage when needed.",
+            "Adjust optional.crawl.crawl_page_timeout_ms if pages are slow to load."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many sitemap pages are crawled per run.",
+          "suggestions": [
+            "Start with RANDOM and a small limit (10\u201325) to validate extraction quality before scaling up.",
+            "Use LATEST to always re-check the most recently modified pages first.",
+            "Use ALL to crawl every URL in the sitemap \u2014 combine with broken-link detectors for integrity checks."
+          ]
+        }
+      }
+    },
+    "S3_COMPATIBLE_STORAGE": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a storage-scoped name that makes endpoint and bucket intent obvious.",
+          "suggestions": [
+            "Include provider and data domain (example: R2 Marketing Exports).",
+            "Add environment markers when needed (prod/staging/dev)."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Set required.bucket for the S3-compatible container to scan.",
+          "suggestions": [
+            "Use this source for AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints.",
+            "Set optional.connection.endpoint_url for non-AWS providers."
+          ],
+          "questions": [
+            "What bucket should be scanned?",
+            "Do you need a custom endpoint_url?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Use static access keys or leave masked empty to rely on ambient AWS credential chain.",
+          "suggestions": [
+            "Set aws_access_key_id + aws_secret_access_key (+ aws_session_token for temporary credentials).",
+            "For AWS-native environments, IAM role/instance profile can be enough."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.connection and optional.scope to tune S3 listing/downloading behavior.",
+          "suggestions": [
+            "Set optional.scope.prefix to focus on a path-like subset.",
+            "Use include_extensions/exclude_extensions to limit formats (for example .pdf, .csv, .parquet).",
+            "Tune optional.connection.max_object_bytes to control download cost for content parsing.",
+            "Set include_content_preview=false if you only need object metadata indexing."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many objects are listed/processed each run.",
+          "suggestions": [
+            "Use LATEST to prioritize newly modified objects.",
+            "Use RANDOM for broad coverage across large containers.",
+            "Use ALL for full inventory sweeps when runtime and cost are acceptable."
+          ]
+        }
+      }
+    },
+    "AZURE_BLOB_STORAGE": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a container-scoped name that includes account and container intent.",
+          "suggestions": [
+            "Include account and domain (example: Azure Finance Archive).",
+            "Add environment markers when needed (prod/staging/dev)."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Set required.account_url and required.container for Azure Blob Storage.",
+          "suggestions": [
+            "Use account_url like https://<account>.blob.core.windows.net.",
+            "Set container to the exact Azure Blob container name."
+          ],
+          "questions": [
+            "What account_url should be scanned?",
+            "Which container should be scanned?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Use connection string, account key/SAS, or service principal credentials.",
+          "suggestions": [
+            "Prefer azure_connection_string for quick setup.",
+            "Use azure_account_key or azure_sas_token when needed.",
+            "Use azure_client_id + azure_client_secret + azure_tenant_id for service principal auth.",
+            "Leave masked empty to rely on managed identity/default credential chain."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.connection and optional.scope to tune listing/downloading behavior.",
+          "suggestions": [
+            "Set optional.scope.prefix to focus on a virtual folder prefix.",
+            "Use include_extensions/exclude_extensions to limit formats.",
+            "Tune optional.connection.max_object_bytes to control preview download cost."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many blobs are listed/processed each run.",
+          "suggestions": [
+            "Use LATEST to prioritize recently modified blobs.",
+            "Use RANDOM for broad coverage in large containers.",
+            "Use ALL for full inventory sweeps when runtime and cost are acceptable."
+          ]
+        }
+      }
+    },
+    "GOOGLE_CLOUD_STORAGE": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a bucket-scoped name that clearly identifies data domain and environment.",
+          "suggestions": [
+            "Include bucket purpose (example: GCS Product Exports).",
+            "Add environment markers when needed (prod/staging/dev)."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Set required.bucket for the Google Cloud Storage bucket to scan.",
+          "suggestions": [
+            "Use the exact GCS bucket name.",
+            "Set optional.connection.project_id when multiple project contexts are possible."
+          ],
+          "questions": [
+            "What bucket should be scanned?",
+            "Do you need a specific project_id override?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Use inline service account JSON or ambient ADC/workload identity.",
+          "suggestions": [
+            "Set gcp_credentials_json for inline service account credentials.",
+            "Use optional.connection.gcp_credentials_file for file-based credentials.",
+            "Leave masked empty to rely on GOOGLE_APPLICATION_CREDENTIALS or workload identity."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.connection and optional.scope to tune listing/downloading behavior.",
+          "suggestions": [
+            "Set optional.scope.prefix to focus on a key prefix.",
+            "Use include_extensions/exclude_extensions to limit formats.",
+            "Tune optional.connection.max_object_bytes to control preview download cost."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many GCS objects are listed/processed each run.",
+          "suggestions": [
+            "Use LATEST to prioritize recently modified objects.",
+            "Use RANDOM for broad coverage in large buckets.",
+            "Use ALL for full inventory sweeps when runtime and cost are acceptable."
+          ]
+        }
+      }
+    },
+    "POSTGRESQL": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a database-oriented name so teams can quickly identify scope.",
+          "suggestions": [
+            "Include environment and system name (example: Billing Postgres Prod).",
+            "If this is schema-scoped, include schema in the name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "required.host and required.port are mandatory; everything else is configured under optional sections.",
+          "suggestions": [
+            "Set required.host and required.port to DB endpoint values reachable from the runner.",
+            "Use optional.connection.ssl_mode/connect_timeout_seconds for extra connection controls.",
+            "Use optional.scope for database/schema/table selection."
+          ],
+          "questions": [
+            "What host should be scanned?",
+            "Do you want a single database or all visible databases?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "masked.username and masked.password are required for standard PostgreSQL auth.",
+          "suggestions": [
+            "Use a least-privilege read-only account.",
+            "Verify the account can read information_schema and target tables."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.connection and optional.scope tune connection behavior and scan scope.",
+          "suggestions": [
+            "Use optional.scope.database for focused scans; include_all_databases for broad coverage.",
+            "Use optional.scope.include_schemas/exclude_schemas to control cost.",
+            "Use optional.connection.ssl_mode and connect_timeout_seconds for secure or slow hosts."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how rows are sampled from each table.",
+          "suggestions": [
+            "Use LATEST with order_by_column=updated_at to focus on recently changed rows.",
+            "Use RANDOM for a broad, unbiased sample across all tables.",
+            "Use ALL to read every row \u2014 only suitable for small tables or targeted audits.",
+            "Tune max_columns and max_cell_chars to control content size per row."
+          ]
+        }
+      }
+    },
+    "MYSQL": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a database-oriented name so teams can quickly identify scope.",
+          "suggestions": [
+            "Include environment and system name (example: Billing MySQL Prod).",
+            "If this is database-scoped, include database in the name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "required.host and required.port are mandatory; everything else is configured under optional sections.",
+          "suggestions": [
+            "Set required.host and required.port to DB endpoint values reachable from the runner.",
+            "Use optional.connection.connect_timeout_seconds for extra connection controls.",
+            "Use optional.scope for database and table selection."
+          ],
+          "questions": [
+            "What host should be scanned?",
+            "Do you want a single database or all visible databases?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "masked.username and masked.password are required for standard MySQL auth.",
+          "suggestions": [
+            "Use a least-privilege read-only account.",
+            "Verify the account can read information_schema and target tables."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.connection and optional.scope tune connection behavior and scan scope.",
+          "suggestions": [
+            "Use optional.scope.database for focused scans; include_all_databases for broad coverage.",
+            "Use optional.scope.include_tables to target specific tables.",
+            "Use optional.connection.connect_timeout_seconds for slow or remote hosts."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how rows are sampled from each table.",
+          "suggestions": [
+            "Use LATEST with order_by_column=updated_at to focus on recently changed rows.",
+            "Use RANDOM for a broad, unbiased sample across all tables.",
+            "Use ALL to read every row \u2014 only suitable for small tables or targeted audits.",
+            "Tune max_columns and max_cell_chars to control content size per row."
+          ]
+        }
+      }
+    },
+    "MSSQL": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a database-oriented name so teams can quickly identify scope.",
+          "suggestions": [
+            "Include environment and system name (example: Billing MSSQL Prod).",
+            "If this is database-scoped, include database in the name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "required.host and required.port are mandatory; everything else is configured under optional sections.",
+          "suggestions": [
+            "Set required.host and required.port to SQL Server endpoint values reachable from the runner.",
+            "Use optional.connection.connect_timeout_seconds for slow or remote hosts.",
+            "Use optional.scope for database, schema, and object selection."
+          ],
+          "questions": [
+            "What host should be scanned?",
+            "Which SQL Server port should be used?",
+            "Do you want a single database or all visible databases?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "masked.username and masked.password are required. Choose optional.connection.auth_mode as CUSTOM or LDAP.",
+          "suggestions": [
+            "Use a least-privilege read-only account.",
+            "For LDAP mode, set optional.connection.ldap_domain to auto-prefix the username.",
+            "Verify the account can read INFORMATION_SCHEMA and target tables/views."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.connection and optional.scope tune connection behavior and scan scope.",
+          "suggestions": [
+            "Use optional.scope.database for focused scans; include_all_databases for broad coverage.",
+            "Use optional.scope.include_tables/include_views to control whether tables or views are extracted.",
+            "Use optional.scope.include_objects for explicit object allowlists.",
+            "Set optional.connection.is_aws_rds explicitly in production to avoid environment detection ambiguity.",
+            "Use optional.extraction.include_table_lineage/include_view_lineage to control lineage link generation."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how rows are sampled from each SQL Server table/view.",
+          "suggestions": [
+            "Use LATEST with order_by_column=updated_at to focus on recently changed rows.",
+            "Use RANDOM for a broad, unbiased sample across tables and views.",
+            "Use ALL to read every row \u2014 only suitable for small datasets or targeted audits.",
+            "Tune max_columns and max_cell_chars to control content size per row."
+          ]
+        }
+      }
+    },
+    "ORACLE": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a service-oriented name so teams can quickly identify Oracle scope.",
+          "suggestions": [
+            "Include environment and system name (example: Billing Oracle PROD).",
+            "If this is service-scoped, include service name in the source name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "required.host, required.port, and required.service_name are mandatory; everything else is configured under optional sections.",
+          "suggestions": [
+            "Set required.host and required.port to Oracle endpoint values reachable from the runner.",
+            "Set required.service_name to the Oracle service identifier (for example TEST_PDB).",
+            "Use optional.connection.connect_timeout_seconds for slow or remote hosts."
+          ],
+          "questions": [
+            "What Oracle host should be scanned?",
+            "Which Oracle port should be used?",
+            "What Oracle service_name should be used?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "masked.username and masked.password are required for standard Oracle auth.",
+          "suggestions": [
+            "Use a least-privilege read-only account.",
+            "Verify the account can read ALL_TABLES, ALL_VIEWS, ALL_TAB_COLUMNS, and dependency metadata."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.connection and optional.scope tune connection behavior, scope, and lineage depth.",
+          "suggestions": [
+            "Use optional.scope.include_tables/include_views to control extracted object types.",
+            "Enable optional.scope.include_view_lineage and include_view_column_lineage when downstream relationship context is needed.",
+            "Use optional.scope.include_objects for explicit object allowlists."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how rows are sampled from each Oracle table/view.",
+          "suggestions": [
+            "Use LATEST with order_by_column=updated_at to focus on recently changed rows.",
+            "Use RANDOM for a broad, unbiased sample across tables and views.",
+            "Use ALL to read every row \u2014 only suitable for small datasets or targeted audits.",
+            "Tune max_columns and max_cell_chars to control content size per row."
+          ]
+        }
+      }
+    },
+    "HIVE": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a warehouse-oriented name so teams can quickly identify Hive scope.",
+          "suggestions": [
+            "Include environment and platform name (example: Analytics Hive Prod).",
+            "If this is database-scoped, include the database in the source name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "required.host and required.port are mandatory; everything else is configured under optional sections.",
+          "suggestions": [
+            "Set required.host and required.port to Hive endpoint values reachable from the runner.",
+            "Use optional.scope.database for single-database scans or include_all_databases for broad coverage.",
+            "Set optional.connection.scheme when using HTTP/HTTPS transports (for example hive+https)."
+          ],
+          "questions": [
+            "What Hive host should be scanned?",
+            "Which Hive port should be used?",
+            "Do you want a single Hive database or all visible databases?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "masked.username and masked.password are used for username/password and LDAP-style Hive authentication.",
+          "suggestions": [
+            "Use a least-privilege read-only account.",
+            "For LDAP auth, set optional.connection.connect_args.auth to LDAP.",
+            "For Kerberos auth, use optional.connection.connect_args.auth=KERBEROS and set kerberos_service_name when needed."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.connection and optional.scope tune transport/authentication behavior and scan scope.",
+          "suggestions": [
+            "Use optional.connection.connect_args to pass Hive driver arguments (auth, kerberos_service_name, http_path).",
+            "Use optional.scope.include_tables/include_views to control extracted object types.",
+            "Use optional.scope.include_objects to target explicit objects."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how rows are sampled from each Hive table/view.",
+          "suggestions": [
+            "Use LATEST with order_by_column=updated_at when tables store recency fields.",
+            "Use RANDOM for broad coverage across Hive objects.",
+            "Use ALL for complete scans on small datasets or targeted audits.",
+            "Tune max_columns and max_cell_chars to cap detector payload size."
+          ]
+        }
+      }
+    },
+    "DATABRICKS": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a workspace/catalog-oriented name so teams can quickly identify Databricks Unity Catalog scope.",
+          "suggestions": [
+            "Include workspace and domain (example: Finance Databricks Unity Catalog).",
+            "If scoped to specific catalogs, include them in the source name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "required.workspace_url and required.warehouse_id are mandatory. Authentication mode switches between PAT_TOKEN and SERVICE_PRINCIPAL.",
+          "suggestions": [
+            "Use PAT_TOKEN for personal access token auth with masked.token.",
+            "Use SERVICE_PRINCIPAL with required.client_id and masked.client_secret for non-user automation.",
+            "Set required.warehouse_id to enable SQL-based row sampling."
+          ],
+          "questions": [
+            "Which Databricks workspace_url should be scanned?",
+            "Which SQL warehouse_id should be used for sampling?",
+            "Do you want PAT_TOKEN or SERVICE_PRINCIPAL authentication?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Store Databricks secrets only in masked fields.",
+          "suggestions": [
+            "PAT_TOKEN mode requires masked.token.",
+            "SERVICE_PRINCIPAL mode requires masked.client_secret.",
+            "Avoid embedding credentials in workspace URLs."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.connection tunes API/statement behavior, optional.scope narrows Unity Catalog objects, and optional.extraction controls lineage/notebook/pipeline metadata.",
+          "suggestions": [
+            "Use optional.scope.include_catalogs/include_schemas/include_tables for focused scans.",
+            "Enable optional.extraction.include_table_lineage to populate table links.",
+            "Enable include_notebooks/include_pipelines only when you need those metadata assets."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls sampled rows per Unity Catalog table during detector payload generation.",
+          "suggestions": [
+            "Use LATEST with order_by_column=updated_at for recency-focused monitoring.",
+            "Use RANDOM for broad row coverage across many tables.",
+            "Use ALL for complete scans only on small scoped datasets."
+          ]
+        }
+      }
+    },
+    "SNOWFLAKE": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use an account-oriented name so teams can quickly identify Snowflake scope.",
+          "suggestions": [
+            "Include account and business domain (example: Finance Snowflake Prod).",
+            "If this is database-scoped, include the database name in the source name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "required.account_id and required.authentication_type are mandatory. Authentication type switches masked fields.",
+          "suggestions": [
+            "Use DEFAULT_AUTHENTICATOR with masked.username and masked.password for standard service accounts.",
+            "Use KEY_PAIR_AUTHENTICATOR with masked.username and masked.private_key for key-pair auth.",
+            "Set account_id as locator/org-account form; full host URLs are normalized automatically."
+          ],
+          "questions": [
+            "Which Snowflake account_id should be scanned?",
+            "Which authentication_type do you want to use?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Store Snowflake credentials and key material only in masked fields.",
+          "suggestions": [
+            "DEFAULT_AUTHENTICATOR requires masked.username and masked.password.",
+            "KEY_PAIR_AUTHENTICATOR requires masked.username and masked.private_key (plus optional private_key_password).",
+            "OAUTH_AUTHENTICATOR_TOKEN requires masked.username and masked.token."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.connection tunes account/session settings, optional.scope narrows object selection, and optional.extraction controls lineage windows.",
+          "suggestions": [
+            "Use optional.connection.warehouse and role for predictable SQL context.",
+            "Use optional.scope.database/include_schemas/include_objects to constrain scan cost.",
+            "Set optional.extraction.start_time with include_table_lineage/include_view_lineage to bound lineage extraction."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how rows are sampled from each Snowflake table/view.",
+          "suggestions": [
+            "Use LATEST with order_by_column=UPDATED_AT when recency fields exist.",
+            "Use RANDOM for broad row coverage across scoped objects.",
+            "Use ALL only for small schemas or focused audits."
+          ]
+        }
+      }
+    },
+    "MONGODB": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a deployment-oriented name so teams can quickly identify the MongoDB scope.",
+          "suggestions": [
+            "Include environment and deployment type (example: Finance MongoDB Atlas Prod).",
+            "If the scan is scoped to a single database, include the database name (example: Chunker MongoDB Atlas — chunker).",
+            "For multi-database scans, use the cluster name (example: BIGFREE Atlas — all databases)."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Choose deployment mode first — Atlas uses cluster_host, on-prem uses host and port.",
+          "suggestions": [
+            "For Atlas: set required.deployment=ATLAS and required.cluster_host to the bare host (bigfree.zaz2dbb.mongodb.net) or a full mongodb+srv:// URI — credentials in the URI are discarded, always use masked fields.",
+            "For on-prem: set required.deployment=ON_PREM with required.host (e.g. mongo.internal) and required.port (default 27017).",
+            "Never embed username or password in cluster_host — use masked.username and masked.password instead."
+          ],
+          "questions": [
+            "Is this MongoDB Atlas or self-hosted / on-prem?",
+            "What is the Atlas cluster host, or the on-prem host and port?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Use masked.username and masked.password for SCRAM authentication. Pass an empty object {} for anonymous/no-auth access.",
+          "suggestions": [
+            "Use a least-privilege read-only account (e.g. a user with the readAnyDatabase role on Atlas).",
+            "Set optional.connection.auth_mechanism=SCRAM-SHA-256 for Atlas (recommended) or SCRAM-SHA-1 for older deployments.",
+            "Set optional.connection.auth_source=admin when the user account lives in the admin database (common for on-prem).",
+            "For unauthenticated local dev clusters, pass masked={} (empty object) — the MongoDBMaskedNone variant."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.connection tunes authentication and TLS; optional.scope controls which databases and collections are scanned.",
+          "suggestions": [
+            "Scope to a single database: set optional.scope.database='mydb' and optional.scope.include_all_databases=false — faster and cheaper.",
+            "Scan all databases: leave include_all_databases=true; system databases (admin, config, local) are excluded by default via optional.scope.exclude_databases.",
+            "Use optional.scope.include_collections or exclude_collections (as 'collection' or 'database.collection' strings) to allow-/deny-list specific collections.",
+            "Cap cost on wide clusters: set optional.scope.collection_limit (e.g. 50) to stop after N collections per database.",
+            "TLS: optional.connection.tls=true is usually required for remote/cloud deployments; Atlas handles it by default.",
+            "Replica sets: set optional.connection.replica_set for on-prem replica set names.",
+            "Connection timeout: optional.connection.connect_timeout_ms defaults to 10000 ms; increase for slow networks."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many documents are sampled from each collection and in what order.",
+          "suggestions": [
+            "Use RANDOM (default) for broad, unbiased coverage — uses MongoDB $sample aggregation per collection.",
+            "Use LATEST to prioritise the newest documents (sorted descending by _id or a custom order_by_column); useful for audit-trail or event collections.",
+            "Use ALL only for small, targeted collections — reads every document.",
+            "Set limit (default 100) to the number of documents per collection; lower values (10-30) for large clusters, higher (200+) for focused audits.",
+            "Set order_by_column to a timestamp field (e.g. updated_at) combined with LATEST to get truly recent documents; set fallback_to_random=true so collections without that field still get sampled.",
+            "Tune max_total_chars (default 20000) and max_cell_chars to control content size sent to detectors."
+          ]
+        },
+        "detectors": {
+          "title": "Detectors",
+          "summary": "MongoDB collections often contain PII, secrets, and sensitive business data — detectors are highly recommended.",
+          "suggestions": [
+            "Enable SECRETS to catch API keys, tokens, and credentials stored in documents (common in config or session collections).",
+            "Enable PII to detect names, emails, phone numbers, and government IDs in user/customer collections.",
+            "Enable FINANCIAL to detect card numbers, IBANs, and account references in transaction or billing collections.",
+            "Run SECRETS + PII together for most Atlas deployments — they are fast, regex-based, and add minimal overhead.",
+            "Custom detectors (CLASSIFIER / ENTITY / RULESET) can be layered on top for domain-specific classification."
+          ]
+        }
+      }
+    },
+    "POWERBI": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a workspace-oriented name so teams can quickly identify PowerBI scope.",
+          "suggestions": [
+            "Include tenant or business domain (example: Finance PowerBI Tenant A).",
+            "If this is workspace-scoped, include the workspace name in the source name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "PowerBI requires an auth mode switch: SERVICE_PRINCIPAL uses tenant/client IDs, ACCESS_TOKEN uses a pre-issued bearer token.",
+          "suggestions": [
+            "For SERVICE_PRINCIPAL, set required.tenant_id and required.client_id.",
+            "For ACCESS_TOKEN, set required.auth_mode=ACCESS_TOKEN and provide masked.access_token.",
+            "Keep all secrets in masked fields only."
+          ],
+          "questions": [
+            "Do you want SERVICE_PRINCIPAL or ACCESS_TOKEN authentication?",
+            "Which tenant/workspace scope should be scanned?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Use masked.client_secret for service principal auth or masked.access_token for bearer-token auth.",
+          "suggestions": [
+            "Prefer service principal auth for long-lived scheduled ingestion.",
+            "Use access tokens for short-lived delegated flows only.",
+            "Never embed secrets inside optional.connection URLs or extra options."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.connection tunes API behavior, optional.scope limits workspaces, and optional.extraction toggles entity groups.",
+          "suggestions": [
+            "Use optional.scope.workspace_ids or workspace_names to reduce scan cost.",
+            "Set optional.extraction.extract_dataset_schema=true when dataset table metadata is required.",
+            "Set optional.extraction.extract_ownership=true only when principal permissions allow owner reads."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many PowerBI assets are extracted per run.",
+          "suggestions": [
+            "Use RANDOM for broad coverage across dashboards/reports/datasets.",
+            "Use LATEST with order_by_column=modifiedDateTime when workspace APIs expose update timestamps.",
+            "Use ALL for full tenant/workspace inventories or baseline audits."
+          ]
+        }
+      }
+    },
+    "TABLEAU": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a Tableau scope-oriented name that reflects site and ownership context.",
+          "suggestions": [
+            "Include the Tableau site and business domain (example: Tableau Finance).",
+            "If scoped to one project, include the project name in the source name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Tableau supports auth mode switching: USERNAME_PASSWORD or PERSONAL_ACCESS_TOKEN.",
+          "suggestions": [
+            "Set required.connect_uri and required.site for every Tableau source.",
+            "Use USERNAME_PASSWORD with masked.username and masked.password for server-managed credentials.",
+            "Use PERSONAL_ACCESS_TOKEN with required.token_name and masked.token_value for Tableau Cloud automation."
+          ],
+          "questions": [
+            "Do you want USERNAME_PASSWORD or PERSONAL_ACCESS_TOKEN authentication?",
+            "Which Tableau connect_uri and site should be scanned?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Store Tableau credentials or token values only in masked fields.",
+          "suggestions": [
+            "USERNAME_PASSWORD mode requires masked.username and masked.password.",
+            "PERSONAL_ACCESS_TOKEN mode requires masked.token_value.",
+            "Never embed credentials in connect_uri or optional fields."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.connection tunes API retries and TLS, optional.scope narrows projects/workbooks/datasources, and optional.extraction controls tags/owners/usage stats.",
+          "suggestions": [
+            "Use optional.scope.project_names/workbook_names/datasource_names to reduce scan cost.",
+            "Enable optional.extraction.ingest_tags and ingest_owner only when downstream governance needs them.",
+            "Enable optional.extraction.extract_usage_stats only when Tableau permissions expose usage metadata."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many Tableau assets are extracted per run.",
+          "suggestions": [
+            "Use RANDOM for broad workbook and datasource coverage.",
+            "Use LATEST with order_by_column=updated_at to prioritize recently changed Tableau assets.",
+            "Use ALL for full Tableau inventories when scope is small."
+          ]
+        }
+      }
+    },
+    "CONFLUENCE": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a Confluence instance and scope-oriented name so teams can identify coverage quickly.",
+          "suggestions": [
+            "Include tenant and scope (example: Acme Confluence Engineering).",
+            "If multiple environments exist, include prod/staging in the name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Cloud ingestion requires base URL and account email for Basic auth with an API token.",
+          "suggestions": [
+            "Use base tenant URL (example: https://your-domain.atlassian.net).",
+            "Use the Atlassian account email tied to your API token."
+          ],
+          "questions": [
+            "What is the Confluence Cloud base URL?",
+            "Which account email should be used for API access?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Confluence Cloud uses API token authentication; token stays in masked config only.",
+          "suggestions": [
+            "Create an Atlassian API token from id.atlassian.com and store it in masked.api_token.",
+            "Minimum read scopes for this connector: read:space:confluence, read:page:confluence, read:comment:confluence, read:attachment:confluence."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.connection, optional.scope.spaces, and optional.content to tune API behavior and extraction depth.",
+          "suggestions": [
+            "Use optional.scope.spaces keys/ids/type/status/labels to constrain ingestion.",
+            "Enable comments and attachments for detector context and richer lineage.",
+            "Tune request_timeout_seconds and max_retries for network reliability."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many Confluence pages are processed per run.",
+          "suggestions": [
+            "Use LATEST for frequent syncs focused on recently updated pages.",
+            "Use RANDOM for broad health checks across spaces.",
+            "Use ALL only when full historical scanning is required."
+          ]
+        }
+      }
+    },
+    "JIRA": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Name should reflect Jira tenant and project scope for easy ownership.",
+          "suggestions": [
+            "Include tenant and domain area (example: Acme Jira Product).",
+            "If this is security-focused, include SEC/IR in the name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Cloud ingestion requires base URL and account email for Basic auth with an API token.",
+          "suggestions": [
+            "Use base tenant URL (example: https://your-domain.atlassian.net).",
+            "Use the Atlassian account email tied to your API token."
+          ],
+          "questions": [
+            "What is the Jira Cloud base URL?",
+            "Which account email should be used for API access?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Jira Cloud token stays in masked config; connector uses Basic auth with account email.",
+          "suggestions": [
+            "Store only api_token in masked config; keep email in required.account_email.",
+            "Classic read scope: read:jira-work. Granular read scope guidance includes issue/comment/attachment/project read scopes."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.connection, optional.scope, and optional.content to tune Jira API behavior and extraction depth.",
+          "suggestions": [
+            "Set optional.scope.project_keys/project_ids/jql when you want to limit extraction to specific teams or workflows.",
+            "Leave optional.scope empty to scan all visible issues, then control volume with sampling.",
+            "Tune include_comments/include_attachments for cost vs context.",
+            "Set max_retries and timeout settings for high-volume projects."
+          ],
+          "questions": [
+            "Do you want to limit Jira ingestion to specific projects?",
+            "Do you have a JQL filter to narrow issue selection?"
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many issues are processed each run from the selected (or full) Jira scope.",
+          "suggestions": [
+            "Use LATEST for operational monitoring of recent ticket changes.",
+            "Use RANDOM for broad project quality checks.",
+            "Use ALL only for smaller tenants or periodic full audits."
+          ]
+        }
+      }
+    },
+    "SERVICEDESK": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Name should reflect Jira Service Management tenant and support scope for easy ownership.",
+          "suggestions": [
+            "Include tenant and support domain (example: Acme Service Desk Support).",
+            "If focused on incidents, include Incident/IR in the name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Cloud ingestion requires base URL and account email for Basic auth with an API token.",
+          "suggestions": [
+            "Use base tenant URL (example: https://your-domain.atlassian.net).",
+            "Use the Atlassian account email tied to your API token."
+          ],
+          "questions": [
+            "What is the Jira Service Management base URL?",
+            "Which account email should be used for API access?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Service Desk token stays in masked config; connector uses Basic auth with account email.",
+          "suggestions": [
+            "Store only api_token in masked config; keep email in required.account_email.",
+            "Classic read scope: read:servicedesk-request. Granular guidance includes read:request:jira-service-management, read:request.comment:jira-service-management, read:request.attachment:jira-service-management, read:servicedesk:jira-service-management, and read:user:jira."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.connection, optional.scope, and optional.content to tune Service Desk API behavior and extraction depth.",
+          "suggestions": [
+            "Set optional.scope.service_desk_ids/request_type_ids/request_status to focus on relevant queues and workflows.",
+            "Leave optional.scope empty to scan all visible requests, then control volume with sampling.",
+            "Tune include_comments/include_attachments for cost vs context.",
+            "Set max_retries and timeout settings for high-volume queues."
+          ],
+          "questions": [
+            "Do you want to limit ingestion to specific service desks or request types?",
+            "Should comments and attachments be included in extraction?"
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many service requests are processed each run from the selected (or full) scope.",
+          "suggestions": [
+            "Use LATEST for operational monitoring of newly updated support requests.",
+            "Use RANDOM for broad quality checks across request queues.",
+            "Use ALL only for smaller tenants or periodic full audits."
+          ]
+        }
+      }
+    }
+  },
+  "schedule": {
+    "title": "Ingestion schedule",
+    "summary": "Automate how often each source is scanned using a built-in cron scheduler.",
+    "suggestions": [
+      "Choose a frequency preset from the Schedule card on the source configuration page.",
+      "Each preset picks a random time within a safe window to avoid all sources running simultaneously.",
+      "Use 'Reroll' to regenerate the random time within the same window.",
+      "For precise control, expand the 'Advanced' accordion and enter a custom 5-field cron expression.",
+      "Nightly (12 am\u20132 am) is best for web crawlers and large ingestion jobs.",
+      "Weekday mornings (6 am\u20139 am Mon\u2013Fri) suit team-facing sources like Slack.",
+      "Disable the schedule to run sources manually only."
+    ],
+    "presets": {
+      "nightly": "Random minute, 12 am\u20131:59 am UTC daily",
+      "daily": "Random hour and minute, once per day",
+      "weekday_morning": "Random minute, 6 am\u20138:59 am UTC, Mon\u2013Fri",
+      "weekday_business": "Random minute, 9 am\u20134:59 pm UTC, Mon\u2013Fri",
+      "weekly": "Random minute, 12 am\u20131:59 am UTC, Sunday",
+      "custom": "User-supplied 5-field cron expression"
+    }
+  },
+  "sampling": {
+    "title": "Sampling",
+    "summary": "Sampling controls how much content is fetched from a source each run, and in what order.",
+    "suggestions": [
+      "LATEST fetches the most recently modified items first \u2014 best for catching new or changed content.",
+      "RANDOM picks a random subset each run \u2014 useful for broad coverage without recency bias.",
+      "ALL scans every item with no limit \u2014 use only on small or static sources to avoid long runs.",
+      "Enable fetch_all_until_first_success to do one-time full coverage until the first successful run, then automatically fall back to your configured sampling strategy.",
+      "The limit field controls how many items are fetched for LATEST and RANDOM strategies.",
+      "For tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake), set order_by_column to a date column (e.g. updated_at) to improve LATEST accuracy.",
+      "For S3-compatible storage, Azure Blob Storage, and Google Cloud Storage, LATEST uses provider last-modified timestamps while RANDOM selects a deterministic random subset from listed objects.",
+      "For MongoDB, LATEST uses newest documents first (by _id ordering) and RANDOM uses document-level random sampling per collection.",
+      "For PowerBI, sampling applies to discovered workspaces/datasets/reports/dashboards: LATEST sorts by metadata timestamps when available, RANDOM samples assets uniformly, and ALL keeps full inventory coverage.",
+      "For Tableau, sampling applies to discovered workbooks and datasources: LATEST uses metadata timestamps (for example updated_at), RANDOM samples assets uniformly, and ALL keeps the full inventory.",
+      "max_columns, max_cell_chars, and max_total_chars cap content size per row for tabular sources."
+    ],
+    "strategies": {
+      "RANDOM": "Pick a random subset of items each run. Provides broad, unbiased coverage.",
+      "LATEST": "Sort by last-modified date and fetch the newest items first. Best for monitoring recent changes.",
+      "ALL": "Fetch every item with no limit. Suitable only for small or static sources."
+    }
+  },
+  "detectors": {
+    "SECRETS": {
+      "title": "Secrets detection",
+      "summary": "Find API keys, tokens, and credentials.",
+      "suggestions": [
+        "Core Secrets preset is high-signal for common providers.",
+        "Broad Sweep increases coverage but may increase noise.",
+        "Raise confidence_threshold to reduce false positives."
+      ]
+    },
+    "PII": {
+      "title": "PII detection",
+      "summary": "Find personal and sensitive identifiers.",
+      "suggestions": [
+        "High Risk PII focuses on sensitive IDs and financial info.",
+        "Contact PII is useful for emails and phone numbers.",
+        "Use severity_threshold to tune alerting."
+      ]
+    },
+    "TOXIC": {
+      "title": "Toxic content detection",
+      "summary": "Find abusive or harmful text.",
+      "suggestions": [
+        "Text Safety preset balances recall and precision.",
+        "Increase confidence_threshold for stricter alerts."
+      ]
+    },
+    "NSFW": {
+      "title": "NSFW detection",
+      "summary": "Find inappropriate or explicit visual content.",
+      "suggestions": [
+        "NSFW Standard works for most cases.",
+        "Use NSFW Explicit for stricter filtering."
+      ]
+    },
+    "YARA": {
+      "title": "YARA detection",
+      "summary": "Scan for malware and suspicious patterns.",
+      "suggestions": [
+        "Baseline YARA is a safe starting point.",
+        "Strict YARA increases timeout for deeper scans."
+      ]
+    },
+    "BROKEN_LINKS": {
+      "title": "Broken links detection",
+      "summary": "Check that extracted links and images are reachable and not empty.",
+      "suggestions": [
+        "Enable for URL-heavy pages where link integrity matters.",
+        "Findings are low severity by default and focus on availability."
+      ]
+    },
+    "CUSTOM": {
+      "title": "Custom detector",
+      "summary": "Build user-defined detections using ruleset, classifier, or entity extraction methods.",
+      "suggestions": [
+        "Use RULESET for deterministic keyword/regex matching with transparent logic.",
+        "Use CLASSIFIER to start with zero-shot labels, then add examples for SetFit fine-tuning.",
+        "Use ENTITY to extract custom spans with GLiNER labels in multilingual text.",
+        "Set a stable custom_detector_key so findings and feedback stay linked across runs."
+      ],
+      "methods": {
+        "RULESET": {
+          "title": "Ruleset detector",
+          "summary": "Deterministic detection using regex patterns, keyword lists, and scoring thresholds. Fully transparent — no training required. Best for well-structured patterns like IBANs, VAT IDs, GDPR keywords, financial amounts, and compliance markers.",
+          "when_to_use": [
+            "You need 100% reproducible, explainable results.",
+            "The signal is a known pattern (regex), a keyword list, or a co-occurrence rule.",
+            "You need immediate results — no training step required.",
+            "Examples: IBAN numbers, GDPR keyword density, 'Vertraulich' markers, financial amounts above a threshold."
+          ],
+          "config_shape": {
+            "regex_rules": "Array of { id (string, required), name (string, required), pattern (string, required), flags (string, e.g. 'i' for case-insensitive), severity ('critical'|'high'|'medium'|'low'|'info') }. additionalProperties:false — NO label, NO weight fields.",
+            "keyword_rules": "Array of { id (string, required), name (string, required), keywords (string[], required), case_sensitive (boolean, default false), severity }. additionalProperties:false — NO label, NO weight fields.",
+            "confidence_threshold": "Top-level float (0–1). Default 0.7. This controls reporting sensitivity. There is NO flag_threshold and NO weight scoring.",
+            "important": "additionalProperties is false on every rule object — any unknown field (label, weight, flag_threshold) causes a validation error."
+          },
+          "examples": [
+            {
+              "use_case": "Person name mention (case-insensitive)",
+              "key": "ruleset_name_mention",
+              "name": "Name Mention Ruleset",
+              "config_sketch": "regex_rules: [{id:'Ostap_mention',name:'Name mention',pattern:'\\\\b(Ostap|Bender|andri)\\\\b',flags:'i',severity:'medium'}]"
+            },
+            {
+              "use_case": "GDPR keyword density (Austrian/German DSGVO)",
+              "key": "gdpr_keyword_ruleset",
+              "name": "GDPR Keyword Ruleset",
+              "config_sketch": "keyword_rules: [{id:'gdpr_terms',name:'GDPR Terms',keywords:['Datenschutz','DSGVO','Einwilligung','Auskunft','Berichtigung','Löschung'],case_sensitive:false,severity:'high'}]"
+            },
+            {
+              "use_case": "IBAN regex detection",
+              "key": "financial_disclosure_ruleset",
+              "name": "Financial Disclosure Ruleset",
+              "config_sketch": "regex_rules: [{id:'iban',name:'IBAN',pattern:'[A-Z]{2}\\\\d{2}[\\\\s\\\\d]{15,32}',severity:'high'},{id:'eur_amount',name:'EUR Amount',pattern:'EUR\\\\s[\\\\d.]+,[\\\\d]{2}',severity:'medium'}]"
+            },
+            {
+              "use_case": "Confidentiality marker",
+              "key": "confidentiality_marker_ruleset",
+              "name": "Confidentiality Marker Ruleset",
+              "config_sketch": "keyword_rules: [{id:'confidential',name:'Confidential markers',keywords:['Vertraulich','Nicht zur Weitergabe','Streng vertraulich','Confidential'],case_sensitive:false,severity:'high'}]"
+            }
+          ],
+          "tips": [
+            "Start with keyword_rules — they are easier to audit than regex.",
+            "Use flags:'i' on regex_rules for case-insensitive matching instead of duplicating patterns.",
+            "Always include a true-negative test: run the ruleset on clean text to verify zero hits.",
+            "For IBAN patterns use: [A-Z]{2}\\d{2}[\\s\\d]{15,32}",
+            "For AT/DE/CH VAT IDs: (ATU\\d{8}|DE\\d{9}|CHE-\\d{3}\\.\\d{3}\\.\\d{3})",
+            "For German date formats: \\d{1,2}\\.\\s*\\w+\\s+\\d{4}|\\d{1,2}\\.\\d{1,2}\\.\\d{2,4}"
+          ]
+        },
+        "CLASSIFIER": {
+          "title": "Classifier detector",
+          "summary": "Assigns a label (and confidence score) to the full document or a passage. Starts zero-shot with label names alone — add labeled examples to fine-tune with SetFit. Best for tone, intent, compliance category, language, and risk classification.",
+          "when_to_use": [
+            "You need to categorize documents by topic, tone, intent, or risk level.",
+            "The signal is semantic — not a fixed pattern.",
+            "You want to start without training data (zero-shot) and refine later.",
+            "Examples: financial advice vs. information vs. opinion, toxicity, language detection, spam, anonymity risk."
+          ],
+          "config_shape": {
+            "labels": "Array of OBJECTS { id (string, required), name (string, required), description (string, optional) }. NOT plain strings — additionalProperties:false.",
+            "training_examples": "Optional array of { text (string), label (string) } pairs — for SetFit fine-tuning with 8+ examples per label.",
+            "confidence_threshold": "Top-level float (0–1). Default 0.7.",
+            "hypothesis_template": "Template for zero-shot NLI, e.g. 'This text contains {}.' The {} is replaced with the label name.",
+            "important": "labels must be objects with id+name, never plain strings like 'advice'."
+          },
+          "examples": [
+            {
+              "use_case": "Financial advice classifier (DACH content safety)",
+              "key": "financial_advice_classifier",
+              "name": "Financial Advice Classifier",
+              "labels_value": [{"id":"advice","name":"Financial Advice"},{"id":"information","name":"Information"},{"id":"opinion","name":"Opinion"}],
+              "note": "'advice' = directive ('Sie sollten...', 'Kaufen Sie...'), 'information' = factual reporting, 'opinion' = hedged personal view"
+            },
+            {
+              "use_case": "Toxicity classifier (comment moderation)",
+              "key": "toxicity_classifier",
+              "name": "Toxicity Classifier",
+              "labels_value": [{"id":"toxic","name":"Toxic"},{"id":"safe","name":"Safe"}],
+              "note": "Start zero-shot; add borderline examples to push the decision boundary."
+            },
+            {
+              "use_case": "Language gate (DACH ingestion)",
+              "key": "language_classifier",
+              "name": "Language Classifier",
+              "labels_value": [{"id":"de","name":"German"},{"id":"en","name":"English"},{"id":"fr","name":"French"},{"id":"it","name":"Italian"},{"id":"other","name":"Other"}]
+            },
+            {
+              "use_case": "Hate speech classifier (DSA compliance)",
+              "key": "hate_speech_classifier",
+              "name": "Hate Speech Classifier",
+              "labels_value": [{"id":"hate","name":"Hate Speech"},{"id":"borderline","name":"Borderline"},{"id":"safe","name":"Safe"}],
+              "note": "Three-label setup routes borderline to human review instead of auto-removal."
+            }
+          ],
+          "tips": [
+            "label id and name are the zero-shot signal — make id and name specific and self-explanatory.",
+            "Add at least 8–15 training_examples per label before triggering SetFit training.",
+            "Use three labels (hate/borderline/safe) instead of binary to avoid false positive auto-removal.",
+            "Set confidence_threshold to 0.6–0.7 for production to reduce borderline misclassifications."
+          ]
+        },
+        "ENTITY": {
+          "title": "Entity detector",
+          "summary": "Extracts and labels named spans from text (NER). Uses GLiNER for multilingual zero-shot extraction. Best for PII, domain identifiers, legal entities, DACH-specific structured values. Returns precise character spans, not document-level labels.",
+          "when_to_use": [
+            "You need to find and extract specific named spans: names, IBANs, phone numbers, addresses, dates.",
+            "The output should include the exact matched text and its position.",
+            "You need multilingual extraction across German, Austrian German, English.",
+            "Examples: PersonName, IBAN, VATId, CompanyName, Address, PhoneNumber, Email, Date."
+          ],
+          "config_shape": {
+            "entity_labels": "Flat array of plain strings — the entity type names GLiNER will extract. Field name is entity_labels, NOT labels.",
+            "model": "GLiNER model string (optional, default 'urchade/gliner_multi-v2.1').",
+            "confidence_threshold": "Top-level float (0–1). Default 0.7.",
+            "important": "The field is entity_labels (not labels, not entity.labels). It is a plain string array, not objects."
+          },
+          "examples": [
+            {
+              "use_case": "DACH PII entity extraction (business contact)",
+              "key": "dach_pii_entity",
+              "name": "DACH PII Entity Detector",
+              "entity_labels_value": ["PersonName", "CompanyName", "IBAN", "VATId", "PhoneNumber", "Email", "Address", "Date"],
+              "patch_path": "config.entity.entity_labels",
+              "note": "Covers the full DACH business contact surface."
+            },
+            {
+              "use_case": "IBAN entity extractor",
+              "key": "iban_entity",
+              "name": "IBAN Entity Detector",
+              "entity_labels_value": ["IBAN", "BIC"],
+              "patch_path": "config.entity.entity_labels"
+            },
+            {
+              "use_case": "Person name extractor (DACH titles)",
+              "key": "person_name_entity",
+              "name": "Person Name Entity Detector",
+              "entity_labels_value": ["PersonName"],
+              "patch_path": "config.entity.entity_labels",
+              "note": "Handles Austrian/German titles: Dr., Mag., Ing., Mag.a — and Umlauts in surnames."
+            },
+            {
+              "use_case": "Date extractor (German formats)",
+              "key": "date_entity",
+              "name": "Date Entity Detector",
+              "entity_labels_value": ["Date"],
+              "patch_path": "config.entity.entity_labels",
+              "note": "Handles: 03.03.2024, 3.3.24, 03. März 2024 — all common DACH date formats."
+            }
+          ],
+          "tips": [
+            "ALWAYS patch config.entity.entity_labels (not config.entity.labels — that field does not exist).",
+            "entity_labels is a plain string array: ['PersonName','IBAN'] — never objects.",
+            "Use descriptive English label names even for German content — GLiNER is multilingual.",
+            "Combine EntityDetector with a RulesetDetector for high-precision validation.",
+            "Test against placeholder data ('Mustermann', 'AT00 0000...') to verify false positive resistance."
+          ]
+        }
+      },
+      "key_naming": {
+        "summary": "The detector key is a stable slug that links all findings across runs. Choose it carefully — it cannot change without breaking historical data.",
+        "suggestions": [
+          "Use snake_case with a method prefix: ruleset_gdpr_keywords, classifier_financial_advice, entity_dach_pii.",
+          "Include the scope or domain in the key: iban_detector, vat_id_entity, toxicity_classifier.",
+          "Keep keys lowercase and hyphen/underscore-separated — no spaces or special characters.",
+          "Once set and used in findings, treat the key as immutable."
+        ]
+      },
+      "evaluation": {
+        "RULESET": [
+          "Verify each rule triggers individually on a crafted test document.",
+          "Verify combined rules exceed the threshold on a real positive example.",
+          "Verify clean documents score zero.",
+          "Check near-miss patterns do not cross the threshold (boundary test)."
+        ],
+        "CLASSIFIER": [
+          "Measure precision and recall per label on held-out examples.",
+          "Build a confusion matrix — especially for borderline vs. extreme labels.",
+          "Check that confidence scores are calibrated (0.9 should mean ~90% correct).",
+          "Test on documents from all expected languages if multilingual."
+        ],
+        "ENTITY": [
+          "Measure span-level precision and recall (exact match and partial match separately).",
+          "Test on placeholder/synthetic data to confirm false positives are suppressed.",
+          "Verify Umlaut-containing names and Austrian/German title prefixes are handled correctly.",
+          "Test all date format variants and phone number dial formats."
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,739 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { Badge } from "@workspace/ui/components/badge";
+import { Button } from "@workspace/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
+import {
+  SourceForm,
+  type SourceFormHandle,
+  type SourceType,
+} from "@/components/source-form";
+import {
+  SourceScanConfig,
+  type DetectorConfigInput,
+} from "@/components/source-scan-config";
+import {
+  SourceStepperHeader,
+  sourceStepper,
+} from "@/components/source-stepper";
+import { DetailBackButton } from "@/components/detail-back-button";
+import {
+  TestConnectionDialog,
+  type TestConnectionStatus,
+} from "@/components/test-connection-dialog";
+import {
+  defaultScheduleValue,
+  type ScheduleValue,
+} from "@/components/schedule-card";
+import { toast } from "sonner";
+import {
+  api,
+  type AssistantOperation,
+  type AssistantUiAction,
+  type StartRunnerDto,
+} from "@workspace/api-client";
+import { cn } from "@workspace/ui/lib/utils";
+import {
+  flattenObjectToPatches,
+  setValueAtPath,
+} from "@/lib/assistant-form-utils";
+import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
+import { useTranslation } from "@/hooks/use-translation";
+
+const normalizeDetectors = (detectors: DetectorConfigInput[]) =>
+  detectors
+    .filter((detector) => detector.type.toUpperCase() !== "CUSTOM")
+    .filter((detector) => detector.type)
+    .map((detector) => ({
+      type: detector.type,
+      enabled: detector.enabled,
+      ...(detector.config && Object.keys(detector.config).length > 0
+        ? { config: detector.config }
+        : {}),
+    }));
+
+export default function EditSourcePage() {
+  const router = useRouter();
+  const { t } = useTranslation();
+  const params = useParams();
+  const sourceId = params.id as string;
+  const sourceFormRef = useRef<SourceFormHandle | null>(null);
+  const [source, setSource] = useState<{
+    id: string;
+    name: string;
+    type: SourceType;
+    config?: Record<string, unknown>;
+  } | null>(null);
+  const [detectors, setDetectors] = useState<DetectorConfigInput[]>([]);
+  const [selectedCustomDetectorIds, setSelectedCustomDetectorIds] = useState<
+    string[]
+  >([]);
+  const [configDraft, setConfigDraft] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [configSaved, setConfigSaved] = useState(false);
+  const [schedule, setSchedule] = useState<ScheduleValue>(
+    defaultScheduleValue(),
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [isTestingConfig, setIsTestingConfig] = useState(false);
+  const [isSavingDetectors, setIsSavingDetectors] = useState(false);
+  const [testConnectionDialog, setTestConnectionDialog] = useState<{
+    open: boolean;
+    status: TestConnectionStatus;
+    message: string;
+  }>({
+    open: false,
+    status: "loading",
+    message: "Testing connection...",
+  });
+
+  useEffect(() => {
+    const fetchSource = async () => {
+      try {
+        setIsLoading(true);
+        const data = await api.sources.sourcesControllerGetSource({
+          id: sourceId,
+        });
+        if (!data) {
+          throw new Error("Source not found");
+        }
+        setSource({
+          id: data.id || sourceId,
+          name: data.name || "",
+          type: (data.type as SourceType) || "WORDPRESS",
+          config: data.config as Record<string, unknown> | undefined,
+        });
+        // Read schedule fields from source response
+        if (data.scheduleEnabled) {
+          setSchedule({
+            enabled: true,
+            preset: "custom",
+            cron:
+              typeof data.scheduleCron === "string" ? data.scheduleCron : "",
+            timezone:
+              typeof data.scheduleTimezone === "string"
+                ? data.scheduleTimezone
+                : "UTC",
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch source:", error);
+        toast.error(
+          error instanceof Error
+            ? `Failed to load source: ${error.message}`
+            : "Failed to load source",
+        );
+        router.push("/sources");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (sourceId) {
+      fetchSource();
+    }
+  }, [sourceId, router]);
+
+  const formDefaults = useMemo(() => {
+    const {
+      detectors: _detectors,
+      custom_detectors: _customDetectors,
+      ...configFields
+    } = (source?.config || {}) as Record<string, unknown>;
+    return { ...configFields, name: source?.name || "" };
+  }, [source?.config, source?.name]);
+
+  const defaultDetectors = useMemo(() => {
+    const configDetectors = (source?.config as { detectors?: unknown })
+      ?.detectors;
+    if (!Array.isArray(configDetectors)) {
+      return [] as DetectorConfigInput[];
+    }
+    return configDetectors.map((detector) => ({
+      type: String((detector as { type?: unknown }).type ?? ""),
+      enabled: Boolean((detector as { enabled?: unknown }).enabled ?? true),
+      config: (detector as { config?: Record<string, unknown> }).config ?? {},
+    }));
+  }, [source?.config]);
+
+  useEffect(() => {
+    setDetectors(defaultDetectors);
+  }, [defaultDetectors]);
+
+  useEffect(() => {
+    const configured = (source?.config as { custom_detectors?: unknown })
+      ?.custom_detectors;
+    if (!Array.isArray(configured)) {
+      setSelectedCustomDetectorIds([]);
+      return;
+    }
+    setSelectedCustomDetectorIds(
+      configured
+        .map((entry) => String(entry).trim())
+        .filter((entry) => entry.length > 0),
+    );
+  }, [source?.config]);
+
+  useEffect(() => {
+    setConfigDraft(formDefaults);
+    setConfigSaved(Boolean(source));
+  }, [formDefaults, source]);
+
+  const assistantBridge = useMemo(() => {
+    if (!source) {
+      return null;
+    }
+
+    return {
+      contextKey: "source.edit" as const,
+      canOpen: true,
+      getContext: async () => {
+        const formValues = sourceFormRef.current?.getValues() ?? formDefaults;
+        const validation = (await sourceFormRef.current?.validate()) ?? {
+          isValid: false,
+          missingFields: [],
+          errors: ["Source form is not mounted"],
+        };
+
+        return {
+          key: "source.edit" as const,
+          route: `/sources/${sourceId}/edit`,
+          title: t("sources.new.editAssistant"),
+          entityId: source.id,
+          values: formValues,
+          schema: sourceFormRef.current?.getSchema() as Record<
+            string,
+            unknown
+          > | null,
+          validation,
+          metadata: {
+            sourceType: source.type,
+            schedule,
+            detectors: normalizeDetectors(detectors),
+            customDetectorIds: selectedCustomDetectorIds,
+          },
+          supportedOperations: [
+            "update_source",
+            "test_source_connection",
+          ] satisfies AssistantOperation[],
+        };
+      },
+      applyAction: async (action: AssistantUiAction) => {
+        if (action.type === "patch_fields") {
+          const formPatches = action.patches.filter(
+            (patch) => !patch.path.startsWith("schedule."),
+          );
+          const schedulePatches = action.patches.filter((patch) =>
+            patch.path.startsWith("schedule."),
+          );
+
+          if (formPatches.length > 0) {
+            await sourceFormRef.current?.applyPatches(formPatches);
+            setConfigDraft(sourceFormRef.current?.getValues() ?? null);
+          }
+
+          if (schedulePatches.length > 0) {
+            setSchedule((current) =>
+              schedulePatches.reduce<ScheduleValue>((nextSchedule, patch) => {
+                const path = patch.path.replace(/^schedule\./, "");
+                return setValueAtPath(
+                  nextSchedule as Record<string, unknown>,
+                  path,
+                  patch.value,
+                ) as ScheduleValue;
+              }, current),
+            );
+          }
+          return;
+        }
+
+        if (action.type === "sync_source") {
+          await sourceFormRef.current?.applyPatches(
+            flattenObjectToPatches(action.values),
+          );
+          setSource((current) =>
+            current
+              ? {
+                  ...current,
+                  id: action.sourceId,
+                  name:
+                    typeof action.values.name === "string"
+                      ? action.values.name
+                      : current.name,
+                  config: action.values,
+                }
+              : current,
+          );
+          setConfigDraft(action.values);
+          setConfigSaved(true);
+          if (action.schedule) {
+            setSchedule((current) => ({
+              ...current,
+              enabled: action.schedule?.enabled ?? current.enabled,
+              cron: action.schedule?.cron ?? current.cron,
+              timezone: action.schedule?.timezone ?? current.timezone,
+            }));
+          }
+        }
+      },
+    };
+  }, [
+    detectors,
+    formDefaults,
+    schedule,
+    selectedCustomDetectorIds,
+    source,
+    sourceId,
+  ]);
+
+  useRegisterAssistantBridge(assistantBridge);
+
+  const handleSaveConfig = async (
+    data: Record<string, unknown>,
+    onSuccess: () => void,
+  ) => {
+    if (!source) return;
+
+    try {
+      setIsSavingConfig(true);
+
+      const {
+        name,
+        type: _type,
+        detectors: _detectors,
+        ...configFields
+      } = data;
+      const detectorPayload = normalizeDetectors(detectors);
+      const config = {
+        type: source.type,
+        ...configFields,
+        ...(selectedCustomDetectorIds.length > 0
+          ? { custom_detectors: selectedCustomDetectorIds }
+          : {}),
+        ...(detectorPayload.length > 0 ? { detectors: detectorPayload } : {}),
+      };
+
+      const scheduleFields =
+        schedule.enabled && schedule.cron
+          ? {
+              scheduleEnabled: true,
+              scheduleCron: schedule.cron,
+              scheduleTimezone: schedule.timezone,
+            }
+          : { scheduleEnabled: false };
+
+      const updated = await api.sources.sourcesControllerUpdateSource({
+        id: sourceId,
+        updateSourceDto: {
+          name: name ? String(name) : undefined,
+          config,
+          ...scheduleFields,
+        },
+      });
+
+      if (updated) {
+        setSource({
+          id: updated.id || sourceId,
+          name: updated.name || source.name,
+          type: (updated.type as SourceType) || source.type,
+          config: updated.config as Record<string, unknown> | undefined,
+        });
+      }
+
+      setConfigDraft(data);
+      setConfigSaved(true);
+      toast.success(
+        t("sources.updated", { name: updated?.name || source.name }),
+      );
+      onSuccess();
+    } catch (error) {
+      console.error("Failed to update source:", error);
+      toast.error(
+        error instanceof Error
+          ? `Failed to update source: ${error.message}`
+          : "Failed to update source",
+      );
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  const handleTestConfig = async (data: Record<string, unknown>) => {
+    if (!source) return;
+
+    try {
+      setTestConnectionDialog({
+        open: true,
+        status: "loading",
+        message: t("sources.new.testingConnection"),
+      });
+      setIsTestingConfig(true);
+
+      const {
+        name,
+        type: _type,
+        detectors: _detectors,
+        ...configFields
+      } = data;
+      const detectorPayload = normalizeDetectors(detectors);
+      const config = {
+        type: source.type,
+        ...configFields,
+        ...(selectedCustomDetectorIds.length > 0
+          ? { custom_detectors: selectedCustomDetectorIds }
+          : {}),
+        ...(detectorPayload.length > 0 ? { detectors: detectorPayload } : {}),
+      };
+
+      const updated = await api.sources.sourcesControllerUpdateSource({
+        id: sourceId,
+        updateSourceDto: {
+          name: name ? String(name) : undefined,
+          config,
+        },
+      });
+
+      if (updated) {
+        setSource({
+          id: updated.id || sourceId,
+          name: updated.name || source.name,
+          type: (updated.type as SourceType) || source.type,
+          config: updated.config as Record<string, unknown> | undefined,
+        });
+      }
+
+      setConfigDraft(data);
+      setConfigSaved(true);
+
+      const result = await api.sources.sourcesControllerTestConnection({
+        id: sourceId,
+      });
+      if (result?.status === "SUCCESS") {
+        setTestConnectionDialog({
+          open: true,
+          status: "success",
+          message: result?.message || t("sources.new.connectionOk"),
+        });
+      } else {
+        setTestConnectionDialog({
+          open: true,
+          status: "error",
+          message: result?.message || t("sources.new.connectionFailed"),
+        });
+      }
+    } catch (error) {
+      console.error("Failed to test connection:", error);
+      const errorMessage = await extractApiErrorMessage(
+        error,
+        "Failed to test connection",
+      );
+      setTestConnectionDialog({
+        open: true,
+        status: "error",
+        message: errorMessage,
+      });
+    } finally {
+      setIsTestingConfig(false);
+    }
+  };
+
+  const handleSaveDetectors = async (action: "scan" | "view") => {
+    if (!source) return;
+
+    try {
+      setIsSavingDetectors(true);
+
+      const draft = configDraft ?? {};
+      const {
+        name,
+        type: _type,
+        detectors: _detectors,
+        ...configFields
+      } = draft;
+      const detectorPayload = normalizeDetectors(detectors);
+      const config = {
+        type: source.type,
+        ...configFields,
+        ...(selectedCustomDetectorIds.length > 0
+          ? { custom_detectors: selectedCustomDetectorIds }
+          : {}),
+        ...(detectorPayload.length > 0 ? { detectors: detectorPayload } : {}),
+      };
+
+      const updated = await api.sources.sourcesControllerUpdateSource({
+        id: sourceId,
+        updateSourceDto: {
+          name: typeof name === "string" ? name : undefined,
+          config,
+        },
+      });
+
+      if (updated) {
+        setSource({
+          id: updated.id || sourceId,
+          name: updated.name || source.name,
+          type: (updated.type as SourceType) || source.type,
+          config: updated.config as Record<string, unknown> | undefined,
+        });
+      }
+
+      toast.success(t("sources.new.detectorsSaved"));
+
+      if (action === "scan") {
+        const startRunnerDto: StartRunnerDto = { triggerType: "MANUAL" };
+        const runner = await api.runners.cliRunnerControllerStartRunner({
+          sourceId,
+          startRunnerDto,
+        });
+        if (runner?.id) {
+          router.push(`/scans/${runner.id}`);
+        } else {
+          router.push("/scans");
+        }
+        return;
+      }
+
+      router.push(`/sources/${sourceId}`);
+    } catch (error) {
+      console.error("Failed to update detectors:", error);
+      toast.error(
+        error instanceof Error
+          ? `Failed to update detectors: ${error.message}`
+          : "Failed to update detectors",
+      );
+    } finally {
+      setIsSavingDetectors(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <DetailBackButton fallbackHref="/sources" />
+          <div>
+            <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
+              {t("sources.editSource")}
+            </h1>
+            <p className="text-muted-foreground">
+              {t("sources.edit.loading")}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!source) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <DetailBackButton fallbackHref="/sources" />
+        <div>
+          <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
+            {t("sources.editSource")}
+          </h1>
+          <p className="text-muted-foreground">{t("sources.edit.configure", { name: source.name })}</p>
+        </div>
+      </div>
+
+      <sourceStepper.Scoped initialStep="config">
+        <SourceEditStepperContent
+          sourceType={source.type}
+          sourceId={sourceId}
+          sourceFormRef={sourceFormRef}
+          formDefaults={formDefaults}
+          defaultDetectors={defaultDetectors}
+          schedule={schedule}
+          configSaved={configSaved}
+          isSavingConfig={isSavingConfig}
+          isTestingConfig={isTestingConfig}
+          isSavingDetectors={isSavingDetectors}
+          onSaveConfig={handleSaveConfig}
+          onTestConfig={handleTestConfig}
+          onSaveDetectors={handleSaveDetectors}
+          onDetectorsChange={setDetectors}
+          selectedCustomDetectorIds={selectedCustomDetectorIds}
+          onCustomDetectorsChange={setSelectedCustomDetectorIds}
+          onScheduleChange={setSchedule}
+        />
+      </sourceStepper.Scoped>
+
+      <TestConnectionDialog
+        open={testConnectionDialog.open}
+        status={testConnectionDialog.status}
+        message={testConnectionDialog.message}
+        onOpenChange={(open) => {
+          setTestConnectionDialog((current) => ({
+            ...current,
+            open,
+          }));
+        }}
+      />
+    </div>
+  );
+}
+
+function SourceEditStepperContent({
+  sourceType,
+  sourceId: _sourceId,
+  sourceFormRef,
+  formDefaults,
+  defaultDetectors,
+  schedule,
+  configSaved,
+  isSavingConfig,
+  isTestingConfig,
+  isSavingDetectors,
+  onSaveConfig,
+  onTestConfig,
+  onSaveDetectors,
+  onDetectorsChange,
+  selectedCustomDetectorIds,
+  onCustomDetectorsChange,
+  onScheduleChange,
+}: {
+  sourceType: SourceType;
+  sourceId: string;
+  sourceFormRef: RefObject<SourceFormHandle | null>;
+  formDefaults: Record<string, unknown>;
+  defaultDetectors: DetectorConfigInput[];
+  schedule: ScheduleValue;
+  configSaved: boolean;
+  isSavingConfig: boolean;
+  isTestingConfig: boolean;
+  isSavingDetectors: boolean;
+  onSaveConfig: (data: Record<string, unknown>, onSuccess: () => void) => void;
+  onTestConfig: (data: Record<string, unknown>) => void;
+  onSaveDetectors: (action: "scan" | "view") => void;
+  onDetectorsChange: (detectors: DetectorConfigInput[]) => void;
+  selectedCustomDetectorIds: string[];
+  onCustomDetectorsChange: (ids: string[]) => void;
+  onScheduleChange: (schedule: ScheduleValue) => void;
+}) {
+  const { t } = useTranslation();
+  const stepper = sourceStepper.useStepper();
+  const showConfig = stepper.flow.is("config");
+  const showDetectors = stepper.flow.is("detectors");
+  const [scanSummary, setScanSummary] = useState({
+    visibleCount: 0,
+    enabledCount: 0,
+  });
+
+  return (
+    <div className="space-y-6">
+      <SourceStepperHeader
+        canNavigateToDetectors={configSaved || showDetectors}
+      />
+
+      <div className={cn(!showConfig && "hidden")}>
+        <Card className="border-2 border-black rounded-[6px] shadow-[6px_6px_0_#000]">
+          <CardHeader>
+            <CardTitle className="uppercase tracking-[0.06em]">
+              {t("sources.edit.configuration")}
+            </CardTitle>
+            <CardDescription>
+              {t("sources.edit.updateSettings")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SourceForm
+              ref={sourceFormRef}
+              sourceType={sourceType}
+              defaultValues={formDefaults}
+              onSubmit={(data) =>
+                onSaveConfig(data, () => stepper.navigation.next())
+              }
+              onTest={onTestConfig}
+              mode="edit"
+              disabled={isSavingConfig || isTestingConfig}
+              submitLabel={t("sources.edit.saveAndContinue")}
+              testLabel={t("sources.edit.testSource")}
+              showCancel={false}
+              schedule={schedule}
+              onScheduleChange={onScheduleChange}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className={cn(!showDetectors && "hidden")}>
+        <Card className="border-2 border-black rounded-[6px] shadow-[6px_6px_0_#000]">
+          <CardHeader>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <CardTitle className="uppercase tracking-[0.06em]">
+                  {t("sources.edit.detectorConfig")}
+                </CardTitle>
+                <CardDescription>
+                  {t("sources.edit.detectorConfigDesc")}
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-[0.12em]">
+                <Badge variant="secondary">
+                  {t("sources.edit.visible", { count: scanSummary.visibleCount })}
+                </Badge>
+                <Badge className="bg-accent text-accent-foreground">
+                  {t("sources.edit.enabled", { count: scanSummary.enabledCount })}
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <SourceScanConfig
+              defaultDetectors={defaultDetectors}
+              onDetectorsChange={onDetectorsChange}
+              onSummaryChange={setScanSummary}
+              selectedCustomDetectorIds={selectedCustomDetectorIds}
+              onCustomDetectorsChange={onCustomDetectorsChange}
+              mode="edit"
+            />
+
+            <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <Button
+                variant="outline"
+                className="rounded-[4px] border-2 border-black"
+                onClick={() => stepper.navigation.prev()}
+                disabled={isSavingDetectors}
+              >
+                {t("sources.edit.back")}
+              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Button
+                  variant="outline"
+                  className="rounded-[4px] border-2 border-black"
+                  onClick={() => onSaveDetectors("view")}
+                  disabled={isSavingDetectors}
+                >
+                  {t("common.save")}
+                </Button>
+                <Button
+                  className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+                  onClick={() => onSaveDetectors("scan")}
+                  disabled={isSavingDetectors}
+                >
+                  {t("sources.edit.saveAndScan")}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

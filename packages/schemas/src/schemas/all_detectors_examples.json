@@ -1,0 +1,1105 @@
+{
+  "SECRETS": [
+    {
+      "name": "Core Secrets",
+      "description": "Common cloud and API credentials with strong signal.",
+      "config": {
+        "enabled_patterns": [
+          "aws",
+          "github",
+          "slack",
+          "stripe",
+          "google",
+          "azure",
+          "private_key"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Broad Sweep",
+      "description": "Covers all known secret types for wide visibility.",
+      "config": {
+        "enabled_patterns": [
+          "aws",
+          "github",
+          "slack",
+          "stripe",
+          "google",
+          "azure",
+          "private_key",
+          "generic_api_key",
+          "generic_secret"
+        ],
+        "confidence_threshold": 0.7,
+        "max_findings": 200
+      }
+    },
+    {
+      "name": "Lightweight",
+      "description": "Focus on generic keys to reduce noise.",
+      "config": {
+        "enabled_patterns": [
+          "generic_api_key",
+          "generic_secret"
+        ],
+        "confidence_threshold": 0.85,
+        "max_findings": 50
+      }
+    }
+  ],
+  "PII": [
+    {
+      "name": "High Risk PII",
+      "description": "Find critical identity and financial details first.",
+      "config": {
+        "enabled_patterns": [
+          "ssn",
+          "credit_card",
+          "iban_code",
+          "us_passport",
+          "us_driver_license",
+          "austrian_svnr",
+          "swiss_ahv",
+          "german_tax_id"
+        ],
+        "severity_threshold": "high",
+        "confidence_threshold": 0.8
+      }
+    },
+    {
+      "name": "Contact PII",
+      "description": "Focus on personal contact details and location clues.",
+      "config": {
+        "enabled_patterns": [
+          "email",
+          "phone_number",
+          "person",
+          "location",
+          "date_of_birth"
+        ],
+        "severity_threshold": "medium",
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Full PII Coverage",
+      "description": "Run broad privacy checks across all supported personal data patterns.",
+      "config": {
+        "enabled_patterns": [
+          "credit_card",
+          "ssn",
+          "email",
+          "phone_number",
+          "person",
+          "location",
+          "ip_address",
+          "iban_code",
+          "us_passport",
+          "us_driver_license",
+          "austrian_svnr",
+          "swiss_ahv",
+          "german_tax_id",
+          "eu_national_id",
+          "date_of_birth"
+        ],
+        "severity_threshold": "low",
+        "confidence_threshold": 0.7
+      }
+    }
+  ],
+  "TOXIC": [
+    {
+      "name": "Text Safety",
+      "description": "Balanced coverage for toxic and abusive text.",
+      "config": {
+        "enabled_patterns": [
+          "toxicity",
+          "severe_toxicity",
+          "obscene",
+          "threat",
+          "insult",
+          "identity_attack"
+        ],
+        "model_name": "unbiased",
+        "confidence_threshold": 0.7
+      }
+    },
+    {
+      "name": "Strict Toxicity",
+      "description": "High-confidence alerts on severe toxicity.",
+      "config": {
+        "enabled_patterns": [
+          "severe_toxicity",
+          "threat",
+          "identity_attack"
+        ],
+        "model_name": "original",
+        "confidence_threshold": 0.85
+      }
+    }
+  ],
+  "NSFW": [
+    {
+      "name": "NSFW Standard",
+      "description": "Baseline NSFW screening for visuals.",
+      "config": {
+        "enabled_patterns": [
+          "nsfw"
+        ],
+        "model_name": "original",
+        "confidence_threshold": 0.7
+      }
+    },
+    {
+      "name": "NSFW Explicit",
+      "description": "Flag explicit content with higher precision.",
+      "config": {
+        "enabled_patterns": [
+          "nsfw_explicit",
+          "nsfw"
+        ],
+        "model_name": "original",
+        "confidence_threshold": 0.8
+      }
+    }
+  ],
+  "YARA": [
+    {
+      "name": "Baseline YARA",
+      "description": "Default rules with conservative timeouts.",
+      "config": {
+        "timeout": 60,
+        "max_findings": 200
+      }
+    },
+    {
+      "name": "Strict YARA",
+      "description": "Higher timeout for deeper scans.",
+      "config": {
+        "timeout": 90,
+        "max_findings": 500
+      }
+    },
+    {
+      "name": "Custom Rules",
+      "description": "Use a custom YARA rules directory.",
+      "config": {
+        "rules_path": "/opt/unstructured/yara",
+        "timeout": 90
+      }
+    }
+  ],
+  "BROKEN_LINKS": [
+    {
+      "name": "Broken Links Check",
+      "description": "Flags links and images that are unreachable or return empty content.",
+      "config": {}
+    }
+  ],
+  "PROMPT_INJECTION": [
+    {
+      "name": "Prompt Injection Baseline",
+      "description": "Heuristic baseline for instruction override and prompt exfiltration attempts.",
+      "config": {
+        "confidence_threshold": 0.7,
+        "max_findings": 25
+      }
+    }
+  ],
+  "PHISHING_URL": [
+    {
+      "name": "Phishing URL Baseline",
+      "description": "Classify extracted URLs for phishing and malware intent.",
+      "config": {
+        "confidence_threshold": 0.75,
+        "max_findings": 25
+      }
+    }
+  ],
+  "SPAM": [
+    {
+      "name": "UGC Spam Filter",
+      "description": "High-throughput spam filtering for user-generated content streams.",
+      "config": {
+        "confidence_threshold": 0.8,
+        "max_findings": 500
+      }
+    },
+    {
+      "name": "Spam Audit",
+      "description": "Broader retrospective spam analysis across existing content.",
+      "config": {
+        "confidence_threshold": 0.65,
+        "max_findings": 1000
+      }
+    }
+  ],
+  "LANGUAGE": [
+    {
+      "name": "Language Routing",
+      "description": "Use high-confidence language detection when jurisdiction routing depends on it.",
+      "config": {
+        "confidence_threshold": 0.9
+      }
+    },
+    {
+      "name": "Language Baseline",
+      "description": "Permissive language tagging for low-stakes analytics and indexing.",
+      "config": {
+        "confidence_threshold": 0.7
+      }
+    }
+  ],
+  "CODE_SECURITY": [
+    {
+      "name": "Code Security Baseline",
+      "description": "Scan code snippets for insecure patterns using Bandit.",
+      "config": {
+        "confidence_threshold": 0.7,
+        "max_findings": 50
+      }
+    }
+  ],
+  "PLAGIARISM": [
+    {
+      "name": "Policy Similarity Check",
+      "description": "Identify reused passages that may need attribution review.",
+      "config": {
+        "confidence_threshold": 0.8,
+        "max_findings": 25
+      }
+    }
+  ],
+  "IMAGE_VIOLENCE": [
+    {
+      "name": "Visual Safety Watch",
+      "description": "Flag potentially violent imagery for manual moderation.",
+      "config": {
+        "confidence_threshold": 0.75,
+        "max_findings": 25
+      }
+    }
+  ],
+  "OCR_PII": [
+    {
+      "name": "Scanned Document Privacy",
+      "description": "Extract text from images and detect personal identifiers.",
+      "config": {
+        "enabled_patterns": [
+          "email",
+          "phone_number",
+          "credit_card",
+          "date_of_birth"
+        ],
+        "confidence_threshold": 0.75
+      }
+    }
+  ],
+  "DEID_SCORE": [
+    {
+      "name": "Anonymization Confidence",
+      "description": "Score how safely content was anonymized before sharing.",
+      "config": {
+        "enabled_patterns": [
+          "person",
+          "date_of_birth",
+          "location",
+          "email",
+          "phone_number",
+          "ip_address"
+        ],
+        "confidence_threshold": 0.7
+      }
+    },
+    {
+      "name": "GDPR Article 17 Verification",
+      "description": "Verify right-to-erasure requests were fully executed across core EU and DACH identifiers.",
+      "config": {
+        "enabled_patterns": [
+          "person",
+          "email",
+          "phone_number",
+          "location",
+          "date_of_birth",
+          "ip_address",
+          "iban_code",
+          "austrian_svnr",
+          "swiss_ahv",
+          "german_tax_id",
+          "eu_national_id"
+        ],
+        "confidence_threshold": 0.65,
+        "min_k_anonymity": 5,
+        "min_l_diversity": 2
+      }
+    },
+    {
+      "name": "High-Risk Re-identification Check",
+      "description": "Focus on quasi-identifiers that can still re-identify people after masking.",
+      "config": {
+        "enabled_patterns": [
+          "date_of_birth",
+          "location",
+          "person",
+          "ip_address"
+        ],
+        "confidence_threshold": 0.6,
+        "min_k_anonymity": 8,
+        "min_l_diversity": 3
+      }
+    }
+  ],
+  "HATE_SPEECH": [
+    {
+      "name": "DSA Article 16 Compliance",
+      "description": "High-confidence alerts for potentially illegal hate speech requiring notice-and-action workflows.",
+      "config": {
+        "confidence_threshold": 0.85,
+        "max_findings": 25,
+        "severity_threshold": "high"
+      }
+    },
+    {
+      "name": "Community Moderation Queue",
+      "description": "Capture borderline cases so moderators can review early before escalation.",
+      "config": {
+        "confidence_threshold": 0.65,
+        "max_findings": 100
+      }
+    }
+  ],
+  "AI_GENERATED": [
+    {
+      "name": "EU AI Act Disclosure Check",
+      "description": "Identify likely AI-authored text requiring disclosure labels under EU AI Act Article 50.",
+      "config": {
+        "confidence_threshold": 0.8,
+        "max_findings": 50
+      }
+    },
+    {
+      "name": "Editorial Quality Gate",
+      "description": "Flag likely AI-generated text for editorial review before publication.",
+      "config": {
+        "confidence_threshold": 0.7,
+        "max_findings": 200
+      }
+    }
+  ],
+  "CONTENT_QUALITY": [
+    {
+      "name": "Low Quality Flag",
+      "description": "Surface pages with weak readability or thin content for editorial improvement.",
+      "config": {
+        "confidence_threshold": 0.4,
+        "max_findings": 100,
+        "min_score_threshold": 40
+      }
+    },
+    {
+      "name": "Premium Content Gate",
+      "description": "Apply a stricter quality bar before content is promoted or monetized.",
+      "config": {
+        "confidence_threshold": 0.7,
+        "min_score_threshold": 70
+      }
+    }
+  ],
+  "DUPLICATE": [
+    {
+      "name": "Pre-publish Deduplication",
+      "description": "Block near-duplicate content before publishing to reduce SEO and moderation noise.",
+      "config": {
+        "confidence_threshold": 0.9,
+        "max_findings": 50
+      }
+    },
+    {
+      "name": "Training Data Quality",
+      "description": "Detect near-duplicates in ML datasets to reduce memorization and bias amplification.",
+      "config": {
+        "confidence_threshold": 0.8,
+        "max_findings": 500
+      }
+    }
+  ],
+  "DOMAIN_CLASS": [
+    {
+      "name": "Business Domain Tags",
+      "description": "Auto-tag content by domain so ownership and routing are clear.",
+      "config": {
+        "enabled_patterns": [
+          "finance",
+          "health",
+          "legal",
+          "hr",
+          "technology",
+          "other"
+        ],
+        "confidence_threshold": 0.65
+      }
+    },
+    {
+      "name": "Regulated Domain Triage",
+      "description": "Prioritize high-risk regulated domains for expert review.",
+      "config": {
+        "enabled_patterns": [
+          "health",
+          "legal",
+          "finance"
+        ],
+        "confidence_threshold": 0.7
+      }
+    }
+  ],
+  "CONTENT_TYPE": [
+    {
+      "name": "Style Labeling",
+      "description": "Classify whether content is factual, opinion, promotional, or instructional.",
+      "config": {
+        "enabled_patterns": [
+          "factual",
+          "opinion",
+          "promotional",
+          "instructional"
+        ],
+        "confidence_threshold": 0.65
+      }
+    },
+    {
+      "name": "Promotional Content Triage",
+      "description": "Identify promotional content that may need disclosure or policy checks.",
+      "config": {
+        "enabled_patterns": [
+          "promotional"
+        ],
+        "confidence_threshold": 0.7
+      }
+    }
+  ],
+  "SENSITIVITY_TIER": [
+    {
+      "name": "Data Sensitivity Routing",
+      "description": "Assign handling tiers for governance and sharing controls.",
+      "config": {
+        "enabled_patterns": [
+          "PUBLIC",
+          "INTERNAL",
+          "CONFIDENTIAL",
+          "RESTRICTED"
+        ],
+        "confidence_threshold": 0.7
+      }
+    },
+    {
+      "name": "Internal Content Gate",
+      "description": "Flag confidential or restricted content before external sharing.",
+      "config": {
+        "enabled_patterns": [
+          "CONFIDENTIAL",
+          "RESTRICTED"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Public-safe Check",
+      "description": "Confirm content is classified as PUBLIC before publishing broadly.",
+      "config": {
+        "enabled_patterns": [
+          "PUBLIC"
+        ],
+        "confidence_threshold": 0.8
+      }
+    }
+  ],
+  "JURISDICTION_TAG": [
+    {
+      "name": "Regulation Tagging",
+      "description": "Suggest likely regulatory obligations from language and content context.",
+      "config": {
+        "enabled_patterns": [
+          "GDPR",
+          "DSA",
+          "CCPA",
+          "HIPAA",
+          "NDSG"
+        ],
+        "confidence_threshold": 0.65
+      }
+    },
+    {
+      "name": "DACH Market Compliance",
+      "description": "Focus on regulations most relevant for German, Austrian, and Swiss markets.",
+      "config": {
+        "enabled_patterns": [
+          "GDPR",
+          "DSA",
+          "NDSG"
+        ],
+        "confidence_threshold": 0.7
+      }
+    }
+  ],
+  "BIAS": [
+    {
+      "name": "Fairness Baseline",
+      "description": "Detect common biased language signals during content review.",
+      "config": {
+        "enabled_patterns": [
+          "gender_bias",
+          "racial_bias",
+          "age_bias",
+          "religious_bias"
+        ],
+        "confidence_threshold": 0.7
+      }
+    },
+    {
+      "name": "High Sensitivity Bias Review",
+      "description": "Use stricter thresholds for public-facing content with fairness risk.",
+      "config": {
+        "enabled_patterns": [
+          "gender_bias",
+          "racial_bias",
+          "religious_bias",
+          "political_bias"
+        ],
+        "confidence_threshold": 0.82,
+        "max_findings": 50
+      }
+    }
+  ],
+  "CUSTOM": [
+    {
+      "name": "DACH Contract Risk Terms",
+      "description": "Multilingual classifier for legal/compliance contract risk wording.",
+      "config": {
+        "custom_detector_key": "cust_dach_contract_risk",
+        "name": "DACH Contract Risk Terms",
+        "description": "Detect legal/compliance risk language",
+        "method": "CLASSIFIER",
+        "languages": [
+          "de",
+          "en"
+        ],
+        "confidence_threshold": 0.7,
+        "max_findings": 100,
+        "ruleset": {
+          "regex_rules": [],
+          "keyword_rules": []
+        },
+        "classifier": {
+          "labels": [
+            {
+              "id": "risk_term",
+              "name": "Risk Term",
+              "description": "Potential legal risk wording"
+            }
+          ],
+          "zero_shot_model": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli",
+          "hypothesis_template": "This text contains {}.",
+          "training_examples": [],
+          "min_examples_per_label": 8,
+          "setfit_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        },
+        "entity": {
+          "entity_labels": [],
+          "model": "urchade/gliner_multi-v2.1"
+        }
+      }
+    },
+    {
+      "name": "DACH Regulatory Entity Extractor",
+      "description": "Extract custom regulatory entities using GLiNER labels.",
+      "config": {
+        "custom_detector_key": "cust_dach_entity_extractor",
+        "name": "DACH Regulatory Entity Extractor",
+        "method": "ENTITY",
+        "languages": [
+          "de",
+          "en"
+        ],
+        "confidence_threshold": 0.72,
+        "entity": {
+          "entity_labels": [
+            "handelsregisternummer",
+            "w-idnr",
+            "steuernummer",
+            "finma_identifier"
+          ],
+          "model": "urchade/gliner_multi-v2.1"
+        }
+      }
+    },
+    {
+      "name": "German Compound Ruleset",
+      "description": "Regex and keyword rules tailored for German compliance phrases.",
+      "config": {
+        "custom_detector_key": "cust_de_compound_ruleset",
+        "name": "German Compound Ruleset",
+        "method": "RULESET",
+        "languages": [
+          "de"
+        ],
+        "confidence_threshold": 0.75,
+        "ruleset": {
+          "regex_rules": [
+            {
+              "id": "de_handelsregister",
+              "name": "Handelsregister Number",
+              "pattern": "\\b(?:HRB|HRA)\\s?\\d{2,8}\\b",
+              "flags": "i",
+              "severity": "medium"
+            }
+          ],
+          "keyword_rules": [
+            {
+              "id": "de_data_protection",
+              "name": "Data Protection Officer",
+              "keywords": [
+                "datenschutzbeauftragter",
+                "datenschutzfolgeabschatzung"
+              ],
+              "case_sensitive": false,
+              "severity": "low"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "NetzDG Illegal Content Signals",
+      "description": "Classifier labels for policy review queues aligned to NetzDG categories.",
+      "config": {
+        "custom_detector_key": "cust_netzdg_content_signals",
+        "name": "NetzDG Illegal Content Signals",
+        "method": "CLASSIFIER",
+        "languages": [
+          "de"
+        ],
+        "classifier": {
+          "labels": [
+            {
+              "id": "hate_speech",
+              "name": "Hate Speech"
+            },
+            {
+              "id": "threat_of_violence",
+              "name": "Threat of Violence"
+            },
+            {
+              "id": "incitement",
+              "name": "Incitement"
+            }
+          ],
+          "min_examples_per_label": 8,
+          "training_examples": [
+            {
+              "text": "Wir werden euch morgen angreifen.",
+              "label": "threat_of_violence",
+              "accepted": true
+            }
+          ],
+          "hypothesis_template": "This text contains {}."
+        }
+      }
+    },
+    {
+      "name": "German Invoice PII Ruleset",
+      "description": "Ruleset for invoice and procurement text (IBAN, VAT, tax IDs).",
+      "config": {
+        "custom_detector_key": "cust_invoice_pii_ruleset",
+        "name": "German Invoice PII Ruleset",
+        "method": "RULESET",
+        "languages": [
+          "de",
+          "en"
+        ],
+        "ruleset": {
+          "regex_rules": [
+            {
+              "id": "iban_de",
+              "name": "German IBAN",
+              "pattern": "\\bDE\\d{20}\\b",
+              "flags": "i",
+              "severity": "high"
+            },
+            {
+              "id": "ust_id",
+              "name": "EU VAT ID",
+              "pattern": "\\bDE\\d{9}\\b",
+              "flags": "i",
+              "severity": "medium"
+            }
+          ],
+          "keyword_rules": [
+            {
+              "id": "invoice_words",
+              "name": "Invoice Terms",
+              "keywords": [
+                "rechnung",
+                "kundennummer",
+                "umsatzsteuer"
+              ],
+              "case_sensitive": false,
+              "severity": "low"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Swiss Financial Entity Extractor",
+      "description": "Entity extraction labels for Swiss regulatory and financial text.",
+      "config": {
+        "custom_detector_key": "cust_swiss_financial_entities",
+        "name": "Swiss Financial Entity Extractor",
+        "method": "ENTITY",
+        "languages": [
+          "de",
+          "fr",
+          "it",
+          "en"
+        ],
+        "entity": {
+          "entity_labels": [
+            "ahv_number",
+            "finma_reference",
+            "iban_ch",
+            "counterparty_name"
+          ],
+          "model": "urchade/gliner_multi-v2.1"
+        }
+      }
+    },
+    {
+      "name": "Sarcasm & Irony Detector",
+      "description": "Detects sarcastic or ironic language with zero-shot fallback and few-shot adaptation.",
+      "config": {
+        "custom_detector_key": "sarcasm_detector",
+        "name": "Sarcasm & Irony Detector",
+        "method": "CLASSIFIER",
+        "languages": [
+          "en",
+          "de"
+        ],
+        "confidence_threshold": 0.72,
+        "classifier": {
+          "labels": [
+            {
+              "id": "sarcastic",
+              "name": "Sarcastic or Ironic",
+              "description": "Text expressing opposite intent for humor or criticism"
+            },
+            {
+              "id": "sincere",
+              "name": "Sincere",
+              "description": "Straightforward literal language"
+            }
+          ],
+          "zero_shot_model": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli",
+          "hypothesis_template": "This text is written sarcastically or ironically {}.",
+          "training_examples": [],
+          "min_examples_per_label": 8,
+          "setfit_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        }
+      }
+    },
+    {
+      "name": "High Anger / Aggression Signal",
+      "description": "Classifier signal for emotionally escalated user comments.",
+      "config": {
+        "custom_detector_key": "high_anger_signal",
+        "name": "High Anger / Aggression Signal",
+        "method": "CLASSIFIER",
+        "confidence_threshold": 0.78,
+        "classifier": {
+          "labels": [
+            {
+              "id": "angry",
+              "name": "Angry or Aggressive",
+              "description": "Hostile, frustrated, threatening tone"
+            },
+            {
+              "id": "neutral",
+              "name": "Neutral or Positive",
+              "description": "Calm, constructive, or neutral language"
+            }
+          ],
+          "hypothesis_template": "This text expresses anger or aggression {}.",
+          "min_examples_per_label": 8
+        }
+      }
+    },
+    {
+      "name": "Passive-Aggressive Tone",
+      "description": "Detects indirect hostility in workplace communications.",
+      "config": {
+        "custom_detector_key": "passive_aggressive",
+        "name": "Passive-Aggressive Tone",
+        "method": "CLASSIFIER",
+        "confidence_threshold": 0.7,
+        "classifier": {
+          "labels": [
+            {
+              "id": "passive_aggressive",
+              "name": "Passive-Aggressive",
+              "description": "Indirect hostility veiled as politeness"
+            },
+            {
+              "id": "direct",
+              "name": "Direct Communication",
+              "description": "Clear neutral or constructive communication"
+            }
+          ],
+          "hypothesis_template": "This text contains passive-aggressive or indirectly hostile communication {}.",
+          "min_examples_per_label": 8
+        }
+      }
+    },
+    {
+      "name": "Undisclosed Promotional Content",
+      "description": "Flags likely promotional text disguised as organic review content.",
+      "config": {
+        "custom_detector_key": "fake_review_signal",
+        "name": "Undisclosed Promotional Content",
+        "method": "CLASSIFIER",
+        "confidence_threshold": 0.73,
+        "classifier": {
+          "labels": [
+            {
+              "id": "promotional",
+              "name": "Promotional / Advertising",
+              "description": "Paid endorsement or marketing-style copy"
+            },
+            {
+              "id": "organic",
+              "name": "Organic Opinion",
+              "description": "Genuine balanced user review"
+            }
+          ],
+          "hypothesis_template": "This text is promotional or advertising content {}.",
+          "min_examples_per_label": 8
+        }
+      }
+    },
+    {
+      "name": "Unlicensed Financial Advice Signal",
+      "description": "Flags text that resembles direct investment advice.",
+      "config": {
+        "custom_detector_key": "unlicensed_financial_advice",
+        "name": "Unlicensed Financial Advice Signal",
+        "method": "CLASSIFIER",
+        "confidence_threshold": 0.75,
+        "classifier": {
+          "labels": [
+            {
+              "id": "financial_advice",
+              "name": "Specific Financial Advice",
+              "description": "Buy/sell or portfolio recommendations"
+            },
+            {
+              "id": "general_info",
+              "name": "General Financial Information",
+              "description": "Educational or informational finance content"
+            }
+          ],
+          "hypothesis_template": "This text contains specific financial or investment advice {}.",
+          "min_examples_per_label": 8
+        }
+      }
+    },
+    {
+      "name": "Medical Misinformation Signal",
+      "description": "Classifier for potentially misleading medical claims.",
+      "config": {
+        "custom_detector_key": "medical_misinfo",
+        "name": "Medical Misinformation Signal",
+        "method": "CLASSIFIER",
+        "confidence_threshold": 0.72,
+        "classifier": {
+          "labels": [
+            {
+              "id": "misinformation",
+              "name": "Potential Medical Misinformation",
+              "description": "Unproven cures or contradictory health claims"
+            },
+            {
+              "id": "accurate",
+              "name": "Medically Accurate or Neutral",
+              "description": "Consensus-aligned or neutral medical text"
+            }
+          ],
+          "hypothesis_template": "This text contains medical misinformation or unproven health claims {}.",
+          "min_examples_per_label": 10
+        }
+      }
+    },
+    {
+      "name": "User Distress Signal",
+      "description": "Detects potential crisis language for human escalation workflows.",
+      "config": {
+        "custom_detector_key": "distress_signal",
+        "name": "User Distress Signal",
+        "method": "CLASSIFIER",
+        "confidence_threshold": 0.65,
+        "max_findings": 5,
+        "classifier": {
+          "labels": [
+            {
+              "id": "distress",
+              "name": "Distress or Crisis Signal",
+              "description": "Hopelessness or self-harm indicators"
+            },
+            {
+              "id": "not_distress",
+              "name": "Not a Distress Signal",
+              "description": "Non-crisis frustration or hyperbole"
+            }
+          ],
+          "hypothesis_template": "This text expresses genuine personal distress or a mental health crisis {}.",
+          "min_examples_per_label": 15
+        }
+      }
+    },
+    {
+      "name": "Internal Product Code Detector",
+      "description": "Detects internal SKU/project identifiers in user-facing content.",
+      "config": {
+        "custom_detector_key": "internal_product_codes",
+        "name": "Internal Product Code Detector",
+        "method": "RULESET",
+        "languages": [
+          "en",
+          "de"
+        ],
+        "confidence_threshold": 0.9,
+        "ruleset": {
+          "regex_rules": [
+            {
+              "id": "sku_format",
+              "name": "Internal SKU Pattern",
+              "pattern": "\\bINT-[A-Z]{2,4}-\\d{4,6}\\b",
+              "severity": "high"
+            },
+            {
+              "id": "project_code",
+              "name": "Internal Project Code",
+              "pattern": "\\bPROJ-[A-Z0-9]{6,10}\\b",
+              "severity": "medium"
+            }
+          ],
+          "keyword_rules": []
+        }
+      }
+    },
+    {
+      "name": "Competitor Brand Mention",
+      "description": "Flags known competitor mentions for policy review.",
+      "config": {
+        "custom_detector_key": "competitor_mentions",
+        "name": "Competitor Brand Mention",
+        "method": "RULESET",
+        "confidence_threshold": 0.95,
+        "ruleset": {
+          "regex_rules": [],
+          "keyword_rules": [
+            {
+              "id": "competitors",
+              "name": "Known Competitors",
+              "keywords": [
+                "CompetitorA",
+                "CompetitorB GmbH",
+                "RivalProduct",
+                "OtherBrand AG"
+              ],
+              "case_sensitive": false,
+              "severity": "medium"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Austrian Legal Citation Detector",
+      "description": "Detects Austrian legal references in German texts.",
+      "config": {
+        "custom_detector_key": "at_legal_refs",
+        "name": "Austrian Legal Citation Detector",
+        "method": "RULESET",
+        "languages": [
+          "de"
+        ],
+        "confidence_threshold": 0.9,
+        "ruleset": {
+          "regex_rules": [
+            {
+              "id": "paragraph_ref",
+              "name": "Austrian Law Paragraph Citation",
+              "pattern": "§\\s*\\d+\\s*(Abs\\.?\\s*\\d+\\s*)?(ABGB|UGB|DSG|StGB|GmbHG|AktG|ZPO)",
+              "severity": "info"
+            },
+            {
+              "id": "bgbl_ref",
+              "name": "Federal Law Gazette Reference",
+              "pattern": "BGBl\\.?\\s+(I|II|III)?\\s*Nr\\.\\s*\\d+/\\d{4}",
+              "severity": "info"
+            }
+          ],
+          "keyword_rules": []
+        }
+      }
+    },
+    {
+      "name": "Vendor & Supplier Entity Extractor",
+      "description": "Extracts supplier and contractor entities from procurement text.",
+      "config": {
+        "custom_detector_key": "vendor_entity_extractor",
+        "name": "Vendor & Supplier Entity Extractor",
+        "method": "ENTITY",
+        "confidence_threshold": 0.55,
+        "entity": {
+          "entity_labels": [
+            "vendor name",
+            "supplier company",
+            "contractor",
+            "subcontractor",
+            "service provider",
+            "Auftragnehmer",
+            "Lieferant"
+          ],
+          "model": "urchade/gliner_multi-v2.1"
+        }
+      }
+    },
+    {
+      "name": "DACH Regulatory Term Extractor",
+      "description": "Extracts regulator and regulation mentions for compliance indexing.",
+      "config": {
+        "custom_detector_key": "dach_regulatory_terms",
+        "name": "DACH Regulatory Term Extractor",
+        "method": "ENTITY",
+        "languages": [
+          "de"
+        ],
+        "confidence_threshold": 0.6,
+        "entity": {
+          "entity_labels": [
+            "German supervisory authority",
+            "Austrian supervisory authority",
+            "Swiss supervisory authority",
+            "GDPR article reference",
+            "German law citation",
+            "regulatory fine amount",
+            "compliance deadline",
+            "Bußgeld",
+            "Aufsichtsbehörde"
+          ],
+          "model": "urchade/gliner_multi-v2.1"
+        }
+      }
+    }
+  ]
+}

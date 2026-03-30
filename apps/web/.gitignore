@@ -1,0 +1,29 @@
+# Generated API client
+/lib/api/generated/
+
+# Dependencies
+/node_modules
+
+# Production build
+/.next/
+/out/
+
+# Environment files
+.env*.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Playwright
+/playwright-report/
+/playwright/.cache/
+/test-results/

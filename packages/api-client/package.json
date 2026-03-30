@@ -1,0 +1,28 @@
+{
+  "name": "@workspace/api-client",
+  "version": "0.2.24",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "generate": "bun x @openapitools/openapi-generator-cli generate -i ../../apps/api/openapi.json -g typescript-fetch -o ./src/generated --skip-validate-spec --additional-properties=typescriptThreePlus=true,supportsES6=true,npmName=@workspace/api-client,npmVersion=0.0.1 && bun run fix",
+    "clean": "rm -rf ./src/generated",
+    "fix": "node scripts/fix-exports.cjs",
+    "codegen": "bun run generate",
+    "lint": "echo 'No linting configured'",
+    "check-types": "tsc --noEmit",
+    "test": "echo 'No tests configured for api-client'",
+    "test:e2e": "echo 'No e2e tests configured for api-client'"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@openapitools/openapi-generator-cli": "2.28.0",
+    "@types/node": "^25.3.1",
+    "typescript": "^5.9.3"
+  }
+}

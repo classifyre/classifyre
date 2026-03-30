@@ -1,0 +1,75 @@
+# VPS develop values
+# Same single-node K3s setup as values-vps.yaml, but deployed to the
+# classifyre-develop namespace on NodePort 30101 with :develop image tags.
+# Access: http://<vps-ip>:30101  (port must be opened in VPS firewall)
+
+api:
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/classifyre/unstructured/api
+    tag: "develop"
+    pullPolicy: Always
+
+  startCommand: node dist/src/main.js
+
+  autoscaling:
+    enabled: false
+
+  pdb:
+    enabled: false
+
+  cliJobs:
+    image:
+      repository: ghcr.io/classifyre/unstructured/cli
+      tag: "develop"
+      pullPolicy: Always
+    uvCache:
+      accessModes:
+        - ReadWriteOnce
+    playwrightCache:
+      accessModes:
+        - ReadWriteOnce
+
+  runnerLogs:
+    accessModes:
+      - ReadWriteOnce
+
+  migration:
+    # Published API image currently keeps Prisma engine files under root-owned Bun modules.
+    containerSecurityContext:
+      runAsUser: 0
+      runAsGroup: 0
+      runAsNonRoot: false
+
+frontend:
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/classifyre/unstructured/web
+    tag: "develop"
+    pullPolicy: Always
+
+  startCommand: node /app/apps/web/server.js
+
+  autoscaling:
+    enabled: false
+
+  pdb:
+    enabled: false
+
+  service:
+    type: NodePort
+    port: 3100
+    nodePort: 30101
+
+ingress:
+  enabled: false
+
+postgres:
+  mode: embedded
+  embedded:
+    password: "classifyre-vps-develop"
+    persistence:
+      accessModes:
+        - ReadWriteOnce

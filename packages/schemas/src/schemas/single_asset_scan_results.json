@@ -1,0 +1,470 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SingleAssetScanResults",
+  "description": "Single asset scan results with detector findings",
+  "type": "object",
+  "properties": {
+    "hash": {
+      "description": "Unique stable hash of the asset",
+      "title": "Hash",
+      "type": "string"
+    },
+    "checksum": {
+      "description": "SHA-256 checksum of the asset metadata to detect changes",
+      "title": "Checksum",
+      "type": "string"
+    },
+    "name": {
+      "description": "Name of the asset",
+      "title": "Name",
+      "type": "string"
+    },
+    "external_url": {
+      "description": "External URL of the asset",
+      "title": "External Url",
+      "type": "string"
+    },
+    "links": {
+      "description": "Linked asset hashes referenced by this asset",
+      "items": {
+        "type": "string"
+      },
+      "title": "Links",
+      "type": "array"
+    },
+    "asset_type": {
+      "$ref": "#/definitions/AssetType",
+      "description": "Canonical asset content type",
+      "title": "Asset Type"
+    },
+    "source_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ID of the source this asset belongs to (optional for local runs)",
+      "title": "Source Id"
+    },
+    "created_at": {
+      "description": "The date and time the asset was created",
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "description": "The date and time the asset was last updated",
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "runner_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ID of the runner that produced this asset (optional for local runs)",
+      "title": "Runner Id"
+    },
+    "findings": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/definitions/DetectionResult"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Detector findings for this asset",
+      "title": "Findings"
+    },
+    "scan_stats": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ScanStats"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Statistics about the detector scan for this asset",
+      "title": "Scan Stats"
+    }
+  },
+  "required": [
+    "hash",
+    "checksum",
+    "name",
+    "external_url",
+    "links",
+    "asset_type",
+    "created_at",
+    "updated_at"
+  ],
+  "definitions": {
+    "AssetType": {
+      "type": "string",
+      "enum": [
+        "TXT",
+        "TABLE",
+        "IMAGE",
+        "VIDEO",
+        "AUDIO",
+        "URL",
+        "BINARY",
+        "OTHER"
+      ],
+      "description": "Canonical type of the asset payload"
+    },
+    "DetectorType": {
+      "type": "string",
+      "enum": [
+        "SECRETS",
+        "PII",
+        "TOXIC",
+        "NSFW",
+        "YARA",
+        "BROKEN_LINKS",
+        "PROMPT_INJECTION",
+        "PHISHING_URL",
+        "SPAM",
+        "LANGUAGE",
+        "CODE_SECURITY",
+        "PLAGIARISM",
+        "IMAGE_VIOLENCE",
+        "OCR_PII",
+        "DEID_SCORE",
+        "HATE_SPEECH",
+        "AI_GENERATED",
+        "CONTENT_QUALITY",
+        "BIAS",
+        "DUPLICATE",
+        "DOMAIN_CLASS",
+        "CONTENT_TYPE",
+        "SENSITIVITY_TIER",
+        "JURISDICTION_TAG",
+        "CUSTOM"
+      ],
+      "description": "Type of detector for content analysis"
+    },
+    "FindingCategory": {
+      "type": "string",
+      "enum": [
+        "SECURITY",
+        "PRIVACY",
+        "THREAT",
+        "CONTENT",
+        "QUALITY",
+        "FAIRNESS",
+        "COMPLIANCE",
+        "SECRETS",
+        "PII",
+        "CLASSIFICATION"
+      ],
+      "description": "Normalized finding category for reporting and filtering"
+    },
+    "Severity": {
+      "description": "Severity level of finding",
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "info"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "Location": {
+      "description": "Location of finding in source content",
+      "properties": {
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable source reference: 'schema.table, row N' for tabular, URL for web/Slack",
+          "title": "Path"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional detail, e.g. column name where value was found",
+          "title": "Description"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Line number (1-indexed)"
+        },
+        "column": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Column number (1-indexed)"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Start offset (0-indexed)"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "End offset (0-indexed)"
+        }
+      },
+      "title": "Location",
+      "type": "object"
+    },
+    "ScanStats": {
+      "description": "Statistics about detector scan for an asset",
+      "type": "object",
+      "properties": {
+        "scanned_at": {
+          "description": "Timestamp when the scan started",
+          "format": "date-time",
+          "type": "string"
+        },
+        "duration_ms": {
+          "description": "Duration of the scan in milliseconds",
+          "type": "integer"
+        },
+        "detectors_run": {
+          "description": "List of detector types that were run",
+          "items": {
+            "$ref": "#/definitions/DetectorType"
+          },
+          "type": "array"
+        },
+        "content_size_bytes": {
+          "description": "Size of the content that was scanned",
+          "type": "integer"
+        },
+        "findings_count": {
+          "description": "Total number of findings detected",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "scanned_at",
+        "duration_ms",
+        "detectors_run"
+      ]
+    },
+    "DetectionResult": {
+      "description": "Result from detector scan",
+      "properties": {
+        "detector_type": {
+          "$ref": "#/definitions/DetectorType",
+          "description": "Type of detector that found this",
+          "title": "Detector Type"
+        },
+        "finding_type": {
+          "description": "Type of finding (e.g., 'aws_key', 'ssn', 'toxicity')",
+          "title": "Finding Type",
+          "type": "string"
+        },
+        "category": {
+          "description": "Category of finding (normalized category preferred, string allowed for compatibility)",
+          "title": "Category",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FindingCategory"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "severity": {
+          "$ref": "#/definitions/Severity"
+        },
+        "confidence": {
+          "description": "Confidence score (0-1)",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "matched_content": {
+          "description": "The content that matched",
+          "title": "Matched Content",
+          "type": "string"
+        },
+        "redacted_content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Redacted version of matched content",
+          "title": "Redacted Content"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Location"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Location of finding in content"
+        },
+        "context_before": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Text before the match",
+          "title": "Context Before"
+        },
+        "context_after": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Text after the match",
+          "title": "Context After"
+        },
+        "runner_id": {
+          "description": "ID of the runner that detected this finding",
+          "title": "Runner Id",
+          "type": "string"
+        },
+        "custom_detector_id": {
+          "description": "Database ID of custom detector instance when detector_type is CUSTOM",
+          "title": "Custom Detector Id",
+          "type": "string"
+        },
+        "custom_detector_key": {
+          "description": "Stable key of custom detector instance when detector_type is CUSTOM",
+          "title": "Custom Detector Key",
+          "type": "string"
+        },
+        "custom_detector_name": {
+          "description": "Display name of custom detector instance when detector_type is CUSTOM",
+          "title": "Custom Detector Name",
+          "type": "string"
+        },
+        "detected_at": {
+          "description": "Timestamp when this finding was detected",
+          "format": "date-time",
+          "title": "Detected At",
+          "type": "string"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional detector-specific metadata",
+          "title": "Metadata"
+        },
+        "extracted_data": {
+          "anyOf": [
+            { "additionalProperties": true, "type": "object" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Structured field values extracted from matched content",
+          "title": "Extracted Data"
+        },
+        "extraction_method": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Which extraction strategy was used: REGEX, GLINER, CLASSIFIER_GLINER",
+          "title": "Extraction Method"
+        }
+      },
+      "required": [
+        "detector_type",
+        "finding_type",
+        "category",
+        "severity",
+        "confidence",
+        "matched_content"
+      ],
+      "title": "DetectionResult",
+      "type": "object"
+    }
+  }
+}

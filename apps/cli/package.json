@@ -1,0 +1,17 @@
+{
+  "name": "@classifyre/cli",
+  "version": "0.2.24",
+  "private": true,
+  "scripts": {
+    "build": "uv sync",
+    "dev": "uv run main.py",
+    "lint": "uv run ruff check . --fix && uv run ruff format .",
+    "check-types": "uv run mypy .",
+    "test": "uv sync --group dev --group detectors --group file-processing && uv run pytest",
+    "test:integration": "uv run pytest tests/integration/ -m integration",
+    "test:integration:run": "RUN_INTEGRATION_TESTS=1 uv run pytest tests/integration/ -m integration",
+    "e2e": "bun run test:e2e",
+    "test:e2e": "if rg -q '@pytest\\.mark\\.e2e' tests; then RUN_E2E_TESTS=1 uv run pytest -m e2e; else echo 'No CLI e2e tests collected; treating as pass'; fi",
+    "codegen": "uv run --python 3.12 --group dev --locked python scripts/generate_models.py"
+  }
+}

@@ -1,0 +1,107 @@
+---
+title: Business Glossary
+description: How to define and manage business glossary terms that map business language to technical detection concepts.
+---
+
+import { Badge, Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components"
+
+# Business Glossary
+
+<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+  Configuration Guide
+</Badge>
+
+The Business Glossary bridges the gap between technical detection outputs and the language your
+organization uses. Instead of asking "How many SECRETS and YARA findings do we have?", stakeholders
+can ask "What are our Security Threats?"
+
+## How It Works
+
+Each glossary term stores a **filter mapping** — a JSON object that maps to one or more technical
+dimensions:
+
+| Filter Key | Maps To | Example |
+|---|---|---|
+| `detectorTypes` | Detector type enum | `["SECRETS", "PII", "YARA"]` |
+| `severities` | Severity enum | `["CRITICAL", "HIGH"]` |
+| `statuses` | Finding status enum | `["OPEN"]` |
+| `findingTypes` | Finding type strings | `["aws_key", "ssn"]` |
+| `customDetectorKeys` | Custom detector keys | `["gdpr-scanner"]` |
+
+When a metric or query is scoped to a glossary term, the filter mapping is automatically
+applied as a `WHERE` clause.
+
+## Creating a Glossary Term
+
+Navigate to **Semantic Layer > Glossary > New** in the web app, or use the API:
+
+```bash
+curl -X POST /semantic/glossary \
+  -H "Content-Type: application/json" \
+  -d '{
+    "slug": "security-threats",
+    "displayName": "Security Threats",
+    "description": "Findings from security-focused detectors",
+    "category": "Security",
+    "filterMapping": {
+      "detectorTypes": ["SECRETS", "YARA", "PROMPT_INJECTION"]
+    }
+  }'
+```
+
+## Default Glossary Terms
+
+Classifyre ships with pre-built glossary terms that cover common business concepts:
+
+| Term | Category | Filter Mapping |
+|---|---|---|
+| **Security Threats** | Security | `SECRETS`, `YARA`, `PROMPT_INJECTION` detectors |
+| **PII Exposure** | Privacy | `PII`, `PHI` detectors |
+| **Compliance Violations** | Compliance | `COMPLIANCE`, `GDPR`, `HIPAA` detectors |
+| **Content Safety Issues** | Content | `TOXIC`, `NSFW`, `BIAS` detectors |
+| **Critical Findings** | Security | `CRITICAL` severity only |
+| **Unresolved Issues** | Operations | `OPEN` status only |
+| **Data Quality** | Operations | Custom detectors: `data-quality-checker`, `schema-validator` |
+
+## Filter Mapping Schema
+
+```typescript
+interface GlossaryFilterMapping {
+  detectorTypes?: string[];    // e.g. ["SECRETS", "PII"]
+  severities?: string[];       // e.g. ["CRITICAL", "HIGH"]
+  statuses?: string[];         // e.g. ["OPEN", "RESOLVED"]
+  findingTypes?: string[];     // e.g. ["aws_key", "ssn"]
+  customDetectorKeys?: string[]; // For custom detector references
+}
+```
+
+The filter mapping supports combining multiple dimensions. For example, a term
+"Critical Security Threats" could map:
+
+```json
+{
+  "detectorTypes": ["SECRETS", "YARA"],
+  "severities": ["CRITICAL"]
+}
+```
+
+This produces an AND condition: findings must match **both** the detector types
+AND the severity to be included.
+
+## Previewing Matches
+
+Before saving a glossary term, you can preview how many findings match the filter:
+
+```bash
+POST /semantic/glossary/:slug/preview
+```
+
+This returns the count of matching findings, helping you validate the mapping
+before associating metrics with it.
+
+## Linking to Metrics
+
+Glossary terms can be linked to metric definitions. When a metric is scoped
+to a glossary term, the term's filter mapping is automatically applied during
+evaluation. This means a metric like "Total Findings" becomes
+"Total Security Threats" when scoped to the `security-threats` term.

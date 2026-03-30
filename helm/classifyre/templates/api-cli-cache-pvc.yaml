@@ -1,0 +1,53 @@
+{{- if and .Values.api.cliJobs.enabled .Values.api.cliJobs.uvCache.enabled (not .Values.api.cliJobs.uvCache.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-cli-uv-cache" (include "classifyre.fullname" .) }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.api.cliJobs.uvCache.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.api.cliJobs.uvCache.size }}
+  {{- with .Values.api.cliJobs.uvCache.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}
+{{- if and .Values.api.cliJobs.enabled .Values.api.cliJobs.playwrightCache.enabled (not .Values.api.cliJobs.playwrightCache.existingClaim) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-cli-playwright-cache" (include "classifyre.fullname" .) }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.api.cliJobs.playwrightCache.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.api.cliJobs.playwrightCache.size }}
+  {{- with .Values.api.cliJobs.playwrightCache.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}
+{{- if and .Values.api.runnerLogs.enabled (not .Values.api.runnerLogs.existingClaim) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-runner-logs" (include "classifyre.fullname" .) }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.api.runnerLogs.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.api.runnerLogs.size }}
+  {{- with .Values.api.runnerLogs.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}

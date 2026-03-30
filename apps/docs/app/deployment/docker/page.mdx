@@ -1,0 +1,271 @@
+---
+title: Docker
+sidebarTitle: Docker (dev / demo)
+description: Run the entire Classifyre stack in a single Docker container for local development, demos, and evaluations.
+---
+
+import { Callout, Steps } from "nextra/components"
+
+# Docker
+
+<Callout type="warning">
+  **This image is not for production.** It runs every service in a single container with an embedded database and no replication, high availability, or automated backups. Use the [Kubernetes deployment](/deployment/kubernetes) for production workloads.
+</Callout>
+
+The Classifyre all-in-one Docker image bundles everything into a single container — PostgreSQL, the NestJS API, the Next.js web UI, and a Caddy reverse proxy. One command and the full application is running on port `3000`.
+
+**Good for**
+
+- Local development and feature exploration
+- Sales demos and proof-of-concept trials
+- Offline or air-gapped environments
+- CI integration tests against a real running instance
+
+---
+
+## The image
+
+```
+ghcr.io/classifyre/unstructured
+```
+
+Available for `linux/amd64` and `linux/arm64`. Tags follow the same scheme as the Kubernetes images — pin to a release version for reproducible demos.
+
+```bash
+docker pull ghcr.io/classifyre/unstructured:latest
+
+# Pin to a specific release (recommended)
+docker pull ghcr.io/classifyre/unstructured:0.1.8
+```
+
+---
+
+## What runs inside
+
+All services start automatically via [s6-overlay](https://github.com/just-containers/s6-overlay), a lightweight process supervisor that manages boot order and handles graceful shutdown.
+
+```
+Container  →  port 3000
+│
+└── s6-overlay (PID 1)
+    ├── PostgreSQL 16    — database for all application data
+    ├── NestJS API       — REST + WebSocket backend  (internal :8000)
+    ├── Next.js Web      — dashboard UI              (internal :3100)
+    └── Caddy            — reverse proxy, single public endpoint
+                           /         → web UI
+                           /api/*    → API
+                           /socket.io/* → WebSocket
+```
+
+Prisma migrations run automatically every time the container starts. You never need to run them manually.
+
+---
+
+## Quick start
+
+<Steps>
+
+### Run without persistence
+
+```bash
+docker run --rm \
+  -p 3000:3000 \
+  ghcr.io/classifyre/unstructured:latest
+```
+
+Open **http://localhost:3000** in your browser.
+
+The API health endpoint is at **http://localhost:3000/api/ping**.
+
+<Callout type="info">
+  Without a volume, everything — sources, findings, settings, and credentials — is lost when the container stops.
+</Callout>
+
+### Add a data volume
+
+```bash
+docker run --rm \
+  -p 3000:3000 \
+  -v classifyre-data:/data \
+  ghcr.io/classifyre/unstructured:latest
+```
+
+With `-v classifyre-data:/data` the database and all application state survive container restarts and image upgrades.
+
+</Steps>
+
+---
+
+## Volumes
+
+The container writes everything to `/data`. This single mount point covers the entire application state.
+
+```
+/data
+├── postgres/        PostgreSQL data directory (all your sources, findings, detectors, jobs)
+└── logs/
+    ├── api.log
+    ├── postgres.log
+    └── caddy.log
+```
+
+### What you lose without a volume
+
+| Data | Impact if lost |
+|---|---|
+| PostgreSQL database | All sources, findings, custom detectors, and job history gone |
+| Encryption key | Stored connector credentials become permanently unreadable |
+| Logs | No audit trail between sessions |
+
+### Why the encryption key matters
+
+Classifyre encrypts connector credentials (API tokens, passwords) at rest using `CLASSIFYRE_MASKED_CONFIG_KEY`. When no volume is mounted, a new random key is generated on every container start. Any credentials you saved in the previous session become unreadable because the key that encrypted them no longer exists.
+
+**Always mount a volume for any session where you configure real connectors.**
+
+---
+
+## Docker Compose
+
+For demos that survive machine reboots, Docker Compose is simpler than bare `docker run` flags.
+
+```yaml filename="docker-compose.yml"
+services:
+  classifyre:
+    image: ghcr.io/classifyre/unstructured:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - classifyre-data:/data
+    environment:
+      LOG_LEVEL: info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  classifyre-data:
+```
+
+```bash
+# Start in the background
+docker compose up -d
+
+# Follow logs
+docker compose logs -f
+
+# Stop (volume is preserved)
+docker compose down
+```
+
+---
+
+## Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `CLASSIFYRE_MASKED_CONFIG_KEY` | auto-generated | 32-character key for encrypting connector credentials. Set explicitly if you need the same key across sessions without a persistent volume. |
+| `LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warn`, `error`. |
+| `NODE_ENV` | `production` | Runtime environment. |
+
+```bash
+docker run \
+  -p 3000:3000 \
+  -v classifyre-data:/data \
+  -e LOG_LEVEL=debug \
+  ghcr.io/classifyre/unstructured:latest
+```
+
+---
+
+## System requirements
+
+| | Minimum | Recommended |
+|---|---|---|
+| CPU | 1 core | 2 cores |
+| RAM | 1 GB | 2 GB |
+| Disk | 2 GB | 5 GB |
+
+Playwright (browser-based crawling) is bundled in the image. Connectors that use it consume an additional ~500 MB RAM per browser instance during active scans.
+
+---
+
+## Upgrading
+
+Pull the new image, stop the existing container, start again pointing at the same volume. Migrations run automatically.
+
+```bash
+docker pull ghcr.io/classifyre/unstructured:latest
+
+docker compose down
+docker compose up -d
+```
+
+The data volume is untouched by image upgrades.
+
+---
+
+## Backup and restore
+
+Even for demos, you may want to preserve a working state.
+
+**Backup:**
+
+```bash
+docker run --rm \
+  -v classifyre-data:/data \
+  -v "$(pwd)/backups:/backup" \
+  alpine \
+  tar czf /backup/classifyre-$(date +%Y%m%d).tar.gz -C /data .
+```
+
+**Restore:**
+
+```bash
+docker run --rm \
+  -v classifyre-data:/data \
+  -v "$(pwd)/backups:/backup" \
+  alpine \
+  tar xzf /backup/classifyre-20240101.tar.gz -C /data
+```
+
+---
+
+## Troubleshooting
+
+**Container exits immediately**
+
+```bash
+docker logs <container-id>
+```
+
+Common causes: port 3000 already in use (`lsof -i :3000`), insufficient disk space (`docker system df`).
+
+**Web UI loads but API returns errors**
+
+```bash
+# Tail the API log
+docker exec <container-id> tail -f /data/logs/api.log
+
+# Check s6 service status
+docker exec <container-id> s6-rc -a list
+```
+
+**Verify health**
+
+```bash
+curl -i http://localhost:3000/api/ping
+# → 200 {"status":"ok"}
+```
+
+---
+
+## Moving to production
+
+When you outgrow the single-container setup, deploy Classifyre on Kubernetes with proper separation of concerns, a managed database, and horizontal scaling.
+
+→ [Kubernetes Deployment](/deployment/kubernetes)

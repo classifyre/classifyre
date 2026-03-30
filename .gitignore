@@ -2,9 +2,53 @@
 runner-logs/
 dumps/
 apps/web/playwright/.cache/
-classifyre/apps/web/playwright/.cache/
 **/__pycache__/
 *.py[cod]
 .secrets
 .claude/
-classifyre/.claude/
+.codex/
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Testing
+coverage
+
+# Turbo
+.turbo
+
+# Vercel
+.vercel
+
+# Build Outputs
+.next/
+out/
+build
+dist
+classifyre/apps/web/playwright/.cache/
+apps/web/public/docs/
+
+# Python cache artifacts
+__pycache__/
+*.pyc
+# Debug
+npm-debug.log*
+
+# Misc
+.DS_Store
+*.pem
+
+# Generated API Types (regenerate from openapi.json)
+apps/web/lib/api/schema.ts
+apps/web/lib/api/schema.d.ts
+.tools/
+
+bin/act

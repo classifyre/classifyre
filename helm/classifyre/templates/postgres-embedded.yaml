@@ -1,0 +1,150 @@
+{{- if eq .Values.postgres.mode "embedded" }}
+{{- $pvcName := default (printf "%s-data" (include "classifyre.postgres.fullname" .)) .Values.postgres.embedded.persistence.existingClaim -}}
+{{- if and .Values.postgres.embedded.persistence.enabled (not .Values.postgres.embedded.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $pvcName }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  accessModes:
+    {{- toYaml .Values.postgres.embedded.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.postgres.embedded.persistence.size }}
+  {{- with .Values.postgres.embedded.persistence.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "classifyre.postgres.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+  {{- with .Values.postgres.embedded.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "classifyre.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+  ports:
+    - name: pg
+      port: {{ .Values.postgres.embedded.port }}
+      targetPort: pg
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "classifyre.postgres.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "classifyre.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "classifyre.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+        {{- with .Values.postgres.embedded.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.postgres.embedded.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.postgres.embedded.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      {{- if ne .Values.postgres.embedded.terminationGracePeriodSeconds nil }}
+      terminationGracePeriodSeconds: {{ .Values.postgres.embedded.terminationGracePeriodSeconds }}
+      {{- end }}
+      {{- with .Values.postgres.embedded.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.embedded.image.repository }}:{{ .Values.postgres.embedded.image.tag }}
+          imagePullPolicy: {{ .Values.postgres.embedded.image.pullPolicy }}
+          ports:
+            - name: pg
+              containerPort: {{ .Values.postgres.embedded.port }}
+              protocol: TCP
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.embedded.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.embedded.username | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.databaseSecretName" . }}
+                  key: {{ include "classifyre.databasePasswordKey" . }}
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p {{ .Values.postgres.embedded.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p {{ .Values.postgres.embedded.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.postgres.embedded.resources | nindent 12 }}
+          {{- with .Values.postgres.embedded.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql
+      volumes:
+        - name: postgres-data
+          {{- if .Values.postgres.embedded.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ $pvcName }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.postgres.embedded.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.postgres.embedded.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.postgres.embedded.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,16 @@
+{
+  "name": "@workspace/typescript-config",
+  "version": "0.0.0",
+  "private": true,
+  "license": "PROPRIETARY",
+  "scripts": {
+    "test": "echo 'No tests for typescript-config'",
+    "test:e2e": "echo 'No e2e tests for typescript-config'",
+    "lint": "echo 'No linting for typescript-config'",
+    "build": "echo 'No build for typescript-config'",
+    "codegen": "echo 'No codegen for typescript-config'"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

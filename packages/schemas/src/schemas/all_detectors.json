@@ -1,0 +1,1341 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DetectorsRefactored",
+  "description": "Merged detector schemas with all detector types and common definitions",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/ContentDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/SecretsDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/PIIDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/ThreatDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/BrokenLinksDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/ContentQualityDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/ClassificationDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/DeidScoreDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/BiasDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/CustomDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/GenericDetectorConfig"
+    }
+  ],
+  "definitions": {
+    "DetectorType": {
+      "type": "string",
+      "enum": [
+        "SECRETS",
+        "PII",
+        "TOXIC",
+        "NSFW",
+        "YARA",
+        "BROKEN_LINKS",
+        "PROMPT_INJECTION",
+        "PHISHING_URL",
+        "SPAM",
+        "LANGUAGE",
+        "CODE_SECURITY",
+        "PLAGIARISM",
+        "IMAGE_VIOLENCE",
+        "OCR_PII",
+        "DEID_SCORE",
+        "HATE_SPEECH",
+        "AI_GENERATED",
+        "CONTENT_QUALITY",
+        "BIAS",
+        "DUPLICATE",
+        "DOMAIN_CLASS",
+        "CONTENT_TYPE",
+        "SENSITIVITY_TIER",
+        "JURISDICTION_TAG",
+        "CUSTOM"
+      ],
+      "description": "Type of detector for content analysis"
+    },
+    "DetectorCategory": {
+      "type": "string",
+      "enum": [
+        "SECURITY",
+        "PRIVACY",
+        "THREAT",
+        "CONTENT",
+        "QUALITY",
+        "FAIRNESS",
+        "COMPLIANCE",
+        "CLASSIFICATION"
+      ],
+      "description": "High-level detector category for filtering and governance"
+    },
+    "SupportedAssetType": {
+      "type": "string",
+      "enum": [
+        "TXT",
+        "TABLE",
+        "IMAGE",
+        "VIDEO",
+        "AUDIO",
+        "URL",
+        "BINARY",
+        "OTHER"
+      ],
+      "description": "Canonical output asset type the detector can process"
+    },
+    "SourceAssetType": {
+      "type": "string",
+      "enum": [
+        "WORDPRESS",
+        "SLACK",
+        "SITEMAP",
+        "S3_COMPATIBLE_STORAGE",
+        "AZURE_BLOB_STORAGE",
+        "GOOGLE_CLOUD_STORAGE",
+        "POSTGRESQL",
+        "MYSQL",
+        "JIRA",
+        "CONFLUENCE",
+        "SERVICEDESK",
+        "DATABRICKS",
+        "SNOWFLAKE",
+        "MONGODB",
+        "TABLEAU",
+        "MSSQL",
+        "ORACLE",
+        "HIVE",
+        "POWERBI"
+      ],
+      "description": "Source types where detector execution is supported"
+    },
+    "DetectorLifecycleStatus": {
+      "type": "string",
+      "enum": [
+        "active",
+        "planned",
+        "experimental",
+        "deprecated"
+      ],
+      "description": "Implementation lifecycle status of a detector"
+    },
+    "DetectorPriority": {
+      "type": "string",
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3",
+        "P4"
+      ],
+      "description": "Roadmap priority for rollout"
+    },
+    "DetectorCatalogEntry": {
+      "type": "object",
+      "description": "Catalog metadata for one detector type",
+      "properties": {
+        "detector_type": {
+          "$ref": "#/definitions/DetectorType",
+          "description": "Canonical detector identifier"
+        },
+        "lifecycle_status": {
+          "$ref": "#/definitions/DetectorLifecycleStatus"
+        },
+        "priority": {
+          "$ref": "#/definitions/DetectorPriority"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DetectorCategory"
+          },
+          "uniqueItems": true,
+          "minItems": 1,
+          "description": "Detector categories used for routing, reporting, and policy"
+        },
+        "supported_asset_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SupportedAssetType"
+          },
+          "uniqueItems": true,
+          "minItems": 1,
+          "description": "Asset modalities the detector can scan"
+        },
+        "supported_source_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceAssetType"
+          },
+          "uniqueItems": true,
+          "description": "Optional source-level compatibility list"
+        },
+        "supported_mime_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "description": "Optional MIME type compatibility list"
+        },
+        "recommended_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Recommended model, engine, or package for this detector"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Implementation notes and constraints"
+        }
+      },
+      "required": [
+        "detector_type",
+        "lifecycle_status",
+        "priority",
+        "categories",
+        "supported_asset_types"
+      ]
+    },
+    "DetectorCatalog": {
+      "type": "array",
+      "description": "Detector capability catalog used for planning and runtime routing",
+      "items": {
+        "$ref": "#/definitions/DetectorCatalogEntry"
+      },
+      "default": [
+        {
+          "detector_type": "SECRETS",
+          "lifecycle_status": "active",
+          "priority": "P0",
+          "categories": [
+            "SECURITY",
+            "COMPLIANCE"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "detect-secrets"
+        },
+        {
+          "detector_type": "PII",
+          "lifecycle_status": "active",
+          "priority": "P0",
+          "categories": [
+            "PRIVACY",
+            "COMPLIANCE"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "presidio-analyzer"
+        },
+        {
+          "detector_type": "TOXIC",
+          "lifecycle_status": "active",
+          "priority": "P1",
+          "categories": [
+            "CONTENT"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "detoxify"
+        },
+        {
+          "detector_type": "NSFW",
+          "lifecycle_status": "active",
+          "priority": "P1",
+          "categories": [
+            "CONTENT"
+          ],
+          "supported_asset_types": [
+            "IMAGE"
+          ],
+          "recommended_model": "nudenet",
+          "notes": "MIT licensed package (commercial use allowed)."
+        },
+        {
+          "detector_type": "YARA",
+          "lifecycle_status": "active",
+          "priority": "P1",
+          "categories": [
+            "THREAT",
+            "SECURITY"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL",
+            "BINARY"
+          ],
+          "recommended_model": "yara-python"
+        },
+        {
+          "detector_type": "BROKEN_LINKS",
+          "lifecycle_status": "active",
+          "priority": "P2",
+          "categories": [
+            "QUALITY"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "HTTP validation engine",
+          "notes": "Checks extracted links and embedded assets for unreachable, empty, or error responses."
+        },
+        {
+          "detector_type": "PROMPT_INJECTION",
+          "lifecycle_status": "active",
+          "priority": "P0",
+          "categories": [
+            "SECURITY"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "protectai/deberta-v3-base-prompt-injection-v2"
+        },
+        {
+          "detector_type": "PHISHING_URL",
+          "lifecycle_status": "active",
+          "priority": "P2",
+          "categories": [
+            "THREAT",
+            "SECURITY"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "CrabInHoney/urlbert-tiny-phishing-classifier"
+        },
+        {
+          "detector_type": "SPAM",
+          "lifecycle_status": "active",
+          "priority": "P2",
+          "categories": [
+            "QUALITY"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "mrm8488/bert-tiny-finetuned-sms-spam-detection"
+        },
+        {
+          "detector_type": "LANGUAGE",
+          "lifecycle_status": "active",
+          "priority": "P2",
+          "categories": [
+            "QUALITY"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "fast-langdetect"
+        },
+        {
+          "detector_type": "CODE_SECURITY",
+          "lifecycle_status": "active",
+          "priority": "P3",
+          "categories": [
+            "SECURITY",
+            "THREAT"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "OTHER"
+          ],
+          "recommended_model": "bandit"
+        },
+        {
+          "detector_type": "PLAGIARISM",
+          "lifecycle_status": "planned",
+          "priority": "P4",
+          "categories": [
+            "QUALITY",
+            "COMPLIANCE"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL",
+            "OTHER"
+          ],
+          "recommended_model": "datasketch + all-MiniLM-L6-v2"
+        },
+        {
+          "detector_type": "IMAGE_VIOLENCE",
+          "lifecycle_status": "experimental",
+          "priority": "P4",
+          "categories": [
+            "CONTENT"
+          ],
+          "supported_asset_types": [
+            "IMAGE"
+          ],
+          "recommended_model": null,
+          "notes": "Deferred until a commercially-permissive model license is verified."
+        },
+        {
+          "detector_type": "OCR_PII",
+          "lifecycle_status": "planned",
+          "priority": "P4",
+          "categories": [
+            "PRIVACY",
+            "COMPLIANCE"
+          ],
+          "supported_asset_types": [
+            "IMAGE"
+          ],
+          "recommended_model": "tesseract + presidio-analyzer"
+        },
+        {
+          "detector_type": "DEID_SCORE",
+          "lifecycle_status": "planned",
+          "priority": "P0",
+          "categories": [
+            "PRIVACY",
+            "COMPLIANCE"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE"
+          ],
+          "recommended_model": "presidio-analyzer + pycanon + scrubadub",
+          "notes": "Measures anonymization completeness and residual privacy risk after masking, with support for DACH identifiers."
+        },
+        {
+          "detector_type": "HATE_SPEECH",
+          "lifecycle_status": "planned",
+          "priority": "P2",
+          "categories": [
+            "CONTENT",
+            "COMPLIANCE"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "facebook/roberta-hate-speech-dynabench-r4-target",
+          "notes": "Flags targeted hateful language for moderation and policy reporting, including German-language coverage."
+        },
+        {
+          "detector_type": "AI_GENERATED",
+          "lifecycle_status": "planned",
+          "priority": "P1",
+          "categories": [
+            "CONTENT",
+            "COMPLIANCE"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "distilbert-base-uncased (RAID fine-tuned)",
+          "notes": "Estimates likelihood that content is AI-authored to support disclosure and compliance workflows."
+        },
+        {
+          "detector_type": "CONTENT_QUALITY",
+          "lifecycle_status": "planned",
+          "priority": "P2",
+          "categories": [
+            "QUALITY"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "sentence-transformers/all-MiniLM-L6-v2 + textstat",
+          "notes": "Scores readability and coherence so teams can prioritize low-quality content for review."
+        },
+        {
+          "detector_type": "BIAS",
+          "lifecycle_status": "active",
+          "priority": "P2",
+          "categories": [
+            "FAIRNESS",
+            "CONTENT"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "valurank/distilroberta-bias",
+          "notes": "Detects biased language patterns for fairness governance and moderation workflows."
+        },
+        {
+          "detector_type": "DUPLICATE",
+          "lifecycle_status": "planned",
+          "priority": "P2",
+          "categories": [
+            "QUALITY"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "datasketch (MinHash LSH)",
+          "notes": "Finds near-duplicate content to reduce noise and repeated policy or legal risk."
+        },
+        {
+          "detector_type": "DOMAIN_CLASS",
+          "lifecycle_status": "planned",
+          "priority": "P2",
+          "categories": [
+            "CLASSIFICATION"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "typeform/distilbert-base-uncased-mnli",
+          "notes": "Classifies business domain labels (for example finance, health, legal) for routing and ownership."
+        },
+        {
+          "detector_type": "CONTENT_TYPE",
+          "lifecycle_status": "planned",
+          "priority": "P3",
+          "categories": [
+            "CLASSIFICATION"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "typeform/distilbert-base-uncased-mnli",
+          "notes": "Labels writing style (factual, opinion, promotional, instructional) to support review policy selection."
+        },
+        {
+          "detector_type": "SENSITIVITY_TIER",
+          "lifecycle_status": "planned",
+          "priority": "P2",
+          "categories": [
+            "CLASSIFICATION",
+            "COMPLIANCE"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "typeform/distilbert-base-uncased-mnli",
+          "notes": "Assigns data sensitivity levels (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED) for governance controls."
+        },
+        {
+          "detector_type": "JURISDICTION_TAG",
+          "lifecycle_status": "planned",
+          "priority": "P3",
+          "categories": [
+            "CLASSIFICATION",
+            "COMPLIANCE"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL"
+          ],
+          "recommended_model": "fast-langdetect + rules engine",
+          "notes": "Infers likely regulation tags (for example GDPR, DSA, CCPA, HIPAA, nDSG) from language and context."
+        },
+        {
+          "detector_type": "CUSTOM",
+          "lifecycle_status": "active",
+          "priority": "P0",
+          "categories": [
+            "CLASSIFICATION",
+            "COMPLIANCE"
+          ],
+          "supported_asset_types": [
+            "TXT",
+            "TABLE",
+            "URL",
+            "IMAGE"
+          ],
+          "recommended_model": "mDeBERTa-v3 + SetFit + GLiNER",
+          "notes": "User-defined detector that supports ruleset, few-shot classification, and entity extraction methods."
+        }
+      ]
+    },
+    "Severity": {
+      "type": "string",
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "info"
+      ],
+      "description": "Severity level of finding"
+    },
+    "Location": {
+      "type": "object",
+      "description": "Location of finding in content",
+      "properties": {
+        "line": {
+          "type": "integer",
+          "description": "Line number (1-indexed)"
+        },
+        "column": {
+          "type": "integer",
+          "description": "Column number (1-indexed)"
+        },
+        "start": {
+          "type": "integer",
+          "description": "Start offset (0-indexed)"
+        },
+        "end": {
+          "type": "integer",
+          "description": "End offset (0-indexed)"
+        },
+        "path": {
+          "type": "string",
+          "description": "File path or identifier"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ]
+    },
+    "ContentEnabledPattern": {
+      "type": "string",
+      "enum": [
+        "toxicity",
+        "severe_toxicity",
+        "obscene",
+        "threat",
+        "insult",
+        "identity_attack",
+        "nsfw",
+        "nsfw_explicit"
+      ],
+      "description": "Content detector pattern types"
+    },
+    "SecretsEnabledPattern": {
+      "type": "string",
+      "enum": [
+        "aws",
+        "github",
+        "slack",
+        "stripe",
+        "google",
+        "azure",
+        "private_key",
+        "generic_api_key",
+        "generic_secret"
+      ],
+      "description": "Secrets detector pattern types"
+    },
+    "PIIEnabledPattern": {
+      "type": "string",
+      "enum": [
+        "credit_card",
+        "ssn",
+        "email",
+        "phone_number",
+        "person",
+        "location",
+        "ip_address",
+        "iban_code",
+        "us_passport",
+        "us_driver_license",
+        "austrian_svnr",
+        "swiss_ahv",
+        "german_tax_id",
+        "eu_national_id",
+        "date_of_birth"
+      ],
+      "description": "PII detector pattern types"
+    },
+    "DetectorConfig": {
+      "type": "object",
+      "description": "Configuration for detector",
+      "properties": {
+        "enabled_patterns": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "List of enabled pattern names"
+        },
+        "severity_threshold": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Severity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Minimum severity to report"
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.7,
+          "description": "Minimum confidence to report (0-1)"
+        },
+        "max_findings": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum number of findings to return"
+        }
+      }
+    },
+    "ContentDetectorConfig": {
+      "title": "ContentDetectorConfig",
+      "description": "Configuration for content safety detectors",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "enabled_patterns": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ContentEnabledPattern"
+              },
+              "description": "Specific content types to detect"
+            },
+            "model_name": {
+              "type": "string",
+              "enum": [
+                "original",
+                "unbiased",
+                "multilingual"
+              ],
+              "default": "original",
+              "title": "ContentModelName",
+              "description": "Detoxify model variant"
+            }
+          }
+        }
+      ]
+    },
+    "SecretsDetectorConfig": {
+      "title": "SecretsDetectorConfig",
+      "description": "Configuration for secrets detector",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "enabled_patterns": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/SecretsEnabledPattern"
+              },
+              "description": "Specific secret types to detect"
+            }
+          }
+        }
+      ]
+    },
+    "PIIDetectorConfig": {
+      "title": "PIIDetectorConfig",
+      "description": "Configuration for PII detector",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "enabled_patterns": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PIIEnabledPattern"
+              },
+              "description": "Specific PII types to detect"
+            },
+            "language": {
+              "type": "string",
+              "default": "en",
+              "description": "Language code for NER models"
+            }
+          }
+        }
+      ]
+    },
+    "ThreatDetectorConfig": {
+      "title": "ThreatDetectorConfig",
+      "description": "Configuration for threat detector",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "enabled_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "YARA rule names to enable"
+            },
+            "rules_path": {
+              "type": "string",
+              "description": "Path to custom YARA rules directory"
+            },
+            "timeout": {
+              "type": "integer",
+              "default": 60,
+              "description": "Timeout for YARA scanning in seconds"
+            }
+          }
+        }
+      ]
+    },
+    "BrokenLinksDetectorConfig": {
+      "title": "BrokenLinksDetectorConfig",
+      "description": "Configuration for broken links detector",
+      "type": "object",
+      "properties": {}
+    },
+    "ContentQualityDetectorConfig": {
+      "title": "ContentQualityDetectorConfig",
+      "description": "Configuration for content quality scoring detectors",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "readability_weight": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.4,
+              "description": "Weight applied to readability signal in composite score"
+            },
+            "coherence_weight": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.35,
+              "description": "Weight applied to coherence signal in composite score"
+            },
+            "density_weight": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.25,
+              "description": "Weight applied to information-density signal in composite score"
+            },
+            "min_score_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 40,
+              "description": "Minimum quality score threshold to report"
+            }
+          }
+        }
+      ]
+    },
+    "ClassificationDetectorConfig": {
+      "title": "ClassificationDetectorConfig",
+      "description": "Configuration for classification and tagging detectors",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "enabled_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional subset of labels/tags to include for this classifier"
+            }
+          }
+        }
+      ]
+    },
+    "DeidScoreDetectorConfig": {
+      "title": "DeidScoreDetectorConfig",
+      "description": "Configuration for de-identification completeness scoring detector",
+      "allOf": [
+        {
+          "$ref": "#/definitions/PIIDetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "min_k_anonymity": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 5,
+              "description": "Minimum target k-anonymity threshold for risk evaluation"
+            },
+            "min_l_diversity": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 2,
+              "description": "Minimum target l-diversity threshold for risk evaluation"
+            },
+            "quasi_identifiers": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PIIEnabledPattern"
+              },
+              "description": "Quasi-identifiers used for re-identification risk calculations"
+            }
+          }
+        }
+      ]
+    },
+    "BiasEnabledPattern": {
+      "type": "string",
+      "enum": [
+        "gender_bias",
+        "racial_bias",
+        "age_bias",
+        "religious_bias",
+        "political_bias"
+      ],
+      "description": "Bias detector pattern types"
+    },
+    "BiasDetectorConfig": {
+      "title": "BiasDetectorConfig",
+      "description": "Configuration for fairness and bias detector",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "enabled_patterns": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/BiasEnabledPattern"
+              },
+              "description": "Specific bias signals to detect"
+            }
+          }
+        }
+      ]
+    },
+    "CustomDetectorMethod": {
+      "type": "string",
+      "enum": [
+        "RULESET",
+        "CLASSIFIER",
+        "ENTITY"
+      ],
+      "description": "Execution method for custom detector logic"
+    },
+    "CustomRegexRule": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable ID for this regex rule"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name for this regex rule"
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Regular expression pattern"
+        },
+        "flags": {
+          "type": "string",
+          "default": "",
+          "description": "Regex flags (for example i, m, s)"
+        },
+        "severity": {
+          "$ref": "#/definitions/Severity"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "pattern"
+      ],
+      "additionalProperties": false
+    },
+    "CustomKeywordRule": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable ID for this keyword rule"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name for this keyword rule"
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Keyword set to match"
+        },
+        "case_sensitive": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether keyword matching is case-sensitive"
+        },
+        "severity": {
+          "$ref": "#/definitions/Severity"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "keywords"
+      ],
+      "additionalProperties": false
+    },
+    "CustomExtractorField": {
+      "type": "object",
+      "description": "One output field in the extraction schema",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Output field name — becomes a key in extracted_data JSON"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable hint for what this field captures"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "boolean", "list[string]", "list[number]"],
+          "default": "string"
+        },
+        "entity_label": {
+          "type": "string",
+          "description": "GLiNER entity label (ENTITY and CLASSIFIER methods)"
+        },
+        "regex_pattern": {
+          "type": "string",
+          "description": "Regex with one named capture group (?P<value>...) for RULESET method"
+        },
+        "regex_flags": {
+          "type": "string",
+          "default": "i",
+          "description": "Regex flags: i=case-insensitive, m=multiline, s=dotall"
+        },
+        "aggregate": {
+          "type": "string",
+          "enum": ["first", "last", "list", "join", "count"],
+          "default": "list",
+          "description": "How to aggregate multiple matches"
+        },
+        "join_separator": {
+          "type": "string",
+          "default": ", "
+        },
+        "min_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.4,
+          "description": "Minimum GLiNER confidence for this field"
+        },
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, skip saving extraction when this field is empty"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "CustomExtractorConfig": {
+      "type": "object",
+      "description": "Structured extraction — runs after detection fires on the same content",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/CustomExtractorField" },
+          "minItems": 1
+        },
+        "gliner_model": {
+          "type": "string",
+          "default": "urchade/gliner_multi-v2.1"
+        },
+        "content_limit": {
+          "type": "integer",
+          "minimum": 320,
+          "maximum": 8192,
+          "default": 4000,
+          "description": "Chars of content to pass to extractor (classifier matched_content is only 320 chars)"
+        }
+      },
+      "required": ["fields"],
+      "additionalProperties": false
+    },
+    "CustomRulesetConfig": {
+      "type": "object",
+      "properties": {
+        "regex_rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CustomRegexRule"
+          },
+          "default": []
+        },
+        "keyword_rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CustomKeywordRule"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomClassifierLabel": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "CustomClassifierTrainingExample": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "accepted": {
+          "type": "boolean",
+          "default": true
+        },
+        "source": {
+          "type": "string",
+          "default": "editor",
+          "description": "Origin of this example (editor/feedback/import)"
+        }
+      },
+      "required": [
+        "text",
+        "label"
+      ],
+      "additionalProperties": false
+    },
+    "CustomClassifierConfig": {
+      "type": "object",
+      "properties": {
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CustomClassifierLabel"
+          },
+          "default": []
+        },
+        "zero_shot_model": {
+          "type": "string",
+          "default": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"
+        },
+        "hypothesis_template": {
+          "type": "string",
+          "default": "This text contains {}."
+        },
+        "training_examples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CustomClassifierTrainingExample"
+          },
+          "default": []
+        },
+        "min_examples_per_label": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 8
+        },
+        "setfit_model": {
+          "type": "string",
+          "default": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomEntityConfig": {
+      "type": "object",
+      "properties": {
+        "entity_labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "model": {
+          "type": "string",
+          "default": "urchade/gliner_multi-v2.1"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomDetectorConfig": {
+      "title": "CustomDetectorConfig",
+      "description": "Configuration for user-defined detector execution",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "custom_detector_key": {
+              "type": "string",
+              "description": "Stable key used to identify one custom detector instance"
+            },
+            "name": {
+              "type": "string",
+              "description": "User-facing name of custom detector"
+            },
+            "description": {
+              "type": "string"
+            },
+            "method": {
+              "$ref": "#/definitions/CustomDetectorMethod",
+              "default": "RULESET"
+            },
+            "languages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "de",
+                "en"
+              ]
+            },
+            "ruleset": {
+              "$ref": "#/definitions/CustomRulesetConfig"
+            },
+            "classifier": {
+              "$ref": "#/definitions/CustomClassifierConfig"
+            },
+            "entity": {
+              "$ref": "#/definitions/CustomEntityConfig"
+            },
+            "extractor": {
+              "$ref": "#/definitions/CustomExtractorConfig",
+              "description": "Optional structured extraction — runs when detector fires"
+            }
+          },
+          "required": [
+            "custom_detector_key",
+            "name",
+            "method"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "GenericDetectorConfig": {
+      "title": "GenericDetectorConfig",
+      "description": "Generic config for detectors without specialised parameters",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        }
+      ]
+    }
+  }
+}

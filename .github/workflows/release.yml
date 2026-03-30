@@ -1,0 +1,366 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version in major.minor.patch format"
+        required: true
+        type: string
+
+permissions:
+  actions: write
+  contents: write
+  packages: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci-gate:
+    name: CI gate
+    uses: ./.github/workflows/ci.yml
+
+  prepare-release:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    needs: [ci-gate]
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      sha: ${{ steps.commit.outputs.sha }}
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${INPUT_VERSION#v}"
+          if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must match major.minor.patch"
+            exit 1
+          fi
+
+          TAG="v${VERSION}"
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} already exists locally"
+            exit 1
+          fi
+          if git ls-remote --tags origin "${TAG}" | grep -q "${TAG}$"; then
+            echo "::error::Tag ${TAG} already exists on origin"
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Bump package versions
+        run: node scripts/set-release-version.mjs "${{ steps.version.outputs.version }}"
+
+      - name: Commit and tag release
+        id: commit
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- \
+            package.json \
+            apps/api/package.json \
+            apps/blog/package.json \
+            apps/docs/package.json \
+            apps/web/package.json \
+            apps/cli/package.json \
+            apps/cli/pyproject.toml \
+            packages/api-client/package.json \
+            packages/devops/package.json \
+            packages/schemas/package.json \
+            packages/schemas/pyproject.toml \
+            helm/classifyre/Chart.yaml; then
+            echo "::error::Release version ${VERSION} is already applied"
+            exit 1
+          fi
+
+          git add \
+            package.json \
+            apps/api/package.json \
+            apps/blog/package.json \
+            apps/docs/package.json \
+            apps/web/package.json \
+            apps/cli/package.json \
+            apps/cli/pyproject.toml \
+            packages/api-client/package.json \
+            packages/devops/package.json \
+            packages/schemas/package.json \
+            packages/schemas/pyproject.toml \
+            helm/classifyre/Chart.yaml \
+            scripts/set-release-version.mjs
+
+          git commit -m "chore(release): ${TAG}"
+          git tag "${TAG}"
+          git push origin HEAD:main
+          git push origin "${TAG}"
+
+          echo "sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+  build-main-images:
+    name: Wait for CI pipeline on release commit
+    runs-on: ubuntu-latest
+    needs: [prepare-release]
+
+    steps:
+      - name: Wait for release commit on origin/main
+        env:
+          EXPECTED_SHA: ${{ needs.prepare-release.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          for _ in $(seq 1 30); do
+            current_sha=$(gh api "repos/${REPO}/commits/main" --jq '.sha')
+            if [ "${current_sha}" = "${EXPECTED_SHA}" ]; then
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "::error::Release commit did not become origin/main in time"
+          exit 1
+
+      - name: Dispatch CI workflow for release commit
+        id: dispatch
+        env:
+          EXPECTED_SHA: ${{ needs.prepare-release.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # GITHUB_TOKEN pushes do not trigger push-event workflows; dispatch explicitly.
+          dispatch_started_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          gh api \
+            --method POST \
+            "repos/${REPO}/actions/workflows/ci.yml/dispatches" \
+            -f ref=main >/dev/null
+
+          for _ in $(seq 1 30); do
+            run_id=$(gh api \
+              "repos/${REPO}/actions/workflows/ci.yml/runs?event=workflow_dispatch&branch=main&per_page=20" \
+              --jq ".workflow_runs | map(select(.head_sha == \"${EXPECTED_SHA}\" and .created_at >= \"${dispatch_started_at}\")) | sort_by(.created_at) | reverse | .[0].id // empty")
+
+            if [ -n "${run_id}" ]; then
+              echo "run_id=${run_id}" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "::error::Timed out waiting for CI workflow run to start"
+          exit 1
+
+      - name: Wait for CI workflow to succeed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: gh run watch "${{ steps.dispatch.outputs.run_id }}" --repo "${REPO}" --interval 30 --exit-status
+
+  retag-images:
+    name: Retag Docker images
+    runs-on: ubuntu-latest
+    needs: [prepare-release, build-main-images]
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retag main images for release
+        env:
+          REPO: ghcr.io/${{ github.repository }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          major="${VERSION%%.*}"
+          remainder="${VERSION#${major}.}"
+          minor="${remainder%%.*}"
+
+          retag() {
+            local image="$1"
+            docker buildx imagetools create \
+              --tag "${image}:${VERSION}" \
+              --tag "${image}:${major}.${minor}" \
+              --tag "${image}:${major}" \
+              --tag "${image}:latest" \
+              "${image}:main"
+          }
+
+          retag "${REPO}"
+          retag "${REPO}/web"
+          retag "${REPO}/api"
+          retag "${REPO}/cli"
+
+  publish-helm-chart:
+    name: Publish Helm chart to GHCR
+    runs-on: ubuntu-latest
+    needs: [prepare-release, retag-images]
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.tag }}
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Lint chart
+        run: helm lint helm/classifyre
+
+      - name: Package and push chart
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+          REPO: ghcr.io/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          helm package helm/classifyre
+          helm push "classifyre-${VERSION}.tgz" "oci://${REPO}/charts"
+
+  publish-pypi:
+    name: Publish Python packages to PyPI
+    runs-on: ubuntu-latest
+    needs: [prepare-release, retag-images]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.tag }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build and publish classifyre-schemas
+        working-directory: packages/schemas
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          uv build
+          uv publish
+
+      - name: Build and publish classifyre-cli
+        working-directory: apps/cli
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          uv build
+          uv publish
+
+  create-release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    needs: [prepare-release, retag-images, publish-helm-chart, publish-pypi]
+
+    steps:
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+  deploy-k3s:
+    name: Deploy to k3s
+    runs-on: ubuntu-latest
+    needs: [prepare-release, create-release]
+
+    env:
+      HELM_RELEASE_NAME: classifyre
+      HELM_NAMESPACE: classifyre
+      HELM_VALUES_FILE: ./helm/classifyre/values-vps.yaml
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Configure kubeconfig
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.kube
+          printf '%s' "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Verify cluster access
+        run: |
+          set -euo pipefail
+          kubectl cluster-info
+          kubectl get ns "${HELM_NAMESPACE}" >/dev/null 2>&1 || true
+
+      - name: Deploy release with Helm
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          helm upgrade --install "${HELM_RELEASE_NAME}" ./helm/classifyre \
+            --namespace "${HELM_NAMESPACE}" \
+            --create-namespace \
+            -f "${HELM_VALUES_FILE}" \
+            --set api.image.tag="${VERSION}" \
+            --set api.cliJobs.image.tag="${VERSION}" \
+            --set frontend.image.tag="${VERSION}" \
+            --wait \
+            --timeout 15m
+
+      - name: Show rollout status
+        run: |
+          set -euo pipefail
+          kubectl -n "${HELM_NAMESPACE}" get deploy,pods,svc
+          helm status "${HELM_RELEASE_NAME}" -n "${HELM_NAMESPACE}"

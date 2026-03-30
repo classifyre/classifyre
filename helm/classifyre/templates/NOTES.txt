@@ -1,0 +1,41 @@
+Classifyre has been deployed.
+
+Release: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+Web service:
+  {{ include "classifyre.web.fullname" . }}:{{ .Values.frontend.service.port }}
+
+API service:
+  {{ include "classifyre.api.fullname" . }}:{{ .Values.api.service.port }}
+
+{{- if .Values.ingress.enabled }}
+Ingress host:
+  {{ .Values.ingress.host }}
+
+Quick checks:
+  curl -i http://{{ .Values.ingress.host }}/
+  curl -i http://{{ .Values.ingress.host }}/api/ping
+{{- else }}
+No ingress enabled. Use port-forward:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "classifyre.web.fullname" . }} 3100:{{ .Values.frontend.service.port }}
+  curl -i http://127.0.0.1:3100/
+  curl -i http://127.0.0.1:3100/api/ping
+{{- end }}
+
+CLI job execution mode:
+  {{- if .Values.api.cliJobs.enabled }} enabled (backend will create Kubernetes Jobs) {{- else }} disabled {{- end }}
+
+Database mode: {{ .Values.postgres.mode }}
+{{- if eq .Values.postgres.mode "embedded" }}
+  !! WARNING: embedded PostgreSQL is a single-replica Deployment with no HA or backups.
+  !! Use postgres.mode=cnpg (CloudNativePG) or postgres.mode=external for production.
+{{- end }}
+{{- if and (eq .Values.postgres.mode "external") (eq .Values.postgres.connection.sslMode "disable") }}
+  !! WARNING: postgres.connection.sslMode=disable — database connection is unencrypted.
+  !! Set postgres.connection.sslMode=require or verify-full for production.
+{{- end }}
+{{- if and .Values.ingress.enabled (empty .Values.ingress.tls) }}
+  !! NOTE: ingress has no TLS configured. Add ingress.tls and a cert-manager cluster-issuer
+  !! annotation via ingress.annotations for HTTPS.
+{{- end }}

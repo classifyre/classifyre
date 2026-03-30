@@ -1,0 +1,11 @@
+# Generated API client
+/src/generated/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Logs
+*.log

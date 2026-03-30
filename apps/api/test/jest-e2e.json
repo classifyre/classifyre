@@ -1,0 +1,17 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "testPathIgnorePatterns": [".remote-e2e-spec.ts$"],
+  "setupFiles": ["<rootDir>/setup-env.ts"],
+  "transform": {
+    "^.+\\.(t|j)s$": ["ts-jest", {
+      "tsconfig": "./test/tsconfig.e2e.json"
+    }]
+  },
+  "transformIgnorePatterns": [],
+  "testTimeout": 120000,
+  "forceExit": true,
+  "maxWorkers": 1
+}

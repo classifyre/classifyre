@@ -1,0 +1,655 @@
+# -- Override chart name used in resource names.
+nameOverride: ""
+# -- Fully override release-based resource names.
+fullnameOverride: ""
+
+# -- Additional labels added to all chart resources.
+commonLabels: {}
+# -- Additional annotations added to supported chart resources.
+commonAnnotations: {}
+
+# -- Image pull secrets for all workloads.
+imagePullSecrets: []
+
+serviceAccount:
+  # -- Create the API service account.
+  create: true
+  # -- Existing service account name to use when `create=false`.
+  name: ""
+  # -- Extra annotations for the API service account.
+  annotations: {}
+  # -- Mount service account token into API pods (required for Kubernetes CLI jobs).
+  automount: true
+
+rbac:
+  # -- Create Role/RoleBinding for API CLI job orchestration.
+  create: true
+
+api:
+  # -- Number of API replicas when autoscaling is disabled.
+  replicaCount: 2
+
+  image:
+    # -- API container image repository.
+    repository: ghcr.io/classifyre/unstructured/api
+    # -- API container image tag. Defaults to the chart appVersion when empty.
+    tag: ""
+    # -- API image pull policy.
+    pullPolicy: IfNotPresent
+
+  # -- Optional API container command override.
+  command: []
+  # -- Optional API container args override.
+  args: []
+  # -- Working directory used by default shell command.
+  workingDir: ""
+  # -- Default API process command when `command/args` are not set.
+  startCommand: node dist/src/main.js
+
+  # -- Additional pod labels for API deployment.
+  podLabels: {}
+  # -- Additional pod annotations for API deployment.
+  podAnnotations: {}
+
+  service:
+    # -- API service type.
+    type: ClusterIP
+    # -- API service port.
+    port: 8000
+    # -- Fixed nodePort when `type` is `NodePort` or `LoadBalancer`.
+    nodePort: null
+    # -- Additional API service annotations.
+    annotations: {}
+
+  env:
+    # -- Runtime environment passed to API container.
+    NODE_ENV: production
+    # -- API listen port.
+    PORT: "8000"
+    # -- Execution mode used by API.
+    ENVIRONMENT: kubernetes
+    # -- Temporary directory used by API.
+    TEMP_DIR: /tmp
+    # -- Filesystem directory for runner execution logs.
+    RUNNER_LOGS_DIR: /var/lib/classifyre/runner-logs
+
+  maskedConfigEncryption:
+    # -- Existing secret name that contains API masked-config encryption key.
+    # -- When set, chart will not create or manage this secret.
+    existingSecret: ""
+    # -- Secret name created by this chart when existingSecret is empty.
+    secretName: ""
+    # -- Secret key name used for CLASSIFYRE_MASKED_CONFIG_KEY.
+    secretKey: CLASSIFYRE_MASKED_CONFIG_KEY
+    # -- Explicit encryption key value to store in chart-managed secret.
+    # -- Must be exactly 32 chars when using raw string format.
+    value: ""
+    # -- Generate a random 32-character key when value is empty.
+    # -- Generated key is persisted via Kubernetes Secret lookup across upgrades.
+    autoGenerate: true
+
+  # -- Extra environment variables for API container.
+  extraEnv: []
+  # -- Extra envFrom sources for API container.
+  extraEnvFrom: []
+
+  resources:
+    # -- API resource requests.
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    # -- API resource limits.
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  # -- API scheduling: node selector.
+  nodeSelector: {}
+  # -- API scheduling: tolerations.
+  tolerations: []
+  # -- API scheduling: affinity rules. When empty, default soft anti-affinity is applied.
+  affinity: {}
+  # -- API topology spread constraints. When empty, a default hostname spread is applied.
+  topologySpreadConstraints: []
+  # -- API pod priority class.
+  priorityClassName: ""
+  # -- API pod termination grace period (seconds). Set to null to use Kubernetes default.
+  terminationGracePeriodSeconds: null
+  # -- API deployment strategy override.
+  strategy: {}
+  # -- Lifecycle hooks for the API container. The default preStop delay avoids dropped connections
+  # -- during rolling updates by giving kube-proxy time to drain in-flight requests.
+  lifecycle:
+    preStop:
+      exec:
+        command: ["/bin/sh", "-c", "sleep 5"]
+
+  podSecurityContext:
+    # -- Require API container to run as non-root.
+    runAsNonRoot: true
+    # -- API pod user ID.
+    runAsUser: 10001
+    # -- API pod group ID.
+    runAsGroup: 10001
+    # -- API fsGroup for mounted volumes.
+    fsGroup: 10001
+    seccompProfile:
+      # -- API pod seccomp profile type.
+      type: RuntimeDefault
+
+  containerSecurityContext:
+    # -- Disallow privilege escalation in API container.
+    allowPrivilegeEscalation: false
+    # -- Keep root filesystem writable. Enable only after mounting emptyDir volumes over every
+    # -- path the app writes to at runtime (e.g. /tmp, log dirs). Hardening step for advanced users.
+    readOnlyRootFilesystem: false
+    capabilities:
+      # -- Drop all Linux capabilities in API container.
+      drop:
+        - ALL
+
+  livenessProbe:
+    # -- Enable API liveness probe.
+    enabled: true
+    # -- HTTP path for API liveness probe.
+    path: /ping
+    # -- Delay before starting API liveness checks.
+    initialDelaySeconds: 30
+    # -- API liveness check period.
+    periodSeconds: 15
+    # -- API liveness check timeout.
+    timeoutSeconds: 5
+    # -- API liveness failure threshold.
+    failureThreshold: 6
+
+  readinessProbe:
+    # -- Enable API readiness probe.
+    enabled: true
+    # -- HTTP path for API readiness probe.
+    path: /ping
+    # -- Delay before starting API readiness checks.
+    initialDelaySeconds: 10
+    # -- API readiness check period.
+    periodSeconds: 10
+    # -- API readiness check timeout.
+    timeoutSeconds: 3
+    # -- API readiness failure threshold.
+    failureThreshold: 6
+
+  startupProbe:
+    # -- Enable API startup probe.
+    enabled: true
+    # -- HTTP path for API startup probe.
+    path: /ping
+    # -- API startup check period.
+    periodSeconds: 10
+    # -- API startup check timeout.
+    timeoutSeconds: 3
+    # -- API startup failure threshold.
+    failureThreshold: 30
+
+  autoscaling:
+    # -- Enable HPA for API deployment.
+    enabled: true
+    # -- Minimum API replicas under HPA.
+    minReplicas: 2
+    # -- Maximum API replicas under HPA.
+    maxReplicas: 10
+    # -- Target average CPU utilization for API HPA.
+    targetCPUUtilizationPercentage: 70
+    # -- Target average memory utilization for API HPA.
+    targetMemoryUtilizationPercentage: 75
+
+  pdb:
+    # -- Enable PodDisruptionBudget for API deployment.
+    enabled: true
+    # -- API minimum pods available during disruptions.
+    minAvailable: 1
+
+  migration:
+    # -- Run database migrations as an API init container.
+    enabled: true
+    # -- Migration command/script.
+    script: npx prisma migrate deploy --schema /app/api/prisma/schema.prisma
+    # -- Security context for the migration init container.
+    # -- Override with runAsUser/runAsNonRoot: false if the migration toolchain requires root (e.g. Prisma on Bun).
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+
+  cliJobs:
+    # -- Enable Kubernetes-backed CLI jobs.
+    enabled: true
+    # -- Namespace used for CLI jobs. Empty means release namespace.
+    namespace: ""
+
+    image:
+      # -- CLI job image repository.
+      repository: ghcr.io/classifyre/unstructured/cli
+      # -- CLI job image tag. Defaults to the chart appVersion when empty.
+      tag: ""
+      # -- CLI job image pull policy.
+      pullPolicy: IfNotPresent
+
+    # -- Service account for CLI jobs. Empty uses API service account.
+    serviceAccountName: ""
+    # -- Retry attempts for failed CLI jobs.
+    backoffLimit: 2
+    # -- Max runtime per CLI job (seconds).
+    activeDeadlineSeconds: 3600
+    # -- TTL for completed CLI jobs (seconds). Ignored when cleanup policy deletes jobs immediately.
+    ttlSecondsAfterFinished: 1800
+    # -- Cleanup policy for CLI jobs: none, failed, or always.
+    cleanupPolicy: always
+    # -- Max time API waits for job completion (seconds).
+    waitTimeoutSeconds: 3900
+    # -- Poll interval while waiting for job completion (milliseconds).
+    pollIntervalMs: 2000
+    # -- Working directory inside CLI job container.
+    workDir: /app/apps/cli
+    # -- Allow CLI to auto-install optional detector dependencies.
+    autoInstallOptionalDeps: true
+
+    resources:
+      # -- CLI job resource requests.
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      # -- CLI job resource limits.
+      limits:
+        cpu: "2"
+        memory: 4Gi
+
+    # -- CLI job scheduling: node selector.
+    nodeSelector: {}
+    # -- CLI job scheduling: tolerations.
+    tolerations: []
+    # -- CLI job scheduling: affinity rules.
+    affinity: {}
+    # -- CLI job priority class.
+    priorityClassName: ""
+    # -- Mount service account token into CLI job pods.
+    automountServiceAccountToken: false
+    # -- Pod security context for CLI job pods.
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+      # fsGroup ensures Kubernetes pre-chowns mounted PVCs (uv-cache, playwright-cache,
+      # runner-logs) to GID 10001 so the non-root container can write to them on fresh installs.
+      fsGroup: 10001
+      seccompProfile:
+        type: RuntimeDefault
+    # -- Container security context for CLI job container.
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      capabilities:
+        drop:
+          - ALL
+
+    # -- Additional environment variables for CLI jobs (list of EnvVar objects; supports secretKeyRef etc.).
+    extraEnv: []
+
+    uvCache:
+      # -- Enable shared PVC for uv cache.
+      enabled: true
+      # -- Mount path for uv cache in CLI job container.
+      mountPath: /cache/uv
+      # -- Existing PVC name for uv cache. Empty creates a new PVC.
+      existingClaim: ""
+      # -- Storage class for uv cache PVC.
+      storageClassName: ""
+      # -- Access modes for uv cache PVC.
+      accessModes:
+        - ReadWriteMany
+      # -- Requested size for uv cache PVC.
+      size: 20Gi
+
+    playwrightCache:
+      # -- Enable shared PVC for Playwright browser cache.
+      enabled: true
+      # -- Mount path for Playwright cache.
+      mountPath: /ms-playwright
+      # -- Existing PVC name for Playwright cache. Empty creates a new PVC.
+      existingClaim: ""
+      # -- Storage class for Playwright cache PVC.
+      storageClassName: ""
+      # -- Access modes for Playwright cache PVC.
+      accessModes:
+        - ReadWriteMany
+      # -- Requested size for Playwright cache PVC.
+      size: 10Gi
+
+  runnerLogs:
+    # -- Enable PVC-backed storage for runner logs.
+    enabled: true
+    # -- Mount path for runner logs directory.
+    mountPath: /var/lib/classifyre/runner-logs
+    # -- Existing PVC name for runner logs. Empty creates a new PVC.
+    existingClaim: ""
+    # -- Storage class for runner logs PVC.
+    storageClassName: ""
+    # -- Access modes for runner logs PVC.
+    accessModes:
+      - ReadWriteMany
+    # -- Requested size for runner logs PVC.
+    size: 20Gi
+
+frontend:
+  # -- Number of web replicas when autoscaling is disabled.
+  replicaCount: 2
+
+  image:
+    # -- Web container image repository.
+    repository: ghcr.io/classifyre/unstructured/web
+    # -- Web container image tag. Defaults to the chart appVersion when empty.
+    tag: ""
+    # -- Web image pull policy.
+    pullPolicy: IfNotPresent
+
+  # -- Optional web container command override.
+  command: []
+  # -- Optional web container args override.
+  args: []
+  # -- Default web process command when `command/args` are not set.
+  startCommand: node /app/apps/web/server.js
+
+  # -- Additional pod labels for web deployment.
+  podLabels: {}
+  # -- Additional pod annotations for web deployment.
+  podAnnotations: {}
+
+  service:
+    # -- Web service type.
+    type: ClusterIP
+    # -- Web service port.
+    port: 3100
+    # -- Fixed nodePort when `type` is `NodePort` or `LoadBalancer`.
+    nodePort: null
+    # -- Additional web service annotations.
+    annotations: {}
+
+  env:
+    # -- Runtime environment passed to web container.
+    NODE_ENV: production
+    # -- Web listen port.
+    PORT: "3100"
+    # -- Bind address for Next.js standalone server.
+    HOSTNAME: 0.0.0.0
+    # -- Browser-side API base path.
+    NEXT_PUBLIC_API_URL: /api
+
+  # -- Extra environment variables for web container.
+  extraEnv: []
+  # -- Extra envFrom sources for web container.
+  extraEnvFrom: []
+
+  resources:
+    # -- Web resource requests.
+    requests:
+      cpu: 200m
+      memory: 384Mi
+    # -- Web resource limits.
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  # -- Web scheduling: node selector.
+  nodeSelector: {}
+  # -- Web scheduling: tolerations.
+  tolerations: []
+  # -- Web scheduling: affinity rules. When empty, default soft anti-affinity is applied.
+  affinity: {}
+  # -- Web topology spread constraints. When empty, a default hostname spread is applied.
+  topologySpreadConstraints: []
+  # -- Web pod priority class.
+  priorityClassName: ""
+  # -- Web pod termination grace period (seconds). Set to null to use Kubernetes default.
+  terminationGracePeriodSeconds: null
+  # -- Web deployment strategy override.
+  strategy: {}
+  # -- Lifecycle hooks for the web container.
+  lifecycle:
+    preStop:
+      exec:
+        command: ["/bin/sh", "-c", "sleep 5"]
+
+  podSecurityContext:
+    # -- Require web container to run as non-root.
+    runAsNonRoot: true
+    # -- Web pod user ID.
+    runAsUser: 10001
+    # -- Web pod group ID.
+    runAsGroup: 10001
+    # -- Web fsGroup for mounted volumes.
+    fsGroup: 10001
+    seccompProfile:
+      # -- Web pod seccomp profile type.
+      type: RuntimeDefault
+
+  containerSecurityContext:
+    # -- Disallow privilege escalation in web container.
+    allowPrivilegeEscalation: false
+    # -- Keep root filesystem writable. Enable only after mounting emptyDir volumes over every
+    # -- path the app writes to at runtime. Hardening step for advanced users.
+    readOnlyRootFilesystem: false
+    capabilities:
+      # -- Drop all Linux capabilities in web container.
+      drop:
+        - ALL
+
+  livenessProbe:
+    # -- Enable web liveness probe.
+    enabled: true
+    # -- HTTP path for web liveness probe.
+    path: /
+    # -- Delay before starting web liveness checks.
+    initialDelaySeconds: 30
+    # -- Web liveness check period.
+    periodSeconds: 15
+    # -- Web liveness check timeout.
+    timeoutSeconds: 5
+    # -- Web liveness failure threshold.
+    failureThreshold: 6
+
+  readinessProbe:
+    # -- Enable web readiness probe.
+    enabled: true
+    # -- HTTP path for web readiness probe.
+    path: /
+    # -- Delay before starting web readiness checks.
+    initialDelaySeconds: 10
+    # -- Web readiness check period.
+    periodSeconds: 10
+    # -- Web readiness check timeout.
+    timeoutSeconds: 3
+    # -- Web readiness failure threshold.
+    failureThreshold: 6
+
+  startupProbe:
+    # -- Enable web startup probe.
+    enabled: true
+    # -- HTTP path for web startup probe.
+    path: /
+    # -- Web startup check period.
+    periodSeconds: 10
+    # -- Web startup check timeout.
+    timeoutSeconds: 3
+    # -- Web startup failure threshold.
+    failureThreshold: 30
+
+  autoscaling:
+    # -- Enable HPA for web deployment.
+    enabled: true
+    # -- Minimum web replicas under HPA.
+    minReplicas: 2
+    # -- Maximum web replicas under HPA.
+    maxReplicas: 10
+    # -- Target average CPU utilization for web HPA.
+    targetCPUUtilizationPercentage: 70
+    # -- Target average memory utilization for web HPA.
+    targetMemoryUtilizationPercentage: 75
+
+  pdb:
+    # -- Enable PodDisruptionBudget for web deployment.
+    enabled: true
+    # -- Web minimum pods available during disruptions.
+    minAvailable: 1
+
+ingress:
+  # -- Enable ingress resources for web/api/socket routes.
+  enabled: false
+  # -- Ingress class name.
+  className: nginx
+  # -- Shared ingress annotations (nginx-specific rewrite annotations are applied to API ingress automatically).
+  annotations: {}
+  # -- Hostname for all ingress rules. Required when ingress.enabled=true.
+  host: ""
+  # -- TLS configuration for ingress.
+  tls: []
+
+postgres:
+  # -- PostgreSQL mode: external, cnpg, or embedded.
+  mode: external
+
+  connection:
+    # -- sslmode used by API when connecting to PostgreSQL (`disable`, `require`, `verify-ca`, `verify-full`).
+    sslMode: disable
+
+  embedded:
+    # -- Additional labels for embedded Postgres pod.
+    podLabels: {}
+    # -- Additional annotations for embedded Postgres pod.
+    podAnnotations: {}
+    service:
+      # -- Additional annotations for embedded Postgres service.
+      annotations: {}
+    image:
+      # -- Embedded Postgres image repository.
+      repository: postgres
+      # -- Embedded Postgres image tag.
+      tag: "18"
+      # -- Embedded Postgres image pull policy.
+      pullPolicy: IfNotPresent
+    # -- Embedded Postgres service and container port.
+    port: 5432
+    # -- Embedded Postgres database name.
+    database: classifyre
+    # -- Embedded Postgres user name.
+    username: postgres
+    # -- Embedded Postgres password (required when existingSecret is empty).
+    password: ""
+    # -- Existing secret name holding embedded Postgres password.
+    existingSecret: ""
+    # -- Secret key name for embedded Postgres password.
+    existingSecretPasswordKey: password
+    # -- Embedded Postgres scheduling: node selector.
+    nodeSelector: {}
+    # -- Embedded Postgres scheduling: tolerations.
+    tolerations: []
+    # -- Embedded Postgres scheduling: affinity rules.
+    affinity: {}
+    # -- Embedded Postgres pod priority class.
+    priorityClassName: ""
+    # -- Embedded Postgres pod termination grace period (seconds). Set to null to use Kubernetes default.
+    terminationGracePeriodSeconds: null
+    # -- Embedded Postgres pod security context.
+    podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+      # postgres image entrypoint skips chmod when already running as the postgres user (uid 999).
+      # fsGroup ensures Kubernetes pre-chowns the PVC to GID 999 before the container starts.
+      runAsUser: 999
+      runAsGroup: 999
+      fsGroup: 999
+    # -- Embedded Postgres container security context.
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+    persistence:
+      # -- Enable persistent volume for embedded Postgres data.
+      enabled: true
+      # -- Existing PVC name for embedded Postgres data.
+      existingClaim: ""
+      # -- Storage class for embedded Postgres PVC.
+      storageClassName: ""
+      # -- Access modes for embedded Postgres PVC.
+      accessModes:
+        - ReadWriteOnce
+      # -- Requested size for embedded Postgres PVC.
+      size: 20Gi
+    resources:
+      # -- Embedded Postgres resource requests.
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      # -- Embedded Postgres resource limits.
+      limits:
+        cpu: "1"
+        memory: 1Gi
+
+  external:
+    # -- External Postgres host.
+    host: ""
+    # -- External Postgres port.
+    port: 5432
+    # -- External Postgres database name.
+    database: classifyre
+    # -- External Postgres user name.
+    username: classifyre
+    # -- Deprecated: use `postgres.connection.sslMode` instead.
+    sslMode: disable
+    # -- Existing secret name for external Postgres credentials.
+    existingSecret: ""
+    # -- Optional secret key containing full DATABASE_URL.
+    existingSecretUrlKey: ""
+    # -- Secret key name for external Postgres password.
+    existingSecretPasswordKey: password
+    # -- External Postgres password (required when existingSecret is empty).
+    password: ""
+
+  cnpg:
+    # -- CloudNativePG cluster resource name.
+    clusterName: classifyre-cnpg
+    # -- Number of CNPG instances.
+    instances: 3
+    # -- CNPG Postgres image.
+    imageName: ghcr.io/cloudnative-pg/postgresql:17
+    # -- Database bootstrapped by CNPG.
+    database: classifyre
+    # -- Owner user bootstrapped by CNPG.
+    user: classifyre
+    # -- Application password for generated CNPG secret.
+    appPassword: ""
+    # -- Existing CNPG superuser secret name.
+    superuserSecretName: ""
+    # -- Existing CNPG app secret name.
+    bootstrapSecretName: ""
+    storage:
+      # -- CNPG storage size per instance.
+      size: 20Gi
+      # -- CNPG storage class name.
+      storageClassName: ""
+
+networkPolicy:
+  # -- Enable network policies for API and web pods.
+  enabled: false
+  # -- Namespace selector allowed to reach API/web when network policy is enabled.
+  ingressNamespaceSelector: {}
+
+priorityClasses:
+  # -- Create service and batch priority classes.
+  create: false
+  # -- Priority class name for service workloads.
+  serviceName: service-standard
+  # -- Numeric priority value for service workloads.
+  serviceValue: 10000
+  # -- Priority class name for batch workloads.
+  batchName: batch-low-priority
+  # -- Numeric priority value for batch workloads.
+  batchValue: 1000

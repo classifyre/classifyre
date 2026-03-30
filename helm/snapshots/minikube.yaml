@@ -1,0 +1,797 @@
+---
+# Source: classifyre/templates/pdb-api.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: classifyre-api
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: classifyre
+      app.kubernetes.io/instance: classifyre
+      app.kubernetes.io/component: api
+---
+# Source: classifyre/templates/pdb-web.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: classifyre-web
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: classifyre
+      app.kubernetes.io/instance: classifyre
+      app.kubernetes.io/component: web
+---
+# Source: classifyre/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: classifyre-api
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: classifyre/templates/api-secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: classifyre-api-secrets
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+type: Opaque
+stringData:
+  CLASSIFYRE_MASKED_CONFIG_KEY: "snapshot-classifyre-masked-key-0001"
+---
+# Source: classifyre/templates/database-secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: classifyre-db
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+type: Opaque
+stringData:
+  password: "postgres"
+---
+# Source: classifyre/templates/api-cli-job-template-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: classifyre-api-cli-job-template
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+data:
+  job-template.json: |
+    {
+      "apiVersion": "batch/v1",
+      "kind": "Job",
+      "spec": {
+        "backoffLimit": 2,
+        "activeDeadlineSeconds": 3600,
+        "ttlSecondsAfterFinished": 1800,
+        "template": {
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/name": "classifyre",
+              "app.kubernetes.io/instance": "classifyre",
+              "app.kubernetes.io/managed-by": "Helm",
+              "app.kubernetes.io/component": "cli-job"
+            }
+          },
+          "spec": {
+            "restartPolicy": "Never",
+            "serviceAccountName": "classifyre-api",
+            "automountServiceAccountToken": false,
+            "imagePullSecrets": [],
+            "priorityClassName": "",
+            "nodeSelector": {},
+            "tolerations": [],
+            "affinity": {},
+            "securityContext": {"fsGroup":10001,"runAsGroup":10001,"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},
+            "containers": [
+              {
+                "name": "cli",
+                "image": "classifyre-all-in-one:dev",
+                "imagePullPolicy": "IfNotPresent",
+                "resources": {"limits":{"cpu":"2","memory":"4Gi"},"requests":{"cpu":"500m","memory":"1Gi"}},
+                "securityContext": {"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":false},
+                "env": [
+                  {
+                    "name": "CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS",
+                    "value": "1"
+                  },
+                  {
+                    "name": "CLASSIFYRE_OUTPUT_REST_URL",
+                    "value": "http://classifyre-api:8000"
+                  },
+                  {
+                    "name": "CLASSIFYRE_OUTPUT_BATCH_SIZE",
+                    "value": "20"
+                  },
+                  {
+                    "name": "CRAWL4_AI_BASE_DIRECTORY",
+                    "value": "/tmp"
+                  },
+                  {
+                    "name": "HOME",
+                    "value": "/tmp"
+                  },
+                  {
+                    "name": "UV_CACHE_DIR",
+                    "value": "/cache/uv"
+                  },
+                  {
+                    "name": "PLAYWRIGHT_BROWSERS_PATH",
+                    "value": "/ms-playwright"
+                  }
+                ],
+                "volumeMounts": [
+                  {
+                    "name": "uv-cache",
+                    "mountPath": "/cache/uv"
+                  },
+                  {
+                    "name": "playwright-cache",
+                    "mountPath": "/ms-playwright"
+                  },
+                  {
+                    "name": "runner-logs",
+                    "mountPath": "/var/lib/classifyre/runner-logs"
+                  }
+                ]
+              }
+            ],
+            "volumes": [
+              {
+                "name": "uv-cache",
+                "persistentVolumeClaim": {
+                  "claimName": "classifyre-cli-uv-cache"
+                }
+              },
+              {
+                "name": "playwright-cache",
+                "persistentVolumeClaim": {
+                  "claimName": "classifyre-cli-playwright-cache"
+                }
+              },
+              {
+                "name": "runner-logs",
+                "persistentVolumeClaim": {
+                  "claimName": "classifyre-runner-logs"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+---
+# Source: classifyre/templates/api-cli-cache-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: classifyre-cli-uv-cache
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Source: classifyre/templates/api-cli-cache-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: classifyre-cli-playwright-cache
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Source: classifyre/templates/api-cli-cache-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: classifyre-runner-logs
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Source: classifyre/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: classifyre-api-job-manager
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+# Source: classifyre/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: classifyre-api-job-manager
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+subjects:
+  - kind: ServiceAccount
+    name: classifyre-api
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: classifyre-api-job-manager
+---
+# Source: classifyre/templates/postgres-embedded.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: classifyre-postgres
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: classifyre
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: postgres
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: pg
+      protocol: TCP
+---
+# Source: classifyre/templates/service-api.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: classifyre-api
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: classifyre
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP
+---
+# Source: classifyre/templates/service-web.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: classifyre-web
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: web
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: classifyre
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 3100
+      targetPort: http
+      protocol: TCP
+---
+# Source: classifyre/templates/deployment-api.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: classifyre-api
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: api
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: classifyre
+      app.kubernetes.io/instance: classifyre
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: classifyre
+        app.kubernetes.io/instance: classifyre
+        app.kubernetes.io/component: api
+      annotations:
+        checksum/cli-job-template: c7c12af3b09735d6a251b5b88590864e75092e5f77f32b364266b5f44f88324f
+    spec:
+      serviceAccountName: classifyre-api
+      automountServiceAccountToken: true
+      securityContext:
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: prisma-migrate
+          image: classifyre-all-in-one:dev
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+          command:
+            - /bin/sh
+            - -lc
+          args:
+            - >-
+              set -eu;
+              cd "/app/api";
+              if [ -d "/app/node_modules" ] && [ ! -e "/node_modules" ]; then
+                ln -s /app/node_modules /node_modules;
+              fi;
+              if [ -z "${DATABASE_URL:-}" ] || [ "${DATABASE_URL}" = "postgresql://postgres@127.0.0.1:5432/classifyre" ]; then
+                export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}";
+              fi;
+              prisma migrate deploy --schema /app/api/prisma/schema.prisma
+          env:
+            - name: DB_HOST
+              value: "classifyre-postgres"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: "classifyre"
+            - name: DB_USER
+              value: "postgres"
+            - name: DB_SSLMODE
+              value: "disable"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: classifyre-db
+                  key: password
+            - name: CLASSIFYRE_MASKED_CONFIG_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: classifyre-api-secrets
+                  key: CLASSIFYRE_MASKED_CONFIG_KEY
+      containers:
+        - name: api
+          image: classifyre-all-in-one:dev
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -lc
+          args:
+            - >-
+              set -eu;
+              cd "/app/api";
+              if [ -d "/app/node_modules" ] && [ ! -e "/node_modules" ]; then
+                ln -s /app/node_modules /node_modules;
+              fi;
+              if [ -z "${DATABASE_URL:-}" ] || [ "${DATABASE_URL}" = "postgresql://postgres@127.0.0.1:5432/classifyre" ]; then
+                export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}";
+              fi;
+              exec node /app/api/dist/src/main.js
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: DB_HOST
+              value: "classifyre-postgres"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: "classifyre"
+            - name: DB_USER
+              value: "postgres"
+            - name: DB_SSLMODE
+              value: "disable"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: classifyre-db
+                  key: password
+            - name: CLASSIFYRE_MASKED_CONFIG_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: classifyre-api-secrets
+                  key: CLASSIFYRE_MASKED_CONFIG_KEY
+            - name: ENVIRONMENT
+              value: "kubernetes"
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "8000"
+            - name: RUNNER_LOGS_DIR
+              value: "/var/lib/classifyre/runner-logs"
+            - name: TEMP_DIR
+              value: "/tmp"
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: K8S_JOBS_ENABLED
+              value: "1"
+            - name: K8S_JOBS_NAMESPACE
+              value: "default"
+            - name: K8S_CLI_JOB_TEMPLATE_PATH
+              value: /etc/classifyre/cli-job-template/job-template.json
+            - name: K8S_CLI_JOB_WAIT_TIMEOUT_SECONDS
+              value: "3900"
+            - name: K8S_CLI_JOB_POLL_INTERVAL_MS
+              value: "2000"
+            - name: K8S_CLI_JOB_CLEANUP_POLICY
+              value: "always"
+            - name: K8S_CLI_JOB_WORKDIR
+              value: "/app/apps/cli"
+          volumeMounts:
+            - name: cli-job-template
+              mountPath: /etc/classifyre/cli-job-template
+              readOnly: true
+            - name: runner-logs
+              mountPath: "/var/lib/classifyre/runner-logs"
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /ping
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - /bin/sh
+                - -c
+                - sleep 5
+      volumes:
+        - name: cli-job-template
+          configMap:
+            name: classifyre-api-cli-job-template
+        - name: runner-logs
+          persistentVolumeClaim:
+            claimName: classifyre-runner-logs
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: classifyre
+                    app.kubernetes.io/instance: classifyre
+                    app.kubernetes.io/component: api
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: classifyre
+              app.kubernetes.io/instance: classifyre
+              app.kubernetes.io/component: api
+---
+# Source: classifyre/templates/deployment-web.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: classifyre-web
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: web
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: classifyre
+      app.kubernetes.io/instance: classifyre
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: classifyre
+        app.kubernetes.io/instance: classifyre
+        app.kubernetes.io/component: web
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: classifyre-all-in-one:dev
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -lc
+          args:
+            - >-
+              set -eu;
+              exec node /app/web/apps/web/server.js
+          ports:
+            - name: http
+              containerPort: 3100
+              protocol: TCP
+          env:
+            - name: API_URL
+              value: "http://classifyre-api:8000"
+            - name: HOSTNAME
+              value: "0.0.0.0"
+            - name: NEXT_PUBLIC_API_URL
+              value: "/api"
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3100"
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 384Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - /bin/sh
+                - -c
+                - sleep 5
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: classifyre
+                    app.kubernetes.io/instance: classifyre
+                    app.kubernetes.io/component: web
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: classifyre
+              app.kubernetes.io/instance: classifyre
+              app.kubernetes.io/component: web
+---
+# Source: classifyre/templates/postgres-embedded.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: classifyre-postgres
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-0.2.9
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: classifyre
+      app.kubernetes.io/instance: classifyre
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: classifyre
+        app.kubernetes.io/instance: classifyre
+        app.kubernetes.io/component: postgres
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 999
+        runAsGroup: 999
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:18
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: pg
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_DB
+              value: "classifyre"
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: classifyre-db
+                  key: password
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p 5432
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p 5432
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql
+      volumes:
+        - name: postgres-data
+          emptyDir: {}

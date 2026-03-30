@@ -1,0 +1,35 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "cache": false,
+      "outputs": [],
+      "dependsOn": []
+    },
+    "lint": {
+      "cache": false
+    },
+    "test": {
+      "cache": false
+    },
+    "docker:build": {
+      "cache": false
+    },
+    "docker:build:multiarch": {
+      "cache": false
+    },
+    "helm:lint": {
+      "cache": false
+    },
+    "helm:snapshot": {
+      "cache": false
+    },
+    "helm:snapshot:check": {
+      "cache": false
+    },
+    "helm:test": {
+      "cache": false
+    }
+  }
+}

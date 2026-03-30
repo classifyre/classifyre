@@ -1,0 +1,6 @@
+.next/
+out/
+node_modules/
+
+# auto-generated from helm/classifyre/README.md — rebuilt on every docs build
+src/_generated/

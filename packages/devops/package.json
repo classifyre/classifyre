@@ -1,0 +1,19 @@
+{
+  "name": "@workspace/devops",
+  "version": "0.2.24",
+  "private": true,
+  "scripts": {
+    "build": "bun run docker:build",
+    "lint": "bun run helm:lint && bun run helm:docs:check",
+    "test": "bun run helm:test",
+    "docker:build": "bash ../../scripts/docker-build-allinone.sh",
+    "docker:build:multiarch": "bash ../../scripts/docker-build-multiarch.sh",
+    "helm:lint": "bash ../../scripts/helm-lint.sh",
+    "helm:docs": "bash ../../scripts/helm-docs.sh",
+    "helm:docs:check": "bash ../../scripts/helm-docs.sh --check",
+    "helm:snapshot": "bash ../../scripts/helm-snapshot.sh",
+    "helm:snapshot:check": "bash ../../scripts/helm-snapshot.sh --check",
+    "helm:validate": "bash ../../scripts/helm-validate.sh",
+    "helm:test": "bash ../../scripts/helm-lint.sh && bash ../../scripts/helm-docs.sh --check && bash ../../scripts/helm-snapshot.sh --check && bash ../../scripts/helm-validate.sh"
+  }
+}

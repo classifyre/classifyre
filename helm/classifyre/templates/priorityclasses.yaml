@@ -1,0 +1,23 @@
+{{- if .Values.priorityClasses.create }}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ .Values.priorityClasses.serviceName }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+value: {{ .Values.priorityClasses.serviceValue }}
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Service workloads priority class"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ .Values.priorityClasses.batchName }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+value: {{ .Values.priorityClasses.batchValue }}
+preemptionPolicy: Never
+globalDefault: false
+description: "Batch CLI Job workloads priority class"
+{{- end }}
