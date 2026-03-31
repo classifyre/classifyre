@@ -5,7 +5,7 @@ description: Helm-based deployment patterns, image tags, PostgreSQL modes, and s
 ---
 
 import { Callout, Steps, Tabs } from "nextra/components"
-import { HelmValuesTable } from "../../../components/helm-values-table"
+import HelmValuesReference from "../../../src/_generated/helm-values.mdx"
 
 # Kubernetes Deployment
 
@@ -388,4 +388,4 @@ kubectl -n classifyre delete pvc --all
 
 ## All values
 
-<HelmValuesTable />
+<HelmValuesReference />

@@ -4,9 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "predev": "node ../../scripts/extract-helm-values.mjs",
     "dev": "next dev --webpack --port 3002",
-    "prebuild": "node ../../scripts/extract-helm-values.mjs",
     "build": "next build --webpack",
     "postbuild": "next-sitemap --config next-sitemap.config.js",
     "start": "next start",

@@ -60,20 +60,26 @@ jobs:
       - name: Generate code
         run: bun run codegen
 
+      - name: Generate docs artifacts
+        run: bun run docs:generate
+
       - name: Verify generated files are committed
         run: |
           if ! git diff --quiet -- \
+            apps/docs/src/_generated/helm-values.mdx \
             packages/api-client/src/generated \
             apps/cli/src/models/generated_input.py \
             apps/cli/src/models/generated_detectors.py \
             apps/cli/src/models/generated_single_asset_scan_results.py; then
-            echo "::error::Generated files are out of date. Run 'bun run codegen' and commit changes."
+            echo "::error::Generated files are out of date. Run 'bun run codegen', 'bun run docs:generate', and commit changes."
             git status --short -- \
+              apps/docs/src/_generated/helm-values.mdx \
               packages/api-client/src/generated \
               apps/cli/src/models/generated_input.py \
               apps/cli/src/models/generated_detectors.py \
               apps/cli/src/models/generated_single_asset_scan_results.py
             git diff --stat -- \
+              apps/docs/src/_generated/helm-values.mdx \
               packages/api-client/src/generated \
               apps/cli/src/models/generated_input.py \
               apps/cli/src/models/generated_detectors.py \

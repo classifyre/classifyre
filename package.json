@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "build": "turbo build --filter=!@workspace/devops",
+    "docs:generate": "node scripts/extract-helm-values.mjs",
+    "docs:check-generated": "node scripts/extract-helm-values.mjs --check",
     "docs:build": "bun run --cwd apps/docs build",
     "docs:sync": "node scripts/sync-docs-to-web.mjs",
     "docs:bundle": "bun run docs:build && bun run docs:sync",
