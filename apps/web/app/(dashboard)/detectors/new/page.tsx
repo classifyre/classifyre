@@ -46,9 +46,7 @@ export default function NewCustomDetectorPage() {
       router.push(`/detectors/${created.id}`);
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : t("detectors.failedToCreate"),
+        error instanceof Error ? error.message : t("detectors.failedToCreate"),
       );
     } finally {
       setIsSaving(false);

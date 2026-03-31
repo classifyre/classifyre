@@ -21,14 +21,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
-import type { AssistantOperation, AssistantUiAction } from "@workspace/api-client";
+import type {
+  AssistantOperation,
+  AssistantUiAction,
+} from "@workspace/api-client";
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { semanticApi, type GlossaryTerm } from "@/lib/semantic-api";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
 
 const METRIC_TYPES = ["SIMPLE", "RATIO", "DERIVED", "TREND"] as const;
-const AGGREGATIONS = ["COUNT", "COUNT_DISTINCT", "SUM", "AVG", "MIN", "MAX"] as const;
+const AGGREGATIONS = [
+  "COUNT",
+  "COUNT_DISTINCT",
+  "SUM",
+  "AVG",
+  "MIN",
+  "MAX",
+] as const;
 const DIMENSIONS = [
   "severity",
   "detectorType",
@@ -96,15 +106,12 @@ export default function NewMetricPage() {
     [],
   );
 
-  const updateDefinitionField = useCallback(
-    (key: string, value: unknown) => {
-      setForm((prev) => ({
-        ...prev,
-        definition: { ...prev.definition, [key]: value },
-      }));
-    },
-    [],
-  );
+  const updateDefinitionField = useCallback((key: string, value: unknown) => {
+    setForm((prev) => ({
+      ...prev,
+      definition: { ...prev.definition, [key]: value },
+    }));
+  }, []);
 
   const toggleDimension = useCallback((dim: string) => {
     setForm((prev) => {
@@ -157,10 +164,7 @@ export default function NewMetricPage() {
             next.definition = { ...next.definition, [subKey]: value };
           } else if (path === "allowedDimensions" && Array.isArray(value)) {
             next.allowedDimensions = value as string[];
-          } else if (
-            path === "glossaryTermId" &&
-            typeof value === "string"
-          ) {
+          } else if (path === "glossaryTermId" && typeof value === "string") {
             next.glossaryTermId = value;
           } else if (path === "format" && typeof value === "string") {
             next.format = value;
@@ -204,7 +208,9 @@ export default function NewMetricPage() {
       router.push(`/semantic/metrics/${created.id}`);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : t("semantic.metrics.failedToCreate"),
+        error instanceof Error
+          ? error.message
+          : t("semantic.metrics.failedToCreate"),
       );
     } finally {
       setIsSaving(false);
@@ -299,7 +305,9 @@ export default function NewMetricPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="displayName">{t("semantic.metrics.displayName")}</Label>
+            <Label htmlFor="displayName">
+              {t("semantic.metrics.displayName")}
+            </Label>
             <Input
               id="displayName"
               placeholder={t("semantic.metrics.displayNamePlaceholder")}
@@ -309,7 +317,9 @@ export default function NewMetricPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">{t("semantic.metrics.description")}</Label>
+            <Label htmlFor="description">
+              {t("semantic.metrics.description")}
+            </Label>
             <Textarea
               id="description"
               placeholder={t("semantic.metrics.descriptionPlaceholder")}
@@ -361,7 +371,9 @@ export default function NewMetricPage() {
                 <SelectContent>
                   {METRIC_TYPES.map((mt) => (
                     <SelectItem key={mt} value={mt}>
-                      {t(`semantic.metrics.type${mt}` as Parameters<typeof t>[0])}
+                      {t(
+                        `semantic.metrics.type${mt}` as Parameters<typeof t>[0],
+                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -409,7 +421,9 @@ export default function NewMetricPage() {
                   <SelectValue placeholder={t("semantic.metrics.none")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">{t("semantic.metrics.none")}</SelectItem>
+                  <SelectItem value="__none__">
+                    {t("semantic.metrics.none")}
+                  </SelectItem>
                   {glossaryTerms.map((term) => (
                     <SelectItem key={term.id} value={term.id}>
                       {term.displayName}
@@ -511,7 +525,9 @@ export default function NewMetricPage() {
           disabled={isSaving}
           className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
         >
-          {isSaving ? t("semantic.metrics.creating") : t("semantic.metrics.createMetric")}
+          {isSaving
+            ? t("semantic.metrics.creating")
+            : t("semantic.metrics.createMetric")}
         </Button>
       </div>
     </div>
@@ -630,8 +646,8 @@ function RatioDefinitionFields({
               placeholder="e.g. FALSE_POSITIVE"
               value={
                 (
-                  (numerator.filters as Record<string, string[]>)
-                    ?.statuses || []
+                  (numerator.filters as Record<string, string[]>)?.statuses ||
+                  []
                 ).join(", ") || ""
               }
               onChange={(e) => {

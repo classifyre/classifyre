@@ -152,13 +152,10 @@ export const semanticApi = {
       return fetchJson(`/semantic/metrics/${id}`, { method: "DELETE" });
     },
     certify(id: string, certifiedBy: string) {
-      return fetchJson<MetricDefinition>(
-        `/semantic/metrics/${id}/certify`,
-        {
-          method: "POST",
-          body: JSON.stringify({ certifiedBy }),
-        },
-      );
+      return fetchJson<MetricDefinition>(`/semantic/metrics/${id}/certify`, {
+        method: "POST",
+        body: JSON.stringify({ certifiedBy }),
+      });
     },
   },
 

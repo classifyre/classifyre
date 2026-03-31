@@ -251,7 +251,9 @@ export function McpSettingsCard() {
             current.map((item) => (item.id === updated.id ? updated : item)),
           ),
         );
-        toast.success(nextActive ? t("mcp.tokenReactivated") : t("mcp.tokenRevoked"));
+        toast.success(
+          nextActive ? t("mcp.tokenReactivated") : t("mcp.tokenRevoked"),
+        );
       } catch (updateError) {
         toast.error(
           updateError instanceof Error

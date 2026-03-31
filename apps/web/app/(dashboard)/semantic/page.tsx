@@ -22,7 +22,10 @@ import {
   StatsCard,
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
-import type { AssistantOperation, AssistantUiAction } from "@workspace/api-client";
+import type {
+  AssistantOperation,
+  AssistantUiAction,
+} from "@workspace/api-client";
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import {
   semanticApi,
@@ -357,7 +360,9 @@ export default function SemanticLayerPage() {
                     <SelectValue placeholder={t("semantic.allData")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">{t("semantic.allData")}</SelectItem>
+                    <SelectItem value="__all__">
+                      {t("semantic.allData")}
+                    </SelectItem>
                     {glossaryTerms.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.displayName}
@@ -553,9 +558,7 @@ export default function SemanticLayerPage() {
                 <button
                   key={term.id}
                   type="button"
-                  onClick={() =>
-                    router.push(`/semantic/glossary/${term.id}`)
-                  }
+                  onClick={() => router.push(`/semantic/glossary/${term.id}`)}
                   className="group relative w-full overflow-hidden rounded-[4px] border-2 border-border bg-background px-3 py-2.5 text-left transition-all hover:-translate-y-px hover:bg-secondary/30"
                   style={
                     term.color
@@ -640,9 +643,7 @@ export default function SemanticLayerPage() {
               <button
                 key={metric.id}
                 type="button"
-                onClick={() =>
-                  router.push(`/semantic/metrics/${metric.id}`)
-                }
+                onClick={() => router.push(`/semantic/metrics/${metric.id}`)}
                 className="group flex w-full items-center gap-3 rounded-[4px] border-2 border-border bg-background px-3 py-2.5 text-left transition-all hover:-translate-y-px hover:bg-secondary/30"
               >
                 <div className="min-w-0 flex-1">
@@ -659,7 +660,13 @@ export default function SemanticLayerPage() {
                       {metric.status}
                     </Badge>
                     <Badge variant="outline" className="font-mono text-[9px]">
-                      {METRIC_TYPE_LABELS_KEYS[metric.type] ? t(`semantic.metrics.${METRIC_TYPE_LABELS_KEYS[metric.type]}` as Parameters<typeof t>[0]) : metric.type}
+                      {METRIC_TYPE_LABELS_KEYS[metric.type]
+                        ? t(
+                            `semantic.metrics.${METRIC_TYPE_LABELS_KEYS[metric.type]}` as Parameters<
+                              typeof t
+                            >[0],
+                          )
+                        : metric.type}
                     </Badge>
                   </div>
                   {metric.description && (
@@ -671,7 +678,10 @@ export default function SemanticLayerPage() {
 
                 <div className="flex shrink-0 items-center gap-2">
                   {metric.glossaryTerm && (
-                    <Badge variant="outline" className="hidden text-[9px] sm:inline-flex">
+                    <Badge
+                      variant="outline"
+                      className="hidden text-[9px] sm:inline-flex"
+                    >
                       {metric.glossaryTerm.displayName}
                     </Badge>
                   )}

@@ -363,10 +363,14 @@ export function BulkUpdateDialog({
                 onValueChange={(v) => setStatus(v as StatusValue | typeof NONE)}
               >
                 <SelectTrigger className="h-9 w-full border-2 border-black rounded-[4px]">
-                  <SelectValue placeholder={t("findings.bulkUpdate.noChange")} />
+                  <SelectValue
+                    placeholder={t("findings.bulkUpdate.noChange")}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE}>{t("findings.bulkUpdate.noChange")}</SelectItem>
+                  <SelectItem value={NONE}>
+                    {t("findings.bulkUpdate.noChange")}
+                  </SelectItem>
                   {STATUS_OPTIONS.map((value) => (
                     <SelectItem key={value} value={value}>
                       <span
@@ -393,10 +397,14 @@ export function BulkUpdateDialog({
                 }
               >
                 <SelectTrigger className="h-9 w-full border-2 border-black rounded-[4px]">
-                  <SelectValue placeholder={t("findings.bulkUpdate.noChange")} />
+                  <SelectValue
+                    placeholder={t("findings.bulkUpdate.noChange")}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE}>{t("findings.bulkUpdate.noChange")}</SelectItem>
+                  <SelectItem value={NONE}>
+                    {t("findings.bulkUpdate.noChange")}
+                  </SelectItem>
                   {Object.entries(BulkUpdateFindingsDtoSeverityEnum).map(
                     ([label, value]) => (
                       <SelectItem key={value} value={value}>

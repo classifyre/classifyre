@@ -24,11 +24,11 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select";
 import { cn } from "@workspace/ui/lib/utils";
-import type { AssistantOperation, AssistantUiAction } from "@workspace/api-client";
-import {
-  api,
-  type CustomDetectorResponseDto,
+import type {
+  AssistantOperation,
+  AssistantUiAction,
 } from "@workspace/api-client";
+import { api, type CustomDetectorResponseDto } from "@workspace/api-client";
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { semanticApi } from "@/lib/semantic-api";
 import {
@@ -182,7 +182,10 @@ export default function NewGlossaryTermPage() {
   }, []);
 
   const updateField = useCallback(
-    <K extends keyof GlossaryFormState>(key: K, value: GlossaryFormState[K]) => {
+    <K extends keyof GlossaryFormState>(
+      key: K,
+      value: GlossaryFormState[K],
+    ) => {
       setForm((prev) => ({ ...prev, [key]: value }));
     },
     [],
@@ -284,7 +287,8 @@ export default function NewGlossaryTermPage() {
       setIsSaving(true);
       const fm = form.filterMapping;
       const filterMapping: Record<string, string[]> = {};
-      if (fm.detectorTypes.length) filterMapping.detectorTypes = fm.detectorTypes;
+      if (fm.detectorTypes.length)
+        filterMapping.detectorTypes = fm.detectorTypes;
       if (fm.severities.length) filterMapping.severities = fm.severities;
       if (fm.statuses.length) filterMapping.statuses = fm.statuses;
       if (fm.findingTypes.length) filterMapping.findingTypes = fm.findingTypes;
@@ -304,7 +308,9 @@ export default function NewGlossaryTermPage() {
       router.push(`/semantic/glossary/${created.id}`);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to create glossary term",
+        error instanceof Error
+          ? error.message
+          : "Failed to create glossary term",
       );
     } finally {
       setIsSaving(false);
@@ -404,7 +410,9 @@ export default function NewGlossaryTermPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="displayName">{t("semantic.glossary.displayName")}</Label>
+            <Label htmlFor="displayName">
+              {t("semantic.glossary.displayName")}
+            </Label>
             <Input
               id="displayName"
               placeholder={t("semantic.glossary.displayNamePlaceholder")}
@@ -414,7 +422,9 @@ export default function NewGlossaryTermPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">{t("semantic.glossary.description")}</Label>
+            <Label htmlFor="description">
+              {t("semantic.glossary.description")}
+            </Label>
             <Textarea
               id="description"
               placeholder={t("semantic.glossary.descriptionPlaceholder")}
@@ -432,12 +442,16 @@ export default function NewGlossaryTermPage() {
                 onValueChange={(v) => updateField("category", v)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={t("semantic.glossary.selectCategory")} />
+                  <SelectValue
+                    placeholder={t("semantic.glossary.selectCategory")}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {CATEGORIES.map((cat) => (
                     <SelectItem key={cat} value={cat}>
-                      {t(`semantic.categories.${cat}` as Parameters<typeof t>[0])}
+                      {t(
+                        `semantic.categories.${cat}` as Parameters<typeof t>[0],
+                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -613,9 +627,7 @@ export default function NewGlossaryTermPage() {
                     <button
                       key={key}
                       type="button"
-                      onClick={() =>
-                        toggleArrayItem("customDetectorKeys", key)
-                      }
+                      onClick={() => toggleArrayItem("customDetectorKeys", key)}
                       title={cd.description ?? cd.name}
                       className={cn(
                         "inline-flex flex-col items-start rounded-[4px] border-2 px-2.5 py-1.5 transition-all",
@@ -656,9 +668,7 @@ export default function NewGlossaryTermPage() {
               id="customDetectorKeys"
               placeholder={t("semantic.glossary.keysPlaceholder")}
               value={form.filterMapping.customDetectorKeys
-                .filter(
-                  (k) => !customDetectors.some((cd) => cd.key === k),
-                )
+                .filter((k) => !customDetectors.some((cd) => cd.key === k))
                 .join(", ")}
               onChange={(e) => {
                 const manualKeys = e.target.value
@@ -667,9 +677,7 @@ export default function NewGlossaryTermPage() {
                   .filter(Boolean);
                 const apiKeys = customDetectors
                   .filter((cd) =>
-                    form.filterMapping.customDetectorKeys.includes(
-                      cd.key,
-                    ),
+                    form.filterMapping.customDetectorKeys.includes(cd.key),
                   )
                   .map((cd) => cd.key);
                 setForm((prev) => ({
@@ -699,7 +707,9 @@ export default function NewGlossaryTermPage() {
           disabled={isSaving}
           className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
         >
-          {isSaving ? t("semantic.glossary.creating") : t("semantic.glossary.createTerm")}
+          {isSaving
+            ? t("semantic.glossary.creating")
+            : t("semantic.glossary.createTerm")}
         </Button>
       </div>
     </div>

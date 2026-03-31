@@ -88,15 +88,31 @@ export function ScheduleCard({
     label: string;
     hint: string;
   }[] = [
-    { value: "nightly", label: t("schedule.presets.nightly"), hint: t("schedule.hints.nightly") },
-    { value: "daily", label: t("schedule.presets.daily"), hint: t("schedule.hints.daily") },
-    { value: "weekday_morning", label: t("schedule.presets.weekdayAm"), hint: t("schedule.hints.weekdayAm") },
+    {
+      value: "nightly",
+      label: t("schedule.presets.nightly"),
+      hint: t("schedule.hints.nightly"),
+    },
+    {
+      value: "daily",
+      label: t("schedule.presets.daily"),
+      hint: t("schedule.hints.daily"),
+    },
+    {
+      value: "weekday_morning",
+      label: t("schedule.presets.weekdayAm"),
+      hint: t("schedule.hints.weekdayAm"),
+    },
     {
       value: "weekday_business",
       label: t("schedule.presets.businessHours"),
       hint: t("schedule.hints.businessHours"),
     },
-    { value: "weekly", label: t("schedule.presets.weekly"), hint: t("schedule.hints.weekly") },
+    {
+      value: "weekly",
+      label: t("schedule.presets.weekly"),
+      hint: t("schedule.hints.weekly"),
+    },
   ];
 
   const [isSaving, setIsSaving] = React.useState(false);

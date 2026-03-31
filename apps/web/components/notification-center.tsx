@@ -251,7 +251,9 @@ export function NotificationCenter() {
           ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 p-10 text-center">
               <Bell className="h-10 w-10 text-muted-foreground" />
-              <p className="text-sm font-medium">{t("notifications.noNotifications")}</p>
+              <p className="text-sm font-medium">
+                {t("notifications.noNotifications")}
+              </p>
               <p className="text-xs text-muted-foreground">
                 You are fully caught up.
               </p>

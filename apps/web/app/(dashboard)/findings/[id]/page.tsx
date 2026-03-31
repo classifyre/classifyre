@@ -270,7 +270,10 @@ export default function FindingDetailPage() {
             label: t("findings.detail.backToDiscovery"),
             onClick: () => router.push("/discovery"),
           }}
-          secondaryAction={{ label: t("findings.detail.goBack"), onClick: () => router.back() }}
+          secondaryAction={{
+            label: t("findings.detail.goBack"),
+            onClick: () => router.back(),
+          }}
         />
       </div>
     );
@@ -281,7 +284,9 @@ export default function FindingDetailPage() {
   const statusBadgeValue = toStatusBadgeValue(finding.status);
   const detectorLabel =
     detectorLabels[finding.detectorType] ||
-    (finding.detectorType ? formatEnumLabel(finding.detectorType) : t("findings.detail.detectedIssue"));
+    (finding.detectorType
+      ? formatEnumLabel(finding.detectorType)
+      : t("findings.detail.detectedIssue"));
   const assetLabel =
     finding.asset?.name ||
     finding.asset?.externalUrl ||
@@ -289,7 +294,9 @@ export default function FindingDetailPage() {
     finding.assetId ||
     t("assets.detail.unknownSource");
   const sourceLabel =
-    finding.source?.name || finding.sourceId || t("assets.detail.unknownSource");
+    finding.source?.name ||
+    finding.sourceId ||
+    t("assets.detail.unknownSource");
   const sourceType = finding.source?.type ?? "filesystem";
   const confidence = summary?.confidence || { percent: 0, label: "0%" };
   const history = finding.history ?? [];
@@ -326,7 +333,8 @@ export default function FindingDetailPage() {
               </StatusBadge>
             </div>
             <p className="text-muted-foreground">
-              {detectorLabel} • {finding.findingType || t("findings.detail.detectedIssue")}
+              {detectorLabel} •{" "}
+              {finding.findingType || t("findings.detail.detectedIssue")}
             </p>
           </div>
         </div>
@@ -336,7 +344,9 @@ export default function FindingDetailPage() {
             size="icon"
             onClick={() => setDrawerOpen((prev) => !prev)}
             aria-label={
-              drawerOpen ? t("findings.detail.closeDetails") : t("findings.detail.openDetails")
+              drawerOpen
+                ? t("findings.detail.closeDetails")
+                : t("findings.detail.openDetails")
             }
           >
             {drawerOpen ? (
@@ -387,7 +397,9 @@ export default function FindingDetailPage() {
               {summary?.firstDetected}
             </div>
             <p className="text-xs text-muted-foreground">
-              {t("findings.detail.lastSeen", { relative: summary?.lastSeenRelative || "—" })}
+              {t("findings.detail.lastSeen", {
+                relative: summary?.lastSeenRelative || "—",
+              })}
             </p>
           </div>
           <div className="space-y-2">
@@ -398,7 +410,9 @@ export default function FindingDetailPage() {
             <div className="text-2xl font-semibold">
               {summary?.historyCount ?? 0}
             </div>
-            <p className="text-xs text-muted-foreground">{t("findings.detail.trackedAcrossRuns")}</p>
+            <p className="text-xs text-muted-foreground">
+              {t("findings.detail.trackedAcrossRuns")}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -439,7 +453,9 @@ export default function FindingDetailPage() {
               <Table className="min-w-[560px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-56">{t("findings.detail.field")}</TableHead>
+                    <TableHead className="w-56">
+                      {t("findings.detail.field")}
+                    </TableHead>
                     <TableHead>{t("findings.detail.value")}</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -462,7 +478,8 @@ export default function FindingDetailPage() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm break-all">
-                        {finding.location?.path || t("findings.detail.unknownPath")}
+                        {finding.location?.path ||
+                          t("findings.detail.unknownPath")}
                       </div>
                       {finding.location?.description && (
                         <div className="mt-0.5 text-xs text-foreground/80">
@@ -532,7 +549,9 @@ export default function FindingDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle>{t("findings.detail.assetSource")}</CardTitle>
-            <CardDescription>{t("findings.detail.assetSourceDesc")}</CardDescription>
+            <CardDescription>
+              {t("findings.detail.assetSourceDesc")}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-md border border-dashed border-border/60 bg-muted/40 p-4">
@@ -587,9 +606,7 @@ export default function FindingDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle>{t("findings.detail.history")}</CardTitle>
-          <CardDescription>
-            {t("findings.detail.historyDesc")}
-          </CardDescription>
+          <CardDescription>{t("findings.detail.historyDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {history.length === 0 ? (

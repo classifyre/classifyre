@@ -166,7 +166,8 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
         onSecondarySubmit={onTest ? handleTest : undefined}
         onCancel={onCancel}
         submitLabel={
-          submitLabel ?? (mode === "create" ? t("forms.createSource") : t("forms.saveChanges"))
+          submitLabel ??
+          (mode === "create" ? t("forms.createSource") : t("forms.saveChanges"))
         }
         secondarySubmitLabel={
           onTest ? (testLabel ?? t("forms.testConnection")) : undefined

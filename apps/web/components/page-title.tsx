@@ -9,7 +9,12 @@ interface PageTitleProps extends React.ComponentProps<"div"> {
   description?: string;
 }
 
-export function PageTitle({ title, description, className, ...props }: PageTitleProps) {
+export function PageTitle({
+  title,
+  description,
+  className,
+  ...props
+}: PageTitleProps) {
   return (
     <div className={cn("space-y-1", className)} {...props}>
       <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">

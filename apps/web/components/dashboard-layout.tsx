@@ -243,7 +243,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           ]
         : [crumb],
     );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [findingAssetCrumbs, resolvedDynamicLabels, segments, t]);
 
   return (

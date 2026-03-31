@@ -114,9 +114,7 @@ export function FindingMetadataCard({ detectorType, metadata }: Props) {
         <div className="flex items-center justify-between gap-2">
           <div>
             <CardTitle>{t("findings.signals.title")}</CardTitle>
-            <CardDescription>
-              {t("findings.signals.desc")}
-            </CardDescription>
+            <CardDescription>{t("findings.signals.desc")}</CardDescription>
           </div>
           <Badge variant="outline" className="font-mono text-xs">
             {detectorType.replace(/_/g, " ")}

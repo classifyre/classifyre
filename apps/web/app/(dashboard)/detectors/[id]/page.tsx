@@ -135,7 +135,11 @@ export default function CustomDetectorDetailsPage() {
   };
 
   if (isLoading || !detector) {
-    return <div className="text-sm text-muted-foreground">{t("detectors.loadingLabel")}</div>;
+    return (
+      <div className="text-sm text-muted-foreground">
+        {t("detectors.loadingLabel")}
+      </div>
+    );
   }
 
   const sourcesUsing = detector.sourcesUsing ?? [];
@@ -193,7 +197,9 @@ export default function CustomDetectorDetailsPage() {
               {t("detectors.sourcesUsing")}
             </p>
             {sourcesUsing.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("common.none")}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("common.none")}
+              </p>
             ) : (
               <ul className="space-y-0.5">
                 {sourcesUsing.map((source) => (
@@ -219,7 +225,9 @@ export default function CustomDetectorDetailsPage() {
           </div>
           {detector.method !== "RULESET" && (
             <div className="rounded-[4px] border border-black/20 p-3">
-              <p className="text-xs text-muted-foreground">{t("detectors.lastTrained")}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("detectors.lastTrained")}
+              </p>
               <p className="text-sm font-medium">
                 {detector.lastTrainedAt
                   ? formatDate(detector.lastTrainedAt)
@@ -272,7 +280,9 @@ export default function CustomDetectorDetailsPage() {
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("detectors.deleteTitle", { name: detector.name })}</DialogTitle>
+            <DialogTitle>
+              {t("detectors.deleteTitle", { name: detector.name })}
+            </DialogTitle>
             <DialogDescription asChild>
               <div className="space-y-3">
                 <p>{t("detectors.deleteConfirm")}</p>
@@ -317,7 +327,9 @@ export default function CustomDetectorDetailsPage() {
               onClick={handleDelete}
               disabled={isDeleting}
             >
-              {isDeleting ? t("detectors.deleting") : t("detectors.deleteButton")}
+              {isDeleting
+                ? t("detectors.deleting")
+                : t("detectors.deleteButton")}
             </Button>
           </DialogFooter>
         </DialogContent>

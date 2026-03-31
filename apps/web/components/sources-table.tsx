@@ -792,7 +792,9 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
       {/* Footer: page size + pagination */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t pt-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{t("common.rowsPerPage")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("common.rowsPerPage")}
+          </span>
           <Select value={pageSize} onValueChange={setPageSize}>
             <SelectTrigger className="h-8 w-[130px] border-2 border-black rounded-[4px]">
               <SelectValue placeholder="Rows" />

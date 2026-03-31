@@ -16,9 +16,7 @@ export default function CustomDetectorsPage() {
           <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
             {t("detectors.title")}
           </h1>
-          <p className="text-muted-foreground">
-            {t("detectors.description")}
-          </p>
+          <p className="text-muted-foreground">{t("detectors.description")}</p>
         </div>
         <Button asChild className="rounded-[4px] border-2 border-black">
           <Link href="/detectors/new">

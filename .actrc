@@ -1,0 +1,16 @@
+# act configuration — run GitHub Actions locally
+# https://github.com/nektos/act
+
+# Runner image with Docker pre-installed (needed for docker/build-push-action)
+-P ubuntu-latest=catthehacker/ubuntu:act-22.04
+
+# Local artifact server so validate→docker artifact pass works
+--artifact-server-path /tmp/act-artifacts
+
+# Secrets file (create from scripts/ci-local.sh or manually)
+--secret-file .secrets
+
+# NOTE: Do NOT set --container-architecture linux/amd64 on Apple M-series.
+# Running amd64 containers via software QEMU causes SIGSEGV for bun/uv/python.
+# Instead, act runs native arm64 containers; docker buildx targets linux/amd64
+# via Docker Desktop's Rosetta 2 (cross-compilation, much more stable).

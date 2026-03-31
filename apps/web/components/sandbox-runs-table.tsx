@@ -872,7 +872,9 @@ export function SandboxRunsTable({
 
       <div className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{t("common.rowsPerPage")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("common.rowsPerPage")}
+          </span>
           <Select value={pageSize} onValueChange={setPageSize}>
             <SelectTrigger className="h-8 w-[130px] rounded-[4px] border-2 border-black">
               <SelectValue placeholder="Rows" />

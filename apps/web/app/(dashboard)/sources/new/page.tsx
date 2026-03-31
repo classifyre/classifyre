@@ -629,10 +629,14 @@ function SourceStepperContent({
               </div>
               <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-[0.12em]">
                 <Badge variant="secondary">
-                  {t("sources.edit.visible", { count: scanSummary.visibleCount })}
+                  {t("sources.edit.visible", {
+                    count: scanSummary.visibleCount,
+                  })}
                 </Badge>
                 <Badge className="bg-accent text-accent-foreground">
-                  {t("sources.edit.enabled", { count: scanSummary.enabledCount })}
+                  {t("sources.edit.enabled", {
+                    count: scanSummary.enabledCount,
+                  })}
                 </Badge>
               </div>
             </div>

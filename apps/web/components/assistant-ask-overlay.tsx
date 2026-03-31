@@ -234,7 +234,11 @@ export function AssistantAskOverlay({
           disabled={!input.trim() || pending}
           className="w-full"
         >
-          {pending ? <Spinner size="sm" label={t("ai.thinking")} /> : t("common.send")}
+          {pending ? (
+            <Spinner size="sm" label={t("ai.thinking")} />
+          ) : (
+            t("common.send")
+          )}
         </Button>
       </div>
     </>

@@ -67,9 +67,7 @@ export default function MetricExplorerPage() {
 
   const toggleMetric = (id: string) => {
     setSelectedMetrics((prev) =>
-      prev.includes(id)
-        ? prev.filter((s) => s !== id)
-        : [...prev, id],
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
     );
   };
 
@@ -104,8 +102,7 @@ export default function MetricExplorerPage() {
     );
   }
 
-  const getMetricDisplay = (id: string) =>
-    metrics.find((m) => m.id === id);
+  const getMetricDisplay = (id: string) => metrics.find((m) => m.id === id);
 
   return (
     <div className="space-y-6 p-6">
@@ -118,11 +115,15 @@ export default function MetricExplorerPage() {
         {/* Controls */}
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="text-sm">{t("semantic.explore.configuration")}</CardTitle>
+            <CardTitle className="text-sm">
+              {t("semantic.explore.configuration")}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-xs font-medium">{t("semantic.explore.glossaryTerm")}</label>
+              <label className="text-xs font-medium">
+                {t("semantic.explore.glossaryTerm")}
+              </label>
               <Select
                 value={selectedTerm || "__all__"}
                 onValueChange={(v) => setSelectedTerm(v === "__all__" ? "" : v)}
@@ -131,7 +132,9 @@ export default function MetricExplorerPage() {
                   <SelectValue placeholder={t("semantic.explore.allData")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">{t("semantic.explore.allData")}</SelectItem>
+                  <SelectItem value="__all__">
+                    {t("semantic.explore.allData")}
+                  </SelectItem>
                   {glossaryTerms.map((term) => (
                     <SelectItem key={term.id} value={term.id}>
                       {term.displayName}
@@ -142,7 +145,9 @@ export default function MetricExplorerPage() {
             </div>
 
             <div>
-              <label className="text-xs font-medium">{t("semantic.explore.metrics")}</label>
+              <label className="text-xs font-medium">
+                {t("semantic.explore.metrics")}
+              </label>
               <div className="mt-1 flex flex-wrap gap-1">
                 {metrics.map((m) => (
                   <Badge
@@ -160,7 +165,9 @@ export default function MetricExplorerPage() {
             </div>
 
             <div>
-              <label className="text-xs font-medium">{t("semantic.explore.dimensionBreakdown")}</label>
+              <label className="text-xs font-medium">
+                {t("semantic.explore.dimensionBreakdown")}
+              </label>
               <Select
                 value={selectedDimension || "__none__"}
                 onValueChange={(v) =>
@@ -171,7 +178,9 @@ export default function MetricExplorerPage() {
                   <SelectValue placeholder={t("semantic.explore.none")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">{t("semantic.explore.none")}</SelectItem>
+                  <SelectItem value="__none__">
+                    {t("semantic.explore.none")}
+                  </SelectItem>
                   {DIMENSIONS.map((d) => (
                     <SelectItem key={d} value={d}>
                       {d}
@@ -186,7 +195,9 @@ export default function MetricExplorerPage() {
               disabled={selectedMetrics.length === 0 || querying}
               className="w-full"
             >
-              {querying ? t("semantic.explore.querying") : t("semantic.explore.explore")}
+              {querying
+                ? t("semantic.explore.querying")
+                : t("semantic.explore.explore")}
             </Button>
           </CardContent>
         </Card>

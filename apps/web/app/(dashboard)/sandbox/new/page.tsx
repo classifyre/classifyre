@@ -234,7 +234,9 @@ export default function NewSandboxScanPage() {
         throw new Error("Failed to queue sandbox runs");
       });
 
-      toast.success(t("upload.queued", { fileName: firstSuccessfulStart.fileName }));
+      toast.success(
+        t("upload.queued", { fileName: firstSuccessfulStart.fileName }),
+      );
       router.push("/sandbox");
 
       void Promise.allSettled(startRequests).then((results) => {
@@ -290,9 +292,7 @@ export default function NewSandboxScanPage() {
         <Card>
           <CardHeader>
             <CardTitle>{t("sandbox.uploadFiles")}</CardTitle>
-            <CardDescription>
-              {t("sandbox.uploadFilesDesc")}
-            </CardDescription>
+            <CardDescription>{t("sandbox.uploadFilesDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div
@@ -325,7 +325,9 @@ export default function NewSandboxScanPage() {
               </div>
               <div className="text-center">
                 <p className="text-sm">
-                  {isDragging ? t("sandbox.dropFilesActive") : t("sandbox.dropFiles")}
+                  {isDragging
+                    ? t("sandbox.dropFilesActive")
+                    : t("sandbox.dropFiles")}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   or{" "}
@@ -409,9 +411,7 @@ export default function NewSandboxScanPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <CardTitle>{t("sandbox.detectors")}</CardTitle>
-                <CardDescription>
-                  {t("sandbox.detectorsDesc")}
-                </CardDescription>
+                <CardDescription>{t("sandbox.detectorsDesc")}</CardDescription>
               </div>
               <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-[0.12em]">
                 <Badge variant="secondary">

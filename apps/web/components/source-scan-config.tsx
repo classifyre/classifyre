@@ -341,7 +341,9 @@ function DetectorConfigCard({
           {enabled && (
             <Badge variant="outline" className="border-2 border-border">
               {selectedPresetLabel
-                ? t("sources.scanConfig.presetLabel", { label: selectedPresetLabel })
+                ? t("sources.scanConfig.presetLabel", {
+                    label: selectedPresetLabel,
+                  })
                 : t("sources.scanConfig.customPreset")}
             </Badge>
           )}
@@ -423,7 +425,9 @@ function DetectorConfigCard({
             <div className="flex items-center gap-2">
               <SlidersHorizontal className="h-4 w-4" />
               <div>
-                <p className="text-sm font-semibold">{t("sources.scanConfig.advancedSettings")}</p>
+                <p className="text-sm font-semibold">
+                  {t("sources.scanConfig.advancedSettings")}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {t("sources.scanConfig.advancedSettingsDesc")}
                 </p>
@@ -436,7 +440,9 @@ function DetectorConfigCard({
                 variant="outline"
                 className="rounded-[4px] border-2 border-black"
               >
-                {isAdvancedOpen ? t("sources.scanConfig.hide") : t("sources.scanConfig.show")}
+                {isAdvancedOpen
+                  ? t("sources.scanConfig.hide")
+                  : t("sources.scanConfig.show")}
               </Button>
             </CollapsibleTrigger>
           </div>
@@ -521,8 +527,7 @@ function CustomDetectorCatalogCard({
     >
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          {detector.description?.trim() ||
-            t("sources.scanConfig.fallbackDesc")}
+          {detector.description?.trim() || t("sources.scanConfig.fallbackDesc")}
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -530,10 +535,14 @@ function CustomDetectorCatalogCard({
             {formatCustomDetectorMethod(detector.method)}
           </Badge>
           <Badge variant="outline" className="border-2 border-border">
-            {detector.isActive ? t("sources.scanConfig.catalogActive") : t("sources.scanConfig.catalogInactive")}
+            {detector.isActive
+              ? t("sources.scanConfig.catalogActive")
+              : t("sources.scanConfig.catalogInactive")}
           </Badge>
           <Badge variant="outline" className="border-2 border-border">
-            {t("sources.scanConfig.findingsCount", { count: detector.findingsCount })}
+            {t("sources.scanConfig.findingsCount", {
+              count: detector.findingsCount,
+            })}
           </Badge>
         </div>
 
@@ -543,7 +552,9 @@ function CustomDetectorCatalogCard({
               {t("sources.scanConfig.usedBy")}
             </p>
             <p className="text-sm font-semibold">
-              {t("sources.scanConfig.sourcesCount", { count: detector.sourcesUsingCount })}
+              {t("sources.scanConfig.sourcesCount", {
+                count: detector.sourcesUsingCount,
+              })}
             </p>
           </div>
           <div>
@@ -551,7 +562,9 @@ function CustomDetectorCatalogCard({
               {t("sources.scanConfig.withFindings")}
             </p>
             <p className="text-sm font-semibold">
-              {t("sources.scanConfig.sourcesCount", { count: detector.sourcesWithFindingsCount })}
+              {t("sources.scanConfig.sourcesCount", {
+                count: detector.sourcesWithFindingsCount,
+              })}
             </p>
           </div>
           <div>
@@ -564,7 +577,9 @@ function CustomDetectorCatalogCard({
 
         {detector.recentSourceNames.length > 0 ? (
           <p className="text-xs text-muted-foreground">
-            {t("sources.scanConfig.recentSources", { names: detector.recentSourceNames.slice(0, 3).join(", ") })}
+            {t("sources.scanConfig.recentSources", {
+              names: detector.recentSourceNames.slice(0, 3).join(", "),
+            })}
           </p>
         ) : null}
       </div>
@@ -903,7 +918,9 @@ export function SourceScanConfig({
               ) : (
                 <div className="rounded-[6px] border-2 border-dashed border-border p-6 text-center">
                   <p className="text-sm font-medium">
-                    {t("sources.scanConfig.noDetectors", { group: group.label })}
+                    {t("sources.scanConfig.noDetectors", {
+                      group: group.label,
+                    })}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {t("sources.scanConfig.noDetectorsHint")}
@@ -981,7 +998,9 @@ export function SourceScanConfig({
         </Tabs>
       ) : (
         <div className="rounded-[6px] border-2 border-dashed border-border p-8 text-center">
-          <p className="text-sm font-medium">{t("sources.scanConfig.noSchemas")}</p>
+          <p className="text-sm font-medium">
+            {t("sources.scanConfig.noSchemas")}
+          </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {t("sources.scanConfig.noSchemasHint")}
           </p>

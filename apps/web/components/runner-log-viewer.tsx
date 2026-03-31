@@ -332,7 +332,11 @@ export function RunnerLogViewer({
 
     try {
       await copyTextToClipboard(exportRows(selectedRows));
-      toast.success(t("runners.logs.copiedRows", { count: String(selectedRows.length.toLocaleString()) }));
+      toast.success(
+        t("runners.logs.copiedRows", {
+          count: String(selectedRows.length.toLocaleString()),
+        }),
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to copy rows";

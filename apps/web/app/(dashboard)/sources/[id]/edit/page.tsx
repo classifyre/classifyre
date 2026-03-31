@@ -527,9 +527,7 @@ export default function EditSourcePage() {
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
               {t("sources.editSource")}
             </h1>
-            <p className="text-muted-foreground">
-              {t("sources.edit.loading")}
-            </p>
+            <p className="text-muted-foreground">{t("sources.edit.loading")}</p>
           </div>
         </div>
       </div>
@@ -548,7 +546,9 @@ export default function EditSourcePage() {
           <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
             {t("sources.editSource")}
           </h1>
-          <p className="text-muted-foreground">{t("sources.edit.configure", { name: source.name })}</p>
+          <p className="text-muted-foreground">
+            {t("sources.edit.configure", { name: source.name })}
+          </p>
         </div>
       </div>
 
@@ -686,10 +686,14 @@ function SourceEditStepperContent({
               </div>
               <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-[0.12em]">
                 <Badge variant="secondary">
-                  {t("sources.edit.visible", { count: scanSummary.visibleCount })}
+                  {t("sources.edit.visible", {
+                    count: scanSummary.visibleCount,
+                  })}
                 </Badge>
                 <Badge className="bg-accent text-accent-foreground">
-                  {t("sources.edit.enabled", { count: scanSummary.enabledCount })}
+                  {t("sources.edit.enabled", {
+                    count: scanSummary.enabledCount,
+                  })}
                 </Badge>
               </div>
             </div>

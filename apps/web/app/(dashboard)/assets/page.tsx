@@ -325,7 +325,9 @@ export default function AssetsPage() {
       {isBaseLoading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="ml-2 text-sm">{t("assets.loadingVisualizations")}</span>
+          <span className="ml-2 text-sm">
+            {t("assets.loadingVisualizations")}
+          </span>
         </div>
       ) : (
         <>

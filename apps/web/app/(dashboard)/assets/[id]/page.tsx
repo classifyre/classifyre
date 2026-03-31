@@ -63,7 +63,8 @@ export default function AssetDetailPage() {
             if (!isActive) return;
             setSourceMeta({
               id: assetResponse.sourceId,
-              name: sourceResponse.name?.trim() || t("assets.detail.unknownSource"),
+              name:
+                sourceResponse.name?.trim() || t("assets.detail.unknownSource"),
             });
           } catch {
             if (!isActive) return;
@@ -149,7 +150,10 @@ export default function AssetDetailPage() {
             label: t("assets.detail.backToDiscovery"),
             onClick: () => router.push("/discovery"),
           }}
-          secondaryAction={{ label: t("assets.detail.goBack"), onClick: () => router.back() }}
+          secondaryAction={{
+            label: t("assets.detail.goBack"),
+            onClick: () => router.back(),
+          }}
         />
       </div>
     );
@@ -175,7 +179,9 @@ export default function AssetDetailPage() {
         </div>
         {sourceId && (
           <Button size="sm" asChild>
-            <Link href={`/sources/${sourceId}`}>{t("assets.detail.openSource")}</Link>
+            <Link href={`/sources/${sourceId}`}>
+              {t("assets.detail.openSource")}
+            </Link>
           </Button>
         )}
       </div>
@@ -183,15 +189,15 @@ export default function AssetDetailPage() {
       <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle>{t("assets.detail.metadata")}</CardTitle>
-          <CardDescription>
-            {t("assets.detail.metadataDesc")}
-          </CardDescription>
+          <CardDescription>{t("assets.detail.metadataDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-3">
             <SourceIcon source={sourceType} size="md" />
             <div>
-              <div className="text-sm text-muted-foreground">{t("common.source")}</div>
+              <div className="text-sm text-muted-foreground">
+                {t("common.source")}
+              </div>
               {sourceId ? (
                 <Link
                   href={`/sources/${sourceId}`}
@@ -208,19 +214,25 @@ export default function AssetDetailPage() {
           <Separator />
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <div className="text-xs text-muted-foreground">{t("assets.detail.assetName")}</div>
+              <div className="text-xs text-muted-foreground">
+                {t("assets.detail.assetName")}
+              </div>
               <div className="text-sm font-semibold break-words">
                 {assetLabel}
               </div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">{t("assets.detail.assetType")}</div>
+              <div className="text-xs text-muted-foreground">
+                {t("assets.detail.assetType")}
+              </div>
               <div className="text-sm font-semibold">
                 {assetDetails.assetType}
               </div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">{t("assets.detail.externalUrl")}</div>
+              <div className="text-xs text-muted-foreground">
+                {t("assets.detail.externalUrl")}
+              </div>
               <div className="text-sm font-mono break-all">
                 {assetDetails.externalUrl || "—"}
               </div>
@@ -237,7 +249,9 @@ export default function AssetDetailPage() {
                   {t("assets.detail.openSourceDetails")}
                 </Link>
               ) : (
-                <div className="text-sm font-semibold">{t("assets.detail.unavailable")}</div>
+                <div className="text-sm font-semibold">
+                  {t("assets.detail.unavailable")}
+                </div>
               )}
             </div>
           </div>

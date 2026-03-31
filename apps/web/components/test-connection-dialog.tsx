@@ -97,7 +97,9 @@ export function TestConnectionDialog({
 
         <DialogFooter className="sm:justify-end">
           {isLocked ? (
-            <div className="text-xs text-muted-foreground">{t("sources.testConnection.wait")}</div>
+            <div className="text-xs text-muted-foreground">
+              {t("sources.testConnection.wait")}
+            </div>
           ) : (
             <Button
               type="button"

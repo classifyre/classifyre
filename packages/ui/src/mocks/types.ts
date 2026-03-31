@@ -168,52 +168,52 @@ export interface MockReport {
 }
 
 export interface MockGlossaryTerm {
-  id: string
-  slug: string
-  displayName: string
-  description: string
-  category: string
-  filterMapping: Record<string, string[]>
-  color?: string
-  icon?: string
-  isActive: boolean
-  findingCount: number
-  metricCount: number
-  createdAt: Date
-  updatedAt: Date
+  id: string;
+  slug: string;
+  displayName: string;
+  description: string;
+  category: string;
+  filterMapping: Record<string, string[]>;
+  color?: string;
+  icon?: string;
+  isActive: boolean;
+  findingCount: number;
+  metricCount: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface MockMetricDefinition {
-  id: string
-  slug: string
-  displayName: string
-  description: string
-  type: "SIMPLE" | "RATIO" | "DERIVED" | "TREND"
-  status: "DRAFT" | "ACTIVE" | "DEPRECATED"
-  definition: Record<string, unknown>
-  allowedDimensions: string[]
-  format: string
-  unit: string
-  owner: string
-  certifiedBy?: string
-  certifiedAt?: Date
-  currentValue: number | null
-  glossaryTermSlug?: string
-  createdAt: Date
-  updatedAt: Date
+  id: string;
+  slug: string;
+  displayName: string;
+  description: string;
+  type: "SIMPLE" | "RATIO" | "DERIVED" | "TREND";
+  status: "DRAFT" | "ACTIVE" | "DEPRECATED";
+  definition: Record<string, unknown>;
+  allowedDimensions: string[];
+  format: string;
+  unit: string;
+  owner: string;
+  certifiedBy?: string;
+  certifiedAt?: Date;
+  currentValue: number | null;
+  glossaryTermSlug?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface MockMetricResult {
-  metricSlug: string
-  value: number | null
-  breakdown: { dimensionValue: string; value: number }[]
+  metricSlug: string;
+  value: number | null;
+  breakdown: { dimensionValue: string; value: number }[];
 }
 
 export interface MockDashboardPlacement {
-  id: string
-  metricSlug: string
-  dashboard: string
-  position: number
-  size: "sm" | "md" | "lg" | "xl"
-  chartType: string
+  id: string;
+  metricSlug: string;
+  dashboard: string;
+  position: number;
+  size: "sm" | "md" | "lg" | "xl";
+  chartType: string;
 }

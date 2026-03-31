@@ -288,9 +288,13 @@ export default function DiscoveryPage() {
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
               Overview
             </h1>
-            <p className="text-destructive">{t("discovery.errorPrefix", { message: error })}</p>
+            <p className="text-destructive">
+              {t("discovery.errorPrefix", { message: error })}
+            </p>
           </div>
-          <Button onClick={() => window.location.reload()}>{t("discovery.retry")}</Button>
+          <Button onClick={() => window.location.reload()}>
+            {t("discovery.retry")}
+          </Button>
         </div>
       </div>
     );
@@ -320,7 +324,10 @@ export default function DiscoveryPage() {
       ? t("discovery.requireReview", { count: criticalHigh })
       : attentionLevel === "none"
         ? t("discovery.noFindingsInWindow")
-        : t("discovery.currentHighest", { count: attentionCount, level: attentionLevel });
+        : t("discovery.currentHighest", {
+            count: attentionCount,
+            level: attentionLevel,
+          });
 
   return (
     <div className="min-w-0 space-y-6 overflow-x-hidden">
@@ -344,9 +351,15 @@ export default function DiscoveryPage() {
                   <SelectValue placeholder="Window" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="7">{t("findings.window.7days")}</SelectItem>
-                  <SelectItem value="30">{t("findings.window.30days")}</SelectItem>
-                  <SelectItem value="90">{t("findings.window.90days")}</SelectItem>
+                  <SelectItem value="7">
+                    {t("findings.window.7days")}
+                  </SelectItem>
+                  <SelectItem value="30">
+                    {t("findings.window.30days")}
+                  </SelectItem>
+                  <SelectItem value="90">
+                    {t("findings.window.90days")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -366,7 +379,10 @@ export default function DiscoveryPage() {
             {[
               { label: t("discovery.open"), value: statusCounts.open },
               { label: t("discovery.resolved"), value: statusCounts.resolved },
-              { label: t("discovery.falsePositive"), value: statusCounts.falsePositive },
+              {
+                label: t("discovery.falsePositive"),
+                value: statusCounts.falsePositive,
+              },
               { label: t("discovery.ignored"), value: statusCounts.ignored },
             ].map(({ label, value }) => (
               <div key={label} className={`${panelInsetCardClass} min-w-0`}>
@@ -644,7 +660,10 @@ export default function DiscoveryPage() {
             {[
               { label: t("discovery.open"), value: statusCounts.open },
               { label: t("discovery.resolved"), value: statusCounts.resolved },
-              { label: t("discovery.falsePositive"), value: statusCounts.falsePositive },
+              {
+                label: t("discovery.falsePositive"),
+                value: statusCounts.falsePositive,
+              },
               { label: t("discovery.ignored"), value: statusCounts.ignored },
             ].map(({ label, value }) => (
               <div key={label} className={panelInsetCardClass}>

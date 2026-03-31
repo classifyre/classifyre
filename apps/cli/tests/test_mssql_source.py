@@ -154,7 +154,9 @@ async def test_mssql_extract_streams_assets_in_batches(
     source = MSSQLSource(_recipe())
     tables = [
         TableRef(database="some_db", schema="some_schema", table="sysjobs", object_type="TABLE"),
-        TableRef(database="some_db", schema="some_schema", table="sysjobsteps", object_type="TABLE"),
+        TableRef(
+            database="some_db", schema="some_schema", table="sysjobsteps", object_type="TABLE"
+        ),
         TableRef(database="some_db", schema="some_schema", table="v_jobs", object_type="VIEW"),
     ]
     monkeypatch.setattr(source, "_iter_tables", lambda: tables)
@@ -189,7 +191,9 @@ async def test_mssql_fetch_content_uses_cache(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = MSSQLSource(_recipe())
-    table_ref = TableRef(database="some_db", schema="some_schema", table="sysjobs", object_type="TABLE")
+    table_ref = TableRef(
+        database="some_db", schema="some_schema", table="sysjobs", object_type="TABLE"
+    )
     asset = source._table_to_asset(table_ref)
     source._table_lookup[asset.hash] = table_ref
 
@@ -221,7 +225,9 @@ def test_mssql_latest_sampling_falls_back_to_random() -> None:
             },
         )
     )
-    table_ref = TableRef(database="some_db", schema="some_schema", table="sysjobs", object_type="TABLE")
+    table_ref = TableRef(
+        database="some_db", schema="some_schema", table="sysjobs", object_type="TABLE"
+    )
 
     query, params = source._build_sampling_query(table_ref, ["id", "name"])
 
@@ -232,7 +238,9 @@ def test_mssql_latest_sampling_falls_back_to_random() -> None:
 
 def test_mssql_all_strategy_omits_top() -> None:
     source = MSSQLSource(_recipe(sampling={"strategy": "ALL"}))
-    table_ref = TableRef(database="some_db", schema="some_schema", table="sysjobs", object_type="TABLE")
+    table_ref = TableRef(
+        database="some_db", schema="some_schema", table="sysjobs", object_type="TABLE"
+    )
 
     query, params = source._build_sampling_query(table_ref, ["id", "name"])
 
@@ -259,7 +267,9 @@ async def test_mssql_extract_runs_detector_pipeline_when_enabled(
     monkeypatch.setattr(
         source,
         "_iter_tables",
-        lambda: [TableRef(database="some_db", schema="some_schema", table="sysjobs", object_type="TABLE")],
+        lambda: [
+            TableRef(database="some_db", schema="some_schema", table="sysjobs", object_type="TABLE")
+        ],
     )
     monkeypatch.setattr(source, "_collect_dependency_links", lambda _tables: {})
 

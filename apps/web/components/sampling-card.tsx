@@ -58,9 +58,24 @@ export function SamplingCard({
     hint: string;
     Icon: React.ElementType;
   }[] = [
-    { value: "LATEST", label: t("sources.sampling.strategyLatest"), hint: t("sources.sampling.hintLatest"), Icon: Clock },
-    { value: "RANDOM", label: t("sources.sampling.strategyRandom"), hint: t("sources.sampling.hintRandom"), Icon: Shuffle },
-    { value: "ALL", label: t("sources.sampling.strategyAll"), hint: t("sources.sampling.hintAll"), Icon: Infinity },
+    {
+      value: "LATEST",
+      label: t("sources.sampling.strategyLatest"),
+      hint: t("sources.sampling.hintLatest"),
+      Icon: Clock,
+    },
+    {
+      value: "RANDOM",
+      label: t("sources.sampling.strategyRandom"),
+      hint: t("sources.sampling.hintRandom"),
+      Icon: Shuffle,
+    },
+    {
+      value: "ALL",
+      label: t("sources.sampling.strategyAll"),
+      hint: t("sources.sampling.hintAll"),
+      Icon: Infinity,
+    },
   ];
 
   const handleStrategyChange = (strategy: SamplingStrategy) => {

@@ -61,7 +61,9 @@ export default function MetricDetailPage() {
     return (
       <div className="p-6">
         <DetailBackButton fallbackHref="/semantic/metrics" />
-        <p className="mt-4 text-muted-foreground">{t("semantic.metrics.notFound")}</p>
+        <p className="mt-4 text-muted-foreground">
+          {t("semantic.metrics.notFound")}
+        </p>
       </div>
     );
   }
@@ -98,9 +100,7 @@ export default function MetricDetailPage() {
               {t("semantic.metrics.certify")}
             </Button>
           )}
-          <Badge
-            variant={metric.status === "ACTIVE" ? "default" : "secondary"}
-          >
+          <Badge variant={metric.status === "ACTIVE" ? "default" : "secondary"}>
             {metric.status}
           </Badge>
         </div>
@@ -115,9 +115,7 @@ export default function MetricDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-hero text-4xl">
-              {formatValue(result?.value)}
-            </p>
+            <p className="font-hero text-4xl">{formatValue(result?.value)}</p>
             {metric.unit && (
               <p className="text-sm text-muted-foreground">{metric.unit}</p>
             )}
@@ -133,11 +131,15 @@ export default function MetricDetailPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{t("semantic.metrics.typeLabel")}</span>
+              <span className="text-xs text-muted-foreground">
+                {t("semantic.metrics.typeLabel")}
+              </span>
               <Badge variant="outline">{metric.type}</Badge>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{t("semantic.metrics.formatLabel")}</span>
+              <span className="text-xs text-muted-foreground">
+                {t("semantic.metrics.formatLabel")}
+              </span>
               <span className="text-sm">{metric.format ?? "number"}</span>
             </div>
             {metric.glossaryTerm && (
@@ -149,9 +151,7 @@ export default function MetricDetailPage() {
                   variant="outline"
                   className="cursor-pointer"
                   onClick={() =>
-                    router.push(
-                      `/semantic/glossary/${metric.glossaryTerm!.id}`,
-                    )
+                    router.push(`/semantic/glossary/${metric.glossaryTerm!.id}`)
                   }
                 >
                   {metric.glossaryTerm.displayName}
@@ -190,7 +190,9 @@ export default function MetricDetailPage() {
       {result?.breakdown && result.breakdown.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">{t("semantic.metrics.dimensionBreakdown")}</CardTitle>
+            <CardTitle className="text-sm">
+              {t("semantic.metrics.dimensionBreakdown")}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -213,7 +215,9 @@ export default function MetricDetailPage() {
       {/* Definition */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">{t("semantic.metrics.definitionJson")}</CardTitle>
+          <CardTitle className="text-sm">
+            {t("semantic.metrics.definitionJson")}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <pre className="rounded-lg bg-muted p-3 text-xs font-mono overflow-auto max-h-48">
@@ -231,21 +235,29 @@ export default function MetricDetailPage() {
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 text-sm lg:grid-cols-4">
           <div>
-            <span className="text-muted-foreground">{t("semantic.metrics.ownerLabel")}</span>{" "}
+            <span className="text-muted-foreground">
+              {t("semantic.metrics.ownerLabel")}
+            </span>{" "}
             {metric.owner ?? "—"}
           </div>
           <div>
-            <span className="text-muted-foreground">{t("semantic.metrics.certifiedByLabel")}</span>{" "}
+            <span className="text-muted-foreground">
+              {t("semantic.metrics.certifiedByLabel")}
+            </span>{" "}
             {metric.certifiedBy ?? "—"}
           </div>
           <div>
-            <span className="text-muted-foreground">{t("semantic.metrics.certifiedAtLabel")}</span>{" "}
+            <span className="text-muted-foreground">
+              {t("semantic.metrics.certifiedAtLabel")}
+            </span>{" "}
             {metric.certifiedAt
               ? new Date(metric.certifiedAt).toLocaleDateString()
               : "—"}
           </div>
           <div>
-            <span className="text-muted-foreground">{t("semantic.metrics.createdLabel")}</span>{" "}
+            <span className="text-muted-foreground">
+              {t("semantic.metrics.createdLabel")}
+            </span>{" "}
             {new Date(metric.createdAt).toLocaleDateString()}
           </div>
         </CardContent>

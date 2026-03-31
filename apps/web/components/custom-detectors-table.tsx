@@ -415,8 +415,12 @@ export function CustomDetectorsTable() {
             <TableHeader>
               <TableRow>
                 <TableHead>{renderSortHead("Detector", "name")}</TableHead>
-                <TableHead>{renderSortHead(t("common.method"), "method")}</TableHead>
-                <TableHead>{renderSortHead(t("common.status"), "status")}</TableHead>
+                <TableHead>
+                  {renderSortHead(t("common.method"), "method")}
+                </TableHead>
+                <TableHead>
+                  {renderSortHead(t("common.status"), "status")}
+                </TableHead>
                 <TableHead>
                   {renderSortHead(t("common.sources"), "sourcesUsingCount")}
                 </TableHead>
@@ -426,7 +430,9 @@ export function CustomDetectorsTable() {
                 <TableHead>
                   {renderSortHead(t("detectors.lastTrained"), "lastTrainedAt")}
                 </TableHead>
-                <TableHead>{renderSortHead(t("common.updated"), "updatedAt")}</TableHead>
+                <TableHead>
+                  {renderSortHead(t("common.updated"), "updatedAt")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -528,7 +534,9 @@ export function CustomDetectorsTable() {
                           </p>
                         </div>
                       ) : (
-                        <p className="text-xs text-muted-foreground">{t("detectors.never")}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t("detectors.never")}
+                        </p>
                       )}
                     </TableCell>
                     <TableCell>

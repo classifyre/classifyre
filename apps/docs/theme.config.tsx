@@ -1,6 +1,8 @@
 const config = {
   logo: (
-    <span style={{ fontWeight: 700, letterSpacing: "-0.02em" }}>Classifyre</span>
+    <span style={{ fontWeight: 700, letterSpacing: "-0.02em" }}>
+      Classifyre
+    </span>
   ),
   project: {
     link: "https://github.com/classifyre/unstructured",
@@ -18,8 +20,8 @@ const config = {
   footer: {
     text: (
       <span>
-        © {new Date().getFullYear()} Classifyre. Open-source metadata ingestion for
-        unstructured data.
+        © {new Date().getFullYear()} Classifyre. Open-source metadata ingestion
+        for unstructured data.
       </span>
     ),
   },

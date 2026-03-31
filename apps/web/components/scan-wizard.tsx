@@ -142,7 +142,9 @@ export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12">{t("common.selectOption")}</TableHead>
+                      <TableHead className="w-12">
+                        {t("common.selectOption")}
+                      </TableHead>
                       <TableHead>{t("common.name")}</TableHead>
                       <TableHead>{t("common.type")}</TableHead>
                       <TableHead>{t("common.status")}</TableHead>
@@ -183,7 +185,9 @@ export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
                                 if (isDisabled) return;
                                 setSourceId(checked === true ? id : "");
                               }}
-                              aria-label={t("sources.scanWizard.selectSource", { name: source.name ?? "source" })}
+                              aria-label={t("sources.scanWizard.selectSource", {
+                                name: source.name ?? "source",
+                              })}
                             />
                           </TableCell>
                           <TableCell className="font-medium">

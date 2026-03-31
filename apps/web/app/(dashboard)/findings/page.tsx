@@ -317,9 +317,15 @@ function FindingsPageContent() {
                     <SelectValue placeholder={t("findings.window.label")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="7">{t("findings.window.7days")}</SelectItem>
-                    <SelectItem value="30">{t("findings.window.30days")}</SelectItem>
-                    <SelectItem value="90">{t("findings.window.90days")}</SelectItem>
+                    <SelectItem value="7">
+                      {t("findings.window.7days")}
+                    </SelectItem>
+                    <SelectItem value="30">
+                      {t("findings.window.30days")}
+                    </SelectItem>
+                    <SelectItem value="90">
+                      {t("findings.window.90days")}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </CardHeader>

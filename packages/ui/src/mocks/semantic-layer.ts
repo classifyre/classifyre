@@ -1,11 +1,17 @@
-import type { MockGlossaryTerm, MockMetricDefinition, MockMetricResult, MockDashboardPlacement } from "./types"
+import type {
+  MockGlossaryTerm,
+  MockMetricDefinition,
+  MockMetricResult,
+  MockDashboardPlacement,
+} from "./types";
 
 export const mockGlossaryTerms: MockGlossaryTerm[] = [
   {
     id: "gt-1",
     slug: "security-threats",
     displayName: "Security Threats",
-    description: "Findings from detectors that identify security vulnerabilities such as exposed secrets, malicious patterns, and prompt injection attempts.",
+    description:
+      "Findings from detectors that identify security vulnerabilities such as exposed secrets, malicious patterns, and prompt injection attempts.",
     category: "Security",
     filterMapping: {
       detectorTypes: ["SECRETS", "YARA", "PROMPT_INJECTION"],
@@ -22,7 +28,8 @@ export const mockGlossaryTerms: MockGlossaryTerm[] = [
     id: "gt-2",
     slug: "pii-exposure",
     displayName: "PII Exposure",
-    description: "Personally identifiable information detected across data sources, including SSNs, email addresses, phone numbers, and government IDs.",
+    description:
+      "Personally identifiable information detected across data sources, including SSNs, email addresses, phone numbers, and government IDs.",
     category: "Privacy",
     filterMapping: {
       detectorTypes: ["PII", "PHI"],
@@ -39,7 +46,8 @@ export const mockGlossaryTerms: MockGlossaryTerm[] = [
     id: "gt-3",
     slug: "compliance-violations",
     displayName: "Compliance Violations",
-    description: "Findings that indicate regulatory non-compliance including GDPR data handling issues and HIPAA protected health information exposure.",
+    description:
+      "Findings that indicate regulatory non-compliance including GDPR data handling issues and HIPAA protected health information exposure.",
     category: "Compliance",
     filterMapping: {
       detectorTypes: ["COMPLIANCE", "GDPR", "HIPAA"],
@@ -56,7 +64,8 @@ export const mockGlossaryTerms: MockGlossaryTerm[] = [
     id: "gt-4",
     slug: "content-safety",
     displayName: "Content Safety Issues",
-    description: "Content flagged for toxicity, bias, NSFW material, or other safety concerns that could pose reputational or legal risk.",
+    description:
+      "Content flagged for toxicity, bias, NSFW material, or other safety concerns that could pose reputational or legal risk.",
     category: "Content",
     filterMapping: {
       detectorTypes: ["TOXIC", "NSFW", "BIAS"],
@@ -73,7 +82,8 @@ export const mockGlossaryTerms: MockGlossaryTerm[] = [
     id: "gt-5",
     slug: "critical-findings",
     displayName: "Critical Findings",
-    description: "All findings classified as critical severity, regardless of detector type. These require immediate attention and remediation.",
+    description:
+      "All findings classified as critical severity, regardless of detector type. These require immediate attention and remediation.",
     category: "Security",
     filterMapping: {
       severities: ["CRITICAL"],
@@ -90,7 +100,8 @@ export const mockGlossaryTerms: MockGlossaryTerm[] = [
     id: "gt-6",
     slug: "unresolved-issues",
     displayName: "Unresolved Issues",
-    description: "All open findings that have not yet been resolved, marked as false positive, or acknowledged by a team member.",
+    description:
+      "All open findings that have not yet been resolved, marked as false positive, or acknowledged by a team member.",
     category: "Operations",
     filterMapping: {
       statuses: ["OPEN"],
@@ -107,7 +118,8 @@ export const mockGlossaryTerms: MockGlossaryTerm[] = [
     id: "gt-7",
     slug: "data-quality",
     displayName: "Data Quality",
-    description: "Findings related to data integrity, formatting issues, and quality concerns detected during automated scanning.",
+    description:
+      "Findings related to data integrity, formatting issues, and quality concerns detected during automated scanning.",
     category: "Operations",
     filterMapping: {
       detectorTypes: ["CUSTOM"],
@@ -121,14 +133,15 @@ export const mockGlossaryTerms: MockGlossaryTerm[] = [
     createdAt: new Date("2026-03-01"),
     updatedAt: new Date("2026-03-10"),
   },
-]
+];
 
 export const mockMetricDefinitions: MockMetricDefinition[] = [
   {
     id: "md-1",
     slug: "total-findings",
     displayName: "Total Findings",
-    description: "Total count of all findings detected across all sources and detector types.",
+    description:
+      "Total count of all findings detected across all sources and detector types.",
     type: "SIMPLE",
     status: "ACTIVE",
     definition: { aggregation: "COUNT", entity: "finding" },
@@ -147,10 +160,15 @@ export const mockMetricDefinitions: MockMetricDefinition[] = [
     id: "md-2",
     slug: "open-findings",
     displayName: "Open Findings",
-    description: "Count of findings currently in OPEN status requiring review or remediation.",
+    description:
+      "Count of findings currently in OPEN status requiring review or remediation.",
     type: "SIMPLE",
     status: "ACTIVE",
-    definition: { aggregation: "COUNT", entity: "finding", filters: { statuses: ["OPEN"] } },
+    definition: {
+      aggregation: "COUNT",
+      entity: "finding",
+      filters: { statuses: ["OPEN"] },
+    },
     allowedDimensions: ["severity", "detectorType", "category"],
     format: "number",
     unit: "findings",
@@ -166,11 +184,16 @@ export const mockMetricDefinitions: MockMetricDefinition[] = [
     id: "md-3",
     slug: "false-positive-rate",
     displayName: "False Positive Rate",
-    description: "Percentage of findings that were marked as false positives out of all reviewed findings. Lower is better.",
+    description:
+      "Percentage of findings that were marked as false positives out of all reviewed findings. Lower is better.",
     type: "RATIO",
     status: "ACTIVE",
     definition: {
-      numerator: { aggregation: "COUNT", entity: "finding", filters: { statuses: ["FALSE_POSITIVE"] } },
+      numerator: {
+        aggregation: "COUNT",
+        entity: "finding",
+        filters: { statuses: ["FALSE_POSITIVE"] },
+      },
       denominator: { aggregation: "COUNT", entity: "finding" },
     },
     allowedDimensions: ["detectorType", "category"],
@@ -188,11 +211,16 @@ export const mockMetricDefinitions: MockMetricDefinition[] = [
     id: "md-4",
     slug: "resolution-rate",
     displayName: "Resolution Rate",
-    description: "Percentage of findings that have been resolved. Measures team effectiveness at addressing detected issues.",
+    description:
+      "Percentage of findings that have been resolved. Measures team effectiveness at addressing detected issues.",
     type: "RATIO",
     status: "ACTIVE",
     definition: {
-      numerator: { aggregation: "COUNT", entity: "finding", filters: { statuses: ["RESOLVED"] } },
+      numerator: {
+        aggregation: "COUNT",
+        entity: "finding",
+        filters: { statuses: ["RESOLVED"] },
+      },
       denominator: { aggregation: "COUNT", entity: "finding" },
     },
     allowedDimensions: ["severity", "detectorType"],
@@ -210,11 +238,16 @@ export const mockMetricDefinitions: MockMetricDefinition[] = [
     id: "md-5",
     slug: "scan-coverage",
     displayName: "Scan Coverage",
-    description: "Ratio of assets with at least one finding to total assets. Indicates how thoroughly assets are being scanned.",
+    description:
+      "Ratio of assets with at least one finding to total assets. Indicates how thoroughly assets are being scanned.",
     type: "RATIO",
     status: "ACTIVE",
     definition: {
-      numerator: { aggregation: "COUNT_DISTINCT", field: "assetId", entity: "finding" },
+      numerator: {
+        aggregation: "COUNT_DISTINCT",
+        field: "assetId",
+        entity: "finding",
+      },
       denominator: { aggregation: "COUNT", entity: "asset" },
     },
     allowedDimensions: [],
@@ -232,7 +265,8 @@ export const mockMetricDefinitions: MockMetricDefinition[] = [
     id: "md-6",
     slug: "avg-confidence",
     displayName: "Average Confidence",
-    description: "Mean confidence score across all findings. Higher values indicate more reliable detections.",
+    description:
+      "Mean confidence score across all findings. Higher values indicate more reliable detections.",
     type: "SIMPLE",
     status: "ACTIVE",
     definition: { aggregation: "AVG", entity: "finding", field: "confidence" },
@@ -251,10 +285,15 @@ export const mockMetricDefinitions: MockMetricDefinition[] = [
     id: "md-7",
     slug: "weekly-finding-trend",
     displayName: "Weekly Finding Trend",
-    description: "Week-over-week change in total findings. Positive values indicate an increase in detections.",
+    description:
+      "Week-over-week change in total findings. Positive values indicate an increase in detections.",
     type: "TREND",
     status: "DRAFT",
-    definition: { baseMetricSlug: "total-findings", compareWindow: "7d", currentWindow: "7d" },
+    definition: {
+      baseMetricSlug: "total-findings",
+      compareWindow: "7d",
+      currentWindow: "7d",
+    },
     allowedDimensions: [],
     format: "percentage",
     unit: "change",
@@ -266,7 +305,7 @@ export const mockMetricDefinitions: MockMetricDefinition[] = [
     createdAt: new Date("2026-02-01"),
     updatedAt: new Date("2026-03-25"),
   },
-]
+];
 
 export const mockMetricResults: MockMetricResult[] = [
   {
@@ -302,7 +341,7 @@ export const mockMetricResults: MockMetricResult[] = [
     value: 0.578,
     breakdown: [],
   },
-]
+];
 
 export const mockDashboardPlacements: MockDashboardPlacement[] = [
   {
@@ -345,4 +384,4 @@ export const mockDashboardPlacements: MockDashboardPlacement[] = [
     size: "lg",
     chartType: "trend",
   },
-]
+];

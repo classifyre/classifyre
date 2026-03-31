@@ -57,7 +57,9 @@ export default function GlossaryTermDetailPage() {
     return (
       <div className="p-6">
         <DetailBackButton fallbackHref="/semantic/glossary" />
-        <p className="mt-4 text-muted-foreground">{t("semantic.glossary.notFound")}</p>
+        <p className="mt-4 text-muted-foreground">
+          {t("semantic.glossary.notFound")}
+        </p>
       </div>
     );
   }
@@ -74,11 +76,12 @@ export default function GlossaryTermDetailPage() {
               style={{ backgroundColor: term.color }}
             />
           )}
-          <PageTitle title={term.displayName} description={term.description ?? undefined} />
+          <PageTitle
+            title={term.displayName}
+            description={term.description ?? undefined}
+          />
         </div>
-        {term.category && (
-          <Badge variant="outline">{term.category}</Badge>
-        )}
+        {term.category && <Badge variant="outline">{term.category}</Badge>}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -136,7 +139,9 @@ export default function GlossaryTermDetailPage() {
         <section className="space-y-3">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            <h3 className="font-medium">{t("semantic.glossary.associatedMetrics")}</h3>
+            <h3 className="font-medium">
+              {t("semantic.glossary.associatedMetrics")}
+            </h3>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {term.metrics.map((metric: any) => (
@@ -166,15 +171,23 @@ export default function GlossaryTermDetailPage() {
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-muted-foreground">{t("semantic.glossary.activeLabel")}</span>{" "}
-            {term.isActive ? t("semantic.glossary.yes") : t("semantic.glossary.no")}
+            <span className="text-muted-foreground">
+              {t("semantic.glossary.activeLabel")}
+            </span>{" "}
+            {term.isActive
+              ? t("semantic.glossary.yes")
+              : t("semantic.glossary.no")}
           </div>
           <div>
-            <span className="text-muted-foreground">{t("semantic.glossary.createdLabel")}</span>{" "}
+            <span className="text-muted-foreground">
+              {t("semantic.glossary.createdLabel")}
+            </span>{" "}
             {new Date(term.createdAt).toLocaleDateString()}
           </div>
           <div>
-            <span className="text-muted-foreground">{t("semantic.glossary.updatedLabel")}</span>{" "}
+            <span className="text-muted-foreground">
+              {t("semantic.glossary.updatedLabel")}
+            </span>{" "}
             {new Date(term.updatedAt).toLocaleDateString()}
           </div>
         </CardContent>

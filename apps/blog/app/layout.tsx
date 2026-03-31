@@ -98,8 +98,8 @@ export const metadata: Metadata = {
 
 const banner = (
   <Banner storageKey="classifyre-blog-banner">
-    Engineering notes with Classifyre&apos;s shared brutalist token system and docs
-    shell.
+    Engineering notes with Classifyre&apos;s shared brutalist token system and
+    docs shell.
   </Banner>
 );
 

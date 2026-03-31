@@ -587,7 +587,9 @@ export function RunnersTable({
 
       <div className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{t("common.rowsPerPage")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("common.rowsPerPage")}
+          </span>
           <Select value={pageSize} onValueChange={setPageSize}>
             <SelectTrigger className="h-8 w-[130px] border-2 border-black rounded-[4px]">
               <SelectValue placeholder={t("common.rows")} />

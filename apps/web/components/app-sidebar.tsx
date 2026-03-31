@@ -58,7 +58,9 @@ export function AppSidebar() {
                   <Shield className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-serif font-bold">{t("app.name")}</span>
+                  <span className="truncate font-serif font-bold">
+                    {t("app.name")}
+                  </span>
                   <span className="truncate text-xs text-muted-foreground">
                     {t("app.tagline")}
                   </span>
@@ -134,7 +136,9 @@ export function AppSidebar() {
         </SidebarMenu>
         <div className="px-2 pb-2">
           <div className="px-2 py-2 text-xs">
-            <span className="font-mono text-sidebar-foreground">{t("common.version")}</span>
+            <span className="font-mono text-sidebar-foreground">
+              {t("common.version")}
+            </span>
             <span className="ml-2 font-mono text-sidebar-foreground">
               {softwareVersionLabel}
             </span>

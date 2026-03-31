@@ -24,7 +24,9 @@ export default function SandboxPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-3xl font-semibold tracking-tight">{t("sandbox.title")}</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              {t("sandbox.title")}
+            </h1>
             <Badge
               variant={isPolling ? "default" : "outline"}
               className="text-[10px] uppercase tracking-[0.12em]"
@@ -48,9 +50,7 @@ export default function SandboxPage() {
       <Card>
         <CardHeader>
           <CardTitle>{t("sandbox.runResults")}</CardTitle>
-          <CardDescription>
-            {t("sandbox.autoRefresh")}
-          </CardDescription>
+          <CardDescription>{t("sandbox.autoRefresh")}</CardDescription>
         </CardHeader>
         <CardContent className="p-5">
           <SandboxRunsTable onPollingChange={setIsPolling} />
