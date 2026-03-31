@@ -10,7 +10,7 @@
     "./types": "./src/types.ts"
   },
   "scripts": {
-    "build": "bun run codegen",
+    "build": "test -f ./src/generated/src/models/index.ts || (echo 'Missing generated API client. Run `bun run --cwd packages/api-client codegen` locally and commit `packages/api-client/src/generated`.' && exit 1)",
     "generate": "bun x @openapitools/openapi-generator-cli generate -i ../../apps/api/openapi.json -g typescript-fetch -o ./src/generated --skip-validate-spec --additional-properties=typescriptThreePlus=true,supportsES6=true,npmName=@workspace/api-client,npmVersion=0.0.1 && bun run fix",
     "clean": "rm -rf ./src/generated",
     "fix": "node scripts/fix-exports.cjs",

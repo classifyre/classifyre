@@ -1,6 +1,3 @@
-# Generated API client
-/src/generated/
-
 # Dependencies
 node_modules/
 
