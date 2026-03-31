@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-schemas"
-version = "0.2.24"
+version = "0.2.25"
 description = "Shared JSON schemas for Classifyre monorepo"
 requires-python = ">=3.12"
 dependencies = [
