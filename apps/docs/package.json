@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev --webpack --port 3002",
     "build": "next build --webpack",
-    "postbuild": "next-sitemap --config next-sitemap.config.js",
+    "postbuild": "next-sitemap --config next-sitemap.config.js && pagefind --site out --output-subdir _pagefind",
     "start": "next start",
     "lint": "eslint .",
     "check-types": "tsc --noEmit",
@@ -29,13 +29,14 @@
     "rehype-slug": "^6.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.17",
     "@types/node": "^20.19.25",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@workspace/eslint-config": "workspace:^",
     "@workspace/typescript-config": "workspace:*",
-    "@tailwindcss/postcss": "^4.1.17",
     "eslint": "^9.39.1",
+    "pagefind": "^1.4.0",
     "typescript": "^5.9.3"
   }
 }
