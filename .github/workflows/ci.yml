@@ -105,7 +105,7 @@ jobs:
         run: bun run test
 
       - name: Stage CI artifacts
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
         run: |
           # Ensure static docs are exported and synced into web public assets.
           bun run docs:bundle
@@ -128,7 +128,7 @@ jobs:
           cp -r apps/web/public/. /tmp/web-dist/public/ 2>/dev/null || true
 
       - name: Upload api build
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
         uses: actions/upload-artifact@v4
         with:
           name: api-build
@@ -137,7 +137,7 @@ jobs:
           retention-days: 1
 
       - name: Upload codegen
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
         uses: actions/upload-artifact@v4
         with:
           name: codegen
@@ -146,7 +146,7 @@ jobs:
           retention-days: 1
 
       - name: Upload web dist
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
         uses: actions/upload-artifact@v4
         with:
           name: web-dist
