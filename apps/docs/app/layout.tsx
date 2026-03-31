@@ -11,6 +11,7 @@ import { getPageMap } from "nextra/page-map";
 import { Footer, Layout, Navbar } from "nextra-theme-docs";
 
 import { Badge } from "@workspace/ui/components";
+import { softwareVersionLabel } from "@workspace/ui/lib/software-version";
 import { getAllSourceDocs } from "@workspace/schemas/source-docs";
 import { getAllDetectorDocs } from "@workspace/schemas/detector-docs";
 
@@ -332,9 +333,14 @@ const navbar = (
         >
           Docs
         </Badge>
-        <span className="font-serif text-xl font-black uppercase tracking-[0.08em]">
-          Classifyre
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-serif text-xl font-black uppercase tracking-[0.08em]">
+            Classifyre
+          </span>
+          <span className="rounded-[4px] border border-border/70 bg-background/80 px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
+            {softwareVersionLabel}
+          </span>
+        </div>
       </div>
     }
     logoLink

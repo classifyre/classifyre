@@ -26,6 +26,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@workspace/ui/components/sidebar";
+import { softwareVersionLabel } from "@workspace/ui/lib/software-version";
 import { useTranslation } from "@/hooks/use-translation";
 
 export function AppSidebar() {
@@ -131,6 +132,14 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <div className="px-2 pb-2">
+          <div className="px-2 py-2 text-xs">
+            <span className="font-mono text-sidebar-foreground">{t("common.version")}</span>
+            <span className="ml-2 font-mono text-sidebar-foreground">
+              {softwareVersionLabel}
+            </span>
+          </div>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
