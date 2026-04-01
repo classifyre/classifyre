@@ -57,11 +57,11 @@ helm upgrade --install classifyre ./helm/classifyre \
   --set postgres.external.existingSecretPasswordKey='password' \
   --set api.maskedConfigEncryption.existingSecret='classifyre-api-secrets' \
   --set api.maskedConfigEncryption.secretKey='CLASSIFYRE_MASKED_CONFIG_KEY' \
-  --set api.image.repository='ghcr.io/classifyre/unstructured/api' \
+  --set api.image.repository='classifyre/api' \
   --set api.image.tag='<immutable-tag>' \
-  --set frontend.image.repository='ghcr.io/classifyre/unstructured/web' \
+  --set frontend.image.repository='classifyre/web' \
   --set frontend.image.tag='<immutable-tag>' \
-  --set api.cliJobs.image.repository='ghcr.io/classifyre/unstructured/cli' \
+  --set api.cliJobs.image.repository='classifyre/cli' \
   --set api.cliJobs.image.tag='<immutable-tag>'
 ```
 
@@ -74,11 +74,11 @@ helm upgrade --install classifyre ./helm/classifyre \
   --set postgres.mode=cnpg \
   --set postgres.cnpg.appPassword='<app-password>' \
   --set api.maskedConfigEncryption.value="$(openssl rand -base64 32)" \
-  --set api.image.repository='ghcr.io/classifyre/unstructured/api' \
+  --set api.image.repository='classifyre/api' \
   --set api.image.tag='<immutable-tag>' \
-  --set frontend.image.repository='ghcr.io/classifyre/unstructured/web' \
+  --set frontend.image.repository='classifyre/web' \
   --set frontend.image.tag='<immutable-tag>' \
-  --set api.cliJobs.image.repository='ghcr.io/classifyre/unstructured/cli' \
+  --set api.cliJobs.image.repository='classifyre/cli' \
   --set api.cliJobs.image.tag='<immutable-tag>'
 ```
 

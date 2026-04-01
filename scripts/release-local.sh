@@ -3,13 +3,13 @@
 #
 # Mirrors .github/workflows/release.yml but skips the 'build-main-images' job
 # (which just waits for GitHub-hosted CI to finish). Run ci-local.sh first to
-# build and push :main images, then call this script to cut the release.
+# build and push :main images to Docker Hub, then call this script to cut the release.
 #
 # Prerequisites:
-#   ./scripts/ci-local.sh       (validates + builds :main images in GHCR)
+#   ./scripts/ci-local.sh       (validates + builds :main images on Docker Hub)
 #   brew install kubectl helm
 #   gh auth login
-#   Docker Desktop running and logged in to GHCR
+#   Docker Desktop running
 #   KUBECONFIG env var or file at ~/.kube/config pointing at the k3s cluster
 #
 # Usage:
@@ -22,6 +22,9 @@ VERSION="${1:-}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
+source "${REPO_ROOT}/scripts/lib/load-secrets.sh"
+load_repo_secrets "${REPO_ROOT}"
+
 # ── Validate version arg ──────────────────────────────────────────────────────
 if [[ -z "${VERSION}" ]]; then
   echo "Usage: $0 <major.minor.patch>" >&2
@@ -33,7 +36,8 @@ if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 TAG="v${VERSION}"
-GHCR_REPO="ghcr.io/classifyre/unstructured"
+DOCKER_NAMESPACE="${DOCKER_USERNAME:-classifyre}"
+ALL_IN_ONE_REPO="${DOCKER_NAMESPACE}/all-in-one"
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
@@ -112,48 +116,30 @@ echo "==> [3/5] Pushing commit and tag to origin/main..."
 git push origin HEAD:main
 git push origin "${TAG}"
 
-# ── Step 4: Retag GHCR images :main → version tags ───────────────────────────
+# ── Step 4: Retag Docker Hub images :main → release tags ─────────────────────
 echo ""
-echo "==> [4/5] Retagging Docker images ${GHCR_REPO}:main → ${VERSION}..."
+echo "==> [4/5] Retagging Docker images ${ALL_IN_ONE_REPO}:main → ${VERSION}..."
 
-# Log in to GHCR with the PAT (required for imagetools create to push new tags)
-GHCR_PAT="${GHCR_PAT:-${GITHUB_TOKEN:-}}"
-if [[ -z "${GHCR_PAT}" ]]; then
-  if command -v gh >/dev/null 2>&1; then
-    GHCR_PAT="$(gh auth token 2>/dev/null || true)"
-  fi
-fi
-if [[ -z "${GHCR_PAT}" ]]; then
-  echo "Error: GHCR_PAT not set. Export a classic PAT with write:packages scope." >&2
+if [[ -z "${DOCKER_USERNAME:-}" || -z "${DOCKERHUB_TOKEN:-}" ]]; then
+  echo "Error: DOCKER_USERNAME and DOCKERHUB_TOKEN must be set." >&2
+  echo "Add them to ${REPO_ROOT}/.secrets or export them before running this script." >&2
   exit 1
 fi
-GHCR_USER="${GHCR_REPO#ghcr.io/}"
-GHCR_USER="${GHCR_USER%%/*}"
-if [[ -z "${GHCR_USER}" || "${GHCR_USER}" == "${GHCR_REPO}" ]]; then
-  echo "Error: could not derive GHCR owner from ${GHCR_REPO}" >&2
-  exit 1
-fi
-echo "${GHCR_PAT}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
-
-MAJOR="${VERSION%%.*}"
-REMAINDER="${VERSION#${MAJOR}.}"
-MINOR="${REMAINDER%%.*}"
+echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
 
 retag() {
   local image="$1"
-  echo "    ${image}:main → :${VERSION}, :${MAJOR}.${MINOR}, :${MAJOR}, :latest"
+  echo "    ${image}:main → :${VERSION}, :latest"
   docker buildx imagetools create \
     --tag "${image}:${VERSION}" \
-    --tag "${image}:${MAJOR}.${MINOR}" \
-    --tag "${image}:${MAJOR}" \
     --tag "${image}:latest" \
     "${image}:main"
 }
 
-retag "${GHCR_REPO}"
-retag "${GHCR_REPO}/web"
-retag "${GHCR_REPO}/api"
-retag "${GHCR_REPO}/cli"
+retag "${ALL_IN_ONE_REPO}"
+retag "${DOCKER_NAMESPACE}/web"
+retag "${DOCKER_NAMESPACE}/api"
+retag "${DOCKER_NAMESPACE}/cli"
 
 # ── Step 5a: Publish Python packages to PyPI ─────────────────────────────────
 echo ""

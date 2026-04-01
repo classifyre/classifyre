@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: ${{ github.event_name == 'workflow_call' && format('ci-gate-{0}', github.run_id) || format('{0}-{1}-{2}', github.workflow, github.event_name, github.ref) }}
@@ -167,16 +166,16 @@ jobs:
       matrix:
         include:
           - name: all-in-one
-            image: ghcr.io/${{ github.repository }}
+            repository: all-in-one
             target: runtime
           - name: web
-            image: ghcr.io/${{ github.repository }}/web
+            repository: web
             target: web-final
           - name: api
-            image: ghcr.io/${{ github.repository }}/api
+            repository: api
             target: api-final
           - name: cli
-            image: ghcr.io/${{ github.repository }}/cli
+            repository: cli
             target: cli-final
 
     steps:
@@ -223,15 +222,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          # GHCR_PAT: optional classic PAT with write:packages scope.
-          # Set in .secrets for local act runs when the gh OAuth token lacks write:packages.
-          # Real GitHub Actions uses GITHUB_TOKEN (auto-provisioned with packages:write).
-          password: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Compute image tag
         id: tag
@@ -242,17 +237,16 @@ jobs:
         if: ${{ !env.ACT }}
         uses: docker/metadata-action@v5
         with:
-          images: ${{ matrix.image }}
+          images: ${{ format('{0}/{1}', secrets.DOCKER_USERNAME, matrix.repository) }}
           tags: |
             type=raw,value=${{ steps.tag.outputs.value }},enable=${{ !startsWith(github.ref, 'refs/tags/') }}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long,prefix=sha-
 
       - name: Extract metadata (act fallback)
         id: meta_act
         if: ${{ env.ACT }}
         run: |
-          echo "tags=${{ matrix.image }}:${{ steps.tag.outputs.value }}" >> "$GITHUB_OUTPUT"
+          echo "tags=${{ secrets.DOCKER_USERNAME }}/${{ matrix.repository }}:${{ steps.tag.outputs.value }},${{ secrets.DOCKER_USERNAME }}/${{ matrix.repository }}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "labels=" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
@@ -268,58 +262,5 @@ jobs:
             api-dist=${{ github.workspace }}/api-dist
             codegen=${{ github.workspace }}/codegen
             web-dist=${{ github.workspace }}/web-dist
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:build-cache-${{ matrix.name }}
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:build-cache-${{ matrix.name }},mode=max,image-manifest=true
-
-  cleanup:
-    name: Delete branch images
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
-    steps:
-      - name: Delete branch container images
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          OWNER="${{ github.repository_owner }}"
-          REPO="${{ github.event.repository.name }}"
-          BRANCH_TAG="${{ github.head_ref }}"
-          BRANCH_TAG="${BRANCH_TAG//\//-}"
-
-          # Skip cleanup for fork PRs — head_ref from a fork can collide with
-          # long-lived tags (e.g. a fork branch named 'main' would delete the
-          # shared production image tag used for normal builds/releases).
-          if [[ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
-            echo "Skipping cleanup: PR is from a fork (head ref: ${BRANCH_TAG})"
-            exit 0
-          fi
-
-          # Guard against accidental deletion of protected long-lived tags in
-          # case a same-repo branch name ever collides with one.
-          PROTECTED_TAGS="main master latest"
-          for protected in $PROTECTED_TAGS; do
-            if [[ "${BRANCH_TAG}" == "${protected}" ]]; then
-              echo "Skipping cleanup: BRANCH_TAG '${BRANCH_TAG}' matches protected tag '${protected}'"
-              exit 0
-            fi
-          done
-
-          delete_tag() {
-            local pkg_raw="$1"
-            local pkg_enc
-            pkg_enc=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))" <<< "${pkg_raw}")
-
-            local ids
-            ids=$(gh api "/users/${OWNER}/packages/container/${pkg_enc}/versions" \
-              --jq ".[] | select((.metadata.container.tags // []) | index(\"${BRANCH_TAG}\") != null) | .id" 2>/dev/null || true)
-
-            for id in $ids; do
-              if gh api --method DELETE "/users/${OWNER}/packages/container/${pkg_enc}/versions/${id}"; then
-                echo "Deleted ${pkg_raw}:${BRANCH_TAG}"
-              fi
-            done
-          }
-
-          delete_tag "${REPO}"
-          delete_tag "${REPO}/web"
-          delete_tag "${REPO}/api"
-          delete_tag "${REPO}/cli"
+          cache-from: type=registry,ref=${{ format('{0}/{1}:build-cache', secrets.DOCKER_USERNAME, matrix.repository) }}
+          cache-to: type=registry,ref=${{ format('{0}/{1}:build-cache', secrets.DOCKER_USERNAME, matrix.repository) }},mode=max,image-manifest=true

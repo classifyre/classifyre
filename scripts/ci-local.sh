@@ -2,7 +2,7 @@
 # Run the CI workflow locally using act (https://github.com/nektos/act).
 #
 # Builds all Docker images (api, web, cli, all-in-one) and pushes them to
-# GHCR with the :main tag — same as what GitHub CI does on a push to main.
+# Docker Hub with the :main tag — same as what GitHub CI does on a push to main.
 #
 # Prerequisites:
 #   brew install act
@@ -19,6 +19,9 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
+source "${REPO_ROOT}/scripts/lib/load-secrets.sh"
+load_repo_secrets "${REPO_ROOT}"
+
 # ── Resolve GitHub token ──────────────────────────────────────────────────────
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
   if command -v gh >/dev/null 2>&1; then
@@ -32,32 +35,14 @@ if [[ -z "${GITHUB_TOKEN:-}" ]]; then
   exit 1
 fi
 
-# ── Resolve GHCR token (needs write:packages scope for docker push) ───────────
-# The gh OAuth token often lacks write:packages. Use GHCR_PAT env var if set,
-# otherwise fall back to GITHUB_TOKEN (works on real GitHub Actions where the
-# auto-provisioned token has packages:write, but may fail locally).
-GHCR_PAT="${GHCR_PAT:-${GITHUB_TOKEN}}"
+# ── Resolve Docker Hub credentials ────────────────────────────────────────────
+DOCKER_USERNAME="${DOCKER_USERNAME:-}"
+DOCKERHUB_TOKEN="${DOCKERHUB_TOKEN:-}"
 
-# ── Write ephemeral .secrets file ────────────────────────────────────────────
-SECRETS_FILE="${REPO_ROOT}/.secrets"
-cat > "${SECRETS_FILE}" <<EOF
-GITHUB_TOKEN=${GITHUB_TOKEN}
-GHCR_PAT=${GHCR_PAT}
-EOF
-
-# Note: KUBECONFIG is only needed for release.yml deploy-k3s job, not ci.yml.
-
-echo "Secrets written to ${SECRETS_FILE}"
-
-# Warn if GHCR_PAT looks like an OAuth token without write:packages
-if [[ "${GHCR_PAT}" == gho_* ]]; then
-  echo ""
-  echo "⚠️  GHCR_PAT is an OAuth token (gho_*). Docker pushes may fail with"
-  echo "   'permission_denied' if write:packages scope is missing."
-  echo "   Fix: create a classic PAT at https://github.com/settings/tokens/new"
-  echo "   with 'write:packages' scope, then:"
-  echo "     export GHCR_PAT=<pat> && ./scripts/ci-local.sh -j docker"
-  echo ""
+if [[ -z "${DOCKER_USERNAME}" || -z "${DOCKERHUB_TOKEN}" ]]; then
+  echo "Error: DOCKER_USERNAME and DOCKERHUB_TOKEN must be set." >&2
+  echo "Add them to ${REPO_ROOT}/.secrets or export them before running this script." >&2
+  exit 1
 fi
 
 # ── Ensure artifact scratch directory exists ──────────────────────────────────
@@ -69,6 +54,12 @@ mkdir -p /tmp/act-artifacts
 # the docker jobs' `if: github.event_name != 'workflow_call'` check to skip them.
 EVENT_FILE="/tmp/act-event-dispatch.json"
 echo '{"inputs":{}}' > "${EVENT_FILE}"
+
+ACT_SECRET_ARGS=(
+  -s "GITHUB_TOKEN=${GITHUB_TOKEN}"
+  -s "DOCKER_USERNAME=${DOCKER_USERNAME}"
+  -s "DOCKERHUB_TOKEN=${DOCKERHUB_TOKEN}"
+)
 
 run_act() {
   local label="$1"
@@ -87,6 +78,7 @@ run_act() {
     -e "${EVENT_FILE}" \
     --artifact-server-path /tmp/act-artifacts \
     --env DOCKER_PLATFORMS=linux/amd64 \
+    "${ACT_SECRET_ARGS[@]}" \
     "$@" 2>&1 | tee "${act_log}"
   local act_exit=${PIPESTATUS[0]}
   set -e

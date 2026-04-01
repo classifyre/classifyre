@@ -4,9 +4,9 @@ This guide covers production deployment of Classifyre on Kubernetes with the Hel
 
 Published images:
 
-- API: `ghcr.io/classifyre/unstructured/api`
-- Web: `ghcr.io/classifyre/unstructured/web`
-- CLI jobs: `ghcr.io/classifyre/unstructured/cli`
+- API: `classifyre/api`
+- Web: `classifyre/web`
+- CLI jobs: `classifyre/cli`
 
 ## Deployment Model
 
@@ -67,7 +67,7 @@ rbac:
 
 api:
   image:
-    repository: ghcr.io/classifyre/unstructured/api
+    repository: classifyre/api
     tag: "<immutable-tag>"
     pullPolicy: IfNotPresent
   maskedConfigEncryption:
@@ -92,7 +92,7 @@ api:
   cliJobs:
     enabled: true
     image:
-      repository: ghcr.io/classifyre/unstructured/cli
+      repository: classifyre/cli
       tag: "<immutable-tag>"
       pullPolicy: IfNotPresent
     cleanupPolicy: always
@@ -114,7 +114,7 @@ api:
 
 frontend:
   image:
-    repository: ghcr.io/classifyre/unstructured/web
+    repository: classifyre/web
     tag: "<immutable-tag>"
     pullPolicy: IfNotPresent
   env:

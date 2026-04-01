@@ -9,7 +9,7 @@ Usage:
   scripts/build-multiarch-image.sh --image <name> --tag <tag> [options]
 
 Required:
-  --image <name>           Image name, e.g. ghcr.io/acme/classifyre-all-in-one
+  --image <name>           Image name, e.g. classifyre/all-in-one
   --tag <tag>              Image tag, e.g. v1.2.3
 
 Options:
@@ -24,12 +24,12 @@ Options:
 
 Examples:
   scripts/build-multiarch-image.sh \
-    --image ghcr.io/acme/classifyre-all-in-one \
+    --image classifyre/all-in-one \
     --tag v1.0.0 \
     --push
 
   scripts/build-multiarch-image.sh \
-    --image classifyre-all-in-one \
+    --image classifyre/all-in-one \
     --tag dev \
     --platforms linux/arm64 \
     --load
@@ -160,4 +160,3 @@ echo "Building ${IMAGE}:${TAG}"
 echo "Platforms: ${PLATFORMS}"
 echo "Mode: ${MODE}"
 docker buildx build "${BUILD_ARGS[@]}" "${CONTEXT_PATH}"
-

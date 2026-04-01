@@ -15,7 +15,7 @@ Usage via env vars:
   IMAGE=<registry/image> TAG=<tag> [PLATFORMS=linux/amd64,linux/arm64] [MODE=push|load] [LATEST=1]
 
 Example:
-  IMAGE=ghcr.io/acme/classifyre-all-in-one TAG=v1.0.0 MODE=push bash scripts/docker-build-multiarch.sh
+  IMAGE=classifyre/all-in-one TAG=v1.0.0 MODE=push bash scripts/docker-build-multiarch.sh
 EOF
   exit 1
 fi

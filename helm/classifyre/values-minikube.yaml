@@ -4,7 +4,7 @@ api:
     enabled: false
 
   image:
-    repository: classifyre-all-in-one
+    repository: classifyre/all-in-one
     tag: dev
     pullPolicy: IfNotPresent
 
@@ -21,7 +21,7 @@ api:
   cliJobs:
     enabled: true
     image:
-      repository: classifyre-all-in-one
+      repository: classifyre/all-in-one
       tag: dev
       pullPolicy: IfNotPresent
     workDir: /app/apps/cli
@@ -48,7 +48,7 @@ frontend:
     enabled: false
 
   image:
-    repository: classifyre-all-in-one
+    repository: classifyre/all-in-one
     tag: dev
     pullPolicy: IfNotPresent
 

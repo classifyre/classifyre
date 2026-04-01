@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-IMAGE_TAG="${IMAGE_TAG:-classifyre-all-in-one:local}"
+IMAGE_TAG="${IMAGE_TAG:-classifyre/all-in-one:local}"
 DOCKERFILE_PATH="${DOCKERFILE_PATH:-${REPO_ROOT}/Dockerfile}"
 CONTEXT_PATH="${CONTEXT_PATH:-${REPO_ROOT}}"
 WEB_API_URL="${WEB_API_URL:-http://127.0.0.1:8000}"

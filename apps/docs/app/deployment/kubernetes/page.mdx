@@ -31,25 +31,24 @@ The official Classifyre Helm chart deploys the API, web UI, database migrations,
 
 ## Images
 
-All images are published to GHCR alongside each release.
+Release images are published to Docker Hub, while the Helm chart remains in GHCR.
 
 | Component | Image |
 |---|---|
-| API (NestJS backend) | `ghcr.io/classifyre/unstructured/api` |
-| Web (Next.js frontend) | `ghcr.io/classifyre/unstructured/web` |
-| CLI (Python scan worker) | `ghcr.io/classifyre/unstructured/cli` |
+| API (NestJS backend) | `classifyre/api` |
+| Web (Next.js frontend) | `classifyre/web` |
+| CLI (Python scan worker) | `classifyre/cli` |
 
 ### Available tags
 
-Every GitHub release publishes the following tags simultaneously:
+Every full release publishes the version tag and `latest`. CI also publishes mutable branch tags and immutable commit tags.
 
 | Tag | Example | Meaning | Recommended for |
 |---|---|---|---|
 | `{major}.{minor}.{patch}` | `0.1.2` | Exact release | **Production** |
-| `{major}.{minor}` | `0.1` | Latest patch in 0.1.x | Opt-in to patches |
-| `{major}` | `0` | Latest minor in 0.x | Not recommended |
 | `latest` | - | Latest stable release | Demos / quick evals |
 | `main` | - | Latest commit on `main` | CI / development |
+| `sha-<commit>` | `sha-0123abcd...` | Immutable CI build | Debugging / rollback |
 
 All images are multi-arch: `linux/amd64` + `linux/arm64`.
 
@@ -57,7 +56,7 @@ When you install the chart at a specific version and leave image tags empty, the
 
 ```bash
 # Pull a specific version
-docker pull ghcr.io/classifyre/unstructured/api:0.1.8
+docker pull classifyre/api:0.1.8
 ```
 
 ---

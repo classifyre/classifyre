@@ -26,16 +26,16 @@ The Classifyre all-in-one Docker image bundles everything into a single containe
 ## The image
 
 ```
-ghcr.io/classifyre/unstructured
+classifyre/all-in-one
 ```
 
 Available for `linux/amd64` and `linux/arm64`. Tags follow the same scheme as the Kubernetes images — pin to a release version for reproducible demos.
 
 ```bash
-docker pull ghcr.io/classifyre/unstructured:latest
+docker pull classifyre/all-in-one:latest
 
 # Pin to a specific release (recommended)
-docker pull ghcr.io/classifyre/unstructured:0.1.8
+docker pull classifyre/all-in-one:0.1.8
 ```
 
 ---
@@ -70,7 +70,7 @@ Prisma migrations run automatically every time the container starts. You never n
 ```bash
 docker run --rm \
   -p 3000:3000 \
-  ghcr.io/classifyre/unstructured:latest
+  classifyre/all-in-one:latest
 ```
 
 Open **http://localhost:3000** in your browser.
@@ -87,7 +87,7 @@ The API health endpoint is at **http://localhost:3000/api/ping**.
 docker run --rm \
   -p 3000:3000 \
   -v classifyre-data:/data \
-  ghcr.io/classifyre/unstructured:latest
+  classifyre/all-in-one:latest
 ```
 
 With `-v classifyre-data:/data` the database and all application state survive container restarts and image upgrades.
@@ -132,7 +132,7 @@ For demos that survive machine reboots, Docker Compose is simpler than bare `doc
 ```yaml filename="docker-compose.yml"
 services:
   classifyre:
-    image: ghcr.io/classifyre/unstructured:latest
+    image: classifyre/all-in-one:latest
     ports:
       - "3000:3000"
     volumes:
@@ -177,7 +177,7 @@ docker run \
   -p 3000:3000 \
   -v classifyre-data:/data \
   -e LOG_LEVEL=debug \
-  ghcr.io/classifyre/unstructured:latest
+  classifyre/all-in-one:latest
 ```
 
 ---
@@ -199,7 +199,7 @@ Playwright (browser-based crawling) is bundled in the image. Connectors that use
 Pull the new image, stop the existing container, start again pointing at the same volume. Migrations run automatically.
 
 ```bash
-docker pull ghcr.io/classifyre/unstructured:latest
+docker pull classifyre/all-in-one:latest
 
 docker compose down
 docker compose up -d

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IMAGE_TAG="${IMAGE_TAG:-classifyre-all-in-one:local}"
+IMAGE_TAG="${IMAGE_TAG:-classifyre/all-in-one:local}"
 PORT="${PORT:-3300}"
 CONTAINER_NAME="${CONTAINER_NAME:-classifyre-allinone-smoke}"
 BUILD_IMAGE="${BUILD_IMAGE:-1}"

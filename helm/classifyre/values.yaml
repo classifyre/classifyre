@@ -31,7 +31,7 @@ api:
 
   image:
     # -- API container image repository.
-    repository: ghcr.io/classifyre/unstructured/api
+    repository: classifyre/api
     # -- API container image tag. Defaults to the chart appVersion when empty.
     tag: ""
     # -- API image pull policy.
@@ -227,7 +227,7 @@ api:
 
     image:
       # -- CLI job image repository.
-      repository: ghcr.io/classifyre/unstructured/cli
+      repository: classifyre/cli
       # -- CLI job image tag. Defaults to the chart appVersion when empty.
       tag: ""
       # -- CLI job image pull policy.
@@ -344,7 +344,7 @@ frontend:
 
   image:
     # -- Web container image repository.
-    repository: ghcr.io/classifyre/unstructured/web
+    repository: classifyre/web
     # -- Web container image tag. Defaults to the chart appVersion when empty.
     tag: ""
     # -- Web image pull policy.

@@ -19,7 +19,7 @@ REBUILD_IMAGE=1 bash ./helm/test-minikube.sh
 
 `test-minikube.sh`:
 
-- builds/uses local `classifyre-all-in-one:k8s-dev` image,
+- builds/uses local `classifyre/all-in-one:k8s-dev` image,
 - installs chart with `values-minikube.yaml`,
 - validates `GET /` and `GET /api/ping` through web service.
 
@@ -35,7 +35,7 @@ minikube start
 
 ```bash
 cd /unstructured
-minikube image build -t classifyre-all-in-one:k8s-dev -f ./Dockerfile --build-opt build-arg=WEB_API_URL=http://classifyre-api:8000 .
+minikube image build -t classifyre/all-in-one:k8s-dev -f ./Dockerfile --build-opt build-arg=WEB_API_URL=http://classifyre-api:8000 .
 ```
 
 3. Install chart with local values:
@@ -43,11 +43,11 @@ minikube image build -t classifyre-all-in-one:k8s-dev -f ./Dockerfile --build-op
 ```bash
 cd /unstructured
 helm upgrade --install classifyre ./helm/classifyre -n classifyre-dev --create-namespace -f ./helm/classifyre/values-minikube.yaml \
-  --set api.image.repository=classifyre-all-in-one \
+  --set api.image.repository=classifyre/all-in-one \
   --set api.image.tag=k8s-dev \
-  --set frontend.image.repository=classifyre-all-in-one \
+  --set frontend.image.repository=classifyre/all-in-one \
   --set frontend.image.tag=k8s-dev \
-  --set api.cliJobs.image.repository=classifyre-all-in-one \
+  --set api.cliJobs.image.repository=classifyre/all-in-one \
   --set api.cliJobs.image.tag=k8s-dev
 ```
 
@@ -67,7 +67,7 @@ kubectl -n classifyre-dev get jobs -w
 
 ## Separate API/Web/CLI Images via Local Registry
 
-Use this flow when validating split images (for example `ghcr.io/classifyre/unstructured/{api,web,cli}:main`).
+Use this flow when validating split images (for example `classifyre/{api,web,cli}:main`).
 
 1. Start Minikube:
 
@@ -92,17 +92,17 @@ docker run --privileged --rm tonistiigi/binfmt --install amd64
 4. Pull and mirror split images into local registry:
 
 ```bash
-docker pull --platform linux/amd64 ghcr.io/classifyre/unstructured/api:main
-docker pull --platform linux/amd64 ghcr.io/classifyre/unstructured/web:main
-docker pull --platform linux/amd64 ghcr.io/classifyre/unstructured/cli:main
+docker pull --platform linux/amd64 classifyre/api:main
+docker pull --platform linux/amd64 classifyre/web:main
+docker pull --platform linux/amd64 classifyre/cli:main
 
-docker tag ghcr.io/classifyre/unstructured/api:main localhost:5000/unstructured/api:main
-docker tag ghcr.io/classifyre/unstructured/web:main localhost:5000/unstructured/web:main
-docker tag ghcr.io/classifyre/unstructured/cli:main localhost:5000/unstructured/cli:main
+docker tag classifyre/api:main localhost:5000/classifyre/api:main
+docker tag classifyre/web:main localhost:5000/classifyre/web:main
+docker tag classifyre/cli:main localhost:5000/classifyre/cli:main
 
-docker push localhost:5000/unstructured/api:main
-docker push localhost:5000/unstructured/web:main
-docker push localhost:5000/unstructured/cli:main
+docker push localhost:5000/classifyre/api:main
+docker push localhost:5000/classifyre/web:main
+docker push localhost:5000/classifyre/cli:main
 ```
 
 5. Deploy with split-image Minikube values:

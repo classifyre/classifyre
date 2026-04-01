@@ -10,6 +10,7 @@ on:
 
 permissions:
   actions: write
+  checks: read
   contents: write
   packages: write
 
@@ -69,8 +70,22 @@ jobs:
         with:
           node-version: 24
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
       - name: Bump package versions
         run: node scripts/set-release-version.mjs "${{ steps.version.outputs.version }}"
+
+      - name: Refresh uv lockfiles
+        run: |
+          set -euo pipefail
+          cd apps/cli && uv lock
+          cd ../../packages/schemas && uv lock
 
       - name: Commit and tag release
         id: commit
@@ -91,10 +106,12 @@ jobs:
             apps/web/package.json \
             apps/cli/package.json \
             apps/cli/pyproject.toml \
+            apps/cli/uv.lock \
             packages/api-client/package.json \
             packages/devops/package.json \
             packages/schemas/package.json \
             packages/schemas/pyproject.toml \
+            packages/schemas/uv.lock \
             helm/classifyre/Chart.yaml; then
             echo "::error::Release version ${VERSION} is already applied"
             exit 1
@@ -108,10 +125,12 @@ jobs:
             apps/web/package.json \
             apps/cli/package.json \
             apps/cli/pyproject.toml \
+            apps/cli/uv.lock \
             packages/api-client/package.json \
             packages/devops/package.json \
             packages/schemas/package.json \
             packages/schemas/pyproject.toml \
+            packages/schemas/uv.lock \
             helm/classifyre/Chart.yaml \
             scripts/set-release-version.mjs
 
@@ -194,38 +213,31 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Retag main images for release
         env:
-          REPO: ghcr.io/${{ github.repository }}
+          DOCKER_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
           VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
           set -euo pipefail
-
-          major="${VERSION%%.*}"
-          remainder="${VERSION#${major}.}"
-          minor="${remainder%%.*}"
 
           retag() {
             local image="$1"
             docker buildx imagetools create \
               --tag "${image}:${VERSION}" \
-              --tag "${image}:${major}.${minor}" \
-              --tag "${image}:${major}" \
               --tag "${image}:latest" \
               "${image}:main"
           }
 
-          retag "${REPO}"
-          retag "${REPO}/web"
-          retag "${REPO}/api"
-          retag "${REPO}/cli"
+          retag "${DOCKER_NAMESPACE}/all-in-one"
+          retag "${DOCKER_NAMESPACE}/web"
+          retag "${DOCKER_NAMESPACE}/api"
+          retag "${DOCKER_NAMESPACE}/cli"
 
   publish-helm-chart:
     name: Publish Helm chart to GHCR

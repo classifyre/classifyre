@@ -41,7 +41,7 @@ git push origin main --tags
 The `release` workflow triggers on the pushed tag and:
 
 1. Builds Docker images (`api`, `web`, `cli`, all-in-one) tagged as `main`
-2. Retags images to `0.2.0`, `0.2`, `0`, and `latest`
+2. Retags images to `0.2.0` and `latest`
 3. Lints and packages the Helm chart
 4. Pushes the chart to `oci://ghcr.io/classifyre/unstructured/charts/classifyre:0.2.0`
 5. Creates the GitHub Release with auto-generated notes
