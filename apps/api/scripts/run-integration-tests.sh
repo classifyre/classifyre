@@ -16,9 +16,13 @@ load_env_file() {
 
 cd "${APP_DIR}"
 
-load_env_file "${APP_DIR}/.env"
-load_env_file "${APP_DIR}/.env.test"
-load_env_file "${APP_DIR}/.env.test.local"
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  load_env_file "${APP_DIR}/.env"
+  load_env_file "${APP_DIR}/.env.test"
+  load_env_file "${APP_DIR}/.env.test.local"
+else
+  echo "Using DATABASE_URL from environment."
+fi
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
   echo "DATABASE_URL must be set for integration tests." >&2
