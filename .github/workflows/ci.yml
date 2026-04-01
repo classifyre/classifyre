@@ -103,6 +103,13 @@ jobs:
       - name: Unit tests
         run: bun run test
 
+      - name: API integration tests
+        if: ${{ secrets.INTEGRATION_DATABASE_URL != '' }}
+        env:
+          DATABASE_URL: ${{ secrets.INTEGRATION_DATABASE_URL }}
+          INTEGRATION_TEST_RESET_DB: "1"
+        run: cd apps/api && bun run test:integration:run
+
       - name: Stage CI artifacts
         if: github.event_name != 'workflow_call' && github.event.action != 'closed'
         run: |

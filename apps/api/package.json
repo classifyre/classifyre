@@ -18,6 +18,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:e2e:remote": "TEST_API_URL=${TEST_API_URL:-http://localhost:8000/} jest --config ./test/jest-e2e.remote.json",
     "test:integration": "jest --config ./test/jest-e2e.json test/source.e2e-spec.ts",
+    "test:integration:run": "bash ./scripts/run-integration-tests.sh",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
