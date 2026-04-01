@@ -2,6 +2,16 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      release_type:
+        description: Release version increment
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   actions: read
@@ -78,17 +88,35 @@ jobs:
 
       - name: Resolve release versions
         id: versions
+        env:
+          RELEASE_TYPE: ${{ inputs.release_type }}
         run: |
           set -euo pipefail
 
-          version="$(node -p "require('./package.json').version")"
-          if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          current_version="$(node -p "require('./package.json').version")"
+          if ! [[ "${current_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::package.json version must be major.minor.patch"
             exit 1
           fi
 
+          if ! [[ "${RELEASE_TYPE}" =~ ^(patch|minor|major)$ ]]; then
+            echo "::error::release_type must be one of: patch, minor, major"
+            exit 1
+          fi
+
+          version="$(
+            node -e "
+              const type = process.env.RELEASE_TYPE;
+              const [major, minor, patch] = require('./package.json').version.split('.').map(Number);
+              const next =
+                type === 'major' ? [major + 1, 0, 0] :
+                type === 'minor' ? [major, minor + 1, 0] :
+                [major, minor, patch + 1];
+              process.stdout.write(next.join('.'));
+            "
+          )"
           tag="v${version}"
-          next_version="$(node -e "const [major, minor, patch] = require('./package.json').version.split('.').map(Number); process.stdout.write([major, minor, patch + 1].join('.'))")"
+          next_version="$(VERSION="${version}" node -e "const [major, minor, patch] = process.env.VERSION.split('.').map(Number); process.stdout.write([major, minor, patch + 1].join('.'))")"
 
           if git rev-parse "${tag}" >/dev/null 2>&1; then
             echo "::error::Tag ${tag} already exists locally"
@@ -107,6 +135,46 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Apply release version
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          set -euo pipefail
+          node scripts/set-release-version.mjs "${VERSION}"
+          (cd apps/cli && uv lock)
+          (cd packages/schemas && uv lock)
+
+      - name: Commit release version
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          set -euo pipefail
+          git add \
+            package.json \
+            apps/api/package.json \
+            apps/blog/package.json \
+            apps/docs/package.json \
+            apps/web/package.json \
+            apps/cli/package.json \
+            apps/cli/pyproject.toml \
+            apps/cli/uv.lock \
+            packages/api-client/package.json \
+            packages/devops/package.json \
+            packages/schemas/package.json \
+            packages/schemas/pyproject.toml \
+            packages/schemas/uv.lock \
+            helm/classifyre/Chart.yaml
+
+          git commit -m "chore(release): v${VERSION}"
 
       - name: Create local release tag
         run: git tag "${{ steps.versions.outputs.tag }}"
@@ -156,14 +224,6 @@ jobs:
           helm lint helm/classifyre
           helm package helm/classifyre
           helm push "classifyre-${VERSION}.tgz" "oci://ghcr.io/${REPO}/charts"
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
 
       - name: Publish classifyre-schemas to PyPI
         if: env.PYPI_TOKEN != ''
