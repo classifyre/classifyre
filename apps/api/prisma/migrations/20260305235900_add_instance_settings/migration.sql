@@ -1,6 +1,12 @@
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'InstanceLanguage') THEN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'InstanceLanguage'
+      AND n.nspname = current_schema()
+  ) THEN
     CREATE TYPE "InstanceLanguage" AS ENUM ('ENGLISH');
   END IF;
 END
@@ -8,7 +14,13 @@ $$;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'InstanceTimeFormat') THEN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'InstanceTimeFormat'
+      AND n.nspname = current_schema()
+  ) THEN
     CREATE TYPE "InstanceTimeFormat" AS ENUM ('TWELVE_HOUR', 'TWENTY_FOUR_HOUR');
   END IF;
 END

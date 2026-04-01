@@ -109,6 +109,7 @@ jobs:
         env:
           DATABASE_URL: ${{ env.INTEGRATION_DATABASE_URL }}
           INTEGRATION_TEST_RESET_DB: "1"
+          INTEGRATION_TEST_SCHEMA_KEY: ${{ github.head_ref || github.ref_name }}
         run: cd apps/api && bun run test:integration:run
 
       - name: Stage CI artifacts
@@ -248,13 +249,12 @@ jobs:
           images: ${{ format('{0}/{1}', secrets.DOCKER_USERNAME, matrix.repository) }}
           tags: |
             type=raw,value=${{ steps.tag.outputs.value }},enable=${{ !startsWith(github.ref, 'refs/tags/') }}
-            type=sha,format=long,prefix=sha-
 
       - name: Extract metadata (act fallback)
         id: meta_act
         if: ${{ env.ACT }}
         run: |
-          echo "tags=${{ secrets.DOCKER_USERNAME }}/${{ matrix.repository }}:${{ steps.tag.outputs.value }},${{ secrets.DOCKER_USERNAME }}/${{ matrix.repository }}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "tags=${{ secrets.DOCKER_USERNAME }}/${{ matrix.repository }}:${{ steps.tag.outputs.value }}" >> "$GITHUB_OUTPUT"
           echo "labels=" >> "$GITHUB_OUTPUT"
 
       - name: Build and push

@@ -2,7 +2,13 @@ ALTER TYPE "DetectorType" ADD VALUE IF NOT EXISTS 'CUSTOM';
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'CustomDetectorMethod') THEN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'CustomDetectorMethod'
+      AND n.nspname = current_schema()
+  ) THEN
     CREATE TYPE "CustomDetectorMethod" AS ENUM ('RULESET', 'CLASSIFIER', 'ENTITY');
   END IF;
 END
@@ -10,7 +16,13 @@ $$;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'CustomDetectorTrainingStatus') THEN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'CustomDetectorTrainingStatus'
+      AND n.nspname = current_schema()
+  ) THEN
     CREATE TYPE "CustomDetectorTrainingStatus" AS ENUM ('PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED');
   END IF;
 END
