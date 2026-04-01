@@ -18,6 +18,7 @@ concurrency:
 
 env:
   DOCKER_PLATFORMS: linux/amd64,linux/arm64
+  INTEGRATION_DATABASE_URL: ${{ secrets.INTEGRATION_DATABASE_URL || vars.INTEGRATION_DATABASE_URL || '' }}
 
 jobs:
   validate:
@@ -104,9 +105,9 @@ jobs:
         run: bun run test
 
       - name: API integration tests
-        if: ${{ secrets.INTEGRATION_DATABASE_URL != '' }}
+        if: env.INTEGRATION_DATABASE_URL != ''
         env:
-          DATABASE_URL: ${{ secrets.INTEGRATION_DATABASE_URL }}
+          DATABASE_URL: ${{ env.INTEGRATION_DATABASE_URL }}
           INTEGRATION_TEST_RESET_DB: "1"
         run: cd apps/api && bun run test:integration:run
 
