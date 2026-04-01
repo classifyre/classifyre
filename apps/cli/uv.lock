@@ -571,6 +571,306 @@ wheels = [
 ]
 
 [[package]]
+name = "classifyre-cli"
+version = "0.2.25"
+source = { editable = "." }
+dependencies = [
+    { name = "beautifulsoup4" },
+    { name = "classifyre-schemas" },
+    { name = "crawl4ai" },
+    { name = "email-validator" },
+    { name = "en-core-web-sm" },
+    { name = "jsonschema" },
+    { name = "lxml" },
+    { name = "pydantic" },
+    { name = "requests" },
+]
+
+[package.dev-dependencies]
+azure-blob-storage = [
+    { name = "azure-identity" },
+    { name = "azure-storage-blob" },
+]
+classification = [
+    { name = "fast-langdetect" },
+    { name = "transformers" },
+]
+content = [
+    { name = "detoxify" },
+    { name = "nudenet" },
+    { name = "onnxruntime" },
+    { name = "pillow" },
+    { name = "sentencepiece" },
+    { name = "torch" },
+    { name = "transformers" },
+]
+custom = [
+    { name = "datasets" },
+    { name = "gliner" },
+    { name = "scikit-learn" },
+    { name = "sentence-transformers" },
+    { name = "setfit" },
+    { name = "torch" },
+    { name = "transformers" },
+]
+databricks = [
+    { name = "databricks-sql-connector" },
+]
+detectors = [
+    { name = "bandit" },
+    { name = "commonregex" },
+    { name = "datasets" },
+    { name = "datasketch" },
+    { name = "de-core-news-lg" },
+    { name = "detect-secrets" },
+    { name = "detoxify" },
+    { name = "fast-langdetect" },
+    { name = "gliner" },
+    { name = "nudenet" },
+    { name = "onnxruntime" },
+    { name = "optimum", extra = ["onnxruntime"] },
+    { name = "phonenumbers" },
+    { name = "pillow" },
+    { name = "presidio-analyzer" },
+    { name = "presidio-anonymizer" },
+    { name = "pycanon" },
+    { name = "pytesseract" },
+    { name = "scikit-learn" },
+    { name = "scrubadub" },
+    { name = "sentence-transformers" },
+    { name = "sentencepiece" },
+    { name = "setfit" },
+    { name = "spacy" },
+    { name = "textstat" },
+    { name = "torch" },
+    { name = "transformers" },
+    { name = "yara-python" },
+]
+dev = [
+    { name = "datamodel-code-generator" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+]
+file-processing = [
+    { name = "chardet" },
+    { name = "filetype" },
+    { name = "openpyxl" },
+    { name = "pdfplumber" },
+    { name = "pyarrow" },
+    { name = "python-docx" },
+]
+google-cloud-storage = [
+    { name = "google-cloud-storage" },
+]
+hive = [
+    { name = "pure-sasl" },
+    { name = "pyhive" },
+    { name = "thrift" },
+    { name = "thrift-sasl" },
+]
+mongodb = [
+    { name = "pymongo" },
+]
+mssql = [
+    { name = "pymssql" },
+]
+mysql = [
+    { name = "pymysql" },
+]
+oracle = [
+    { name = "oracledb" },
+]
+postgresql = [
+    { name = "psycopg2-binary" },
+]
+privacy = [
+    { name = "commonregex" },
+    { name = "de-core-news-lg" },
+    { name = "phonenumbers" },
+    { name = "pillow" },
+    { name = "presidio-analyzer" },
+    { name = "presidio-anonymizer" },
+    { name = "pycanon" },
+    { name = "pytesseract" },
+    { name = "scrubadub" },
+    { name = "spacy" },
+]
+quality = [
+    { name = "datasketch" },
+    { name = "fast-langdetect" },
+    { name = "sentence-transformers" },
+    { name = "sentencepiece" },
+    { name = "textstat" },
+    { name = "torch" },
+    { name = "transformers" },
+]
+s3-compatible-storage = [
+    { name = "boto3" },
+]
+security = [
+    { name = "bandit" },
+    { name = "detect-secrets" },
+    { name = "onnxruntime" },
+    { name = "optimum", extra = ["onnxruntime"] },
+    { name = "sentencepiece" },
+    { name = "torch" },
+    { name = "transformers" },
+    { name = "yara-python" },
+]
+snowflake = [
+    { name = "snowflake-connector-python" },
+]
+tableau = [
+    { name = "tableauserverclient" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "beautifulsoup4", specifier = ">=4.12.0" },
+    { name = "classifyre-schemas", editable = "../../packages/schemas" },
+    { name = "crawl4ai", specifier = ">=0.8.0" },
+    { name = "email-validator", specifier = ">=2.3.0" },
+    { name = "en-core-web-sm", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" },
+    { name = "jsonschema", specifier = ">=4.26.0" },
+    { name = "lxml", specifier = ">=5.0.0" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "requests", specifier = ">=2.32.3" },
+]
+
+[package.metadata.requires-dev]
+azure-blob-storage = [
+    { name = "azure-identity", specifier = ">=1.25.1,<2.0.0" },
+    { name = "azure-storage-blob", specifier = ">=12.26.0,<13.0.0" },
+]
+classification = [
+    { name = "fast-langdetect", specifier = ">=1.0.0" },
+    { name = "transformers", specifier = ">=4.50.0,<6.0.0" },
+]
+content = [
+    { name = "detoxify", specifier = ">=0.5.2" },
+    { name = "nudenet", specifier = ">=3.4.2" },
+    { name = "onnxruntime", specifier = ">=1.24.2" },
+    { name = "pillow", specifier = ">=12.1.1" },
+    { name = "sentencepiece", specifier = ">=0.2.1" },
+    { name = "torch", specifier = ">=2.10.0" },
+    { name = "transformers", specifier = ">=4.50.0,<6.0.0" },
+]
+custom = [
+    { name = "datasets", specifier = ">=4.4.1" },
+    { name = "gliner", specifier = ">=0.2.22" },
+    { name = "scikit-learn", specifier = ">=1.7.2" },
+    { name = "sentence-transformers", specifier = ">=5.2.3" },
+    { name = "setfit", specifier = ">=1.1.3" },
+    { name = "torch", specifier = ">=2.10.0" },
+    { name = "transformers", specifier = ">=4.50.0,<6.0.0" },
+]
+databricks = [{ name = "databricks-sql-connector", specifier = ">=4.0.0,<5.0.0" }]
+detectors = [
+    { name = "bandit", specifier = ">=1.9.4" },
+    { name = "commonregex", specifier = ">=1.5.4" },
+    { name = "datasets", specifier = ">=4.4.1" },
+    { name = "datasketch", specifier = ">=1.9.0" },
+    { name = "de-core-news-lg", url = "https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl" },
+    { name = "detect-secrets", specifier = ">=1.5.0" },
+    { name = "detoxify", specifier = ">=0.5.2" },
+    { name = "fast-langdetect", specifier = ">=1.0.0" },
+    { name = "gliner", specifier = ">=0.2.22" },
+    { name = "nudenet", specifier = ">=3.4.2" },
+    { name = "onnxruntime", specifier = ">=1.24.2" },
+    { name = "optimum", extras = ["onnxruntime"], specifier = ">=2.1.0" },
+    { name = "phonenumbers", specifier = ">=9.0.25" },
+    { name = "pillow", specifier = ">=12.1.1" },
+    { name = "presidio-analyzer", specifier = ">=2.2.361" },
+    { name = "presidio-anonymizer", specifier = ">=2.2.361" },
+    { name = "pycanon", specifier = ">=1.1.0" },
+    { name = "pytesseract", specifier = ">=0.3.13" },
+    { name = "scikit-learn", specifier = ">=1.7.2" },
+    { name = "scrubadub", specifier = ">=2.0.1" },
+    { name = "sentence-transformers", specifier = ">=5.2.3" },
+    { name = "sentencepiece", specifier = ">=0.2.1" },
+    { name = "setfit", specifier = ">=1.1.3" },
+    { name = "spacy", specifier = ">=3.8.11" },
+    { name = "textstat", specifier = ">=0.7.13" },
+    { name = "torch", specifier = ">=2.10.0" },
+    { name = "transformers", specifier = ">=4.50.0,<6.0.0" },
+    { name = "yara-python", specifier = ">=4.5.4" },
+]
+dev = [
+    { name = "datamodel-code-generator", specifier = ">=0.45.0" },
+    { name = "mypy", specifier = ">=1.13.0" },
+    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-asyncio", specifier = ">=0.24.0" },
+    { name = "ruff", specifier = ">=0.8.0" },
+]
+file-processing = [
+    { name = "chardet", specifier = ">=5.2.0" },
+    { name = "filetype", specifier = ">=1.2.0" },
+    { name = "openpyxl", specifier = ">=3.1.5" },
+    { name = "pdfplumber", specifier = ">=0.11.9" },
+    { name = "pyarrow", specifier = ">=18.0.0" },
+    { name = "python-docx", specifier = ">=1.2.0" },
+]
+google-cloud-storage = [{ name = "google-cloud-storage", specifier = ">=3.4.0,<4.0.0" }]
+hive = [
+    { name = "pure-sasl", specifier = ">=0.6.2,<1.0.0" },
+    { name = "pyhive", specifier = ">=0.7.0,<1.0.0" },
+    { name = "thrift", specifier = ">=0.16.0,<1.0.0" },
+    { name = "thrift-sasl", specifier = ">=0.4.3,<1.0.0" },
+]
+mongodb = [{ name = "pymongo", specifier = ">=4.15.2,<5.0.0" }]
+mssql = [{ name = "pymssql", specifier = ">=2.3.4,<3.0.0" }]
+mysql = [{ name = "pymysql", specifier = ">=1.1.1,<2.0.0" }]
+oracle = [{ name = "oracledb", specifier = ">=2.5.1,<3.0.0" }]
+postgresql = [{ name = "psycopg2-binary", specifier = ">=2.9.9,<3.0.0" }]
+privacy = [
+    { name = "commonregex", specifier = ">=1.5.4" },
+    { name = "de-core-news-lg", url = "https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl" },
+    { name = "phonenumbers", specifier = ">=9.0.25" },
+    { name = "pillow", specifier = ">=12.1.1" },
+    { name = "presidio-analyzer", specifier = ">=2.2.361" },
+    { name = "presidio-anonymizer", specifier = ">=2.2.361" },
+    { name = "pycanon", specifier = ">=1.1.0" },
+    { name = "pytesseract", specifier = ">=0.3.13" },
+    { name = "scrubadub", specifier = ">=2.0.1" },
+    { name = "spacy", specifier = ">=3.8.11" },
+]
+quality = [
+    { name = "datasketch", specifier = ">=1.9.0" },
+    { name = "fast-langdetect", specifier = ">=1.0.0" },
+    { name = "sentence-transformers", specifier = ">=5.2.3" },
+    { name = "sentencepiece", specifier = ">=0.2.1" },
+    { name = "textstat", specifier = ">=0.7.13" },
+    { name = "torch", specifier = ">=2.10.0" },
+    { name = "transformers", specifier = ">=4.50.0,<6.0.0" },
+]
+s3-compatible-storage = [{ name = "boto3", specifier = ">=1.40.40,<2.0.0" }]
+security = [
+    { name = "bandit", specifier = ">=1.9.4" },
+    { name = "detect-secrets", specifier = ">=1.5.0" },
+    { name = "onnxruntime", specifier = ">=1.24.2" },
+    { name = "optimum", extras = ["onnxruntime"], specifier = ">=2.1.0" },
+    { name = "sentencepiece", specifier = ">=0.2.1" },
+    { name = "torch", specifier = ">=2.10.0" },
+    { name = "transformers", specifier = ">=4.50.0,<6.0.0" },
+    { name = "yara-python", specifier = ">=4.5.4" },
+]
+snowflake = [{ name = "snowflake-connector-python", specifier = ">=4.0.0,<5.0.0" }]
+tableau = [{ name = "tableauserverclient", specifier = ">=0.38,<1.0.0" }]
+
+[[package]]
+name = "classifyre-schemas"
+version = "0.2.25"
+source = { editable = "../../packages/schemas" }
+dependencies = [
+    { name = "fastjsonschema" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "fastjsonschema", specifier = "==2.21.2" }]
+
+[[package]]
 name = "click"
 version = "8.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1647,306 +1947,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/f3/49/3b30cad09e7771a49
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fa/5e/f8e9a1d23b9c20a551a8a02ea3637b4642e22c2626e3a13a9a29cdea99eb/importlib_metadata-8.7.1-py3-none-any.whl", hash = "sha256:5a1f80bf1daa489495071efbb095d75a634cf28a8bc299581244063b53176151", size = 27865, upload-time = "2025-12-21T10:00:18.329Z" },
 ]
-
-[[package]]
-name = "classifyre-cli"
-version = "0.2.24"
-source = { editable = "." }
-dependencies = [
-    { name = "beautifulsoup4" },
-    { name = "crawl4ai" },
-    { name = "email-validator" },
-    { name = "en-core-web-sm" },
-    { name = "classifyre-schemas" },
-    { name = "jsonschema" },
-    { name = "lxml" },
-    { name = "pydantic" },
-    { name = "requests" },
-]
-
-[package.dev-dependencies]
-azure-blob-storage = [
-    { name = "azure-identity" },
-    { name = "azure-storage-blob" },
-]
-classification = [
-    { name = "fast-langdetect" },
-    { name = "transformers" },
-]
-content = [
-    { name = "detoxify" },
-    { name = "nudenet" },
-    { name = "onnxruntime" },
-    { name = "pillow" },
-    { name = "sentencepiece" },
-    { name = "torch" },
-    { name = "transformers" },
-]
-custom = [
-    { name = "datasets" },
-    { name = "gliner" },
-    { name = "scikit-learn" },
-    { name = "sentence-transformers" },
-    { name = "setfit" },
-    { name = "torch" },
-    { name = "transformers" },
-]
-databricks = [
-    { name = "databricks-sql-connector" },
-]
-detectors = [
-    { name = "bandit" },
-    { name = "commonregex" },
-    { name = "datasets" },
-    { name = "datasketch" },
-    { name = "de-core-news-lg" },
-    { name = "detect-secrets" },
-    { name = "detoxify" },
-    { name = "fast-langdetect" },
-    { name = "gliner" },
-    { name = "nudenet" },
-    { name = "onnxruntime" },
-    { name = "optimum", extra = ["onnxruntime"] },
-    { name = "phonenumbers" },
-    { name = "pillow" },
-    { name = "presidio-analyzer" },
-    { name = "presidio-anonymizer" },
-    { name = "pycanon" },
-    { name = "pytesseract" },
-    { name = "scikit-learn" },
-    { name = "scrubadub" },
-    { name = "sentence-transformers" },
-    { name = "sentencepiece" },
-    { name = "setfit" },
-    { name = "spacy" },
-    { name = "textstat" },
-    { name = "torch" },
-    { name = "transformers" },
-    { name = "yara-python" },
-]
-dev = [
-    { name = "datamodel-code-generator" },
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
-]
-file-processing = [
-    { name = "chardet" },
-    { name = "filetype" },
-    { name = "openpyxl" },
-    { name = "pdfplumber" },
-    { name = "pyarrow" },
-    { name = "python-docx" },
-]
-google-cloud-storage = [
-    { name = "google-cloud-storage" },
-]
-hive = [
-    { name = "pure-sasl" },
-    { name = "pyhive" },
-    { name = "thrift" },
-    { name = "thrift-sasl" },
-]
-mongodb = [
-    { name = "pymongo" },
-]
-mssql = [
-    { name = "pymssql" },
-]
-mysql = [
-    { name = "pymysql" },
-]
-oracle = [
-    { name = "oracledb" },
-]
-postgresql = [
-    { name = "psycopg2-binary" },
-]
-privacy = [
-    { name = "commonregex" },
-    { name = "de-core-news-lg" },
-    { name = "phonenumbers" },
-    { name = "pillow" },
-    { name = "presidio-analyzer" },
-    { name = "presidio-anonymizer" },
-    { name = "pycanon" },
-    { name = "pytesseract" },
-    { name = "scrubadub" },
-    { name = "spacy" },
-]
-quality = [
-    { name = "datasketch" },
-    { name = "fast-langdetect" },
-    { name = "sentence-transformers" },
-    { name = "sentencepiece" },
-    { name = "textstat" },
-    { name = "torch" },
-    { name = "transformers" },
-]
-s3-compatible-storage = [
-    { name = "boto3" },
-]
-security = [
-    { name = "bandit" },
-    { name = "detect-secrets" },
-    { name = "onnxruntime" },
-    { name = "optimum", extra = ["onnxruntime"] },
-    { name = "sentencepiece" },
-    { name = "torch" },
-    { name = "transformers" },
-    { name = "yara-python" },
-]
-snowflake = [
-    { name = "snowflake-connector-python" },
-]
-tableau = [
-    { name = "tableauserverclient" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "beautifulsoup4", specifier = ">=4.12.0" },
-    { name = "crawl4ai", specifier = ">=0.8.0" },
-    { name = "email-validator", specifier = ">=2.3.0" },
-    { name = "en-core-web-sm", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" },
-    { name = "classifyre-schemas", editable = "../../packages/schemas" },
-    { name = "jsonschema", specifier = ">=4.26.0" },
-    { name = "lxml", specifier = ">=5.0.0" },
-    { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "requests", specifier = ">=2.32.3" },
-]
-
-[package.metadata.requires-dev]
-azure-blob-storage = [
-    { name = "azure-identity", specifier = ">=1.25.1,<2.0.0" },
-    { name = "azure-storage-blob", specifier = ">=12.26.0,<13.0.0" },
-]
-classification = [
-    { name = "fast-langdetect", specifier = ">=1.0.0" },
-    { name = "transformers", specifier = ">=4.50.0,<6.0.0" },
-]
-content = [
-    { name = "detoxify", specifier = ">=0.5.2" },
-    { name = "nudenet", specifier = ">=3.4.2" },
-    { name = "onnxruntime", specifier = ">=1.24.2" },
-    { name = "pillow", specifier = ">=12.1.1" },
-    { name = "sentencepiece", specifier = ">=0.2.1" },
-    { name = "torch", specifier = ">=2.10.0" },
-    { name = "transformers", specifier = ">=4.50.0,<6.0.0" },
-]
-custom = [
-    { name = "datasets", specifier = ">=4.4.1" },
-    { name = "gliner", specifier = ">=0.2.22" },
-    { name = "scikit-learn", specifier = ">=1.7.2" },
-    { name = "sentence-transformers", specifier = ">=5.2.3" },
-    { name = "setfit", specifier = ">=1.1.3" },
-    { name = "torch", specifier = ">=2.10.0" },
-    { name = "transformers", specifier = ">=4.50.0,<6.0.0" },
-]
-databricks = [{ name = "databricks-sql-connector", specifier = ">=4.0.0,<5.0.0" }]
-detectors = [
-    { name = "bandit", specifier = ">=1.9.4" },
-    { name = "commonregex", specifier = ">=1.5.4" },
-    { name = "datasets", specifier = ">=4.4.1" },
-    { name = "datasketch", specifier = ">=1.9.0" },
-    { name = "de-core-news-lg", url = "https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl" },
-    { name = "detect-secrets", specifier = ">=1.5.0" },
-    { name = "detoxify", specifier = ">=0.5.2" },
-    { name = "fast-langdetect", specifier = ">=1.0.0" },
-    { name = "gliner", specifier = ">=0.2.22" },
-    { name = "nudenet", specifier = ">=3.4.2" },
-    { name = "onnxruntime", specifier = ">=1.24.2" },
-    { name = "optimum", extras = ["onnxruntime"], specifier = ">=2.1.0" },
-    { name = "phonenumbers", specifier = ">=9.0.25" },
-    { name = "pillow", specifier = ">=12.1.1" },
-    { name = "presidio-analyzer", specifier = ">=2.2.361" },
-    { name = "presidio-anonymizer", specifier = ">=2.2.361" },
-    { name = "pycanon", specifier = ">=1.1.0" },
-    { name = "pytesseract", specifier = ">=0.3.13" },
-    { name = "scikit-learn", specifier = ">=1.7.2" },
-    { name = "scrubadub", specifier = ">=2.0.1" },
-    { name = "sentence-transformers", specifier = ">=5.2.3" },
-    { name = "sentencepiece", specifier = ">=0.2.1" },
-    { name = "setfit", specifier = ">=1.1.3" },
-    { name = "spacy", specifier = ">=3.8.11" },
-    { name = "textstat", specifier = ">=0.7.13" },
-    { name = "torch", specifier = ">=2.10.0" },
-    { name = "transformers", specifier = ">=4.50.0,<6.0.0" },
-    { name = "yara-python", specifier = ">=4.5.4" },
-]
-dev = [
-    { name = "datamodel-code-generator", specifier = ">=0.45.0" },
-    { name = "mypy", specifier = ">=1.13.0" },
-    { name = "pytest", specifier = ">=9.0.2" },
-    { name = "pytest-asyncio", specifier = ">=0.24.0" },
-    { name = "ruff", specifier = ">=0.8.0" },
-]
-file-processing = [
-    { name = "chardet", specifier = ">=5.2.0" },
-    { name = "filetype", specifier = ">=1.2.0" },
-    { name = "openpyxl", specifier = ">=3.1.5" },
-    { name = "pdfplumber", specifier = ">=0.11.9" },
-    { name = "pyarrow", specifier = ">=18.0.0" },
-    { name = "python-docx", specifier = ">=1.2.0" },
-]
-google-cloud-storage = [{ name = "google-cloud-storage", specifier = ">=3.4.0,<4.0.0" }]
-hive = [
-    { name = "pure-sasl", specifier = ">=0.6.2,<1.0.0" },
-    { name = "pyhive", specifier = ">=0.7.0,<1.0.0" },
-    { name = "thrift", specifier = ">=0.16.0,<1.0.0" },
-    { name = "thrift-sasl", specifier = ">=0.4.3,<1.0.0" },
-]
-mongodb = [{ name = "pymongo", specifier = ">=4.15.2,<5.0.0" }]
-mssql = [{ name = "pymssql", specifier = ">=2.3.4,<3.0.0" }]
-mysql = [{ name = "pymysql", specifier = ">=1.1.1,<2.0.0" }]
-oracle = [{ name = "oracledb", specifier = ">=2.5.1,<3.0.0" }]
-postgresql = [{ name = "psycopg2-binary", specifier = ">=2.9.9,<3.0.0" }]
-privacy = [
-    { name = "commonregex", specifier = ">=1.5.4" },
-    { name = "de-core-news-lg", url = "https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl" },
-    { name = "phonenumbers", specifier = ">=9.0.25" },
-    { name = "pillow", specifier = ">=12.1.1" },
-    { name = "presidio-analyzer", specifier = ">=2.2.361" },
-    { name = "presidio-anonymizer", specifier = ">=2.2.361" },
-    { name = "pycanon", specifier = ">=1.1.0" },
-    { name = "pytesseract", specifier = ">=0.3.13" },
-    { name = "scrubadub", specifier = ">=2.0.1" },
-    { name = "spacy", specifier = ">=3.8.11" },
-]
-quality = [
-    { name = "datasketch", specifier = ">=1.9.0" },
-    { name = "fast-langdetect", specifier = ">=1.0.0" },
-    { name = "sentence-transformers", specifier = ">=5.2.3" },
-    { name = "sentencepiece", specifier = ">=0.2.1" },
-    { name = "textstat", specifier = ">=0.7.13" },
-    { name = "torch", specifier = ">=2.10.0" },
-    { name = "transformers", specifier = ">=4.50.0,<6.0.0" },
-]
-s3-compatible-storage = [{ name = "boto3", specifier = ">=1.40.40,<2.0.0" }]
-security = [
-    { name = "bandit", specifier = ">=1.9.4" },
-    { name = "detect-secrets", specifier = ">=1.5.0" },
-    { name = "onnxruntime", specifier = ">=1.24.2" },
-    { name = "optimum", extras = ["onnxruntime"], specifier = ">=2.1.0" },
-    { name = "sentencepiece", specifier = ">=0.2.1" },
-    { name = "torch", specifier = ">=2.10.0" },
-    { name = "transformers", specifier = ">=4.50.0,<6.0.0" },
-    { name = "yara-python", specifier = ">=4.5.4" },
-]
-snowflake = [{ name = "snowflake-connector-python", specifier = ">=4.0.0,<5.0.0" }]
-tableau = [{ name = "tableauserverclient", specifier = ">=0.38,<1.0.0" }]
-
-[[package]]
-name = "classifyre-schemas"
-version = "0.2.24"
-source = { editable = "../../packages/schemas" }
-dependencies = [
-    { name = "fastjsonschema" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "fastjsonschema", specifier = "==2.21.2" }]
 
 [[package]]
 name = "inflect"
