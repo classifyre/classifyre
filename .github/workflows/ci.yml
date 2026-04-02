@@ -118,30 +118,14 @@ jobs:
         run: |
           # Ensure static docs are exported and synced into web public assets.
           bun run docs:bundle
-
-          mkdir -p /tmp/api-dist /tmp/codegen /tmp/web-dist/standalone /tmp/web-dist/static /tmp/web-dist/public
-          cp -r apps/api/dist/. /tmp/api-dist/
-          cp -r packages/api-client/src/generated/. /tmp/codegen/
-
-          # Resolve bun's .bun/ symlinks before upload.
-          # upload-artifact excludes dotfile dirs (.bun/) which makes bun's
-          # node_modules/ symlinks dangling in the downloaded artifact.
-          # cp -rL follows symlinks, producing real directories instead.
-          cp -rL apps/web/.next/standalone/. /tmp/web-dist/standalone/
-          cp -r apps/web/.next/static/. /tmp/web-dist/static/
-
-
-          # Preserve public/ dir: upload-artifact excludes dotfiles like .gitkeep
-          # which makes empty dirs disappear; marker is removed in the Dockerfile.
-          touch /tmp/web-dist/public/_ci_dir_marker
-          cp -r apps/web/public/. /tmp/web-dist/public/ 2>/dev/null || true
+          bash ./scripts/stage-docker-artifacts.sh /tmp/classifyre-ci-artifacts
 
       - name: Upload api build
         if: github.event_name != 'workflow_call' && github.event.action != 'closed'
         uses: actions/upload-artifact@v6
         with:
           name: api-build
-          path: /tmp/api-dist
+          path: /tmp/classifyre-ci-artifacts/api-dist
           if-no-files-found: error
           retention-days: 1
 
@@ -150,7 +134,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: codegen
-          path: /tmp/codegen
+          path: /tmp/classifyre-ci-artifacts/codegen
           if-no-files-found: error
           retention-days: 1
 
@@ -159,7 +143,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: web-dist
-          path: /tmp/web-dist
+          path: /tmp/classifyre-ci-artifacts/web-dist
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
