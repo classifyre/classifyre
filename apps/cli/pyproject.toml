@@ -214,6 +214,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = [
     "detect_secrets.*",
+    "cryptography.*",
     "presidio_analyzer.*",
     "presidio_anonymizer.*",
     "spacy.*",
