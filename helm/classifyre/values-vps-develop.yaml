@@ -24,10 +24,14 @@ api:
       repository: classifyre/cli
       tag: "develop"
       pullPolicy: Always
+    # local-path leaves these cache PVCs pending until a job consumes them, which
+    # blocks `helm upgrade --wait` during deploy even though the app is healthy.
     uvCache:
+      enabled: false
       accessModes:
         - ReadWriteOnce
     playwrightCache:
+      enabled: false
       accessModes:
         - ReadWriteOnce
 

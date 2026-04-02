@@ -33,11 +33,14 @@ api:
       limits:
         cpu: "2"
         memory: 6Gi
-    # local-path provisioner only supports ReadWriteOnce
+    # local-path leaves these cache PVCs pending until a job consumes them, which
+    # blocks `helm upgrade --wait` during deploy even though the app is healthy.
     uvCache:
+      enabled: false
       accessModes:
         - ReadWriteOnce
     playwrightCache:
+      enabled: false
       accessModes:
         - ReadWriteOnce
 
