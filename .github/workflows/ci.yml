@@ -17,6 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   DOCKER_PLATFORMS: linux/amd64,linux/arm64
   INTEGRATION_DATABASE_URL: ${{ secrets.INTEGRATION_DATABASE_URL || vars.INTEGRATION_DATABASE_URL || '' }}
 
@@ -28,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Remove local Python virtualenvs
         run: rm -rf apps/cli/.venv packages/schemas/.venv
@@ -49,7 +50,7 @@ jobs:
             packages/schemas/uv.lock
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -137,7 +138,7 @@ jobs:
 
       - name: Upload api build
         if: github.event_name != 'workflow_call' && github.event.action != 'closed'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: api-build
           path: /tmp/api-dist
@@ -146,7 +147,7 @@ jobs:
 
       - name: Upload codegen
         if: github.event_name != 'workflow_call' && github.event.action != 'closed'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: codegen
           path: /tmp/codegen
@@ -155,7 +156,7 @@ jobs:
 
       - name: Upload web dist
         if: github.event_name != 'workflow_call' && github.event.action != 'closed'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: web-dist
           path: /tmp/web-dist
@@ -189,7 +190,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download api build
         uses: actions/download-artifact@v4
