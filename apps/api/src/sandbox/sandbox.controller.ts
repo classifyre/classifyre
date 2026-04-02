@@ -17,6 +17,7 @@ import {
   ApiResponse,
   ApiBody,
 } from '@nestjs/swagger';
+import '@fastify/multipart';
 import type { FastifyRequest } from 'fastify';
 import { SandboxService } from './sandbox.service';
 import { QuerySandboxRunsDto } from './dto/query-sandbox-runs.dto';

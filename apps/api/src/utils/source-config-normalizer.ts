@@ -169,14 +169,6 @@ function normalizeLegacyShape(type: string, config: JsonRecord) {
     }
   }
 
-  if (type === 'SITEMAP' && typeof config.sitemap_url === 'string') {
-    const required = ensureNestedObject(config, 'required');
-    if (typeof required.sitemap_url !== 'string') {
-      required.sitemap_url = config.sitemap_url;
-    }
-    delete config.sitemap_url;
-  }
-
   if (type === 'SLACK' && typeof config.workspace === 'string') {
     const required = ensureNestedObject(config, 'required');
     if (typeof required.workspace !== 'string') {

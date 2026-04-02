@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.
+ * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -320,7 +320,7 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Register a new data source for metadata ingestion (WordPress, Slack, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk).
+     * Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk).
      * Create a new data source
      */
     async sourcesControllerCreateSourceRaw(requestParameters: SourcesControllerCreateSourceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SourceResponseDto>> {
@@ -352,7 +352,7 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Register a new data source for metadata ingestion (WordPress, Slack, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk).
+     * Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk).
      * Create a new data source
      */
     async sourcesControllerCreateSource(requestParameters: SourcesControllerCreateSourceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SourceResponseDto> {
@@ -711,7 +711,6 @@ export const SourceAssetsControllerListSourceAssetsSourceTypesEnum = {
     GoogleSlides: 'GOOGLE_SLIDES',
     Wordpress: 'WORDPRESS',
     Slack: 'SLACK',
-    Sitemap: 'SITEMAP',
     S3CompatibleStorage: 'S3_COMPATIBLE_STORAGE',
     AzureBlobStorage: 'AZURE_BLOB_STORAGE',
     GoogleCloudStorage: 'GOOGLE_CLOUD_STORAGE',

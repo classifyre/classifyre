@@ -18,7 +18,7 @@ async function generateSpec() {
     .setTitle('Classifyre API')
     .setDescription(
       'Metadata ingestion and detection API for unstructured data sources. ' +
-        'Supports WordPress, Slack, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. ' +
+        'Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. ' +
         'Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.',
     )
     .setVersion('1.0.0')

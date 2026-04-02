@@ -7,9 +7,6 @@
       "$ref": "#/definitions/SlackInput"
     },
     {
-      "$ref": "#/definitions/SitemapInput"
-    },
-    {
       "$ref": "#/definitions/S3CompatibleStorageInput"
     },
     {
@@ -67,7 +64,6 @@
       "enum": [
         "WORDPRESS",
         "SLACK",
-        "SITEMAP",
         "S3_COMPATIBLE_STORAGE",
         "AZURE_BLOB_STORAGE",
         "GOOGLE_CLOUD_STORAGE",
@@ -93,7 +89,7 @@
         "TABULAR",
         "UNSTRUCTURED"
       ],
-      "description": "Category of the source: TABULAR for structured databases (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake), UNSTRUCTURED for text/web/document sources (WordPress, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk)"
+      "description": "Category of the source: TABULAR for structured databases (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake), UNSTRUCTURED for text/web/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk)"
     },
     "DetectorType": {
       "type": "string",
@@ -159,7 +155,7 @@
     "SamplingConfig": {
       "title": "SamplingConfig",
       "type": "object",
-      "description": "Controls how much content is extracted from each source. Apply to every source type: for tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake) limit is rows per table; for unstructured/document sources (WordPress, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk) limit is items/pages/documents/assets per run.",
+      "description": "Controls how much content is extracted from each source. Apply to every source type: for tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake) limit is rows per table; for unstructured/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk) limit is items/pages/documents/assets per run.",
       "properties": {
         "strategy": {
           "$ref": "#/definitions/SamplingStrategy"
@@ -479,94 +475,6 @@
         },
         "ingestion": {
           "$ref": "#/definitions/SlackOptionalIngestion"
-        }
-      },
-      "additionalProperties": false
-    },
-    "SitemapRequired": {
-      "title": "SitemapRequired",
-      "type": "object",
-      "properties": {
-        "sitemap_url": {
-          "type": "string",
-          "format": "uri",
-          "description": "Website sitemap URL (for example, https://example.com/sitemap.xml)"
-        }
-      },
-      "required": [
-        "sitemap_url"
-      ],
-      "additionalProperties": false
-    },
-    "SitemapOptionalCrawl": {
-      "title": "SitemapOptionalCrawl",
-      "type": "object",
-      "description": "Crawl behaviour and request-level limits.",
-      "properties": {
-        "max_nested_sitemaps": {
-          "type": "integer",
-          "minimum": 1,
-          "default": 100,
-          "description": "Maximum number of nested sitemap documents to traverse"
-        },
-        "request_timeout_seconds": {
-          "type": "number",
-          "minimum": 1,
-          "default": 30,
-          "description": "HTTP timeout for sitemap and linked asset requests"
-        },
-        "crawl_page_timeout_ms": {
-          "type": "integer",
-          "minimum": 1000,
-          "default": 120000,
-          "description": "Per-page browser timeout in milliseconds"
-        },
-        "user_agent": {
-          "type": "string",
-          "description": "Optional user agent for sitemap and asset HTTP requests"
-        }
-      },
-      "additionalProperties": false
-    },
-    "SitemapOptionalAssets": {
-      "title": "SitemapOptionalAssets",
-      "type": "object",
-      "description": "Related asset extraction and lineage controls.",
-      "properties": {
-        "max_related_assets_per_page": {
-          "type": "integer",
-          "minimum": 0,
-          "default": 40,
-          "description": "Maximum number of non-HTML linked assets to materialize per crawled page"
-        },
-        "max_asset_bytes": {
-          "type": "integer",
-          "minimum": 1024,
-          "default": 5242880,
-          "description": "Maximum number of bytes to download per linked asset when inferring type/text"
-        },
-        "include_external_links": {
-          "type": "boolean",
-          "default": false,
-          "description": "Include external links in page lineage/hashes"
-        },
-        "fetch_related_assets": {
-          "type": "boolean",
-          "default": true,
-          "description": "Fetch linked media/doc assets and persist them as lineage-linked assets"
-        }
-      },
-      "additionalProperties": false
-    },
-    "SitemapOptional": {
-      "title": "SitemapOptional",
-      "type": "object",
-      "properties": {
-        "crawl": {
-          "$ref": "#/definitions/SitemapOptionalCrawl"
-        },
-        "assets": {
-          "$ref": "#/definitions/SitemapOptionalAssets"
         }
       },
       "additionalProperties": false
@@ -2916,42 +2824,6 @@
           "required": [
             "required",
             "masked",
-            "sampling"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
-    "SitemapInput": {
-      "title": "SitemapInput",
-      "allOf": [
-        {
-          "$ref": "#/definitions/CoreInput"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "type": {
-              "const": "SITEMAP"
-            },
-            "required": {
-              "$ref": "#/definitions/SitemapRequired"
-            },
-            "optional": {
-              "$ref": "#/definitions/SitemapOptional"
-            },
-            "detectors": {
-              "$ref": "#/definitions/Detectors"
-            },
-            "custom_detectors": {
-              "$ref": "#/definitions/CustomDetectorSelections"
-            },
-            "sampling": {
-              "$ref": "#/definitions/SamplingConfig"
-            }
-          },
-          "required": [
-            "required",
             "sampling"
           ],
           "additionalProperties": false

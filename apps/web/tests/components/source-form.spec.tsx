@@ -2,8 +2,12 @@ import * as React from "react";
 import { expect, test } from "@playwright/experimental-ct-react";
 import { SourceForm } from "@/components/source-form";
 
-const validSitemapDefaults = {
-  required: { sitemap_url: "https://example.com/sitemap.xml" },
+const validS3Defaults = {
+  required: { bucket: "customer-exports" },
+  masked: {
+    aws_access_key_id: "access-key",
+    aws_secret_access_key: "secret-key",
+  },
   sampling: { strategy: "RANDOM" as const },
 };
 
@@ -17,11 +21,11 @@ function getRequestTimeoutSeconds(
   if (!optional || typeof optional !== "object") {
     return undefined;
   }
-  const crawl = (optional as Record<string, unknown>).crawl;
-  if (!crawl || typeof crawl !== "object") {
+  const connection = (optional as Record<string, unknown>).connection;
+  if (!connection || typeof connection !== "object") {
     return undefined;
   }
-  return (crawl as Record<string, unknown>).request_timeout_seconds;
+  return (connection as Record<string, unknown>).request_timeout_seconds;
 }
 
 test("edit mode does not rehydrate optional numeric defaults from source schema", async ({
@@ -30,9 +34,9 @@ test("edit mode does not rehydrate optional numeric defaults from source schema"
   let submitted: Record<string, unknown> | null = null;
   const component = await mount(
     <SourceForm
-      sourceType="SITEMAP"
+      sourceType="S3_COMPATIBLE_STORAGE"
       mode="edit"
-      defaultValues={{ name: "existing-source", ...validSitemapDefaults }}
+      defaultValues={{ name: "existing-source", ...validS3Defaults }}
       onSubmit={(data) => {
         submitted = data;
       }}
@@ -52,9 +56,9 @@ test("create mode still shows source schema numeric defaults", async ({
   let submitted: Record<string, unknown> | null = null;
   const component = await mount(
     <SourceForm
-      sourceType="SITEMAP"
+      sourceType="S3_COMPATIBLE_STORAGE"
       mode="create"
-      defaultValues={{ name: "new-source", ...validSitemapDefaults }}
+      defaultValues={{ name: "new-source", ...validS3Defaults }}
       onSubmit={(data) => {
         submitted = data;
       }}
@@ -140,9 +144,20 @@ test("sampling checkbox submits fetch_all_until_first_success", async ({
   let submitted: Record<string, unknown> | null = null;
   const component = await mount(
     <SourceForm
-      sourceType="SITEMAP"
+      sourceType="POSTGRESQL"
       mode="create"
-      defaultValues={{ name: "new-source", ...validSitemapDefaults }}
+      defaultValues={{
+        name: "new-source",
+        required: {
+          host: "db.local",
+          port: 5432,
+        },
+        masked: {
+          username: "postgres",
+          password: "secret",
+        },
+        sampling: { strategy: "RANDOM" },
+      }}
       onSubmit={(data) => {
         submitted = data;
       }}

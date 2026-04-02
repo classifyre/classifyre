@@ -27,11 +27,6 @@ api:
       accessModes:
         - ReadWriteOnce
       size: 5Gi
-    playwrightCache:
-      enabled: true
-      accessModes:
-        - ReadWriteOnce
-      size: 5Gi
 
   runnerLogs:
     enabled: true

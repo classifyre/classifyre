@@ -277,8 +277,8 @@ api:
       runAsNonRoot: true
       runAsUser: 10001
       runAsGroup: 10001
-      # fsGroup ensures Kubernetes pre-chowns mounted PVCs (uv-cache, playwright-cache,
-      # runner-logs) to GID 10001 so the non-root container can write to them on fresh installs.
+      # fsGroup ensures Kubernetes pre-chowns mounted PVCs (uv-cache, runner-logs)
+      # to GID 10001 so the non-root container can write to them on fresh installs.
       fsGroup: 10001
       seccompProfile:
         type: RuntimeDefault
@@ -307,21 +307,6 @@ api:
         - ReadWriteMany
       # -- Requested size for uv cache PVC.
       size: 20Gi
-
-    playwrightCache:
-      # -- Enable shared PVC for Playwright browser cache.
-      enabled: true
-      # -- Mount path for Playwright cache.
-      mountPath: /ms-playwright
-      # -- Existing PVC name for Playwright cache. Empty creates a new PVC.
-      existingClaim: ""
-      # -- Storage class for Playwright cache PVC.
-      storageClassName: ""
-      # -- Access modes for Playwright cache PVC.
-      accessModes:
-        - ReadWriteMany
-      # -- Requested size for Playwright cache PVC.
-      size: 10Gi
 
   runnerLogs:
     # -- Enable PVC-backed storage for runner logs.

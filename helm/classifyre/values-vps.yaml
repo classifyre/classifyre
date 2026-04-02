@@ -39,10 +39,6 @@ api:
       enabled: false
       accessModes:
         - ReadWriteOnce
-    playwrightCache:
-      enabled: false
-      accessModes:
-        - ReadWriteOnce
 
   runnerLogs:
     accessModes:

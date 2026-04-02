@@ -144,11 +144,6 @@ ENV UV_LINK_MODE=copy \
     UV_CACHE_DIR=/cache/uv \
     CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1 \
     PATH="/app/apps/cli/.venv/bin:${PATH}"
-# Install Chromium OS-level dependencies (libglib2, libnss3, etc.) at build time as root.
-# The browser binary itself is still downloaded on demand by _install_playwright_chromium()
-# so the image stays small. System libs require apt-get/root — that's why they must be
-# baked in rather than installed at runtime under the non-root uid 10001.
-RUN playwright install-deps chromium
 # Match uid 10001 from helm podSecurityContext so uv sync can modify the venv at runtime
 RUN groupadd -g 10001 classifyre && useradd -u 10001 -g 10001 -r classifyre \
     && chown -R 10001:10001 /app
@@ -185,8 +180,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
     NEXT_PUBLIC_API_URL=/api \
     UV_LINK_MODE=copy \
     UV_CACHE_DIR=/cache/uv \
-    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
-    CLASSIFYRE_PLAYWRIGHT_INSTALL_WITH_DEPS=0 \
     CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1
 
 RUN set -eux; \
@@ -210,33 +203,6 @@ RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
       caddy \
-      fonts-liberation \
-      libasound2 \
-      libatk-bridge2.0-0 \
-      libatk1.0-0 \
-      libatspi2.0-0 \
-      libcairo2 \
-      libcups2 \
-      libdbus-1-3 \
-      libdrm2 \
-      libgbm1 \
-      libglib2.0-0 \
-      libgtk-3-0 \
-      libnspr4 \
-      libnss3 \
-      libpango-1.0-0 \
-      libx11-6 \
-      libx11-xcb1 \
-      libxcb1 \
-      libxcomposite1 \
-      libxdamage1 \
-      libxext6 \
-      libxfixes3 \
-      libxkbcommon0 \
-      libxrandr2 \
-      libxshmfence1 \
-      libxss1 \
-      libxtst6 \
       nodejs \
       postgresql-${PG_MAJOR} \
       postgresql-client-${PG_MAJOR}; \
@@ -282,9 +248,9 @@ COPY --from=api-builder /repo/packages/schemas/node_modules /app/packages/schema
 RUN set -eux; \
     ln -sfn /app/node_modules /node_modules; \
     ln -sfn /app/packages /packages; \
-    mkdir -p /var/lib/postgresql/data /var/run/postgresql /cache/uv /tmp "${PLAYWRIGHT_BROWSERS_PATH}" "${RUNNER_LOGS_DIR}"; \
+    mkdir -p /var/lib/postgresql/data /var/run/postgresql /cache/uv /tmp "${RUNNER_LOGS_DIR}"; \
     chown -R postgres:postgres /var/lib/postgresql /var/run/postgresql; \
-    chown -R 10001:10001 /app/apps/cli /app/packages/schemas /cache/uv "${PLAYWRIGHT_BROWSERS_PATH}" "${RUNNER_LOGS_DIR}"; \
+    chown -R 10001:10001 /app/apps/cli /app/packages/schemas /cache/uv "${RUNNER_LOGS_DIR}"; \
     chmod 700 /var/lib/postgresql/data
 
 RUN <<'EOF'

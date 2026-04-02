@@ -102,7 +102,6 @@
       "enum": [
         "WORDPRESS",
         "SLACK",
-        "SITEMAP",
         "S3_COMPATIBLE_STORAGE",
         "AZURE_BLOB_STORAGE",
         "GOOGLE_CLOUD_STORAGE",

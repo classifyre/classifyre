@@ -48,7 +48,7 @@ export class SourcesController {
   @ApiOperation({
     summary: 'Create a new data source',
     description:
-      'Register a new data source for metadata ingestion (WordPress, Slack, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk).',
+      'Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk).',
   })
   @ApiBody({
     type: CreateSourceDto,
@@ -104,28 +104,6 @@ export class SourcesController {
             sampling: {
               strategy: 'RANDOM',
               limit: 100,
-            },
-          },
-        },
-      },
-      sitemap: {
-        summary: 'Sitemap Source',
-        value: {
-          type: 'SITEMAP',
-          name: 'Production Website Index',
-          config: {
-            type: 'SITEMAP',
-            required: {
-              sitemap_url: 'https://www.example.com/sitemap.xml',
-            },
-            optional: {
-              crawl: {
-                max_nested_sitemaps: 100,
-              },
-            },
-            sampling: {
-              strategy: 'RANDOM',
-              limit: 25,
             },
           },
         },

@@ -39,8 +39,8 @@ describe('masked-config.utils', () => {
 
     it('returns a shallow clone when masked field is missing', () => {
       const config = {
-        type: 'SITEMAP',
-        required: { sitemap_url: 'https://example.com/sitemap.xml' },
+        type: 'POSTGRESQL',
+        required: { host: 'db.local', port: 5432 },
       };
 
       const transformed = transformMaskedConfig(
