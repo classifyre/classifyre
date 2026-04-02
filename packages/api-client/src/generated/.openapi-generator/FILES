@@ -1,6 +1,5 @@
 .gitignore
 .npmignore
-.openapi-generator-ignore
 README.md
 docs/AIApi.md
 docs/AiCompleteRequestDto.md
