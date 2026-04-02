@@ -61,12 +61,11 @@ data:
                     "name": "HOME",
                     "value": "/tmp"
                   }
-                  {{- if .Values.api.cliJobs.uvCache.enabled }},
+                  ,
                   {
                     "name": "UV_CACHE_DIR",
-                    "value": "{{ .Values.api.cliJobs.uvCache.mountPath }}"
+                    "value": "{{ if .Values.api.cliJobs.uvCache.enabled }}{{ .Values.api.cliJobs.uvCache.mountPath }}{{ else }}/tmp/uv-cache{{ end }}"
                   }
-                  {{- end }}
                   {{- if .Values.api.cliJobs.playwrightCache.enabled }},
                   {
                     "name": "PLAYWRIGHT_BROWSERS_PATH",
