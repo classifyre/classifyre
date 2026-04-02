@@ -71,7 +71,7 @@ describe('KubernetesCliJobService', () => {
 
     const result = await (service as any).runJob({
       sourceId: 'source-1',
-      recipe: { type: 'SITEMAP' },
+      recipe: { type: 'POSTGRESQL' },
       mode: 'extract',
       runnerId: 'runner-1',
     });
@@ -96,7 +96,7 @@ describe('KubernetesCliJobService', () => {
 
     const result = await (service as any).runJob({
       sourceId: 'source-2',
-      recipe: { type: 'SITEMAP' },
+      recipe: { type: 'POSTGRESQL' },
       mode: 'extract',
       runnerId: 'runner-2',
     });
@@ -112,7 +112,7 @@ describe('KubernetesCliJobService', () => {
 
     await (service as any).runJob({
       sourceId: 'source-3',
-      recipe: { type: 'SITEMAP' },
+      recipe: { type: 'POSTGRESQL' },
       mode: 'test',
     });
 
@@ -143,7 +143,7 @@ describe('KubernetesCliJobService', () => {
     await expect(
       (service as any).runJob({
         sourceId: 'source-4',
-        recipe: { type: 'SITEMAP' },
+        recipe: { type: 'POSTGRESQL' },
         mode: 'extract',
         runnerId: 'runner-4',
       }),
@@ -335,7 +335,7 @@ describe('KubernetesCliJobService', () => {
         sourceId: 'source-1',
         runnerId: 'runner-1',
         mode: 'extract',
-        recipe: { type: 'SITEMAP' },
+        recipe: { type: 'POSTGRESQL' },
         hasSuccessfulRuns: false,
       },
     );

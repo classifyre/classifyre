@@ -1766,7 +1766,6 @@ export const JsonSchemaForm = React.forwardRef<
   const TABULAR_SOURCE_TYPE_MAP: Record<IngestionSourceType, boolean> = {
     WORDPRESS: false,
     SLACK: false,
-    SITEMAP: false,
     S3_COMPATIBLE_STORAGE: false,
     AZURE_BLOB_STORAGE: false,
     GOOGLE_CLOUD_STORAGE: false,

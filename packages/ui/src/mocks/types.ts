@@ -20,7 +20,6 @@ export interface MockFinding {
     | "database"
     | "wordpress"
     | "slack"
-    | "sitemap"
     | "postgresql"
     | "mysql";
   sourceName: string;
@@ -40,7 +39,6 @@ export interface MockSource {
     | "database"
     | "wordpress"
     | "slack"
-    | "sitemap"
     | "postgresql"
     | "mysql";
   path: string;

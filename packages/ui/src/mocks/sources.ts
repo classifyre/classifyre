@@ -55,19 +55,6 @@ export const mockSources: MockSource[] = [
       channel_types: ["public_channel", "private_channel"],
     },
   },
-  {
-    id: "source-8",
-    name: "Website Index: Marketing Site",
-    type: "sitemap",
-    path: "www.example.com/sitemap.xml",
-    status: "healthy",
-    lastScan: new Date(Date.now() - 6 * 60 * 60 * 1000),
-    fileCount: 340,
-    findingCount: 2,
-    config: {
-      sitemap_url: "https://www.example.com/sitemap.xml",
-    },
-  },
 ];
 
 export function getMockSources(filters?: {

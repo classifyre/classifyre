@@ -24,7 +24,6 @@ class AssetType(StrEnum):
 
     WORDPRESS = 'WORDPRESS'
     SLACK = 'SLACK'
-    SITEMAP = 'SITEMAP'
     S3_COMPATIBLE_STORAGE = 'S3_COMPATIBLE_STORAGE'
     AZURE_BLOB_STORAGE = 'AZURE_BLOB_STORAGE'
     GOOGLE_CLOUD_STORAGE = 'GOOGLE_CLOUD_STORAGE'
@@ -45,7 +44,7 @@ class AssetType(StrEnum):
 
 class SourceCategory(StrEnum):
     """
-    Category of the source: TABULAR for structured databases (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake), UNSTRUCTURED for text/web/document sources (WordPress, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk)
+    Category of the source: TABULAR for structured databases (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake), UNSTRUCTURED for text/web/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk)
     """
 
     TABULAR = 'TABULAR'
@@ -119,7 +118,7 @@ class SamplingStrategy(StrEnum):
 
 class SamplingConfig(BaseModel):
     """
-    Controls how much content is extracted from each source. Apply to every source type: for tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake) limit is rows per table; for unstructured/document sources (WordPress, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk) limit is items/pages/documents/assets per run.
+    Controls how much content is extracted from each source. Apply to every source type: for tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake) limit is rows per table; for unstructured/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk) limit is items/pages/documents/assets per run.
     """
 
     model_config = ConfigDict(
@@ -330,73 +329,6 @@ class SlackOptional(BaseModel):
     channels: SlackOptionalChannels | None = None
     time_range: SlackOptionalTimeRange | None = None
     ingestion: SlackOptionalIngestion | None = None
-
-
-class SitemapRequired(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    sitemap_url: AnyUrl = Field(
-        ...,
-        description='Website sitemap URL (for example, https://example.com/sitemap.xml)',
-    )
-
-
-class SitemapOptionalCrawl(BaseModel):
-    """
-    Crawl behaviour and request-level limits.
-    """
-
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    max_nested_sitemaps: int | None = Field(
-        100, description='Maximum number of nested sitemap documents to traverse', ge=1
-    )
-    request_timeout_seconds: float | None = Field(
-        30, description='HTTP timeout for sitemap and linked asset requests', ge=1.0
-    )
-    crawl_page_timeout_ms: int | None = Field(
-        120000, description='Per-page browser timeout in milliseconds', ge=1000
-    )
-    user_agent: str | None = Field(
-        None, description='Optional user agent for sitemap and asset HTTP requests'
-    )
-
-
-class SitemapOptionalAssets(BaseModel):
-    """
-    Related asset extraction and lineage controls.
-    """
-
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    max_related_assets_per_page: int | None = Field(
-        40,
-        description='Maximum number of non-HTML linked assets to materialize per crawled page',
-        ge=0,
-    )
-    max_asset_bytes: int | None = Field(
-        5242880,
-        description='Maximum number of bytes to download per linked asset when inferring type/text',
-        ge=1024,
-    )
-    include_external_links: bool | None = Field(
-        False, description='Include external links in page lineage/hashes'
-    )
-    fetch_related_assets: bool | None = Field(
-        True,
-        description='Fetch linked media/doc assets and persist them as lineage-linked assets',
-    )
-
-
-class SitemapOptional(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    crawl: SitemapOptionalCrawl | None = None
-    assets: SitemapOptionalAssets | None = None
 
 
 class ObjectStorageOptionalScope(BaseModel):
@@ -1861,7 +1793,6 @@ class Type(StrEnum):
 
     WORDPRESS = 'WORDPRESS'
     SLACK = 'SLACK'
-    SITEMAP = 'SITEMAP'
     S3_COMPATIBLE_STORAGE = 'S3_COMPATIBLE_STORAGE'
     AZURE_BLOB_STORAGE = 'AZURE_BLOB_STORAGE'
     GOOGLE_CLOUD_STORAGE = 'GOOGLE_CLOUD_STORAGE'
@@ -1887,20 +1818,6 @@ class SlackInput(CoreInput):
         ..., title='SlackMasked'
     )
     optional: SlackOptional | None = None
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-
-
-class SitemapInput(CoreInput):
-    type: Literal['SITEMAP'] = 'SITEMAP'
-    required: SitemapRequired
-    optional: SitemapOptional | None = None
     detectors: list[Detector] | None = Field(
         None, description='Detectors to run on ingested content'
     )
@@ -2192,7 +2109,7 @@ class ConfluenceOptionalConnection(BaseModel):
     )
 
 
-class Type16(StrEnum):
+class Type15(StrEnum):
     """
     Filter spaces by space type
     """
@@ -2229,7 +2146,7 @@ class ConfluenceOptionalScopeSpaces(BaseModel):
     keys: list[str] | None = Field(
         None, description='Filter spaces by keys (up to 250)', max_length=250
     )
-    type: Type16 | None = Field(None, description='Filter spaces by space type')
+    type: Type15 | None = Field(None, description='Filter spaces by space type')
     status: Status | None = Field(None, description='Filter spaces by status')
     labels: list[str] | None = Field(
         None,
@@ -2495,14 +2412,13 @@ class ServiceDeskOptional(BaseModel):
     content: ServiceDeskOptionalContent | None = None
 
 
-class Type17(StrEnum):
+class Type16(StrEnum):
     """
     Type of the asset or source
     """
 
     WORDPRESS = 'WORDPRESS'
     SLACK = 'SLACK'
-    SITEMAP = 'SITEMAP'
     S3_COMPATIBLE_STORAGE = 'S3_COMPATIBLE_STORAGE'
     AZURE_BLOB_STORAGE = 'AZURE_BLOB_STORAGE'
     GOOGLE_CLOUD_STORAGE = 'GOOGLE_CLOUD_STORAGE'
@@ -2569,7 +2485,6 @@ class ServiceDeskInput(CoreInput):
 class SourceInput(
     RootModel[
         SlackInput
-        | SitemapInput
         | S3CompatibleStorageInput
         | AzureBlobStorageInput
         | GoogleCloudStorageInput
@@ -2591,7 +2506,6 @@ class SourceInput(
 ):
     root: (
         SlackInput
-        | SitemapInput
         | S3CompatibleStorageInput
         | AzureBlobStorageInput
         | GoogleCloudStorageInput

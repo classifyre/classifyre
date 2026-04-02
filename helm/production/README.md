@@ -108,9 +108,6 @@ api:
     uvCache:
       enabled: true
       size: 20Gi
-    playwrightCache:
-      enabled: true
-      size: 10Gi
 
 frontend:
   image:

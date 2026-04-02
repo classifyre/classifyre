@@ -24,8 +24,8 @@ class _DummySource(BaseSource):
 
 def _recipe() -> dict[str, Any]:
     return {
-        "type": "SITEMAP",
-        "required": {"sitemap_url": "https://example.com/sitemap.xml"},
+        "type": "POSTGRESQL",
+        "required": {"host": "db.local", "port": 5432},
         "sampling": {
             "strategy": "LATEST",
             "limit": 10,

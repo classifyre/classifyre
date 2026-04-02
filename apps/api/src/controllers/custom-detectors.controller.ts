@@ -21,6 +21,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import '@fastify/multipart';
 import type { FastifyRequest } from 'fastify';
 import { CustomDetectorsService } from '../custom-detectors.service';
 import { ListCustomDetectorsQueryDto } from '../dto/list-custom-detectors-query.dto';

@@ -483,14 +483,6 @@ export class KubernetesCliJobService {
       this.setEnvValue(envMap, 'UV_CACHE_DIR', process.env.UV_CACHE_DIR);
     }
 
-    if (process.env.PLAYWRIGHT_BROWSERS_PATH) {
-      this.setEnvValue(
-        envMap,
-        'PLAYWRIGHT_BROWSERS_PATH',
-        process.env.PLAYWRIGHT_BROWSERS_PATH,
-      );
-    }
-
     container.env = Array.from(envMap.values());
     container.command = ['/bin/sh', '-lc'];
     container.args = [this.buildJobCommand(params.mode, workDir)];

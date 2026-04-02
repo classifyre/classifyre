@@ -49,7 +49,6 @@ For the current k3s VPS shape, the important overrides are:
 
 - `api.runnerLogs.accessModes`
 - `api.cliJobs.uvCache.accessModes`
-- `api.cliJobs.playwrightCache.accessModes`
 - `postgres.embedded.persistence.accessModes`
 
 ## CLI Job Runtime Characteristics

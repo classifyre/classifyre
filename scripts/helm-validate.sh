@@ -58,8 +58,8 @@ run_checks() {
   echo "── ${label} ──"
 
   # ── CLI job: non-root writable PVC mounts ─────────────────────────────────
-  # fsGroup:10001 ensures Kubernetes pre-chowns PVCs (uv-cache, playwright-cache,
-  # runner-logs) so uid 10001 can write on fresh installs.
+  # fsGroup:10001 ensures Kubernetes pre-chowns PVCs (uv-cache, runner-logs)
+  # so uid 10001 can write on fresh installs.
   assert_contains \
     "CLI job podSecurityContext sets fsGroup: 10001" \
     "fsGroup: 10001" \
@@ -68,14 +68,6 @@ run_checks() {
   assert_contains \
     "CLI job podSecurityContext sets runAsUser: 10001" \
     "runAsUser: 10001" \
-    "${rendered}"
-
-  # ── CLI job: crawl4ai writable home ───────────────────────────────────────
-  # crawl4ai calls Path.home() at import time; without HOME=/tmp it resolves to
-  # '/' (no /etc/passwd entry for uid 10001) and fails to mkdir /.crawl4ai.
-  assert_contains \
-    "CLI job env includes CRAWL4_AI_BASE_DIRECTORY=/tmp" \
-    "CRAWL4_AI_BASE_DIRECTORY" \
     "${rendered}"
 
   assert_contains \

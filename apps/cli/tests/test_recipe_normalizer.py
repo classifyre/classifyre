@@ -4,8 +4,8 @@ from src.sources.recipe_normalizer import normalize_source_recipe
 def test_normalize_source_recipe_keeps_fetch_all_until_first_success():
     normalized = normalize_source_recipe(
         {
-            "type": "SITEMAP",
-            "required": {"sitemap_url": "https://example.com/sitemap.xml"},
+            "type": "POSTGRESQL",
+            "required": {"host": "db.local", "port": 5432},
             "sampling": {
                 "strategy": "RANDOM",
                 "limit": 5,
@@ -21,8 +21,8 @@ def test_normalize_source_recipe_keeps_fetch_all_until_first_success():
 def test_normalize_source_recipe_copies_fetch_all_flag_from_optional_sampling():
     normalized = normalize_source_recipe(
         {
-            "type": "SITEMAP",
-            "required": {"sitemap_url": "https://example.com/sitemap.xml"},
+            "type": "POSTGRESQL",
+            "required": {"host": "db.local", "port": 5432},
             "optional": {
                 "sampling": {
                     "mode": "latest",
@@ -41,8 +41,8 @@ def test_normalize_source_recipe_copies_fetch_all_flag_from_optional_sampling():
 def test_normalize_source_recipe_ignores_non_boolean_fetch_all_flag():
     normalized = normalize_source_recipe(
         {
-            "type": "SITEMAP",
-            "required": {"sitemap_url": "https://example.com/sitemap.xml"},
+            "type": "POSTGRESQL",
+            "required": {"host": "db.local", "port": 5432},
             "sampling": {
                 "strategy": "RANDOM",
                 "fetch_all_until_first_success": "yes",

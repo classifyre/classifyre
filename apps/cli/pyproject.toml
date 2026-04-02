@@ -15,7 +15,6 @@ dependencies = [
     "en-core-web-sm",
     "beautifulsoup4>=4.12.0",
     "lxml>=5.0.0",
-    "crawl4ai>=0.8.0",
 ]
 
 [tool.uv.sources]
@@ -223,7 +222,6 @@ module = [
     "transformers.*",
     "torch.*",
     "yara.*",
-    "crawl4ai.*",
     "nudenet.*",
     "fast_langdetect.*",
     "bandit.*",

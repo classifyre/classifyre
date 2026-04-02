@@ -2,9 +2,9 @@ import { normalizeSourceConfig } from './source-config-normalizer';
 
 describe('normalizeSourceConfig sampling', () => {
   it('preserves fetch_all_until_first_success when provided in sampling', () => {
-    const normalized = normalizeSourceConfig('SITEMAP', {
-      type: 'SITEMAP',
-      required: { sitemap_url: 'https://example.com/sitemap.xml' },
+    const normalized = normalizeSourceConfig('POSTGRESQL', {
+      type: 'POSTGRESQL',
+      required: { host: 'db.local', port: 5432 },
       sampling: {
         strategy: 'RANDOM',
         limit: 20,
@@ -22,9 +22,9 @@ describe('normalizeSourceConfig sampling', () => {
   });
 
   it('hydrates fetch_all_until_first_success from optional.sampling legacy shape', () => {
-    const normalized = normalizeSourceConfig('SITEMAP', {
-      type: 'SITEMAP',
-      required: { sitemap_url: 'https://example.com/sitemap.xml' },
+    const normalized = normalizeSourceConfig('POSTGRESQL', {
+      type: 'POSTGRESQL',
+      required: { host: 'db.local', port: 5432 },
       optional: {
         sampling: {
           mode: 'latest',
@@ -45,9 +45,9 @@ describe('normalizeSourceConfig sampling', () => {
   });
 
   it('ignores non-boolean fetch_all_until_first_success values', () => {
-    const normalized = normalizeSourceConfig('SITEMAP', {
-      type: 'SITEMAP',
-      required: { sitemap_url: 'https://example.com/sitemap.xml' },
+    const normalized = normalizeSourceConfig('POSTGRESQL', {
+      type: 'POSTGRESQL',
+      required: { host: 'db.local', port: 5432 },
       sampling: {
         strategy: 'RANDOM',
         limit: 10,

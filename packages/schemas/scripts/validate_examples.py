@@ -10,7 +10,6 @@ import fastjsonschema
 # Map source type to schema definition name
 TYPE_TO_DEFINITION = {
     "SLACK": "SlackInput",
-    "SITEMAP": "SitemapInput",
     "S3_COMPATIBLE_STORAGE": "S3CompatibleStorageInput",
     "AZURE_BLOB_STORAGE": "AzureBlobStorageInput",
     "GOOGLE_CLOUD_STORAGE": "GoogleCloudStorageInput",

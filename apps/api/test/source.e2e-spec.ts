@@ -202,37 +202,6 @@ describe('Source (e2e)', () => {
     expect(response.body).toEqual(testPayload);
   });
 
-  it('should create a new sitemap source and validate it', async () => {
-    const createSourceDto = {
-      type: 'SITEMAP',
-      name: 'Test Sitemap Source',
-      config: {
-        type: 'SITEMAP',
-        required: {
-          sitemap_url: 'https://www.classifyre.com/sitemap.xml',
-        },
-        optional: {
-          crawl: {
-            max_nested_sitemaps: 10,
-          },
-        },
-        sampling: {
-          strategy: 'RANDOM',
-          limit: 10,
-        },
-      },
-    };
-
-    const response = await request(app.getHttpServer())
-      .post('/sources')
-      .send(createSourceDto)
-      .expect(201);
-
-    expect(response.body).toHaveProperty('id');
-    expect(response.body.type).toBe('SITEMAP');
-    expect(response.body.name).toBe('Test Sitemap Source');
-  });
-
   it('should create a new mysql source using credentials and validate it', async () => {
     const { host, port } = resolveMySqlHostPort();
     const database = process.env.MYSQL_TEST_DATABASE || 'app_db';
@@ -285,7 +254,6 @@ describe('Source (e2e)', () => {
     const sourceTypes = [
       'WORDPRESS',
       'SLACK',
-      'SITEMAP',
       'S3_COMPATIBLE_STORAGE',
       'AZURE_BLOB_STORAGE',
       'GOOGLE_CLOUD_STORAGE',

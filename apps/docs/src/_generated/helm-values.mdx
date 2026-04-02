@@ -23,12 +23,6 @@
 | api.cliJobs.image.tag | string | `""` | CLI job image tag. Defaults to the chart appVersion when empty. |
 | api.cliJobs.namespace | string | `""` | Namespace used for CLI jobs. Empty means release namespace. |
 | api.cliJobs.nodeSelector | object | `{}` | CLI job scheduling: node selector. |
-| api.cliJobs.playwrightCache.accessModes | list | `["ReadWriteMany"]` | Access modes for Playwright cache PVC. |
-| api.cliJobs.playwrightCache.enabled | bool | `true` | Enable shared PVC for Playwright browser cache. |
-| api.cliJobs.playwrightCache.existingClaim | string | `""` | Existing PVC name for Playwright cache. Empty creates a new PVC. |
-| api.cliJobs.playwrightCache.mountPath | string | `"/ms-playwright"` | Mount path for Playwright cache. |
-| api.cliJobs.playwrightCache.size | string | `"10Gi"` | Requested size for Playwright cache PVC. |
-| api.cliJobs.playwrightCache.storageClassName | string | `""` | Storage class for Playwright cache PVC. |
 | api.cliJobs.podSecurityContext | object | `{"fsGroup":10001,"runAsGroup":10001,"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod security context for CLI job pods. |
 | api.cliJobs.pollIntervalMs | int | `2000` | Poll interval while waiting for job completion (milliseconds). |
 | api.cliJobs.priorityClassName | string | `""` | CLI job priority class. |

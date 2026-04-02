@@ -15,24 +15,6 @@ spec:
   storageClassName: {{ . | quote }}
   {{- end }}
 {{- end }}
-{{- if and .Values.api.cliJobs.enabled .Values.api.cliJobs.playwrightCache.enabled (not .Values.api.cliJobs.playwrightCache.existingClaim) }}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ printf "%s-cli-playwright-cache" (include "classifyre.fullname" .) }}
-  labels:
-    {{- include "classifyre.commonLabels" . | nindent 4 }}
-spec:
-  accessModes:
-    {{- toYaml .Values.api.cliJobs.playwrightCache.accessModes | nindent 4 }}
-  resources:
-    requests:
-      storage: {{ .Values.api.cliJobs.playwrightCache.size }}
-  {{- with .Values.api.cliJobs.playwrightCache.storageClassName }}
-  storageClassName: {{ . | quote }}
-  {{- end }}
-{{- end }}
 {{- if and .Values.api.runnerLogs.enabled (not .Values.api.runnerLogs.existingClaim) }}
 ---
 apiVersion: v1

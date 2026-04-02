@@ -68,7 +68,7 @@
     },
     "/sources": {
       "post": {
-        "description": "Register a new data source for metadata ingestion (WordPress, Slack, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk).",
+        "description": "Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk).",
         "operationId": "SourcesController_createSource",
         "parameters": [],
         "requestBody": {
@@ -132,28 +132,6 @@
                       "sampling": {
                         "strategy": "RANDOM",
                         "limit": 100
-                      }
-                    }
-                  }
-                },
-                "sitemap": {
-                  "summary": "Sitemap Source",
-                  "value": {
-                    "type": "SITEMAP",
-                    "name": "Production Website Index",
-                    "config": {
-                      "type": "SITEMAP",
-                      "required": {
-                        "sitemap_url": "https://www.example.com/sitemap.xml"
-                      },
-                      "optional": {
-                        "crawl": {
-                          "max_nested_sitemaps": 100
-                        }
-                      },
-                      "sampling": {
-                        "strategy": "RANDOM",
-                        "limit": 25
                       }
                     }
                   }
@@ -1117,7 +1095,8 @@
                 "enum": [
                   "NEW",
                   "UPDATED",
-                  "UNCHANGED"
+                  "UNCHANGED",
+                  "DELETED"
                 ]
               }
             }
@@ -1144,7 +1123,6 @@
                   "GOOGLE_SLIDES",
                   "WORDPRESS",
                   "SLACK",
-                  "SITEMAP",
                   "S3_COMPATIBLE_STORAGE",
                   "AZURE_BLOB_STORAGE",
                   "GOOGLE_CLOUD_STORAGE",
@@ -1311,7 +1289,7 @@
     },
     "/sources/{sourceId}/assets/finalize": {
       "post": {
-        "description": "Finalizes ingest run. No-op since sampling means not all assets appear in every run — absence does not imply deletion.",
+        "description": "Finalizes ingest run. For sources with sampling strategy ALL, marks assets absent from seenHashes as DELETED and auto-resolves their open findings. For RANDOM/LATEST strategies this is a no-op since absence does not imply deletion.",
         "operationId": "SourceAssetsController_finalizeIngest",
         "parameters": [
           {
@@ -3705,11 +3683,423 @@
           "Sandbox"
         ]
       }
+    },
+    "/semantic/glossary": {
+      "post": {
+        "operationId": "GlossaryController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGlossaryTermDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a new glossary term",
+        "tags": [
+          "Semantic Layer - Glossary"
+        ]
+      },
+      "get": {
+        "operationId": "GlossaryController_findAll",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List all glossary terms",
+        "tags": [
+          "Semantic Layer - Glossary"
+        ]
+      }
+    },
+    "/semantic/glossary/{id}": {
+      "get": {
+        "operationId": "GlossaryController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get a glossary term by id",
+        "tags": [
+          "Semantic Layer - Glossary"
+        ]
+      },
+      "put": {
+        "operationId": "GlossaryController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGlossaryTermDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update a glossary term",
+        "tags": [
+          "Semantic Layer - Glossary"
+        ]
+      },
+      "delete": {
+        "operationId": "GlossaryController_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a glossary term",
+        "tags": [
+          "Semantic Layer - Glossary"
+        ]
+      }
+    },
+    "/semantic/glossary/{id}/preview": {
+      "post": {
+        "operationId": "GlossaryController_preview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Preview the number of findings matching this glossary term",
+        "tags": [
+          "Semantic Layer - Glossary"
+        ]
+      }
+    },
+    "/semantic/metrics": {
+      "post": {
+        "operationId": "MetricsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMetricDefinitionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a new metric definition",
+        "tags": [
+          "Semantic Layer - Metrics"
+        ]
+      },
+      "get": {
+        "operationId": "MetricsController_findAll",
+        "parameters": [
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List all metric definitions",
+        "tags": [
+          "Semantic Layer - Metrics"
+        ]
+      }
+    },
+    "/semantic/metrics/{id}": {
+      "get": {
+        "operationId": "MetricsController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get a metric definition by id",
+        "tags": [
+          "Semantic Layer - Metrics"
+        ]
+      },
+      "put": {
+        "operationId": "MetricsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMetricDefinitionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update a metric definition",
+        "tags": [
+          "Semantic Layer - Metrics"
+        ]
+      },
+      "delete": {
+        "operationId": "MetricsController_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a metric definition",
+        "tags": [
+          "Semantic Layer - Metrics"
+        ]
+      }
+    },
+    "/semantic/metrics/{id}/certify": {
+      "post": {
+        "operationId": "MetricsController_certify",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Certify a metric (DRAFT → ACTIVE)",
+        "tags": [
+          "Semantic Layer - Metrics"
+        ]
+      }
+    },
+    "/semantic/query": {
+      "post": {
+        "operationId": "MetricQueryController_queryMetric",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryMetricDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Evaluate a metric with optional dimensions and filters",
+        "tags": [
+          "Semantic Layer - Query"
+        ]
+      }
+    },
+    "/semantic/query/timeseries": {
+      "post": {
+        "operationId": "MetricQueryController_queryTimeSeries",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryMetricTimeSeriesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Evaluate a metric as a time series",
+        "tags": [
+          "Semantic Layer - Query"
+        ]
+      }
+    },
+    "/semantic/query/dashboard": {
+      "post": {
+        "operationId": "MetricQueryController_queryDashboard",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryDashboardMetricsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Batch-evaluate all metrics placed on a dashboard",
+        "tags": [
+          "Semantic Layer - Query"
+        ]
+      }
+    },
+    "/semantic/query/explore": {
+      "post": {
+        "operationId": "MetricQueryController_explore",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Explore detection data through a glossary term with metric breakdown",
+        "tags": [
+          "Semantic Layer - Query"
+        ]
+      }
     }
   },
   "info": {
     "title": "Classifyre API",
-    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.",
+    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.",
     "version": "1.0.0",
     "contact": {
       "name": "Classifyre Team",
@@ -3758,7 +4148,6 @@
             "enum": [
               "WORDPRESS",
               "SLACK",
-              "SITEMAP",
               "S3_COMPATIBLE_STORAGE",
               "AZURE_BLOB_STORAGE",
               "GOOGLE_CLOUD_STORAGE",
@@ -3907,7 +4296,6 @@
             "enum": [
               "WORDPRESS",
               "SLACK",
-              "SITEMAP",
               "S3_COMPATIBLE_STORAGE",
               "AZURE_BLOB_STORAGE",
               "GOOGLE_CLOUD_STORAGE",
@@ -4027,7 +4415,6 @@
                 "GOOGLE_SLIDES",
                 "WORDPRESS",
                 "SLACK",
-                "SITEMAP",
                 "S3_COMPATIBLE_STORAGE",
                 "AZURE_BLOB_STORAGE",
                 "GOOGLE_CLOUD_STORAGE",
@@ -4116,6 +4503,9 @@
           "assetsUnchanged": {
             "type": "number"
           },
+          "assetsDeleted": {
+            "type": "number"
+          },
           "totalFindings": {
             "type": "number"
           },
@@ -4134,6 +4524,7 @@
           "assetsCreated",
           "assetsUpdated",
           "assetsUnchanged",
+          "assetsDeleted",
           "totalFindings",
           "triggeredAt"
         ]
@@ -4310,7 +4701,6 @@
               "GOOGLE_SLIDES",
               "WORDPRESS",
               "SLACK",
-              "SITEMAP",
               "S3_COMPATIBLE_STORAGE",
               "AZURE_BLOB_STORAGE",
               "GOOGLE_CLOUD_STORAGE",
@@ -4342,7 +4732,8 @@
             "enum": [
               "NEW",
               "UPDATED",
-              "UNCHANGED"
+              "UNCHANGED",
+              "DELETED"
             ]
           },
           "createdAt": {
@@ -4392,7 +4783,8 @@
               "enum": [
                 "NEW",
                 "UPDATED",
-                "UNCHANGED"
+                "UNCHANGED",
+                "DELETED"
               ]
             }
           },
@@ -4414,7 +4806,6 @@
                 "GOOGLE_SLIDES",
                 "WORDPRESS",
                 "SLACK",
-                "SITEMAP",
                 "S3_COMPATIBLE_STORAGE",
                 "AZURE_BLOB_STORAGE",
                 "GOOGLE_CLOUD_STORAGE",
@@ -5230,7 +5621,6 @@
               "GOOGLE_SLIDES",
               "WORDPRESS",
               "SLACK",
-              "SITEMAP",
               "S3_COMPATIBLE_STORAGE",
               "AZURE_BLOB_STORAGE",
               "GOOGLE_CLOUD_STORAGE",
@@ -6980,7 +7370,8 @@
           "language": {
             "type": "string",
             "enum": [
-              "ENGLISH"
+              "ENGLISH",
+              "GERMAN"
             ],
             "example": "ENGLISH"
           },
@@ -7033,7 +7424,8 @@
           "language": {
             "type": "string",
             "enum": [
-              "ENGLISH"
+              "ENGLISH",
+              "GERMAN"
             ],
             "example": "ENGLISH"
           },
@@ -7572,6 +7964,10 @@
             "type": "number",
             "default": 0
           },
+          "assetsDeleted": {
+            "type": "number",
+            "default": 0
+          },
           "totalFindings": {
             "type": "number",
             "default": 0
@@ -7606,6 +8002,7 @@
           "assetsCreated",
           "assetsUpdated",
           "assetsUnchanged",
+          "assetsDeleted",
           "totalFindings"
         ]
       },
@@ -7764,7 +8161,6 @@
                 "GOOGLE_SLIDES",
                 "WORDPRESS",
                 "SLACK",
-                "SITEMAP",
                 "S3_COMPATIBLE_STORAGE",
                 "AZURE_BLOB_STORAGE",
                 "GOOGLE_CLOUD_STORAGE",
@@ -7935,6 +8331,10 @@
             "type": "number",
             "default": 0
           },
+          "assetsDeleted": {
+            "type": "number",
+            "default": 0
+          },
           "totalFindings": {
             "type": "number",
             "default": 0
@@ -7968,6 +8368,7 @@
           "assetsCreated",
           "assetsUpdated",
           "assetsUnchanged",
+          "assetsDeleted",
           "totalFindings"
         ]
       },
@@ -8237,6 +8638,387 @@
           "total",
           "skip",
           "limit"
+        ]
+      },
+      "GlossaryFilterMappingDto": {
+        "type": "object",
+        "properties": {
+          "detectorTypes": {
+            "description": "Detector types to include",
+            "example": [
+              "SECRETS",
+              "PII"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "severities": {
+            "description": "Severity levels to include",
+            "example": [
+              "CRITICAL",
+              "HIGH"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypes": {
+            "description": "Finding types to include",
+            "example": [
+              "aws_key",
+              "ssn"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "customDetectorKeys": {
+            "description": "Custom detector keys to include",
+            "example": [
+              "gdpr-scanner"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "statuses": {
+            "description": "Finding statuses to include",
+            "example": [
+              "OPEN"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CreateGlossaryTermDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "Human-readable display name",
+            "example": "Security Threats"
+          },
+          "description": {
+            "type": "string",
+            "description": "Plain-language explanation of what this term means",
+            "example": "All findings related to security vulnerabilities including exposed secrets and malware signatures"
+          },
+          "category": {
+            "type": "string",
+            "description": "Grouping category",
+            "example": "Security"
+          },
+          "filterMapping": {
+            "description": "Mapping to technical detection filters",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GlossaryFilterMappingDto"
+              }
+            ]
+          },
+          "color": {
+            "type": "string",
+            "description": "Hex color for UI display",
+            "example": "#ff2b2b"
+          },
+          "icon": {
+            "type": "string",
+            "description": "Lucide icon name",
+            "example": "shield-alert"
+          }
+        },
+        "required": [
+          "displayName",
+          "filterMapping"
+        ]
+      },
+      "UpdateGlossaryTermDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "filterMapping": {
+            "$ref": "#/components/schemas/GlossaryFilterMappingDto"
+          },
+          "color": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateMetricDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "Human-readable display name",
+            "example": "False Positive Rate"
+          },
+          "description": {
+            "type": "string",
+            "description": "Explanation of what this metric measures",
+            "example": "Percentage of findings marked as false positive out of total findings"
+          },
+          "type": {
+            "type": "string",
+            "description": "Metric calculation type",
+            "enum": [
+              "SIMPLE",
+              "RATIO",
+              "DERIVED",
+              "TREND"
+            ],
+            "example": "RATIO"
+          },
+          "definition": {
+            "type": "object",
+            "description": "Metric calculation definition (depends on type)",
+            "example": {
+              "numerator": {
+                "aggregation": "COUNT",
+                "entity": "finding",
+                "filters": {
+                  "statuses": [
+                    "FALSE_POSITIVE"
+                  ]
+                }
+              },
+              "denominator": {
+                "aggregation": "COUNT",
+                "entity": "finding"
+              }
+            }
+          },
+          "allowedDimensions": {
+            "description": "Dimensions this metric can be sliced by",
+            "example": [
+              "severity",
+              "detectorType",
+              "source"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "glossaryTermId": {
+            "type": "string",
+            "description": "Associated glossary term id"
+          },
+          "format": {
+            "type": "string",
+            "description": "Display format",
+            "example": "percentage"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Display unit",
+            "example": "%"
+          },
+          "color": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "displayName",
+          "type",
+          "definition"
+        ]
+      },
+      "UpdateMetricDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "definition": {
+            "type": "object"
+          },
+          "allowedDimensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "glossaryTermId": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "QueryMetricDto": {
+        "type": "object",
+        "properties": {
+          "metricId": {
+            "type": "string",
+            "description": "Metric id to evaluate",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "dimensions": {
+            "description": "Dimensions to group by",
+            "example": [
+              "severity",
+              "detectorType"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "type": "object",
+            "description": "Additional filters to apply",
+            "example": {
+              "sourceIds": [
+                "src-1"
+              ],
+              "severities": [
+                "CRITICAL",
+                "HIGH"
+              ]
+            }
+          },
+          "from": {
+            "type": "string",
+            "description": "Time range start"
+          },
+          "to": {
+            "type": "string",
+            "description": "Time range end"
+          },
+          "glossaryTermId": {
+            "type": "string",
+            "description": "Glossary term id to scope the query"
+          }
+        },
+        "required": [
+          "metricId"
+        ]
+      },
+      "QueryMetricTimeSeriesDto": {
+        "type": "object",
+        "properties": {
+          "metricId": {
+            "type": "string",
+            "description": "Metric id to evaluate",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "dimensions": {
+            "description": "Dimensions to group by",
+            "example": [
+              "severity",
+              "detectorType"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "type": "object",
+            "description": "Additional filters to apply",
+            "example": {
+              "sourceIds": [
+                "src-1"
+              ],
+              "severities": [
+                "CRITICAL",
+                "HIGH"
+              ]
+            }
+          },
+          "from": {
+            "type": "string",
+            "description": "Time range start"
+          },
+          "to": {
+            "type": "string",
+            "description": "Time range end"
+          },
+          "glossaryTermId": {
+            "type": "string",
+            "description": "Glossary term id to scope the query"
+          },
+          "granularity": {
+            "type": "string",
+            "description": "Time bucket granularity",
+            "enum": [
+              "hour",
+              "day",
+              "week",
+              "month"
+            ],
+            "example": "day"
+          }
+        },
+        "required": [
+          "metricId",
+          "granularity"
+        ]
+      },
+      "QueryDashboardMetricsDto": {
+        "type": "object",
+        "properties": {
+          "dashboard": {
+            "type": "string",
+            "description": "Dashboard identifier",
+            "example": "discovery"
+          },
+          "filters": {
+            "type": "object",
+            "description": "Global filters applied to all metrics"
+          },
+          "from": {
+            "type": "string",
+            "description": "Time range start"
+          },
+          "to": {
+            "type": "string",
+            "description": "Time range end"
+          }
+        },
+        "required": [
+          "dashboard"
         ]
       }
     }
