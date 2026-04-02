@@ -1,9 +1,10 @@
-name: Develop
+name: Deploy Develop Environment
 
 # Triggered after the CI workflow completes successfully on the develop branch.
 # CI (ci.yml) already runs on every push and builds/pushes the :develop Docker
 # image. This workflow runs afterwards and deploys it to the classifyre-develop
-# namespace on the VPS.
+# namespace on the VPS. It can also be run manually to deploy any existing image
+# tag into that same develop namespace.
 on:
   workflow_run:
     workflows: [CI]
@@ -12,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "Image tag to deploy (default: develop)"
+        description: "Docker image tag to deploy to the develop namespace"
         required: false
         default: "develop"
 
@@ -33,6 +34,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
 
     env:
+      DOCKER_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
       HELM_RELEASE_NAME: classifyre-develop
       HELM_NAMESPACE: classifyre-develop
       HELM_VALUES_FILE: ./helm/classifyre/values-vps-develop.yaml
@@ -42,8 +44,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          # For workflow_run, check out the develop branch HEAD, not the CI run's commit.
-          ref: develop
+          # Automatic deploys always use develop. Manual deploys use the selected ref.
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || 'develop' }}
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
@@ -61,6 +63,16 @@ jobs:
       - name: Verify cluster access
         run: kubectl cluster-info
 
+      - name: Show deployment target
+        run: |
+          set -euo pipefail
+          echo "Namespace: ${HELM_NAMESPACE}"
+          echo "Release: ${HELM_RELEASE_NAME}"
+          echo "Image tag: ${IMAGE_TAG}"
+          echo "API image: ${DOCKER_NAMESPACE}/api:${IMAGE_TAG}"
+          echo "Web image: ${DOCKER_NAMESPACE}/web:${IMAGE_TAG}"
+          echo "CLI image: ${DOCKER_NAMESPACE}/cli:${IMAGE_TAG}"
+
       - name: Deploy develop with Helm
         run: |
           set -euo pipefail
@@ -69,8 +81,11 @@ jobs:
             --namespace "${HELM_NAMESPACE}" \
             --create-namespace \
             -f "${HELM_VALUES_FILE}" \
+            --set api.image.repository="${DOCKER_NAMESPACE}/api" \
             --set api.image.tag="${IMAGE_TAG}" \
+            --set api.cliJobs.image.repository="${DOCKER_NAMESPACE}/cli" \
             --set api.cliJobs.image.tag="${IMAGE_TAG}" \
+            --set frontend.image.repository="${DOCKER_NAMESPACE}/web" \
             --set frontend.image.tag="${IMAGE_TAG}" \
             --wait \
             --timeout 15m
