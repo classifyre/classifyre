@@ -78,14 +78,6 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMeta> = {
     category: "COLLABORATION",
     keywords: ["chat", "messages", "workspace"],
   },
-  SITEMAP: {
-    label: "Website Index",
-    description:
-      "Scan website content from your sitemap for continuous monitoring.",
-    icon: CreateSourceDtoTypeEnum.Sitemap,
-    category: "WEB_AND_UGC",
-    keywords: ["site", "crawl", "web", "urls"],
-  },
   S3_COMPATIBLE_STORAGE: {
     label: "S3-Compatible Storage",
     description:

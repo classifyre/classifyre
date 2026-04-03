@@ -54,10 +54,6 @@ data:
                     "value": "20"
                   },
                   {
-                    "name": "CRAWL4_AI_BASE_DIRECTORY",
-                    "value": "/tmp"
-                  },
-                  {
                     "name": "HOME",
                     "value": "/tmp"
                   }
@@ -77,22 +73,13 @@ data:
                   {{- end }}
                 ],
                 "volumeMounts": [
-                  {{- $hasPrev := false -}}
                   {{- if .Values.api.cliJobs.uvCache.enabled }}
                   {
                     "name": "uv-cache",
                     "mountPath": "{{ .Values.api.cliJobs.uvCache.mountPath }}"
                   }
-                  {{- $hasPrev = true -}}
                   {{- end }}
-                  {{- if .Values.api.cliJobs.playwrightCache.enabled }}
-                  {{- if $hasPrev }},{{- end }}
-                  {
-                    "name": "playwright-cache",
-                    "mountPath": "{{ .Values.api.cliJobs.playwrightCache.mountPath }}"
-                  }
-                  {{- $hasPrev = true -}}
-                  {{- end }}
+                  {{- $hasPrev := .Values.api.cliJobs.uvCache.enabled -}}
                   {{- if .Values.api.runnerLogs.enabled }}
                   {{- if $hasPrev }},{{- end }}
                   {
@@ -110,16 +97,6 @@ data:
                 "name": "uv-cache",
                 "persistentVolumeClaim": {
                   "claimName": "{{ default (printf "%s-cli-uv-cache" (include "classifyre.fullname" .)) .Values.api.cliJobs.uvCache.existingClaim }}"
-                }
-              }
-              {{- $hasPrevVol = true -}}
-              {{- end }}
-              {{- if .Values.api.cliJobs.playwrightCache.enabled }}
-              {{- if $hasPrevVol }},{{- end }}
-              {
-                "name": "playwright-cache",
-                "persistentVolumeClaim": {
-                  "claimName": "{{ default (printf "%s-cli-playwright-cache" (include "classifyre.fullname" .)) .Values.api.cliJobs.playwrightCache.existingClaim }}"
                 }
               }
               {{- $hasPrevVol = true -}}

@@ -36,7 +36,6 @@ trap 'on_exit "$?"' EXIT
 mkdir -p \
   "${TMP_DIR}/postgres" \
   "${TMP_DIR}/uv-cache" \
-  "${TMP_DIR}/playwright" \
   "${TMP_DIR}/runner-logs"
 chmod -R 0777 "${TMP_DIR}"
 
@@ -45,7 +44,6 @@ docker run -d \
   -p "${PORT}:3000" \
   -v "${TMP_DIR}/postgres:/var/lib/postgresql/data" \
   -v "${TMP_DIR}/uv-cache:/cache/uv" \
-  -v "${TMP_DIR}/playwright:/ms-playwright" \
   -v "${TMP_DIR}/runner-logs:/var/lib/classifyre/runner-logs" \
   "${IMAGE_TAG}" >/dev/null
 

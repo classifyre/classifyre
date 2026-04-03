@@ -350,9 +350,8 @@ The chart provisions three PVCs by default.
 |---|---|---|
 | `runner-logs` | Scan execution logs (mounted in API pods) | 20 Gi |
 | `uv-cache` | Python package cache shared across CLI jobs | 20 Gi |
-| `playwright-cache` | Playwright browser binaries for CLI jobs | 10 Gi |
 
-All three require `ReadWriteMany` access mode. On clusters without a `ReadWriteMany` storage class (e.g. bare k3s), set a compatible `storageClassName` or point them at an existing NFS/CSI-backed PVC:
+Both require `ReadWriteMany` access mode. On clusters without a `ReadWriteMany` storage class (e.g. bare k3s), set a compatible `storageClassName` or point them at an existing NFS/CSI-backed PVC:
 
 ```yaml
 api:
@@ -360,8 +359,6 @@ api:
     storageClassName: nfs-client
   cliJobs:
     uvCache:
-      storageClassName: nfs-client
-    playwrightCache:
       storageClassName: nfs-client
 ```
 

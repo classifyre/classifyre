@@ -197,7 +197,7 @@ class BaseSource(ABC):
 
         Override per source type:
         - Tabular (PostgreSQL, MySQL): "schema.table, row N"
-        - Web (WordPress, Sitemap): the page URL
+        - Web (WordPress): the page URL
         - Slack: permalink or "channel / message_ts"
         """
         pass

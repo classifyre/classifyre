@@ -27,7 +27,6 @@ import {
   Database,
   Folder,
   Monitor,
-  Network,
   Settings,
 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -102,7 +101,6 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
 > = {
   [CreateSourceDtoTypeEnum.Wordpress]: siWordpress,
   [CreateSourceDtoTypeEnum.Slack]: null,
-  [CreateSourceDtoTypeEnum.Sitemap]: null,
   [CreateSourceDtoTypeEnum.S3CompatibleStorage]: null,
   [CreateSourceDtoTypeEnum.AzureBlobStorage]: null,
   [CreateSourceDtoTypeEnum.GoogleCloudStorage]: null,
@@ -140,7 +138,6 @@ export const MISSING_SIMPLE_ICON_SOURCE_TYPES = Object.values(
 const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Wordpress]: createSimpleIconComponent(siWordpress),
   [CreateSourceDtoTypeEnum.Slack]: SlackIcon,
-  [CreateSourceDtoTypeEnum.Sitemap]: Network,
   [CreateSourceDtoTypeEnum.S3CompatibleStorage]: Cloud,
   [CreateSourceDtoTypeEnum.AzureBlobStorage]: Cloud,
   [CreateSourceDtoTypeEnum.GoogleCloudStorage]: Cloud,

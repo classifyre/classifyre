@@ -218,8 +218,8 @@ describe('CliRunnerService', () => {
     const { service, prisma, runnerLogStorage, maskedConfigCryptoService } =
       createService();
     const plainConfig = {
-      type: 'SITEMAP',
-      required: { sitemap_url: 'https://example.com/sitemap.xml' },
+      type: 'POSTGRESQL',
+      required: { host: 'db.local', port: 5432 },
       sampling: {
         strategy: 'RANDOM',
         limit: 10,
@@ -264,8 +264,8 @@ describe('CliRunnerService', () => {
       expect.objectContaining({
         id: 'source-1',
         config: expect.objectContaining({
-          type: 'SITEMAP',
-          required: { sitemap_url: 'https://example.com/sitemap.xml' },
+          type: 'POSTGRESQL',
+          required: { host: 'db.local', port: 5432 },
           sampling: {
             strategy: 'RANDOM',
             limit: 10,
@@ -522,8 +522,8 @@ describe('CliRunnerService', () => {
   it('repairs a missing current runner reference before creating a new run', async () => {
     const { runnerLogStorage, maskedConfigCryptoService } = createService();
     const plainConfig = {
-      type: 'SITEMAP',
-      required: { sitemap_url: 'https://example.com/sitemap.xml' },
+      type: 'POSTGRESQL',
+      required: { host: 'db.local', port: 5432 },
     };
     const encryptedConfig =
       maskedConfigCryptoService.encryptMaskedConfig(plainConfig);

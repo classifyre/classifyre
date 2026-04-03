@@ -1,18 +1,12 @@
-name: Develop
+name: Feature Branch Deployment
 
-# Triggered after the CI workflow completes successfully on the develop branch.
-# CI (ci.yml) already runs on every push and builds/pushes the :develop Docker
-# image. This workflow runs afterwards and deploys it to the classifyre-develop
-# namespace on the VPS.
+# Manual deployment workflow for rolling any existing image tag into the
+# classifyre-develop namespace on the VPS.
 on:
-  workflow_run:
-    workflows: [CI]
-    branches: [develop]
-    types: [completed]
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "Image tag to deploy (default: develop)"
+        description: "Docker image tag to deploy to the develop namespace"
         required: false
         default: "develop"
 
@@ -24,15 +18,11 @@ env:
 
 jobs:
   deploy-develop:
-    name: Deploy to develop
+    name: Deploy Image To Develop Namespace
     runs-on: ubuntu-latest
-    # For workflow_run: only deploy when CI succeeded.
-    # For workflow_dispatch: always run.
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
 
     env:
+      DOCKER_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
       HELM_RELEASE_NAME: classifyre-develop
       HELM_NAMESPACE: classifyre-develop
       HELM_VALUES_FILE: ./helm/classifyre/values-vps-develop.yaml
@@ -42,7 +32,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          # For workflow_run, check out the develop branch HEAD, not the CI run's commit.
+          # Keep deploy config stable and ignore the UI ref selector.
           ref: develop
 
       - name: Setup kubectl
@@ -61,6 +51,42 @@ jobs:
       - name: Verify cluster access
         run: kubectl cluster-info
 
+      - name: Show deployment target
+        run: |
+          set -euo pipefail
+          echo "Namespace: ${HELM_NAMESPACE}"
+          echo "Release: ${HELM_RELEASE_NAME}"
+          echo "Image tag: ${IMAGE_TAG}"
+          echo "API image: ${DOCKER_NAMESPACE}/api:${IMAGE_TAG}"
+          echo "Web image: ${DOCKER_NAMESPACE}/web:${IMAGE_TAG}"
+          echo "CLI image: ${DOCKER_NAMESPACE}/cli:${IMAGE_TAG}"
+
+      - name: Clear pending Helm operation
+        run: |
+          set -euo pipefail
+
+          history_json="$(helm history "${HELM_RELEASE_NAME}" -n "${HELM_NAMESPACE}" -o json 2>/dev/null || true)"
+          if [[ -z "${history_json}" || "${history_json}" == "[]" ]]; then
+            echo "No existing Helm release state to clear."
+            exit 0
+          fi
+
+          last_status="$(jq -r '.[-1].status // empty' <<< "${history_json}")"
+          last_revision="$(jq -r '.[-1].revision // empty' <<< "${history_json}")"
+
+          if [[ "${last_status}" != pending-* ]]; then
+            echo "Helm release is not pending (${last_status:-unknown})."
+            exit 0
+          fi
+
+          if [[ -z "${last_revision}" ]]; then
+            echo "::error::Pending Helm release detected but revision could not be resolved."
+            exit 1
+          fi
+
+          echo "Deleting stale Helm release secret for pending revision ${last_revision}."
+          kubectl -n "${HELM_NAMESPACE}" delete secret "sh.helm.release.v1.${HELM_RELEASE_NAME}.v${last_revision}" --ignore-not-found=true
+
       - name: Deploy develop with Helm
         run: |
           set -euo pipefail
@@ -69,8 +95,11 @@ jobs:
             --namespace "${HELM_NAMESPACE}" \
             --create-namespace \
             -f "${HELM_VALUES_FILE}" \
+            --set api.image.repository="${DOCKER_NAMESPACE}/api" \
             --set api.image.tag="${IMAGE_TAG}" \
+            --set api.cliJobs.image.repository="${DOCKER_NAMESPACE}/cli" \
             --set api.cliJobs.image.tag="${IMAGE_TAG}" \
+            --set frontend.image.repository="${DOCKER_NAMESPACE}/web" \
             --set frontend.image.tag="${IMAGE_TAG}" \
             --wait \
             --timeout 15m

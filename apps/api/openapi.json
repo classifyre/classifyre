@@ -68,7 +68,7 @@
     },
     "/sources": {
       "post": {
-        "description": "Register a new data source for metadata ingestion (WordPress, Slack, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk).",
+        "description": "Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk).",
         "operationId": "SourcesController_createSource",
         "parameters": [],
         "requestBody": {
@@ -132,28 +132,6 @@
                       "sampling": {
                         "strategy": "RANDOM",
                         "limit": 100
-                      }
-                    }
-                  }
-                },
-                "sitemap": {
-                  "summary": "Sitemap Source",
-                  "value": {
-                    "type": "SITEMAP",
-                    "name": "Production Website Index",
-                    "config": {
-                      "type": "SITEMAP",
-                      "required": {
-                        "sitemap_url": "https://www.example.com/sitemap.xml"
-                      },
-                      "optional": {
-                        "crawl": {
-                          "max_nested_sitemaps": 100
-                        }
-                      },
-                      "sampling": {
-                        "strategy": "RANDOM",
-                        "limit": 25
                       }
                     }
                   }
@@ -1145,7 +1123,6 @@
                   "GOOGLE_SLIDES",
                   "WORDPRESS",
                   "SLACK",
-                  "SITEMAP",
                   "S3_COMPATIBLE_STORAGE",
                   "AZURE_BLOB_STORAGE",
                   "GOOGLE_CLOUD_STORAGE",
@@ -4122,7 +4099,7 @@
   },
   "info": {
     "title": "Classifyre API",
-    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, Sitemap, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.",
+    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.",
     "version": "1.0.0",
     "contact": {
       "name": "Classifyre Team",
@@ -4171,7 +4148,6 @@
             "enum": [
               "WORDPRESS",
               "SLACK",
-              "SITEMAP",
               "S3_COMPATIBLE_STORAGE",
               "AZURE_BLOB_STORAGE",
               "GOOGLE_CLOUD_STORAGE",
@@ -4320,7 +4296,6 @@
             "enum": [
               "WORDPRESS",
               "SLACK",
-              "SITEMAP",
               "S3_COMPATIBLE_STORAGE",
               "AZURE_BLOB_STORAGE",
               "GOOGLE_CLOUD_STORAGE",
@@ -4440,7 +4415,6 @@
                 "GOOGLE_SLIDES",
                 "WORDPRESS",
                 "SLACK",
-                "SITEMAP",
                 "S3_COMPATIBLE_STORAGE",
                 "AZURE_BLOB_STORAGE",
                 "GOOGLE_CLOUD_STORAGE",
@@ -4727,7 +4701,6 @@
               "GOOGLE_SLIDES",
               "WORDPRESS",
               "SLACK",
-              "SITEMAP",
               "S3_COMPATIBLE_STORAGE",
               "AZURE_BLOB_STORAGE",
               "GOOGLE_CLOUD_STORAGE",
@@ -4833,7 +4806,6 @@
                 "GOOGLE_SLIDES",
                 "WORDPRESS",
                 "SLACK",
-                "SITEMAP",
                 "S3_COMPATIBLE_STORAGE",
                 "AZURE_BLOB_STORAGE",
                 "GOOGLE_CLOUD_STORAGE",
@@ -5649,7 +5621,6 @@
               "GOOGLE_SLIDES",
               "WORDPRESS",
               "SLACK",
-              "SITEMAP",
               "S3_COMPATIBLE_STORAGE",
               "AZURE_BLOB_STORAGE",
               "GOOGLE_CLOUD_STORAGE",
@@ -8190,7 +8161,6 @@
                 "GOOGLE_SLIDES",
                 "WORDPRESS",
                 "SLACK",
-                "SITEMAP",
                 "S3_COMPATIBLE_STORAGE",
                 "AZURE_BLOB_STORAGE",
                 "GOOGLE_CLOUD_STORAGE",

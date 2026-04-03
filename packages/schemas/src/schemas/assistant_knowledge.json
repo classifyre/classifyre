@@ -104,47 +104,6 @@
         }
       }
     },
-    "SITEMAP": {
-      "sections": {
-        "name": {
-          "title": "Source name",
-          "summary": "Use a site-scoped name that signals website index ingestion.",
-          "suggestions": [
-            "Use the domain in the name (example: Classifyre Website Index).",
-            "If you have multiple environments, include prod/staging."
-          ]
-        },
-        "required": {
-          "title": "Required",
-          "summary": "required.sitemap_url defines discovery entrypoint.",
-          "suggestions": [
-            "Use full HTTPS URLs.",
-            "Nested sitemap indexes are traversed automatically."
-          ],
-          "questions": [
-            "What is the sitemap URL to ingest?"
-          ]
-        },
-        "optional": {
-          "title": "Optional",
-          "summary": "optional.crawl and optional.assets tune coverage, performance, and lineage depth.",
-          "suggestions": [
-            "Enable optional.assets.fetch_related_assets to materialize image/pdf/video lineage assets.",
-            "Use optional.assets.include_external_links for broader lineage when needed.",
-            "Adjust optional.crawl.crawl_page_timeout_ms if pages are slow to load."
-          ]
-        },
-        "sampling": {
-          "title": "Sampling",
-          "summary": "Controls how many sitemap pages are crawled per run.",
-          "suggestions": [
-            "Start with RANDOM and a small limit (10\u201325) to validate extraction quality before scaling up.",
-            "Use LATEST to always re-check the most recently modified pages first.",
-            "Use ALL to crawl every URL in the sitemap \u2014 combine with broken-link detectors for integrity checks."
-          ]
-        }
-      }
-    },
     "S3_COMPATIBLE_STORAGE": {
       "sections": {
         "name": {

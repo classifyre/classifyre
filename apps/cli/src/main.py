@@ -324,7 +324,9 @@ def main() -> None:
 
     source_type = recipe.get("type", "").lower()
     if not source_type:
-        logger.error("Recipe must have a 'type' field (e.g., 'WORDPRESS', 'SLACK', 'SITEMAP')")
+        logger.error(
+            "Recipe must have a 'type' field (e.g., 'WORDPRESS', 'SLACK', 'S3_COMPATIBLE_STORAGE')"
+        )
         logger.info("Available source types: %s", ", ".join(available_sources))
         sys.exit(1)
 

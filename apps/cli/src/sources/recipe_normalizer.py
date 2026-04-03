@@ -194,12 +194,6 @@ def normalize_source_recipe(
             required.setdefault("workspace", normalized.pop("workspace"))
         normalized["required"] = required
 
-    if source_type_value == "SITEMAP":
-        required = _as_dict(normalized.get("required"))
-        if isinstance(normalized.get("sitemap_url"), str):
-            required.setdefault("sitemap_url", normalized.pop("sitemap_url"))
-        normalized["required"] = required
-
     if source_type_value in {
         "S3_COMPATIBLE_STORAGE",
         "AZURE_BLOB_STORAGE",
