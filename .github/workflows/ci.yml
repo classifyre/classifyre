@@ -37,7 +37,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: file
+          bun-version-file: package.json
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v7
