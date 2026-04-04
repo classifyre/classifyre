@@ -29,12 +29,14 @@ mkdir -p "${WEB_DIST}/standalone" "${WEB_DIST}/static" "${WEB_DIST}/public"
 cp -r apps/api/dist/. "${API_DIST}/"
 cp -r packages/api-client/src/generated/. "${CODEGEN}/"
 
-# Resolve bun's .bun/ symlinks before the Docker build context is staged.
-# Remove bun's internal package-cache symlink tree first: node_modules/.bun/
-# contains symlinks pointing to the global bun store (~/.bun/install/cache),
-# which is not present inside CI runners or Docker build contexts.
-# cp -rL would try to dereference those dangling symlinks and fail.
-rm -rf apps/web/.next/standalone/node_modules/.bun
+# Resolve all symlinks before the Docker build context is staged (cp -rL).
+# Bun's workspace layout leaves dangling symlinks in the standalone output:
+#  - node_modules/.bun/ → global bun install cache (absent on CI / in Docker)
+#  - apps/web/node_modules/next → not present; bun hoists it to root
+#  - node_modules/typescript → dev-only dep, absent at runtime
+# Prune every dangling symlink (-xtype l = symlink whose target doesn't exist)
+# so cp -rL only sees real files and valid symlinks it can dereference.
+find apps/web/.next/standalone -xtype l -delete
 cp -rL apps/web/.next/standalone/. "${WEB_DIST}/standalone/"
 cp -r apps/web/.next/static/. "${WEB_DIST}/static/"
 
