@@ -59,6 +59,11 @@ updates:
       # recharts v3 changed tooltip payload API — unpin after migrating chart.tsx
       - dependency-name: recharts
         update-types: ["version-update:semver-major"]
+      # @base-ui/react >=1.2 references Element at module level, breaking Next.js SSG
+      # (combobox.tsx imports it; barrel export pulls it into SSR bundles)
+      # Unpin when base-ui adds proper SSR guards or combobox moves to a lazy import
+      - dependency-name: "@base-ui/react"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
       # Next 16.2 broke Nextra MDX metadata exports — unpin when Nextra fixes it
       - dependency-name: next
         update-types: ["version-update:semver-patch"]
