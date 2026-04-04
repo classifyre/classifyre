@@ -354,7 +354,7 @@ async def test_tabular_detection_scans_per_cell_and_filters_entities_by_column()
             )
         ],
         column_names=["name", "email", "url", "company", "text"],
-        serialize_cell=lambda cell: str(cell),
+        serialize_cell=str,
         max_total_chars=5_000,
         include_column_names=True,
     )
@@ -434,7 +434,7 @@ async def test_tabular_detection_drops_single_token_person_noise_from_text_colum
         strategy="ALL",
         rows=[("Patrick Clark", "Moore, Powell and Carter")],
         column_names=["name", "text"],
-        serialize_cell=lambda cell: str(cell),
+        serialize_cell=str,
         max_total_chars=5_000,
         include_column_names=True,
     )
