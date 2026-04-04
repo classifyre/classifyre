@@ -57,11 +57,15 @@ data:
                     "name": "HOME",
                     "value": "/tmp"
                   }
-                  {{- if .Values.api.cliJobs.uvCache.enabled }},
+                  ,
                   {
                     "name": "UV_CACHE_DIR",
-                    "value": "{{ .Values.api.cliJobs.uvCache.mountPath }}"
+                    "value": "{{ if .Values.api.cliJobs.uvCache.enabled }}{{ .Values.api.cliJobs.uvCache.mountPath }}{{ else }}/tmp/uv-cache{{ end }}"
                   }
+                  {{- if .Values.api.cliJobs.playwrightCache.enabled }},
+                  {
+                    "name": "PLAYWRIGHT_BROWSERS_PATH",
+                    "value": "{{ .Values.api.cliJobs.playwrightCache.mountPath }}"
                   }
                   {{- end }}
                   {{- range .Values.api.cliJobs.extraEnv }},

@@ -2267,6 +2267,7 @@ export const JsonSchemaForm = React.forwardRef<
               onClick={handleSecondarySubmit}
               disabled={disabled}
               className="rounded-[4px] border-2 border-black"
+              data-testid="btn-test-source"
             >
               {secondarySubmitLabel}
             </Button>
@@ -2275,6 +2276,7 @@ export const JsonSchemaForm = React.forwardRef<
             type="submit"
             disabled={disabled}
             className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+            data-testid="btn-save-source"
           >
             {submitLabel}
           </Button>

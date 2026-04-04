@@ -115,12 +115,9 @@ class PostgreSQLSource(BaseSource):
         configured_database = scope_options.database
 
         if not include_all:
-            if configured_database:
-                return [configured_database]
-            raise ValueError(
-                "PostgreSQL source requires optional.scope.database when include_all_databases is false. "
-                "Set optional.scope.database (e.g. 'classifyre') or enable include_all_databases."
-            )
+            # Default to "postgres" maintenance database when no explicit database is configured,
+            # so that connection tests can proceed and report actual auth/connectivity errors.
+            return [configured_database or "postgres"]
 
         maintenance_database = scope_options.maintenance_database or "postgres"
         databases: list[str] = []

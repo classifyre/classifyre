@@ -92,7 +92,10 @@ def test_postgresql_test_connection_success(monkeypatch: pytest.MonkeyPatch) -> 
     assert "Reachable databases: 1" in result["message"]
 
 
-def test_postgresql_requires_database_when_not_include_all() -> None:
+def test_postgresql_defaults_to_postgres_db_when_not_include_all() -> None:
+    # When no explicit database is configured, _resolve_databases should default
+    # to "postgres" so that connection tests can surface real auth errors
+    # rather than failing with a config error before reaching the server.
     source = PostgreSQLSource(
         _recipe(
             optional={
@@ -104,8 +107,7 @@ def test_postgresql_requires_database_when_not_include_all() -> None:
         )
     )
 
-    with pytest.raises(ValueError, match=r"requires optional\.scope\.database"):
-        source._resolve_databases()
+    assert source._resolve_databases() == ["postgres"]
 
 
 def test_postgresql_include_all_uses_configured_maintenance_database(

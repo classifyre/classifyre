@@ -300,6 +300,7 @@ function DetectorConfigCard({
             pressed={enabled}
             onPressedChange={(pressed) => onStateChange({ enabled: pressed })}
             className="cursor-pointer"
+            data-testid={`detector-toggle-${detector.type}`}
           >
             {enabled ? t("sources.scanConfig.on") : t("sources.scanConfig.off")}
           </Toggle>
@@ -863,6 +864,7 @@ export function SourceScanConfig({
                 key={group.id}
                 value={group.id}
                 className="flex-none rounded-[4px] border border-black/20 px-3 cursor-pointer"
+                data-testid={`tab-${group.id}`}
               >
                 <span className="text-xs font-mono uppercase tracking-[0.12em]">
                   {group.label}

@@ -72,6 +72,7 @@ export function DeleteSourceAction({
               "h-8 rounded-[4px] border-2 border-destructive text-destructive hover:bg-destructive/10",
               className,
             )}
+            data-testid="btn-delete-source"
           >
             {isDeleting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -87,6 +88,7 @@ export function DeleteSourceAction({
               "rounded-[4px] border-2 border-black bg-[#ff2b2b] text-white shadow-[3px_3px_0_#000] hover:bg-[#e62626]",
               className,
             )}
+            data-testid="btn-delete-source"
           >
             {isDeleting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -119,6 +121,7 @@ export function DeleteSourceAction({
             disabled={isDeleting}
             onClick={handleDelete}
             className="rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
+            data-testid="btn-delete-confirm"
           >
             {isDeleting ? "Deleting..." : "Delete Source"}
           </AlertDialogAction>
