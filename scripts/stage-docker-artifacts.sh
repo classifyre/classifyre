@@ -30,6 +30,11 @@ cp -r apps/api/dist/. "${API_DIST}/"
 cp -r packages/api-client/src/generated/. "${CODEGEN}/"
 
 # Resolve bun's .bun/ symlinks before the Docker build context is staged.
+# Remove bun's internal package-cache symlink tree first: node_modules/.bun/
+# contains symlinks pointing to the global bun store (~/.bun/install/cache),
+# which is not present inside CI runners or Docker build contexts.
+# cp -rL would try to dereference those dangling symlinks and fail.
+rm -rf apps/web/.next/standalone/node_modules/.bun
 cp -rL apps/web/.next/standalone/. "${WEB_DIST}/standalone/"
 cp -r apps/web/.next/static/. "${WEB_DIST}/static/"
 
