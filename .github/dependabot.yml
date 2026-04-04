@@ -64,6 +64,11 @@ updates:
       # Unpin when base-ui adds proper SSR guards or combobox moves to a lazy import
       - dependency-name: "@base-ui/react"
         update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+      # react-medium-image-zoom >=5.4.2 uses `instanceof Element` in render path,
+      # crashing Next.js SSG workers (no DOM globals in Node.js).
+      # Unpin when the package adds a typeof Element guard (SSR-safe check)
+      - dependency-name: react-medium-image-zoom
+        update-types: ["version-update:semver-patch"]
       # Next 16.2 broke Nextra MDX metadata exports — unpin when Nextra fixes it
       - dependency-name: next
         update-types: ["version-update:semver-patch"]
