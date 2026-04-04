@@ -1,0 +1,90 @@
+version: 2
+
+updates:
+  # ── GitHub Actions ─────────────────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: "chore(ci)"
+
+  # ── JS/TS monorepo (bun workspaces) ────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+    labels: [dependencies, javascript]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      nestjs:
+        patterns: ["@nestjs/*"]
+      prisma:
+        patterns: ["prisma", "@prisma/*"]
+      radix-ui:
+        patterns: ["@radix-ui/*", "radix-ui"]
+      eslint:
+        patterns: ["eslint*", "@eslint/*", "typescript-eslint", "@typescript-eslint/*", "globals"]
+      typescript:
+        patterns: ["typescript"]
+      playwright:
+        patterns: ["playwright", "@playwright/*"]
+      tailwind:
+        patterns: ["tailwindcss", "@tailwindcss/*", "tw-animate-css"]
+      next:
+        patterns: ["next", "@next/*", "nextra*", "nextra-theme-docs"]
+      ai-sdks:
+        patterns: ["@anthropic-ai/*", "@google/genai", "openai", "@modelcontextprotocol/*"]
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+    # Packages with known breaking major upgrades — ignore majors until ready
+    ignore:
+      # TS 6.0 breaks NestJS DTOs — unpin after DTO classes are migrated
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # ESLint 10 incompatible with eslint-plugin-react@7 — unpin after react plugin v8 ships
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
+      # react-hooks v7 adds new rules that break existing code — unpin after fixing violations
+      - dependency-name: eslint-plugin-react-hooks
+        update-types: ["version-update:semver-major"]
+      # recharts v3 changed tooltip payload API — unpin after migrating chart.tsx
+      - dependency-name: recharts
+        update-types: ["version-update:semver-major"]
+      # Next 16.2 broke Nextra MDX metadata exports — unpin when Nextra fixes it
+      - dependency-name: next
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "@next/eslint-plugin-next"
+        update-types: ["version-update:semver-patch"]
+
+  # ── Python CLI ─────────────────────────────────────────────────────────────
+  - package-ecosystem: uv
+    directory: /apps/cli
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+    labels: [dependencies, python]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      torch-ml:
+        patterns: ["torch", "transformers", "onnxruntime", "optimum", "sentence-transformers", "setfit", "datasets", "scikit-learn"]
+      spacy:
+        patterns: ["spacy", "thinc", "srsly", "weasel", "cymem", "preshed", "murmurhash", "blis"]
+      presidio:
+        patterns: ["presidio-*"]
+      aws:
+        patterns: ["boto3", "botocore"]
+      azure:
+        patterns: ["azure-*"]
+      google-cloud:
+        patterns: ["google-cloud-*", "google-auth*"]
