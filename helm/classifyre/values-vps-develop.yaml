@@ -13,6 +13,9 @@ api:
 
   startCommand: node dist/src/main.js
 
+  env:
+    CLASSIFYRE_DEMO_MODE: "true"
+
   autoscaling:
     enabled: false
 
@@ -51,6 +54,9 @@ frontend:
     pullPolicy: Always
 
   startCommand: node /app/apps/web/server.js
+
+  env:
+    NEXT_PUBLIC_DEMO_MODE: "true"
 
   autoscaling:
     enabled: false
