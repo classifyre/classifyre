@@ -6,7 +6,9 @@
   "demo": {
     "badge": "Demo",
     "tooltip": "Demo mode is active. Viewing, search, and dashboards work normally. Creating, editing, deleting, running scans, training detectors, and the browser assistant are disabled.",
-    "mcpNotice": "Demo mode is active. MCP read-only access works with an existing token, but creating, editing, or deleting tokens is disabled."
+    "mcpNotice": "Demo mode is active. MCP read-only access works with an existing token, but creating, editing, or deleting tokens is disabled.",
+    "blockedTitle": "Not available in demo mode",
+    "blockedDescription": "This operation is not available in demo mode. Create, update, and delete operations are disabled."
   },
   "nav": {
     "overview": "Overview",
