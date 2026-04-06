@@ -104,6 +104,12 @@ jobs:
             --wait \
             --timeout 15m
 
+      - name: Force web rollout
+        run: |
+          set -euo pipefail
+          kubectl -n "${HELM_NAMESPACE}" rollout restart deployment/"${HELM_RELEASE_NAME}-web"
+          kubectl -n "${HELM_NAMESPACE}" rollout status deployment/"${HELM_RELEASE_NAME}-web" --timeout=10m
+
       - name: Show rollout status
         run: |
           set -euo pipefail
