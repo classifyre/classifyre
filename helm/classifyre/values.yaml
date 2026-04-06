@@ -308,6 +308,21 @@ api:
       # -- Requested size for uv cache PVC.
       size: 20Gi
 
+    playwrightCache:
+      # -- Enable shared PVC for Playwright browser cache.
+      enabled: false
+      # -- Mount path for Playwright cache in CLI job container.
+      mountPath: /cache/playwright
+      # -- Existing PVC name for Playwright cache. Empty creates a new PVC.
+      existingClaim: ""
+      # -- Storage class for Playwright cache PVC.
+      storageClassName: ""
+      # -- Access modes for Playwright cache PVC.
+      accessModes:
+        - ReadWriteMany
+      # -- Requested size for Playwright cache PVC.
+      size: 5Gi
+
   runnerLogs:
     # -- Enable PVC-backed storage for runner logs.
     enabled: true
