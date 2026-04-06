@@ -96,7 +96,7 @@ def test_oracle_test_connection_success(monkeypatch: pytest.MonkeyPatch) -> None
             ObjectRef(service_name="some_db", schema="HR", name="EMPLOYEES", object_type="TABLE")
         ],
     )
-    monkeypatch.setattr(source, "_connect", lambda: _DummyConnection())
+    monkeypatch.setattr(source, "_connect", _DummyConnection)
 
     result = source.test_connection()
 

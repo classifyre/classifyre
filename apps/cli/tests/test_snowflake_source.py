@@ -117,7 +117,7 @@ class _DummyConnection:
 def test_snowflake_test_connection_success(monkeypatch: pytest.MonkeyPatch) -> None:
     source = SnowflakeSource(_default_recipe())
     monkeypatch.setattr(source, "_resolve_databases", lambda: ["ANALYTICS"])
-    monkeypatch.setattr(source, "_connect", lambda: _DummyConnection())
+    monkeypatch.setattr(source, "_connect", _DummyConnection)
 
     result = source.test_connection()
 
