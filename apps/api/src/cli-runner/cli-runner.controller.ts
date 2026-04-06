@@ -19,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { CliRunnerService } from './cli-runner.service';
 import { RunnerStatus } from '@prisma/client';
+import { AllowInDemoMode } from '../demo-mode.decorator';
 import {
   StartRunnerDto,
   CreateExternalRunnerDto,
@@ -167,6 +168,7 @@ export class CliRunnerController {
   }
 }
 
+@AllowInDemoMode()
 @ApiTags('Runners')
 @Controller('search')
 export class SearchRunnersController {

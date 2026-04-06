@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { InstanceLanguage, InstanceTimeFormat } from '@prisma/client';
 import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaService } from './prisma.service';
+import { DemoModeService } from './demo-mode.service';
 
 describe('InstanceSettingsService', () => {
   let service: InstanceSettingsService;
@@ -18,6 +19,7 @@ describe('InstanceSettingsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InstanceSettingsService,
+        DemoModeService,
         {
           provide: PrismaService,
           useValue: mockPrismaService,
@@ -49,6 +51,7 @@ describe('InstanceSettingsService', () => {
       id: 1,
       aiEnabled: true,
       mcpEnabled: true,
+      demoMode: false,
       language: InstanceLanguage.ENGLISH,
       timezone: 'UTC',
       timeFormat: InstanceTimeFormat.TWELVE_HOUR,

@@ -32,6 +32,7 @@ import { SourceResponseDto } from '../dto/source-response.dto';
 import { TestConnectionResponseDto } from '../dto/test-connection-response.dto';
 import { SearchSourcesRequestDto } from '../dto/search-sources-request.dto';
 import { SearchSourcesResponseDto } from '../dto/search-sources-response.dto';
+import { AllowInDemoMode } from '../demo-mode.decorator';
 
 @Controller('sources')
 @ApiTags('Sources')
@@ -822,6 +823,7 @@ export class SourcesController {
   }
 }
 
+@AllowInDemoMode()
 @Controller('search/sources')
 @ApiTags('Sources')
 export class SearchSourcesController {

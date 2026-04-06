@@ -1,4 +1,8 @@
 {
+  "demo": {
+    "readOnly": "Diese Instanz befindet sich im schreibgeschützten Demo-Modus. Erstellen, Aktualisieren und Löschen sind deaktiviert.",
+    "tooltip": "Demo-Modus ist aktiv. Ansicht, Suche und Dashboards funktionieren normal. Erstellen, Bearbeiten, Löschen, Scans ausführen, Detektoren trainieren und der Browser-Assistent sind deaktiviert."
+  },
   "errors": {
     "asset": {
       "notFound": "Asset mit ID {{id}} nicht gefunden"

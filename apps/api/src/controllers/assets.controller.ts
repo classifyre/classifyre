@@ -30,6 +30,7 @@ import { SearchAssetsRequestDto } from '../dto/search-assets-request.dto';
 import { SearchAssetsResponseDto } from '../dto/search-assets-response.dto';
 import { SearchAssetsChartsRequestDto } from '../dto/search-assets-charts-request.dto';
 import { SearchAssetsChartsResponseDto } from '../dto/search-assets-charts-response.dto';
+import { AllowInDemoMode } from '../demo-mode.decorator';
 import { SearchFindingsRequestDto } from '../dto/search-findings-request.dto';
 import { SearchFindingsResponseDto } from '../dto/search-findings-response.dto';
 import { SearchFindingsChartsRequestDto } from '../dto/search-findings-charts-request.dto';
@@ -73,6 +74,7 @@ export class AssetsController {
   }
 }
 
+@AllowInDemoMode()
 @Controller('search')
 @ApiTags('Assets')
 export class SearchAssetsController {

@@ -32,6 +32,7 @@ import { TrainCustomDetectorDto } from '../dto/train-custom-detector.dto';
 import { CustomDetectorTrainingRunDto } from '../dto/custom-detector-training-run.dto';
 import { CustomDetectorExampleDto } from '../dto/custom-detector-example.dto';
 import { ParseTrainingExamplesResponseDto } from '../dto/parse-training-examples-response.dto';
+import { AllowInDemoMode } from '../demo-mode.decorator';
 
 @ApiTags('Custom Detectors')
 @Controller('custom-detectors')
@@ -77,6 +78,7 @@ export class CustomDetectorsController {
     return this.customDetectorsService.create(dto);
   }
 
+  @AllowInDemoMode()
   @Post('training-examples/parse')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

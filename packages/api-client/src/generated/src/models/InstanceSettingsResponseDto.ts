@@ -56,6 +56,12 @@ export interface InstanceSettingsResponseDto {
      */
     timeFormat: InstanceSettingsResponseDtoTimeFormatEnum;
     /**
+     * Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.
+     * @type {boolean}
+     * @memberof InstanceSettingsResponseDto
+     */
+    demoMode: boolean;
+    /**
      * 
      * @type {Date}
      * @memberof InstanceSettingsResponseDto
@@ -99,6 +105,7 @@ export function instanceOfInstanceSettingsResponseDto(value: object): value is I
     if (!('language' in value) || value['language'] === undefined) return false;
     if (!('timezone' in value) || value['timezone'] === undefined) return false;
     if (!('timeFormat' in value) || value['timeFormat'] === undefined) return false;
+    if (!('demoMode' in value) || value['demoMode'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     return true;
@@ -120,6 +127,7 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'language': json['language'],
         'timezone': json['timezone'],
         'timeFormat': json['timeFormat'],
+        'demoMode': json['demoMode'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
     };
@@ -142,6 +150,7 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
         'language': value['language'],
         'timezone': value['timezone'],
         'timeFormat': value['timeFormat'],
+        'demoMode': value['demoMode'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
     };

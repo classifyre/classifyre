@@ -1,12 +1,14 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { MetricEngineService } from './metric-engine.service';
+import { AllowInDemoMode } from '../demo-mode.decorator';
 import {
   QueryMetricDto,
   QueryMetricTimeSeriesDto,
   QueryDashboardMetricsDto,
 } from './dto/query-metric.dto';
 
+@AllowInDemoMode()
 @ApiTags('Semantic Layer - Query')
 @Controller('semantic/query')
 export class MetricQueryController {

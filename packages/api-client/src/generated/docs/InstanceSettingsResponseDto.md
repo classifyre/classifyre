@@ -12,6 +12,7 @@ Name | Type
 `language` | string
 `timezone` | string
 `timeFormat` | string
+`demoMode` | boolean
 `createdAt` | Date
 `updatedAt` | Date
 
@@ -28,6 +29,7 @@ const example = {
   "language": ENGLISH,
   "timezone": UTC,
   "timeFormat": TWELVE_HOUR,
+  "demoMode": false,
   "createdAt": null,
   "updatedAt": null,
 } satisfies InstanceSettingsResponseDto

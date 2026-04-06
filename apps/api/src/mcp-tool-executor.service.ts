@@ -3,6 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { DemoModeService } from './demo-mode.service';
+import { DemoModeException } from './demo-mode.exception';
 import { CustomDetectorMethod } from '@prisma/client';
 import { CliRunnerService } from './cli-runner/cli-runner.service';
 import { CustomDetectorsService } from './custom-detectors.service';
@@ -59,9 +61,17 @@ export class McpToolExecutorService {
     private readonly schedulerService: SchedulerService,
     private readonly glossaryService: GlossaryService,
     private readonly metricsService: MetricsService,
+    private readonly demoMode: DemoModeService,
   ) {}
 
+  private assertNotDemoMode(): void {
+    if (this.demoMode.isDemoMode) {
+      throw new DemoModeException();
+    }
+  }
+
   async createSource(args: CreateSourceArgs) {
+    this.assertNotDemoMode();
     const normalizedConfig = await this.prepareSourceConfig(
       args.type,
       args.config,
@@ -85,6 +95,7 @@ export class McpToolExecutorService {
   }
 
   async updateSource(args: UpdateSourceArgs) {
+    this.assertNotDemoMode();
     const source = await this.requireSource(args.id);
     let normalizedConfig: JsonRecord | undefined;
 
@@ -123,10 +134,12 @@ export class McpToolExecutorService {
   }
 
   async testSourceConnection(id: string) {
+    this.assertNotDemoMode();
     return this.cliRunnerService.testConnection(id);
   }
 
   async createCustomDetector(args: CreateCustomDetectorArgs) {
+    this.assertNotDemoMode();
     return this.customDetectorsService.create({
       ...args,
       config: args.config ?? {},
@@ -134,6 +147,7 @@ export class McpToolExecutorService {
   }
 
   async trainCustomDetector(args: TrainCustomDetectorArgs) {
+    this.assertNotDemoMode();
     return this.customDetectorsService.train(args.id, {
       sourceId: args.sourceId,
     });
@@ -150,10 +164,12 @@ export class McpToolExecutorService {
     inputText: string;
     expectedOutcome: Record<string, unknown>;
   }) {
+    this.assertNotDemoMode();
     return this.customDetectorTests.createScenario(args.detectorId, args);
   }
 
   async runDetectorTests(args: { detectorId: string; triggeredBy?: string }) {
+    this.assertNotDemoMode();
     return this.customDetectorTests.runScenarios(
       args.detectorId,
       (args.triggeredBy as any) || 'ASSISTANT',
@@ -168,6 +184,7 @@ export class McpToolExecutorService {
     color?: string;
     icon?: string;
   }) {
+    this.assertNotDemoMode();
     return this.glossaryService.create({
       displayName: args.displayName,
       description: args.description,
@@ -189,6 +206,7 @@ export class McpToolExecutorService {
     unit?: string;
     owner?: string;
   }) {
+    this.assertNotDemoMode();
     return this.metricsService.create({
       displayName: args.displayName,
       description: args.description,
@@ -203,6 +221,7 @@ export class McpToolExecutorService {
   }
 
   async certifyMetric(id: string, certifiedBy: string) {
+    this.assertNotDemoMode();
     return this.metricsService.certify(id, certifiedBy);
   }
 
@@ -218,10 +237,12 @@ export class McpToolExecutorService {
       isActive?: boolean;
     },
   ) {
+    this.assertNotDemoMode();
     return this.glossaryService.update(id, args as any);
   }
 
   async deleteGlossaryTerm(id: string) {
+    this.assertNotDemoMode();
     return this.glossaryService.delete(id);
   }
 
@@ -239,10 +260,12 @@ export class McpToolExecutorService {
       isActive?: boolean;
     },
   ) {
+    this.assertNotDemoMode();
     return this.metricsService.update(id, args as any);
   }
 
   async deleteMetricDefinition(id: string) {
+    this.assertNotDemoMode();
     return this.metricsService.delete(id);
   }
 

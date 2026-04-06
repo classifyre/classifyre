@@ -72,6 +72,8 @@ api:
     TEMP_DIR: /tmp
     # -- Filesystem directory for runner execution logs.
     RUNNER_LOGS_DIR: /var/lib/classifyre/runner-logs
+    # -- Enable read-only demo mode. When "true" all mutating API operations return 403.
+    DEMO_MODE: "false"
 
   maskedConfigEncryption:
     # -- Existing secret name that contains API masked-config encryption key.

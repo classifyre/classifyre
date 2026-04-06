@@ -7388,6 +7388,11 @@
             ],
             "example": "TWELVE_HOUR"
           },
+          "demoMode": {
+            "type": "boolean",
+            "description": "Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.",
+            "example": false
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -7404,6 +7409,7 @@
           "language",
           "timezone",
           "timeFormat",
+          "demoMode",
           "createdAt",
           "updatedAt"
         ]

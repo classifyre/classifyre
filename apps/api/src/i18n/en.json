@@ -1,4 +1,8 @@
 {
+  "demo": {
+    "readOnly": "This instance is in read-only demo mode. Create, update, and delete operations are disabled.",
+    "tooltip": "Demo mode is active. Viewing, search, and dashboards work normally. Creating, editing, deleting, running scans, training detectors, and the browser assistant are disabled."
+  },
   "errors": {
     "asset": {
       "notFound": "Asset with ID {{id}} not found"
