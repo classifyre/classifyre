@@ -1,0 +1,83 @@
+name: Dependabot Codegen
+
+# Re-runs install + codegen after Dependabot bumps a dependency so that
+# generated files (OpenAPI client, Python models, docs artifacts) stay in
+# sync and CI's "Verify generated files are committed" check passes.
+on:
+  push:
+    branches:
+      - 'dependabot/**'
+
+permissions:
+  contents: write
+
+jobs:
+  codegen:
+    name: Regenerate after dependency bump
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref }}
+          # Use default GITHUB_TOKEN; contents:write above allows the push back.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove local Python virtualenvs
+        run: rm -rf apps/cli/.venv packages/schemas/.venv
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            apps/cli/pyproject.toml
+            apps/cli/uv.lock
+            packages/schemas/pyproject.toml
+            packages/schemas/uv.lock
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install JS dependencies
+        # Do NOT use --frozen-lockfile: Dependabot bumped package.json versions
+        # and we need bun to write an updated bun.lock.
+        run: bun install
+
+      - name: Generate code
+        run: bun run codegen
+
+      - name: Generate docs artifacts
+        run: bun run docs:generate
+
+      - name: Commit generated and lock file changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          CHANGED_FILES=(
+            bun.lock
+            apps/docs/src/_generated/helm-values.mdx
+            packages/api-client/src/generated
+            apps/cli/src/models/generated_input.py
+            apps/cli/src/models/generated_detectors.py
+            apps/cli/src/models/generated_single_asset_scan_results.py
+          )
+
+          if ! git diff --quiet -- "${CHANGED_FILES[@]}"; then
+            git add "${CHANGED_FILES[@]}"
+            git commit -m "chore: update lockfile and regenerate artifacts after Dependabot bump"
+            git push
+          else
+            echo "No generated files changed — nothing to commit."
+          fi
