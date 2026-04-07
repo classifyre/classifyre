@@ -4,6 +4,7 @@ updates:
   # ── GitHub Actions ─────────────────────────────────────────────────────────
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -11,10 +12,15 @@ updates:
     labels: [dependencies, ci]
     commit-message:
       prefix: "chore(ci)"
+    groups:
+      # One PR for all minor/patch bumps; majors get individual PRs (breaking changes).
+      actions-non-major:
+        update-types: [minor, patch]
 
   # ── JS/TS monorepo (bun workspaces) ────────────────────────────────────────
   - package-ecosystem: npm
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -23,26 +29,9 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     groups:
-      nestjs:
-        patterns: ["@nestjs/*"]
-      prisma:
-        patterns: ["prisma", "@prisma/*"]
-      radix-ui:
-        patterns: ["@radix-ui/*", "radix-ui"]
-      eslint:
-        patterns: ["eslint*", "@eslint/*", "typescript-eslint", "@typescript-eslint/*", "globals"]
-      typescript:
-        patterns: ["typescript"]
-      playwright:
-        patterns: ["playwright", "@playwright/*"]
-      tailwind:
-        patterns: ["tailwindcss", "@tailwindcss/*", "tw-animate-css"]
-      next:
-        patterns: ["next", "@next/*", "nextra*", "nextra-theme-docs"]
-      ai-sdks:
-        patterns: ["@anthropic-ai/*", "@google/genai", "openai", "@modelcontextprotocol/*"]
-      react:
-        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      # One PR for all minor/patch bumps; majors get individual PRs (breaking changes).
+      js-non-major:
+        update-types: [minor, patch]
     # Packages with known breaking major upgrades — ignore majors until ready
     ignore:
       # TS 6.0 breaks NestJS DTOs — unpin after DTO classes are migrated
@@ -78,6 +67,7 @@ updates:
   # ── Python CLI ─────────────────────────────────────────────────────────────
   - package-ecosystem: uv
     directory: /apps/cli
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
@@ -86,15 +76,6 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     groups:
-      torch-ml:
-        patterns: ["torch", "transformers", "onnxruntime", "optimum", "sentence-transformers", "setfit", "datasets", "scikit-learn"]
-      spacy:
-        patterns: ["spacy", "thinc", "srsly", "weasel", "cymem", "preshed", "murmurhash", "blis"]
-      presidio:
-        patterns: ["presidio-*"]
-      aws:
-        patterns: ["boto3", "botocore"]
-      azure:
-        patterns: ["azure-*"]
-      google-cloud:
-        patterns: ["google-cloud-*", "google-auth*"]
+      # One PR for all minor/patch bumps; majors get individual PRs (breaking changes).
+      python-non-major:
+        update-types: [minor, patch]
