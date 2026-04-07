@@ -1,6 +1,6 @@
 {
   "name": "classifyre",
-  "version": "0.2.33",
+  "version": "0.2.34",
   "private": true,
   "scripts": {
     "build": "turbo build --filter=!@workspace/devops",
