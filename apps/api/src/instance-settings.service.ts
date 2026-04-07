@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { DemoModeService } from './demo-mode.service';
 import type { InstanceSettings, Prisma } from '@prisma/client';
 import { InstanceSettingsResponseDto } from './dto/instance-settings-response.dto';
 import { UpdateInstanceSettingsDto } from './dto/update-instance-settings.dto';
@@ -8,7 +9,10 @@ const INSTANCE_SETTINGS_ID = 1;
 
 @Injectable()
 export class InstanceSettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demoMode: DemoModeService,
+  ) {}
 
   private toResponse(settings: InstanceSettings): InstanceSettingsResponseDto {
     return {
@@ -18,6 +22,7 @@ export class InstanceSettingsService {
       language: settings.language,
       timezone: settings.timezone,
       timeFormat: settings.timeFormat,
+      demoMode: this.demoMode.isDemoMode,
       createdAt: settings.createdAt,
       updatedAt: settings.updatedAt,
     };

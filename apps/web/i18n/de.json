@@ -3,6 +3,13 @@
     "name": "Classifyre",
     "tagline": "Erkennungsplattform"
   },
+  "demo": {
+    "badge": "Demo",
+    "tooltip": "Demo-Modus ist aktiv. Ansicht, Suche und Dashboards funktionieren normal. Erstellen, Bearbeiten, Löschen, Scans ausführen, Detektoren trainieren und der Browser-Assistent sind deaktiviert.",
+    "mcpNotice": "Demo-Modus ist aktiv. MCP-Lesezugriff funktioniert mit einem vorhandenen Token, aber das Erstellen, Bearbeiten oder Löschen von Tokens ist deaktiviert.",
+    "blockedTitle": "Im Demo-Modus nicht verfügbar",
+    "blockedDescription": "Diese Operation ist im Demo-Modus nicht verfügbar. Erstellen, Bearbeiten und Löschen sind deaktiviert."
+  },
   "nav": {
     "overview": "Übersicht",
     "findings": "Befunde",

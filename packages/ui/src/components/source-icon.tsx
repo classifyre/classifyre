@@ -231,6 +231,9 @@ function SourceIcon({
   className,
   ...props
 }: SourceIconProps) {
+  // getSourceTypeIcon returns a stable component reference from SOURCE_ICON_BY_TYPE
+  // (a static lookup table). The variable is capitalised so React treats it as a
+  // component; it is not created anew on each render.
   const Icon = getSourceTypeIcon(source);
 
   return (

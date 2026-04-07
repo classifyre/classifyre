@@ -179,6 +179,7 @@ export function SourceCatalog({
                           key={entry.type}
                           href={entry.href}
                           className={sharedClassName}
+                          data-testid={`source-type-${entry.type}`}
                         >
                           {innerContent}
                         </a>
@@ -191,6 +192,7 @@ export function SourceCatalog({
                         type="button"
                         onClick={() => onSelect?.(entry.type)}
                         className={sharedClassName}
+                        data-testid={`source-type-${entry.type}`}
                       >
                         {innerContent}
                       </button>

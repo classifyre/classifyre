@@ -673,6 +673,7 @@ function SourceStepperContent({
                   className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
                   onClick={() => onSaveDetectors("scan")}
                   disabled={isSavingDetectors}
+                  data-testid="btn-save-and-scan"
                 >
                   {t("sources.edit.saveAndScan")}
                 </Button>

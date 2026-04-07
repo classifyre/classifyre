@@ -43,6 +43,7 @@
 | api.containerSecurityContext.allowPrivilegeEscalation | bool | `false` | Disallow privilege escalation in API container. |
 | api.containerSecurityContext.capabilities.drop | list | `["ALL"]` | Drop all Linux capabilities in API container. |
 | api.containerSecurityContext.readOnlyRootFilesystem | bool | `false` | path the app writes to at runtime (e.g. /tmp, log dirs). Hardening step for advanced users. |
+| api.env.DEMO_MODE | string | `"false"` | Enable read-only demo mode. When "true" all mutating API operations return 403. |
 | api.env.ENVIRONMENT | string | `"kubernetes"` | Execution mode used by API. |
 | api.env.NODE_ENV | string | `"production"` | Runtime environment passed to API container. |
 | api.env.PORT | string | `"8000"` | API listen port. |

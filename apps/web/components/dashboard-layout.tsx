@@ -18,7 +18,7 @@ import {
 } from "@workspace/ui/components/breadcrumb";
 import { NotificationCenter } from "./notification-center";
 import { Button } from "@workspace/ui/components/button";
-import { Settings } from "lucide-react";
+import { Eye, Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { api } from "@workspace/api-client";
@@ -29,6 +29,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { AssistantWorkflowTrigger } from "./assistant-workflow-provider";
+import { useInstanceSettings } from "./instance-settings-provider";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 
@@ -81,6 +82,7 @@ type FindingAssetCrumb = {
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { t } = useTranslation();
+  const { settings } = useInstanceSettings();
 
   const segmentLabelMap: Record<string, string> = {
     dashboard: t("breadcrumb.dashboard"),
@@ -322,6 +324,23 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </Breadcrumb>
           </div>
           <div className="flex items-center gap-2">
+            {settings.demoMode && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex cursor-default items-center gap-1.5 rounded-[4px] border border-amber-600/40 bg-amber-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-400">
+                    <Eye className="h-3 w-3" />
+                    {t("demo.badge")}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  sideOffset={6}
+                  className="max-w-xs"
+                >
+                  {t("demo.tooltip")}
+                </TooltipContent>
+              </Tooltip>
+            )}
             <AssistantWorkflowTrigger />
             <ThemeToggle />
             <NotificationCenter />

@@ -91,6 +91,8 @@ export function TestConnectionDialog({
             "rounded-[4px] border-2 border-black/15 bg-muted/30 p-3 text-sm",
             status === "error" && "border-destructive/30 bg-destructive/5",
           )}
+          data-testid="test-connection-status"
+          data-status={status}
         >
           {message}
         </div>
@@ -105,6 +107,7 @@ export function TestConnectionDialog({
               type="button"
               onClick={() => onOpenChange(false)}
               className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+              data-testid="btn-test-connection-close"
             >
               {t("sources.testConnection.close")}
             </Button>

@@ -145,7 +145,7 @@ class _FakeSession:
 def test_databricks_test_connection_success(monkeypatch: pytest.MonkeyPatch) -> None:
     source = DatabricksSource(_pat_recipe())
     monkeypatch.setattr(source, "_list_catalogs", lambda: ["main"])
-    monkeypatch.setattr(source, "_connect_sql", lambda: _DummyConnection())
+    monkeypatch.setattr(source, "_connect_sql", _DummyConnection)
 
     result = source.test_connection()
 

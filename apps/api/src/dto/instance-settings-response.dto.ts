@@ -42,6 +42,13 @@ export class InstanceSettingsResponseDto {
   })
   timeFormat: InstanceTimeFormatValue;
 
+  @ApiProperty({
+    description:
+      'Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.',
+    example: false,
+  })
+  demoMode: boolean;
+
   @ApiProperty()
   createdAt: Date;
 

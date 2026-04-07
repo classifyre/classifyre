@@ -37,6 +37,7 @@ import {
 } from "@workspace/ui/components";
 import {
   Copy,
+  Eye,
   KeyRound,
   Loader2,
   Pencil,
@@ -399,7 +400,7 @@ export function McpSettingsCard() {
               <Button
                 size="sm"
                 onClick={() => setCreateOpen(true)}
-                disabled={loading || !settings.mcpEnabled}
+                disabled={loading || !settings.mcpEnabled || settings.demoMode}
               >
                 <Plus className="h-3.5 w-3.5" />
                 Create Token
@@ -409,6 +410,15 @@ export function McpSettingsCard() {
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {settings.demoMode ? (
+            <Alert className="border-amber-500/40 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-950/40">
+              <Eye className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+              <AlertDescription className="text-amber-800 dark:text-amber-300">
+                {t("demo.mcpNotice")}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
           {!settings.mcpEnabled ? (
             <Alert className="border-muted/60 bg-muted/30">
               <ShieldOff className="h-4 w-4" />
@@ -622,7 +632,7 @@ export function McpSettingsCard() {
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={isBusy}
+                              disabled={isBusy || settings.demoMode}
                               onClick={() =>
                                 setEditing({
                                   id: token.id,
@@ -637,7 +647,7 @@ export function McpSettingsCard() {
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={isBusy}
+                              disabled={isBusy || settings.demoMode}
                               onClick={() => {
                                 void handleToggleToken(token);
                               }}
@@ -654,7 +664,7 @@ export function McpSettingsCard() {
                             <Button
                               variant="destructive"
                               size="sm"
-                              disabled={isBusy}
+                              disabled={isBusy || settings.demoMode}
                               onClick={() => setDeletingToken(token)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />

@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { PrismaService } from './prisma.service';
+import { DemoModeService } from './demo-mode.service';
+import { DemoModeGuard } from './demo-mode.guard';
 import { SourceService } from './source.service';
 import { AssetService } from './asset.service';
 import { FindingsService } from './findings.service';
@@ -70,6 +73,8 @@ import {
     AssistantController,
   ],
   providers: [
+    { provide: APP_GUARD, useClass: DemoModeGuard },
+    DemoModeService,
     PrismaService,
     SourceService,
     AssetService,

@@ -32,6 +32,7 @@ export function SourceExampleSelector({
           <button
             type="button"
             onClick={onStartBlank}
+            data-testid="start-blank"
             className={cn(
               "group cursor-pointer text-left border-2 border-black rounded-[6px] bg-background p-4 shadow-[4px_4px_0_#000] transition-all",
               "hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[5px_5px_0_#000]",

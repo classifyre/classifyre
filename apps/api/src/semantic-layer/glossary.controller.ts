@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { GlossaryService } from './glossary.service';
+import { AllowInDemoMode } from '../demo-mode.decorator';
 import { CreateGlossaryTermDto } from './dto/create-glossary-term.dto';
 import { UpdateGlossaryTermDto } from './dto/update-glossary-term.dto';
 
@@ -56,6 +57,7 @@ export class GlossaryController {
     return this.glossaryService.delete(id);
   }
 
+  @AllowInDemoMode()
   @Post(':id/preview')
   @ApiOperation({
     summary: 'Preview the number of findings matching this glossary term',

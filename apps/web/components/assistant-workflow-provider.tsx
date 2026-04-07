@@ -20,6 +20,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
 import { usePathname } from "next/navigation";
 import { Rnd } from "react-rnd";
+import { useInstanceSettings } from "@/components/instance-settings-provider";
 
 type AssistantAttachment = Extract<
   AssistantUiAction,
@@ -746,7 +747,8 @@ export function AssistantWorkflowProvider({
 
 function AssistantWorkflowFab() {
   const context = useAssistantWorkflow();
-  if (!context.active) {
+  const { settings } = useInstanceSettings();
+  if (!context.active || settings.demoMode) {
     return null;
   }
 
@@ -766,8 +768,9 @@ function AssistantWorkflowFab() {
 
 export function AssistantWorkflowTrigger() {
   const context = useAssistantWorkflow();
+  const { settings } = useInstanceSettings();
 
-  if (!context.active) {
+  if (!context.active || settings.demoMode) {
     return null;
   }
 
