@@ -56,7 +56,15 @@ jobs:
           java-version: '21'
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        # Dependabot updates package.json but bun.lock may lag (bun lockfile format
+        # is not natively written by Dependabot). The dependabot-codegen workflow
+        # commits the corrected lockfile back, so skip --frozen-lockfile there.
+        run: |
+          if [[ "${{ github.actor }}" == "dependabot[bot]" ]]; then
+            bun install
+          else
+            bun install --frozen-lockfile
+          fi
 
       - name: Generate code
         run: bun run codegen
