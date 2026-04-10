@@ -225,6 +225,8 @@
       "locked": "gesperrt"
     },
     "scanConfig": {
+      "browseTitle": "Detektorkatalog durchsuchen",
+      "browseDesc": "In integrierten und benutzerdefinierten Detektoren suchen und jede Konfiguration ohne Tabs anpassen.",
       "customize": "Anpassen",
       "reset": "Zurücksetzen",
       "presets": "Voreinstellungen",
@@ -233,6 +235,7 @@
       "advancedSettingsDesc": "Schwellenwerte, Modellparameter und Musterkontrolle.",
       "hide": "Ausblenden",
       "show": "Einblenden",
+      "noResults": "Keine Detektoren passen zu dieser Suche.",
       "noDetectors": "Keine Detektoren passen zur Suche in {{group}}.",
       "noDetectorsHint": "Suchbegriff erweitern oder andere Kategorie wählen.",
       "customDetectors": "Benutzerdefinierte Detektoren",
@@ -242,6 +245,7 @@
       "loading": "Benutzerdefinierte Detektoren werden geladen...",
       "noCustom": "Keine benutzerdefinierten Detektoren passen zur Suche.",
       "noCustomHint": "Suchbegriff erweitern oder neuen Detektor im Katalog erstellen.",
+      "noSelectableCustomHint": "Für diese Quelle sind keine aktiven benutzerdefinierten Detektoren verfügbar. Neuen Detektor erstellen oder Katalog verwalten.",
       "noSchemas": "Keine Detector-Schemas verfügbar.",
       "noSchemasHint": "Detector-Schemas hinzufügen, um den Scan zu konfigurieren.",
       "catalogActive": "Katalog aktiv",
@@ -717,7 +721,12 @@
     "thinking": "Wird verarbeitet",
     "assistantFailed": "Assistentenanfrage fehlgeschlagen",
     "assistantQuickStart": "Assistent Schnellstart",
-    "assistantQuickStartDesc": "Eine Vorlage auswählen oder leer beginnen. Alles kann später angepasst werden."
+    "assistantQuickStartDesc": "Eine Vorlage auswählen oder leer beginnen. Alles kann später angepasst werden.",
+    "start": "Start",
+    "startBlank": "Leer beginnen",
+    "startBlankDescription": "Beginne mit einem leeren Formular und konfiguriere die Quelle von Grund auf.",
+    "template": "Vorlage",
+    "noTemplatesAvailable": "Für diese Quelle sind noch keine Vorlagen verfügbar."
   },
   "mcp": {
     "enable": "MCP aktivieren",

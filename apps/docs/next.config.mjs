@@ -1,11 +1,14 @@
 import path from "node:path";
+import process from "node:process";
 import { fileURLToPath } from "node:url";
 import nextra from "nextra";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypeSlug from "rehype-slug";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const docsBasePath = process.env.NEXT_PUBLIC_DOCS_BASE_PATH ?? (process.env.NODE_ENV === "production" ? "/docs" : "");
+const docsBasePath =
+  process.env.NEXT_PUBLIC_DOCS_BASE_PATH ??
+  (process.env.NODE_ENV === "production" ? "/docs" : "");
 const normalizedDocsBasePath =
   !docsBasePath || docsBasePath === "/"
     ? ""

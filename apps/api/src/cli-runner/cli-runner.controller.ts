@@ -97,6 +97,7 @@ export class CliRunnerController {
     return this.cliRunnerService.deleteRunner(runnerId);
   }
 
+  @AllowInDemoMode()
   @Patch('runners/:runnerId/status')
   @ApiOperation({ summary: 'Update runner status' })
   @ApiBody({

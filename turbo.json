@@ -1,7 +1,12 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
-  "globalEnv": ["API_URL", "INTERNAL_API_URL", "NEXT_PUBLIC_API_URL"],
+  "globalEnv": [
+    "API_URL",
+    "INTERNAL_API_URL",
+    "NEXT_PUBLIC_API_URL",
+    "NODE_ENV"
+  ],
   "tasks": {
     "prisma:generate": {
       "cache": true,

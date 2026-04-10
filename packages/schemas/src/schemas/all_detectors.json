@@ -243,7 +243,8 @@
             "TABLE",
             "URL"
           ],
-          "recommended_model": "detect-secrets"
+          "recommended_model": "detect-secrets",
+          "notes": "Detects confidential credentials like API keys, tokens, or passwords that could lead to security breaches."
         },
         {
           "detector_type": "PII",
@@ -258,7 +259,8 @@
             "TABLE",
             "URL"
           ],
-          "recommended_model": "presidio-analyzer"
+          "recommended_model": "presidio-analyzer",
+          "notes": "Identifies personal data (e.g., names, emails, IDs) that must be protected for privacy and compliance."
         },
         {
           "detector_type": "TOXIC",
@@ -272,7 +274,8 @@
             "TABLE",
             "URL"
           ],
-          "recommended_model": "detoxify"
+          "recommended_model": "detoxify",
+          "notes": "Flags harmful or abusive language that could damage user experience or brand reputation."
         },
         {
           "detector_type": "NSFW",
@@ -285,7 +288,7 @@
             "IMAGE"
           ],
           "recommended_model": "nudenet",
-          "notes": "MIT licensed package (commercial use allowed)."
+          "notes": "Detects inappropriate or explicit content not suitable for workplace or general audiences."
         },
         {
           "detector_type": "YARA",
@@ -301,7 +304,8 @@
             "URL",
             "BINARY"
           ],
-          "recommended_model": "yara-python"
+          "recommended_model": "yara-python",
+          "notes": "Uses security rules to identify known malware patterns or suspicious file content."
         },
         {
           "detector_type": "BROKEN_LINKS",
@@ -316,7 +320,7 @@
             "URL"
           ],
           "recommended_model": "HTTP validation engine",
-          "notes": "Checks extracted links and embedded assets for unreachable, empty, or error responses."
+          "notes": "Finds non-working or invalid links that reduce content quality and user trust."
         },
         {
           "detector_type": "PROMPT_INJECTION",
@@ -330,7 +334,8 @@
             "TABLE",
             "URL"
           ],
-          "recommended_model": "protectai/deberta-v3-base-prompt-injection-v2"
+          "recommended_model": "protectai/deberta-v3-base-prompt-injection-v2",
+          "notes": "Detects attempts to manipulate AI systems with malicious or hidden instructions."
         },
         {
           "detector_type": "PHISHING_URL",
@@ -345,7 +350,8 @@
             "TABLE",
             "URL"
           ],
-          "recommended_model": "CrabInHoney/urlbert-tiny-phishing-classifier"
+          "recommended_model": "CrabInHoney/urlbert-tiny-phishing-classifier",
+          "notes": "Identifies suspicious links designed to steal credentials or sensitive information."
         },
         {
           "detector_type": "SPAM",
@@ -359,7 +365,8 @@
             "TABLE",
             "URL"
           ],
-          "recommended_model": "mrm8488/bert-tiny-finetuned-sms-spam-detection"
+          "recommended_model": "mrm8488/bert-tiny-finetuned-sms-spam-detection",
+          "notes": "Flags low-quality or irrelevant bulk content often used for unsolicited promotion."
         },
         {
           "detector_type": "LANGUAGE",
@@ -373,7 +380,8 @@
             "TABLE",
             "URL"
           ],
-          "recommended_model": "fast-langdetect"
+          "recommended_model": "fast-langdetect",
+          "notes": "Detects the language of the content to support localization and processing rules."
         },
         {
           "detector_type": "CODE_SECURITY",
@@ -388,7 +396,8 @@
             "TABLE",
             "OTHER"
           ],
-          "recommended_model": "bandit"
+          "recommended_model": "bandit",
+          "notes": "Identifies vulnerabilities or insecure patterns in source code (e.g., hardcoded secrets)."
         },
         {
           "detector_type": "PLAGIARISM",
@@ -404,7 +413,8 @@
             "URL",
             "OTHER"
           ],
-          "recommended_model": "datasketch + all-MiniLM-L6-v2"
+          "recommended_model": "datasketch + all-MiniLM-L6-v2",
+          "notes": "Detects copied or unoriginal content that may violate intellectual property rules."
         },
         {
           "detector_type": "IMAGE_VIOLENCE",
@@ -417,7 +427,7 @@
             "IMAGE"
           ],
           "recommended_model": null,
-          "notes": "Deferred until a commercially-permissive model license is verified."
+          "notes": "Identifies violent or graphic imagery that may be unsafe or non-compliant. Commercial rollout is deferred until a model with verified license terms is selected."
         },
         {
           "detector_type": "OCR_PII",
@@ -430,7 +440,8 @@
           "supported_asset_types": [
             "IMAGE"
           ],
-          "recommended_model": "tesseract + presidio-analyzer"
+          "recommended_model": "tesseract + presidio-analyzer",
+          "notes": "Extracts and detects personal data from images or scanned documents using OCR."
         },
         {
           "detector_type": "DEID_SCORE",
@@ -445,7 +456,7 @@
             "TABLE"
           ],
           "recommended_model": "presidio-analyzer + pycanon + scrubadub",
-          "notes": "Measures anonymization completeness and residual privacy risk after masking, with support for DACH identifiers."
+          "notes": "Measures how well sensitive data has been anonymized or removed from content."
         },
         {
           "detector_type": "HATE_SPEECH",
@@ -461,7 +472,7 @@
             "URL"
           ],
           "recommended_model": "facebook/roberta-hate-speech-dynabench-r4-target",
-          "notes": "Flags targeted hateful language for moderation and policy reporting, including German-language coverage."
+          "notes": "Flags content that promotes discrimination or hatred toward individuals or groups."
         },
         {
           "detector_type": "AI_GENERATED",
@@ -477,7 +488,7 @@
             "URL"
           ],
           "recommended_model": "distilbert-base-uncased (RAID fine-tuned)",
-          "notes": "Estimates likelihood that content is AI-authored to support disclosure and compliance workflows."
+          "notes": "Estimates whether content was generated by AI rather than a human (probabilistic)."
         },
         {
           "detector_type": "CONTENT_QUALITY",
@@ -492,7 +503,7 @@
             "URL"
           ],
           "recommended_model": "sentence-transformers/all-MiniLM-L6-v2 + textstat",
-          "notes": "Scores readability and coherence so teams can prioritize low-quality content for review."
+          "notes": "Evaluates clarity, usefulness, and overall quality of content for end users."
         },
         {
           "detector_type": "BIAS",
@@ -508,7 +519,7 @@
             "URL"
           ],
           "recommended_model": "valurank/distilroberta-bias",
-          "notes": "Detects biased language patterns for fairness governance and moderation workflows."
+          "notes": "Detects potential bias or unfair language that could lead to ethical or reputational risks."
         },
         {
           "detector_type": "DUPLICATE",
@@ -523,7 +534,7 @@
             "URL"
           ],
           "recommended_model": "datasketch (MinHash LSH)",
-          "notes": "Finds near-duplicate content to reduce noise and repeated policy or legal risk."
+          "notes": "Identifies repeated or highly similar content across documents or datasets."
         },
         {
           "detector_type": "DOMAIN_CLASS",
@@ -538,7 +549,7 @@
             "URL"
           ],
           "recommended_model": "typeform/distilbert-base-uncased-mnli",
-          "notes": "Classifies business domain labels (for example finance, health, legal) for routing and ownership."
+          "notes": "Classifies content into business domains (e.g., finance, legal, healthcare)."
         },
         {
           "detector_type": "CONTENT_TYPE",
@@ -553,7 +564,7 @@
             "URL"
           ],
           "recommended_model": "typeform/distilbert-base-uncased-mnli",
-          "notes": "Labels writing style (factual, opinion, promotional, instructional) to support review policy selection."
+          "notes": "Identifies the format or type of content (e.g., email, contract, code, image)."
         },
         {
           "detector_type": "SENSITIVITY_TIER",
@@ -569,7 +580,7 @@
             "URL"
           ],
           "recommended_model": "typeform/distilbert-base-uncased-mnli",
-          "notes": "Assigns data sensitivity levels (PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED) for governance controls."
+          "notes": "Assigns a sensitivity level (e.g., public, internal, confidential, restricted)."
         },
         {
           "detector_type": "JURISDICTION_TAG",
@@ -585,7 +596,7 @@
             "URL"
           ],
           "recommended_model": "fast-langdetect + rules engine",
-          "notes": "Infers likely regulation tags (for example GDPR, DSA, CCPA, HIPAA, nDSG) from language and context."
+          "notes": "Tags content with relevant legal or geographic context (e.g., GDPR, US, EU)."
         },
         {
           "detector_type": "CUSTOM",
@@ -602,7 +613,7 @@
             "IMAGE"
           ],
           "recommended_model": "mDeBERTa-v3 + SetFit + GLiNER",
-          "notes": "User-defined detector that supports ruleset, few-shot classification, and entity extraction methods."
+          "notes": "User-defined rules tailored to specific business needs or internal policies."
         }
       ]
     },

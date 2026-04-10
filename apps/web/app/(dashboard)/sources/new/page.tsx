@@ -3,15 +3,7 @@
 import { useMemo, useRef, useState, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
 import {
   api,
   type AssistantOperation,
@@ -30,6 +22,7 @@ import {
   SourceScanConfig,
   type DetectorConfigInput,
 } from "@/components/source-scan-config";
+import { SourceDetectorConfigCard } from "@/components/source-detector-config-card";
 import {
   SourceStepperHeader,
   sourceStepper,
@@ -616,32 +609,15 @@ function SourceStepperContent({
       </div>
 
       <div className={cn(!showDetectors && "hidden")}>
-        <Card className="border-2 border-black rounded-[6px] shadow-[6px_6px_0_#000]">
-          <CardHeader>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <CardTitle className="uppercase tracking-[0.06em]">
-                  {t("sources.edit.detectorConfig")}
-                </CardTitle>
-                <CardDescription>
-                  {t("sources.edit.detectorConfigDesc")}
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-[0.12em]">
-                <Badge variant="secondary">
-                  {t("sources.edit.visible", {
-                    count: scanSummary.visibleCount,
-                  })}
-                </Badge>
-                <Badge className="bg-accent text-accent-foreground">
-                  {t("sources.edit.enabled", {
-                    count: scanSummary.enabledCount,
-                  })}
-                </Badge>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-6 space-y-6">
+        <SourceDetectorConfigCard
+          visibleCount={scanSummary.visibleCount}
+          enabledCount={scanSummary.enabledCount}
+          isSaving={isSavingDetectors}
+          onBack={() => stepper.navigation.prev()}
+          onSave={() => onSaveDetectors("view")}
+          onSaveAndScan={() => onSaveDetectors("scan")}
+          saveAndScanTestId="btn-save-and-scan"
+        >
             <SourceScanConfig
               defaultDetectors={detectorDefaults}
               onDetectorsChange={onDetectorsChange}
@@ -650,37 +626,7 @@ function SourceStepperContent({
               onCustomDetectorsChange={onCustomDetectorsChange}
               mode="create"
             />
-
-            <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <Button
-                variant="outline"
-                className="rounded-[4px] border-2 border-black"
-                onClick={() => stepper.navigation.prev()}
-                disabled={isSavingDetectors}
-              >
-                {t("sources.edit.back")}
-              </Button>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Button
-                  variant="outline"
-                  className="rounded-[4px] border-2 border-black"
-                  onClick={() => onSaveDetectors("view")}
-                  disabled={isSavingDetectors}
-                >
-                  {t("common.save")}
-                </Button>
-                <Button
-                  className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
-                  onClick={() => onSaveDetectors("scan")}
-                  disabled={isSavingDetectors}
-                  data-testid="btn-save-and-scan"
-                >
-                  {t("sources.edit.saveAndScan")}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        </SourceDetectorConfigCard>
       </div>
     </div>
   );

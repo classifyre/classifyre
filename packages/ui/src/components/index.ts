@@ -39,6 +39,7 @@ export * from "./sidebar";
 export * from "./skeleton";
 export * from "./slider";
 export * from "./sonner";
+export * from "./theme-toggle";
 export * from "./spinner";
 export * from "./switch";
 export * from "./table";
@@ -59,8 +60,13 @@ export * from "./finding-detail-drawer";
 export * from "./source-card";
 export * from "./asset-card";
 export * from "./detector-card";
+export * from "./detector-catalog-utils";
+export * from "./detector-catalog";
 export * from "./empty-state";
 export * from "./stats-card";
+export * from "./ai-assisted-card";
+export * from "./ai-prompt-popover";
+export * from "./assistant-workflow-panel";
 
 // Re-export mock types for convenience
 export type {

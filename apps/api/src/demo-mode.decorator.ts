@@ -7,5 +7,4 @@ export const ALLOW_IN_DEMO_MODE_KEY = 'allowInDemoMode';
  * Apply to non-GET endpoints that are query/read-only by nature
  * (e.g. POST /search/*, POST /semantic/query/*).
  */
-export const AllowInDemoMode = () =>
-  SetMetadata(ALLOW_IN_DEMO_MODE_KEY, true);
+export const AllowInDemoMode = () => SetMetadata(ALLOW_IN_DEMO_MODE_KEY, true);

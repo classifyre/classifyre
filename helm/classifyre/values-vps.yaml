@@ -1,7 +1,7 @@
 # VPS demo/test values
 # Single-node K3s, no ingress, NodePort access for web only.
 # API remains ClusterIP — Next.js proxies /api calls server-side.
-# Access: http://144.217.166.247:30100
+# Access: https://demo.classifyre.com
 
 api:
   replicaCount: 1

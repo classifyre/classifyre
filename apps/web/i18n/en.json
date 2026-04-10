@@ -225,6 +225,8 @@
       "locked": "locked"
     },
     "scanConfig": {
+      "browseTitle": "Browse detector catalog",
+      "browseDesc": "Search across built-in and custom detectors, then tune each one without switching tabs.",
       "customize": "Customize",
       "reset": "Reset",
       "presets": "Presets",
@@ -233,6 +235,7 @@
       "advancedSettingsDesc": "Thresholds, model parameters, and pattern-level controls.",
       "hide": "Hide",
       "show": "Show",
+      "noResults": "No detectors match this search.",
       "noDetectors": "No detectors match this search in {{group}}.",
       "noDetectorsHint": "Try a broader search term or switch to another category.",
       "customDetectors": "Custom Detectors",
@@ -242,6 +245,7 @@
       "loading": "Loading custom detectors...",
       "noCustom": "No custom detectors match this search.",
       "noCustomHint": "Try a broader search term or create a new detector in the catalog.",
+      "noSelectableCustomHint": "No active custom detectors are available for this source. Create a new one or manage the catalog.",
       "noSchemas": "No detector schemas available.",
       "noSchemasHint": "Add detector schemas to configure scan coverage.",
       "catalogActive": "Catalog Active",
@@ -717,7 +721,12 @@
     "thinking": "Thinking",
     "assistantFailed": "Assistant request failed",
     "assistantQuickStart": "Assistant Quick Start",
-    "assistantQuickStartDesc": "Pick a template or start from blank. You can override everything later."
+    "assistantQuickStartDesc": "Pick a template or start from blank. You can override everything later.",
+    "start": "Start",
+    "startBlank": "Start Blank",
+    "startBlankDescription": "Begin with an empty form and configure the source from scratch.",
+    "template": "Template",
+    "noTemplatesAvailable": "No templates available for this source yet."
   },
   "mcp": {
     "enable": "Enable MCP",
