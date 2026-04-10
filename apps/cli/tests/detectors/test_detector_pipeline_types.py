@@ -44,7 +44,10 @@ class TestDetectorPipelineTypes:
 
     @staticmethod
     def _is_dependency_available(module_name: str) -> bool:
-        return find_spec(module_name) is not None
+        try:
+            return find_spec(module_name) is not None
+        except (ModuleNotFoundError, ValueError):
+            return False
 
     @pytest.fixture
     def mock_source(self):

@@ -941,6 +941,7 @@ export function SourceScanConfig({
             </Card>
           ) : null}
 
+          {(!searchTerm || visibleCustomDetectors.length > 0 || customDetectorsLoading || customDetectorsError) && (
           <CatalogSection
             title={t("sources.scanConfig.customDetectors")}
             description={t("sources.scanConfig.customDetectorsDesc")}
@@ -1026,6 +1027,7 @@ export function SourceScanConfig({
               </div>
             )}
           </CatalogSection>
+          )}
         </div>
       )}
     </div>
