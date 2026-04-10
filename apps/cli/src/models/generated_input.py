@@ -22,24 +22,24 @@ class AssetType(StrEnum):
     Type of the asset or source
     """
 
-    WORDPRESS = "WORDPRESS"
-    SLACK = "SLACK"
-    S3_COMPATIBLE_STORAGE = "S3_COMPATIBLE_STORAGE"
-    AZURE_BLOB_STORAGE = "AZURE_BLOB_STORAGE"
-    GOOGLE_CLOUD_STORAGE = "GOOGLE_CLOUD_STORAGE"
-    POSTGRESQL = "POSTGRESQL"
-    MYSQL = "MYSQL"
-    MSSQL = "MSSQL"
-    ORACLE = "ORACLE"
-    HIVE = "HIVE"
-    DATABRICKS = "DATABRICKS"
-    SNOWFLAKE = "SNOWFLAKE"
-    MONGODB = "MONGODB"
-    POWERBI = "POWERBI"
-    TABLEAU = "TABLEAU"
-    CONFLUENCE = "CONFLUENCE"
-    JIRA = "JIRA"
-    SERVICEDESK = "SERVICEDESK"
+    WORDPRESS = 'WORDPRESS'
+    SLACK = 'SLACK'
+    S3_COMPATIBLE_STORAGE = 'S3_COMPATIBLE_STORAGE'
+    AZURE_BLOB_STORAGE = 'AZURE_BLOB_STORAGE'
+    GOOGLE_CLOUD_STORAGE = 'GOOGLE_CLOUD_STORAGE'
+    POSTGRESQL = 'POSTGRESQL'
+    MYSQL = 'MYSQL'
+    MSSQL = 'MSSQL'
+    ORACLE = 'ORACLE'
+    HIVE = 'HIVE'
+    DATABRICKS = 'DATABRICKS'
+    SNOWFLAKE = 'SNOWFLAKE'
+    MONGODB = 'MONGODB'
+    POWERBI = 'POWERBI'
+    TABLEAU = 'TABLEAU'
+    CONFLUENCE = 'CONFLUENCE'
+    JIRA = 'JIRA'
+    SERVICEDESK = 'SERVICEDESK'
 
 
 class SourceCategory(StrEnum):
@@ -47,8 +47,8 @@ class SourceCategory(StrEnum):
     Category of the source: TABULAR for structured databases (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake), UNSTRUCTURED for text/web/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk)
     """
 
-    TABULAR = "TABULAR"
-    UNSTRUCTURED = "UNSTRUCTURED"
+    TABULAR = 'TABULAR'
+    UNSTRUCTURED = 'UNSTRUCTURED'
 
 
 class DetectorType(StrEnum):
@@ -56,31 +56,31 @@ class DetectorType(StrEnum):
     Type of detector for content analysis
     """
 
-    SECRETS = "SECRETS"
-    PII = "PII"
-    TOXIC = "TOXIC"
-    NSFW = "NSFW"
-    YARA = "YARA"
-    BROKEN_LINKS = "BROKEN_LINKS"
-    PROMPT_INJECTION = "PROMPT_INJECTION"
-    PHISHING_URL = "PHISHING_URL"
-    SPAM = "SPAM"
-    LANGUAGE = "LANGUAGE"
-    CODE_SECURITY = "CODE_SECURITY"
-    PLAGIARISM = "PLAGIARISM"
-    IMAGE_VIOLENCE = "IMAGE_VIOLENCE"
-    OCR_PII = "OCR_PII"
-    DEID_SCORE = "DEID_SCORE"
-    HATE_SPEECH = "HATE_SPEECH"
-    AI_GENERATED = "AI_GENERATED"
-    CONTENT_QUALITY = "CONTENT_QUALITY"
-    BIAS = "BIAS"
-    DUPLICATE = "DUPLICATE"
-    DOMAIN_CLASS = "DOMAIN_CLASS"
-    CONTENT_TYPE = "CONTENT_TYPE"
-    SENSITIVITY_TIER = "SENSITIVITY_TIER"
-    JURISDICTION_TAG = "JURISDICTION_TAG"
-    CUSTOM = "CUSTOM"
+    SECRETS = 'SECRETS'
+    PII = 'PII'
+    TOXIC = 'TOXIC'
+    NSFW = 'NSFW'
+    YARA = 'YARA'
+    BROKEN_LINKS = 'BROKEN_LINKS'
+    PROMPT_INJECTION = 'PROMPT_INJECTION'
+    PHISHING_URL = 'PHISHING_URL'
+    SPAM = 'SPAM'
+    LANGUAGE = 'LANGUAGE'
+    CODE_SECURITY = 'CODE_SECURITY'
+    PLAGIARISM = 'PLAGIARISM'
+    IMAGE_VIOLENCE = 'IMAGE_VIOLENCE'
+    OCR_PII = 'OCR_PII'
+    DEID_SCORE = 'DEID_SCORE'
+    HATE_SPEECH = 'HATE_SPEECH'
+    AI_GENERATED = 'AI_GENERATED'
+    CONTENT_QUALITY = 'CONTENT_QUALITY'
+    BIAS = 'BIAS'
+    DUPLICATE = 'DUPLICATE'
+    DOMAIN_CLASS = 'DOMAIN_CLASS'
+    CONTENT_TYPE = 'CONTENT_TYPE'
+    SENSITIVITY_TIER = 'SENSITIVITY_TIER'
+    JURISDICTION_TAG = 'JURISDICTION_TAG'
+    CUSTOM = 'CUSTOM'
 
 
 class PostStatus(StrEnum):
@@ -88,11 +88,11 @@ class PostStatus(StrEnum):
     WordPress post status
     """
 
-    publish = "publish"
-    future = "future"
-    draft = "draft"
-    pending = "pending"
-    private = "private"
+    publish = 'publish'
+    future = 'future'
+    draft = 'draft'
+    pending = 'pending'
+    private = 'private'
 
 
 class SlackChannelType(StrEnum):
@@ -100,10 +100,10 @@ class SlackChannelType(StrEnum):
     Slack conversation types to include
     """
 
-    public_channel = "public_channel"
-    private_channel = "private_channel"
-    mpim = "mpim"
-    im = "im"
+    public_channel = 'public_channel'
+    private_channel = 'private_channel'
+    mpim = 'mpim'
+    im = 'im'
 
 
 class SamplingStrategy(StrEnum):
@@ -111,9 +111,9 @@ class SamplingStrategy(StrEnum):
     Sampling strategy: RANDOM samples items randomly, LATEST prioritises the most recently modified/created items, ALL scans every item with no limit
     """
 
-    RANDOM = "RANDOM"
-    LATEST = "LATEST"
-    ALL = "ALL"
+    RANDOM = 'RANDOM'
+    LATEST = 'LATEST'
+    ALL = 'ALL'
 
 
 class SamplingConfig(BaseModel):
@@ -122,58 +122,60 @@ class SamplingConfig(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     strategy: SamplingStrategy
     fetch_all_until_first_success: bool | None = Field(
         False,
-        description="When true, force strategy ALL until this source gets its first successful run. After the first successful run, use strategy/limit as configured.",
+        description='When true, force strategy ALL until this source gets its first successful run. After the first successful run, use strategy/limit as configured.',
     )
     limit: int | None = Field(
         100,
-        description="Maximum number of items to sample per asset (rows for tabular, pages/items for unstructured). Ignored when strategy is ALL.",
+        description='Maximum number of items to sample per asset (rows for tabular, pages/items for unstructured). Ignored when strategy is ALL.',
         ge=1,
         le=100000,
     )
     order_by_column: str | None = Field(
         None,
-        description="Column to use for LATEST sampling mode in tabular sources (usually created_at/updated_at). Auto-detected when not set.",
+        description='Column to use for LATEST sampling mode in tabular sources (usually created_at/updated_at). Auto-detected when not set.',
     )
     fallback_to_random: bool | None = Field(
         True,
-        description="Tabular sources only. Fallback to RANDOM ordering when LATEST mode cannot resolve an ordering column.",
+        description='Tabular sources only. Fallback to RANDOM ordering when LATEST mode cannot resolve an ordering column.',
     )
     max_columns: int | None = Field(
         25,
-        description="Tabular sources only. Maximum number of columns to include per sampled row.",
+        description='Tabular sources only. Maximum number of columns to include per sampled row.',
         ge=1,
         le=500,
     )
     max_cell_chars: int | None = Field(
         512,
-        description="Tabular sources only. Maximum characters per cell in detector payload formatting.",
+        description='Tabular sources only. Maximum characters per cell in detector payload formatting.',
         ge=16,
         le=50000,
     )
     max_total_chars: int | None = Field(
         20000,
-        description="Tabular sources only. Maximum total formatted payload size sent to detectors per asset.",
+        description='Tabular sources only. Maximum total formatted payload size sent to detectors per asset.',
         ge=128,
         le=500000,
     )
     include_column_names: bool | None = Field(
         True,
-        description="Tabular sources only. Include column names in sampled detector payload rows.",
+        description='Tabular sources only. Include column names in sampled detector payload rows.',
     )
 
 
 class Detector(BaseModel):
     model_config = ConfigDict(
-        extra="allow",
+        extra='allow',
     )
     type: DetectorType
     enabled: bool | None = True
-    config: dict[str, Any] | None = Field(None, description="Detector-specific configuration")
+    config: dict[str, Any] | None = Field(
+        None, description='Detector-specific configuration'
+    )
 
 
 class CustomDetectorSelection(RootModel[str]):
@@ -182,22 +184,22 @@ class CustomDetectorSelection(RootModel[str]):
 
 class WordPressRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     url: AnyUrl = Field(
-        ..., description="Base URL of the WordPress site (e.g., https://example.com)"
+        ..., description='Base URL of the WordPress site (e.g., https://example.com)'
     )
 
 
 class WordPressMasked(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     username: str | None = Field(
-        None, description="Username for authentication (optional for public content)"
+        None, description='Username for authentication (optional for public content)'
     )
     application_password: str | None = Field(
-        None, description="WordPress application password for authentication (optional)"
+        None, description='WordPress application password for authentication (optional)'
     )
 
 
@@ -207,44 +209,44 @@ class WordPressOptionalContent(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    fetch_posts: bool | None = Field(True, description="Whether to fetch blog posts")
-    fetch_pages: bool | None = Field(True, description="Whether to fetch pages")
+    fetch_posts: bool | None = Field(True, description='Whether to fetch blog posts')
+    fetch_pages: bool | None = Field(True, description='Whether to fetch pages')
     post_status: list[PostStatus] | None = Field(
-        ["publish"],
-        description="Post status filters (requires authentication for non-public statuses)",
+        ['publish'],
+        description='Post status filters (requires authentication for non-public statuses)',
     )
 
 
 class WordPressOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     content: WordPressOptionalContent | None = None
 
 
 class SlackRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     workspace: str | None = Field(
-        None, description="Slack workspace name or domain (for display and stable IDs)"
+        None, description='Slack workspace name or domain (for display and stable IDs)'
     )
 
 
 class SlackMaskedBotToken(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    bot_token: str = Field(..., description="Slack bot token (starts with xoxb-)")
+    bot_token: str = Field(..., description='Slack bot token (starts with xoxb-)')
 
 
 class SlackMaskedUserToken(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    user_token: str = Field(..., description="Slack user token (starts with xoxp-)")
+    user_token: str = Field(..., description='Slack user token (starts with xoxp-)')
 
 
 class TokenType(StrEnum):
@@ -252,16 +254,16 @@ class TokenType(StrEnum):
     Token type hint
     """
 
-    bot = "bot"
-    user = "user"
+    bot = 'bot'
+    user = 'user'
 
 
 class SlackMaskedToken(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    token: str = Field(..., description="Slack token (bot or user)")
-    token_type: TokenType | None = Field(None, description="Token type hint")
+    token: str = Field(..., description='Slack token (bot or user)')
+    token_type: TokenType | None = Field(None, description='Token type hint')
 
 
 class SlackOptionalChannels(BaseModel):
@@ -270,18 +272,18 @@ class SlackOptionalChannels(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     channel_types: list[SlackChannelType] | None = Field(
-        ["public_channel"],
-        description="Slack conversation types to include when listing channels",
+        ['public_channel'],
+        description='Slack conversation types to include when listing channels',
     )
     channel_ids: list[str] | None = Field(
         None,
-        description="Explicit channel IDs to scan. If provided, channel_types is ignored.",
+        description='Explicit channel IDs to scan. If provided, channel_types is ignored.',
     )
     exclude_archived: bool | None = Field(
-        True, description="Exclude archived channels when listing"
+        True, description='Exclude archived channels when listing'
     )
 
 
@@ -291,12 +293,14 @@ class SlackOptionalTimeRange(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     oldest: str | None = Field(
-        None, description="Start of date range (Slack timestamp or ISO 8601)"
+        None, description='Start of date range (Slack timestamp or ISO 8601)'
     )
-    latest: str | None = Field(None, description="End of date range (Slack timestamp or ISO 8601)")
+    latest: str | None = Field(
+        None, description='End of date range (Slack timestamp or ISO 8601)'
+    )
 
 
 class SlackOptionalIngestion(BaseModel):
@@ -305,20 +309,22 @@ class SlackOptionalIngestion(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    batch_size: int | None = Field(200, description="Messages per API call (max 200)", ge=1, le=200)
+    batch_size: int | None = Field(
+        200, description='Messages per API call (max 200)', ge=1, le=200
+    )
     rate_limit_delay_seconds: float | None = Field(
-        1, description="Delay between API calls to avoid rate limits", ge=0.0
+        1, description='Delay between API calls to avoid rate limits', ge=0.0
     )
     include_thread_replies: bool | None = Field(
-        False, description="Include thread replies in fetched content for detectors"
+        False, description='Include thread replies in fetched content for detectors'
     )
 
 
 class SlackOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     channels: SlackOptionalChannels | None = None
     time_range: SlackOptionalTimeRange | None = None
@@ -331,36 +337,38 @@ class ObjectStorageOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     prefix: str | None = Field(
-        None, description="Object key prefix filter (for example, exports/2026/)"
+        None, description='Object key prefix filter (for example, exports/2026/)'
     )
     include_extensions: list[str] | None = Field(
         None,
-        description="Optional extension allowlist (for example, .pdf, .csv, .parquet)",
+        description='Optional extension allowlist (for example, .pdf, .csv, .parquet)',
     )
-    exclude_extensions: list[str] | None = Field(None, description="Optional extension denylist")
+    exclude_extensions: list[str] | None = Field(
+        None, description='Optional extension denylist'
+    )
     include_empty_objects: bool | None = Field(
-        False, description="Include zero-byte objects in extraction results"
+        False, description='Include zero-byte objects in extraction results'
     )
     include_object_metadata: bool | None = Field(
         True,
-        description="Attach provider metadata (etag, size, content-type hints, timestamps) to asset checksums",
+        description='Attach provider metadata (etag, size, content-type hints, timestamps) to asset checksums',
     )
     include_content_preview: bool | None = Field(
         True,
-        description="Download object bytes to infer MIME and extract detector-ready text previews",
+        description='Download object bytes to infer MIME and extract detector-ready text previews',
     )
 
 
 class S3CompatibleStorageRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     bucket: str = Field(
         ...,
-        description="Bucket name for AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints",
+        description='Bucket name for AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints',
     )
 
 
@@ -370,51 +378,57 @@ class S3CompatibleStorageMasked(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    aws_access_key_id: str | None = Field(None, description="S3-compatible access key ID")
-    aws_secret_access_key: str | None = Field(None, description="S3-compatible secret access key")
+    aws_access_key_id: str | None = Field(
+        None, description='S3-compatible access key ID'
+    )
+    aws_secret_access_key: str | None = Field(
+        None, description='S3-compatible secret access key'
+    )
     aws_session_token: str | None = Field(
-        None, description="Optional session token for temporary credentials"
+        None, description='Optional session token for temporary credentials'
     )
 
 
 class S3CompatibleStorageOptionalConnection(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     region_name: str | None = Field(
         None,
-        description="Region (recommended for AWS; required by some S3-compatible providers)",
+        description='Region (recommended for AWS; required by some S3-compatible providers)',
     )
     endpoint_url: AnyUrl | None = Field(
         None,
-        description="Custom endpoint URL for MinIO/R2/B2/Garage and other S3-compatible providers",
+        description='Custom endpoint URL for MinIO/R2/B2/Garage and other S3-compatible providers',
     )
     request_timeout_seconds: float | None = Field(
         30,
-        description="Network timeout in seconds for list/download operations",
+        description='Network timeout in seconds for list/download operations',
         ge=1.0,
         le=300.0,
     )
     max_keys_per_page: int | None = Field(
         200,
-        description="Maximum objects requested per provider list API call",
+        description='Maximum objects requested per provider list API call',
         ge=1,
         le=1000,
     )
     max_object_bytes: int | None = Field(
         5242880,
-        description="Maximum bytes downloaded per object for MIME detection and text extraction",
+        description='Maximum bytes downloaded per object for MIME detection and text extraction',
         ge=1024,
         le=52428800,
     )
-    verify_ssl: bool | None = Field(True, description="TLS certificate verification toggle")
+    verify_ssl: bool | None = Field(
+        True, description='TLS certificate verification toggle'
+    )
 
 
 class S3CompatibleStorageOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: S3CompatibleStorageOptionalConnection | None = None
     scope: ObjectStorageOptionalScope | None = None
@@ -422,13 +436,13 @@ class S3CompatibleStorageOptional(BaseModel):
 
 class AzureBlobStorageRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     account_url: AnyUrl = Field(
         ...,
-        description="Azure Blob account URL (for example, https://<account>.blob.core.windows.net)",
+        description='Azure Blob account URL (for example, https://<account>.blob.core.windows.net)',
     )
-    container: str = Field(..., description="Azure Blob container name")
+    container: str = Field(..., description='Azure Blob container name')
 
 
 class AzureBlobStorageMasked(BaseModel):
@@ -437,41 +451,41 @@ class AzureBlobStorageMasked(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     azure_connection_string: str | None = Field(
         None,
-        description="Azure storage connection string (takes precedence over other auth fields)",
+        description='Azure storage connection string (takes precedence over other auth fields)',
     )
-    azure_account_key: str | None = Field(None, description="Azure storage account key")
-    azure_sas_token: str | None = Field(None, description="Azure SAS token")
+    azure_account_key: str | None = Field(None, description='Azure storage account key')
+    azure_sas_token: str | None = Field(None, description='Azure SAS token')
     azure_client_id: str | None = Field(
-        None, description="Azure Entra client ID (service principal auth)"
+        None, description='Azure Entra client ID (service principal auth)'
     )
     azure_client_secret: str | None = Field(
-        None, description="Azure Entra client secret (service principal auth)"
+        None, description='Azure Entra client secret (service principal auth)'
     )
     azure_tenant_id: str | None = Field(
-        None, description="Azure Entra tenant ID (service principal auth)"
+        None, description='Azure Entra tenant ID (service principal auth)'
     )
 
 
 class AzureBlobStorageOptionalConnection(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     request_timeout_seconds: float | None = Field(
         30,
-        description="Network timeout in seconds for list/download operations",
+        description='Network timeout in seconds for list/download operations',
         ge=1.0,
         le=300.0,
     )
     max_keys_per_page: int | None = Field(
-        200, description="Maximum blobs requested per list page", ge=1, le=1000
+        200, description='Maximum blobs requested per list page', ge=1, le=1000
     )
     max_object_bytes: int | None = Field(
         5242880,
-        description="Maximum bytes downloaded per blob for MIME detection and text extraction",
+        description='Maximum bytes downloaded per blob for MIME detection and text extraction',
         ge=1024,
         le=52428800,
     )
@@ -479,7 +493,7 @@ class AzureBlobStorageOptionalConnection(BaseModel):
 
 class AzureBlobStorageOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: AzureBlobStorageOptionalConnection | None = None
     scope: ObjectStorageOptionalScope | None = None
@@ -487,9 +501,9 @@ class AzureBlobStorageOptional(BaseModel):
 
 class GoogleCloudStorageRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    bucket: str = Field(..., description="Google Cloud Storage bucket name")
+    bucket: str = Field(..., description='Google Cloud Storage bucket name')
 
 
 class GoogleCloudStorageMasked(BaseModel):
@@ -498,36 +512,36 @@ class GoogleCloudStorageMasked(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     gcp_credentials_json: str | None = Field(
-        None, description="Google service account credentials JSON as inline string"
+        None, description='Google service account credentials JSON as inline string'
     )
 
 
 class GoogleCloudStorageOptionalConnection(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     project_id: str | None = Field(
         None,
-        description="Optional GCP project ID override for auth context and bucket listing",
+        description='Optional GCP project ID override for auth context and bucket listing',
     )
     gcp_credentials_file: str | None = Field(
-        None, description="Path to Google service account JSON credentials file"
+        None, description='Path to Google service account JSON credentials file'
     )
     request_timeout_seconds: float | None = Field(
         30,
-        description="Network timeout in seconds for list/download operations",
+        description='Network timeout in seconds for list/download operations',
         ge=1.0,
         le=300.0,
     )
     max_keys_per_page: int | None = Field(
-        200, description="Maximum objects requested per list page", ge=1, le=1000
+        200, description='Maximum objects requested per list page', ge=1, le=1000
     )
     max_object_bytes: int | None = Field(
         5242880,
-        description="Maximum bytes downloaded per object for MIME detection and text extraction",
+        description='Maximum bytes downloaded per object for MIME detection and text extraction',
         ge=1024,
         le=52428800,
     )
@@ -535,7 +549,7 @@ class GoogleCloudStorageOptionalConnection(BaseModel):
 
 class GoogleCloudStorageOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: GoogleCloudStorageOptionalConnection | None = None
     scope: ObjectStorageOptionalScope | None = None
@@ -546,28 +560,28 @@ class PostgreSQLSSLMode(StrEnum):
     SSL mode for PostgreSQL connection
     """
 
-    disable = "disable"
-    allow = "allow"
-    prefer = "prefer"
-    require = "require"
-    verify_ca = "verify-ca"
-    verify_full = "verify-full"
+    disable = 'disable'
+    allow = 'allow'
+    prefer = 'prefer'
+    require = 'require'
+    verify_ca = 'verify-ca'
+    verify_full = 'verify-full'
 
 
 class PostgreSQLRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    host: str = Field(..., description="PostgreSQL host")
-    port: int = Field(..., description="PostgreSQL port", ge=1, le=65535)
+    host: str = Field(..., description='PostgreSQL host')
+    port: int = Field(..., description='PostgreSQL port', ge=1, le=65535)
 
 
 class PostgreSQLMasked(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    username: str = Field(..., description="Database username")
-    password: str = Field(..., description="Database password")
+    username: str = Field(..., description='Database username')
+    password: str = Field(..., description='Database password')
 
 
 class PostgreSQLOptionalConnection(BaseModel):
@@ -576,11 +590,11 @@ class PostgreSQLOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    ssl_mode: PostgreSQLSSLMode | None = "prefer"
+    ssl_mode: PostgreSQLSSLMode | None = 'prefer'
     connect_timeout_seconds: int | None = Field(
-        10, description="Connection timeout in seconds", ge=1, le=120
+        10, description='Connection timeout in seconds', ge=1, le=120
     )
 
 
@@ -590,38 +604,38 @@ class PostgreSQLOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     database: str | None = Field(
         None,
-        description="Single database to scan (optional when include_all_databases is true)",
+        description='Single database to scan (optional when include_all_databases is true)',
     )
     include_all_databases: bool | None = Field(
-        False, description="Scan all non-template databases visible to this user"
+        False, description='Scan all non-template databases visible to this user'
     )
     maintenance_database: str | None = Field(
-        "postgres",
-        description="Database used for database enumeration when include_all_databases is true",
+        'postgres',
+        description='Database used for database enumeration when include_all_databases is true',
     )
     include_schemas: list[str] | None = Field(
-        None, description="Optional schema allowlist (exact schema names)"
+        None, description='Optional schema allowlist (exact schema names)'
     )
     exclude_schemas: list[str] | None = Field(
-        ["information_schema", "pg_catalog", "pg_toast"],
-        description="Schema denylist (exact schema names)",
+        ['information_schema', 'pg_catalog', 'pg_toast'],
+        description='Schema denylist (exact schema names)',
     )
     include_tables: list[str] | None = Field(
         None,
-        description="Optional table allowlist. Accepted forms: schema.table or database.schema.table",
+        description='Optional table allowlist. Accepted forms: schema.table or database.schema.table',
     )
     table_limit: int | None = Field(
-        None, description="Optional cap on number of table assets extracted", ge=1
+        None, description='Optional cap on number of table assets extracted', ge=1
     )
 
 
 class PostgreSQLOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: PostgreSQLOptionalConnection | None = None
     scope: PostgreSQLOptionalScope | None = None
@@ -629,18 +643,18 @@ class PostgreSQLOptional(BaseModel):
 
 class MySQLRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    host: str = Field(..., description="MySQL host")
-    port: int = Field(..., description="MySQL port", ge=1, le=65535)
+    host: str = Field(..., description='MySQL host')
+    port: int = Field(..., description='MySQL port', ge=1, le=65535)
 
 
 class MySQLMasked(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    username: str = Field(..., description="Database username")
-    password: str = Field(..., description="Database password")
+    username: str = Field(..., description='Database username')
+    password: str = Field(..., description='Database password')
 
 
 class MySQLOptionalConnection(BaseModel):
@@ -649,10 +663,10 @@ class MySQLOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connect_timeout_seconds: int | None = Field(
-        10, description="Connection timeout in seconds", ge=1, le=120
+        10, description='Connection timeout in seconds', ge=1, le=120
     )
 
 
@@ -662,33 +676,33 @@ class MySQLOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     database: str | None = Field(
         None,
-        description="Single database to scan (optional when include_all_databases is true)",
+        description='Single database to scan (optional when include_all_databases is true)',
     )
     include_all_databases: bool | None = Field(
-        False, description="Scan all visible databases except excluded system databases"
+        False, description='Scan all visible databases except excluded system databases'
     )
     exclude_databases: list[str] | None = Field(
-        ["information_schema", "mysql", "performance_schema", "sys"],
-        description="Database denylist (exact database names)",
+        ['information_schema', 'mysql', 'performance_schema', 'sys'],
+        description='Database denylist (exact database names)',
     )
     include_tables: list[str] | None = Field(
         None,
-        description="Optional table allowlist. Accepted forms: table or database.table",
+        description='Optional table allowlist. Accepted forms: table or database.table',
     )
     table_limit: int | None = Field(
         None,
-        description="Optional cap on number of table assets extracted per database",
+        description='Optional cap on number of table assets extracted per database',
         ge=1,
     )
 
 
 class MySQLOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: MySQLOptionalConnection | None = None
     scope: MySQLOptionalScope | None = None
@@ -696,18 +710,18 @@ class MySQLOptional(BaseModel):
 
 class MSSQLRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    host: str = Field(..., description="SQL Server host endpoint")
-    port: int = Field(..., description="SQL Server TCP port", ge=1, le=65535)
+    host: str = Field(..., description='SQL Server host endpoint')
+    port: int = Field(..., description='SQL Server TCP port', ge=1, le=65535)
 
 
 class MSSQLMasked(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    username: str = Field(..., description="SQL Server login username")
-    password: str = Field(..., description="SQL Server login password")
+    username: str = Field(..., description='SQL Server login username')
+    password: str = Field(..., description='SQL Server login password')
 
 
 class AuthMode(StrEnum):
@@ -715,8 +729,8 @@ class AuthMode(StrEnum):
     Authentication mode. CUSTOM uses masked.username as-is, LDAP prefixes username with ldap_domain when provided.
     """
 
-    CUSTOM = "CUSTOM"
-    LDAP = "LDAP"
+    CUSTOM = 'CUSTOM'
+    LDAP = 'LDAP'
 
 
 class MSSQLOptionalConnection(BaseModel):
@@ -725,22 +739,22 @@ class MSSQLOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     auth_mode: AuthMode | None = Field(
-        "CUSTOM",
-        description="Authentication mode. CUSTOM uses masked.username as-is, LDAP prefixes username with ldap_domain when provided.",
+        'CUSTOM',
+        description='Authentication mode. CUSTOM uses masked.username as-is, LDAP prefixes username with ldap_domain when provided.',
     )
     ldap_domain: str | None = Field(
         None,
-        description="Optional LDAP/AD domain for LDAP auth mode (for example, CORP or corp.local).",
+        description='Optional LDAP/AD domain for LDAP auth mode (for example, CORP or corp.local).',
     )
     is_aws_rds: bool | None = Field(
         None,
-        description="Set true for AWS RDS SQL Server, false for on-prem. If unset, runtime auto-detects using host patterns.",
+        description='Set true for AWS RDS SQL Server, false for on-prem. If unset, runtime auto-detects using host patterns.',
     )
     connect_timeout_seconds: int | None = Field(
-        10, description="Connection timeout in seconds", ge=1, le=120
+        10, description='Connection timeout in seconds', ge=1, le=120
     )
 
 
@@ -750,51 +764,51 @@ class MSSQLOptionalExtraction(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     include_table_lineage: bool | None = Field(
         True,
-        description="Include table-level lineage links using foreign key metadata.",
+        description='Include table-level lineage links using foreign key metadata.',
     )
     include_view_lineage: bool | None = Field(
         True,
-        description="Include view-to-table/view lineage links using SQL Server dependency metadata.",
+        description='Include view-to-table/view lineage links using SQL Server dependency metadata.',
     )
     include_view_column_lineage: bool | None = Field(
-        True, description="Enable view column lineage extraction when available."
+        True, description='Enable view column lineage extraction when available.'
     )
     include_stored_procedures: bool | None = Field(
-        True, description="Include stored procedure metadata extraction."
+        True, description='Include stored procedure metadata extraction.'
     )
     include_stored_procedures_code: bool | None = Field(
         True,
-        description="Include stored procedure source code metadata when available.",
+        description='Include stored procedure source code metadata when available.',
     )
     include_jobs: bool | None = Field(
-        True, description="Include SQL Server Agent jobs metadata extraction."
+        True, description='Include SQL Server Agent jobs metadata extraction.'
     )
     include_query_lineage: bool | None = Field(
         False,
-        description="Enable query-based lineage extraction from Query Store/DMVs.",
+        description='Enable query-based lineage extraction from Query Store/DMVs.',
     )
     max_queries_to_extract: int | None = Field(
         1000,
-        description="Maximum number of queries to analyze for query-based lineage.",
+        description='Maximum number of queries to analyze for query-based lineage.',
         ge=1,
         le=10000,
     )
     min_query_calls: int | None = Field(
         1,
-        description="Minimum execution count for queries to be included in query-based lineage.",
+        description='Minimum execution count for queries to be included in query-based lineage.',
         ge=1,
     )
     query_exclude_patterns: list[str] | None = Field(
         None,
-        description="SQL LIKE patterns used to exclude queries from query-based lineage.",
+        description='SQL LIKE patterns used to exclude queries from query-based lineage.',
         max_length=100,
     )
     include_usage_statistics: bool | None = Field(
-        False, description="Enable usage statistics extraction from SQL query metadata."
+        False, description='Enable usage statistics extraction from SQL query metadata.'
     )
 
 
@@ -804,40 +818,44 @@ class MSSQLOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     database: str | None = Field(
         None,
-        description="Single database to scan (optional when include_all_databases is true)",
+        description='Single database to scan (optional when include_all_databases is true)',
     )
     include_all_databases: bool | None = Field(
-        False, description="Scan all visible databases except excluded system databases"
+        False, description='Scan all visible databases except excluded system databases'
     )
     exclude_databases: list[str] | None = Field(
-        ["master", "tempdb", "model"],
-        description="Database denylist (exact database names)",
+        ['master', 'tempdb', 'model'],
+        description='Database denylist (exact database names)',
     )
     include_schemas: list[str] | None = Field(
-        None, description="Optional schema allowlist (exact schema names)"
+        None, description='Optional schema allowlist (exact schema names)'
     )
     exclude_schemas: list[str] | None = Field(
-        ["INFORMATION_SCHEMA", "sys"],
-        description="Schema denylist (exact schema names)",
+        ['INFORMATION_SCHEMA', 'sys'],
+        description='Schema denylist (exact schema names)',
     )
-    include_tables: bool | None = Field(True, description="Include table assets in extraction")
-    include_views: bool | None = Field(True, description="Include view assets in extraction")
+    include_tables: bool | None = Field(
+        True, description='Include table assets in extraction'
+    )
+    include_views: bool | None = Field(
+        True, description='Include view assets in extraction'
+    )
     include_objects: list[str] | None = Field(
         None,
-        description="Optional object allowlist. Accepted forms: schema.object or database.schema.object",
+        description='Optional object allowlist. Accepted forms: schema.object or database.schema.object',
     )
     table_limit: int | None = Field(
-        None, description="Optional cap on number of table/view assets extracted", ge=1
+        None, description='Optional cap on number of table/view assets extracted', ge=1
     )
 
 
 class MSSQLOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: MSSQLOptionalConnection | None = None
     scope: MSSQLOptionalScope | None = None
@@ -846,19 +864,21 @@ class MSSQLOptional(BaseModel):
 
 class OracleRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    host: str = Field(..., description="Oracle host endpoint")
-    port: int = Field(..., description="Oracle TCP port", ge=1, le=65535)
-    service_name: str = Field(..., description="Oracle service name (for example, TEST_PDB)")
+    host: str = Field(..., description='Oracle host endpoint')
+    port: int = Field(..., description='Oracle TCP port', ge=1, le=65535)
+    service_name: str = Field(
+        ..., description='Oracle service name (for example, TEST_PDB)'
+    )
 
 
 class OracleMasked(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    username: str = Field(..., description="Oracle login username")
-    password: str = Field(..., description="Oracle login password")
+    username: str = Field(..., description='Oracle login username')
+    password: str = Field(..., description='Oracle login password')
 
 
 class OracleOptionalConnection(BaseModel):
@@ -867,10 +887,10 @@ class OracleOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connect_timeout_seconds: int | None = Field(
-        10, description="Connection timeout in seconds", ge=1, le=120
+        10, description='Connection timeout in seconds', ge=1, le=120
     )
 
 
@@ -880,48 +900,52 @@ class OracleOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     include_schemas: list[str] | None = Field(
-        None, description="Optional schema allowlist (exact schema names)"
+        None, description='Optional schema allowlist (exact schema names)'
     )
     exclude_schemas: list[str] | None = Field(
         [
-            "SYS",
-            "SYSTEM",
-            "DBSNMP",
-            "WMSYS",
-            "CTXSYS",
-            "XDB",
-            "MDSYS",
-            "ORDSYS",
-            "OUTLN",
-            "ORDDATA",
+            'SYS',
+            'SYSTEM',
+            'DBSNMP',
+            'WMSYS',
+            'CTXSYS',
+            'XDB',
+            'MDSYS',
+            'ORDSYS',
+            'OUTLN',
+            'ORDDATA',
         ],
-        description="Schema denylist (exact schema names)",
+        description='Schema denylist (exact schema names)',
     )
-    include_tables: bool | None = Field(True, description="Include table assets in extraction")
-    include_views: bool | None = Field(True, description="Include view assets in extraction")
+    include_tables: bool | None = Field(
+        True, description='Include table assets in extraction'
+    )
+    include_views: bool | None = Field(
+        True, description='Include view assets in extraction'
+    )
     include_view_lineage: bool | None = Field(
         True,
-        description="Extract coarse lineage links from views to referenced tables/views",
+        description='Extract coarse lineage links from views to referenced tables/views',
     )
     include_view_column_lineage: bool | None = Field(
         True,
-        description="Enable view column lineage collection from Oracle dependency metadata",
+        description='Enable view column lineage collection from Oracle dependency metadata',
     )
     include_objects: list[str] | None = Field(
         None,
-        description="Optional object allowlist. Accepted forms: schema.object or service.schema.object",
+        description='Optional object allowlist. Accepted forms: schema.object or service.schema.object',
     )
     table_limit: int | None = Field(
-        None, description="Optional cap on number of table/view assets extracted", ge=1
+        None, description='Optional cap on number of table/view assets extracted', ge=1
     )
 
 
 class OracleOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: OracleOptionalConnection | None = None
     scope: OracleOptionalScope | None = None
@@ -932,27 +956,27 @@ class HiveScheme(StrEnum):
     Hive transport and driver scheme
     """
 
-    hive = "hive"
-    hive_http = "hive+http"
-    hive_https = "hive+https"
-    sparksql = "sparksql"
-    databricks_pyhive = "databricks+pyhive"
+    hive = 'hive'
+    hive_http = 'hive+http'
+    hive_https = 'hive+https'
+    sparksql = 'sparksql'
+    databricks_pyhive = 'databricks+pyhive'
 
 
 class HiveRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    host: str = Field(..., description="Hive host endpoint")
-    port: int = Field(..., description="Hive TCP port", ge=1, le=65535)
+    host: str = Field(..., description='Hive host endpoint')
+    port: int = Field(..., description='Hive TCP port', ge=1, le=65535)
 
 
 class HiveMasked(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    username: str = Field(..., description="Hive login username")
-    password: str = Field(..., description="Hive login password")
+    username: str = Field(..., description='Hive login username')
+    password: str = Field(..., description='Hive login password')
 
 
 class HiveOptionalConnection(BaseModel):
@@ -961,12 +985,12 @@ class HiveOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     scheme: HiveScheme | None = None
     connect_args: dict[str, Any] | None = Field(
         {},
-        description="Additional PyHive connection arguments (e.g. auth, kerberos_service_name, http_path).",
+        description='Additional PyHive connection arguments (e.g. auth, kerberos_service_name, http_path).',
     )
 
 
@@ -976,36 +1000,40 @@ class HiveOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     database: str | None = Field(
         None,
-        description="Single Hive database to scan (optional when include_all_databases is true)",
+        description='Single Hive database to scan (optional when include_all_databases is true)',
     )
     include_all_databases: bool | None = Field(
         False,
-        description="Scan all visible Hive databases except excluded system databases",
+        description='Scan all visible Hive databases except excluded system databases',
     )
     exclude_databases: list[str] | None = Field(
-        ["information_schema", "sys"],
-        description="Database denylist (exact database names)",
+        ['information_schema', 'sys'],
+        description='Database denylist (exact database names)',
     )
-    include_tables: bool | None = Field(True, description="Include table assets in extraction")
-    include_views: bool | None = Field(True, description="Include view assets in extraction")
+    include_tables: bool | None = Field(
+        True, description='Include table assets in extraction'
+    )
+    include_views: bool | None = Field(
+        True, description='Include view assets in extraction'
+    )
     include_objects: list[str] | None = Field(
         None,
-        description="Optional object allowlist. Accepted forms: table or database.table",
+        description='Optional object allowlist. Accepted forms: table or database.table',
     )
     table_limit: int | None = Field(
         None,
-        description="Optional cap on number of table/view assets extracted per database",
+        description='Optional cap on number of table/view assets extracted per database',
         ge=1,
     )
 
 
 class HiveOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: HiveOptionalConnection | None = None
     scope: HiveOptionalScope | None = None
@@ -1016,51 +1044,53 @@ class DatabricksAuthMode(StrEnum):
     Databricks authentication mode
     """
 
-    PAT_TOKEN = "PAT_TOKEN"
-    SERVICE_PRINCIPAL = "SERVICE_PRINCIPAL"
+    PAT_TOKEN = 'PAT_TOKEN'
+    SERVICE_PRINCIPAL = 'SERVICE_PRINCIPAL'
 
 
 class DatabricksRequiredPat(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    auth_mode: Literal["PAT_TOKEN"]
+    auth_mode: Literal['PAT_TOKEN']
     workspace_url: AnyUrl = Field(
         ...,
-        description="Databricks workspace URL (for example, https://adb-1234567890123456.7.azuredatabricks.net)",
+        description='Databricks workspace URL (for example, https://adb-1234567890123456.7.azuredatabricks.net)',
     )
     warehouse_id: str = Field(
-        ..., description="Databricks SQL warehouse ID used for sampling queries"
+        ..., description='Databricks SQL warehouse ID used for sampling queries'
     )
 
 
 class DatabricksRequiredServicePrincipal(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    auth_mode: Literal["SERVICE_PRINCIPAL"]
+    auth_mode: Literal['SERVICE_PRINCIPAL']
     workspace_url: AnyUrl = Field(
         ...,
-        description="Databricks workspace URL (for example, https://adb-1234567890123456.7.azuredatabricks.net)",
+        description='Databricks workspace URL (for example, https://adb-1234567890123456.7.azuredatabricks.net)',
     )
     warehouse_id: str = Field(
-        ..., description="Databricks SQL warehouse ID used for sampling queries"
+        ..., description='Databricks SQL warehouse ID used for sampling queries'
     )
-    client_id: str = Field(..., description="Databricks service principal client ID")
+    client_id: str = Field(..., description='Databricks service principal client ID')
 
 
 class DatabricksMaskedPat(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    token: str = Field(..., description="Databricks personal access token (PAT)")
+    token: str = Field(..., description='Databricks personal access token (PAT)')
 
 
 class DatabricksMaskedServicePrincipal(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    client_secret: str = Field(..., description="Databricks service principal client secret")
+    client_secret: str = Field(
+        ..., description='Databricks service principal client secret'
+    )
 
 
 class DatabricksOptionalConnection(BaseModel):
@@ -1069,17 +1099,17 @@ class DatabricksOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     timeout_seconds: int | None = Field(
-        30, description="HTTP timeout for Databricks API calls", ge=5, le=300
+        30, description='HTTP timeout for Databricks API calls', ge=5, le=300
     )
     statement_timeout_seconds: int | None = Field(
-        60, description="Maximum wait timeout for SQL statement execution", ge=5, le=600
+        60, description='Maximum wait timeout for SQL statement execution', ge=5, le=600
     )
     max_statement_polls: int | None = Field(
         30,
-        description="Maximum polling attempts when waiting for SQL statement completion",
+        description='Maximum polling attempts when waiting for SQL statement completion',
         ge=1,
         le=120,
     )
@@ -1091,33 +1121,33 @@ class DatabricksOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     include_catalogs: list[str] | None = Field(
-        None, description="Optional catalog allowlist (exact catalog names)"
+        None, description='Optional catalog allowlist (exact catalog names)'
     )
     exclude_catalogs: list[str] | None = Field(
-        [], description="Catalog denylist (exact catalog names)"
+        [], description='Catalog denylist (exact catalog names)'
     )
     include_schemas: list[str] | None = Field(
         None,
-        description="Optional schema allowlist. Accepted forms: schema or catalog.schema",
+        description='Optional schema allowlist. Accepted forms: schema or catalog.schema',
     )
     exclude_schemas: list[str] | None = Field(
-        ["information_schema"],
-        description="Schema denylist. Accepted forms: schema or catalog.schema",
+        ['information_schema'],
+        description='Schema denylist. Accepted forms: schema or catalog.schema',
     )
     include_tables: list[str] | None = Field(
         None,
-        description="Optional table allowlist. Accepted forms: table, schema.table, or catalog.schema.table",
+        description='Optional table allowlist. Accepted forms: table, schema.table, or catalog.schema.table',
     )
     table_limit_per_schema: int | None = Field(
         None,
-        description="Optional cap on number of Unity Catalog tables extracted per schema",
+        description='Optional cap on number of Unity Catalog tables extracted per schema',
         ge=1,
     )
     include_hive_metastore: bool | None = Field(
-        False, description="Include hive_metastore catalog in extraction"
+        False, description='Include hive_metastore catalog in extraction'
     )
 
 
@@ -1127,27 +1157,27 @@ class DatabricksOptionalExtraction(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     include_table_lineage: bool | None = Field(
         True,
-        description="Include table-level lineage links between Unity Catalog tables",
+        description='Include table-level lineage links between Unity Catalog tables',
     )
     include_column_lineage: bool | None = Field(
-        False, description="Attempt to fetch column-level lineage metadata"
+        False, description='Attempt to fetch column-level lineage metadata'
     )
     include_notebooks: bool | None = Field(
-        False, description="Extract workspace notebook metadata as additional assets"
+        False, description='Extract workspace notebook metadata as additional assets'
     )
     include_pipelines: bool | None = Field(
         False,
-        description="Extract Delta Live Tables pipeline metadata as additional assets",
+        description='Extract Delta Live Tables pipeline metadata as additional assets',
     )
 
 
 class DatabricksOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: DatabricksOptionalConnection | None = None
     scope: DatabricksOptionalScope | None = None
@@ -1159,92 +1189,94 @@ class SnowflakeAuthenticationType(StrEnum):
     Snowflake authentication type
     """
 
-    DEFAULT_AUTHENTICATOR = "DEFAULT_AUTHENTICATOR"
-    EXTERNAL_BROWSER_AUTHENTICATOR = "EXTERNAL_BROWSER_AUTHENTICATOR"
-    KEY_PAIR_AUTHENTICATOR = "KEY_PAIR_AUTHENTICATOR"
-    OAUTH_AUTHENTICATOR_TOKEN = "OAUTH_AUTHENTICATOR_TOKEN"
+    DEFAULT_AUTHENTICATOR = 'DEFAULT_AUTHENTICATOR'
+    EXTERNAL_BROWSER_AUTHENTICATOR = 'EXTERNAL_BROWSER_AUTHENTICATOR'
+    KEY_PAIR_AUTHENTICATOR = 'KEY_PAIR_AUTHENTICATOR'
+    OAUTH_AUTHENTICATOR_TOKEN = 'OAUTH_AUTHENTICATOR_TOKEN'
 
 
 class SnowflakeRequiredDefaultAuthenticator(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    authentication_type: Literal["DEFAULT_AUTHENTICATOR"]
+    authentication_type: Literal['DEFAULT_AUTHENTICATOR']
     account_id: str = Field(
         ...,
-        description="Snowflake account identifier (for example, xy12345.us-east-2.aws or LMAUONV-ONE_DATA_DEV)",
+        description='Snowflake account identifier (for example, xy12345.us-east-2.aws or LMAUONV-ONE_DATA_DEV)',
     )
 
 
 class SnowflakeRequiredExternalBrowserAuthenticator(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    authentication_type: Literal["EXTERNAL_BROWSER_AUTHENTICATOR"]
+    authentication_type: Literal['EXTERNAL_BROWSER_AUTHENTICATOR']
     account_id: str = Field(
         ...,
-        description="Snowflake account identifier (for example, xy12345.us-east-2.aws or LMAUONV-ONE_DATA_DEV)",
+        description='Snowflake account identifier (for example, xy12345.us-east-2.aws or LMAUONV-ONE_DATA_DEV)',
     )
 
 
 class SnowflakeRequiredKeyPairAuthenticator(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    authentication_type: Literal["KEY_PAIR_AUTHENTICATOR"]
+    authentication_type: Literal['KEY_PAIR_AUTHENTICATOR']
     account_id: str = Field(
         ...,
-        description="Snowflake account identifier (for example, xy12345.us-east-2.aws or LMAUONV-ONE_DATA_DEV)",
+        description='Snowflake account identifier (for example, xy12345.us-east-2.aws or LMAUONV-ONE_DATA_DEV)',
     )
 
 
 class SnowflakeRequiredOauthAuthenticatorToken(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    authentication_type: Literal["OAUTH_AUTHENTICATOR_TOKEN"]
+    authentication_type: Literal['OAUTH_AUTHENTICATOR_TOKEN']
     account_id: str = Field(
         ...,
-        description="Snowflake account identifier (for example, xy12345.us-east-2.aws or LMAUONV-ONE_DATA_DEV)",
+        description='Snowflake account identifier (for example, xy12345.us-east-2.aws or LMAUONV-ONE_DATA_DEV)',
     )
 
 
 class SnowflakeMaskedDefaultAuthenticator(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    username: str = Field(..., description="Snowflake login username")
-    password: str = Field(..., description="Snowflake login password")
+    username: str = Field(..., description='Snowflake login username')
+    password: str = Field(..., description='Snowflake login password')
 
 
 class SnowflakeMaskedExternalBrowserAuthenticator(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    username: str = Field(..., description="Snowflake login username")
+    username: str = Field(..., description='Snowflake login username')
 
 
 class SnowflakeMaskedKeyPairAuthenticator(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    username: str = Field(..., description="Snowflake login username")
+    username: str = Field(..., description='Snowflake login username')
     private_key: str = Field(
         ...,
-        description="Snowflake private key PEM content. You can pass escaped newlines (\\n).",
+        description='Snowflake private key PEM content. You can pass escaped newlines (\\n).',
     )
     private_key_password: str | None = Field(
         None,
-        description="Password for encrypted private key PEM (optional when key is not encrypted).",
+        description='Password for encrypted private key PEM (optional when key is not encrypted).',
     )
 
 
 class SnowflakeMaskedOauthAuthenticatorToken(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    username: str = Field(..., description="Snowflake login username")
-    token: str = Field(..., description="OAuth bearer token for Snowflake authentication")
+    username: str = Field(..., description='Snowflake login username')
+    token: str = Field(
+        ..., description='OAuth bearer token for Snowflake authentication'
+    )
 
 
 class SnowflakeOptionalConnection(BaseModel):
@@ -1253,24 +1285,24 @@ class SnowflakeOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     warehouse: str | None = Field(
-        None, description="Snowflake warehouse to use for metadata and sampling queries"
+        None, description='Snowflake warehouse to use for metadata and sampling queries'
     )
     role: str | None = Field(
-        None, description="Snowflake role to use for metadata and sampling queries"
+        None, description='Snowflake role to use for metadata and sampling queries'
     )
     snowflake_domain: str | None = Field(
-        "snowflakecomputing.com",
-        description="Snowflake domain suffix (use snowflakecomputing.cn for China regions).",
+        'snowflakecomputing.com',
+        description='Snowflake domain suffix (use snowflakecomputing.cn for China regions).',
     )
     connect_timeout_seconds: int | None = Field(
-        15, description="Connection timeout in seconds", ge=1, le=300
+        15, description='Connection timeout in seconds', ge=1, le=300
     )
     connect_args: dict[str, Any] | None = Field(
         {},
-        description="Additional snowflake.connector.connect keyword arguments (advanced usage).",
+        description='Additional snowflake.connector.connect keyword arguments (advanced usage).',
     )
 
 
@@ -1280,33 +1312,37 @@ class SnowflakeOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     database: str | None = Field(
         None,
-        description="Single database to scan (optional when include_all_databases is true)",
+        description='Single database to scan (optional when include_all_databases is true)',
     )
     include_all_databases: bool | None = Field(
-        False, description="Scan all visible databases except excluded system databases"
+        False, description='Scan all visible databases except excluded system databases'
     )
     exclude_databases: list[str] | None = Field(
-        ["SNOWFLAKE", "SNOWFLAKE_SAMPLE_DATA"],
-        description="Database denylist (exact database names)",
+        ['SNOWFLAKE', 'SNOWFLAKE_SAMPLE_DATA'],
+        description='Database denylist (exact database names)',
     )
     include_schemas: list[str] | None = Field(
-        None, description="Optional schema allowlist (exact schema names)"
+        None, description='Optional schema allowlist (exact schema names)'
     )
     exclude_schemas: list[str] | None = Field(
-        ["INFORMATION_SCHEMA"], description="Schema denylist (exact schema names)"
+        ['INFORMATION_SCHEMA'], description='Schema denylist (exact schema names)'
     )
-    include_tables: bool | None = Field(True, description="Include table assets in extraction")
-    include_views: bool | None = Field(True, description="Include view assets in extraction")
+    include_tables: bool | None = Field(
+        True, description='Include table assets in extraction'
+    )
+    include_views: bool | None = Field(
+        True, description='Include view assets in extraction'
+    )
     include_objects: list[str] | None = Field(
         None,
-        description="Optional object allowlist. Accepted forms: schema.object or database.schema.object",
+        description='Optional object allowlist. Accepted forms: schema.object or database.schema.object',
     )
     table_limit: int | None = Field(
-        None, description="Optional cap on number of table/view assets extracted", ge=1
+        None, description='Optional cap on number of table/view assets extracted', ge=1
     )
 
 
@@ -1316,24 +1352,24 @@ class SnowflakeOptionalExtraction(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     start_time: AwareDatetime | None = Field(
-        None, description="Optional lineage lower bound timestamp (ISO 8601)."
+        None, description='Optional lineage lower bound timestamp (ISO 8601).'
     )
     include_table_lineage: bool | None = Field(
         True,
-        description="Include table-level lineage links when dependency metadata is accessible.",
+        description='Include table-level lineage links when dependency metadata is accessible.',
     )
     include_view_lineage: bool | None = Field(
         True,
-        description="Include view-to-table/view lineage links when dependency metadata is accessible.",
+        description='Include view-to-table/view lineage links when dependency metadata is accessible.',
     )
 
 
 class SnowflakeOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: SnowflakeOptionalConnection | None = None
     scope: SnowflakeOptionalScope | None = None
@@ -1345,37 +1381,37 @@ class MongoDBDeployment(StrEnum):
     MongoDB deployment mode
     """
 
-    ATLAS = "ATLAS"
-    ON_PREM = "ON_PREM"
+    ATLAS = 'ATLAS'
+    ON_PREM = 'ON_PREM'
 
 
 class MongoDBRequiredAtlas(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    deployment: Literal["ATLAS"]
+    deployment: Literal['ATLAS']
     cluster_host: str = Field(
         ...,
-        description="Atlas SRV cluster host or full mongodb+srv:// URI (for example, cluster.abc123.mongodb.net or mongodb+srv://cluster.abc123.mongodb.net). If a full URI is supplied, the host is extracted and credentials are discarded — set them in masked fields instead.",
+        description='Atlas SRV cluster host or full mongodb+srv:// URI (for example, cluster.abc123.mongodb.net or mongodb+srv://cluster.abc123.mongodb.net). If a full URI is supplied, the host is extracted and credentials are discarded — set them in masked fields instead.',
         min_length=1,
     )
 
 
 class MongoDBRequiredOnPrem(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    deployment: Literal["ON_PREM"]
-    host: str = Field(..., description="On-prem MongoDB host endpoint")
-    port: int = Field(..., description="On-prem MongoDB TCP port", ge=1, le=65535)
+    deployment: Literal['ON_PREM']
+    host: str = Field(..., description='On-prem MongoDB host endpoint')
+    port: int = Field(..., description='On-prem MongoDB TCP port', ge=1, le=65535)
 
 
 class MongoDBMaskedUsernamePassword(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    username: str = Field(..., description="MongoDB login username")
-    password: str = Field(..., description="MongoDB login password")
+    username: str = Field(..., description='MongoDB login username')
+    password: str = Field(..., description='MongoDB login password')
 
 
 class MongoDBMaskedNone(BaseModel):
@@ -1384,7 +1420,7 @@ class MongoDBMaskedNone(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
 
 
@@ -1393,13 +1429,13 @@ class MongoDBAuthMechanism(StrEnum):
     MongoDB authentication mechanism
     """
 
-    DEFAULT = "DEFAULT"
-    SCRAM_SHA_1 = "SCRAM-SHA-1"
-    SCRAM_SHA_256 = "SCRAM-SHA-256"
-    MONGODB_AWS = "MONGODB-AWS"
-    MONGODB_X509 = "MONGODB-X509"
-    GSSAPI = "GSSAPI"
-    PLAIN = "PLAIN"
+    DEFAULT = 'DEFAULT'
+    SCRAM_SHA_1 = 'SCRAM-SHA-1'
+    SCRAM_SHA_256 = 'SCRAM-SHA-256'
+    MONGODB_AWS = 'MONGODB-AWS'
+    MONGODB_X509 = 'MONGODB-X509'
+    GSSAPI = 'GSSAPI'
+    PLAIN = 'PLAIN'
 
 
 class MongoDBOptionalConnection(BaseModel):
@@ -1408,30 +1444,34 @@ class MongoDBOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     auth_mechanism: MongoDBAuthMechanism | None = None
     auth_source: str | None = Field(
-        None, description="Authentication database/source (for example, admin)"
+        None, description='Authentication database/source (for example, admin)'
     )
     app_name: str | None = Field(
-        None, description="MongoDB appName (Atlas and driver telemetry label)"
+        None, description='MongoDB appName (Atlas and driver telemetry label)'
     )
-    tls: bool | None = Field(None, description="Enable TLS for on-prem connections when required")
-    replica_set: str | None = Field(None, description="Replica set name for on-prem deployments")
+    tls: bool | None = Field(
+        None, description='Enable TLS for on-prem connections when required'
+    )
+    replica_set: str | None = Field(
+        None, description='Replica set name for on-prem deployments'
+    )
     direct_connection: bool | None = Field(
         None,
-        description="Connect directly to a single host instead of topology discovery",
+        description='Connect directly to a single host instead of topology discovery',
     )
     connect_timeout_ms: int | None = Field(
         10000,
-        description="MongoDB connection timeout in milliseconds",
+        description='MongoDB connection timeout in milliseconds',
         ge=100,
         le=120000,
     )
     options: dict[str, Any] | None = Field(
         {},
-        description="Additional pymongo.MongoClient keyword arguments (advanced usage).",
+        description='Additional pymongo.MongoClient keyword arguments (advanced usage).',
     )
 
 
@@ -1441,40 +1481,40 @@ class MongoDBOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     database: str | None = Field(
         None,
-        description="Single database to scan (optional when include_all_databases is true)",
+        description='Single database to scan (optional when include_all_databases is true)',
     )
     include_all_databases: bool | None = Field(
-        True, description="Scan all visible databases except excluded system databases"
+        True, description='Scan all visible databases except excluded system databases'
     )
     exclude_databases: list[str] | None = Field(
-        ["admin", "config", "local"],
-        description="Database denylist (exact database names)",
+        ['admin', 'config', 'local'],
+        description='Database denylist (exact database names)',
     )
     include_collections: list[str] | None = Field(
         None,
-        description="Optional collection allowlist. Accepted forms: collection or database.collection",
+        description='Optional collection allowlist. Accepted forms: collection or database.collection',
     )
     exclude_collections: list[str] | None = Field(
         None,
-        description="Optional collection denylist. Accepted forms: collection or database.collection",
+        description='Optional collection denylist. Accepted forms: collection or database.collection',
     )
     include_system_collections: bool | None = Field(
-        False, description="Include system.* collections when true"
+        False, description='Include system.* collections when true'
     )
     collection_limit: int | None = Field(
         None,
-        description="Optional cap on number of collections extracted per database",
+        description='Optional cap on number of collections extracted per database',
         ge=1,
     )
 
 
 class MongoDBOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: MongoDBOptionalConnection | None = None
     scope: MongoDBOptionalScope | None = None
@@ -1485,42 +1525,44 @@ class PowerBIAuthMode(StrEnum):
     PowerBI authentication mode
     """
 
-    SERVICE_PRINCIPAL = "SERVICE_PRINCIPAL"
-    ACCESS_TOKEN = "ACCESS_TOKEN"
+    SERVICE_PRINCIPAL = 'SERVICE_PRINCIPAL'
+    ACCESS_TOKEN = 'ACCESS_TOKEN'
 
 
 class PowerBIRequiredServicePrincipal(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    auth_mode: Literal["SERVICE_PRINCIPAL"]
-    tenant_id: str = Field(..., description="Azure tenant identifier", pattern="^[0-9a-fA-F-]{36}$")
+    auth_mode: Literal['SERVICE_PRINCIPAL']
+    tenant_id: str = Field(
+        ..., description='Azure tenant identifier', pattern='^[0-9a-fA-F-]{36}$'
+    )
     client_id: str = Field(
-        ..., description="Azure app client identifier", pattern="^[0-9a-fA-F-]{36}$"
+        ..., description='Azure app client identifier', pattern='^[0-9a-fA-F-]{36}$'
     )
 
 
 class PowerBIRequiredAccessToken(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    auth_mode: Literal["ACCESS_TOKEN"]
+    auth_mode: Literal['ACCESS_TOKEN']
 
 
 class PowerBIMaskedClientSecret(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     client_secret: str = Field(
-        ..., description="Azure app client secret for service principal auth"
+        ..., description='Azure app client secret for service principal auth'
     )
 
 
 class PowerBIMaskedAccessToken(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    access_token: str = Field(..., description="Bearer token for PowerBI API access")
+    access_token: str = Field(..., description='Bearer token for PowerBI API access')
 
 
 class PowerBIOptionalConnection(BaseModel):
@@ -1529,17 +1571,17 @@ class PowerBIOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     authority_url: AnyUrl | None = Field(
-        "https://login.microsoftonline.com",
-        description="Authority base URL for Microsoft Entra token issuance",
+        'https://login.microsoftonline.com',
+        description='Authority base URL for Microsoft Entra token issuance',
     )
     api_base_url: AnyUrl | None = Field(
-        "https://api.powerbi.com/v1.0/myorg", description="PowerBI REST API base URL"
+        'https://api.powerbi.com/v1.0/myorg', description='PowerBI REST API base URL'
     )
     timeout_seconds: int | None = Field(
-        30, description="HTTP timeout for PowerBI API calls", ge=5, le=300
+        30, description='HTTP timeout for PowerBI API calls', ge=5, le=300
     )
 
 
@@ -1549,16 +1591,16 @@ class PowerBIOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     workspace_ids: list[str] | None = Field(
-        None, description="Optional allowlist of workspace IDs to scan"
+        None, description='Optional allowlist of workspace IDs to scan'
     )
     workspace_names: list[str] | None = Field(
-        None, description="Optional allowlist of workspace names to scan"
+        None, description='Optional allowlist of workspace names to scan'
     )
     include_personal_workspaces: bool | None = Field(
-        False, description="Include personal workspaces when true"
+        False, description='Include personal workspaces when true'
     )
 
 
@@ -1568,27 +1610,29 @@ class PowerBIOptionalExtraction(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     extract_ownership: bool | None = Field(
-        False, description="Extract workspace/report/dataset owner metadata"
+        False, description='Extract workspace/report/dataset owner metadata'
     )
     extract_workspaces_to_containers: bool | None = Field(
-        True, description="Emit workspace metadata suitable for container grouping"
+        True, description='Emit workspace metadata suitable for container grouping'
     )
     extract_datasets_to_containers: bool | None = Field(
-        False, description="Emit dataset metadata suitable for container grouping"
+        False, description='Emit dataset metadata suitable for container grouping'
     )
-    extract_dashboards: bool | None = Field(True, description="Extract PowerBI dashboards")
-    extract_reports: bool | None = Field(True, description="Extract PowerBI reports")
+    extract_dashboards: bool | None = Field(
+        True, description='Extract PowerBI dashboards'
+    )
+    extract_reports: bool | None = Field(True, description='Extract PowerBI reports')
     extract_dataset_schema: bool | None = Field(
-        True, description="Attempt to extract PowerBI dataset table schema metadata"
+        True, description='Attempt to extract PowerBI dataset table schema metadata'
     )
 
 
 class PowerBIOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: PowerBIOptionalConnection | None = None
     scope: PowerBIOptionalScope | None = None
@@ -1600,54 +1644,54 @@ class TableauAuthMode(StrEnum):
     Tableau authentication mode
     """
 
-    USERNAME_PASSWORD = "USERNAME_PASSWORD"
-    PERSONAL_ACCESS_TOKEN = "PERSONAL_ACCESS_TOKEN"
+    USERNAME_PASSWORD = 'USERNAME_PASSWORD'
+    PERSONAL_ACCESS_TOKEN = 'PERSONAL_ACCESS_TOKEN'
 
 
 class TableauRequiredUsernamePassword(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    auth_mode: Literal["USERNAME_PASSWORD"]
+    auth_mode: Literal['USERNAME_PASSWORD']
     connect_uri: AnyUrl = Field(
         ...,
-        description="Tableau host URL (for example, https://dub01.online.tableau.com)",
+        description='Tableau host URL (for example, https://dub01.online.tableau.com)',
     )
     site: str = Field(
         ...,
-        description="Tableau site content URL. Use empty string for the Default site on Tableau Server.",
+        description='Tableau site content URL. Use empty string for the Default site on Tableau Server.',
     )
 
 
 class TableauRequiredPersonalAccessToken(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    auth_mode: Literal["PERSONAL_ACCESS_TOKEN"]
+    auth_mode: Literal['PERSONAL_ACCESS_TOKEN']
     connect_uri: AnyUrl = Field(
         ...,
-        description="Tableau host URL (for example, https://dub01.online.tableau.com)",
+        description='Tableau host URL (for example, https://dub01.online.tableau.com)',
     )
     site: str = Field(
         ...,
-        description="Tableau site content URL. Use empty string for the Default site on Tableau Server.",
+        description='Tableau site content URL. Use empty string for the Default site on Tableau Server.',
     )
-    token_name: str = Field(..., description="Tableau personal access token name")
+    token_name: str = Field(..., description='Tableau personal access token name')
 
 
 class TableauMaskedUsernamePassword(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    username: str = Field(..., description="Tableau login username")
-    password: str = Field(..., description="Tableau login password")
+    username: str = Field(..., description='Tableau login username')
+    password: str = Field(..., description='Tableau login password')
 
 
 class TableauMaskedPersonalAccessToken(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    token_value: str = Field(..., description="Tableau personal access token value")
+    token_value: str = Field(..., description='Tableau personal access token value')
 
 
 class TableauOptionalConnection(BaseModel):
@@ -1656,24 +1700,24 @@ class TableauOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     max_retries: int | None = Field(
         3,
-        description="Maximum retries for transient Tableau API request failures",
+        description='Maximum retries for transient Tableau API request failures',
         ge=0,
         le=10,
     )
     ssl_verify: bool | str | None = Field(
         True,
-        description="Verify SSL certificates. Provide a PEM bundle path string for custom certs.",
+        description='Verify SSL certificates. Provide a PEM bundle path string for custom certs.',
     )
     session_trust_env: bool | None = Field(
         False,
-        description="When true, allow requests session proxy/environment settings",
+        description='When true, allow requests session proxy/environment settings',
     )
     timeout_seconds: int | None = Field(
-        30, description="HTTP timeout in seconds for Tableau requests", ge=5, le=300
+        30, description='HTTP timeout in seconds for Tableau requests', ge=5, le=300
     )
 
 
@@ -1683,22 +1727,22 @@ class TableauOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     project_names: list[str] | None = Field(
-        None, description="Optional Tableau project allowlist (exact names)"
+        None, description='Optional Tableau project allowlist (exact names)'
     )
     workbook_names: list[str] | None = Field(
-        None, description="Optional Tableau workbook allowlist (exact names)"
+        None, description='Optional Tableau workbook allowlist (exact names)'
     )
     datasource_names: list[str] | None = Field(
-        None, description="Optional Tableau datasource allowlist (exact names)"
+        None, description='Optional Tableau datasource allowlist (exact names)'
     )
     include_workbooks: bool | None = Field(
-        True, description="Include workbook assets in extraction"
+        True, description='Include workbook assets in extraction'
     )
     include_datasources: bool | None = Field(
-        True, description="Include datasource assets in extraction"
+        True, description='Include datasource assets in extraction'
     )
 
 
@@ -1708,20 +1752,22 @@ class TableauOptionalExtraction(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    ingest_tags: bool | None = Field(False, description="Extract Tableau tags into asset metadata")
+    ingest_tags: bool | None = Field(
+        False, description='Extract Tableau tags into asset metadata'
+    )
     ingest_owner: bool | None = Field(
-        False, description="Extract Tableau owner metadata into assets"
+        False, description='Extract Tableau owner metadata into assets'
     )
     extract_usage_stats: bool | None = Field(
-        False, description="Extract Tableau usage statistics when accessible"
+        False, description='Extract Tableau usage statistics when accessible'
     )
 
 
 class TableauOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: TableauOptionalConnection | None = None
     scope: TableauOptionalScope | None = None
@@ -1731,11 +1777,11 @@ class TableauOptional(BaseModel):
 class CoreInput(BaseModel):
     type: AssetType
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
@@ -1745,292 +1791,298 @@ class Type(StrEnum):
     Type of the asset or source
     """
 
-    WORDPRESS = "WORDPRESS"
-    SLACK = "SLACK"
-    S3_COMPATIBLE_STORAGE = "S3_COMPATIBLE_STORAGE"
-    AZURE_BLOB_STORAGE = "AZURE_BLOB_STORAGE"
-    GOOGLE_CLOUD_STORAGE = "GOOGLE_CLOUD_STORAGE"
-    POSTGRESQL = "POSTGRESQL"
-    MYSQL = "MYSQL"
-    MSSQL = "MSSQL"
-    ORACLE = "ORACLE"
-    HIVE = "HIVE"
-    DATABRICKS = "DATABRICKS"
-    SNOWFLAKE = "SNOWFLAKE"
-    MONGODB = "MONGODB"
-    POWERBI = "POWERBI"
-    TABLEAU = "TABLEAU"
-    CONFLUENCE = "CONFLUENCE"
-    JIRA = "JIRA"
-    SERVICEDESK = "SERVICEDESK"
+    WORDPRESS = 'WORDPRESS'
+    SLACK = 'SLACK'
+    S3_COMPATIBLE_STORAGE = 'S3_COMPATIBLE_STORAGE'
+    AZURE_BLOB_STORAGE = 'AZURE_BLOB_STORAGE'
+    GOOGLE_CLOUD_STORAGE = 'GOOGLE_CLOUD_STORAGE'
+    POSTGRESQL = 'POSTGRESQL'
+    MYSQL = 'MYSQL'
+    MSSQL = 'MSSQL'
+    ORACLE = 'ORACLE'
+    HIVE = 'HIVE'
+    DATABRICKS = 'DATABRICKS'
+    SNOWFLAKE = 'SNOWFLAKE'
+    MONGODB = 'MONGODB'
+    POWERBI = 'POWERBI'
+    TABLEAU = 'TABLEAU'
+    CONFLUENCE = 'CONFLUENCE'
+    JIRA = 'JIRA'
+    SERVICEDESK = 'SERVICEDESK'
 
 
 class SlackInput(CoreInput):
-    type: Literal["SLACK"] = "SLACK"
+    type: Literal['SLACK'] = 'SLACK'
     required: SlackRequired
     masked: SlackMaskedBotToken | SlackMaskedUserToken | SlackMaskedToken = Field(
-        ..., title="SlackMasked"
+        ..., title='SlackMasked'
     )
     optional: SlackOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class S3CompatibleStorageInput(CoreInput):
-    type: Literal["S3_COMPATIBLE_STORAGE"] = "S3_COMPATIBLE_STORAGE"
+    type: Literal['S3_COMPATIBLE_STORAGE'] = 'S3_COMPATIBLE_STORAGE'
     required: S3CompatibleStorageRequired
     masked: S3CompatibleStorageMasked | None = None
     optional: S3CompatibleStorageOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class AzureBlobStorageInput(CoreInput):
-    type: Literal["AZURE_BLOB_STORAGE"] = "AZURE_BLOB_STORAGE"
+    type: Literal['AZURE_BLOB_STORAGE'] = 'AZURE_BLOB_STORAGE'
     required: AzureBlobStorageRequired
     masked: AzureBlobStorageMasked | None = None
     optional: AzureBlobStorageOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class GoogleCloudStorageInput(CoreInput):
-    type: Literal["GOOGLE_CLOUD_STORAGE"] = "GOOGLE_CLOUD_STORAGE"
+    type: Literal['GOOGLE_CLOUD_STORAGE'] = 'GOOGLE_CLOUD_STORAGE'
     required: GoogleCloudStorageRequired
     masked: GoogleCloudStorageMasked | None = None
     optional: GoogleCloudStorageOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class WordPressInput(CoreInput):
-    type: Literal["WORDPRESS"] = "WORDPRESS"
+    type: Literal['WORDPRESS'] = 'WORDPRESS'
     required: WordPressRequired
     masked: WordPressMasked
     optional: WordPressOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class PostgreSQLInput(CoreInput):
-    type: Literal["POSTGRESQL"] = "POSTGRESQL"
+    type: Literal['POSTGRESQL'] = 'POSTGRESQL'
     required: PostgreSQLRequired
     masked: PostgreSQLMasked
     optional: PostgreSQLOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class MySQLInput(CoreInput):
-    type: Literal["MYSQL"] = "MYSQL"
+    type: Literal['MYSQL'] = 'MYSQL'
     required: MySQLRequired
     masked: MySQLMasked
     optional: MySQLOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class MSSQLInput(CoreInput):
-    type: Literal["MSSQL"] = "MSSQL"
+    type: Literal['MSSQL'] = 'MSSQL'
     required: MSSQLRequired
     masked: MSSQLMasked
     optional: MSSQLOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class OracleInput(CoreInput):
-    type: Literal["ORACLE"] = "ORACLE"
+    type: Literal['ORACLE'] = 'ORACLE'
     required: OracleRequired
     masked: OracleMasked
     optional: OracleOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class HiveInput(CoreInput):
-    type: Literal["HIVE"] = "HIVE"
+    type: Literal['HIVE'] = 'HIVE'
     required: HiveRequired
     masked: HiveMasked
     optional: HiveOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class DatabricksInput(CoreInput):
-    type: Literal["DATABRICKS"] = "DATABRICKS"
+    type: Literal['DATABRICKS'] = 'DATABRICKS'
     required: DatabricksRequiredPat | DatabricksRequiredServicePrincipal = Field(
-        ..., title="DatabricksRequired"
+        ..., title='DatabricksRequired'
     )
     masked: DatabricksMaskedPat | DatabricksMaskedServicePrincipal = Field(
-        ..., title="DatabricksMasked"
+        ..., title='DatabricksMasked'
     )
     optional: DatabricksOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class SnowflakeInput(CoreInput):
-    type: Literal["SNOWFLAKE"] = "SNOWFLAKE"
+    type: Literal['SNOWFLAKE'] = 'SNOWFLAKE'
     required: (
         SnowflakeRequiredDefaultAuthenticator
         | SnowflakeRequiredExternalBrowserAuthenticator
         | SnowflakeRequiredKeyPairAuthenticator
         | SnowflakeRequiredOauthAuthenticatorToken
-    ) = Field(..., title="SnowflakeRequired")
+    ) = Field(..., title='SnowflakeRequired')
     masked: (
         SnowflakeMaskedDefaultAuthenticator
         | SnowflakeMaskedExternalBrowserAuthenticator
         | SnowflakeMaskedKeyPairAuthenticator
         | SnowflakeMaskedOauthAuthenticatorToken
-    ) = Field(..., title="SnowflakeMasked")
+    ) = Field(..., title='SnowflakeMasked')
     optional: SnowflakeOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class MongoDBInput(CoreInput):
-    type: Literal["MONGODB"] = "MONGODB"
-    required: MongoDBRequiredAtlas | MongoDBRequiredOnPrem = Field(..., title="MongoDBRequired")
-    masked: MongoDBMaskedUsernamePassword | MongoDBMaskedNone = Field(..., title="MongoDBMasked")
+    type: Literal['MONGODB'] = 'MONGODB'
+    required: MongoDBRequiredAtlas | MongoDBRequiredOnPrem = Field(
+        ..., title='MongoDBRequired'
+    )
+    masked: MongoDBMaskedUsernamePassword | MongoDBMaskedNone = Field(
+        ..., title='MongoDBMasked'
+    )
     optional: MongoDBOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class PowerBIInput(CoreInput):
-    type: Literal["POWERBI"] = "POWERBI"
+    type: Literal['POWERBI'] = 'POWERBI'
     required: PowerBIRequiredServicePrincipal | PowerBIRequiredAccessToken = Field(
-        ..., title="PowerBIRequired"
+        ..., title='PowerBIRequired'
     )
-    masked: PowerBIMaskedClientSecret | PowerBIMaskedAccessToken = Field(..., title="PowerBIMasked")
+    masked: PowerBIMaskedClientSecret | PowerBIMaskedAccessToken = Field(
+        ..., title='PowerBIMasked'
+    )
     optional: PowerBIOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class TableauInput(CoreInput):
-    type: Literal["TABLEAU"] = "TABLEAU"
-    required: TableauRequiredUsernamePassword | TableauRequiredPersonalAccessToken = Field(
-        ..., title="TableauRequired"
+    type: Literal['TABLEAU'] = 'TABLEAU'
+    required: TableauRequiredUsernamePassword | TableauRequiredPersonalAccessToken = (
+        Field(..., title='TableauRequired')
     )
     masked: TableauMaskedUsernamePassword | TableauMaskedPersonalAccessToken = Field(
-        ..., title="TableauMasked"
+        ..., title='TableauMasked'
     )
     optional: TableauOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class ConfluenceRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     base_url: AnyUrl = Field(
         ...,
-        description="Confluence Cloud tenant URL (for example, https://your-domain.atlassian.net)",
+        description='Confluence Cloud tenant URL (for example, https://your-domain.atlassian.net)',
     )
     account_email: EmailStr = Field(
         ...,
-        description="Atlassian account email used with API token for Basic authentication",
+        description='Atlassian account email used with API token for Basic authentication',
     )
 
 
 class ConfluenceMasked(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    api_token: str = Field(..., description="Atlassian API token for Confluence Cloud")
+    api_token: str = Field(..., description='Atlassian API token for Confluence Cloud')
 
 
 class ConfluenceOptionalConnection(BaseModel):
@@ -2039,19 +2091,19 @@ class ConfluenceOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     request_timeout_seconds: float | None = Field(
-        30, description="HTTP request timeout for Confluence API calls", ge=1.0
+        30, description='HTTP request timeout for Confluence API calls', ge=1.0
     )
     rate_limit_delay_seconds: float | None = Field(
         0,
-        description="Additional delay between API requests to reduce rate-limit pressure",
+        description='Additional delay between API requests to reduce rate-limit pressure',
         ge=0.0,
     )
     max_retries: int | None = Field(
         3,
-        description="Maximum retry attempts for transient API failures and rate limits",
+        description='Maximum retry attempts for transient API failures and rate limits',
         ge=0,
         le=10,
     )
@@ -2062,13 +2114,13 @@ class Type15(StrEnum):
     Filter spaces by space type
     """
 
-    global_ = "global"
-    collaboration = "collaboration"
-    knowledge_base = "knowledge_base"
-    personal = "personal"
-    system = "system"
-    onboarding = "onboarding"
-    xflow_sample_space = "xflow_sample_space"
+    global_ = 'global'
+    collaboration = 'collaboration'
+    knowledge_base = 'knowledge_base'
+    personal = 'personal'
+    system = 'system'
+    onboarding = 'onboarding'
+    xflow_sample_space = 'xflow_sample_space'
 
 
 class Status(StrEnum):
@@ -2076,8 +2128,8 @@ class Status(StrEnum):
     Filter spaces by status
     """
 
-    current = "current"
-    archived = "archived"
+    current = 'current'
+    archived = 'archived'
 
 
 class ConfluenceOptionalScopeSpaces(BaseModel):
@@ -2086,26 +2138,26 @@ class ConfluenceOptionalScopeSpaces(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     ids: list[int] | None = Field(
-        None, description="Filter spaces by IDs (up to 250)", max_length=250
+        None, description='Filter spaces by IDs (up to 250)', max_length=250
     )
     keys: list[str] | None = Field(
-        None, description="Filter spaces by keys (up to 250)", max_length=250
+        None, description='Filter spaces by keys (up to 250)', max_length=250
     )
-    type: Type15 | None = Field(None, description="Filter spaces by space type")
-    status: Status | None = Field(None, description="Filter spaces by status")
+    type: Type15 | None = Field(None, description='Filter spaces by space type')
+    status: Status | None = Field(None, description='Filter spaces by status')
     labels: list[str] | None = Field(
         None,
-        description="Filter spaces by labels (comma-separated in API request)",
+        description='Filter spaces by labels (comma-separated in API request)',
         max_length=250,
     )
 
 
 class ConfluenceOptionalScope(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     spaces: ConfluenceOptionalScopeSpaces | None = None
 
@@ -2116,33 +2168,33 @@ class ConfluenceOptionalContent(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     include_footer_comments: bool | None = Field(
         True,
-        description="Include footer comments and aggregate them into a per-page comments asset",
+        description='Include footer comments and aggregate them into a per-page comments asset',
     )
     include_inline_comments: bool | None = Field(
         True,
-        description="Include inline comments and aggregate them into a per-page comments asset",
+        description='Include inline comments and aggregate them into a per-page comments asset',
     )
     include_attachments: bool | None = Field(
-        True, description="Include Confluence page attachments as related assets"
+        True, description='Include Confluence page attachments as related assets'
     )
     include_linked_file_assets: bool | None = Field(
         True,
-        description="Materialize linked file-like URLs from page body as related assets",
+        description='Materialize linked file-like URLs from page body as related assets',
     )
     attachment_max_bytes: int | None = Field(
         5242880,
-        description="Maximum bytes downloaded per attachment for MIME inference and text extraction",
+        description='Maximum bytes downloaded per attachment for MIME inference and text extraction',
         ge=1024,
     )
 
 
 class ConfluenceOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: ConfluenceOptionalConnection | None = None
     scope: ConfluenceOptionalScope | None = None
@@ -2151,23 +2203,23 @@ class ConfluenceOptional(BaseModel):
 
 class JiraRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     base_url: AnyUrl = Field(
         ...,
-        description="Jira Cloud tenant URL (for example, https://your-domain.atlassian.net)",
+        description='Jira Cloud tenant URL (for example, https://your-domain.atlassian.net)',
     )
     account_email: EmailStr = Field(
         ...,
-        description="Atlassian account email used with API token for Basic authentication",
+        description='Atlassian account email used with API token for Basic authentication',
     )
 
 
 class JiraMasked(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    api_token: str = Field(..., description="Atlassian API token for Jira Cloud")
+    api_token: str = Field(..., description='Atlassian API token for Jira Cloud')
 
 
 class JiraOptionalConnection(BaseModel):
@@ -2176,19 +2228,19 @@ class JiraOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     request_timeout_seconds: float | None = Field(
-        30, description="HTTP request timeout for Jira API calls", ge=1.0
+        30, description='HTTP request timeout for Jira API calls', ge=1.0
     )
     rate_limit_delay_seconds: float | None = Field(
         0,
-        description="Additional delay between API requests to reduce rate-limit pressure",
+        description='Additional delay between API requests to reduce rate-limit pressure',
         ge=0.0,
     )
     max_retries: int | None = Field(
         3,
-        description="Maximum retry attempts for transient API failures and rate limits",
+        description='Maximum retry attempts for transient API failures and rate limits',
         ge=0,
         le=10,
     )
@@ -2200,23 +2252,23 @@ class JiraOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     project_keys: list[str] | None = Field(
         None,
-        description="Project keys to include (up to 50)",
+        description='Project keys to include (up to 50)',
         max_length=50,
         min_length=1,
     )
     project_ids: list[int] | None = Field(
         None,
-        description="Project IDs to include (up to 50)",
+        description='Project IDs to include (up to 50)',
         max_length=50,
         min_length=1,
     )
     jql: str | None = Field(
         None,
-        description="Additional JQL filter to combine with project scope",
+        description='Additional JQL filter to combine with project scope',
         min_length=1,
     )
 
@@ -2227,25 +2279,25 @@ class JiraOptionalContent(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     include_comments: bool | None = Field(
         True,
-        description="Include issue comments and aggregate them into a per-issue comments asset",
+        description='Include issue comments and aggregate them into a per-issue comments asset',
     )
     include_attachments: bool | None = Field(
-        True, description="Include issue attachments as related assets"
+        True, description='Include issue attachments as related assets'
     )
     attachment_max_bytes: int | None = Field(
         5242880,
-        description="Maximum bytes downloaded per attachment for MIME inference and text extraction",
+        description='Maximum bytes downloaded per attachment for MIME inference and text extraction',
         ge=1024,
     )
 
 
 class JiraOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: JiraOptionalConnection | None = None
     scope: JiraOptionalScope | None = None
@@ -2254,23 +2306,25 @@ class JiraOptional(BaseModel):
 
 class ServiceDeskRequired(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     base_url: AnyUrl = Field(
         ...,
-        description="Jira Service Management tenant URL (for example, https://your-domain.atlassian.net)",
+        description='Jira Service Management tenant URL (for example, https://your-domain.atlassian.net)',
     )
     account_email: EmailStr = Field(
         ...,
-        description="Atlassian account email used with API token for Basic authentication",
+        description='Atlassian account email used with API token for Basic authentication',
     )
 
 
 class ServiceDeskMasked(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    api_token: str = Field(..., description="Atlassian API token for Jira Service Management Cloud")
+    api_token: str = Field(
+        ..., description='Atlassian API token for Jira Service Management Cloud'
+    )
 
 
 class ServiceDeskOptionalConnection(BaseModel):
@@ -2279,19 +2333,19 @@ class ServiceDeskOptionalConnection(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     request_timeout_seconds: float | None = Field(
-        30, description="HTTP request timeout for Service Desk API calls", ge=1.0
+        30, description='HTTP request timeout for Service Desk API calls', ge=1.0
     )
     rate_limit_delay_seconds: float | None = Field(
         0,
-        description="Additional delay between API requests to reduce rate-limit pressure",
+        description='Additional delay between API requests to reduce rate-limit pressure',
         ge=0.0,
     )
     max_retries: int | None = Field(
         3,
-        description="Maximum retry attempts for transient API failures and rate limits",
+        description='Maximum retry attempts for transient API failures and rate limits',
         ge=0,
         le=10,
     )
@@ -2303,25 +2357,27 @@ class ServiceDeskOptionalScope(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     service_desk_ids: list[int] | None = Field(
-        None, description="Service desk IDs to include", max_length=100, min_length=1
+        None, description='Service desk IDs to include', max_length=100, min_length=1
     )
     request_type_ids: list[int] | None = Field(
-        None, description="Request type IDs to include", max_length=100, min_length=1
+        None, description='Request type IDs to include', max_length=100, min_length=1
     )
     request_status: str | None = Field(
-        None, description="Request status filter passed to Service Desk API"
+        None, description='Request status filter passed to Service Desk API'
     )
     request_ownership: list[str] | None = Field(
         None,
-        description="Ownership filter values passed to Service Desk API (for example, OWNED_REQUESTS)",
+        description='Ownership filter values passed to Service Desk API (for example, OWNED_REQUESTS)',
         min_length=1,
     )
-    organization_id: int | None = Field(None, description="Organization ID used to scope requests")
+    organization_id: int | None = Field(
+        None, description='Organization ID used to scope requests'
+    )
     search_term: str | None = Field(
-        None, description="Search term filter for request summaries and content"
+        None, description='Search term filter for request summaries and content'
     )
 
 
@@ -2331,25 +2387,25 @@ class ServiceDeskOptionalContent(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     include_comments: bool | None = Field(
         True,
-        description="Include request comments and aggregate them into a per-request comments asset",
+        description='Include request comments and aggregate them into a per-request comments asset',
     )
     include_attachments: bool | None = Field(
-        True, description="Include request attachments as related assets"
+        True, description='Include request attachments as related assets'
     )
     attachment_max_bytes: int | None = Field(
         5242880,
-        description="Maximum bytes downloaded per attachment for MIME inference and text extraction",
+        description='Maximum bytes downloaded per attachment for MIME inference and text extraction',
         ge=1024,
     )
 
 
 class ServiceDeskOptional(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     connection: ServiceDeskOptionalConnection | None = None
     scope: ServiceDeskOptionalScope | None = None
@@ -2361,67 +2417,67 @@ class Type16(StrEnum):
     Type of the asset or source
     """
 
-    WORDPRESS = "WORDPRESS"
-    SLACK = "SLACK"
-    S3_COMPATIBLE_STORAGE = "S3_COMPATIBLE_STORAGE"
-    AZURE_BLOB_STORAGE = "AZURE_BLOB_STORAGE"
-    GOOGLE_CLOUD_STORAGE = "GOOGLE_CLOUD_STORAGE"
-    POSTGRESQL = "POSTGRESQL"
-    MYSQL = "MYSQL"
-    MSSQL = "MSSQL"
-    ORACLE = "ORACLE"
-    HIVE = "HIVE"
-    DATABRICKS = "DATABRICKS"
-    SNOWFLAKE = "SNOWFLAKE"
-    MONGODB = "MONGODB"
-    POWERBI = "POWERBI"
-    TABLEAU = "TABLEAU"
-    CONFLUENCE = "CONFLUENCE"
-    JIRA = "JIRA"
-    SERVICEDESK = "SERVICEDESK"
+    WORDPRESS = 'WORDPRESS'
+    SLACK = 'SLACK'
+    S3_COMPATIBLE_STORAGE = 'S3_COMPATIBLE_STORAGE'
+    AZURE_BLOB_STORAGE = 'AZURE_BLOB_STORAGE'
+    GOOGLE_CLOUD_STORAGE = 'GOOGLE_CLOUD_STORAGE'
+    POSTGRESQL = 'POSTGRESQL'
+    MYSQL = 'MYSQL'
+    MSSQL = 'MSSQL'
+    ORACLE = 'ORACLE'
+    HIVE = 'HIVE'
+    DATABRICKS = 'DATABRICKS'
+    SNOWFLAKE = 'SNOWFLAKE'
+    MONGODB = 'MONGODB'
+    POWERBI = 'POWERBI'
+    TABLEAU = 'TABLEAU'
+    CONFLUENCE = 'CONFLUENCE'
+    JIRA = 'JIRA'
+    SERVICEDESK = 'SERVICEDESK'
 
 
 class ConfluenceInput(CoreInput):
-    type: Literal["CONFLUENCE"] = "CONFLUENCE"
+    type: Literal['CONFLUENCE'] = 'CONFLUENCE'
     required: ConfluenceRequired
     masked: ConfluenceMasked
     optional: ConfluenceOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class JiraInput(CoreInput):
-    type: Literal["JIRA"] = "JIRA"
+    type: Literal['JIRA'] = 'JIRA'
     required: JiraRequired
     masked: JiraMasked
     optional: JiraOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
 
 class ServiceDeskInput(CoreInput):
-    type: Literal["SERVICEDESK"] = "SERVICEDESK"
+    type: Literal['SERVICEDESK'] = 'SERVICEDESK'
     required: ServiceDeskRequired
     masked: ServiceDeskMasked
     optional: ServiceDeskOptional | None = None
     detectors: list[Detector] | None = Field(
-        None, description="Detectors to run on ingested content"
+        None, description='Detectors to run on ingested content'
     )
     custom_detectors: list[CustomDetectorSelection] | None = Field(
         None,
-        description="Reusable custom detector IDs selected from the custom detector catalog.",
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
 
@@ -2469,6 +2525,6 @@ class SourceInput(
         | ServiceDeskInput
     ) = Field(
         ...,
-        description="Merged configuration schema with all source types and common definitions",
-        title="SourceInput",
+        description='Merged configuration schema with all source types and common definitions',
+        title='SourceInput',
     )
