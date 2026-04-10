@@ -8,6 +8,7 @@ import {
   BookOpen,
   ChevronRight,
   Plus,
+  Sparkles,
   TrendingUp,
 } from "lucide-react";
 import {
@@ -595,6 +596,13 @@ export default function SemanticLayerPage() {
                       <span className="font-mono text-[10px] text-muted-foreground">
                         {linkedMetrics.length} metric
                         {linkedMetrics.length !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {(term.filterMapping?.customDetectorKeys ?? []).length >
+                      0 && (
+                      <span className="inline-flex items-center gap-0.5 font-mono text-[10px] text-muted-foreground">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        auto-detect
                       </span>
                     )}
                     {term.findingCount != null && term.findingCount > 0 && (

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import type { JSONSchema7 } from "json-schema";
-import { FlaskConical, Search, SlidersHorizontal } from "lucide-react";
+import { BookOpen, FlaskConical, Search, SlidersHorizontal } from "lucide-react";
 import { api, type CustomDetectorResponseDto } from "@workspace/api-client";
+import { semanticApi, type GlossaryTerm } from "@/lib/semantic-api";
 import { useTranslation } from "@/hooks/use-translation";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -493,10 +494,12 @@ function CustomDetectorCatalogCard({
   detector,
   enabled,
   onToggle,
+  linkedGlossaryTerms = [],
 }: {
   detector: CustomDetectorResponseDto;
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
+  linkedGlossaryTerms?: GlossaryTerm[];
 }) {
   const { t } = useTranslation();
   return (
@@ -536,6 +539,17 @@ function CustomDetectorCatalogCard({
               count: detector.findingsCount,
             })}
           </Badge>
+          {linkedGlossaryTerms.map((term) => (
+            <Badge
+              key={term.id}
+              variant="outline"
+              className="inline-flex items-center gap-1 border-2 border-border"
+              style={term.color ? { borderColor: term.color } : undefined}
+            >
+              <BookOpen className="h-2.5 w-2.5" />
+              {term.displayName}
+            </Badge>
+          ))}
         </div>
 
         <div className="grid gap-3 rounded-[6px] border-2 border-border bg-muted/30 p-3 sm:grid-cols-3">
@@ -665,6 +679,7 @@ export function SourceScanConfig({
   const [customDetectorsError, setCustomDetectorsError] = useState<
     string | null
   >(null);
+  const [glossaryTerms, setGlossaryTerms] = useState<GlossaryTerm[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [displayOrder, setDisplayOrder] = useState<string[]>([]);
 
@@ -690,11 +705,13 @@ export function SourceScanConfig({
       try {
         setCustomDetectorsLoading(true);
         setCustomDetectorsError(null);
-        const payload = await api.listCustomDetectors({
-          includeInactive: true,
-        });
+        const [payload, glossaryRes] = await Promise.all([
+          api.listCustomDetectors({ includeInactive: true }),
+          semanticApi.glossary.list().catch(() => ({ items: [] })),
+        ]);
         if (!cancelled) {
           setCustomDetectors(payload ?? []);
+          setGlossaryTerms(glossaryRes.items);
         }
       } catch (error) {
         if (!cancelled) {
@@ -814,6 +831,19 @@ export function SourceScanConfig({
   );
   const hasCustomDetectorCatalog = customDetectors.length > 0;
   const hasSelectableCustomDetectors = selectableCustomDetectors.length > 0;
+
+  // Map each custom detector key → glossary terms that link to it
+  const detectorKeyToGlossaryTerms = useMemo(() => {
+    const map = new Map<string, GlossaryTerm[]>();
+    for (const term of glossaryTerms) {
+      const keys: string[] = term.filterMapping?.customDetectorKeys ?? [];
+      for (const key of keys) {
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(term);
+      }
+    }
+    return map;
+  }, [glossaryTerms]);
 
   const enabledCount =
     Object.values(detectorState).filter((detector) => detector.enabled).length +
@@ -1003,6 +1033,9 @@ export function SourceScanConfig({
                     key={detector.id}
                     detector={detector}
                     enabled={selectedCustomDetectorSet.has(detector.id)}
+                    linkedGlossaryTerms={
+                      detectorKeyToGlossaryTerms.get(detector.key) ?? []
+                    }
                     onToggle={(enabled) => {
                       const nextIds = enabled
                         ? Array.from(
