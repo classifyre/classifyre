@@ -123,7 +123,7 @@ const navbar = (
   >
     <div className="hidden items-center gap-2 lg:flex">
       <Button asChild variant="link">
-        <a href="https://classifyre.com/blog">Blog</a>
+        <a href="/blog">Blog</a>
       </Button>
       <Button asChild variant="link">
         <a href="https://docs.classifyre.com/" target="_blank" rel="noreferrer">
