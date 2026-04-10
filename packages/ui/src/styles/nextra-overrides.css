@@ -29,7 +29,23 @@
 .nextra-navbar,
 .nextra-navbar-blur {
   border-bottom-width: 2px !important;
-  background: linear-gradient(90deg, var(--background) 0%, var(--muted) 100%) !important;
+  background: var(--background) !important;
+}
+
+.nextra-banner {
+  background: var(--foreground) !important;
+  color: var(--primary-foreground) !important;
+}
+
+.classifyre-blog-navbar .nextra-search {
+  min-width: 16rem;
+}
+
+.classifyre-blog-navbar .nextra-search input {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  box-shadow: none;
 }
 
 .nextra-sidebar,
@@ -138,4 +154,9 @@ a {
 article img {
   border: 2px solid var(--border);
   box-shadow: 4px 4px 0 0 var(--border);
+}
+
+:root ::selection {
+  background: var(--accent) !important;
+  color: var(--accent-foreground) !important;
 }

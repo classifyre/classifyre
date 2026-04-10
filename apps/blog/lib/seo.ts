@@ -17,9 +17,9 @@ export function generateBlogSiteSchema(siteUrl: string): SiteLikeSchema {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "@id": `${siteUrl}/#website`,
-    name: "Classifyre Engineering Blog",
+    name: "Classifyre",
     description:
-      "Notes on architecture, delivery systems, and technical decision making in production engineering environments.",
+      "Detect, classify, and label data across databases, lakehouses, collaboration tools, analytics systems, and public content.",
     url: siteUrl,
     inLanguage: "en-US",
   };
@@ -32,7 +32,8 @@ export function generateOrganizationSchema(siteUrl: string): SiteLikeSchema {
     "@id": `${siteUrl}/#organization`,
     name: "Classifyre",
     url: siteUrl,
-    description: "Engineering platform and delivery system documentation.",
+    description:
+      "Open-source data detection, classification, and labeling platform for modern source systems.",
   };
 }
 
@@ -41,9 +42,9 @@ export function generateBlogSchema(siteUrl: string): SiteLikeSchema {
     "@context": "https://schema.org",
     "@type": "Blog",
     "@id": `${siteUrl}/#blog`,
-    name: "Classifyre Engineering Blog",
+    name: "Classifyre Journal",
     description:
-      "Long-form engineering writing: architecture analysis, workflow design, and delivery tradeoffs.",
+      "Product updates, engineering notes, deployment guidance, and detector design write-ups from Classifyre.",
     url: siteUrl,
     inLanguage: "en-US",
     publisher: {

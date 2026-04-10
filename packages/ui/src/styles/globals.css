@@ -168,4 +168,46 @@
     border: 2px solid var(--color-border);
     box-shadow: 4px 4px 0 0 var(--color-border);
   }
+
+  .landing-grid {
+    background-image:
+      linear-gradient(to right, color-mix(in srgb, var(--color-accent) 18%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--color-accent) 18%, transparent) 1px, transparent 1px);
+    background-size: 42px 42px;
+  }
+
+  .marquee-track {
+    animation: classifyre-marquee 28s linear infinite;
+  }
+
+  .marquee-track-slow {
+    animation: classifyre-marquee 58s linear infinite;
+  }
+
+  .edge-fade-x {
+    mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      black 14%,
+      black 86%,
+      transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      black 14%,
+      black 86%,
+      transparent 100%
+    );
+  }
+}
+
+@keyframes classifyre-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
 }

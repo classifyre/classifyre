@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import type { JSONSchema7 } from "json-schema";
 import { FlaskConical, Search, SlidersHorizontal } from "lucide-react";
@@ -9,6 +9,7 @@ import { api, type CustomDetectorResponseDto } from "@workspace/api-client";
 import { useTranslation } from "@/hooks/use-translation";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import { Card, CardContent } from "@workspace/ui/components/card";
 import { Form } from "@workspace/ui/components/form";
 import { Input } from "@workspace/ui/components/input";
 import { Toggle } from "@workspace/ui/components/toggle";
@@ -17,19 +18,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@workspace/ui/components/collapsible";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@workspace/ui/components/tabs";
 import { cn } from "@workspace/ui/lib/utils";
 import { JsonSchemaFields, buildFormDefaults } from "./json-schema-form";
 import { AiAssistedCard } from "@/components/ai-assisted-card";
 import {
   detectorUiGroups,
   getDetectorGroupId,
-  type DetectorUiGroupId,
 } from "@/lib/detector-ui-config";
 import {
   getDetectorSchemas,
@@ -466,9 +460,6 @@ function DetectorConfigCard({
   );
 }
 
-const CUSTOM_DETECTOR_TAB_ID = "custom_detectors";
-type SourceScanTabId = DetectorUiGroupId | typeof CUSTOM_DETECTOR_TAB_ID;
-
 function formatCustomDetectorMethod(method: string): string {
   return method
     .toLowerCase()
@@ -588,6 +579,44 @@ function CustomDetectorCatalogCard({
   );
 }
 
+function CatalogSection({
+  title,
+  description,
+  countLabel,
+  action,
+  children,
+}: {
+  title: string;
+  description: string;
+  countLabel: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Card className="bg-background p-0">
+      <section>
+        <div className="flex flex-col gap-2 border-b-2 border-border bg-foreground px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-xs font-mono font-bold uppercase tracking-[0.12em] text-primary-foreground">
+              {title}
+            </h3>
+            <p className="text-[10px] font-mono text-primary-foreground/60">
+              {description}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {action}
+            <Badge className="w-fit rounded-[4px] border-2 border-black bg-[#b7ff00] text-[10px] uppercase tracking-[0.16em] text-black shadow-[3px_3px_0_#000]">
+              {countLabel}
+            </Badge>
+          </div>
+        </div>
+        <CardContent className="p-4">{children}</CardContent>
+      </section>
+    </Card>
+  );
+}
+
 export function SourceScanConfig({
   defaultDetectors,
   onDetectorsChange,
@@ -637,9 +666,6 @@ export function SourceScanConfig({
     string | null
   >(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeGroup, setActiveGroup] = useState<SourceScanTabId>(
-    detectorUiGroups[0].id,
-  );
   const [displayOrder, setDisplayOrder] = useState<string[]>([]);
 
   const presetMap = useMemo(
@@ -782,45 +808,12 @@ export function SourceScanConfig({
       ),
     [searchTerm, selectableCustomDetectors],
   );
-  const tabs = useMemo<
-    Array<{
-      id: SourceScanTabId;
-      label: string;
-      description: string;
-      totalCount: number;
-      enabledCount: number;
-    }>
-  >(
-    () => [
-      ...groupSummary,
-      {
-        id: CUSTOM_DETECTOR_TAB_ID,
-        label: t("sources.scanConfig.customDetectors"),
-        description: t("sources.scanConfig.customDetectorsDesc"),
-        totalCount: selectableCustomDetectors.length,
-        enabledCount: selectedCustomDetectorIds.length,
-      },
-    ],
-    [
-      groupSummary,
-      selectableCustomDetectors.length,
-      selectedCustomDetectorIds.length,
-      t,
-    ],
+  const visibleGroupSummary = useMemo(
+    () => groupSummary.filter((group) => group.visibleDetectors.length > 0),
+    [groupSummary],
   );
-
-  useEffect(() => {
-    if (tabs.length === 0) {
-      return;
-    }
-    const groupExists = tabs.some((group) => group.id === activeGroup);
-    if (!groupExists) {
-      const firstGroup = tabs[0];
-      if (firstGroup) {
-        setActiveGroup(firstGroup.id as SourceScanTabId);
-      }
-    }
-  }, [tabs, activeGroup]);
+  const hasCustomDetectorCatalog = customDetectors.length > 0;
+  const hasSelectableCustomDetectors = selectableCustomDetectors.length > 0;
 
   const enabledCount =
     Object.values(detectorState).filter((detector) => detector.enabled).length +
@@ -835,59 +828,77 @@ export function SourceScanConfig({
     onSummaryChange?.({ visibleCount, enabledCount });
   }, [enabledCount, onSummaryChange, visibleCount]);
 
+  const hasAnyVisibleResults =
+    visibleGroupSummary.length > 0 || visibleCustomDetectors.length > 0;
+
   return (
-    <div className="space-y-5">
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-        <div className="relative">
+    <div className="space-y-4">
+      <Card className="p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-1">
+            <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+              {t("sources.stepper.detectors")}
+            </div>
+            <div className="text-sm font-semibold uppercase tracking-[0.06em]">
+              {t("sources.scanConfig.browseTitle")}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t("sources.scanConfig.browseDesc")}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">
+              {t("sources.edit.visible", { count: visibleCount })}
+            </Badge>
+            <Badge className="rounded-[4px] border border-black bg-[#b7ff00] text-black">
+              {t("sources.edit.enabled", { count: enabledCount })}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="relative mt-3">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder={t("sources.scanConfig.searchPlaceholder")}
-            className="h-10 rounded-[6px] border-2 border-black bg-background pl-9"
+            className="h-10 rounded-[4px] border-2 border-black bg-background pl-9 text-sm shadow-[3px_3px_0_#000] focus-visible:ring-0"
           />
-        </div>
-      </div>
-
-      {tabs.length > 0 ? (
-        <Tabs
-          value={activeGroup}
-          onValueChange={(value) => setActiveGroup(value as SourceScanTabId)}
-          className="w-full"
-        >
-          <TabsList
-            variant="line"
-            className="w-full justify-start gap-1 overflow-x-auto overflow-y-clip whitespace-nowrap [scrollbar-width:none] [overscroll-behavior-x:contain] [&::-webkit-scrollbar]:hidden"
-          >
-            {tabs.map((group) => (
-              <TabsTrigger
-                key={group.id}
-                value={group.id}
-                className="flex-none rounded-[4px] border border-black/20 px-3 cursor-pointer"
-                data-testid={`tab-${group.id}`}
-              >
-                <span className="text-xs font-mono uppercase tracking-[0.12em]">
-                  {group.label}
-                </span>
-                <span className="ml-1 text-[10px] font-mono text-muted-foreground">
-                  {group.enabledCount}/{group.totalCount}
-                </span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {groupSummary.map((group) => (
-            <TabsContent
-              key={group.id}
-              value={group.id}
-              className="space-y-4 pt-2"
+          {searchQuery ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-1 top-1/2 h-7 -translate-y-1/2 rounded-[4px] px-2 text-xs"
             >
-              <p className="text-sm text-muted-foreground">
-                {group.description}
-              </p>
+              Clear
+            </Button>
+          ) : null}
+        </div>
+      </Card>
 
-              {group.visibleDetectors.length > 0 ? (
-                <div className="grid gap-4 lg:grid-cols-2">
+      {!hasAnyVisibleResults && searchTerm ? (
+        <Card className="border-dashed border-black bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_#000]">
+          <p className="text-sm font-semibold uppercase tracking-[0.08em]">
+            {t("sources.scanConfig.noResults")}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("sources.scanConfig.noDetectorsHint")}
+          </p>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {visibleGroupSummary.length > 0 ? (
+            visibleGroupSummary.map((group) => (
+              <CatalogSection
+                key={group.id}
+                title={group.label}
+                description={group.description}
+                countLabel={t("sources.edit.visible", {
+                  count: group.visibleDetectors.length,
+                })}
+              >
+                <div className="grid gap-4 md:grid-cols-2">
                   {group.visibleDetectors.map((detector) => {
                     const state = detectorState[detector.id];
                     const config = state?.config ?? {};
@@ -917,37 +928,41 @@ export function SourceScanConfig({
                     );
                   })}
                 </div>
-              ) : (
-                <div className="rounded-[6px] border-2 border-dashed border-border p-6 text-center">
-                  <p className="text-sm font-medium">
-                    {t("sources.scanConfig.noDetectors", {
-                      group: group.label,
-                    })}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {t("sources.scanConfig.noDetectorsHint")}
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-          ))}
-
-          <TabsContent
-            value={CUSTOM_DETECTOR_TAB_ID}
-            className="space-y-4 pt-2"
-          >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <p className="text-sm text-muted-foreground">
-                {t("sources.scanConfig.customDetectorsDesc")}
+              </CatalogSection>
+            ))
+          ) : !searchTerm && groupSummary.length === 0 ? (
+            <Card className="border-dashed border-black bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_#000]">
+              <p className="text-sm font-semibold uppercase tracking-[0.08em]">
+                {t("sources.scanConfig.noSchemas")}
               </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t("sources.scanConfig.noSchemasHint")}
+              </p>
+            </Card>
+          ) : null}
+
+          {(!searchTerm || visibleCustomDetectors.length > 0 || customDetectorsLoading || customDetectorsError) && (
+          <CatalogSection
+            title={t("sources.scanConfig.customDetectors")}
+            description={t("sources.scanConfig.customDetectorsDesc")}
+            countLabel={t("sources.edit.enabled", {
+              count: selectedCustomDetectorIds.length,
+            })}
+            action={
               <Button type="button" variant="outline" size="sm" asChild>
-                <Link href="/detectors">
+                <Link
+                  href={
+                    hasCustomDetectorCatalog ? "/detectors" : "/detectors/new"
+                  }
+                >
                   <FlaskConical className="mr-1 h-3.5 w-3.5" />
-                  {t("sources.scanConfig.manage")}
+                  {hasCustomDetectorCatalog
+                    ? t("sources.scanConfig.manage")
+                    : t("detectors.newDetector")}
                 </Link>
               </Button>
-            </div>
-
+            }
+          >
             {customDetectorsError ? (
               <div className="rounded-[6px] border-2 border-dashed border-border p-6 text-center">
                 <p className="text-sm font-medium">
@@ -963,8 +978,26 @@ export function SourceScanConfig({
                   {t("sources.scanConfig.loading")}
                 </p>
               </div>
+            ) : !hasCustomDetectorCatalog ? (
+              <div className="rounded-[6px] border-2 border-dashed border-border p-6 text-center">
+                <p className="text-sm font-medium">
+                  {t("sources.scanConfig.customDetectors")}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("sources.scanConfig.noCustomHint")}
+                </p>
+              </div>
+            ) : !hasSelectableCustomDetectors ? (
+              <div className="rounded-[6px] border-2 border-dashed border-border p-6 text-center">
+                <p className="text-sm font-medium">
+                  {t("sources.scanConfig.customDetectors")}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("sources.scanConfig.noSelectableCustomHint")}
+                </p>
+              </div>
             ) : visibleCustomDetectors.length > 0 ? (
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2">
                 {visibleCustomDetectors.map((detector) => (
                   <CustomDetectorCatalogCard
                     key={detector.id}
@@ -973,10 +1006,7 @@ export function SourceScanConfig({
                     onToggle={(enabled) => {
                       const nextIds = enabled
                         ? Array.from(
-                            new Set([
-                              ...selectedCustomDetectorIds,
-                              detector.id,
-                            ]),
+                            new Set([...selectedCustomDetectorIds, detector.id]),
                           )
                         : selectedCustomDetectorIds.filter(
                             (id) => id !== detector.id,
@@ -996,16 +1026,8 @@ export function SourceScanConfig({
                 </p>
               </div>
             )}
-          </TabsContent>
-        </Tabs>
-      ) : (
-        <div className="rounded-[6px] border-2 border-dashed border-border p-8 text-center">
-          <p className="text-sm font-medium">
-            {t("sources.scanConfig.noSchemas")}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t("sources.scanConfig.noSchemasHint")}
-          </p>
+          </CatalogSection>
+          )}
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 apiVersion: v2
-name: classifyre
-description: Production-ready Helm chart for Classifyre (web, api, and Kubernetes CLI jobs)
+name: classifyre-core
+description: Production-ready Helm chart for Classifyre — web, api, and Kubernetes CLI jobs
 type: application
 version: 0.2.34
 appVersion: "0.2.34"

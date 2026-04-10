@@ -220,6 +220,7 @@ export class SourceAssetsController {
     });
   }
 
+  @AllowInDemoMode()
   @Post('bulk')
   @ApiOperation({
     summary: 'Bulk ingest assets',
@@ -335,6 +336,7 @@ export class SourceAssetsController {
     });
   }
 
+  @AllowInDemoMode()
   @Post('finalize')
   @ApiOperation({
     summary: 'Finalize ingest run',

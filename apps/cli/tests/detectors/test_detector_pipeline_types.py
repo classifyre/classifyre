@@ -1,6 +1,6 @@
 """Test detector pipeline handles detector types correctly."""
 
-import importlib
+from importlib.util import find_spec
 from typing import Any
 
 import pytest
@@ -45,9 +45,8 @@ class TestDetectorPipelineTypes:
     @staticmethod
     def _is_dependency_available(module_name: str) -> bool:
         try:
-            importlib.import_module(module_name)
-            return True
-        except ImportError:
+            return find_spec(module_name) is not None
+        except (ModuleNotFoundError, ValueError):
             return False
 
     @pytest.fixture

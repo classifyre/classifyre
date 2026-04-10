@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import tempfile
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
@@ -261,86 +262,98 @@ class PIIDetector(BaseDetector):
 
         # Initialize Presidio analyzer
         try:
-            global _PRESIDIO_FILTER_INSTALLED  # noqa: PLW0603
-            if not _PRESIDIO_FILTER_INSTALLED:
-                logging.getLogger("presidio-analyzer").addFilter(_PresidioNoiseFilter())
-                _PRESIDIO_FILTER_INSTALLED = True
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message=r"`torch\.jit\.script` is deprecated\..*",
+                    category=DeprecationWarning,
+                    module=r"torch\.jit\._script",
+                )
 
-            cache_dir = os.environ.get("TLDEXTRACT_CACHE")
-            if not cache_dir:
-                default_cache = Path(tempfile.gettempdir()) / "tldextract-cache"
-                default_cache.mkdir(parents=True, exist_ok=True)
-                os.environ["TLDEXTRACT_CACHE"] = str(default_cache)
+                global _PRESIDIO_FILTER_INSTALLED  # noqa: PLW0603
+                if not _PRESIDIO_FILTER_INSTALLED:
+                    logging.getLogger("presidio-analyzer").addFilter(_PresidioNoiseFilter())
+                    _PRESIDIO_FILTER_INSTALLED = True
 
-            presidio_module = require_module("presidio_analyzer", "pii", ["privacy", "detectors"])
-            AnalyzerEngine = presidio_module.AnalyzerEngine  # noqa: N806
+                cache_dir = os.environ.get("TLDEXTRACT_CACHE")
+                if not cache_dir:
+                    default_cache = Path(tempfile.gettempdir()) / "tldextract-cache"
+                    default_cache.mkdir(parents=True, exist_ok=True)
+                    os.environ["TLDEXTRACT_CACHE"] = str(default_cache)
 
-            try:
-                spacy = importlib.import_module("spacy")
-            except Exception:
-                logger.warning("spaCy not available, using basic analyzer")
-                self.analyzer = AnalyzerEngine()
+                presidio_module = require_module(
+                    "presidio_analyzer",
+                    "pii",
+                    ["privacy", "detectors"],
+                )
+                AnalyzerEngine = presidio_module.AnalyzerEngine  # noqa: N806
+
+                try:
+                    spacy = importlib.import_module("spacy")
+                except Exception:
+                    logger.warning("spaCy not available, using basic analyzer")
+                    self.analyzer = AnalyzerEngine()
+                    self._supported_entities = self.analyzer.get_supported_entities()
+                    return
+
+                # Try to load spaCy model directly
+                try:
+                    nlp = spacy.load("en_core_web_sm")
+                    logger.debug("Loaded spaCy model en_core_web_sm")
+                except OSError:
+                    # Model not found, try to create a basic analyzer without NLP
+                    logger.warning("spaCy model not found, using basic analyzer")
+                    self.analyzer = AnalyzerEngine()
+                    self._supported_entities = self.analyzer.get_supported_entities()
+                    return
+
+                # Manually set the spacy model to avoid download attempts
+                nlp_engine_module = require_module(
+                    "presidio_analyzer.nlp_engine",
+                    "pii",
+                    ["privacy", "detectors"],
+                )
+                SpacyNlpEngine = nlp_engine_module.SpacyNlpEngine  # noqa: N806
+                NerModelConfiguration = nlp_engine_module.NerModelConfiguration  # noqa: N806
+                ner_config_module = require_module(
+                    "presidio_analyzer.nlp_engine.ner_model_configuration",
+                    "pii",
+                    ["privacy", "detectors"],
+                )
+
+                ner_config = NerModelConfiguration(
+                    labels_to_ignore=[
+                        "CARDINAL",
+                        "ORDINAL",
+                        "QUANTITY",
+                        "FAC",
+                        "WORK_OF_ART",
+                        "PRODUCT",
+                        "EVENT",
+                        "LAW",
+                        "LANGUAGE",
+                        "PERCENT",
+                        "MONEY",
+                    ],
+                    model_to_presidio_entity_mapping=(
+                        ner_config_module.MODEL_TO_PRESIDIO_ENTITY_MAPPING
+                    ),
+                    low_score_entity_names=ner_config_module.LOW_SCORE_ENTITY_NAMES,
+                )
+                nlp_engine = SpacyNlpEngine(
+                    models=[{"lang_code": "en", "model_name": "en_core_web_sm"}],
+                    ner_model_configuration=ner_config,
+                )
+                nlp_engine.nlp = {"en": nlp}  # Set the loaded model directly
+
+                # Create analyzer
+                self.analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en"])
+
+                # Get list of supported entities
                 self._supported_entities = self.analyzer.get_supported_entities()
-                return
-
-            # Try to load spaCy model directly
-            try:
-                nlp = spacy.load("en_core_web_sm")
-                logger.debug("Loaded spaCy model en_core_web_sm")
-            except OSError:
-                # Model not found, try to create a basic analyzer without NLP
-                logger.warning("spaCy model not found, using basic analyzer")
-                self.analyzer = AnalyzerEngine()
-                self._supported_entities = self.analyzer.get_supported_entities()
-                return
-
-            # Manually set the spacy model to avoid download attempts
-            nlp_engine_module = require_module(
-                "presidio_analyzer.nlp_engine",
-                "pii",
-                ["privacy", "detectors"],
-            )
-            SpacyNlpEngine = nlp_engine_module.SpacyNlpEngine  # noqa: N806
-            NerModelConfiguration = nlp_engine_module.NerModelConfiguration  # noqa: N806
-            ner_config_module = require_module(
-                "presidio_analyzer.nlp_engine.ner_model_configuration",
-                "pii",
-                ["privacy", "detectors"],
-            )
-
-            ner_config = NerModelConfiguration(
-                labels_to_ignore=[
-                    "CARDINAL",
-                    "ORDINAL",
-                    "QUANTITY",
-                    "FAC",
-                    "WORK_OF_ART",
-                    "PRODUCT",
-                    "EVENT",
-                    "LAW",
-                    "LANGUAGE",
-                    "PERCENT",
-                    "MONEY",
-                ],
-                model_to_presidio_entity_mapping=(
-                    ner_config_module.MODEL_TO_PRESIDIO_ENTITY_MAPPING
-                ),
-                low_score_entity_names=ner_config_module.LOW_SCORE_ENTITY_NAMES,
-            )
-            nlp_engine = SpacyNlpEngine(
-                models=[{"lang_code": "en", "model_name": "en_core_web_sm"}],
-                ner_model_configuration=ner_config,
-            )
-            nlp_engine.nlp = {"en": nlp}  # Set the loaded model directly
-
-            # Create analyzer
-            self.analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en"])
-
-            # Get list of supported entities
-            self._supported_entities = self.analyzer.get_supported_entities()
-            logger.debug(
-                f"Initialized PII detector with {len(self._supported_entities)} entity types"
-            )
+                logger.debug(
+                    f"Initialized PII detector with {len(self._supported_entities)} entity types"
+                )
 
         except MissingDependencyError:
             raise

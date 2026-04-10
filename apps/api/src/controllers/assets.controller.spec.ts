@@ -3,6 +3,7 @@ import { SourceAssetsController } from './assets.controller';
 import { AssetService } from '../asset.service';
 import { SourceService } from '../source.service';
 import { ValidationService } from '../validation.service';
+import { ALLOW_IN_DEMO_MODE_KEY } from '../demo-mode.decorator';
 
 describe('SourceAssetsController', () => {
   let controller: SourceAssetsController;
@@ -74,6 +75,22 @@ describe('SourceAssetsController', () => {
       'runner-1',
       ['h1'],
       false,
+    );
+  });
+
+  it('allows scheduler ingestion callbacks in demo mode', () => {
+    const bulkIngest = Object.getOwnPropertyDescriptor(
+      SourceAssetsController.prototype,
+      'bulkIngest',
+    )?.value;
+    const finalizeIngest = Object.getOwnPropertyDescriptor(
+      SourceAssetsController.prototype,
+      'finalizeIngest',
+    )?.value;
+
+    expect(Reflect.getMetadata(ALLOW_IN_DEMO_MODE_KEY, bulkIngest)).toBe(true);
+    expect(Reflect.getMetadata(ALLOW_IN_DEMO_MODE_KEY, finalizeIngest)).toBe(
+      true,
     );
   });
 });

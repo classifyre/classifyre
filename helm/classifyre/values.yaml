@@ -1,5 +1,5 @@
 # -- Override chart name used in resource names.
-nameOverride: ""
+nameOverride: "classifyre"
 # -- Fully override release-based resource names.
 fullnameOverride: ""
 

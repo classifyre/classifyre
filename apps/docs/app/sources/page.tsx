@@ -72,7 +72,7 @@ export default function SourcesPage() {
         </header>
 
         <section id="sources-catalog" className="scroll-mt-24">
-          <SourceCatalog entries={catalogEntries} actionLabel="Open" />
+          <SourceCatalog entries={catalogEntries} />
         </section>
       </div>
     </NextraPageShell>

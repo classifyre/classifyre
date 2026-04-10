@@ -9,7 +9,7 @@ fi
 
 DRY_RUN="${DRY_RUN:-0}"
 PAGE_SIZE="${PAGE_SIZE:-100}"
-KEEP_PATTERN='^(main|latest|develop|[0-9]+\.[0-9]+\.[0-9]+)$'
+KEEP_PATTERN='^(main|latest|develop|build-cache(|-.+)|[0-9]+\.[0-9]+\.[0-9]+)$'
 REPOSITORIES=(all-in-one web api cli)
 
 dockerhub_api() {

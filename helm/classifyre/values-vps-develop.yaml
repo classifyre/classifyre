@@ -1,7 +1,7 @@
 # VPS develop values
 # Same single-node K3s setup as values-vps.yaml, but deployed to the
 # classifyre-develop namespace on NodePort 30101 with :develop image tags.
-# Access: http://<vps-ip>:30101  (port must be opened in VPS firewall)
+# Access: https://staging.classifyre.com/
 
 api:
   replicaCount: 1

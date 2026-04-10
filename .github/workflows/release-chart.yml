@@ -4,7 +4,8 @@ name: Release Chart
 # bumping the app version or rebuilding Docker images.
 #
 # It bumps Chart.yaml `version` only — `appVersion` (and all images) stay as-is.
-# The updated chart is published to GHCR as an OCI artifact.
+# The updated chart is published to Docker Hub as an OCI artifact:
+#   oci://registry-1.docker.io/<DOCKER_USERNAME>/classifyre-core:<version>
 #
 # Tag convention: chart-v<version>  (e.g. chart-v1.0.1)
 # This is distinct from app release tags (v<version>) so the two streams
@@ -22,7 +23,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 permissions:
   contents: write
-  packages: write
 
 concurrency:
   group: release
@@ -105,18 +105,18 @@ jobs:
           git push origin HEAD:main
           git push origin "${TAG}"
 
-      - name: Log in to GHCR
+      - name: Log in to Docker Hub for Helm chart publish
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
-            --username "${{ github.actor }}" \
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | helm registry login registry-1.docker.io \
+            --username "${{ secrets.DOCKER_USERNAME }}" \
             --password-stdin
 
-      - name: Package and push chart
+      - name: Package and push chart to Docker Hub OCI
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          REPO: ghcr.io/${{ github.repository }}
+          DOCKER_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
         run: |
           set -euo pipefail
           helm package helm/classifyre
-          helm push "classifyre-${VERSION}.tgz" "oci://${REPO}/charts"
-          echo "Published oci://${REPO}/charts/classifyre:${VERSION}"
+          helm push "classifyre-core-${VERSION}.tgz" "oci://registry-1.docker.io/${DOCKER_NAMESPACE}"
+          echo "Published oci://registry-1.docker.io/${DOCKER_NAMESPACE}/classifyre-core:${VERSION}"

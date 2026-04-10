@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Bot, Loader2, Send, Sparkles, Upload, Wand2, X } from "lucide-react";
+import { Sparkles, Wand2 } from "lucide-react";
 import {
   api,
   type AssistantChatMessage,
@@ -13,10 +13,7 @@ import {
   type AssistantPageContext,
 } from "@workspace/api-client";
 import { assistantContexts } from "@workspace/schemas/assistant";
-import { Button } from "@workspace/ui/components/button";
-import { Textarea } from "@workspace/ui/components/textarea";
-import { Badge } from "@workspace/ui/components/badge";
-import { cn } from "@workspace/ui/lib/utils";
+import { AssistantWorkflowPanel, Button } from "@workspace/ui/components";
 import { toast } from "sonner";
 import { usePathname } from "next/navigation";
 import { Rnd } from "react-rnd";
@@ -151,7 +148,6 @@ export function AssistantWorkflowProvider({
   const [viewport, setViewport] = React.useState({ width: 0, height: 0 });
   const [assistantWindow, setAssistantWindow] =
     React.useState<AssistantWindowState | null>(null);
-  const messagesScrollRef = React.useRef<HTMLDivElement | null>(null);
   const uploadInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const isCompactViewport =
@@ -238,26 +234,6 @@ export function AssistantWorkflowProvider({
       setAssistantWindow(null);
     }
   }, [open]);
-
-  React.useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const frame = requestAnimationFrame(() => {
-      const container = messagesScrollRef.current;
-      if (!container) {
-        return;
-      }
-
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: messages.length > 1 ? "smooth" : "auto",
-      });
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [messages, open]);
 
   const registerBridge = React.useCallback(
     (nextBridge: AssistantPageBridge | null) => {
@@ -528,217 +504,50 @@ export function AssistantWorkflowProvider({
           }}
           style={{ zIndex: 60, position: "fixed" }}
         >
-          <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[8px] border-2 border-border bg-card text-card-foreground shadow-[8px_8px_0_var(--color-border)]">
-            <header className="assistant-drag-handle shrink-0 cursor-grab active:cursor-grabbing select-none border-b-2 border-border bg-foreground px-4 py-3 text-primary-foreground">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border border-primary-foreground/45 bg-primary-foreground/10">
-                      <Bot className="h-4 w-4" />
-                    </span>
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.08em]">
-                      {contextMeta?.title ?? "Assistant"}
-                    </h3>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-[4px] border border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
-                  onClick={() => setOpen(false)}
-                >
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Close assistant</span>
-                </Button>
-              </div>
-            </header>
-
-            <div className="assistant-window-body flex min-h-0 flex-1 flex-col">
-              <div
-                ref={messagesScrollRef}
-                className="assistant-scroll-area min-h-0 flex-1 overflow-y-auto px-4 py-4"
-              >
-                <div className="space-y-3 pr-1">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        "flex",
-                        message.role === "user"
-                          ? "justify-end"
-                          : "justify-start",
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "min-w-0 max-w-[92%] rounded-[6px] border-2 px-4 py-3 shadow-[4px_4px_0_var(--color-border)]",
-                          message.role === "user"
-                            ? "border-black bg-foreground text-primary-foreground"
-                            : "border-border bg-card",
-                        )}
-                      >
-                        <div className="whitespace-pre-wrap text-sm leading-6 break-words [overflow-wrap:anywhere]">
-                          {message.content}
-                        </div>
-
-                        {message.attachments?.map((attachment) => (
-                          <div
-                            key={`${message.id}-${attachment.kind}`}
-                            className="mt-3 rounded-[4px] border-2 border-border bg-background px-3 py-2"
-                          >
-                            <div className="text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
-                              {attachment.title}
-                            </div>
-                            <pre className="mt-2 overflow-x-auto text-xs leading-5 text-foreground/80">
-                              {JSON.stringify(attachment.payload, null, 2)}
-                            </pre>
-                          </div>
-                        ))}
-
-                        {message.toolCalls?.length ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {message.toolCalls.map((toolCall) => (
-                              <Badge
-                                key={`${message.id}-${toolCall.name}`}
-                                variant="outline"
-                                className="rounded-[4px] border-black font-mono text-[10px]"
-                              >
-                                {toolCall.name}: {toolCall.status}
-                              </Badge>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {pendingConfirmation ? (
-                <div className="shrink-0 border-t-2 border-border px-4 py-4">
-                  <div className="rounded-[6px] border-2 border-black bg-[var(--color-accent)] px-4 py-3 text-[var(--color-accent-foreground)] shadow-[4px_4px_0_var(--color-border)]">
-                    <div className="text-[11px] font-mono uppercase tracking-[0.16em]">
-                      Confirmation required
-                    </div>
-                    <div className="mt-1 text-sm font-semibold">
-                      {pendingConfirmation.title}
-                    </div>
-                    <div className="mt-1 text-sm opacity-80">
-                      {pendingConfirmation.detail}
-                    </div>
-                    <div className="mt-3 flex gap-2">
-                      <Button
-                        type="button"
-                        onClick={() => void sendMessage("Confirm")}
-                        disabled={submitting}
-                        className="rounded-[4px] border-2 border-black bg-foreground text-primary-foreground shadow-[3px_3px_0_var(--color-border)]"
-                      >
-                        Confirm
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setPendingConfirmation(null);
-                          toast("Assistant action cancelled");
-                        }}
-                        disabled={submitting}
-                        className="rounded-[4px] border-2 border-black bg-background shadow-[3px_3px_0_var(--color-border)]"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="shrink-0 border-t-2 border-border px-4 py-4">
-                <div className="space-y-3">
-                  <input
-                    ref={uploadInputRef}
-                    type="file"
-                    accept=".csv,.tsv,.txt,.md,.log,.json,text/plain,text/csv,application/json"
-                    className="hidden"
-                    onChange={(event) => void handleFileUpload(event)}
-                  />
-                  <Textarea
-                    value={input}
-                    onChange={(event) => setInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        void sendMessage(input);
-                      }
-                    }}
-                    disabled={!active || submitting}
-                    placeholder={
-                      active
-                        ? "Describe what should change on this page or which MCP action you want to confirm…"
-                        : "Assistant is unavailable for this page."
-                    }
-                    className="min-h-[108px] rounded-[6px] border-2 border-black bg-background shadow-[4px_4px_0_var(--color-border)]"
-                  />
-                  {uploadedFiles.length > 0 ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      {uploadedFiles.map((file, index) => (
-                        <Badge
-                          key={`${file.fileName}-${index}`}
-                          variant="outline"
-                          className="rounded-[4px] border-border font-mono text-[10px]"
-                        >
-                          {file.fileName} · {formatBytes(file.bytes)}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-xs text-muted-foreground">
-                      {active
-                        ? "Patches apply locally first. MCP mutations stay behind confirmation."
-                        : "Open a supported source or detector workflow to activate the assistant."}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => uploadInputRef.current?.click()}
-                        disabled={!active || submitting || uploadingFile}
-                        className="rounded-[4px] border-2 border-border bg-background shadow-[3px_3px_0_var(--color-border)]"
-                      >
-                        {uploadingFile ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Upload className="mr-2 h-4 w-4" />
-                        )}
-                        {uploadingFile ? "Uploading..." : "Upload"}
-                      </Button>
-                      {submitting ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled
-                          className="rounded-[4px] border-2 border-border bg-background text-muted-foreground shadow-[3px_3px_0_var(--color-border)]"
-                        >
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Processing
-                        </Button>
-                      ) : null}
-                      <Button
-                        type="button"
-                        onClick={() => void sendMessage(input)}
-                        disabled={!active || submitting || !input.trim()}
-                        className="rounded-[4px] border-2 border-black bg-foreground text-primary-foreground shadow-[3px_3px_0_var(--color-border)]"
-                      >
-                        <Send className="mr-2 h-4 w-4" />
-                        Send
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+          <>
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept=".csv,.tsv,.txt,.md,.log,.json,text/plain,text/csv,application/json"
+              className="hidden"
+              onChange={(event) => void handleFileUpload(event)}
+            />
+            <AssistantWorkflowPanel
+              title={contextMeta?.title ?? "Assistant"}
+              messages={messages}
+              pendingConfirmation={pendingConfirmation}
+              onConfirm={() => void sendMessage("Confirm")}
+              onCancelConfirmation={() => {
+                setPendingConfirmation(null);
+                toast("Assistant action cancelled");
+              }}
+              input={input}
+              onInputChange={setInput}
+              onSend={() => void sendMessage(input)}
+              canSend={active && !submitting && Boolean(input.trim())}
+              disabled={!active || submitting}
+              submitting={submitting}
+              placeholder={
+                active
+                  ? "Describe what should change on this page or which MCP action you want to confirm…"
+                  : "Assistant is unavailable for this page."
+              }
+              uploadedFiles={uploadedFiles.map((file, index) => ({
+                id: `${file.fileName}-${index}`,
+                label: `${file.fileName} · ${formatBytes(file.bytes)}`,
+              }))}
+              onUploadClick={() => uploadInputRef.current?.click()}
+              uploadDisabled={!active || submitting || uploadingFile}
+              uploadingFile={uploadingFile}
+              footerNote={
+                active
+                  ? "Patches apply locally first. MCP mutations stay behind confirmation."
+                  : "Open a supported source or detector workflow to activate the assistant."
+              }
+              onClose={() => setOpen(false)}
+              headerClassName="assistant-drag-handle cursor-grab active:cursor-grabbing select-none"
+            />
+          </>
         </Rnd>
       ) : null}
     </AssistantWorkflowContext.Provider>
