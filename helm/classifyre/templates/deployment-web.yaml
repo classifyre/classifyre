@@ -77,6 +77,12 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            {{- if .Values.frontend.posthog.enabled }}
+            - name: NEXT_PUBLIC_POSTHOG_KEY
+              value: {{ .Values.frontend.posthog.apiKey | quote }}
+            - name: NEXT_PUBLIC_POSTHOG_HOST
+              value: {{ .Values.frontend.posthog.host | quote }}
+            {{- end }}
             {{- with .Values.frontend.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

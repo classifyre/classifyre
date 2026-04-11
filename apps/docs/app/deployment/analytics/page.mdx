@@ -1,0 +1,113 @@
+---
+sidebarTitle: Analytics (PostHog)
+title: Analytics with PostHog
+description: Enable PostHog product analytics for the Classifyre web app and docs site via the Helm chart.
+---
+
+import { Callout, Steps, Tabs } from "nextra/components"
+
+# Analytics with PostHog
+
+Classifyre ships optional [PostHog](https://posthog.com) integration for product analytics. When enabled, both the **web app** and the **docs site** report page views and events to your PostHog project.
+
+<Callout type="info">
+Analytics are **off by default**. No data is sent unless you explicitly set `frontend.posthog.enabled: true` and supply an API key.
+</Callout>
+
+## How it works
+
+All PostHog traffic is **proxied through the web container** at `/ingest`. This means:
+
+- Requests from the browser never go directly to `posthog.com` — they go to your own domain first.
+- Ad-blockers and privacy extensions that block `posthog.com` directly are bypassed.
+- No extra ingress rules or firewall exceptions are needed.
+
+```
+Browser → /ingest/* → web container → us.i.posthog.com
+```
+
+The docs site (`/docs`) is served by the same web ingress, so it uses the same `/ingest` proxy automatically.
+
+## Getting a PostHog API key
+
+<Steps>
+
+### Create a PostHog account
+
+Sign up at [posthog.com](https://posthog.com) (cloud) or self-host PostHog on your own infrastructure.
+
+### Create a project
+
+In the PostHog dashboard, go to **Settings → Projects → New project** and give it a name (e.g. `classifyre-production`).
+
+### Copy the project API key
+
+Navigate to **Settings → Project → Project API key**. The key looks like `phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxx`.
+
+</Steps>
+
+## Enabling via Helm
+
+<Callout type="warning">
+**Docs site note:** the docs site is compiled as a static export and bundled into the same Docker image as the web app. The PostHog key for the docs is baked in at **image build time** via the `NEXT_PUBLIC_POSTHOG_KEY` build argument. When you set `frontend.posthog.enabled: true` in Helm, the web container receives the key at runtime and page views from the main app are tracked. To also track docs page views, pass the same key as a Docker build arg when building the image.
+</Callout>
+
+<Tabs items={['values.yaml', 'helm upgrade']}>
+
+<Tabs.Tab>
+
+```yaml
+frontend:
+  posthog:
+    enabled: true
+    apiKey: "phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"   # your PostHog project key
+    host: "/ingest"                               # keep /ingest to use the built-in proxy
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```bash
+helm upgrade classifyre oci://ghcr.io/your-org/classifyre \
+  --set frontend.posthog.enabled=true \
+  --set frontend.posthog.apiKey="phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+## Configuration reference
+
+| Value | Default | Description |
+|---|---|---|
+| `frontend.posthog.enabled` | `false` | Set to `true` to inject the PostHog key into the web container. |
+| `frontend.posthog.apiKey` | `""` | PostHog project API key (`phc_...`). Required when `enabled=true`. |
+| `frontend.posthog.host` | `"/ingest"` | PostHog API host seen by the browser. Keep as `/ingest` to use the built-in proxy. Change only if you run a self-hosted PostHog instance at a different path. |
+
+## Self-hosted PostHog
+
+If you operate your own PostHog instance, point `host` at your PostHog ingestion endpoint instead of relying on the reverse proxy:
+
+```yaml
+frontend:
+  posthog:
+    enabled: true
+    apiKey: "phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    host: "https://posthog.internal.example.com"
+```
+
+<Callout type="warning">
+When using a custom host the built-in `/ingest` proxy is bypassed. Make sure your PostHog instance is reachable from user browsers.
+</Callout>
+
+## Disabling analytics
+
+Set `enabled: false` (the default). The `NEXT_PUBLIC_POSTHOG_KEY` environment variable will not be injected, and the PostHog SDK will not initialise — no requests are made to any analytics endpoint.
+
+```yaml
+frontend:
+  posthog:
+    enabled: false
+```

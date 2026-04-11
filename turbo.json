@@ -5,6 +5,8 @@
     "API_URL",
     "INTERNAL_API_URL",
     "NEXT_PUBLIC_API_URL",
+    "NEXT_PUBLIC_POSTHOG_KEY",
+    "NEXT_PUBLIC_POSTHOG_HOST",
     "NODE_ENV"
   ],
   "tasks": {

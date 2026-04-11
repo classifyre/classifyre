@@ -369,6 +369,15 @@ frontend:
     # -- Browser-side API base path.
     NEXT_PUBLIC_API_URL: /api
 
+  posthog:
+    # -- Enable PostHog analytics. When false, no tracking script is injected.
+    enabled: false
+    # -- PostHog project API key (phc_...). Required when enabled=true.
+    apiKey: ""
+    # -- PostHog ingest host. Defaults to /ingest so requests are proxied
+    # -- through the web container (avoids ad-blocker issues).
+    host: "/ingest"
+
   # -- Extra environment variables for web container.
   extraEnv: []
   # -- Extra envFrom sources for web container.
