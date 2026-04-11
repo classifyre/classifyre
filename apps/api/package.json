@@ -27,7 +27,7 @@
     "test:i18n": "jest src/i18n/i18n-keys.spec.ts --no-coverage"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.82.0",
+    "@anthropic-ai/sdk": "^0.87.0",
     "@fastify/multipart": "^9.4.0",
     "@fastify/static": "^9.0.0",
     "@google/genai": "^1.48.0",
@@ -64,7 +64,7 @@
     "@nestjs/cli": "^11.0.17",
     "@nestjs/schematics": "^11.0.10",
     "@nestjs/testing": "^11.1.18",
-    "@prisma/client-runtime-utils": "7.6.0",
+    "@prisma/client-runtime-utils": "7.7.0",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.5.2",
