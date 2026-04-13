@@ -130,7 +130,7 @@ jobs:
 
       - name: Upload api build
         if: github.event_name != 'workflow_call' && github.event.action != 'closed'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: api-build
           path: /tmp/classifyre-ci-artifacts/api-dist
@@ -139,7 +139,7 @@ jobs:
 
       - name: Upload codegen
         if: github.event_name != 'workflow_call' && github.event.action != 'closed'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: codegen
           path: /tmp/classifyre-ci-artifacts/codegen
@@ -148,7 +148,7 @@ jobs:
 
       - name: Upload web dist
         if: github.event_name != 'workflow_call' && github.event.action != 'closed'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: web-dist
           path: /tmp/classifyre-ci-artifacts/web-dist
