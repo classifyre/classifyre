@@ -217,7 +217,7 @@ jobs:
         # QEMU binfmt handlers overrides Rosetta 2 and causes bun (in api-builder)
         # to SIGSEGV inside linux/amd64 containers on an arm64 host.
         if: ${{ !env.ACT }}
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64,amd64
 
