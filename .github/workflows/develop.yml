@@ -36,7 +36,7 @@ jobs:
           ref: develop
 
       - name: Setup kubectl
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
