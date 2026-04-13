@@ -1,0 +1,68 @@
+{{- if .Values.grafana.enabled -}}
+{{- $releaseName := .Release.Name -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "otel-receiver.fullname" . }}-grafana-datasources
+  labels:
+    {{- include "otel-receiver.labels" . | nindent 4 }}
+    # Picked up by the Grafana sidecar when grafana.sidecar.datasources.enabled=true
+    grafana_datasource: "1"
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      {{- if .Values.tempo.enabled }}
+      - name: Tempo
+        type: tempo
+        uid: tempo
+        access: proxy
+        url: http://{{ $releaseName }}-tempo:3100
+        jsonData:
+          tracesToLogsV2:
+            datasourceUid: loki
+            spanStartTimeShift: "-1m"
+            spanEndTimeShift: "1m"
+            filterByTraceID: true
+            filterBySpanID: false
+          tracesToMetrics:
+            datasourceUid: mimir
+          serviceMap:
+            datasourceUid: mimir
+          lokiSearch:
+            datasourceUid: loki
+          nodeGraph:
+            enabled: true
+        isDefault: false
+        editable: true
+      {{- end }}
+      {{- if .Values.loki.enabled }}
+      - name: Loki
+        type: loki
+        uid: loki
+        access: proxy
+        url: http://{{ $releaseName }}-loki-gateway:80
+        jsonData:
+          derivedFields:
+            - name: TraceID
+              matcherRegex: '"trace_id":"(\w+)"'
+              url: "$${__value.raw}"
+              datasourceUid: tempo
+        isDefault: false
+        editable: true
+      {{- end }}
+      {{- if index .Values "mimir-distributed" "enabled" }}
+      - name: Mimir
+        type: prometheus
+        uid: mimir
+        access: proxy
+        url: http://{{ $releaseName }}-mimir-distributed-nginx/prometheus
+        jsonData:
+          httpMethod: POST
+          exemplarTraceIdDestinations:
+            - name: traceID
+              datasourceUid: tempo
+        isDefault: true
+        editable: true
+      {{- end }}
+{{- end }}

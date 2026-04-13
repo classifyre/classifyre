@@ -640,3 +640,29 @@ priorityClasses:
   batchName: batch-low-priority
   # -- Numeric priority value for batch workloads.
   batchValue: 1000
+
+telemetry:
+  # -- Enable OpenTelemetry instrumentation for API, web, and CLI components.
+  # -- When false, TELEMETRY_DISABLED=1 is injected into all workloads.
+  # -- Opt out: set enabled=false, or set TELEMETRY_DISABLED=1 / DO_NOT_TRACK=1 at runtime.
+  enabled: true
+
+  # -- OTLP endpoint all components export to (traces, metrics, logs).
+  # -- Defaults to the Classifyre-hosted receiver. Override to point at your own
+  # -- OTel Collector (e.g. deploy helm/otel-receiver in your own cluster):
+  # --   otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318"
+  otlpEndpoint: "https://otel.classifyre.com"
+
+  # -- OTLP export protocol: "http/protobuf" (default) or "grpc".
+  otlpProtocol: "http/protobuf"
+
+  # -- Deployment environment tag attached to every span/metric/log.
+  deployEnv: "production"
+
+  instanceId:
+    # -- Persist a stable anonymous instance UUID in a ConfigMap so it survives upgrades.
+    enabled: true
+    # -- Use an existing ConfigMap instead of creating one. Must contain instanceId.configMapKey.
+    existingConfigMap: ""
+    # -- Key inside the ConfigMap that holds the UUID string.
+    configMapKey: instance-id
