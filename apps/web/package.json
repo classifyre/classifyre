@@ -18,6 +18,7 @@
     "test:i18n": "node_modules/.bin/jest lib/i18n-keys.spec.ts --no-coverage"
   },
   "dependencies": {
+    "@vercel/otel": "^2.1.2",
     "@hookform/resolvers": "^5.2.2",
     "@monaco-editor/react": "^4.7.0",
     "@stepperize/core": "^2.1.0",

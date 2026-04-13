@@ -253,6 +253,8 @@ def run_sandbox_command(args: argparse.Namespace) -> None:
 def main() -> None:
     setup_logging()
     load_local_env()
+    from .telemetry import init_telemetry
+    init_telemetry()
 
     available_sources = list_available_sources()
 

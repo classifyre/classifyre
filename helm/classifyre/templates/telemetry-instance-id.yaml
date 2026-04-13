@@ -1,0 +1,17 @@
+{{- if and .Values.telemetry.enabled .Values.telemetry.instanceId.enabled (not .Values.telemetry.instanceId.existingConfigMap) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "classifyre.instanceIdConfigMapName" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: telemetry
+  annotations:
+    # Preserve this ConfigMap across `helm upgrade` so the instance ID stays stable.
+    "helm.sh/resource-policy": keep
+    {{- with .Values.commonAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+data:
+  {{ .Values.telemetry.instanceId.configMapKey }}: {{ uuidv4 | quote }}
+{{- end }}

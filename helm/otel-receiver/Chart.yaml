@@ -1,0 +1,51 @@
+apiVersion: v2
+name: otel-receiver
+description: >
+  Self-hosted observability stack for Classifyre — OpenTelemetry Collector
+  gateway in front of Grafana, Tempo (traces), Loki (logs) and
+  Mimir (metrics).  Deploy this chart once, then point every Classifyre
+  instance at the Collector endpoint.
+type: application
+version: 0.1.0
+keywords:
+  - opentelemetry
+  - grafana
+  - tempo
+  - loki
+  - mimir
+  - observability
+  - classifyre
+home: https://github.com/unstructured/classifyre
+maintainers:
+  - name: Classifyre Team
+
+dependencies:
+  # OTel Collector — the single OTLP ingestion endpoint that fans out to all backends.
+  - name: opentelemetry-collector
+    version: "0.150.0"
+    repository: "https://open-telemetry.github.io/opentelemetry-helm-charts"
+    condition: opentelemetry-collector.enabled
+
+  # Grafana — dashboards, explore, alerting.
+  - name: grafana
+    version: "10.5.15"
+    repository: "https://grafana.github.io/helm-charts"
+    condition: grafana.enabled
+
+  # Tempo — distributed tracing backend (single-binary mode by default).
+  - name: tempo
+    version: "1.24.4"
+    repository: "https://grafana.github.io/helm-charts"
+    condition: tempo.enabled
+
+  # Loki — log aggregation backend.
+  - name: loki
+    version: "6.55.0"
+    repository: "https://grafana.github.io/helm-charts"
+    condition: loki.enabled
+
+  # Mimir — horizontally-scalable metrics backend.
+  - name: mimir-distributed
+    version: "6.0.6"
+    repository: "https://grafana.github.io/helm-charts"
+    condition: mimir-distributed.enabled

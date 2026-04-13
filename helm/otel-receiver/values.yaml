@@ -1,0 +1,334 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Classifyre otel-receiver — self-hosted observability stack
+#
+# Deploy this chart independently in any namespace (e.g. "monitoring") and
+# then point your Classifyre instances at the resulting OTLP endpoint:
+#
+#   classifyre:
+#     telemetry:
+#       enabled: true
+#       otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318"
+#
+# All four sub-charts are enabled by default. Disable any you don't need.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ---------------------------------------------------------------------------
+# OpenTelemetry Collector (single gateway that fans out to all backends)
+# ---------------------------------------------------------------------------
+opentelemetry-collector:
+  enabled: true
+
+  mode: deployment
+
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    tag: "0.126.0"
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+  ports:
+    otlp:
+      enabled: true
+      containerPort: 4317
+      servicePort: 4317
+      protocol: TCP
+    otlp-http:
+      enabled: true
+      containerPort: 4318
+      servicePort: 4318
+      protocol: TCP
+    metrics:
+      enabled: true
+      containerPort: 8888
+      servicePort: 8888
+      protocol: TCP
+
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: "0.0.0.0:4317"
+          http:
+            endpoint: "0.0.0.0:4318"
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 15
+      batch:
+        send_batch_size: 8192
+        timeout: 200ms
+      # Strip usernames from file paths and email addresses in exception events.
+      transform/pii:
+        error_mode: ignore
+        trace_statements:
+          - context: spanevent
+            conditions:
+              - 'name == "exception"'
+            statements:
+              - replace_pattern(attributes["exception.stacktrace"], "/(?:home|Users|root)/[^/\\s]+", "/home/[REDACTED]")
+              - replace_pattern(attributes["exception.message"], "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "[EMAIL_REDACTED]")
+
+    exporters:
+      debug:
+        verbosity: basic
+      # Traces → Tempo
+      otlphttp/tempo:
+        endpoint: "http://{{ .Release.Name }}-tempo:4318"
+      # Metrics → Mimir (remote-write)
+      prometheusremotewrite/mimir:
+        endpoint: "http://{{ .Release.Name }}-mimir-distributed-nginx/api/v1/push"
+        headers:
+          X-Scope-OrgID: classifyre
+      # Logs → Loki
+      loki:
+        endpoint: "http://{{ .Release.Name }}-loki-gateway:80/loki/api/v1/push"
+        headers:
+          X-Scope-OrgID: classifyre
+        default_labels_enabled:
+          exporter: false
+          job: true
+
+    service:
+      telemetry:
+        metrics:
+          address: "0.0.0.0:8888"
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, transform/pii, batch]
+          exporters: [debug, otlphttp/tempo]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [debug, prometheusremotewrite/mimir]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [debug, loki]
+
+# ---------------------------------------------------------------------------
+# Grafana — dashboards, explore, alerting
+# ---------------------------------------------------------------------------
+grafana:
+  enabled: true
+
+  # Change in production. Consider using an existingSecret instead.
+  adminPassword: "changeme"
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+  persistence:
+    enabled: true
+    size: 5Gi
+
+  # Datasources are auto-provisioned via a separate ConfigMap template so that
+  # the service hostnames can use Helm release-name templating.
+  sidecar:
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      labelValue: "1"
+
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://%(domain)s/"
+    analytics:
+      reporting_enabled: false
+      check_for_updates: false
+
+# ---------------------------------------------------------------------------
+# Tempo — distributed tracing (single-binary mode)
+# ---------------------------------------------------------------------------
+tempo:
+  enabled: true
+
+  tempo:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "2"
+        memory: 2Gi
+    storage:
+      trace:
+        # Use local filesystem by default — swap for s3/gcs/azure in production.
+        backend: local
+        local:
+          path: /var/tempo/traces
+        wal:
+          path: /var/tempo/wal
+
+  persistence:
+    enabled: true
+    size: 20Gi
+
+# ---------------------------------------------------------------------------
+# Loki — log aggregation (single-binary / filesystem mode)
+# ---------------------------------------------------------------------------
+loki:
+  enabled: true
+
+  deploymentMode: SingleBinary
+
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    storage:
+      type: filesystem
+    schemaConfig:
+      configs:
+        - from: "2024-01-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
+
+  singleBinary:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "2"
+        memory: 2Gi
+    persistence:
+      enabled: true
+      size: 20Gi
+
+  # Disable components not needed in single-binary mode
+  backend:
+    replicas: 0
+  read:
+    replicas: 0
+  write:
+    replicas: 0
+  chunksCache:
+    enabled: false
+  resultsCache:
+    enabled: false
+
+# ---------------------------------------------------------------------------
+# Mimir — scalable metrics backend (monolithic mode for simplicity)
+# ---------------------------------------------------------------------------
+mimir-distributed:
+  enabled: true
+
+  # Use monolithic mode — easier to operate, adequate for most deployments.
+  # Switch to `large.yaml` preset for high-volume multi-tenant use.
+  mimir:
+    structuredConfig:
+      common:
+        storage:
+          backend: filesystem
+          filesystem:
+            dir: /data/mimir
+      blocks_storage:
+        backend: filesystem
+        filesystem:
+          dir: /data/mimir/blocks
+      compactor:
+        data_dir: /data/mimir/compactor
+      ruler_storage:
+        backend: filesystem
+        filesystem:
+          dir: /data/mimir/ruler
+      alertmanager_storage:
+        backend: filesystem
+        filesystem:
+          dir: /data/mimir/alertmanager
+      multitenancy_enabled: false
+
+  # Use the small preset as a starting point
+  global:
+    extraEnvFrom: []
+
+  ingester:
+    replicas: 1
+    persistentVolume:
+      enabled: true
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: "2"
+        memory: 4Gi
+
+  store-gateway:
+    replicas: 1
+    persistentVolume:
+      enabled: true
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+  compactor:
+    replicas: 1
+    persistentVolume:
+      enabled: true
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+  distributor:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+  querier:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+  query-frontend:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+  ruler:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+
+  alertmanager:
+    enabled: true
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
