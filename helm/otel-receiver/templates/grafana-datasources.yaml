@@ -17,7 +17,7 @@ data:
         type: tempo
         uid: tempo
         access: proxy
-        url: http://{{ $releaseName }}-tempo:3200
+        url: http://{{ $releaseName }}-tempo:3100
         jsonData:
           tracesToLogsV2:
             datasourceUid: loki
@@ -25,15 +25,14 @@ data:
             spanEndTimeShift: "1m"
             filterByTraceID: true
             filterBySpanID: false
+          tracesToMetrics:
+            datasourceUid: mimir
+          serviceMap:
+            datasourceUid: mimir
           lokiSearch:
             datasourceUid: loki
           nodeGraph:
             enabled: true
-          # Enable TraceQL metrics (local-blocks processor must be on in Tempo)
-          traceQuery:
-            timeShiftEnabled: true
-            spanStartTimeShift: "-1m"
-            spanEndTimeShift: "1m"
         isDefault: false
         editable: true
       {{- end }}
@@ -49,7 +48,7 @@ data:
               matcherRegex: '"trace_id":"(\w+)"'
               url: "$${__value.raw}"
               datasourceUid: tempo
-        isDefault: {{ if not (index .Values "mimir-distributed" "enabled") }}true{{ else }}false{{ end }}
+        isDefault: false
         editable: true
       {{- end }}
       {{- if index .Values "mimir-distributed" "enabled" }}
@@ -64,15 +63,6 @@ data:
             - name: traceID
               datasourceUid: tempo
         isDefault: true
-        editable: true
-      {{- end }}
-      {{- if and (index .Values "opentelemetry-collector" "enabled") (not (index .Values "mimir-distributed" "enabled")) }}
-      - name: Prometheus (OTel self-metrics)
-        type: prometheus
-        uid: prometheus
-        access: proxy
-        url: http://{{ $releaseName }}-opentelemetry-collector:8888
-        isDefault: false
         editable: true
       {{- end }}
 {{- end }}
