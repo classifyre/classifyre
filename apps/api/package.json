@@ -36,7 +36,7 @@
     "@opentelemetry/sdk-logs": "^0.214.0",
     "@opentelemetry/sdk-metrics": "^2.6.1",
     "@opentelemetry/sdk-node": "^0.214.0",
-    "@anthropic-ai/sdk": "^0.87.0",
+    "@anthropic-ai/sdk": "^0.88.0",
     "@fastify/multipart": "^9.4.0",
     "@fastify/static": "^9.0.0",
     "@google/genai": "^1.48.0",
