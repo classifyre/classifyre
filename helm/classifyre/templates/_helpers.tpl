@@ -135,27 +135,11 @@ password
 {{- end -}}
 
 {{/*
-OTel Collector service name used as the default OTLP endpoint.
-*/}}
-{{- define "classifyre.otelCollector.fullname" -}}
-{{- printf "%s-otel-collector" (include "classifyre.fullname" .) | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-
-{{/*
-Resolved OTLP HTTP endpoint.
-  - Explicit telemetry.otlpEndpoint takes precedence.
-  - Falls back to in-cluster Collector when receiver.enabled=true.
-  - Empty string when telemetry is disabled.
+Resolved OTLP endpoint. Empty string when telemetry is disabled or no endpoint configured.
 */}}
 {{- define "classifyre.otelEndpoint" -}}
-{{- if not .Values.telemetry.enabled -}}
-{{- "" -}}
-{{- else if .Values.telemetry.otlpEndpoint -}}
+{{- if .Values.telemetry.enabled -}}
 {{- .Values.telemetry.otlpEndpoint -}}
-{{- else if .Values.telemetry.receiver.enabled -}}
-{{- printf "http://%s:4318" (include "classifyre.otelCollector.fullname" .) -}}
-{{- else -}}
-{{- "" -}}
 {{- end -}}
 {{- end -}}
 
