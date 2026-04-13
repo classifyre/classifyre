@@ -15,23 +15,6 @@ logger = logging.getLogger(__name__)
 _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
 
 
-_TIMEOUT_PHRASES = ("timed out", "timeout", "connection reset", "errno 110", "connection refused")
-_TIMEOUT_MYSQL_CODES = {2003, 2006, 2013}
-
-
-def _is_timeout_error(exc: BaseException) -> bool:
-    """Return True when exc represents a connection/read timeout or unreachable host."""
-    exc_str = str(exc).lower()
-    if any(phrase in exc_str for phrase in _TIMEOUT_PHRASES):
-        return True
-    if "timeout" in type(exc).__name__.lower():
-        return True
-    args = getattr(exc, "args", ())
-    if args and isinstance(args[0], int) and args[0] in _TIMEOUT_MYSQL_CODES:
-        return True
-    return False
-
-
 def _sanitize_for_json(value: Any) -> Any:
     """Recursively replace isolated surrogate code points before JSON encoding."""
     if isinstance(value, str):
@@ -146,11 +129,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
             elif args.command == "extract":
                 result = source.test_connection()
                 if result.get("status") == "FAILURE":
-                    msg = result.get("message", "")
-                    if _is_timeout_error(Exception(msg)):
-                        logger.warning("Source unreachable (timeout), skipping: %s", msg)
-                        return
-                    logger.error("Aborting: Connection test failed: %s", msg)
+                    logger.error("Aborting: Connection test failed: %s", result.get("message"))
                     sys.exit(1)
 
                 logger.info("Starting extraction...")
@@ -161,66 +140,47 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     await sink.start()
                     sink_started = True
 
-                    # Build detector pipeline directly so we can stream in two phases:
-                    # 1) stub assets appear in the API immediately, 2) detector
-                    # results are pushed as they complete.
-                    from .pipeline.detector_pipeline import DetectorPipeline
-
-                    pipeline = DetectorPipeline.from_recipe(recipe, source, runner_id)
-                    has_detectors = bool(pipeline.detectors)
+                    extract_result = source.extract()
+                    if not hasattr(extract_result, "__aiter__"):
+                        raise TypeError(
+                            "Source extract() must return an async generator of batches"
+                        )
 
                     output_batch_count = 0
                     total_assets = 0
+                    buffer: list[dict[str, Any]] = []
 
-                    async for raw_batch in source.extract_raw():
-                        if not raw_batch:
+                    async for source_batch in extract_result:
+                        if not source_batch:
                             continue
+                        payload_batch = [_asset_to_payload(asset) for asset in source_batch]
+                        buffer.extend(payload_batch)
 
-                        batch_size = len(raw_batch)
-                        total_assets += batch_size
-
-                        # Phase 1: Emit stub assets immediately so they appear in the UI
-                        stub_batch = [_asset_to_payload(asset) for asset in raw_batch]
-                        for stub in stub_batch:
-                            stub["findings"] = []
-                        await sink.emit_batch(stub_batch, skip_findings=True)
-                        output_batch_count += 1
-                        logger.info(
-                            "Emitted %s stub assets (total: %s)",
-                            batch_size,
-                            total_assets,
-                        )
-
-                        # Phase 2: Run detectors and emit results as they complete
-                        if has_detectors:
-                            result_count = 0
-                            async for processed in pipeline.process_stream(raw_batch):
-                                await sink.emit_batch(
-                                    [_asset_to_payload(processed)],
-                                    skip_findings=False,
-                                )
-                                result_count += 1
-
+                        while len(buffer) >= sink.batch_size:
+                            to_emit = buffer[: sink.batch_size]
+                            buffer = buffer[sink.batch_size :]
+                            await sink.emit_batch(to_emit)
+                            output_batch_count += 1
+                            total_assets += len(to_emit)
                             logger.info(
-                                "Detector results streamed for %s/%s assets in batch",
-                                result_count,
-                                batch_size,
+                                "Emitted output batch %s with %s assets (total: %s)",
+                                output_batch_count,
+                                len(to_emit),
+                                total_assets,
                             )
+
+                    if buffer:
+                        await sink.emit_batch(buffer)
+                        output_batch_count += 1
+                        total_assets += len(buffer)
 
                     await sink.finish()
                     logger.info(
-                        "Extraction completed: %s assets in %s batches",
+                        "Extraction completed: emitted %s assets in %s output batches",
                         total_assets,
                         output_batch_count,
                     )
                 except Exception as extraction_error:
-                    if _is_timeout_error(extraction_error):
-                        logger.warning(
-                            "Source timed out during extraction, partial results flushed: %s",
-                            extraction_error,
-                        )
-                        await sink.finish()
-                        return
                     if sink_started:
                         try:
                             await sink.fail(extraction_error)
@@ -231,17 +191,12 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     raise
 
         except Exception as e:
-            logger.debug("Traceback for %s failure:", args.command, exc_info=True)
-            if _is_timeout_error(e):
-                logger.warning("SCAN TIMED OUT (source unreachable): %s", e)
-                return
-            logger.error("SCAN FAILED: %s", e)
+            logger.error("An error occurred during %s: %s", args.command, e, exc_info=True)
             sys.exit(1)
         finally:
             source.cleanup()
     except Exception as e:
-        logger.debug("Traceback for fatal error:", exc_info=True)
-        logger.error("FATAL: %s", e)
+        logger.error("Fatal error: %s", e, exc_info=True)
         sys.exit(1)
 
 
@@ -250,41 +205,6 @@ def run_command(args: argparse.Namespace, recipe: dict[str, Any]) -> None:
     import asyncio
 
     asyncio.run(run_command_async(args, recipe))
-
-
-def run_train_command(args: argparse.Namespace) -> None:
-    """Fine-tune detector models on labeled training examples.
-
-    Reads pipeline_schema and examples from JSON files, runs GLiNER2 NER
-    fine-tuning and/or SetFit classification training, saves artifacts to
-    output_dir, and prints a JSON result to stdout for the API to consume.
-    """
-    import json
-    from pathlib import Path
-
-    from .detectors.custom.trainer import GLiNER2Trainer
-
-    schema_path = Path(args.pipeline_schema)
-    examples_path = Path(args.examples)
-    output_dir = Path(args.output_dir)
-
-    if not schema_path.exists():
-        logger.error("Pipeline schema file not found: %s", schema_path)
-        sys.exit(1)
-    if not examples_path.exists():
-        logger.error("Examples file not found: %s", examples_path)
-        sys.exit(1)
-
-    try:
-        pipeline_schema: dict[str, Any] = json.loads(schema_path.read_text())
-        examples_raw: list[dict[str, Any]] = json.loads(examples_path.read_text())
-    except json.JSONDecodeError as e:
-        logger.error("Invalid JSON in input files: %s", e)
-        sys.exit(1)
-
-    trainer = GLiNER2Trainer(pipeline_schema, examples_raw, output_dir)
-    result = trainer.train()
-    print(json.dumps(result.to_dict()))
 
 
 def run_sandbox_command(args: argparse.Namespace) -> None:
@@ -320,14 +240,10 @@ def run_sandbox_command(args: argparse.Namespace) -> None:
     try:
         runner = SandboxRunner(detectors)
         parsed, findings = runner.run(file_path)
-        if parsed.parse_error:
-            logger.warning("File parse warning: %s", parsed.parse_error)
-        output: dict[str, Any] = {
+        output = {
             "mime_type": parsed.mime_type,
             "findings": [f.model_dump(mode="json") for f in findings],
         }
-        if parsed.parse_error:
-            output["parse_error"] = parsed.parse_error
         print(json.dumps(_sanitize_for_json(output), ensure_ascii=False))
     except Exception as e:
         logger.error("Sandbox run failed: %s", e, exc_info=True)
@@ -338,7 +254,6 @@ def main() -> None:
     setup_logging()
     load_local_env()
     from .telemetry import init_telemetry
-
     init_telemetry()
 
     available_sources = list_available_sources()
@@ -346,7 +261,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Classifyre Metadata Extraction CLI")
     parser.add_argument(
         "command",
-        choices=["test", "extract", "discover", "sandbox", "train"],
+        choices=["test", "extract", "discover", "sandbox"],
         help="Command to run",
     )
     parser.add_argument(
@@ -393,22 +308,6 @@ def main() -> None:
         default=None,
         help="Path to JSON file with detector configs (sandbox command only)",
     )
-    # train-command arguments
-    parser.add_argument(
-        "--pipeline-schema",
-        default=None,
-        help="Path to pipeline schema JSON file (train command only)",
-    )
-    parser.add_argument(
-        "--examples",
-        default=None,
-        help="Path to training examples JSON file (train command only)",
-    )
-    parser.add_argument(
-        "--output-dir",
-        default=None,
-        help="Directory to write trained model artifacts (train command only)",
-    )
 
     args = parser.parse_args()
 
@@ -417,13 +316,6 @@ def main() -> None:
 
     if args.command == "sandbox":
         run_sandbox_command(args)
-        return
-
-    if args.command == "train":
-        if not args.pipeline_schema or not args.examples or not args.output_dir:
-            logger.error("train requires --pipeline-schema, --examples, and --output-dir")
-            sys.exit(1)
-        run_train_command(args)
         return
 
     if not args.recipe:
