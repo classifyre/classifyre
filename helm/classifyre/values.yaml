@@ -640,3 +640,80 @@ priorityClasses:
   batchName: batch-low-priority
   # -- Numeric priority value for batch workloads.
   batchValue: 1000
+
+telemetry:
+  # -- Enable OpenTelemetry instrumentation for API, web, and CLI components.
+  # -- When false, TELEMETRY_DISABLED=1 is injected into all workloads.
+  # -- Opt out: set enabled=false, or set TELEMETRY_DISABLED=1 / DO_NOT_TRACK=1 at runtime.
+  enabled: true
+
+  # -- OTLP endpoint all components export to (traces, metrics, logs).
+  # -- Defaults to the Classifyre-hosted receiver. Override to point at your own
+  # -- OTel Collector (e.g. deploy helm/otel-receiver in your own cluster):
+  # --   otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318"
+  otlpEndpoint: "https://otel.classifyre.com"
+
+  # -- OTLP export protocol: "http/protobuf" (default) or "grpc".
+  otlpProtocol: "http/protobuf"
+
+  # -- Deployment environment tag attached to every span/metric/log.
+  deployEnv: "production"
+
+  instanceId:
+    # -- Persist a stable anonymous instance UUID in a ConfigMap so it survives upgrades.
+    enabled: true
+    # -- Use an existing ConfigMap instead of creating one. Must contain instanceId.configMapKey.
+    existingConfigMap: ""
+    # -- Key inside the ConfigMap that holds the UUID string.
+    configMapKey: instance-id
+
+  receiver:
+    # -- Deploy an OpenTelemetry Collector as an in-cluster telemetry gateway.
+    # -- When enabled, otlpEndpoint defaults to http://<release>-otel-collector:4318.
+    enabled: false
+
+    image:
+      # -- OTel Collector image repository.
+      repository: otel/opentelemetry-collector-contrib
+      # -- OTel Collector image tag.
+      tag: "0.126.0"
+      # -- OTel Collector image pull policy.
+      pullPolicy: IfNotPresent
+
+    # -- Number of Collector replicas (stateless — safe to scale horizontally).
+    replicaCount: 1
+
+    service:
+      # -- Collector service type.
+      type: ClusterIP
+      # -- Expose Collector outside the cluster (LoadBalancer/NodePort) for remote deployments.
+      # -- Leave ClusterIP for in-cluster use only.
+      annotations: {}
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: "1"
+        memory: 512Mi
+
+    # -- Extra environment variables for the Collector container.
+    extraEnv: []
+
+    # -- Backend endpoints the Collector forwards signals to.
+    # -- Leave empty to drop signals (useful for dev/testing with just the Collector).
+    backends:
+      traces:
+        # -- OTLP HTTP endpoint for traces, e.g. Tempo distributor: "http://tempo:4318"
+        endpoint: ""
+      metrics:
+        # -- Prometheus remote-write endpoint for metrics, e.g. Mimir: "http://mimir:8080/api/v1/push"
+        endpoint: ""
+      logs:
+        # -- Loki push API endpoint, e.g. "http://loki:3100/loki/api/v1/push"
+        endpoint: ""
+
+    # -- Fully custom OTel Collector config (YAML string).
+    # -- When set, overrides the chart-generated config entirely.
+    customConfig: ""

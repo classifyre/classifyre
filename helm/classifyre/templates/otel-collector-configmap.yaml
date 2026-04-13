@@ -1,0 +1,91 @@
+{{- if and .Values.telemetry.enabled .Values.telemetry.receiver.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "classifyre.otelCollector.fullname" . }}-config
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: otel-collector
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  collector.yaml: |
+    {{- if .Values.telemetry.receiver.customConfig }}
+    {{- .Values.telemetry.receiver.customConfig | nindent 4 }}
+    {{- else }}
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: "0.0.0.0:4317"
+          http:
+            endpoint: "0.0.0.0:4318"
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 15
+      batch:
+        send_batch_size: 8192
+        timeout: 200ms
+      # Strip file paths containing usernames from exception stack traces.
+      transform/pii:
+        error_mode: ignore
+        trace_statements:
+          - context: spanevent
+            conditions:
+              - 'name == "exception"'
+            statements:
+              - replace_pattern(attributes["exception.stacktrace"], "/(?:home|Users|root)/[^/\\s]+", "/home/[REDACTED]")
+              - replace_pattern(attributes["exception.message"], "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "[EMAIL_REDACTED]")
+
+    exporters:
+      debug:
+        verbosity: basic
+      {{- if .Values.telemetry.receiver.backends.traces.endpoint }}
+      otlphttp/traces:
+        endpoint: {{ .Values.telemetry.receiver.backends.traces.endpoint | quote }}
+      {{- end }}
+      {{- if .Values.telemetry.receiver.backends.metrics.endpoint }}
+      prometheusremotewrite/metrics:
+        endpoint: {{ .Values.telemetry.receiver.backends.metrics.endpoint | quote }}
+      {{- end }}
+      {{- if .Values.telemetry.receiver.backends.logs.endpoint }}
+      loki/logs:
+        endpoint: {{ .Values.telemetry.receiver.backends.logs.endpoint | quote }}
+      {{- end }}
+
+    service:
+      telemetry:
+        metrics:
+          address: "0.0.0.0:8888"
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, transform/pii, batch]
+          exporters:
+            - debug
+            {{- if .Values.telemetry.receiver.backends.traces.endpoint }}
+            - otlphttp/traces
+            {{- end }}
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters:
+            - debug
+            {{- if .Values.telemetry.receiver.backends.metrics.endpoint }}
+            - prometheusremotewrite/metrics
+            {{- end }}
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters:
+            - debug
+            {{- if .Values.telemetry.receiver.backends.logs.endpoint }}
+            - loki/logs
+            {{- end }}
+    {{- end }}
+{{- end }}
