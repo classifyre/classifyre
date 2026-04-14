@@ -7,6 +7,7 @@ import {
   type Control,
   type FieldPath,
   type FieldValues,
+  type PathValue,
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -708,6 +709,149 @@ interface SchemaFieldProps {
   autoDetectSensitiveFields?: boolean;
 }
 
+function OneOfFieldInner({
+  field,
+  fieldPath,
+  label,
+  required,
+  hideLabel,
+  disabled,
+  normalizedSchema,
+  control,
+  forceMasked,
+  autoDetectSensitiveFields,
+}: {
+  field: {
+    value: unknown;
+    onChange: (value: unknown) => void;
+  };
+  fieldPath: string;
+  label: string;
+  required: boolean;
+  hideLabel: boolean;
+  disabled: boolean;
+  normalizedSchema: JSONSchema7;
+  control: Control<FieldValues>;
+  forceMasked: boolean;
+  autoDetectSensitiveFields: boolean;
+}) {
+  const oneOfOptions = React.useMemo(
+    () => (normalizedSchema.oneOf || []) as JSONSchema7[],
+    [normalizedSchema.oneOf],
+  );
+  const [hasMounted, setHasMounted] = React.useState(false);
+  const hasInitializedRequiredDefault = React.useRef(false);
+
+  React.useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (!required || !hasMounted || hasInitializedRequiredDefault.current) {
+      return;
+    }
+    if (field.value !== undefined || oneOfOptions.length === 0) {
+      return;
+    }
+
+    // Initialize required oneOf fields after mount to avoid react-hook-form
+    // registration timing issues during the initial render pass.
+    field.onChange(createOneOfValue(oneOfOptions[0]!));
+    hasInitializedRequiredDefault.current = true;
+  }, [field, hasMounted, oneOfOptions, required]);
+
+  // Only attempt auto-selection when the field has an explicit value.
+  // Treating undefined as {} would cause empty-property options to score 0 and
+  // appear "selected" even though the real form value is still undefined.
+  const currentValue =
+    field.value !== undefined && isPlainObject(field.value) ? field.value : null;
+  const selectedOption =
+    currentValue !== null ? findSelectedOneOfOption(oneOfOptions, currentValue) : null;
+  const fallbackOption = required && hasMounted ? oneOfOptions[0] || null : null;
+  const activeOption = selectedOption ?? fallbackOption;
+  const selectedKey = selectedOption
+    ? getOneOfOptionIdentity(
+        selectedOption as JSONSchema7,
+        oneOfOptions.indexOf(selectedOption) ?? 0,
+      )
+    : fallbackOption
+      ? getOneOfOptionIdentity(fallbackOption, oneOfOptions.indexOf(fallbackOption))
+      : "";
+
+  return (
+    <FormItem>
+      {!hideLabel && (
+        <FormLabel className="capitalize">
+          {label}
+          {required && <span className="text-destructive"> *</span>}
+        </FormLabel>
+      )}
+      <div className="space-y-4">
+        <Select
+          onValueChange={(value) => {
+            if (value === "__none__") {
+              field.onChange(null);
+              return;
+            }
+            const option = oneOfOptions.find((opt, index) => {
+              return getOneOfOptionIdentity(opt as JSONSchema7, index) === value;
+            });
+
+            if (option) {
+              field.onChange(createOneOfValue(option as JSONSchema7));
+            } else {
+              field.onChange(null);
+            }
+          }}
+          value={selectedKey || (!required ? "__none__" : "")}
+          disabled={disabled}
+        >
+          <FormControl>
+            <SelectTrigger>
+              <SelectValue placeholder="Select option" />
+            </SelectTrigger>
+          </FormControl>
+          <SelectContent>
+            {!required && <SelectItem value="__none__">Not set</SelectItem>}
+            {oneOfOptions.map((option, idx) => {
+              const opt = option as JSONSchema7;
+              const optionValue = getOneOfOptionIdentity(opt, idx);
+              const optionLabel = getOneOfOptionLabel(opt, idx);
+              const optionDescription = opt.description || "";
+              return (
+                <SelectItem key={idx} value={optionValue}>
+                  <div>
+                    <div className="font-medium">{optionLabel}</div>
+                    {optionDescription && (
+                      <div className="text-xs text-muted-foreground">
+                        {optionDescription}
+                      </div>
+                    )}
+                  </div>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+
+        {activeOption && (activeOption as JSONSchema7).properties && (
+          <div className="rounded-md border border-muted/40 bg-muted/10 p-4">
+            <SchemaObjectFields
+              schema={activeOption as JSONSchema7}
+              control={control}
+              path={fieldPath}
+              disabled={disabled}
+              forceMasked={forceMasked}
+              autoDetectSensitiveFields={autoDetectSensitiveFields}
+            />
+          </div>
+        )}
+      </div>
+      <FormMessage />
+    </FormItem>
+  );
+}
+
 function ObjectJsonEditorControl({
   fieldName,
   label,
@@ -943,107 +1087,19 @@ function SchemaField({
         control={control}
         name={fieldName}
         render={({ field }) => {
-          // Only attempt auto-selection when the field has an explicit value.
-          // Treating undefined as {} would cause empty-property options (e.g.
-          // MongoDBMaskedNone) to score 0 and appear "selected" even though the
-          // user hasn't made a choice yet, leaving the real form value as undefined.
-          const currentValue =
-            field.value !== undefined && isPlainObject(field.value)
-              ? field.value
-              : null;
-          const selectedOption =
-            currentValue !== null
-              ? findSelectedOneOfOption(
-                  (normalizedSchema.oneOf || []) as JSONSchema7[],
-                  currentValue,
-                )
-              : null;
-          const selectedKey = selectedOption
-            ? getOneOfOptionIdentity(
-                selectedOption as JSONSchema7,
-                (normalizedSchema.oneOf || []).indexOf(selectedOption) ?? 0,
-              )
-            : "";
-
           return (
-            <FormItem>
-              {!hideLabel && (
-                <FormLabel className="capitalize">
-                  {label}
-                  {required && <span className="text-destructive"> *</span>}
-                </FormLabel>
-              )}
-              <div className="space-y-4">
-                <Select
-                  onValueChange={(value) => {
-                    if (value === "__none__") {
-                      field.onChange(null);
-                      return;
-                    }
-                    const option = normalizedSchema.oneOf?.find(
-                      (opt, index) => {
-                        return (
-                          getOneOfOptionIdentity(opt as JSONSchema7, index) ===
-                          value
-                        );
-                      },
-                    );
-
-                    if (option) {
-                      field.onChange(createOneOfValue(option as JSONSchema7));
-                    } else {
-                      field.onChange(null);
-                    }
-                  }}
-                  value={selectedKey || (!required ? "__none__" : "")}
-                  disabled={disabled}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select option" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {!required && (
-                      <SelectItem value="__none__">Not set</SelectItem>
-                    )}
-                    {normalizedSchema.oneOf?.map((option, idx) => {
-                      const opt = option as JSONSchema7;
-                      const optionValue = getOneOfOptionIdentity(opt, idx);
-                      const optionLabel = getOneOfOptionLabel(opt, idx);
-                      const optionDescription = opt.description || "";
-                      return (
-                        <SelectItem key={idx} value={optionValue}>
-                          <div>
-                            <div className="font-medium">{optionLabel}</div>
-                            {optionDescription && (
-                              <div className="text-xs text-muted-foreground">
-                                {optionDescription}
-                              </div>
-                            )}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-
-                {selectedOption &&
-                  (selectedOption as JSONSchema7).properties && (
-                    <div className="rounded-md border border-muted/40 bg-muted/10 p-4">
-                      <SchemaObjectFields
-                        schema={selectedOption as JSONSchema7}
-                        control={control}
-                        path={fieldPath}
-                        disabled={disabled}
-                        forceMasked={forceMasked}
-                        autoDetectSensitiveFields={autoDetectSensitiveFields}
-                      />
-                    </div>
-                  )}
-              </div>
-              <FormMessage />
-            </FormItem>
+            <OneOfFieldInner
+              field={field}
+              fieldPath={fieldPath}
+              label={label}
+              required={required}
+              hideLabel={hideLabel}
+              disabled={disabled}
+              normalizedSchema={normalizedSchema}
+              control={control}
+              forceMasked={forceMasked}
+              autoDetectSensitiveFields={autoDetectSensitiveFields}
+            />
           );
         }}
       />
@@ -1696,8 +1752,14 @@ export const JsonSchemaForm = React.forwardRef<
     resolver: zodResolver(zodSchema),
     defaultValues: mergedDefaults as FormValues,
   });
+  const hasInitializedResetRef = React.useRef(false);
 
   React.useEffect(() => {
+    if (!hasInitializedResetRef.current) {
+      hasInitializedResetRef.current = true;
+      return;
+    }
+
     form.reset(mergedDefaults as FormValues);
   }, [form, mergedDefaults]);
 
@@ -1709,7 +1771,7 @@ export const JsonSchemaForm = React.forwardRef<
         for (const patch of patches) {
           form.setValue(
             patch.path as FieldPath<FormValues>,
-            patch.value as any,
+            patch.value as PathValue<FormValues, FieldPath<FormValues>>,
             {
               shouldDirty: true,
               shouldTouch: true,
