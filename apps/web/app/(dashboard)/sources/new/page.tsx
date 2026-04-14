@@ -28,6 +28,7 @@ import {
   VerticalStepperNav,
   type SourceStepId,
 } from "@/components/source-stepper";
+import { StickyActionToolbar } from "@/components/sticky-action-toolbar";
 import {
   TestConnectionDialog,
   type TestConnectionStatus,
@@ -44,7 +45,6 @@ import {
   setValueAtPath,
 } from "@/lib/assistant-form-utils";
 import { sanitizeTemplateConfig } from "@/lib/template-example-sanitizer";
-import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 
 const normalizeDetectors = (detectors: DetectorConfigInput[]) =>
@@ -77,14 +77,8 @@ export default function NewSourcePage() {
     DetectorConfigInput[]
   >([]);
   const [sourceId, setSourceId] = useState<string | null>(null);
-  const [configDraft, setConfigDraft] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
-  const [configSaved, setConfigSaved] = useState(false);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isTestingConfig, setIsTestingConfig] = useState(false);
-  const [isSavingDetectors, setIsSavingDetectors] = useState(false);
   const [schedule, setSchedule] = useState<ScheduleValue>(
     defaultScheduleValue(),
   );
@@ -127,8 +121,6 @@ export default function NewSourcePage() {
     }
     setSchedule(defaultScheduleValue(example.schedule));
     setSourceId(null);
-    setConfigDraft(null);
-    setConfigSaved(false);
     setShowExamples(false);
   };
 
@@ -140,8 +132,6 @@ export default function NewSourcePage() {
     setDetectorDefaults([]);
     setSchedule(defaultScheduleValue());
     setSourceId(null);
-    setConfigDraft(null);
-    setConfigSaved(false);
   };
 
   const resetSourceFlowState = () => {
@@ -152,8 +142,6 @@ export default function NewSourcePage() {
     setDetectorDefaults([]);
     setSchedule(defaultScheduleValue());
     setSourceId(null);
-    setConfigDraft(null);
-    setConfigSaved(false);
   };
 
   const handleSelectSourceType = (type: SourceType) => {
@@ -219,21 +207,14 @@ export default function NewSourcePage() {
     return created?.id || null;
   };
 
-  const handleSaveConfig = async (
-    data: Record<string, unknown>,
-    onSuccess: () => void,
-  ) => {
+  const persistSource = async (data: Record<string, unknown>) => {
     try {
       setIsSavingConfig(true);
       const savedId = await saveSourceConfig(data);
-      if (!savedId) return;
+      if (!savedId) return null;
 
       setSourceId(savedId);
-      setConfigDraft(data);
-      setConfigSaved(true);
-
-      toast.success(t("sources.saved"));
-      onSuccess();
+      return savedId;
     } catch (error) {
       console.error("Failed to save source:", error);
       toast.error(
@@ -241,6 +222,7 @@ export default function NewSourcePage() {
           ? `Failed to save source: ${error.message}`
           : "Failed to save source. Please try again.",
       );
+      return null;
     } finally {
       setIsSavingConfig(false);
     }
@@ -254,7 +236,7 @@ export default function NewSourcePage() {
         message: t("sources.new.testingConnection"),
       });
       setIsTestingConfig(true);
-      const savedId = await saveSourceConfig(data);
+      const savedId = await persistSource(data);
       if (!savedId) {
         setTestConnectionDialog({
           open: true,
@@ -263,10 +245,6 @@ export default function NewSourcePage() {
         });
         return;
       }
-
-      setSourceId(savedId);
-      setConfigDraft(data);
-      setConfigSaved(true);
 
       const result = await api.sources.sourcesControllerTestConnection({
         id: savedId,
@@ -300,72 +278,36 @@ export default function NewSourcePage() {
     }
   };
 
-  const handleSaveDetectors = async (action: "scan" | "view") => {
+  const handleSaveAndRun = async (data: Record<string, unknown>) => {
     try {
       if (!selectedSourceType) {
         toast.error(t("sources.typeRequired"));
         return;
       }
 
-      const sourceToUpdate = sourceId;
-      if (!sourceToUpdate) {
-        toast.error(t("sources.saveFirst"));
+      const sourceToRun = await persistSource(data);
+      if (!sourceToRun) {
         return;
       }
 
-      setIsSavingDetectors(true);
-
-      const draft = configDraft ?? {};
-      const {
-        name,
-        type: _type,
-        detectors: _detectors,
-        ...configFields
-      } = draft;
-      const detectorPayload = normalizeDetectors(detectors);
-      const config = {
-        type: selectedSourceType,
-        ...configFields,
-        ...(selectedCustomDetectorIds.length > 0
-          ? { custom_detectors: selectedCustomDetectorIds }
-          : {}),
-        ...(detectorPayload.length > 0 ? { detectors: detectorPayload } : {}),
-      };
-
-      await api.sources.sourcesControllerUpdateSource({
-        id: sourceToUpdate,
-        updateSourceDto: {
-          name: typeof name === "string" ? name : undefined,
-          config,
-        },
+      toast.success(t("sources.saved"));
+      const startRunnerDto: StartRunnerDto = { triggerType: "MANUAL" };
+      const runner = await api.runners.cliRunnerControllerStartRunner({
+        sourceId: sourceToRun,
+        startRunnerDto,
       });
-
-      toast.success(t("sources.new.detectorsSaved"));
-
-      if (action === "scan") {
-        const startRunnerDto: StartRunnerDto = { triggerType: "MANUAL" };
-        const runner = await api.runners.cliRunnerControllerStartRunner({
-          sourceId: sourceToUpdate,
-          startRunnerDto,
-        });
-        if (runner?.id) {
-          router.push(`/scans/${runner.id}`);
-        } else {
-          router.push("/scans");
-        }
-        return;
+      if (runner?.id) {
+        router.push(`/scans/${runner.id}`);
+      } else {
+        router.push("/scans");
       }
-
-      router.push(`/sources/${sourceToUpdate}`);
     } catch (error) {
-      console.error("Failed to save detectors:", error);
+      console.error("Failed to save and run source:", error);
       toast.error(
         error instanceof Error
-          ? `Failed to save detectors: ${error.message}`
-          : "Failed to save detectors. Please try again.",
+          ? `Failed to save source: ${error.message}`
+          : "Failed to save source. Please try again.",
       );
-    } finally {
-      setIsSavingDetectors(false);
     }
   };
 
@@ -427,7 +369,6 @@ export default function NewSourcePage() {
 
           if (formPatches.length > 0) {
             await sourceFormRef.current?.applyPatches(formPatches);
-            setConfigDraft(sourceFormRef.current?.getValues() ?? null);
           }
 
           if (schedulePatches.length > 0) {
@@ -450,8 +391,6 @@ export default function NewSourcePage() {
             flattenObjectToPatches(action.values),
           );
           setSourceId(action.sourceId);
-          setConfigDraft(action.values);
-          setConfigSaved(true);
           if (action.schedule) {
             setSchedule((current) => ({
               ...current,
@@ -470,6 +409,7 @@ export default function NewSourcePage() {
     selectedSourceType,
     showExamples,
     sourceId,
+    t,
   ]);
 
   useRegisterAssistantBridge(assistantBridge);
@@ -508,14 +448,16 @@ export default function NewSourcePage() {
           formDefaultValues={formDefaultValues}
           detectorDefaults={detectorDefaults}
           schedule={schedule}
-          configSaved={configSaved}
           isSavingConfig={isSavingConfig}
           isTestingConfig={isTestingConfig}
-          isSavingDetectors={isSavingDetectors}
           sourceFormRef={sourceFormRef}
-          onSaveConfig={handleSaveConfig}
+          onSave={async (data) => {
+            const savedId = await persistSource(data);
+            if (!savedId) return;
+            toast.success(t("sources.saved"));
+          }}
           onTestConfig={handleTestConfig}
-          onSaveDetectors={handleSaveDetectors}
+          onSaveAndRun={handleSaveAndRun}
           onDetectorsChange={setDetectors}
           selectedCustomDetectorIds={selectedCustomDetectorIds}
           onCustomDetectorsChange={setSelectedCustomDetectorIds}
@@ -543,14 +485,12 @@ function SourceStepperContent({
   formDefaultValues,
   detectorDefaults,
   schedule,
-  configSaved,
   isSavingConfig,
   isTestingConfig,
-  isSavingDetectors,
   sourceFormRef,
-  onSaveConfig,
+  onSave,
   onTestConfig,
-  onSaveDetectors,
+  onSaveAndRun,
   onDetectorsChange,
   selectedCustomDetectorIds,
   onCustomDetectorsChange,
@@ -560,14 +500,12 @@ function SourceStepperContent({
   formDefaultValues: Record<string, unknown> | undefined;
   detectorDefaults: DetectorConfigInput[];
   schedule: ScheduleValue;
-  configSaved: boolean;
   isSavingConfig: boolean;
   isTestingConfig: boolean;
-  isSavingDetectors: boolean;
   sourceFormRef: RefObject<SourceFormHandle | null>;
-  onSaveConfig: (data: Record<string, unknown>, onSuccess: () => void) => void;
+  onSave: (data: Record<string, unknown>) => void | Promise<void>;
   onTestConfig: (data: Record<string, unknown>) => void;
-  onSaveDetectors: (action: "scan" | "view") => void;
+  onSaveAndRun: (data: Record<string, unknown>) => void;
   onDetectorsChange: (detectors: DetectorConfigInput[]) => void;
   selectedCustomDetectorIds: string[];
   onCustomDetectorsChange: (ids: string[]) => void;
@@ -614,10 +552,16 @@ function SourceStepperContent({
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const handleSaveAndContinue = (data: Record<string, unknown>) => {
-    onSaveConfig(data, () => {
-      setTimeout(() => scrollToSection("detectors"), 150);
-    });
+  const withValidFormData = async (
+    handler: (data: Record<string, unknown>) => void | Promise<void>,
+  ) => {
+    const validation = await sourceFormRef.current?.validate();
+    if (!validation?.isValid) {
+      toast.error(t("sources.new.incompleteSettings"));
+      scrollToSection("config");
+      return;
+    }
+    await handler(sourceFormRef.current?.getValues() ?? {});
   };
 
   return (
@@ -626,7 +570,7 @@ function SourceStepperContent({
       <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-black bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
         <HorizontalStepperNav
           activeStepId={activeStepId}
-          configSaved={configSaved}
+          configSaved={true}
           onNavigate={scrollToSection}
         />
       </div>
@@ -640,37 +584,25 @@ function SourceStepperContent({
               ref={sourceFormRef}
               sourceType={selectedSourceType}
               defaultValues={formDefaultValues}
-              onSubmit={handleSaveAndContinue}
+              onSubmit={() => undefined}
               onTest={onTestConfig}
               mode="create"
               disabled={isSavingConfig || isTestingConfig}
-              submitLabel={t("sources.edit.saveAndContinue")}
-              testLabel={t("sources.edit.testSource")}
-              showCancel={false}
+              showActions={false}
               schedule={schedule}
               onScheduleChange={onScheduleChange}
             />
           </section>
 
           <section ref={detectorsRef}>
-            {!configSaved && (
-              <p
-                className={cn(
-                  "mb-4 rounded-[4px] border-2 border-black px-4 py-3 text-sm text-muted-foreground",
-                  "bg-muted/30 shadow-[3px_3px_0_#000]",
-                )}
-              >
-                {t("sources.saveFirst")}
-              </p>
-            )}
             <SourceDetectorConfigCard
               visibleCount={scanSummary.visibleCount}
               enabledCount={scanSummary.enabledCount}
-              isSaving={isSavingDetectors}
+              isSaving={isSavingConfig || isTestingConfig}
               onBack={() => scrollToSection("config")}
-              onSave={() => onSaveDetectors("view")}
-              onSaveAndScan={() => onSaveDetectors("scan")}
-              saveAndScanTestId="btn-save-and-scan"
+              onSave={() => undefined}
+              onSaveAndScan={() => undefined}
+              showActions={false}
             >
               <SourceScanConfig
                 defaultDetectors={detectorDefaults}
@@ -682,17 +614,29 @@ function SourceStepperContent({
               />
             </SourceDetectorConfigCard>
           </section>
+          <StickyActionToolbar
+            onSave={() => void withValidFormData(onSave)}
+            onTest={() => void withValidFormData(onTestConfig)}
+            onSaveAndRun={() => void withValidFormData(onSaveAndRun)}
+            saveLabel={t("common.save")}
+            testLabel={t("sources.edit.testSource")}
+            saveAndRunLabel={t("sources.edit.saveAndScan")}
+            isBusy={isSavingConfig || isTestingConfig}
+            saveAndRunTestId="btn-save-and-scan"
+            className="mt-0"
+          />
         </div>
 
         {/* Right sticky sidebar — desktop only */}
         <aside className="hidden self-start md:sticky md:top-6 md:block md:w-44 lg:w-52">
           <VerticalStepperNav
             activeStepId={activeStepId}
-            configSaved={configSaved}
+            configSaved={true}
             onNavigate={scrollToSection}
           />
         </aside>
       </div>
+
     </div>
   );
 }

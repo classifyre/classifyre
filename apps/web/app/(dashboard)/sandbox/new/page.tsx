@@ -180,7 +180,6 @@ export default function NewSandboxScanPage() {
         type: string;
         enabled: boolean;
         config: Record<string, unknown>;
-        custom_detector_key?: string;
       }> = [...enabledDetectors];
 
       if (selectedCustomDetectorIds.length > 0) {
@@ -190,8 +189,7 @@ export default function NewSandboxScanPage() {
             const response = await fetch(`${base}/custom-detectors/${id}`);
             if (!response.ok) return null;
             return response.json() as Promise<{
-              key?: string;
-              config?: Record<string, unknown>;
+              config: Record<string, unknown>;
             }>;
           }),
         );
@@ -201,7 +199,6 @@ export default function NewSandboxScanPage() {
           detectorPayload.push({
             type: "CUSTOM",
             enabled: true,
-            custom_detector_key: customDetector.key ?? "",
             config: customDetector.config ?? {},
           });
         }
@@ -323,7 +320,7 @@ export default function NewSandboxScanPage() {
         </div>
       </div>
 
-      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-border bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
+      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-black bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
         <HorizontalSandboxStepperNav
           activeStepId={activeStepId}
           canNavigateToDetectors={canNavigateToDetectors}
@@ -344,7 +341,6 @@ export default function NewSandboxScanPage() {
               role="button"
               tabIndex={0}
               aria-label={t("sandbox.dropFiles")}
-              data-testid="file-upload-area"
               onDragEnter={onDragEnter}
               onDragLeave={onDragLeave}
               onDragOver={onDragOver}
@@ -363,7 +359,6 @@ export default function NewSandboxScanPage() {
                 type="file"
                 multiple
                 className="sr-only"
-                data-testid="file-input"
                 onChange={onFileChange}
               />
 
@@ -409,12 +404,10 @@ export default function NewSandboxScanPage() {
                   No files selected yet.
                 </div>
               ) : (
-                <ul className="max-h-64 divide-y overflow-auto" data-testid="file-list">
+                <ul className="max-h-64 divide-y overflow-auto">
                   {files.map((file) => (
                     <li
                       key={fileKey(file)}
-                      data-testid="file-item"
-                      data-filename={file.name}
                       className="flex items-center gap-3 px-3 py-2"
                     >
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -479,7 +472,6 @@ export default function NewSandboxScanPage() {
               <Button
                 onClick={() => void handleRun()}
                 disabled={!canRun}
-                data-testid="btn-run-sandbox"
                 className="w-full sm:w-auto"
               >
                 {isSubmitting ? (
