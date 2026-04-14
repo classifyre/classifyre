@@ -639,7 +639,7 @@ function SourceEditStepperContent({
     const els = [
       { id: "config" as SourceStepId, el: configRef.current },
       { id: "detectors" as SourceStepId, el: detectorsRef.current },
-    ].filter((x): x is { id: SourceStepId; el: HTMLElement } => x.el !== null);
+    ].filter((x): x is { id: SourceStepId; el: HTMLDivElement } => x.el !== null);
 
     const map = new Map<Element, SourceStepId>(els.map(({ id, el }) => [el, id]));
 
