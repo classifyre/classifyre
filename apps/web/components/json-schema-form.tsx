@@ -1586,6 +1586,7 @@ export interface JsonSchemaFormProps {
   assistantSourceType?: string;
   schedule?: ScheduleValue;
   onScheduleChange?: (value: ScheduleValue) => void;
+  showActions?: boolean;
 }
 
 export interface JsonSchemaFormHandle {
@@ -1658,6 +1659,7 @@ export const JsonSchemaForm = React.forwardRef<
     assistantSourceType,
     schedule,
     onScheduleChange,
+    showActions = true,
   },
   ref,
 ) {
@@ -2258,39 +2260,41 @@ export const JsonSchemaForm = React.forwardRef<
           </div>
         )}
 
-        <div className="flex flex-col justify-end gap-2 border-t pt-4 sm:flex-row">
-          {showCancel && onCancel && (
+        {showActions && (
+          <div className="flex flex-col justify-end gap-2 border-t pt-4 sm:flex-row">
+            {showCancel && onCancel && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={disabled}
+                className="rounded-[4px] border-2 border-black"
+              >
+                {cancelLabel}
+              </Button>
+            )}
+            {onSecondarySubmit && secondarySubmitLabel && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSecondarySubmit}
+                disabled={disabled}
+                className="rounded-[4px] border-2 border-black"
+                data-testid="btn-test-source"
+              >
+                {secondarySubmitLabel}
+              </Button>
+            )}
             <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
+              type="submit"
               disabled={disabled}
-              className="rounded-[4px] border-2 border-black"
+              className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+              data-testid="btn-save-source"
             >
-              {cancelLabel}
+              {submitLabel}
             </Button>
-          )}
-          {onSecondarySubmit && secondarySubmitLabel && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleSecondarySubmit}
-              disabled={disabled}
-              className="rounded-[4px] border-2 border-black"
-              data-testid="btn-test-source"
-            >
-              {secondarySubmitLabel}
-            </Button>
-          )}
-          <Button
-            type="submit"
-            disabled={disabled}
-            className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
-            data-testid="btn-save-source"
-          >
-            {submitLabel}
-          </Button>
-        </div>
+          </div>
+        )}
       </form>
     </Form>
   );

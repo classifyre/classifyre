@@ -68,7 +68,7 @@ export function SourceDetectorConfigCard({
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
             <Button
               variant="outline"
-              className="rounded-[4px] border-2 border-border"
+              className="rounded-[4px] border-2 border-black"
               onClick={onBack}
               disabled={isSaving}
             >
@@ -77,14 +77,14 @@ export function SourceDetectorConfigCard({
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Button
                 variant="outline"
-                className="rounded-[4px] border-2 border-border"
+                className="rounded-[4px] border-2 border-black"
                 onClick={onSave}
                 disabled={isSaving}
               >
                 {t("common.save")}
               </Button>
               <Button
-                className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
+                className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
                 onClick={onSaveAndScan}
                 disabled={isSaving}
                 data-testid={saveAndScanTestId}
