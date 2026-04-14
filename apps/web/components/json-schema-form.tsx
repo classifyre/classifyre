@@ -497,12 +497,12 @@ function collectDefaults(schema: JSONSchema7): unknown {
     }
   }
 
-  if (schema.oneOf && Array.isArray(schema.oneOf)) {
-    for (const option of schema.oneOf) {
-      const defaults = collectDefaults(option as JSONSchema7);
-      if (defaults !== undefined) return defaults;
-    }
-  }
+  // Do NOT collect defaults for oneOf schemas. oneOf represents a discriminated
+  // union where the user must explicitly choose an option. Pre-populating from
+  // const discriminators (e.g. {deployment: "ATLAS"}) causes the first option to
+  // be auto-selected on initial render, which mounts child <FormField>s before
+  // the parent oneOf <FormField> runs its registration effect — triggering a
+  // react-hook-form crash (Cannot read properties of undefined (reading 'mount')).
 
   if (isObjectSchema(schema) && schema.properties) {
     const obj: Record<string, unknown> = {};
@@ -943,11 +943,21 @@ function SchemaField({
         control={control}
         name={fieldName}
         render={({ field }) => {
-          const currentValue = isPlainObject(field.value) ? field.value : {};
-          const selectedOption = findSelectedOneOfOption(
-            (normalizedSchema.oneOf || []) as JSONSchema7[],
-            currentValue,
-          );
+          // Only attempt auto-selection when the field has an explicit value.
+          // Treating undefined as {} would cause empty-property options (e.g.
+          // MongoDBMaskedNone) to score 0 and appear "selected" even though the
+          // user hasn't made a choice yet, leaving the real form value as undefined.
+          const currentValue =
+            field.value !== undefined && isPlainObject(field.value)
+              ? field.value
+              : null;
+          const selectedOption =
+            currentValue !== null
+              ? findSelectedOneOfOption(
+                  (normalizedSchema.oneOf || []) as JSONSchema7[],
+                  currentValue,
+                )
+              : null;
           const selectedKey = selectedOption
             ? getOneOfOptionIdentity(
                 selectedOption as JSONSchema7,
