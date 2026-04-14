@@ -21,8 +21,9 @@ import {
 } from "@/components/source-scan-config";
 import { SourceDetectorConfigCard } from "@/components/source-detector-config-card";
 import {
-  SourceStepperHeader,
-  sourceStepper,
+  HorizontalStepperNav,
+  VerticalStepperNav,
+  type SourceStepId,
 } from "@/components/source-stepper";
 import { DetailBackButton } from "@/components/detail-back-button";
 import {
@@ -551,27 +552,25 @@ export default function EditSourcePage() {
         </div>
       </div>
 
-      <sourceStepper.Scoped initialStep="config">
-        <SourceEditStepperContent
-          sourceType={source.type}
-          sourceId={sourceId}
-          sourceFormRef={sourceFormRef}
-          formDefaults={formDefaults}
-          defaultDetectors={defaultDetectors}
-          schedule={schedule}
-          configSaved={configSaved}
-          isSavingConfig={isSavingConfig}
-          isTestingConfig={isTestingConfig}
-          isSavingDetectors={isSavingDetectors}
-          onSaveConfig={handleSaveConfig}
-          onTestConfig={handleTestConfig}
-          onSaveDetectors={handleSaveDetectors}
-          onDetectorsChange={setDetectors}
-          selectedCustomDetectorIds={selectedCustomDetectorIds}
-          onCustomDetectorsChange={setSelectedCustomDetectorIds}
-          onScheduleChange={setSchedule}
-        />
-      </sourceStepper.Scoped>
+      <SourceEditStepperContent
+        sourceType={source.type}
+        sourceId={sourceId}
+        sourceFormRef={sourceFormRef}
+        formDefaults={formDefaults}
+        defaultDetectors={defaultDetectors}
+        schedule={schedule}
+        configSaved={configSaved}
+        isSavingConfig={isSavingConfig}
+        isTestingConfig={isTestingConfig}
+        isSavingDetectors={isSavingDetectors}
+        onSaveConfig={handleSaveConfig}
+        onTestConfig={handleTestConfig}
+        onSaveDetectors={handleSaveDetectors}
+        onDetectorsChange={setDetectors}
+        selectedCustomDetectorIds={selectedCustomDetectorIds}
+        onCustomDetectorsChange={setSelectedCustomDetectorIds}
+        onScheduleChange={setSchedule}
+      />
 
       <TestConnectionDialog
         open={testConnectionDialog.open}
@@ -626,69 +625,125 @@ function SourceEditStepperContent({
   onScheduleChange: (schedule: ScheduleValue) => void;
 }) {
   const { t } = useTranslation();
-  const stepper = sourceStepper.useStepper();
-  const showConfig = stepper.flow.is("config");
-  const showDetectors = stepper.flow.is("detectors");
+  const configRef = useRef<HTMLDivElement>(null);
+  const detectorsRef = useRef<HTMLDivElement>(null);
+  const [activeStepId, setActiveStepId] = useState<SourceStepId>("config");
   const [scanSummary, setScanSummary] = useState({
     visibleCount: 0,
     enabledCount: 0,
   });
 
-  return (
-    <div className="space-y-6">
-      <SourceStepperHeader
-        canNavigateToDetectors={configSaved || showDetectors}
-      />
+  // IntersectionObserver: highlight whichever section is in the top half of the viewport.
+  // Works correctly regardless of which DOM element is the actual scroll container.
+  useEffect(() => {
+    const els = [
+      { id: "config" as SourceStepId, el: configRef.current },
+      { id: "detectors" as SourceStepId, el: detectorsRef.current },
+    ].filter((x): x is { id: SourceStepId; el: HTMLElement } => x.el !== null);
 
-      <div className={cn(!showConfig && "hidden")}>
-        <Card className="border-2 border-black rounded-[6px] shadow-[6px_6px_0_#000]">
-          <CardHeader>
-            <CardTitle className="uppercase tracking-[0.06em]">
-              {t("sources.edit.configuration")}
-            </CardTitle>
-            <CardDescription>
-              {t("sources.edit.updateSettings")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SourceForm
-              ref={sourceFormRef}
-              sourceType={sourceType}
-              defaultValues={formDefaults}
-              onSubmit={(data) =>
-                onSaveConfig(data, () => stepper.navigation.next())
-              }
-              onTest={onTestConfig}
-              mode="edit"
-              disabled={isSavingConfig || isTestingConfig}
-              submitLabel={t("sources.edit.saveAndContinue")}
-              testLabel={t("sources.edit.testSource")}
-              showCancel={false}
-              schedule={schedule}
-              onScheduleChange={onScheduleChange}
-            />
-          </CardContent>
-        </Card>
+    const map = new Map<Element, SourceStepId>(els.map(({ id, el }) => [el, id]));
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const id = map.get(entry.target);
+            if (id) setActiveStepId(id);
+          }
+        }
+      },
+      // Trigger when a section's top edge crosses 40% from top of viewport
+      { rootMargin: "0px 0px -60% 0px", threshold: 0 },
+    );
+
+    els.forEach(({ el }) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  const scrollToSection = (id: SourceStepId) => {
+    const el = id === "config" ? configRef.current : detectorsRef.current;
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handleSaveAndContinue = (data: Record<string, unknown>) => {
+    onSaveConfig(data, () => {
+      setTimeout(() => scrollToSection("detectors"), 150);
+    });
+  };
+
+  return (
+    <div>
+      {/* Mobile sticky horizontal nav */}
+      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-black bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
+        <HorizontalStepperNav
+          activeStepId={activeStepId}
+          configSaved={configSaved}
+          onNavigate={scrollToSection}
+        />
       </div>
 
-      <div className={cn(!showDetectors && "hidden")}>
-        <SourceDetectorConfigCard
-          visibleCount={scanSummary.visibleCount}
-          enabledCount={scanSummary.enabledCount}
-          isSaving={isSavingDetectors}
-          onBack={() => stepper.navigation.prev()}
-          onSave={() => onSaveDetectors("view")}
-          onSaveAndScan={() => onSaveDetectors("scan")}
-        >
-            <SourceScanConfig
-              defaultDetectors={defaultDetectors}
-              onDetectorsChange={onDetectorsChange}
-              onSummaryChange={setScanSummary}
-              selectedCustomDetectorIds={selectedCustomDetectorIds}
-              onCustomDetectorsChange={onCustomDetectorsChange}
-              mode="edit"
-            />
-        </SourceDetectorConfigCard>
+      {/* Desktop: content + right sticky sidebar */}
+      <div className="flex gap-8 lg:gap-12">
+        {/* Scrollable content */}
+        <div className="min-w-0 flex-1 space-y-16 pb-32">
+          <section ref={configRef}>
+            <Card className="rounded-[6px] border-2 border-black shadow-[6px_6px_0_#000]">
+              <CardHeader>
+                <CardTitle className="uppercase tracking-[0.06em]">
+                  {t("sources.edit.configuration")}
+                </CardTitle>
+                <CardDescription>
+                  {t("sources.edit.updateSettings")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SourceForm
+                  ref={sourceFormRef}
+                  sourceType={sourceType}
+                  defaultValues={formDefaults}
+                  onSubmit={handleSaveAndContinue}
+                  onTest={onTestConfig}
+                  mode="edit"
+                  disabled={isSavingConfig || isTestingConfig}
+                  submitLabel={t("sources.edit.saveAndContinue")}
+                  testLabel={t("sources.edit.testSource")}
+                  showCancel={false}
+                  schedule={schedule}
+                  onScheduleChange={onScheduleChange}
+                />
+              </CardContent>
+            </Card>
+          </section>
+
+          <section ref={detectorsRef}>
+            <SourceDetectorConfigCard
+              visibleCount={scanSummary.visibleCount}
+              enabledCount={scanSummary.enabledCount}
+              isSaving={isSavingDetectors}
+              onBack={() => scrollToSection("config")}
+              onSave={() => onSaveDetectors("view")}
+              onSaveAndScan={() => onSaveDetectors("scan")}
+            >
+              <SourceScanConfig
+                defaultDetectors={defaultDetectors}
+                onDetectorsChange={onDetectorsChange}
+                onSummaryChange={setScanSummary}
+                selectedCustomDetectorIds={selectedCustomDetectorIds}
+                onCustomDetectorsChange={onCustomDetectorsChange}
+                mode="edit"
+              />
+            </SourceDetectorConfigCard>
+          </section>
+        </div>
+
+        {/* Right sticky sidebar — desktop only */}
+        <aside className="hidden self-start md:sticky md:top-6 md:block md:w-44 lg:w-52">
+          <VerticalStepperNav
+            activeStepId={activeStepId}
+            configSaved={configSaved}
+            onNavigate={scrollToSection}
+          />
+        </aside>
       </div>
     </div>
   );
