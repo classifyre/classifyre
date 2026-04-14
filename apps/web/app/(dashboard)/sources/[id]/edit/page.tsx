@@ -18,7 +18,6 @@ import {
 import {
   SourceScanConfig,
   type DetectorConfigInput,
-  type SourceScanConfigHandle,
 } from "@/components/source-scan-config";
 import { SourceDetectorConfigCard } from "@/components/source-detector-config-card";
 import {
@@ -26,7 +25,6 @@ import {
   VerticalStepperNav,
   type SourceStepId,
 } from "@/components/source-stepper";
-import { StickyActionToolbar } from "@/components/sticky-action-toolbar";
 import { DetailBackButton } from "@/components/detail-back-button";
 import {
   TestConnectionDialog,
@@ -43,6 +41,7 @@ import {
   type AssistantUiAction,
   type StartRunnerDto,
 } from "@workspace/api-client";
+import { cn } from "@workspace/ui/lib/utils";
 import {
   flattenObjectToPatches,
   setValueAtPath,
@@ -78,12 +77,18 @@ export default function EditSourcePage() {
   const [selectedCustomDetectorIds, setSelectedCustomDetectorIds] = useState<
     string[]
   >([]);
+  const [configDraft, setConfigDraft] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [configSaved, setConfigSaved] = useState(false);
   const [schedule, setSchedule] = useState<ScheduleValue>(
     defaultScheduleValue(),
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isTestingConfig, setIsTestingConfig] = useState(false);
+  const [isSavingDetectors, setIsSavingDetectors] = useState(false);
   const [testConnectionDialog, setTestConnectionDialog] = useState<{
     open: boolean;
     status: TestConnectionStatus;
@@ -181,6 +186,11 @@ export default function EditSourcePage() {
     );
   }, [source?.config]);
 
+  useEffect(() => {
+    setConfigDraft(formDefaults);
+    setConfigSaved(Boolean(source));
+  }, [formDefaults, source]);
+
   const assistantBridge = useMemo(() => {
     if (!source) {
       return null;
@@ -231,6 +241,7 @@ export default function EditSourcePage() {
 
           if (formPatches.length > 0) {
             await sourceFormRef.current?.applyPatches(formPatches);
+            setConfigDraft(sourceFormRef.current?.getValues() ?? null);
           }
 
           if (schedulePatches.length > 0) {
@@ -265,6 +276,8 @@ export default function EditSourcePage() {
                 }
               : current,
           );
+          setConfigDraft(action.values);
+          setConfigSaved(true);
           if (action.schedule) {
             setSchedule((current) => ({
               ...current,
@@ -287,7 +300,10 @@ export default function EditSourcePage() {
 
   useRegisterAssistantBridge(assistantBridge);
 
-  const persistSource = async (data: Record<string, unknown>) => {
+  const handleSaveConfig = async (
+    data: Record<string, unknown>,
+    onSuccess: () => void,
+  ) => {
     if (!source) return;
 
     try {
@@ -336,7 +352,12 @@ export default function EditSourcePage() {
         });
       }
 
-      return true;
+      setConfigDraft(data);
+      setConfigSaved(true);
+      toast.success(
+        t("sources.updated", { name: updated?.name || source.name }),
+      );
+      onSuccess();
     } catch (error) {
       console.error("Failed to update source:", error);
       toast.error(
@@ -344,7 +365,6 @@ export default function EditSourcePage() {
           ? `Failed to update source: ${error.message}`
           : "Failed to update source",
       );
-      return false;
     } finally {
       setIsSavingConfig(false);
     }
@@ -361,8 +381,41 @@ export default function EditSourcePage() {
       });
       setIsTestingConfig(true);
 
-      const didPersist = await persistSource(data);
-      if (!didPersist) return;
+      const {
+        name,
+        type: _type,
+        detectors: _detectors,
+        ...configFields
+      } = data;
+      const detectorPayload = normalizeDetectors(detectors);
+      const config = {
+        type: source.type,
+        ...configFields,
+        ...(selectedCustomDetectorIds.length > 0
+          ? { custom_detectors: selectedCustomDetectorIds }
+          : {}),
+        ...(detectorPayload.length > 0 ? { detectors: detectorPayload } : {}),
+      };
+
+      const updated = await api.sources.sourcesControllerUpdateSource({
+        id: sourceId,
+        updateSourceDto: {
+          name: name ? String(name) : undefined,
+          config,
+        },
+      });
+
+      if (updated) {
+        setSource({
+          id: updated.id || sourceId,
+          name: updated.name || source.name,
+          type: (updated.type as SourceType) || source.type,
+          config: updated.config as Record<string, unknown> | undefined,
+        });
+      }
+
+      setConfigDraft(data);
+      setConfigSaved(true);
 
       const result = await api.sources.sourcesControllerTestConnection({
         id: sourceId,
@@ -396,31 +449,72 @@ export default function EditSourcePage() {
     }
   };
 
-  const handleSaveAndRun = async (data: Record<string, unknown>) => {
+  const handleSaveDetectors = async (action: "scan" | "view") => {
     if (!source) return;
 
     try {
-      const didPersist = await persistSource(data);
-      if (!didPersist) return;
+      setIsSavingDetectors(true);
 
-      toast.success(t("sources.updated", { name: source.name }));
-      const startRunnerDto: StartRunnerDto = { triggerType: "MANUAL" };
-      const runner = await api.runners.cliRunnerControllerStartRunner({
-        sourceId,
-        startRunnerDto,
+      const draft = configDraft ?? {};
+      const {
+        name,
+        type: _type,
+        detectors: _detectors,
+        ...configFields
+      } = draft;
+      const detectorPayload = normalizeDetectors(detectors);
+      const config = {
+        type: source.type,
+        ...configFields,
+        ...(selectedCustomDetectorIds.length > 0
+          ? { custom_detectors: selectedCustomDetectorIds }
+          : {}),
+        ...(detectorPayload.length > 0 ? { detectors: detectorPayload } : {}),
+      };
+
+      const updated = await api.sources.sourcesControllerUpdateSource({
+        id: sourceId,
+        updateSourceDto: {
+          name: typeof name === "string" ? name : undefined,
+          config,
+        },
       });
-      if (runner?.id) {
-        router.push(`/scans/${runner.id}`);
-      } else {
-        router.push("/scans");
+
+      if (updated) {
+        setSource({
+          id: updated.id || sourceId,
+          name: updated.name || source.name,
+          type: (updated.type as SourceType) || source.type,
+          config: updated.config as Record<string, unknown> | undefined,
+        });
       }
+
+      toast.success(t("sources.new.detectorsSaved"));
+
+      if (action === "scan") {
+        const startRunnerDto: StartRunnerDto = { triggerType: "MANUAL" };
+        const runner = await api.runners.cliRunnerControllerStartRunner({
+          sourceId,
+          startRunnerDto,
+        });
+        if (runner?.id) {
+          router.push(`/scans/${runner.id}`);
+        } else {
+          router.push("/scans");
+        }
+        return;
+      }
+
+      router.push(`/sources/${sourceId}`);
     } catch (error) {
-      console.error("Failed to save and run source:", error);
+      console.error("Failed to update detectors:", error);
       toast.error(
         error instanceof Error
-          ? `Failed to update source: ${error.message}`
-          : "Failed to update source",
+          ? `Failed to update detectors: ${error.message}`
+          : "Failed to update detectors",
       );
+    } finally {
+      setIsSavingDetectors(false);
     }
   };
 
@@ -465,15 +559,13 @@ export default function EditSourcePage() {
         formDefaults={formDefaults}
         defaultDetectors={defaultDetectors}
         schedule={schedule}
+        configSaved={configSaved}
         isSavingConfig={isSavingConfig}
         isTestingConfig={isTestingConfig}
-        onSave={async (data) => {
-          const didPersist = await persistSource(data);
-          if (!didPersist) return;
-          toast.success(t("sources.updated", { name: source.name }));
-        }}
+        isSavingDetectors={isSavingDetectors}
+        onSaveConfig={handleSaveConfig}
         onTestConfig={handleTestConfig}
-        onSaveAndRun={handleSaveAndRun}
+        onSaveDetectors={handleSaveDetectors}
         onDetectorsChange={setDetectors}
         selectedCustomDetectorIds={selectedCustomDetectorIds}
         onCustomDetectorsChange={setSelectedCustomDetectorIds}
@@ -502,11 +594,13 @@ function SourceEditStepperContent({
   formDefaults,
   defaultDetectors,
   schedule,
+  configSaved,
   isSavingConfig,
   isTestingConfig,
-  onSave,
+  isSavingDetectors,
+  onSaveConfig,
   onTestConfig,
-  onSaveAndRun,
+  onSaveDetectors,
   onDetectorsChange,
   selectedCustomDetectorIds,
   onCustomDetectorsChange,
@@ -518,11 +612,13 @@ function SourceEditStepperContent({
   formDefaults: Record<string, unknown>;
   defaultDetectors: DetectorConfigInput[];
   schedule: ScheduleValue;
+  configSaved: boolean;
   isSavingConfig: boolean;
   isTestingConfig: boolean;
-  onSave: (data: Record<string, unknown>) => void | Promise<void>;
+  isSavingDetectors: boolean;
+  onSaveConfig: (data: Record<string, unknown>, onSuccess: () => void) => void;
   onTestConfig: (data: Record<string, unknown>) => void;
-  onSaveAndRun: (data: Record<string, unknown>) => void;
+  onSaveDetectors: (action: "scan" | "view") => void;
   onDetectorsChange: (detectors: DetectorConfigInput[]) => void;
   selectedCustomDetectorIds: string[];
   onCustomDetectorsChange: (ids: string[]) => void;
@@ -543,7 +639,7 @@ function SourceEditStepperContent({
     const els = [
       { id: "config" as SourceStepId, el: configRef.current },
       { id: "detectors" as SourceStepId, el: detectorsRef.current },
-    ].filter((x): x is { id: SourceStepId; el: HTMLDivElement } => x.el !== null);
+    ].filter((x): x is { id: SourceStepId; el: HTMLElement } => x.el !== null);
 
     const map = new Map<Element, SourceStepId>(els.map(({ id, el }) => [el, id]));
 
@@ -569,32 +665,19 @@ function SourceEditStepperContent({
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const scanConfigRef = useRef<SourceScanConfigHandle>(null);
-
-  const withValidFormData = async (
-    handler: (data: Record<string, unknown>) => void | Promise<void>,
-  ) => {
-    const validation = await sourceFormRef.current?.validate();
-    if (!validation?.isValid) {
-      const errorMsg = validation?.errors?.length 
-        ? `${t("sources.new.incompleteSettings")}: ${validation.errors.slice(0, 3).join(", ")}`
-        : t("sources.new.incompleteSettings");
-      toast.error(errorMsg);
-      scrollToSection("config");
-      return;
-    }
-    const flushed = await scanConfigRef.current?.flushDetectorChanges();
-    if (flushed === false) return;
-    await handler(sourceFormRef.current?.getValues() ?? {});
+  const handleSaveAndContinue = (data: Record<string, unknown>) => {
+    onSaveConfig(data, () => {
+      setTimeout(() => scrollToSection("detectors"), 150);
+    });
   };
 
   return (
     <div>
       {/* Mobile sticky horizontal nav */}
-      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-border bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
+      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-black bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
         <HorizontalStepperNav
           activeStepId={activeStepId}
-          configSaved={true}
+          configSaved={configSaved}
           onNavigate={scrollToSection}
         />
       </div>
@@ -604,7 +687,7 @@ function SourceEditStepperContent({
         {/* Scrollable content */}
         <div className="min-w-0 flex-1 space-y-16 pb-32">
           <section ref={configRef}>
-            <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
+            <Card className="rounded-[6px] border-2 border-black shadow-[6px_6px_0_#000]">
               <CardHeader>
                 <CardTitle className="uppercase tracking-[0.06em]">
                   {t("sources.edit.configuration")}
@@ -618,11 +701,13 @@ function SourceEditStepperContent({
                   ref={sourceFormRef}
                   sourceType={sourceType}
                   defaultValues={formDefaults}
-                  onSubmit={() => undefined}
+                  onSubmit={handleSaveAndContinue}
                   onTest={onTestConfig}
                   mode="edit"
                   disabled={isSavingConfig || isTestingConfig}
-                  showActions={false}
+                  submitLabel={t("sources.edit.saveAndContinue")}
+                  testLabel={t("sources.edit.testSource")}
+                  showCancel={false}
                   schedule={schedule}
                   onScheduleChange={onScheduleChange}
                 />
@@ -634,14 +719,12 @@ function SourceEditStepperContent({
             <SourceDetectorConfigCard
               visibleCount={scanSummary.visibleCount}
               enabledCount={scanSummary.enabledCount}
-              isSaving={isSavingConfig || isTestingConfig}
+              isSaving={isSavingDetectors}
               onBack={() => scrollToSection("config")}
-              onSave={() => undefined}
-              onSaveAndScan={() => undefined}
-              showActions={false}
+              onSave={() => onSaveDetectors("view")}
+              onSaveAndScan={() => onSaveDetectors("scan")}
             >
               <SourceScanConfig
-                ref={scanConfigRef}
                 defaultDetectors={defaultDetectors}
                 onDetectorsChange={onDetectorsChange}
                 onSummaryChange={setScanSummary}
@@ -651,28 +734,17 @@ function SourceEditStepperContent({
               />
             </SourceDetectorConfigCard>
           </section>
-          <StickyActionToolbar
-            onSave={() => void withValidFormData(onSave)}
-            onTest={() => void withValidFormData(onTestConfig)}
-            onSaveAndRun={() => void withValidFormData(onSaveAndRun)}
-            saveLabel={t("common.save")}
-            testLabel={t("sources.edit.testSource")}
-            saveAndRunLabel={t("sources.edit.saveAndScan")}
-            isBusy={isSavingConfig || isTestingConfig}
-            className="mt-0"
-          />
         </div>
 
         {/* Right sticky sidebar — desktop only */}
         <aside className="hidden self-start md:sticky md:top-6 md:block md:w-44 lg:w-52">
           <VerticalStepperNav
             activeStepId={activeStepId}
-            configSaved={true}
+            configSaved={configSaved}
             onNavigate={scrollToSection}
           />
         </aside>
       </div>
-
     </div>
   );
 }
