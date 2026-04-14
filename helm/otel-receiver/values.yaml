@@ -98,6 +98,7 @@ opentelemetry-collector:
         default_labels_enabled:
           exporter: false
           job: true
+          service_name: true
 
     service:
       telemetry:
@@ -107,15 +108,15 @@ opentelemetry-collector:
         traces:
           receivers: [otlp]
           processors: [memory_limiter, transform/pii, batch]
-          exporters: [debug, otlphttp/tempo]
+          exporters: [otlphttp/tempo]
         metrics:
           receivers: [otlp]
           processors: [memory_limiter, batch]
-          exporters: [debug, prometheusremotewrite/mimir]
+          exporters: [prometheusremotewrite/mimir]
         logs:
           receivers: [otlp]
           processors: [memory_limiter, batch]
-          exporters: [debug, loki]
+          exporters: [loki]
 
 # ---------------------------------------------------------------------------
 # Grafana — dashboards, explore, alerting
@@ -125,6 +126,11 @@ grafana:
 
   # Change in production. Consider using an existingSecret instead.
   adminPassword: "changeme"
+
+  # Disable init container that chowns /var/lib/grafana — fails on existing PVCs
+  # with restrictive security contexts (permission denied on csv/png/pdf dirs).
+  initChownData:
+    enabled: false
 
   resources:
     requests:
@@ -145,6 +151,13 @@ grafana:
       enabled: true
       label: grafana_datasource
       labelValue: "1"
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: false
 
   grafana.ini:
     server:
@@ -175,6 +188,29 @@ tempo:
           path: /var/tempo/traces
         wal:
           path: /var/tempo/wal
+    # Global overrides: enable local-blocks for the default (single) tenant.
+    overrides:
+      defaults:
+        metrics_generator:
+          processors: [local-blocks]
+      per_tenant_override_config: /conf/overrides.yaml
+    # Enable local-blocks processor for TraceQL metrics (rate(), histogram, etc.)
+    # local-blocks stores trace data locally so Grafana can query TraceQL metrics
+    # without a Prometheus/Mimir backend.
+    # NOTE: must be under tempo.tempo (maps to .Values.tempo.metricsGenerator in sub-chart).
+    metricsGenerator:
+      enabled: true
+      processor:
+        local_blocks:
+          flush_to_storage: false
+          filter_server_spans: false
+      storage:
+        path: /var/tempo/generator/wal
+        # remote_write not needed for local-blocks; empty falls back to default URL
+        # which will fail silently — harmless since local-blocks doesn't remote-write.
+        remote_write: []
+      traces_storage:
+        path: /var/tempo/generator/traces
 
   persistence:
     enabled: true

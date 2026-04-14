@@ -33,7 +33,7 @@ Or in values.yaml:
  Internal service endpoints
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {{- if .Values.tempo.enabled }}
-  Tempo:  http://{{ .Release.Name }}-tempo.{{ .Release.Namespace }}:3100
+  Tempo:  http://{{ .Release.Name }}-tempo.{{ .Release.Namespace }}:3200
 {{- end }}
 {{- if .Values.loki.enabled }}
   Loki:   http://{{ .Release.Name }}-loki-gateway.{{ .Release.Namespace }}:80

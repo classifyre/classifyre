@@ -17,7 +17,7 @@ data:
         type: tempo
         uid: tempo
         access: proxy
-        url: http://{{ $releaseName }}-tempo:3100
+        url: http://{{ $releaseName }}-tempo:3200
         jsonData:
           tracesToLogsV2:
             datasourceUid: loki
@@ -25,14 +25,15 @@ data:
             spanEndTimeShift: "1m"
             filterByTraceID: true
             filterBySpanID: false
-          tracesToMetrics:
-            datasourceUid: mimir
-          serviceMap:
-            datasourceUid: mimir
           lokiSearch:
             datasourceUid: loki
           nodeGraph:
             enabled: true
+          # Enable TraceQL metrics (local-blocks processor must be on in Tempo)
+          traceQuery:
+            timeShiftEnabled: true
+            spanStartTimeShift: "-1m"
+            spanEndTimeShift: "1m"
         isDefault: false
         editable: true
       {{- end }}
