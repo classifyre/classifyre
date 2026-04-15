@@ -341,6 +341,7 @@ export default function NewSandboxScanPage() {
               role="button"
               tabIndex={0}
               aria-label={t("sandbox.dropFiles")}
+              data-testid="file-upload-area"
               onDragEnter={onDragEnter}
               onDragLeave={onDragLeave}
               onDragOver={onDragOver}
@@ -359,6 +360,7 @@ export default function NewSandboxScanPage() {
                 type="file"
                 multiple
                 className="sr-only"
+                data-testid="file-input"
                 onChange={onFileChange}
               />
 
@@ -404,10 +406,12 @@ export default function NewSandboxScanPage() {
                   No files selected yet.
                 </div>
               ) : (
-                <ul className="max-h-64 divide-y overflow-auto">
+                <ul className="max-h-64 divide-y overflow-auto" data-testid="file-list">
                   {files.map((file) => (
                     <li
                       key={fileKey(file)}
+                      data-testid="file-item"
+                      data-filename={file.name}
                       className="flex items-center gap-3 px-3 py-2"
                     >
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -472,6 +476,7 @@ export default function NewSandboxScanPage() {
               <Button
                 onClick={() => void handleRun()}
                 disabled={!canRun}
+                data-testid="btn-run-sandbox"
                 className="w-full sm:w-auto"
               >
                 {isSubmitting ? (
