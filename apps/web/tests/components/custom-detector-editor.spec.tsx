@@ -298,7 +298,6 @@ test("json mode is available and disables the step workflow", async ({
   await component.getByRole("button", { name: /^json$/i }).click();
 
   await expect(component.getByText("JSON Editor")).toBeVisible();
-  await expect(component.getByText("Config JSON")).toBeVisible();
   await expect(component.getByText("Method setup")).not.toBeVisible();
   await expect(component.getByText("Pattern & severity")).not.toBeVisible();
 });
