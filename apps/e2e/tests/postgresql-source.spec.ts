@@ -108,14 +108,13 @@ async function closeConnectionDialog(page: Page): Promise<void> {
  * The scan page auto-refreshes every 2.5 s; allow up to 5 minutes.
  */
 async function waitForScanTerminal(page: Page): Promise<string> {
-  const badge = page.locator('[data-testid="scan-status-badge"]');
-  await expect(badge).toBeVisible({ timeout: 30_000 });
-  // Match English (Completed/Error) and German (Abgeschlossen/Fehler)
-  await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler/i, {
-    timeout: 600_000,
+  const completedBadge = page.getByText("Completed", { exact: true });
+  const errorBadge = page.getByText("Error", { exact: true });
+  await expect(completedBadge.or(errorBadge)).toBeVisible({
+    timeout: 300_000,
   });
-  const badgeText = (await badge.textContent()) ?? "";
-  return /error|fehler/i.test(badgeText) ? "ERROR" : "COMPLETED";
+  const isCompleted = await completedBadge.isVisible();
+  return isCompleted ? "COMPLETED" : "ERROR";
 }
 
 /**
@@ -242,7 +241,6 @@ test.describe("PostgreSQL Source", () => {
   test("scan with PII detector produces findings and can be deleted cleanly", async ({
     page,
   }) => {
-    test.setTimeout(600_000);
     await openBlankPostgresForm(page);
 
     const sourceName = `E2E PG PII ${Date.now()}`;
@@ -257,20 +255,12 @@ test.describe("PostgreSQL Source", () => {
     // Save source config first (sets the sourceId for the subsequent save-and-scan)
     await page.locator('[data-testid="btn-save-source"]').click();
 
-    // Navigate to the detectors step
-    await page.getByRole("button", { name: /detektoren/i }).click();
-
-    // Wait for the scan config section to be ready
+    // Wait for the scan config section to be ready (detectors are on the same page now)
     await expect(page.locator('[data-testid="scan-config-section"]')).toBeVisible({
       timeout: 15_000,
     });
 
     // Find and enable PII detector
-    const piiEnable = page.locator('[data-testid="detector-enable-PII"]');
-    if (await piiEnable.isVisible()) {
-      await piiEnable.click();
-    }
-
     const piiToggle = page.locator('[data-testid="detector-toggle-PII"]');
     await expect(piiToggle).toBeVisible({ timeout: 10_000 });
 
@@ -300,7 +290,7 @@ test.describe("PostgreSQL Source", () => {
     // ── Verify PII findings exist ─────────────────────────────────────────────
 
     // Navigate to the source detail via the "Source Details" button on the scan page
-    await page.locator("button").filter({ hasText: /quelldetails/i }).first().click();
+    await page.getByRole("button", { name: "Source Details" }).click();
     await page.waitForURL(/\/sources\/[a-z0-9-]+$/, { timeout: 10_000 });
 
     const sourceId = sourceIdFromUrl(page);
@@ -310,7 +300,7 @@ test.describe("PostgreSQL Source", () => {
     await page.waitForLoadState("networkidle");
 
     // Verify the findings tab is reachable and has PII results
-    const findingsTab = page.getByRole("tab", { name: /findings|befunde/i });
+    const findingsTab = page.getByRole("tab", { name: /findings/i });
     if (await findingsTab.isVisible()) {
       await findingsTab.click();
       // At least one PII finding row should appear
