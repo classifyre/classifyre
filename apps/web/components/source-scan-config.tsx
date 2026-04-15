@@ -832,7 +832,7 @@ export function SourceScanConfig({
     visibleGroupSummary.length > 0 || visibleCustomDetectors.length > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="scan-config-section">
       <Card className="p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
