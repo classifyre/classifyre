@@ -244,7 +244,7 @@ function FindingsRow({ findings }: { findings: SandboxFinding[] }) {
   }
 
   return (
-    <div className="border-t bg-muted/10">
+    <div className="border-t bg-muted/10" data-testid="findings-detail">
       <Table>
         <TableHeader className="bg-white/95 dark:bg-card/95">
           <TableRow>
@@ -286,6 +286,9 @@ function FindingsRow({ findings }: { findings: SandboxFinding[] }) {
             return (
               <TableRow
                 key={`${String(finding.finding_type ?? "finding")}-${index}`}
+                data-testid="finding-row"
+                data-detector-type={finding.detector_type}
+                data-finding-type={finding.finding_type}
               >
                 <TableCell className="py-2 text-xs font-medium">
                   {detectorLabel}
@@ -360,6 +363,9 @@ function RunRow({
       <TableRow
         className={canExpand ? "cursor-pointer hover:bg-muted/40" : undefined}
         onClick={canExpand ? () => setExpanded((value) => !value) : undefined}
+        data-testid="sandbox-run-row"
+        data-run-id={run.id}
+        data-status={run.status}
       >
         <TableCell className="w-8 py-2">
           {canExpand ? (
@@ -375,7 +381,7 @@ function RunRow({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <p className="truncate text-sm font-medium">{run.fileName}</p>
+              <p className="truncate text-sm font-medium" data-testid="run-filename">{run.fileName}</p>
             </div>
           </div>
         </TableCell>
@@ -388,6 +394,8 @@ function RunRow({
             <Badge
               variant={statusConfig.badge}
               className="rounded-[4px] text-[10px] uppercase tracking-[0.1em]"
+              data-testid="run-status-badge"
+              data-status={run.status}
             >
               {statusConfig.label}
             </Badge>
@@ -398,6 +406,8 @@ function RunRow({
           <Badge
             variant="outline"
             className="gap-1.5 rounded-[4px] text-[11px]"
+            data-testid="run-content-type"
+            data-content-type={run.contentType}
           >
             <ContentIcon className="h-3 w-3 text-muted-foreground" />
             {formatEnumLabel(run.contentType)}
@@ -435,6 +445,8 @@ function RunRow({
             <Badge
               variant={findingsCount > 0 ? "secondary" : "outline"}
               className="rounded-[4px] text-[11px]"
+              data-testid="run-findings-count"
+              data-count={findingsCount}
             >
               {findingsCount}
             </Badge>
@@ -462,6 +474,7 @@ function RunRow({
             disabled={isDeleting}
             onClick={(event) => void handleDelete(event)}
             title={t("sandbox.runs.deleteRun")}
+            data-testid="btn-delete-run"
           >
             {isDeleting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
