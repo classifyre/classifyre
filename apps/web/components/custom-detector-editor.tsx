@@ -633,7 +633,9 @@ export const CustomDetectorEditor = React.forwardRef<
   const [name, setName] = useState("Custom Detector");
   const [key, setKey] = useState("cust_detector");
   const [description, setDescription] = useState("");
-  const [method, setMethod] = useState<CustomDetectorMethod>("RULESET");
+  const [method, setMethod] = useState<CustomDetectorMethod>(() =>
+    normalizeMethod(initialValue?.method),
+  );
   const [isActive, setIsActive] = useState(true);
   const [configDraft, setConfigDraft] = useState<Record<string, unknown>>(
     defaultConfig("RULESET"),
