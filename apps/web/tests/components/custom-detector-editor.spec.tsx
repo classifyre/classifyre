@@ -16,14 +16,7 @@ async function mockCustomDetectorList(
       });
       return;
     }
-    if (url.pathname.includes("/custom-detectors/examples")) {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify([]),
-      });
-      return;
-    }
+
     await route.continue();
   });
 }
@@ -94,7 +87,7 @@ test("extractor fields textarea does not normalize typed text back into template
           extractor: {
             enabled: true,
             fields: [],
-            gliner_model: "fastino/gliner2-base-v1",
+            gliner_model: "urchade/gliner_multi-v2.1",
             content_limit: 4000,
           },
         },
@@ -142,7 +135,7 @@ test("extractor content limit can be cleared and retyped without snapping back m
           extractor: {
             enabled: true,
             fields: [],
-            gliner_model: "fastino/gliner2-base-v1",
+            gliner_model: "urchade/gliner_multi-v2.1",
             content_limit: 4000,
           },
         },
@@ -305,6 +298,7 @@ test("json mode is available and disables the step workflow", async ({
   await component.getByRole("button", { name: /^json$/i }).click();
 
   await expect(component.getByText("JSON Editor")).toBeVisible();
+  await expect(component.getByText("Config JSON")).toBeVisible();
   await expect(component.getByText("Method setup")).not.toBeVisible();
   await expect(component.getByText("Pattern & severity")).not.toBeVisible();
 });
