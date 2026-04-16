@@ -144,6 +144,7 @@ export function SamplingCard({
                   type="button"
                   onClick={() => handleStrategyChange(stratVal)}
                   disabled={disabled}
+                  data-testid={`sampling-strategy-${stratVal}`}
                   className={cn(
                     "group flex flex-col items-start gap-0.5 rounded-[4px] border-2 px-3 py-2 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
                     active

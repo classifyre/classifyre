@@ -986,7 +986,7 @@ export function AssetsTable({
 
                   return (
                     <Fragment key={asset.id}>
-                      <TableRow>
+                      <TableRow data-testid="asset-row">
                         <TableCell className="py-2">
                           {canExpand ? (
                             <Button
@@ -1019,6 +1019,7 @@ export function AssetsTable({
                                   onClick={() =>
                                     router.push(`/assets/${asset.id}`)
                                   }
+                                  data-testid="asset-name"
                                 >
                                   <span className="truncate text-sm font-medium inline-block max-w-[280px]">
                                     {assetName}

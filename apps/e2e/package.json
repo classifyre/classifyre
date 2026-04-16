@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "test:e2e": "playwright test",
+    "e2e:test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report"

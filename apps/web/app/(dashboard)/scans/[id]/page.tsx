@@ -445,6 +445,7 @@ export default function RunnerDetailPage() {
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <Badge
                 className={`rounded-[4px] border ${getRunnerStatusBadgeTone(runner.status)}`}
+                data-testid="scan-status-badge"
               >
                 {isRunnerStatusRunning(runner.status) && (
                   <Spinner
@@ -523,10 +524,10 @@ export default function RunnerDetailPage() {
 
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="h-auto rounded-[4px] border-2 border-black bg-background p-1">
-          <TabsTrigger value="overview" className="rounded-[3px]">
+          <TabsTrigger value="overview" className="rounded-[3px]" data-testid="tab-overview">
             Overview
           </TabsTrigger>
-          <TabsTrigger value="findings" className="rounded-[3px]">
+          <TabsTrigger value="findings" className="rounded-[3px]" data-testid="tab-findings">
             Findings
             {findingsTotal > 0 && (
               <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold">
@@ -534,7 +535,7 @@ export default function RunnerDetailPage() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="assets" className="rounded-[3px]">
+          <TabsTrigger value="assets" className="rounded-[3px]" data-testid="tab-assets">
             Assets
             {assetsTotal > 0 && (
               <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold">
@@ -542,7 +543,7 @@ export default function RunnerDetailPage() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="logs" className="rounded-[3px]">
+          <TabsTrigger value="logs" className="rounded-[3px]" data-testid="tab-logs">
             Logs
           </TabsTrigger>
         </TabsList>
@@ -591,6 +592,7 @@ export default function RunnerDetailPage() {
               <Card
                 key={item.label}
                 className="border-2 border-border rounded-[6px]"
+                data-testid={`stats-card-${item.label.toLowerCase().replace(/ \+ /g, "-")}`}
               >
                 <CardContent className="p-4">
                   <p className="text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
@@ -599,6 +601,7 @@ export default function RunnerDetailPage() {
                   <p
                     className="mt-1 text-3xl font-black"
                     style={{ fontFamily: "var(--font-hero)" }}
+                    data-testid="stats-value"
                   >
                     {item.value.toLocaleString()}
                   </p>

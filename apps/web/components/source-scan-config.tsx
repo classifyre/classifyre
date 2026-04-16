@@ -352,6 +352,7 @@ function DetectorConfigCard({
               variant="outline"
               className="rounded-[4px] border-2 border-black"
               onClick={handleEnableCustom}
+              data-testid={`btn-customize-${detector.type}`}
             >
               {t("sources.scanConfig.customize")}
             </Button>
@@ -361,10 +362,10 @@ function DetectorConfigCard({
               variant="outline"
               className="rounded-[4px] border-2 border-black"
               onClick={handleResetDefaults}
+              data-testid={`btn-reset-${detector.type}`}
             >
               {t("sources.scanConfig.reset")}
-            </Button>
-          </div>
+            </Button>          </div>
         </div>
 
         {presetOptions.length > 0 && (
