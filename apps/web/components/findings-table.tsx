@@ -316,7 +316,7 @@ function FindingExpandedRow({ finding }: { finding: FindingResponseDto }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const CHECKBOX_CLASS =
-  "border-2 border-foreground/25 rounded-[2px] data-[state=checked]:bg-accent data-[state=checked]:border-accent data-[state=checked]:text-accent-foreground data-[state=indeterminate]:bg-accent data-[state=indeterminate]:border-accent data-[state=indeterminate]:text-accent-foreground";
+  "border-2 border-foreground/25 rounded-[2px] data-[state=checked]:bg-[#b7ff00] data-[state=checked]:border-[#b7ff00] data-[state=checked]:text-black data-[state=indeterminate]:bg-[#b7ff00] data-[state=indeterminate]:border-[#b7ff00] data-[state=indeterminate]:text-black";
 
 export function FindingsTable({
   severities,
@@ -685,7 +685,7 @@ export function FindingsTable({
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder={t("findings.search")}
-            className="h-9 pl-9 border-2 border-border rounded-[4px]"
+            className="h-9 pl-9 border-2 border-black rounded-[4px]"
           />
         </div>
 
@@ -697,7 +697,7 @@ export function FindingsTable({
             onSeveritiesChange?.(sevValues);
           }}
         >
-          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-black rounded-[4px]">
             <MultiSelectValue placeholder="Severity" />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -711,7 +711,7 @@ export function FindingsTable({
                 <MultiSelectItem key={severity} value={severity}>
                   <span className="inline-flex items-center gap-2">
                     <span
-                      className="h-2.5 w-2.5 rounded-[2px] border border-border/20"
+                      className="h-2.5 w-2.5 rounded-[2px] border border-black/20"
                       style={{
                         backgroundColor:
                           FINDING_SEVERITY_COLOR_BY_ENUM[
@@ -736,7 +736,7 @@ export function FindingsTable({
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[200px] border-2 border-border rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[200px] border-2 border-black rounded-[4px]">
             <MultiSelectValue placeholder={t("findings.detectorTypes")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -761,7 +761,7 @@ export function FindingsTable({
             setDraft((prev) => ({ ...prev, customDetectorKeys: values }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[220px] border-2 border-border rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[220px] border-2 border-black rounded-[4px]">
             <MultiSelectValue placeholder={t("findings.customDetectors")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -794,7 +794,7 @@ export function FindingsTable({
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[170px] border-2 border-border rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[170px] border-2 border-black rounded-[4px]">
             <MultiSelectValue placeholder="Status" />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -819,7 +819,7 @@ export function FindingsTable({
             setDraft((prev) => ({ ...prev, sourceIds: values }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[200px] border-2 border-border rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[200px] border-2 border-black rounded-[4px]">
             <MultiSelectValue placeholder="Sources" />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -848,8 +848,8 @@ export function FindingsTable({
 
       {/* ── Selection banner ── */}
       {selectionCount > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[4px] border-2 border-accent/30 bg-background px-4 py-2.5">
-          <span className="font-mono text-xs text-accent">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[4px] border-2 border-[#b7ff00]/30 bg-[#0b0f0a] px-4 py-2.5">
+          <span className="font-mono text-xs text-[#b7ff00]">
             {isAllSelected
               ? `All ${selectionCount.toLocaleString()} findings selected`
               : `${selectionCount.toLocaleString()} finding${selectionCount !== 1 ? "s" : ""} selected`}
@@ -859,7 +859,7 @@ export function FindingsTable({
             <Button
               size="sm"
               onClick={onBulkUpdate}
-              className="ml-auto bg-accent text-accent-foreground hover:bg-accent/90 font-mono text-xs uppercase tracking-[0.08em] font-bold rounded-[4px] border-0"
+              className="ml-auto bg-[#b7ff00] text-black hover:bg-[#b7ff00]/85 font-mono text-xs uppercase tracking-[0.08em] font-bold rounded-[4px] border-0"
             >
               Update {selectionCount.toLocaleString()} finding
               {selectionCount !== 1 ? "s" : ""}
@@ -1032,7 +1032,7 @@ export function FindingsTable({
                   return (
                     <Fragment key={finding.id}>
                       <TableRow
-                        className={isSelected ? "bg-accent/5" : undefined}
+                        className={isSelected ? "bg-[#b7ff00]/5" : undefined}
                         data-testid="finding-row"
                       >
                         <TableCell className="py-2">
@@ -1261,7 +1261,7 @@ export function FindingsTable({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 rounded-[4px] border-2 border-border"
+                            className="h-8 rounded-[4px] border-2 border-black"
                             onClick={() =>
                               router.push(`/findings/${finding.id}`)
                             }
@@ -1304,7 +1304,7 @@ export function FindingsTable({
             {t("common.rowsPerPage")}
           </span>
           <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
+            <SelectTrigger className="h-8 w-[130px] border-2 border-black rounded-[4px]">
               <SelectValue placeholder="Rows" />
             </SelectTrigger>
             <SelectContent>

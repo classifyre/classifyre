@@ -807,7 +807,7 @@ function OneOfFieldInner({
           disabled={disabled}
         >
           <FormControl>
-            <SelectTrigger>
+            <SelectTrigger data-testid={`select-${String(label).toLowerCase().replace(/[^a-z0-9]/g, "-")}`}>
               <SelectValue placeholder="Select option" />
             </SelectTrigger>
           </FormControl>
@@ -1215,6 +1215,7 @@ function SchemaField({
                         <ToggleGroupItem
                           key={String(option)}
                           value={String(option)}
+                          data-testid={`toggle-option-${String(option)}`}
                         >
                           {String(option).replace(/_/g, " ")}
                         </ToggleGroupItem>
@@ -1378,6 +1379,7 @@ function SchemaField({
                                 }}
                                 autoComplete="off"
                                 disabled={disabled}
+                                data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${index}`}
                               />
                             </FormControl>
                             <Button
@@ -1406,9 +1408,9 @@ function SchemaField({
                               }
                               autoComplete="off"
                               disabled={disabled}
+                              data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${index}`}
                             />
-                          </FormControl>
-                          <Button
+                          </FormControl>                          <Button
                             type="button"
                             variant="ghost"
                             size="icon"
@@ -1427,6 +1429,7 @@ function SchemaField({
                       size="sm"
                       onClick={addItem}
                       disabled={disabled}
+                      data-testid={`btn-add-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Add {label}
@@ -1558,6 +1561,7 @@ function SchemaField({
                 }}
                 autoComplete="off"
                 disabled={disabled}
+                data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
               />
             </FormControl>
             <FormMessage />
@@ -1599,6 +1603,7 @@ function SchemaField({
                 value={field.value ?? ""}
                 autoComplete="new-password"
                 disabled={disabled}
+                data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
               />
             ) : isLongField ? (
               <Textarea
@@ -1607,6 +1612,7 @@ function SchemaField({
                 value={field.value ?? ""}
                 autoComplete="off"
                 disabled={disabled}
+                data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
               />
             ) : (
               <Input
@@ -1616,6 +1622,7 @@ function SchemaField({
                 value={field.value ?? ""}
                 autoComplete="off"
                 disabled={disabled}
+                data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
               />
             )}
           </FormControl>
@@ -2075,6 +2082,7 @@ export const JsonSchemaForm = React.forwardRef<
               <AccordionTrigger
                 className="hover:no-underline"
                 caption="Additional settings you can configure when the default connection setup is not enough."
+                data-testid="accordion-trigger-optional"
               >
                 Optional Parameters
               </AccordionTrigger>
