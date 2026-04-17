@@ -467,7 +467,8 @@ class CustomExtractorField(BaseModel):
     )
     type: Type | None = 'string'
     entity_label: str | None = Field(
-        None, description='GLiNER entity label (ENTITY and CLASSIFIER methods)'
+        None,
+        description='GLiNER2 schema label used for extraction (ENTITY and CLASSIFIER methods)',
     )
     regex_pattern: str | None = Field(
         None,
@@ -498,7 +499,7 @@ class CustomExtractorConfig(BaseModel):
     )
     enabled: bool | None = True
     fields: list[CustomExtractorField] = Field(..., min_length=1)
-    gliner_model: str | None = 'urchade/gliner_multi-v2.1'
+    gliner_model: str | None = 'fastino/gliner2-base-v1'
     content_limit: int | None = Field(
         4000,
         description='Chars of content to pass to extractor (classifier matched_content is only 320 chars)',
@@ -557,7 +558,10 @@ class CustomEntityConfig(BaseModel):
         extra='forbid',
     )
     entity_labels: list[str] | None = []
-    model: str | None = 'urchade/gliner_multi-v2.1'
+    entity_descriptions: dict[str, str] | None = Field(
+        {}, description='Optional GLiNER2 schema descriptions keyed by entity label'
+    )
+    model: str | None = 'fastino/gliner2-base-v1'
 
 
 class CustomDetectorConfig(DetectorConfig):

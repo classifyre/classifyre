@@ -5,6 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Ajv, { type ErrorObject } from "ajv";
 import type { JSONSchema7 } from "json-schema";
 import {
+  AlertTriangle,
+  CheckCircle2,
+
   FileText,
   Loader2,
   Search,
@@ -33,6 +36,13 @@ import {
 } from "@workspace/ui/components/card";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
@@ -67,6 +77,7 @@ export type CustomDetectorEditorInitialValue = {
 type CustomDetectorEditorProps = {
   mode: "create" | "edit";
   initialValue?: CustomDetectorEditorInitialValue;
+  initialMethod?: CustomDetectorMethod;
   submitLabel: string;
   isSubmitting?: boolean;
   onSubmit: (payload: CustomDetectorEditorSubmit) => Promise<void> | void;
@@ -210,7 +221,7 @@ function defaultConfig(
     },
     entity: {
       entity_labels: [],
-      model: "urchade/gliner_multi-v2.1",
+      model: "fastino/gliner2-base-v1",
     },
   };
 }
@@ -293,8 +304,8 @@ function mergeConfigWithDefaults(
   };
 }
 
-function toEditorState(initialValue?: CustomDetectorEditorInitialValue) {
-  const method = normalizeMethod(initialValue?.method);
+function toEditorState(initialValue?: CustomDetectorEditorInitialValue, fallbackMethod?: CustomDetectorMethod) {
+  const method = normalizeMethod(initialValue?.method ?? fallbackMethod);
   const rawConfig = asRecord(initialValue?.config ?? defaultConfig(method));
   const mergedInitialConfig = mergeConfigWithDefaults(rawConfig, method);
   const name = normalizeName(initialValue?.name ?? mergedInitialConfig.name);
@@ -306,7 +317,7 @@ function toEditorState(initialValue?: CustomDetectorEditorInitialValue) {
     initialValue?.description ??
     resolveDescription(mergedInitialConfig.description);
   const resolvedMethod = normalizeMethod(
-    initialValue?.method ?? mergedInitialConfig.method,
+    initialValue?.method ?? fallbackMethod ?? mergedInitialConfig.method,
   );
 
   const config: Record<string, unknown> = {
@@ -563,17 +574,20 @@ function StarterCard({
   badge,
   icon,
   onClick,
+  testId,
 }: {
   title: string;
   description: string;
   badge: React.ReactNode;
   icon: React.ReactNode;
   onClick: () => void;
+  testId?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      data-testid={testId}
       className={cn(
         "group cursor-pointer text-left border-2 border-black rounded-[6px] bg-background p-4 shadow-[4px_4px_0_#000] transition-all",
         "hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[5px_5px_0_#000]",
@@ -600,7 +614,7 @@ export const CustomDetectorEditor = React.forwardRef<
   CustomDetectorEditorHandle,
   CustomDetectorEditorProps
 >(function CustomDetectorEditor(
-  { mode, initialValue, submitLabel, isSubmitting = false, onSubmit },
+  { mode, initialValue, initialMethod, submitLabel, isSubmitting = false, onSubmit },
   ref,
 ) {
   const [examples, setExamples] = useState<CustomDetectorExampleDto[]>([]);
@@ -616,9 +630,11 @@ export const CustomDetectorEditor = React.forwardRef<
   const [activeStepId, setActiveStepId] =
     useState<CustomDetectorStepId>("method");
   const [starterName, setStarterName] = useState<string | null>(
-    mode === "edit" ? "Current detector" : null,
+    mode === "edit" ? "Current detector" : initialMethod !== undefined ? `${initialMethod} blank` : null,
   );
-  const [hasSelectedStarter, setHasSelectedStarter] = useState(mode === "edit");
+  const [hasSelectedStarter, setHasSelectedStarter] = useState(
+    mode === "edit" || initialMethod !== undefined,
+  );
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [hasAttemptedMethodStepAdvance, setHasAttemptedMethodStepAdvance] =
     useState(false);
@@ -629,23 +645,32 @@ export const CustomDetectorEditor = React.forwardRef<
   const [jsonError, setJsonError] = useState<string | null>(null);
   const trainingFileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [isUploadingTrainingFile, setIsUploadingTrainingFile] = useState(false);
+  const [uploadedFileRef, setUploadedFileRef] = useState<File | null>(null);
+  const [columnMappingState, setColumnMappingState] = useState<{
+    availableColumns: string[];
+    detectedLabelColumn: string;
+    detectedTextColumn: string;
+    selectedLabelColumn: string;
+    selectedTextColumn: string;
+    skippedRows: number;
+  } | null>(null);
 
   const [name, setName] = useState("Custom Detector");
   const [key, setKey] = useState("cust_detector");
   const [description, setDescription] = useState("");
   const [method, setMethod] = useState<CustomDetectorMethod>(() =>
-    normalizeMethod(initialValue?.method),
+    normalizeMethod(initialValue?.method ?? initialMethod),
   );
   const [isActive, setIsActive] = useState(true);
-  const [configDraft, setConfigDraft] = useState<Record<string, unknown>>(
-    defaultConfig("RULESET"),
+  const [configDraft, setConfigDraft] = useState<Record<string, unknown>>(() =>
+    defaultConfig(normalizeMethod(initialValue?.method ?? initialMethod)),
   );
   const [editorDrafts, setEditorDrafts] = useState<EditorDrafts>(() =>
-    buildEditorDrafts(defaultConfig("RULESET")),
+    buildEditorDrafts(defaultConfig(normalizeMethod(initialValue?.method ?? initialMethod))),
   );
 
   useEffect(() => {
-    const next = toEditorState(initialValue);
+    const next = toEditorState(initialValue, initialMethod);
     setName(next.name);
     setKey(next.key);
     setDescription(next.description);
@@ -653,15 +678,15 @@ export const CustomDetectorEditor = React.forwardRef<
     setIsActive(next.isActive);
     setConfigDraft(next.config);
     setEditorDrafts(buildEditorDrafts(next.config));
-    setHasSelectedStarter(mode === "edit");
-    setStarterName(mode === "edit" ? "Current detector" : null);
+    setHasSelectedStarter(mode === "edit" || initialMethod !== undefined);
+    setStarterName(mode === "edit" ? "Current detector" : initialMethod !== undefined ? `${initialMethod} blank` : null);
     setActiveStepId("method");
     setValidationErrors([]);
     setHasAttemptedMethodStepAdvance(false);
     setEditorMode("builder");
     setJsonDraft(JSON.stringify(next.config, null, 2));
     setJsonError(null);
-  }, [initialValue, mode]);
+  }, [initialValue, mode, initialMethod]);
 
   const customSchema = useMemo(() => {
     const detectorSchema = getDetectorSchemas({ includeCustom: true }).find(
@@ -694,14 +719,14 @@ export const CustomDetectorEditor = React.forwardRef<
       }
     }
 
-    if (mode === "create") {
+    if (mode === "create" && initialMethod === undefined) {
       void loadExamples();
     }
 
     return () => {
       cancelled = true;
     };
-  }, [mode]);
+  }, [mode, initialMethod]);
 
   useEffect(() => {
     let cancelled = false;
@@ -918,6 +943,30 @@ export const CustomDetectorEditor = React.forwardRef<
 
   const labelsText = editorDrafts.labelsText;
   const trainingExamplesText = editorDrafts.trainingExamplesText;
+
+  const classifierTrainingStrategy = useMemo(() => {
+    const minExamples = typeof classifier.min_examples_per_label === "number" && classifier.min_examples_per_label > 0
+      ? classifier.min_examples_per_label
+      : 8;
+    const rawLabels = Array.isArray(classifier.labels) ? classifier.labels : [];
+    const labels = rawLabels.flatMap((l) => {
+      if (typeof l === "string" && l.length > 0) return [l];
+      const rec = asRecord(l);
+      const name = typeof rec.name === "string" && rec.name.length > 0 ? rec.name : null;
+      return name ? [name] : [];
+    });
+    const examples = Array.isArray(classifier.training_examples)
+      ? classifier.training_examples.map((e) => asRecord(e))
+      : [];
+    const countsByLabel = new Map<string, number>();
+    for (const ex of examples) {
+      const lbl = typeof ex.label === "string" ? ex.label : null;
+      if (lbl) countsByLabel.set(lbl, (countsByLabel.get(lbl) ?? 0) + 1);
+    }
+    const readyLabels = labels.filter((l) => (countsByLabel.get(l) ?? 0) >= minExamples);
+    const readyForSetFit = labels.length > 0 && readyLabels.length === labels.length;
+    return { strategy: readyForSetFit ? "SETFIT" : "ZERO_SHOT", minExamples, labels, countsByLabel, readyLabels };
+  }, [classifier]);
   const entityLabelsText = editorDrafts.entityLabelsText;
 
   const extractorEnabled =
@@ -1007,6 +1056,70 @@ export const CustomDetectorEditor = React.forwardRef<
     });
   };
 
+  const applyParsedExamples = (
+    parsed: Awaited<ReturnType<typeof api.parseCustomDetectorTrainingExamples>>,
+    file: File,
+  ) => {
+    const existingExamples = Array.isArray(classifier.training_examples)
+      ? classifier.training_examples.map((entry) => asRecord(entry))
+      : [];
+    const uploadedExamples = parsed.examples.map((entry) => ({
+      label: entry.label,
+      text: entry.text,
+      accepted: true,
+      source: "upload",
+    }));
+    const mergedExamples = dedupeTrainingExamples([
+      ...existingExamples,
+      ...uploadedExamples,
+    ]);
+    const mergedText = mergedExamples
+      .map(
+        (example) =>
+          `${String(example.label ?? "")}|${String(example.text ?? "")}`,
+      )
+      .join("\n");
+
+    setEditorDrafts((current) => ({
+      ...current,
+      trainingExamplesText: mergedText,
+    }));
+    updateClassifier({
+      ...classifier,
+      training_examples: mergedExamples,
+    });
+
+    const skippedMessage =
+      parsed.skippedRows > 0 ? ` (${parsed.skippedRows} skipped)` : "";
+    toast.success(
+      `Imported ${parsed.importedRows} example${parsed.importedRows === 1 ? "" : "s"} from ${file.name}${skippedMessage}`,
+    );
+
+    const hasMissingColumnSkips =
+      parsed.skippedReasons !== undefined &&
+      (parsed.skippedReasons.missingLabel > 0 || parsed.skippedReasons.missingText > 0);
+
+    if (
+      hasMissingColumnSkips &&
+      parsed.availableColumns &&
+      parsed.availableColumns.length > 1 &&
+      parsed.detectedLabelColumn &&
+      parsed.detectedTextColumn
+    ) {
+      setUploadedFileRef(file);
+      setColumnMappingState({
+        availableColumns: parsed.availableColumns,
+        detectedLabelColumn: parsed.detectedLabelColumn,
+        detectedTextColumn: parsed.detectedTextColumn,
+        selectedLabelColumn: parsed.detectedLabelColumn,
+        selectedTextColumn: parsed.detectedTextColumn,
+        skippedRows: parsed.skippedRows,
+      });
+    } else {
+      setColumnMappingState(null);
+    }
+  };
+
   const handleTrainingExamplesFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -1016,54 +1129,38 @@ export const CustomDetectorEditor = React.forwardRef<
       return;
     }
 
+    setColumnMappingState(null);
     setIsUploadingTrainingFile(true);
     try {
       const parsed = await api.parseCustomDetectorTrainingExamples(
         file,
         file.name,
       );
-      const existingExamples = Array.isArray(classifier.training_examples)
-        ? classifier.training_examples.map((entry) => asRecord(entry))
-        : [];
-      const uploadedExamples = parsed.examples.map((entry) => ({
-        label: entry.label,
-        text: entry.text,
-        accepted: true,
-        source: "upload",
-      }));
-      const mergedExamples = dedupeTrainingExamples([
-        ...existingExamples,
-        ...uploadedExamples,
-      ]);
-      const mergedText = mergedExamples
-        .map(
-          (example) =>
-            `${String(example.label ?? "")}|${String(example.text ?? "")}`,
-        )
-        .join("\n");
-
-      setEditorDrafts((current) => ({
-        ...current,
-        trainingExamplesText: mergedText,
-      }));
-      updateClassifier({
-        ...classifier,
-        training_examples: mergedExamples,
-      });
-
-      const skippedMessage =
-        parsed.skippedRows > 0 ? ` (${parsed.skippedRows} skipped)` : "";
-      toast.success(
-        `Imported ${parsed.importedRows} example${parsed.importedRows === 1 ? "" : "s"} from ${file.name}${skippedMessage}`,
-      );
-      if (parsed.warnings.length > 0) {
-        toast(parsed.warnings[0]);
-      }
+      applyParsedExamples(parsed, file);
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
           : "Failed to parse training examples file",
+      );
+    } finally {
+      setIsUploadingTrainingFile(false);
+    }
+  };
+
+  const handleColumnMappingReparse = async (labelColumn: string, textColumn: string) => {
+    if (!uploadedFileRef) return;
+    setIsUploadingTrainingFile(true);
+    try {
+      const parsed = await api.parseCustomDetectorTrainingExamples(
+        uploadedFileRef,
+        uploadedFileRef.name,
+        { labelColumn, textColumn },
+      );
+      applyParsedExamples(parsed, uploadedFileRef);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to re-parse file with new column mapping",
       );
     } finally {
       setIsUploadingTrainingFile(false);
@@ -1426,6 +1523,7 @@ export const CustomDetectorEditor = React.forwardRef<
                         key={starter.id}
                         title={starter.name}
                         description={starter.description}
+                        testId={`starter-card-${starter.id}`}
                         onClick={() => beginFromStarter(starter)}
                         icon={
                           isBlank ? (
@@ -1595,6 +1693,7 @@ export const CustomDetectorEditor = React.forwardRef<
                         aria-invalid={
                           hasAttemptedMethodStepAdvance && nameError !== null
                         }
+                        data-testid="input-detector-name"
                       />
                       {hasAttemptedMethodStepAdvance && nameError ? (
                         <p className="text-xs text-destructive">{nameError}</p>
@@ -1615,6 +1714,7 @@ export const CustomDetectorEditor = React.forwardRef<
                               keyAvailabilityError !==
                                 "Checking whether this key is already in use..."))
                         }
+                        data-testid="input-detector-key"
                       />
                       {hasAttemptedMethodStepAdvance && keyFormatError ? (
                         <p className="text-xs text-destructive">
@@ -1652,6 +1752,7 @@ export const CustomDetectorEditor = React.forwardRef<
                           })
                         }
                         className="h-10 w-full rounded-[6px] border-2 border-black bg-background px-3 text-sm"
+                        data-testid="select-detector-method"
                       >
                         <option value="RULESET">Ruleset</option>
                         <option value="CLASSIFIER">Classifier</option>
@@ -1669,6 +1770,7 @@ export const CustomDetectorEditor = React.forwardRef<
                           })
                         }
                         className="h-10 w-full rounded-[6px] border-2 border-black bg-background px-3 text-sm"
+                        data-testid="select-detector-status"
                       >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
@@ -1685,6 +1787,7 @@ export const CustomDetectorEditor = React.forwardRef<
                       }
                       className="min-h-[88px]"
                       placeholder="What this detector should detect"
+                      data-testid="textarea-detector-description"
                     />
                   </div>
 
@@ -1932,6 +2035,7 @@ export const CustomDetectorEditor = React.forwardRef<
                           }}
                           className="min-h-[180px]"
                           placeholder={"Risk Term\nHate Speech\nMedical Claim"}
+                          data-testid="textarea-classifier-labels"
                         />
                       </div>
 
@@ -1949,6 +2053,7 @@ export const CustomDetectorEditor = React.forwardRef<
                             })
                           }
                           placeholder="This text contains {}."
+                          data-testid="input-classifier-hypothesis"
                         />
                       </div>
 
@@ -1966,6 +2071,7 @@ export const CustomDetectorEditor = React.forwardRef<
                             })
                           }
                           placeholder="MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"
+                          data-testid="input-classifier-zero-shot-model"
                         />
                       </div>
 
@@ -1983,6 +2089,7 @@ export const CustomDetectorEditor = React.forwardRef<
                             })
                           }
                           placeholder="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+                          data-testid="input-classifier-setfit-model"
                         />
                       </div>
                     </CardContent>
@@ -2002,8 +2109,9 @@ export const CustomDetectorEditor = React.forwardRef<
                         <input
                           ref={trainingFileInputRef}
                           type="file"
-                          accept=".csv,.tsv,.txt,.md,.log,.json,text/csv,text/plain,application/json"
+                          accept=".csv,.tsv,.txt,.md,.log,.json,.xlsx,text/csv,text/plain,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                           className="hidden"
+                          data-testid="training-file-input"
                           onChange={(event) =>
                             void handleTrainingExamplesFileUpload(event)
                           }
@@ -2014,6 +2122,7 @@ export const CustomDetectorEditor = React.forwardRef<
                           size="sm"
                           className="rounded-[4px] border-2 border-border"
                           disabled={isUploadingTrainingFile}
+                          data-testid="btn-upload-training-file"
                           onClick={() => trainingFileInputRef.current?.click()}
                         >
                           {isUploadingTrainingFile ? (
@@ -2026,10 +2135,76 @@ export const CustomDetectorEditor = React.forwardRef<
                             : "Upload file"}
                         </Button>
                         <p className="text-xs text-muted-foreground">
-                          CSV/TSV/TXT/MD/LOG/JSON. Backend parses and appends
-                          normalized examples.
+                          CSV/TSV/TXT/MD/LOG/JSON/XLSX. Columns are auto-detected; use the mapping panel below if rows are skipped.
                         </p>
                       </div>
+
+                      {columnMappingState && (
+                        <div data-testid="column-mapping-panel" className="rounded-[4px] border border-amber-300 bg-amber-50 p-3 space-y-3 dark:border-amber-700 dark:bg-amber-950/40">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                            <div className="text-sm text-amber-800 dark:text-amber-200">
+                              <span className="font-medium">{columnMappingState.skippedRows} rows skipped.</span>{" "}
+                              Auto-detected <span className="font-mono">{columnMappingState.detectedLabelColumn}</span> as label and{" "}
+                              <span className="font-mono">{columnMappingState.detectedTextColumn}</span> as text.
+                              Pick different columns below to re-import.
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Label column</Label>
+                              <Select
+                                value={columnMappingState.selectedLabelColumn}
+                                onValueChange={(val) => {
+                                  setColumnMappingState((s) => s ? { ...s, selectedLabelColumn: val } : s);
+                                }}
+                              >
+                                <SelectTrigger data-testid="select-label-column" className="h-8 text-xs rounded-[4px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {columnMappingState.availableColumns.map((col) => (
+                                    <SelectItem key={col} value={col} className="text-xs">{col}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Text column</Label>
+                              <Select
+                                value={columnMappingState.selectedTextColumn}
+                                onValueChange={(val) => {
+                                  setColumnMappingState((s) => s ? { ...s, selectedTextColumn: val } : s);
+                                }}
+                              >
+                                <SelectTrigger data-testid="select-text-column" className="h-8 text-xs rounded-[4px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {columnMappingState.availableColumns.map((col) => (
+                                    <SelectItem key={col} value={col} className="text-xs">{col}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            data-testid="btn-reparse-columns"
+                            className="rounded-[4px] border-amber-400 text-amber-800 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-200 dark:hover:bg-amber-900/50"
+                            disabled={isUploadingTrainingFile}
+                            onClick={() => void handleColumnMappingReparse(
+                              columnMappingState.selectedLabelColumn,
+                              columnMappingState.selectedTextColumn,
+                            )}
+                          >
+                            {isUploadingTrainingFile ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : null}
+                            Re-import with this mapping
+                          </Button>
+                        </div>
+                      )}
 
                       <div className="space-y-2">
                         <Label>Examples</Label>
@@ -2061,6 +2236,7 @@ export const CustomDetectorEditor = React.forwardRef<
                         <Input
                           type="number"
                           min={1}
+                          data-testid="input-min-examples-per-label"
                           value={Number(classifier.min_examples_per_label ?? 8)}
                           onChange={(event) =>
                             updateClassifier({
@@ -2072,6 +2248,65 @@ export const CustomDetectorEditor = React.forwardRef<
                             })
                           }
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Each label needs this many examples to use SETFIT (fine-tuned). Lower it to enable SETFIT with fewer examples.
+                        </p>
+                      </div>
+
+                      <div
+                        data-testid="training-strategy-indicator"
+                        data-strategy={classifierTrainingStrategy.strategy}
+                        className="rounded-[4px] border border-border p-3 space-y-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          {classifierTrainingStrategy.strategy === "SETFIT" ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                          )}
+                          <span className="text-sm font-medium">
+                            Active strategy:{" "}
+                            <span
+                              data-testid="training-strategy-value"
+                              className={classifierTrainingStrategy.strategy === "SETFIT"
+                                ? "text-green-700 dark:text-green-400"
+                                : "text-amber-700 dark:text-amber-400"
+                              }
+                            >
+                              {classifierTrainingStrategy.strategy}
+                            </span>
+                          </span>
+                        </div>
+                        {classifierTrainingStrategy.strategy === "ZERO_SHOT" && (
+                          <p className="text-xs text-muted-foreground">
+                            Classifier uses label names only (zero-shot). Upload at least {classifierTrainingStrategy.minExamples} examples per label to enable SETFIT fine-tuning.
+                          </p>
+                        )}
+                        {classifierTrainingStrategy.labels.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            {classifierTrainingStrategy.labels.map((label) => {
+                              const count = classifierTrainingStrategy.countsByLabel.get(label) ?? 0;
+                              const ready = count >= classifierTrainingStrategy.minExamples;
+                              return (
+                                <span
+                                  key={label}
+                                  data-testid={`strategy-label-${label}`}
+                                  data-count={count}
+                                  data-ready={ready ? "true" : "false"}
+                                  className={cn(
+                                    "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-mono border",
+                                    ready
+                                      ? "border-green-300 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-950/40 dark:text-green-300"
+                                      : "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+                                  )}
+                                >
+                                  {label}
+                                  <span className="opacity-70">{count}/{classifierTrainingStrategy.minExamples}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -2111,7 +2346,7 @@ export const CustomDetectorEditor = React.forwardRef<
                       <Label>Model</Label>
                       <Input
                         value={String(
-                          entity.model ?? "urchade/gliner_multi-v2.1",
+                          entity.model ?? "fastino/gliner2-base-v1",
                         )}
                         onChange={(event) =>
                           updateEntity({
@@ -2268,7 +2503,7 @@ export const CustomDetectorEditor = React.forwardRef<
                           gliner_model:
                             typeof extractor.gliner_model === "string"
                               ? extractor.gliner_model
-                              : "urchade/gliner_multi-v2.1",
+                              : "fastino/gliner2-base-v1",
                           content_limit:
                             Number.isFinite(parsedContentLimit) &&
                             parsedContentLimit > 0
@@ -2304,7 +2539,7 @@ export const CustomDetectorEditor = React.forwardRef<
                               gliner_model:
                                 typeof extractor.gliner_model === "string"
                                   ? extractor.gliner_model
-                                  : "urchade/gliner_multi-v2.1",
+                                  : "fastino/gliner2-base-v1",
                               content_limit:
                                 typeof extractor.content_limit === "number"
                                   ? extractor.content_limit
@@ -2327,7 +2562,7 @@ export const CustomDetectorEditor = React.forwardRef<
                         <Input
                           value={String(
                             extractor.gliner_model ??
-                              "urchade/gliner_multi-v2.1",
+                              "fastino/gliner2-base-v1",
                           )}
                           onChange={(event) =>
                             updateExtractor({
@@ -2375,7 +2610,7 @@ export const CustomDetectorEditor = React.forwardRef<
                               gliner_model:
                                 typeof extractor.gliner_model === "string"
                                   ? extractor.gliner_model
-                                  : "urchade/gliner_multi-v2.1",
+                                  : "fastino/gliner2-base-v1",
                               content_limit: parsed,
                             });
                           }}
@@ -2400,7 +2635,7 @@ export const CustomDetectorEditor = React.forwardRef<
                               gliner_model:
                                 typeof extractor.gliner_model === "string"
                                   ? extractor.gliner_model
-                                  : "urchade/gliner_multi-v2.1",
+                                  : "fastino/gliner2-base-v1",
                               content_limit: normalized,
                             });
                           }}
@@ -2450,7 +2685,8 @@ export const CustomDetectorEditor = React.forwardRef<
                     type="button"
                     className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
                     onClick={() => void handleSubmit()}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isLoadingExistingDetectors}
+                    data-testid="btn-save-detector"
                   >
                     {isSubmitting
                       ? `${mode === "create" ? "Creating" : "Saving"}...`

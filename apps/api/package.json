@@ -65,6 +65,7 @@
     "rxjs": "^7.8.2",
     "socket.io": "^4.8.3",
     "uuid": "^13.0.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
