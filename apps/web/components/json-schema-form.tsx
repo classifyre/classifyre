@@ -1557,7 +1557,7 @@ function SchemaField({
                 {...field}
                 value={field.value ?? ""}
                 onChange={(event) => {
-                  field.onChange(event.target.value);
+                  field.onChange(coerceNumberInput(event.target.value));
                 }}
                 autoComplete="off"
                 disabled={disabled}

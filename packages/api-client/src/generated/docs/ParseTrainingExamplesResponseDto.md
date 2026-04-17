@@ -12,6 +12,10 @@ Name | Type
 `skippedRows` | number
 `warnings` | Array&lt;string&gt;
 `examples` | [Array&lt;ParsedTrainingExampleDto&gt;](ParsedTrainingExampleDto.md)
+`availableColumns` | Array&lt;string&gt;
+`detectedLabelColumn` | string
+`detectedTextColumn` | string
+`skippedReasons` | [ParseTrainingExamplesSkippedReasonsDto](ParseTrainingExamplesSkippedReasonsDto.md)
 
 ## Example
 
@@ -26,6 +30,10 @@ const example = {
   "skippedRows": null,
   "warnings": null,
   "examples": null,
+  "availableColumns": null,
+  "detectedLabelColumn": null,
+  "detectedTextColumn": null,
+  "skippedReasons": null,
 } satisfies ParseTrainingExamplesResponseDto
 
 console.log(example)

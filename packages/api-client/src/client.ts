@@ -524,6 +524,10 @@ export type ParseTrainingExamplesResponseDto = {
   skippedRows: number;
   warnings: string[];
   examples: ParsedTrainingExampleDto[];
+  availableColumns?: string[];
+  detectedLabelColumn?: string;
+  detectedTextColumn?: string;
+  skippedReasons?: { missingLabel: number; missingText: number; duplicates: number };
 };
 
 export type CustomDetectorExtractionDto = {
@@ -942,6 +946,7 @@ class ApiClient {
   async parseCustomDetectorTrainingExamples(
     file: File | Blob,
     fileName?: string,
+    opts: { labelColumn?: string; textColumn?: string } = {},
   ): Promise<ParseTrainingExamplesResponseDto> {
     const basePath = this.config.basePath.replace(/\/$/, "");
     const formData = new FormData();
@@ -951,6 +956,8 @@ class ApiClient {
         ? file.name
         : "training-data.txt");
     formData.set("file", file, fallbackName);
+    if (opts.labelColumn) formData.set("labelColumn", opts.labelColumn);
+    if (opts.textColumn) formData.set("textColumn", opts.textColumn);
 
     const response = await fetch(
       `${basePath}/custom-detectors/training-examples/parse`,

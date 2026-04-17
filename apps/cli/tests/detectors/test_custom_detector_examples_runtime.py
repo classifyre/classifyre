@@ -77,16 +77,19 @@ async def test_entity_example_vendor_extractor_emits_entity_findings(
     detector = CustomDetector(config)
 
     class FakeEntityModel:
-        def predict_entities(self, _content: str, _labels: list[str]):
-            return [
-                {
-                    "label": "supplier company",
-                    "text": "Acme Lieferant GmbH",
-                    "start": 18,
-                    "end": 37,
-                    "score": 0.82,
+        def extract_entities(self, _content: str, _labels: list[str] | dict[str, str], **_kwargs):
+            return {
+                "entities": {
+                    "supplier company": [
+                        {
+                            "text": "Acme Lieferant GmbH",
+                            "start": 21,
+                            "end": 40,
+                            "confidence": 0.82,
+                        }
+                    ]
                 }
-            ]
+            }
 
     monkeypatch.setattr(detector, "_load_entity_model", lambda _cfg: FakeEntityModel())
 

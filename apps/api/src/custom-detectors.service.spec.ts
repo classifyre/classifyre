@@ -3,6 +3,8 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   CustomDetectorMethod,
   CustomDetectorTrainingStatus,
@@ -430,5 +432,24 @@ describe('CustomDetectorsService', () => {
       'risk',
       'safe',
     ]);
+  });
+
+  it('parses xlsx uploads for training examples using detected columns', () => {
+    const { service } = createService();
+    const payload = fs.readFileSync(
+      path.resolve(__dirname, '../../e2e/assets/phishing_dataset.xlsx'),
+    );
+
+    const parsed = service.parseTrainingExamplesUpload(
+      payload,
+      'phishing_dataset.xlsx',
+    );
+
+    expect(parsed.format).toBe('xlsx');
+    expect(parsed.importedRows).toBeGreaterThan(0);
+    expect(parsed.examples[0]?.label).toBe('legitimate');
+    expect(parsed.examples[0]?.text).toContain('monthly report');
+    expect(parsed.warnings[0]).toContain('label');
+    expect(parsed.warnings[0]).toContain('email_text');
   });
 });

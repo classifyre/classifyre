@@ -1183,8 +1183,9 @@
             "Examples: PersonName, IBAN, VATId, CompanyName, Address, PhoneNumber, Email, Date."
           ],
           "config_shape": {
-            "entity_labels": "Flat array of plain strings — the entity type names GLiNER will extract. Field name is entity_labels, NOT labels.",
-            "model": "GLiNER model string (optional, default 'urchade/gliner_multi-v2.1').",
+            "entity_labels": "Flat array of plain strings — the entity type names GLiNER2 will extract. Field name is entity_labels, NOT labels.",
+            "entity_descriptions": "Optional object mapping entity label -> description for schema-driven extraction quality.",
+            "model": "GLiNER2 model string (optional, default 'fastino/gliner2-base-v1').",
             "confidence_threshold": "Top-level float (0–1). Default 0.7.",
             "important": "The field is entity_labels (not labels, not entity.labels). It is a plain string array, not objects."
           },

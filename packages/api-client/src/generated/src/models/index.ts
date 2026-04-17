@@ -64,6 +64,7 @@ export * from './NotificationResponseDto';
 export * from './NotificationsControllerDeleteNotification200Response';
 export * from './NotificationsControllerMarkAllRead200Response';
 export * from './ParseTrainingExamplesResponseDto';
+export * from './ParseTrainingExamplesSkippedReasonsDto';
 export * from './ParsedTrainingExampleDto';
 export * from './QueryDashboardMetricsDto';
 export * from './QueryMetricDto';

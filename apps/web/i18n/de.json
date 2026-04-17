@@ -531,13 +531,18 @@
     "failedToDeleteScenario": "Szenario konnte nicht gelöscht werden",
     "failedToRunTests": "Tests konnten nicht ausgeführt werden",
     "scenarioDeleted": "Szenario gelöscht",
+    "selectType": "Erkennungstyp wählen",
+    "selectTypeDesc": "Wählen Sie die Erkennungsmethode, die am besten zu Ihrem Anwendungsfall passt. Die Konfiguration kann später angepasst werden.",
     "methods": {
-      "rulesets": "Regelsets",
+      "rulesets": "Regelwerk",
       "rulesetsDesc": "Regex- und Keyword-Logik für deterministisches Mustererkennung.",
-      "classifiers": "Klassifikatoren",
+      "rulesetsLong": "Definieren Sie Schlüsselwörter und reguläre Ausdrücke zur Texterkennung. Vollständig deterministisch – kein Modell erforderlich. Ideal für Compliance-Muster, PII, Secrets oder vorhersehbare Strukturen.",
+      "classifiers": "Klassifikator",
       "classifiersDesc": "Labelbasierte Textklassifizierung mit Trainingsbeispielen.",
+      "classifiersLong": "Trainieren Sie ein Machine-Learning-Modell zur Kategorisierung von Text in eigene Labels. Unterstützt Zero-Shot-Klassifizierung und Feinabstimmung mit eigenen Beispielen. Geeignet für Intent-Erkennung, Themen-Routing oder Tonanalyse.",
       "entity": "Entität",
-      "entityDesc": "Benutzerdefinierte Entitätsextraktion mit eigenen Labelmengen."
+      "entityDesc": "Benutzerdefinierte Entitätsextraktion mit eigenen Labelmengen.",
+      "entityLong": "Extrahieren Sie benannte Entitäten aus Text mit einem vortrainierten GLiNER-Modell und eigenen Labels. Ideal für Personen, Organisationen, Produkte, Codes oder beliebige Konzepte."
     },
     "editor": {
       "methodSetup": "Methoden-Konfiguration",

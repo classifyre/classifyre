@@ -75,6 +75,7 @@ docs/NotificationsApi.md
 docs/NotificationsControllerDeleteNotification200Response.md
 docs/NotificationsControllerMarkAllRead200Response.md
 docs/ParseTrainingExamplesResponseDto.md
+docs/ParseTrainingExamplesSkippedReasonsDto.md
 docs/ParsedTrainingExampleDto.md
 docs/QueryDashboardMetricsDto.md
 docs/QueryMetricDto.md
@@ -230,6 +231,7 @@ src/models/NotificationResponseDto.ts
 src/models/NotificationsControllerDeleteNotification200Response.ts
 src/models/NotificationsControllerMarkAllRead200Response.ts
 src/models/ParseTrainingExamplesResponseDto.ts
+src/models/ParseTrainingExamplesSkippedReasonsDto.ts
 src/models/ParsedTrainingExampleDto.ts
 src/models/QueryDashboardMetricsDto.ts
 src/models/QueryMetricDto.ts
