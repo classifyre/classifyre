@@ -338,7 +338,10 @@ export class CustomDetectorTestsService {
           `uv run --locked --python ${shellEscape(venvPython)} ` +
           `python -m src.main sandbox ${shellEscape(textFile)} --detectors-file ${shellEscape(detectorsFile)}`;
 
-        const result = await execAsync(command, { timeout: 60_000 });
+        // Allow up to 3 min: first run installs optional dep groups + loads
+        // the model into memory, which can take 90–120 s on a cold start.
+        // Subsequent runs reuse the cached model and finish in ~10–15 s.
+        const result = await execAsync(command, { timeout: 180_000 });
         stdout = result.stdout;
       }
 
@@ -404,14 +407,32 @@ export class CustomDetectorTestsService {
       const findings = Array.isArray(actual.findings) ? actual.findings : [];
       const hit = findings.some((f: unknown) => {
         const finding = f as Record<string, unknown>;
+        const metadata =
+          (finding.metadata as Record<string, unknown> | undefined) ?? {};
+
+        // finding_type uses the label_id with "class:" prefix, e.g.
+        // "class:european_country". Strip prefix and normalise underscores → spaces
+        // so it can be compared to the human-readable label ("european country").
         const rawType =
           (finding.finding_type as string | undefined) ??
           (finding.findingType as string | undefined) ??
           '';
-        // CLI prefixes CLASSIFIER finding types with "class:" (e.g. "class:sports").
-        // Strip it before comparing against the user-provided label.
-        const normalizedType = rawType.toLowerCase().replace(/^class:/, '');
-        const labelMatch = normalizedType === expectedLabel;
+        const normalizedType = rawType
+          .toLowerCase()
+          .replace(/^class:/, '')
+          .replace(/_/g, ' ');
+
+        // metadata.label_name carries the original human-readable label name
+        // (e.g. "European country"). Fall back to top-level label_name for
+        // older CLI output formats that emitted it there directly.
+        const labelName = (
+          (metadata.label_name as string | undefined) ??
+          (finding.label_name as string | undefined) ??
+          ''
+        ).toLowerCase();
+
+        const labelMatch =
+          normalizedType === expectedLabel || labelName === expectedLabel;
         const conf =
           typeof finding.confidence === 'number' ? finding.confidence : 1;
         return labelMatch && conf >= minConf;

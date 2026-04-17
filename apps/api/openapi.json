@@ -1418,7 +1418,7 @@
     },
     "/custom-detectors/training-examples/parse": {
       "post": {
-        "description": "Accepts csv/tsv/txt/md/log/json and returns normalized label/text training examples.",
+        "description": "Accepts csv/tsv/txt/md/log/json/xlsx and returns normalized label/text training examples.",
         "operationId": "CustomDetectorsController_parseTrainingExamples",
         "parameters": [],
         "requestBody": {
@@ -6399,6 +6399,28 @@
           "source"
         ]
       },
+      "ParseTrainingExamplesSkippedReasonsDto": {
+        "type": "object",
+        "properties": {
+          "missingLabel": {
+            "type": "number",
+            "description": "Rows skipped because label cell was empty"
+          },
+          "missingText": {
+            "type": "number",
+            "description": "Rows skipped because text cell was empty"
+          },
+          "duplicates": {
+            "type": "number",
+            "description": "Rows removed as exact duplicates"
+          }
+        },
+        "required": [
+          "missingLabel",
+          "missingText",
+          "duplicates"
+        ]
+      },
       "ParseTrainingExamplesResponseDto": {
         "type": "object",
         "properties": {
@@ -6427,6 +6449,29 @@
             "items": {
               "$ref": "#/components/schemas/ParsedTrainingExampleDto"
             }
+          },
+          "availableColumns": {
+            "description": "All column headers found in the file (xlsx/csv only)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detectedLabelColumn": {
+            "type": "string",
+            "description": "Column header auto-detected as the label column"
+          },
+          "detectedTextColumn": {
+            "type": "string",
+            "description": "Column header auto-detected as the text column"
+          },
+          "skippedReasons": {
+            "description": "Breakdown of why rows were skipped",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ParseTrainingExamplesSkippedReasonsDto"
+              }
+            ]
           }
         },
         "required": [

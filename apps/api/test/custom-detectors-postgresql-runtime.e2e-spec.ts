@@ -232,7 +232,7 @@ describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
           max_findings: 20,
           entity: {
             entity_labels: ['person', 'organization', 'company name'],
-            model: 'urchade/gliner_multi-v2.1',
+            model: 'fastino/gliner2-base-v1',
           },
         },
       })

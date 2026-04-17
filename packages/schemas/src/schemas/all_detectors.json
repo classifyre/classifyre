@@ -1097,7 +1097,7 @@
         },
         "entity_label": {
           "type": "string",
-          "description": "GLiNER entity label (ENTITY and CLASSIFIER methods)"
+          "description": "GLiNER2 schema label used for extraction (ENTITY and CLASSIFIER methods)"
         },
         "regex_pattern": {
           "type": "string",
@@ -1149,7 +1149,7 @@
         },
         "gliner_model": {
           "type": "string",
-          "default": "urchade/gliner_multi-v2.1"
+          "default": "fastino/gliner2-base-v1"
         },
         "content_limit": {
           "type": "integer",
@@ -1273,9 +1273,17 @@
           },
           "default": []
         },
+        "entity_descriptions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Optional GLiNER2 schema descriptions keyed by entity label"
+        },
         "model": {
           "type": "string",
-          "default": "urchade/gliner_multi-v2.1"
+          "default": "fastino/gliner2-base-v1"
         }
       },
       "additionalProperties": false

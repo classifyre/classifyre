@@ -87,7 +87,7 @@ test("extractor fields textarea does not normalize typed text back into template
           extractor: {
             enabled: true,
             fields: [],
-            gliner_model: "urchade/gliner_multi-v2.1",
+            gliner_model: "fastino/gliner2-base-v1",
             content_limit: 4000,
           },
         },
@@ -135,7 +135,7 @@ test("extractor content limit can be cleared and retyped without snapping back m
           extractor: {
             enabled: true,
             fields: [],
-            gliner_model: "urchade/gliner_multi-v2.1",
+            gliner_model: "fastino/gliner2-base-v1",
             content_limit: 4000,
           },
         },

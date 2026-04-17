@@ -295,6 +295,19 @@ function normalizeSampling(config: JsonRecord) {
   }
 }
 
+function normalizeRequiredBlock(config: JsonRecord) {
+  const required = asObject(config.required);
+  if (!required) return;
+
+  // Coerce port to integer — HTML number inputs and JSON can deliver it as a string
+  if (required.port !== undefined) {
+    const port = asPositiveInteger(required.port);
+    if (port !== undefined) {
+      required.port = port;
+    }
+  }
+}
+
 export function normalizeSourceConfig(
   sourceType: string,
   config: unknown,
@@ -307,6 +320,7 @@ export function normalizeSourceConfig(
 
   normalizeLegacyShape(type, normalized);
   normalizeSampling(normalized);
+  normalizeRequiredBlock(normalized);
 
   return normalized;
 }

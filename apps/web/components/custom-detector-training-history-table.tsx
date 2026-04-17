@@ -264,10 +264,11 @@ export function CustomDetectorTrainingHistoryTable({
               </TableRow>
             ) : (
               pagedRows.map((run) => (
-                <TableRow key={run.id}>
+                <TableRow key={run.id} data-testid="training-history-row" data-status={run.status} data-strategy={run.strategy ?? ""}>
                   <TableCell>{formatDate(run.startedAt)}</TableCell>
                   <TableCell>
                     <Badge
+                      data-testid="training-run-status"
                       className={`rounded-[4px] border text-[10px] ${getRunnerStatusBadgeTone(
                         detectorTrainingStatusToRunnerStatus(run.status),
                       )}`}
@@ -275,7 +276,7 @@ export function CustomDetectorTrainingHistoryTable({
                       {run.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>{run.strategy ?? "-"}</TableCell>
+                  <TableCell data-testid="training-run-strategy">{run.strategy ?? "-"}</TableCell>
                   <TableCell>{run.trainedExamples ?? "-"}</TableCell>
                   <TableCell>{renderDuration(run)}</TableCell>
                   <TableCell className="max-w-[360px] truncate text-xs text-muted-foreground">

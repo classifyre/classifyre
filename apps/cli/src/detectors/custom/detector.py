@@ -34,6 +34,8 @@ from .extractor import CustomExtractor, ExtractionResult
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_GLINER2_MODEL = "fastino/gliner2-base-v1"
+
 _GERMAN_MERGE_PARTS = (
     "daten",
     "schutz",
@@ -280,58 +282,103 @@ class CustomDetector(BaseDetector):
             return []
 
         try:
-            entities = model.predict_entities(content, labels)
+            result = model.extract_entities(
+                content,
+                self._build_entity_schema(entity_cfg, labels),
+                threshold=0.0,
+                include_confidence=True,
+                include_spans=True,
+            )
         except Exception as exc:  # pragma: no cover - library/runtime specific
-            logger.error("Custom entity detection failed: %s", exc)
+            logger.error("Custom entity detection with GLiNER2 failed: %s", exc)
             return []
 
         findings: list[DetectionResult] = []
-        for entity in entities:
-            score = float(entity.get("score", 0.0))
-            if score < threshold:
-                continue
+        entities = result.get("entities", {})
+        if not isinstance(entities, dict):
+            return findings
 
-            start = entity.get("start")
-            end = entity.get("end")
-            if not isinstance(start, int) or not isinstance(end, int):
-                continue
+        for label in labels:
+            raw_spans = entities.get(label, [])
+            if not isinstance(raw_spans, list):
+                raw_spans = [raw_spans]
 
-            label = str(entity.get("label", "entity")).strip() or "entity"
-            matched = str(entity.get("text", "")).strip()
-            if not matched:
-                matched = content[start:end]
+            for raw_span in raw_spans:
+                normalized = self._normalize_gliner2_span(raw_span, content)
+                if normalized is None:
+                    continue
 
-            findings.append(
-                self._make_result(
-                    finding_type=f"entity:{label}",
-                    category="CLASSIFICATION",
-                    severity=Severity.medium,
-                    confidence=min(0.99, max(0.0, score)),
-                    matched_content=matched,
-                    location=Location(start=start, end=end, path="custom-entity"),
-                    metadata={
-                        "method": "ENTITY",
-                        "entity_label": label,
-                        "model": entity_cfg.model or "urchade/gliner_multi-v2.1",
-                    },
+                matched, score, start, end = normalized
+                if score < threshold:
+                    continue
+
+                findings.append(
+                    self._make_result(
+                        finding_type=f"entity:{label}",
+                        category="CLASSIFICATION",
+                        severity=Severity.medium,
+                        confidence=min(0.99, max(0.0, score)),
+                        matched_content=matched,
+                        location=Location(start=start, end=end, path="custom-entity"),
+                        metadata={
+                            "method": "ENTITY",
+                            "entity_label": label,
+                            "model": entity_cfg.model or _DEFAULT_GLINER2_MODEL,
+                        },
+                    )
                 )
-            )
 
         return findings
+
+    def _build_entity_schema(
+        self, entity_cfg: CustomEntityConfig, labels: list[str]
+    ) -> list[str] | dict[str, str]:
+        descriptions = entity_cfg.entity_descriptions or {}
+        if not descriptions:
+            return labels
+        return {label: descriptions.get(label, "") for label in labels}
+
+    def _normalize_gliner2_span(
+        self, raw_span: Any, content: str
+    ) -> tuple[str, float, int, int] | None:
+        if isinstance(raw_span, dict):
+            matched = str(raw_span.get("text", "")).strip()
+            score = float(raw_span.get("confidence", raw_span.get("score", 0.0)))
+            start = raw_span.get("start")
+            end = raw_span.get("end")
+        else:
+            matched = str(raw_span).strip()
+            score = 1.0
+            start = None
+            end = None
+
+        if not matched and isinstance(start, int) and isinstance(end, int):
+            matched = content[start:end].strip()
+        if not matched:
+            return None
+
+        if not isinstance(start, int) or not isinstance(end, int):
+            start = content.find(matched)
+            end = start + len(matched) if start >= 0 else -1
+
+        if start < 0 or end < 0:
+            return None
+
+        return matched, score, start, end
 
     def _load_entity_model(self, entity_cfg: CustomEntityConfig) -> Any | None:
         if self._entity_model is not None:
             return self._entity_model
 
         try:
-            gliner_module = require_module("gliner", "custom", ["classification", "detectors"])
-            model_name = entity_cfg.model or "urchade/gliner_multi-v2.1"
-            self._entity_model = gliner_module.GLiNER.from_pretrained(model_name)
+            gliner2_module = require_module("gliner2", "custom", ["classification", "detectors"])
+            model_name = entity_cfg.model or _DEFAULT_GLINER2_MODEL
+            self._entity_model = gliner2_module.GLiNER2.from_pretrained(model_name)
             return self._entity_model
         except MissingDependencyError:
             raise
         except Exception as exc:  # pragma: no cover - environment specific
-            logger.warning("Failed to initialize GLiNER for custom detector: %s", exc)
+            logger.warning("Failed to initialize GLiNER2 for custom detector: %s", exc)
             return None
 
     def _classify_with_zero_shot(

@@ -531,13 +531,18 @@
     "failedToDeleteScenario": "Failed to delete scenario",
     "failedToRunTests": "Failed to run tests",
     "scenarioDeleted": "Scenario deleted",
+    "selectType": "Choose a Detector Type",
+    "selectTypeDesc": "Select the detection method that best fits your use case. You can change the configuration later.",
     "methods": {
-      "rulesets": "Rulesets",
+      "rulesets": "Ruleset",
       "rulesetsDesc": "Regex and keyword logic for deterministic pattern matching.",
-      "classifiers": "Classifiers",
+      "rulesetsLong": "Define keywords and regular expressions to detect specific text patterns. Fully deterministic — no model required. Ideal for compliance patterns, PII, secrets, or any predictable structure.",
+      "classifiers": "Classifier",
       "classifiersDesc": "Label-based text classification with training examples.",
+      "classifiersLong": "Train a machine learning model to categorize text into your own labels. Supports zero-shot classification out of the box and fine-tuning with your own examples. Best for intent detection, topic routing, or tone analysis.",
       "entity": "Entity",
-      "entityDesc": "Named entity extraction with custom label vocabularies."
+      "entityDesc": "Named entity extraction with custom label vocabularies.",
+      "entityLong": "Extract named entities from text using a pre-trained GLiNER model with your custom label set. Great for finding people, organizations, products, codes, or any concept you define."
     },
     "editor": {
       "methodSetup": "Method setup",

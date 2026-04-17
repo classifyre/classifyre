@@ -260,7 +260,7 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Accepts csv/tsv/txt/md/log/json and returns normalized label/text training examples.
+     * Accepts csv/tsv/txt/md/log/json/xlsx and returns normalized label/text training examples.
      * Parse uploaded training examples file
      */
     async customDetectorsControllerParseTrainingExamplesRaw(requestParameters: CustomDetectorsControllerParseTrainingExamplesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ParseTrainingExamplesResponseDto>> {
@@ -310,7 +310,7 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Accepts csv/tsv/txt/md/log/json and returns normalized label/text training examples.
+     * Accepts csv/tsv/txt/md/log/json/xlsx and returns normalized label/text training examples.
      * Parse uploaded training examples file
      */
     async customDetectorsControllerParseTrainingExamples(requestParameters: CustomDetectorsControllerParseTrainingExamplesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ParseTrainingExamplesResponseDto> {

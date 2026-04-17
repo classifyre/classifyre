@@ -84,7 +84,7 @@ export class CustomDetectorsController {
   @ApiOperation({
     summary: 'Parse uploaded training examples file',
     description:
-      'Accepts csv/tsv/txt/md/log/json and returns normalized label/text training examples.',
+      'Accepts csv/tsv/txt/md/log/json/xlsx and returns normalized label/text training examples.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -106,15 +106,21 @@ export class CustomDetectorsController {
   ): Promise<ParseTrainingExamplesResponseDto> {
     let fileBuffer: Buffer | undefined;
     let fileName = 'training-data.txt';
+    let labelColumn: string | undefined;
+    let textColumn: string | undefined;
 
     const parts = req.parts();
     for await (const part of parts) {
-      if (part.type !== 'file') {
-        continue;
+      if (part.type === 'file') {
+        fileBuffer = await part.toBuffer();
+        fileName = part.filename ?? fileName;
+      } else if (part.type === 'field') {
+        if (part.fieldname === 'labelColumn' && typeof part.value === 'string') {
+          labelColumn = part.value || undefined;
+        } else if (part.fieldname === 'textColumn' && typeof part.value === 'string') {
+          textColumn = part.value || undefined;
+        }
       }
-      fileBuffer = await part.toBuffer();
-      fileName = part.filename ?? fileName;
-      break;
     }
 
     if (!fileBuffer || fileBuffer.length === 0) {
@@ -124,6 +130,7 @@ export class CustomDetectorsController {
     return this.customDetectorsService.parseTrainingExamplesUpload(
       fileBuffer,
       fileName,
+      { labelColumn, textColumn },
     );
   }
 

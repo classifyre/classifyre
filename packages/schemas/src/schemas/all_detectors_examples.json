@@ -606,7 +606,7 @@
         },
         "entity": {
           "entity_labels": [],
-          "model": "urchade/gliner_multi-v2.1"
+          "model": "fastino/gliner2-base-v1"
         }
       }
     },
@@ -629,7 +629,7 @@
             "steuernummer",
             "finma_identifier"
           ],
-          "model": "urchade/gliner_multi-v2.1"
+          "model": "fastino/gliner2-base-v1"
         }
       }
     },
@@ -770,7 +770,7 @@
             "iban_ch",
             "counterparty_name"
           ],
-          "model": "urchade/gliner_multi-v2.1"
+          "model": "fastino/gliner2-base-v1"
         }
       }
     },
@@ -1070,7 +1070,7 @@
             "Auftragnehmer",
             "Lieferant"
           ],
-          "model": "urchade/gliner_multi-v2.1"
+          "model": "fastino/gliner2-base-v1"
         }
       }
     },
@@ -1097,7 +1097,7 @@
             "Bußgeld",
             "Aufsichtsbehörde"
           ],
-          "model": "urchade/gliner_multi-v2.1"
+          "model": "fastino/gliner2-base-v1"
         }
       }
     }

@@ -213,6 +213,7 @@ All URIs are relative to *http://localhost*
 - [NotificationsControllerDeleteNotification200Response](docs/NotificationsControllerDeleteNotification200Response.md)
 - [NotificationsControllerMarkAllRead200Response](docs/NotificationsControllerMarkAllRead200Response.md)
 - [ParseTrainingExamplesResponseDto](docs/ParseTrainingExamplesResponseDto.md)
+- [ParseTrainingExamplesSkippedReasonsDto](docs/ParseTrainingExamplesSkippedReasonsDto.md)
 - [ParsedTrainingExampleDto](docs/ParsedTrainingExampleDto.md)
 - [QueryDashboardMetricsDto](docs/QueryDashboardMetricsDto.md)
 - [QueryMetricDto](docs/QueryMetricDto.md)

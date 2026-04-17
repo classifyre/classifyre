@@ -339,7 +339,7 @@ No authorization required
 
 Parse uploaded training examples file
 
-Accepts csv/tsv/txt/md/log/json and returns normalized label/text training examples.
+Accepts csv/tsv/txt/md/log/json/xlsx and returns normalized label/text training examples.
 
 ### Example
 

@@ -170,8 +170,16 @@ class TestGlinerExtraction:
         ex = CustomExtractor(config, CustomDetectorMethod.ENTITY)
 
         class MockGliner:
-            def predict_entities(self, content: str, labels: list[str]) -> list[dict]:
-                return [e for e in mock_entities if e.get("label") in labels]
+            def extract_entities(self, content: str, labels: dict[str, str], **_kwargs) -> dict:
+                entities = {
+                    label: [
+                        {"text": e["text"], "confidence": e["score"]}
+                        for e in mock_entities
+                        if e.get("label") == label
+                    ]
+                    for label in labels
+                }
+                return {"entities": entities}
 
         ex._gliner_model = MockGliner()
         return ex
@@ -241,8 +249,12 @@ class TestGlinerExtraction:
         ex = CustomExtractor(config, CustomDetectorMethod.CLASSIFIER)
 
         class MockGliner:
-            def predict_entities(self, content: str, labels: list[str]) -> list[dict]:
-                return [{"label": "food dish", "text": "pizza", "score": 0.9}]
+            def extract_entities(self, content: str, labels: dict[str, str], **_kwargs) -> dict:
+                return {
+                    "entities": {
+                        label: [{"text": "pizza", "confidence": 0.9}] for label in labels
+                    }
+                }
 
         ex._gliner_model = MockGliner()
         result = ex.extract("text", "I ate pizza")
