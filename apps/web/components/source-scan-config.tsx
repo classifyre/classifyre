@@ -513,6 +513,7 @@ function CustomDetectorCatalogCard({
           pressed={enabled}
           onPressedChange={onToggle}
           className="cursor-pointer"
+          data-testid={`toggle-custom-detector-${detector.key}`}
         >
           {enabled ? t("sources.scanConfig.on") : t("sources.scanConfig.off")}
         </Toggle>

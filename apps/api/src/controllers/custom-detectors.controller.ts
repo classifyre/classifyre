@@ -32,11 +32,6 @@ import { TrainCustomDetectorDto } from '../dto/train-custom-detector.dto';
 import { CustomDetectorTrainingRunDto } from '../dto/custom-detector-training-run.dto';
 import { CustomDetectorExampleDto } from '../dto/custom-detector-example.dto';
 import { ParseTrainingExamplesResponseDto } from '../dto/parse-training-examples-response.dto';
-import {
-  SaveTrainingExamplesDto,
-  TrainingExampleDto,
-  TrainingExamplesStatsDto,
-} from '../dto/training-example.dto';
 import { AllowInDemoMode } from '../demo-mode.decorator';
 
 @ApiTags('Custom Detectors')
@@ -120,15 +115,9 @@ export class CustomDetectorsController {
         fileBuffer = await part.toBuffer();
         fileName = part.filename ?? fileName;
       } else if (part.type === 'field') {
-        if (
-          part.fieldname === 'labelColumn' &&
-          typeof part.value === 'string'
-        ) {
+        if (part.fieldname === 'labelColumn' && typeof part.value === 'string') {
           labelColumn = part.value || undefined;
-        } else if (
-          part.fieldname === 'textColumn' &&
-          typeof part.value === 'string'
-        ) {
+        } else if (part.fieldname === 'textColumn' && typeof part.value === 'string') {
           textColumn = part.value || undefined;
         }
       }
@@ -172,72 +161,6 @@ export class CustomDetectorsController {
   async delete(@Param('id') id: string): Promise<{ deleted: true }> {
     return this.customDetectorsService.delete(id);
   }
-
-  // ── Training examples ──────────────────────────────────────────────────────
-
-  @Get(':id/training-examples')
-  @ApiOperation({ summary: 'List stored training examples for a detector' })
-  @ApiParam({ name: 'id', description: 'Custom detector UUID' })
-  @ApiResponse({ status: 200, type: [TrainingExampleDto] })
-  async listTrainingExamples(
-    @Param('id') id: string,
-  ): Promise<TrainingExampleDto[]> {
-    return this.customDetectorsService.listTrainingExamples(id);
-  }
-
-  @Get(':id/training-examples/stats')
-  @ApiOperation({ summary: 'Get training example counts grouped by label' })
-  @ApiParam({ name: 'id', description: 'Custom detector UUID' })
-  @ApiResponse({ status: 200, type: TrainingExamplesStatsDto })
-  async trainingExamplesStats(
-    @Param('id') id: string,
-  ): Promise<TrainingExamplesStatsDto> {
-    return this.customDetectorsService.getTrainingExamplesStats(id);
-  }
-
-  @Post(':id/training-examples')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Save training examples for a detector',
-    description:
-      'Appends (or replaces) labeled examples. Set clearExisting=true to wipe previous examples first.',
-  })
-  @ApiParam({ name: 'id', description: 'Custom detector UUID' })
-  @ApiBody({ type: SaveTrainingExamplesDto })
-  @ApiResponse({ status: 200, schema: { example: { saved: 42 } } })
-  async saveTrainingExamples(
-    @Param('id') id: string,
-    @Body() dto: SaveTrainingExamplesDto,
-  ): Promise<{ saved: number }> {
-    return this.customDetectorsService.saveTrainingExamples(id, dto);
-  }
-
-  @Delete(':id/training-examples')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete all training examples for a detector' })
-  @ApiParam({ name: 'id', description: 'Custom detector UUID' })
-  @ApiResponse({ status: 200, schema: { example: { deleted: 42 } } })
-  async clearTrainingExamples(
-    @Param('id') id: string,
-  ): Promise<{ deleted: number }> {
-    return this.customDetectorsService.clearTrainingExamples(id);
-  }
-
-  @Delete(':id/training-examples/:exampleId')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete a single training example' })
-  @ApiParam({ name: 'id', description: 'Custom detector UUID' })
-  @ApiParam({ name: 'exampleId', description: 'Training example UUID' })
-  @ApiResponse({ status: 200, schema: { example: { deleted: true } } })
-  async deleteTrainingExample(
-    @Param('id') id: string,
-    @Param('exampleId') exampleId: string,
-  ): Promise<{ deleted: true }> {
-    await this.customDetectorsService.deleteTrainingExample(id, exampleId);
-    return { deleted: true };
-  }
-
-  // ── Training ───────────────────────────────────────────────────────────────
 
   @Post(':id/train')
   @ApiOperation({ summary: 'Trigger custom detector training' })

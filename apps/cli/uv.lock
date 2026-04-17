@@ -530,7 +530,7 @@ content = [
 ]
 custom = [
     { name = "datasets" },
-    { name = "gliner" },
+    { name = "gliner2" },
     { name = "scikit-learn" },
     { name = "sentence-transformers" },
     { name = "setfit" },
@@ -549,7 +549,7 @@ detectors = [
     { name = "detect-secrets" },
     { name = "detoxify" },
     { name = "fast-langdetect" },
-    { name = "gliner" },
+    { name = "gliner2" },
     { name = "nudenet" },
     { name = "onnxruntime" },
     { name = "optimum", extra = ["onnxruntime"] },
@@ -686,7 +686,7 @@ content = [
 ]
 custom = [
     { name = "datasets", specifier = ">=4.4.1" },
-    { name = "gliner", specifier = ">=0.2.22" },
+    { name = "gliner2", specifier = ">=1.3.0" },
     { name = "scikit-learn", specifier = ">=1.7.2" },
     { name = "sentence-transformers", specifier = ">=5.2.3" },
     { name = "setfit", specifier = ">=1.1.3" },
@@ -703,7 +703,7 @@ detectors = [
     { name = "detect-secrets", specifier = ">=1.5.0" },
     { name = "detoxify", specifier = ">=0.5.2" },
     { name = "fast-langdetect", specifier = ">=1.0.0" },
-    { name = "gliner", specifier = ">=0.2.22" },
+    { name = "gliner2", specifier = ">=1.3.0" },
     { name = "nudenet", specifier = ">=3.4.2" },
     { name = "onnxruntime", specifier = ">=1.24.2" },
     { name = "optimum", extras = ["onnxruntime"], specifier = ">=2.1.0" },
@@ -1444,6 +1444,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ae/0c/e57098620506889a94d24814a38ee983f5f6aad9f34d815b3f0e5afde8b1/gliner-0.2.25.tar.gz", hash = "sha256:ac5a8c7e4f17f837969e3594f2bf95dc05ba05a01780a16f79d5d443b3b0b98f", size = 172559, upload-time = "2026-02-11T14:33:35.372Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cd/9b/2381015e2e0398b174bd4d0cf5d00e64d55d969d520700a10c4602a06b88/gliner-0.2.25-py3-none-any.whl", hash = "sha256:57c6406352e52bc8977c7819f6b131418c250d633045a31e436b45fc0b39d656", size = 163875, upload-time = "2026-02-11T14:33:29.451Z" },
+]
+
+[[package]]
+name = "gliner2"
+version = "1.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "gliner" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/77/99/856b52815f9faeb0bc123f6b5d8dd5c92fac1fa003c932692d17b8079223/gliner2-1.3.0.tar.gz", hash = "sha256:4e73b38bf75872052606b19eb85e4f742b7e52e32a73403e4abc72cb2af85a63", size = 120245, upload-time = "2026-04-15T14:35:03.564Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/40/e2a39fe97561383d045e3edb6a4446179b81cec76657bbc55d963b455df2/gliner2-1.3.0-py3-none-any.whl", hash = "sha256:027e2776f0e8596d7455ae615eb2a9a847b35863baf8730e4215e6c67ee05be4", size = 92036, upload-time = "2026-04-15T14:35:00.557Z" },
 ]
 
 [[package]]
