@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Optional,
 } from '@nestjs/common';
 import { spawn, type ChildProcess } from 'child_process';
@@ -22,6 +23,7 @@ import {
   SandboxRunsSortOrder,
 } from './dto/query-sandbox-runs.dto';
 import { KubernetesCliJobService } from '../cli-runner/kubernetes-cli-job.service';
+import { SandboxFileStorageService } from './sandbox-file-storage.service';
 
 const TABULAR_MIME_TYPES = new Set([
   'text/csv',
@@ -371,13 +373,137 @@ export class SandboxService {
 
   constructor(
     private prisma: PrismaService,
+    private sandboxFileStorage: SandboxFileStorageService,
     @Optional()
     private kubernetesCliJobService?: KubernetesCliJobService,
   ) {}
 
-  async createRun(fileBuffer: Buffer, fileName: string, detectors: unknown[]) {
-    // Structural validation — AJV oneOf rejects empty configs that match all types,
-    // so we do a lightweight check here; the CLI validates configs at runtime.
+  async createRun(
+    fileBuffer: Buffer,
+    fileName: string,
+    detectors: unknown[],
+    options?: { skipDuplicateCheck?: boolean },
+  ) {
+    this.validateDetectors(detectors);
+
+    const fileExtension = path.extname(fileName);
+    const fileSizeBytes = fileBuffer.length;
+
+    // Duplicate detection: reject if another non-error run has the same file content.
+    let contentHash: string | undefined;
+    let s3Key: string | undefined;
+
+    if (this.sandboxFileStorage.isEnabled) {
+      contentHash = this.sandboxFileStorage.computeHash(fileBuffer);
+
+      if (!options?.skipDuplicateCheck) {
+        const existing = await this.prisma.sandboxRun.findFirst({
+          where: {
+            contentHash,
+            status: { not: SandboxRunStatus.ERROR },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (existing) {
+          throw new ConflictException({
+            message: 'A run with the same file content already exists.',
+            existingRunId: existing.id,
+          });
+        }
+      }
+
+      const uploaded = await this.sandboxFileStorage.uploadFile(
+        fileBuffer,
+        fileExtension,
+      );
+      s3Key = uploaded.s3Key;
+      contentHash = uploaded.contentHash;
+    }
+
+    // Create DB record with PENDING status
+    const run = await this.prisma.sandboxRun.create({
+      data: {
+        fileName,
+        fileType: '',
+        fileExtension,
+        fileSizeBytes,
+        detectors: detectors as any,
+        status: SandboxRunStatus.PENDING,
+        s3Key: s3Key ?? null,
+        contentHash: contentHash ?? null,
+      },
+    });
+
+    void this.processRun(
+      run.id,
+      fileBuffer,
+      fileName,
+      fileExtension,
+      detectors,
+    );
+
+    return run;
+  }
+
+  /**
+   * Re-run an existing completed (or errored) sandbox run with a different
+   * set of detectors. Requires S3 to be enabled so the original file can be
+   * retrieved. Creates a brand-new SandboxRun record that shares the same
+   * S3 object (content-addressed key).
+   */
+  async rerunRun(originalRunId: string, detectors: unknown[]) {
+    this.validateDetectors(detectors);
+
+    const original = await this.prisma.sandboxRun.findUnique({
+      where: { id: originalRunId },
+    });
+    if (!original) {
+      throw new NotFoundException(`Sandbox run ${originalRunId} not found`);
+    }
+    if (
+      original.status === SandboxRunStatus.PENDING ||
+      original.status === SandboxRunStatus.RUNNING
+    ) {
+      throw new BadRequestException(
+        'Cannot rerun a run that is still in progress',
+      );
+    }
+    if (!original.s3Key || !this.sandboxFileStorage.isEnabled) {
+      throw new BadRequestException(
+        'Rerun requires S3 storage to be configured and the original run to have an uploaded file',
+      );
+    }
+
+    const fileBuffer = await this.sandboxFileStorage.downloadFile(
+      original.s3Key,
+    );
+
+    const run = await this.prisma.sandboxRun.create({
+      data: {
+        fileName: original.fileName,
+        fileType: '',
+        fileExtension: original.fileExtension,
+        fileSizeBytes: original.fileSizeBytes,
+        detectors: detectors as any,
+        status: SandboxRunStatus.PENDING,
+        s3Key: original.s3Key,
+        contentHash: original.contentHash,
+      },
+    });
+
+    void this.processRun(
+      run.id,
+      fileBuffer,
+      original.fileName,
+      original.fileExtension,
+      detectors,
+    );
+
+    return run;
+  }
+
+  private validateDetectors(detectors: unknown[]): void {
     const validTypes = new Set<string>(Object.values(DetectorType));
     for (const detector of detectors) {
       const item = detector as Record<string, unknown>;
@@ -397,31 +523,6 @@ export class SandboxService {
         );
       }
     }
-
-    const fileExtension = path.extname(fileName);
-    const fileSizeBytes = fileBuffer.length;
-
-    // Create DB record with PENDING status
-    const run = await this.prisma.sandboxRun.create({
-      data: {
-        fileName,
-        fileType: '',
-        fileExtension,
-        fileSizeBytes,
-        detectors: detectors as any,
-        status: SandboxRunStatus.PENDING,
-      },
-    });
-
-    void this.processRun(
-      run.id,
-      fileBuffer,
-      fileName,
-      fileExtension,
-      detectors,
-    );
-
-    return run;
   }
 
   private async processRun(
@@ -656,6 +757,14 @@ export class SandboxService {
       .catch(() => undefined);
 
     await this.prisma.sandboxRun.delete({ where: { id } });
+
+    // Delete S3 file only if no other run references the same content hash
+    if (run.s3Key && run.contentHash && this.sandboxFileStorage.isEnabled) {
+      const otherRefCount = await this.prisma.sandboxRun.count({
+        where: { contentHash: run.contentHash },
+      });
+      await this.sandboxFileStorage.deleteFile(run.s3Key, otherRefCount);
+    }
   }
 
   private async executeSandboxJob(

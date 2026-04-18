@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -23,6 +24,7 @@ import { SandboxService } from './sandbox.service';
 import { QuerySandboxRunsDto } from './dto/query-sandbox-runs.dto';
 import { SandboxRunDto } from './dto/sandbox-run.dto';
 import { SandboxRunListResponseDto } from './dto/sandbox-run-list-response.dto';
+import { RerunSandboxRunDto } from './dto/rerun-sandbox-run.dto';
 
 @ApiTags('Sandbox')
 @Controller('sandbox')
@@ -128,6 +130,10 @@ Each object has the shape:
     },
   })
   @ApiResponse({ status: 201, type: SandboxRunDto })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict — a run with the same file content already exists',
+  })
   async createRun(@Req() req: FastifyRequest): Promise<SandboxRunDto> {
     let fileBuffer: Buffer | undefined;
     let fileName = 'upload';
@@ -185,12 +191,41 @@ Each object has the shape:
     return this.sandboxService.getRun(id) as Promise<SandboxRunDto>;
   }
 
+  @Post('runs/:id/rerun')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Re-run a sandbox run with different detectors',
+    description: `Creates a new sandbox run using the same uploaded file as an existing run
+but with a different set of detectors. Requires S3 storage to be configured so
+the original file can be retrieved. The original run is not modified.`,
+  })
+  @ApiBody({ type: RerunSandboxRunDto })
+  @ApiResponse({
+    status: 201,
+    type: SandboxRunDto,
+    description: 'New run created from the original file',
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Conflict — identical file already has a non-error run (only when skipDuplicateCheck is false)',
+  })
+  rerunRun(
+    @Param('id') id: string,
+    @Body() dto: RerunSandboxRunDto,
+  ): Promise<SandboxRunDto> {
+    return this.sandboxService.rerunRun(
+      id,
+      dto.detectors ?? [],
+    ) as Promise<SandboxRunDto>;
+  }
+
   @Delete('runs/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete a sandbox run',
     description:
-      'Deletes a sandbox run record. If the run is currently in progress the CLI process is killed first.',
+      'Deletes a sandbox run record and its associated S3 file (if no other runs share it). If the run is currently in progress the CLI process is killed first.',
   })
   @ApiResponse({ status: 204, description: 'Run deleted' })
   deleteRun(@Param('id') id: string): Promise<void> {

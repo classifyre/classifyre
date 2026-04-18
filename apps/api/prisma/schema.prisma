@@ -560,9 +560,13 @@ model SandboxRun {
   status        SandboxRunStatus @default(PENDING)
   errorMessage  String?          @map("error_message")
   durationMs    Int?             @map("duration_ms")
+  // S3-backed file storage: key in the sandbox bucket and SHA-256 content hash
+  s3Key         String?          @map("s3_key")
+  contentHash   String?          @map("content_hash")
 
   @@index([status])
   @@index([createdAt])
+  @@index([contentHash])
   @@map("sandbox_runs")
 }
 
