@@ -31,12 +31,6 @@ api:
         - ReadWriteOnce
       size: 5Gi
 
-  runnerLogs:
-    enabled: true
-    accessModes:
-      - ReadWriteOnce
-    size: 5Gi
-
 frontend:
   replicaCount: 1
   autoscaling:
@@ -69,3 +63,42 @@ priorityClasses:
 
 networkPolicy:
   enabled: false
+
+# ── Object storage (SeaweedFS, single-replica, small footprint) ───────────────
+objectStorage:
+  bucket: classifyre-logs
+
+  seaweedfs:
+    enabled: true
+    s3Port: 8333
+    # Credentials are auto-generated and stored in the classifyre-s3-credentials Secret.
+    accessKeyId: ""
+    secretAccessKey: ""
+
+seaweedfs:
+  master:
+    replicas: 1
+    data:
+      type: "emptyDir"
+    logs:
+      type: "emptyDir"
+
+  volume:
+    replicas: 1
+    dataDirs:
+      - name: data
+        type: "persistentVolumeClaim"
+        size: "5Gi"
+        storageClass: ""
+    idx:
+      type: "emptyDir"
+
+  filer:
+    replicas: 1
+    data:
+      type: "emptyDir"
+
+  s3:
+    enabled: true
+    port: 8333
+    enableAuth: false
