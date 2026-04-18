@@ -31,12 +31,6 @@ api:
     # blocks `helm upgrade --wait` during deploy even though the app is healthy.
     uvCache:
       enabled: false
-      accessModes:
-        - ReadWriteOnce
-
-  runnerLogs:
-    accessModes:
-      - ReadWriteOnce
 
   migration:
     # Published API image currently keeps Prisma engine files under root-owned Bun modules.
@@ -76,3 +70,16 @@ postgres:
     persistence:
       accessModes:
         - ReadWriteOnce
+
+objectStorage:
+  bucket: classifyre-logs
+  seaweedfs:
+    enabled: true
+
+seaweedfs:
+  volume:
+    dataDirs:
+      - name: data
+        type: "persistentVolumeClaim"
+        size: "10Gi"
+        storageClass: ""

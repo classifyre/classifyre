@@ -121,7 +121,7 @@ function stringifySpreadsheetCell(value: unknown): string {
   if (value instanceof Date) {
     return value.toISOString();
   }
-  return String(value).trim();
+  return JSON.stringify(value).trim();
 }
 
 @Injectable()
@@ -199,11 +199,19 @@ export class CustomDetectorsService {
     const availableColumns = firstRowCells.filter((h) => h.length > 0);
 
     const detectedLabelIndex = opts.labelColumn
-      ? firstRowHeaders.findIndex((h) => h === normalizeHeaderCell(opts.labelColumn!))
-      : firstRowHeaders.findIndex((header) => TRAINING_LABEL_HEADERS.has(header));
+      ? firstRowHeaders.findIndex(
+          (h) => h === normalizeHeaderCell(opts.labelColumn!),
+        )
+      : firstRowHeaders.findIndex((header) =>
+          TRAINING_LABEL_HEADERS.has(header),
+        );
     const detectedTextIndex = opts.textColumn
-      ? firstRowHeaders.findIndex((h) => h === normalizeHeaderCell(opts.textColumn!))
-      : firstRowHeaders.findIndex((header) => TRAINING_TEXT_HEADERS.has(header));
+      ? firstRowHeaders.findIndex(
+          (h) => h === normalizeHeaderCell(opts.textColumn!),
+        )
+      : firstRowHeaders.findIndex((header) =>
+          TRAINING_TEXT_HEADERS.has(header),
+        );
 
     let detectedLabelColumn: string | undefined;
     let detectedTextColumn: string | undefined;
@@ -263,10 +271,15 @@ export class CustomDetectorsService {
       skippedRows,
       warnings,
       examples,
-      availableColumns: availableColumns.length > 0 ? availableColumns : undefined,
+      availableColumns:
+        availableColumns.length > 0 ? availableColumns : undefined,
       detectedLabelColumn,
       detectedTextColumn,
-      skippedReasons: { missingLabel: skippedMissingLabel, missingText: skippedMissingText, duplicates: 0 },
+      skippedReasons: {
+        missingLabel: skippedMissingLabel,
+        missingText: skippedMissingText,
+        duplicates: 0,
+      },
     };
   }
 
@@ -396,7 +409,10 @@ export class CustomDetectorsService {
     };
   }
 
-  private findTrainingHeaderIndex(headers: string[], knownHeaders: Set<string>) {
+  private findTrainingHeaderIndex(
+    headers: string[],
+    knownHeaders: Set<string>,
+  ) {
     return headers.findIndex((header) => {
       if (knownHeaders.has(header)) {
         return true;
@@ -427,7 +443,9 @@ export class CustomDetectorsService {
         continue;
       }
 
-      const rawRows = XLSX.utils.sheet_to_json<(string | number | boolean | Date)[]>(sheet, {
+      const rawRows = XLSX.utils.sheet_to_json<
+        (string | number | boolean | Date)[]
+      >(sheet, {
         header: 1,
         defval: '',
         blankrows: false,
@@ -462,7 +480,10 @@ export class CustomDetectorsService {
           );
         }
       } else {
-        labelIndex = this.findTrainingHeaderIndex(normalizedHeaders, TRAINING_LABEL_HEADERS);
+        labelIndex = this.findTrainingHeaderIndex(
+          normalizedHeaders,
+          TRAINING_LABEL_HEADERS,
+        );
       }
 
       if (opts.textColumn) {
@@ -474,13 +495,22 @@ export class CustomDetectorsService {
           );
         }
       } else {
-        textIndex = this.findTrainingHeaderIndex(normalizedHeaders, TRAINING_TEXT_HEADERS);
+        textIndex = this.findTrainingHeaderIndex(
+          normalizedHeaders,
+          TRAINING_TEXT_HEADERS,
+        );
       }
 
       if (labelIndex < 0 || textIndex < 0) {
         const missing: string[] = [];
-        if (labelIndex < 0) missing.push(`label column (${Array.from(TRAINING_LABEL_HEADERS).join(', ')})`);
-        if (textIndex < 0) missing.push(`text column (${Array.from(TRAINING_TEXT_HEADERS).join(', ')})`);
+        if (labelIndex < 0)
+          missing.push(
+            `label column (${Array.from(TRAINING_LABEL_HEADERS).join(', ')})`,
+          );
+        if (textIndex < 0)
+          missing.push(
+            `text column (${Array.from(TRAINING_TEXT_HEADERS).join(', ')})`,
+          );
         throw new BadRequestException(
           `Excel sheet "${sheetName}" is missing: ${missing.join(' and ')}. Available columns: ${availableColumns.join(', ')}.`,
         );

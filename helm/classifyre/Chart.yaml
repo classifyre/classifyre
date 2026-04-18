@@ -2,8 +2,8 @@ apiVersion: v2
 name: classifyre-core
 description: Production-ready Helm chart for Classifyre — web, api, and Kubernetes CLI jobs
 type: application
-version: 0.2.34
-appVersion: "0.2.34"
+version: 0.2.35
+appVersion: "0.2.35"
 keywords:
   - classifyre
   - nestjs
@@ -12,3 +12,12 @@ keywords:
 home: https://github.com/unstructured/classifyre
 maintainers:
   - name: Classifyre Team
+dependencies:
+  # SeaweedFS is an embedded S3-compatible object store used for runner log storage.
+  # Enabled only when objectStorage.seaweedfs.enabled=true.
+  # To disable and use an external S3 provider (AWS, Azure, GCS, MinIO, etc.),
+  # set objectStorage.seaweedfs.enabled=false and fill in objectStorage.external.*
+  - name: seaweedfs
+    version: "~4.0"
+    repository: https://seaweedfs.github.io/seaweedfs/helm
+    condition: objectStorage.seaweedfs.enabled
