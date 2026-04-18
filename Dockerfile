@@ -205,6 +205,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     # to point the all-in-one at AWS, Azure, MinIO, etc.
     SEAWEEDFS_PORT=8888 \
     S3_BUCKET=classifyre-logs \
+    S3_SANDBOX_BUCKET=classifyre-sandbox \
     S3_ENDPOINT=http://127.0.0.1:8888 \
     S3_REGION=us-east-1 \
     S3_FORCE_PATH_STYLE=true \
@@ -372,9 +373,10 @@ for _ in $(seq 1 90); do
   sleep 1
 done
 
-# Wait for SeaweedFS S3 and create the log bucket
+# Wait for SeaweedFS S3 and create required buckets
 S3_PORT="${SEAWEEDFS_PORT:-8888}"
-S3_BUCKET="${S3_BUCKET:-classifyre-logs}"
+LOG_BUCKET="${S3_BUCKET:-classifyre-logs}"
+SANDBOX_BUCKET="${S3_SANDBOX_BUCKET:-classifyre-sandbox}"
 for _ in $(seq 1 60); do
   if curl -fsS --max-time 2 "http://127.0.0.1:${S3_PORT}/" >/dev/null 2>&1 || \
      curl -fsS --max-time 2 "http://127.0.0.1:${S3_PORT}/" 2>&1 | grep -q "AccessDenied\|NoSuchBucket\|InvalidAccessKeyId"; then
@@ -382,13 +384,9 @@ for _ in $(seq 1 60); do
   fi
   sleep 2
 done
-# Create bucket (409 = already exists, both are fine)
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-  -X PUT \
-  -H "Authorization: AWS4-HMAC-SHA256 Credential=${S3_ACCESS_KEY_ID:-classifyre}" \
-  "http://127.0.0.1:${S3_PORT}/${S3_BUCKET}" 2>/dev/null || true)
-# For anonymous local weed (no auth), a plain PUT also works
-curl -s -o /dev/null -X PUT "http://127.0.0.1:${S3_PORT}/${S3_BUCKET}" >/dev/null 2>&1 || true
+# Create buckets (409 = already exists — both codes are fine)
+curl -s -o /dev/null -X PUT "http://127.0.0.1:${S3_PORT}/${LOG_BUCKET}" >/dev/null 2>&1 || true
+curl -s -o /dev/null -X PUT "http://127.0.0.1:${S3_PORT}/${SANDBOX_BUCKET}" >/dev/null 2>&1 || true
 
 CLI_DIR="${CLI_PATH:-/app/apps/cli}"
 mkdir -p "${UV_CACHE_DIR:-/cache/uv}"

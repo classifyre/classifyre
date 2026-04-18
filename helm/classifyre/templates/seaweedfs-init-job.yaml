@@ -1,11 +1,12 @@
 {{- if .Values.objectStorage.seaweedfs.enabled }}
 {{- /*
   One-shot Job that waits for SeaweedFS S3 to be ready, then:
-  1. Creates the log bucket if it does not exist.
-  2. (Optionally) uploads an iam.json so requests with the generated credentials are accepted.
+  1. Creates the runner-log bucket if it does not exist.
+  2. Creates the sandbox-files bucket if it does not exist.
+  3. (Optionally) uploads an iam.json so requests with the generated credentials are accepted.
 
   SeaweedFS accepts unauthenticated requests when no iam config is present, so for
-  development / minikube the job simply pre-creates the bucket.
+  development / minikube the job simply pre-creates both buckets.
 */}}
 apiVersion: batch/v1
 kind: Job
@@ -37,7 +38,20 @@ spec:
             - -ec
             - |
               S3_HOST="{{ include "classifyre.s3Endpoint" . }}"
-              BUCKET="{{ .Values.objectStorage.bucket }}"
+              LOG_BUCKET="{{ .Values.objectStorage.bucket }}"
+              SANDBOX_BUCKET="{{ .Values.objectStorage.sandboxBucket }}"
+
+              create_bucket() {
+                local name="$1"
+                echo "Creating bucket ${name}..."
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                  -X PUT "${S3_HOST}/${name}" 2>&1)
+                if echo "${HTTP_CODE}" | grep -qE "^(200|409)"; then
+                  echo "Bucket ${name} ready (HTTP ${HTTP_CODE})."
+                else
+                  echo "Unexpected HTTP ${HTTP_CODE} creating bucket ${name} — continuing anyway."
+                fi
+              }
 
               echo "Waiting for SeaweedFS S3 at ${S3_HOST}..."
               for i in $(seq 1 60); do
@@ -49,14 +63,8 @@ spec:
                 sleep 5
               done
 
-              echo "Creating bucket ${BUCKET}..."
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-                -X PUT "${S3_HOST}/${BUCKET}" 2>&1)
-              if echo "${HTTP_CODE}" | grep -qE "^(200|409)"; then
-                echo "Bucket ${BUCKET} ready (HTTP ${HTTP_CODE})."
-              else
-                echo "Unexpected HTTP ${HTTP_CODE} creating bucket — continuing anyway."
-              fi
+              create_bucket "${LOG_BUCKET}"
+              create_bucket "${SANDBOX_BUCKET}"
               echo "SeaweedFS init complete."
           resources:
             requests:

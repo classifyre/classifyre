@@ -197,6 +197,8 @@ spec:
             {{- /* ── S3 / object-storage configuration ─────────────────── */}}
             - name: S3_BUCKET
               value: {{ .Values.objectStorage.bucket | quote }}
+            - name: S3_SANDBOX_BUCKET
+              value: {{ .Values.objectStorage.sandboxBucket | quote }}
             - name: S3_LOG_PREFIX
               value: {{ .Values.objectStorage.logPrefix | quote }}
             - name: S3_REGION
