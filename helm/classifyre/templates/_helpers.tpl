@@ -155,6 +155,53 @@ Name of the instance-ID ConfigMap.
 {{- end -}}
 
 {{/*
+S3 endpoint URL for the API and init jobs.
+  - SeaweedFS: derived from the release name and configured S3 port.
+  - External  : objectStorage.external.endpoint (may be empty for AWS S3).
+*/}}
+{{- define "classifyre.s3Endpoint" -}}
+{{- if .Values.objectStorage.seaweedfs.enabled -}}
+  {{- if .Values.objectStorage.seaweedfs.endpointOverride -}}
+    {{- .Values.objectStorage.seaweedfs.endpointOverride -}}
+  {{- else -}}
+    {{- printf "http://%s-seaweedfs-s3.%s.svc.cluster.local:%d" .Release.Name .Release.Namespace (.Values.objectStorage.seaweedfs.s3Port | int) -}}
+  {{- end -}}
+{{- else -}}
+  {{- .Values.objectStorage.external.endpoint -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Name of the secret that holds S3 access-key-id and secret-access-key.
+*/}}
+{{- define "classifyre.s3SecretName" -}}
+{{- if .Values.objectStorage.seaweedfs.enabled -}}
+  {{- default (printf "%s-s3-credentials" (include "classifyre.fullname" .)) .Values.objectStorage.seaweedfs.existingSecret -}}
+{{- else -}}
+  {{- default (printf "%s-s3-credentials" (include "classifyre.fullname" .)) .Values.objectStorage.external.existingSecret -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Key names inside the S3 credentials secret.
+*/}}
+{{- define "classifyre.s3SecretAccessKeyIdKey" -}}
+{{- if .Values.objectStorage.seaweedfs.enabled -}}
+  {{- .Values.objectStorage.seaweedfs.existingSecretAccessKeyIdKey -}}
+{{- else -}}
+  {{- .Values.objectStorage.external.existingSecretAccessKeyIdKey -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.s3SecretSecretAccessKeyKey" -}}
+{{- if .Values.objectStorage.seaweedfs.enabled -}}
+  {{- .Values.objectStorage.seaweedfs.existingSecretSecretAccessKeyKey -}}
+{{- else -}}
+  {{- .Values.objectStorage.external.existingSecretSecretAccessKeyKey -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Shared OTel environment variables injected into API, web, and CLI job containers.
 Renders nothing when telemetry is disabled.
 */}}

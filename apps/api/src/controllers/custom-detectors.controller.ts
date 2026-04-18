@@ -115,9 +115,15 @@ export class CustomDetectorsController {
         fileBuffer = await part.toBuffer();
         fileName = part.filename ?? fileName;
       } else if (part.type === 'field') {
-        if (part.fieldname === 'labelColumn' && typeof part.value === 'string') {
+        if (
+          part.fieldname === 'labelColumn' &&
+          typeof part.value === 'string'
+        ) {
           labelColumn = part.value || undefined;
-        } else if (part.fieldname === 'textColumn' && typeof part.value === 'string') {
+        } else if (
+          part.fieldname === 'textColumn' &&
+          typeof part.value === 'string'
+        ) {
           textColumn = part.value || undefined;
         }
       }

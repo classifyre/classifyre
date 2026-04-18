@@ -1,8 +1,25 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import * as fs from 'fs/promises';
 import { createReadStream, type Stats } from 'fs';
 import * as path from 'path';
-import { type LogLevel, RunnerLogEntryDto, RunnerLogsResponseDto } from './dto';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  CreateBucketCommand,
+  HeadBucketCommand,
+  NoSuchKey,
+} from '@aws-sdk/client-s3';
+import { Readable } from 'stream';
+import { RunnerLogEntryDto, RunnerLogsResponseDto } from './dto';
 
 type RunnerLogStream = 'stderr' | 'stdout' | 'combined';
 
@@ -12,20 +29,91 @@ interface StoredRunnerLogEntry {
   message: string;
 }
 
+interface S3Config {
+  client: S3Client;
+  bucket: string;
+  prefix: string;
+}
+
 @Injectable()
-export class RunnerLogStorageService {
+export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RunnerLogStorageService.name);
+
+  // Filesystem state
   private readonly rootDir = path.resolve(
     process.env.RUNNER_LOGS_DIR ||
       path.join(process.cwd(), 'var', 'runner-logs'),
   );
+  private readonly tempDir = path.resolve(
+    process.env.TEMP_DIR || '/tmp',
+    'classifyre-runner-logs',
+  );
+
+  // Shared write-serialisation
   private readonly lineBuffers = new Map<string, string>();
   private readonly writeQueues = new Map<string, Promise<void>>();
 
+  // S3 backend (populated when S3_BUCKET is set)
+  private s3: S3Config | null = null;
+
+  // Per-runner S3 sync timers
+  private readonly s3SyncTimers = new Map<string, NodeJS.Timeout>();
+
+  async onModuleInit(): Promise<void> {
+    const bucket = process.env.S3_BUCKET;
+    if (!bucket) {
+      return; // filesystem mode
+    }
+
+    const endpoint = process.env.S3_ENDPOINT;
+    const region = process.env.S3_REGION || 'us-east-1';
+    const forcePathStyle = process.env.S3_FORCE_PATH_STYLE !== 'false';
+
+    const client = new S3Client({
+      region,
+      ...(endpoint ? { endpoint } : {}),
+      forcePathStyle,
+      credentials:
+        process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY
+          ? {
+              accessKeyId: process.env.S3_ACCESS_KEY_ID,
+              secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+            }
+          : undefined,
+    });
+
+    this.s3 = {
+      client,
+      bucket,
+      prefix: process.env.S3_LOG_PREFIX || 'runner-logs/',
+    };
+
+    await this.ensureBucket();
+    await fs.mkdir(this.tempDir, { recursive: true });
+
+    this.logger.log(
+      `S3 log storage: bucket=${bucket} endpoint=${endpoint || 'aws'} prefix=${this.s3.prefix}`,
+    );
+  }
+
+  onModuleDestroy(): void {
+    for (const timer of this.s3SyncTimers.values()) {
+      clearInterval(timer);
+    }
+  }
+
   async initializeRunner(runnerId: string): Promise<void> {
-    await this.ensureRunnerDir(runnerId);
-    await fs.writeFile(this.getRunnerLogPath(runnerId), '', 'utf8');
-    this.clearRunnerBuffers(runnerId);
+    if (this.s3) {
+      await fs.mkdir(this.getTempRunnerDir(runnerId), { recursive: true });
+      await fs.writeFile(this.getTempLogPath(runnerId), '', 'utf8');
+      this.clearRunnerBuffers(runnerId);
+      await this.s3PutObject(runnerId, '');
+      this.startSyncTimer(runnerId);
+    } else {
+      await this.ensureRunnerDir(runnerId);
+      await fs.writeFile(this.getRunnerLogPath(runnerId), '', 'utf8');
+      this.clearRunnerBuffers(runnerId);
+    }
   }
 
   async appendChunk(
@@ -33,12 +121,18 @@ export class RunnerLogStorageService {
     chunk: string,
     stream: RunnerLogStream = 'stderr',
   ): Promise<void> {
-    if (!chunk) {
-      return;
-    }
+    if (!chunk) return;
+
+    const filePath = this.s3
+      ? this.getTempLogPath(runnerId)
+      : this.getRunnerLogPath(runnerId);
 
     await this.enqueueWrite(runnerId, async () => {
-      await this.ensureRunnerDir(runnerId);
+      if (this.s3) {
+        await fs.mkdir(this.getTempRunnerDir(runnerId), { recursive: true });
+      } else {
+        await this.ensureRunnerDir(runnerId);
+      }
 
       const bufferKey = this.getBufferKey(runnerId, stream);
       const previousBuffer = this.lineBuffers.get(bufferKey) || '';
@@ -47,9 +141,7 @@ export class RunnerLogStorageService {
       const remainder = lines.pop() || '';
       this.lineBuffers.set(bufferKey, remainder);
 
-      if (lines.length === 0) {
-        return;
-      }
+      if (lines.length === 0) return;
 
       const encoded = lines
         .map((line) =>
@@ -58,13 +150,17 @@ export class RunnerLogStorageService {
         .join('');
 
       if (encoded) {
-        await fs.appendFile(this.getRunnerLogPath(runnerId), encoded, 'utf8');
+        await fs.appendFile(filePath, encoded, 'utf8');
       }
     });
   }
 
   async finalizeRunner(runnerId: string): Promise<void> {
     await this.waitForPendingWrites(runnerId);
+
+    const filePath = this.s3
+      ? this.getTempLogPath(runnerId)
+      : this.getRunnerLogPath(runnerId);
 
     const pendingEntries: StoredRunnerLogEntry[] = [];
     for (const stream of [
@@ -82,132 +178,229 @@ export class RunnerLogStorageService {
       this.lineBuffers.delete(bufferKey);
     }
 
-    if (pendingEntries.length === 0) {
-      return;
+    if (pendingEntries.length > 0) {
+      await this.enqueueWrite(runnerId, async () => {
+        const payload = pendingEntries
+          .map((entry) => this.encodeEntry(entry))
+          .join('');
+        if (payload) await fs.appendFile(filePath, payload, 'utf8');
+      });
+      await this.waitForPendingWrites(runnerId);
     }
 
-    await this.enqueueWrite(runnerId, async () => {
-      await this.ensureRunnerDir(runnerId);
-      const payload = pendingEntries
-        .map((entry) => this.encodeEntry(entry))
-        .join('');
-      if (payload) {
-        await fs.appendFile(this.getRunnerLogPath(runnerId), payload, 'utf8');
-      }
-    });
+    if (this.s3) {
+      this.stopSyncTimer(runnerId);
+      await this.syncToS3(runnerId);
+      await fs.rm(this.getTempRunnerDir(runnerId), {
+        recursive: true,
+        force: true,
+      });
+    }
   }
 
   async deleteRunnerLogs(runnerId: string): Promise<void> {
     await this.waitForPendingWrites(runnerId);
     this.writeQueues.delete(runnerId);
     this.clearRunnerBuffers(runnerId);
-    await fs.rm(this.getRunnerDir(runnerId), { recursive: true, force: true });
+
+    if (this.s3) {
+      this.stopSyncTimer(runnerId);
+      await fs.rm(this.getTempRunnerDir(runnerId), {
+        recursive: true,
+        force: true,
+      });
+      await this.s3DeleteObject(runnerId).catch((err) => {
+        this.logger.warn(
+          `Could not delete S3 log for ${runnerId}: ${err?.message}`,
+        );
+      });
+    } else {
+      await fs.rm(this.getRunnerDir(runnerId), {
+        recursive: true,
+        force: true,
+      });
+    }
   }
 
   async listLogs(params: {
     runnerId: string;
     cursor?: string;
     take?: number | string;
-    search?: string;
-    levels?: string[];
-    sortOrder?: 'asc' | 'desc';
-    streams?: string[];
   }): Promise<RunnerLogsResponseDto> {
     const take = this.resolveTake(params.take);
-    const sortOrder = params.sortOrder === 'desc' ? 'desc' : 'asc';
-    const searchLower = params.search?.trim().toLowerCase() ?? '';
-    const levelFilter = new Set(
-      (params.levels ?? []).map((l) => l.toUpperCase()),
-    );
-    const streamFilter = new Set(params.streams ?? []);
+    const cursor = this.parseCursor(params.cursor);
 
-    const logPath = this.getRunnerLogPath(params.runnerId);
-    const stats = await this.safeStat(logPath);
-
-    if (!stats) {
-      return this.emptyResponse(params.runnerId, take);
+    if (this.s3) {
+      return this.listLogsFromS3(params.runnerId, cursor, take);
     }
-
-    if (sortOrder === 'desc') {
-      return this.listLogsDesc(
-        params.runnerId,
-        logPath,
-        take,
-        this.parseIndexCursor(params.cursor),
-        searchLower,
-        levelFilter,
-        streamFilter,
-      );
-    }
-
-    return this.listLogsAsc(
+    return this.listLogsFromFile(
+      this.getRunnerLogPath(params.runnerId),
       params.runnerId,
-      logPath,
-      stats,
+      cursor,
       take,
-      this.parseByteCursor(params.cursor),
-      searchLower,
-      levelFilter,
-      streamFilter,
     );
   }
 
-  // ── asc (oldest-first, byte-cursor pagination) ────────────────────────────
+  // ── S3 helpers ────────────────────────────────────────────────────────────
 
-  private async listLogsAsc(
-    runnerId: string,
-    logPath: string,
-    stats: Stats,
-    take: number,
-    cursor: number,
-    searchLower: string,
-    levelFilter: Set<string>,
-    streamFilter: Set<string>,
-  ): Promise<RunnerLogsResponseDto> {
-    if (cursor >= stats.size) {
-      return this.emptyResponse(runnerId, take, String(cursor));
-    }
+  private s3Key(runnerId: string): string {
+    return `${this.s3!.prefix}${runnerId}/events.ndjson`;
+  }
 
-    const fileSize = stats.size;
-    const entries: RunnerLogEntryDto[] = [];
-    let currentOffset = cursor;
-    let remainder = '';
-
-    const readable = createReadStream(logPath, {
-      encoding: 'utf8',
-      start: cursor,
-    });
-
-    outer: for await (const chunk of readable) {
-      remainder += chunk;
-
-      while (true) {
-        const newlineIndex = remainder.indexOf('\n');
-        if (newlineIndex === -1) break;
-
-        const rawLine = remainder.slice(0, newlineIndex);
-        remainder = remainder.slice(newlineIndex + 1);
-
-        const lineOffset = currentOffset;
-        currentOffset += Buffer.byteLength(rawLine, 'utf8') + 1;
-
-        if (!rawLine) continue;
-
-        const entry = this.decodeEntry(rawLine, lineOffset);
-        if (this.matchesFilter(entry, searchLower, levelFilter, streamFilter)) {
-          entries.push(entry);
-          if (entries.length >= take) break outer;
+  private async ensureBucket(): Promise<void> {
+    const { client, bucket } = this.s3!;
+    try {
+      await client.send(new HeadBucketCommand({ Bucket: bucket }));
+    } catch {
+      try {
+        await client.send(new CreateBucketCommand({ Bucket: bucket }));
+        this.logger.log(`Created S3 bucket: ${bucket}`);
+      } catch (err: any) {
+        // Ignore BucketAlreadyOwnedByYou (concurrent creation races)
+        if (err?.Code !== 'BucketAlreadyOwnedByYou') {
+          this.logger.error(
+            `Failed to create S3 bucket ${bucket}: ${err?.message}`,
+          );
         }
       }
     }
+  }
 
-    if (entries.length < take && remainder) {
-      const lineOffset = currentOffset;
-      currentOffset = stats.size;
-      const entry = this.decodeEntry(remainder, lineOffset);
-      if (this.matchesFilter(entry, searchLower, levelFilter, streamFilter)) {
-        entries.push(entry);
+  private async s3PutObject(
+    runnerId: string,
+    content: string | Buffer,
+  ): Promise<void> {
+    const { client, bucket } = this.s3!;
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: this.s3Key(runnerId),
+        Body:
+          typeof content === 'string' ? Buffer.from(content, 'utf8') : content,
+        ContentType: 'application/x-ndjson',
+      }),
+    );
+  }
+
+  private async s3DeleteObject(runnerId: string): Promise<void> {
+    const { client, bucket } = this.s3!;
+    await client.send(
+      new DeleteObjectCommand({ Bucket: bucket, Key: this.s3Key(runnerId) }),
+    );
+  }
+
+  private async syncToS3(runnerId: string): Promise<void> {
+    const tempPath = this.getTempLogPath(runnerId);
+    const stat = await this.safeStat(tempPath);
+    if (!stat) return;
+    const content = await fs.readFile(tempPath);
+    await this.s3PutObject(runnerId, content);
+  }
+
+  private startSyncTimer(runnerId: string): void {
+    // Sync every 5 seconds so other API replicas can read fresh logs
+    const timer = setInterval(() => {
+      void this.waitForPendingWrites(runnerId)
+        .then(() => this.syncToS3(runnerId))
+        .catch((err) => {
+          this.logger.warn(`S3 sync failed for ${runnerId}: ${err?.message}`);
+        });
+    }, 5_000);
+    this.s3SyncTimers.set(runnerId, timer);
+  }
+
+  private stopSyncTimer(runnerId: string): void {
+    const timer = this.s3SyncTimers.get(runnerId);
+    if (timer) {
+      clearInterval(timer);
+      this.s3SyncTimers.delete(runnerId);
+    }
+  }
+
+  private async listLogsFromS3(
+    runnerId: string,
+    cursor: number,
+    take: number,
+  ): Promise<RunnerLogsResponseDto> {
+    // Fast path: temp file exists on this replica (active runner)
+    const tempPath = this.getTempLogPath(runnerId);
+    const tempStat = await this.safeStat(tempPath);
+    if (tempStat) {
+      return this.listLogsFromFile(tempPath, runnerId, cursor, take);
+    }
+
+    // Slow path: read from S3 using Range request
+    const { client, bucket } = this.s3!;
+    const key = this.s3Key(runnerId);
+
+    let fileSize: number;
+    try {
+      const head = await client.send(
+        new HeadObjectCommand({ Bucket: bucket, Key: key }),
+      );
+      fileSize = head.ContentLength ?? 0;
+    } catch (err: any) {
+      if (
+        err instanceof NoSuchKey ||
+        err?.name === 'NoSuchKey' ||
+        err?.$metadata?.httpStatusCode === 404
+      ) {
+        return {
+          runnerId,
+          entries: [],
+          nextCursor: null,
+          cursor: String(cursor),
+          hasMore: false,
+          take,
+        };
       }
+      throw err;
+    }
+
+    if (cursor >= fileSize) {
+      return {
+        runnerId,
+        entries: [],
+        nextCursor: null,
+        cursor: String(cursor),
+        hasMore: false,
+        take,
+      };
+    }
+
+    // Download up to 2 MiB starting from cursor
+    const rangeEnd = Math.min(cursor + 2 * 1024 * 1024 - 1, fileSize - 1);
+    const obj = await client.send(
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Range: `bytes=${cursor}-${rangeEnd}`,
+      }),
+    );
+
+    const content = await streamToString(obj.Body as Readable);
+    const entries: RunnerLogEntryDto[] = [];
+    let currentOffset = cursor;
+    let remainder = content;
+
+    while (entries.length < take) {
+      const newlineIndex = remainder.indexOf('\n');
+      if (newlineIndex === -1) break;
+
+      const rawLine = remainder.slice(0, newlineIndex);
+      remainder = remainder.slice(newlineIndex + 1);
+      const lineOffset = currentOffset;
+      currentOffset += Buffer.byteLength(rawLine, 'utf8') + 1;
+      if (rawLine) entries.push(this.decodeEntry(rawLine, lineOffset));
+    }
+
+    if (
+      entries.length < take &&
+      remainder &&
+      currentOffset >= rangeEnd + 1 &&
+      currentOffset < fileSize
+    ) {
+      // The chunk boundary landed mid-line; the caller will resume on next poll
     }
 
     const hasMore = currentOffset < fileSize;
@@ -221,156 +414,67 @@ export class RunnerLogStorageService {
     };
   }
 
-  // ── desc (newest-first, index-cursor pagination) ──────────────────────────
+  // ── Filesystem helpers ────────────────────────────────────────────────────
 
-  private async listLogsDesc(
-    runnerId: string,
+  private async listLogsFromFile(
     logPath: string,
+    runnerId: string,
+    cursor: number,
     take: number,
-    skip: number,
-    searchLower: string,
-    levelFilter: Set<string>,
-    streamFilter: Set<string>,
   ): Promise<RunnerLogsResponseDto> {
-    const allEntries = await this.readAllEntries(logPath);
-    const filtered = allEntries.filter((e) =>
-      this.matchesFilter(e, searchLower, levelFilter, streamFilter),
-    );
-    filtered.reverse();
+    const stats = await this.safeStat(logPath);
 
-    const page = filtered.slice(skip, skip + take);
-    const nextSkip = skip + take;
-    const hasMore = nextSkip < filtered.length;
+    if (!stats || cursor >= stats.size) {
+      return {
+        runnerId,
+        entries: [],
+        nextCursor: null,
+        cursor: String(cursor),
+        hasMore: false,
+        take,
+      };
+    }
 
+    const fileSize = stats.size;
+    const entries: RunnerLogEntryDto[] = [];
+    let currentOffset = cursor;
+    let remainder = '';
+
+    const stream = createReadStream(logPath, {
+      encoding: 'utf8',
+      start: cursor,
+    });
+
+    for await (const chunk of stream) {
+      remainder += chunk;
+      while (entries.length < take) {
+        const newlineIndex = remainder.indexOf('\n');
+        if (newlineIndex === -1) break;
+        const rawLine = remainder.slice(0, newlineIndex);
+        remainder = remainder.slice(newlineIndex + 1);
+        const lineOffset = currentOffset;
+        currentOffset += Buffer.byteLength(rawLine, 'utf8') + 1;
+        if (rawLine) entries.push(this.decodeEntry(rawLine, lineOffset));
+      }
+      if (entries.length >= take) break;
+    }
+
+    if (entries.length < take && remainder) {
+      const lineOffset = currentOffset;
+      currentOffset = fileSize;
+      entries.push(this.decodeEntry(remainder, lineOffset));
+    }
+
+    const hasMore = currentOffset < fileSize;
     return {
       runnerId,
-      entries: page,
-      nextCursor: hasMore ? `i:${nextSkip}` : null,
-      cursor: `i:${nextSkip}`,
+      entries,
+      nextCursor: hasMore ? String(currentOffset) : null,
+      cursor: String(currentOffset),
       hasMore,
       take,
     };
   }
-
-  private async readAllEntries(logPath: string): Promise<RunnerLogEntryDto[]> {
-    const entries: RunnerLogEntryDto[] = [];
-    let remainder = '';
-    let currentOffset = 0;
-
-    const readable = createReadStream(logPath, { encoding: 'utf8' });
-
-    for await (const chunk of readable) {
-      remainder += chunk;
-
-      while (true) {
-        const newlineIndex = remainder.indexOf('\n');
-        if (newlineIndex === -1) break;
-
-        const rawLine = remainder.slice(0, newlineIndex);
-        remainder = remainder.slice(newlineIndex + 1);
-
-        const lineOffset = currentOffset;
-        currentOffset += Buffer.byteLength(rawLine, 'utf8') + 1;
-
-        if (!rawLine) continue;
-        entries.push(this.decodeEntry(rawLine, lineOffset));
-      }
-    }
-
-    if (remainder) {
-      entries.push(this.decodeEntry(remainder, currentOffset));
-    }
-
-    return entries;
-  }
-
-  // ── filtering ─────────────────────────────────────────────────────────────
-
-  private matchesFilter(
-    entry: RunnerLogEntryDto,
-    searchLower: string,
-    levelFilter: Set<string>,
-    streamFilter: Set<string>,
-  ): boolean {
-    if (searchLower && !entry.message.toLowerCase().includes(searchLower)) {
-      return false;
-    }
-    if (levelFilter.size > 0 && !levelFilter.has(entry.level)) {
-      return false;
-    }
-    if (streamFilter.size > 0 && !streamFilter.has(entry.stream)) {
-      return false;
-    }
-    return true;
-  }
-
-  // ── level inference ───────────────────────────────────────────────────────
-
-  private inferLevel(stream: RunnerLogStream, message: string): LogLevel {
-    const structured = this.tryParseJson(message);
-    if (structured) {
-      const raw = structured['level'] ?? structured['severity'];
-      if (typeof raw === 'string') {
-        const normalized = this.normalizeLevel(raw);
-        if (normalized !== 'UNKNOWN') return normalized;
-      }
-    }
-
-    const match = message.match(
-      /\b(trace|debug|info|warn(?:ing)?|error|fatal|critical)\b/i,
-    );
-    if (match?.[1]) return this.normalizeLevel(match[1]);
-
-    if (stream === 'stderr') return 'ERROR';
-
-    return 'UNKNOWN';
-  }
-
-  private normalizeLevel(raw: string): LogLevel {
-    switch (raw.toUpperCase()) {
-      case 'TRACE':
-        return 'TRACE';
-      case 'DEBUG':
-        return 'DEBUG';
-      case 'INFO':
-        return 'INFO';
-      case 'WARN':
-      case 'WARNING':
-        return 'WARN';
-      case 'ERROR':
-        return 'ERROR';
-      case 'FATAL':
-      case 'CRITICAL':
-        return 'FATAL';
-      default:
-        return 'UNKNOWN';
-    }
-  }
-
-  private tryParseJson(message: string): Record<string, unknown> | null {
-    const trimmed = message.trim();
-    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return null;
-    try {
-      const parsed = JSON.parse(trimmed) as unknown;
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  private inferDisplayMessage(
-    structured: Record<string, unknown> | null,
-    rawMessage: string,
-  ): string {
-    const msg = structured?.['message'] ?? structured?.['msg'];
-    if (typeof msg === 'string' && msg.trim().length > 0) return msg.trim();
-    return rawMessage.trim();
-  }
-
-  // ── encoding / decoding ───────────────────────────────────────────────────
 
   private createEntry(
     message: string,
@@ -389,47 +493,36 @@ export class RunnerLogStorageService {
       const stream = this.normalizeStream(parsed.stream);
       const timestamp =
         typeof parsed.timestamp === 'string' ? parsed.timestamp : null;
-      const rawMessage =
+      const message =
         typeof parsed.message === 'string'
           ? parsed.message
           : JSON.stringify(parsed);
-      const structured = this.tryParseJson(rawMessage);
-      const message = this.inferDisplayMessage(structured, rawMessage);
-      const level = this.inferLevel(stream, rawMessage);
-      return { cursor: String(offset), timestamp, stream, message, level };
+      return { cursor: String(offset), timestamp, stream, message };
     } catch {
       return {
         cursor: String(offset),
         timestamp: null,
         stream: 'combined',
         message: rawLine,
-        level: 'UNKNOWN',
       };
     }
   }
 
   private normalizeStream(value: unknown): RunnerLogStream {
-    if (value === 'stderr' || value === 'stdout' || value === 'combined') {
+    if (value === 'stderr' || value === 'stdout' || value === 'combined')
       return value;
-    }
     return 'combined';
   }
 
-  // ── cursor helpers ────────────────────────────────────────────────────────
-
-  private parseByteCursor(cursor?: string): number {
-    if (!cursor || cursor.startsWith('i:')) return 0;
-    const parsed = Number.parseInt(cursor, 10);
-    return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
-  }
-
-  private parseIndexCursor(cursor?: string): number {
+  private parseCursor(cursor?: string): number {
     if (!cursor) return 0;
-    if (cursor.startsWith('i:')) {
-      const n = Number.parseInt(cursor.slice(2), 10);
-      return Number.isFinite(n) && n >= 0 ? n : 0;
+    const parsed = Number.parseInt(cursor, 10);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      throw new BadRequestException(
+        'Invalid cursor. Cursor must be a non-negative integer string.',
+      );
     }
-    return 0;
+    return parsed;
   }
 
   private resolveTake(take?: number | string): number {
@@ -438,23 +531,6 @@ export class RunnerLogStorageService {
     const resolved = Number.isFinite(numeric) ? numeric : 200;
     return Math.max(1, Math.min(1000, Math.trunc(resolved)));
   }
-
-  private emptyResponse(
-    runnerId: string,
-    take: number,
-    cursor = '0',
-  ): RunnerLogsResponseDto {
-    return {
-      runnerId,
-      entries: [],
-      nextCursor: null,
-      cursor,
-      hasMore: false,
-      take,
-    };
-  }
-
-  // ── filesystem helpers ────────────────────────────────────────────────────
 
   private async ensureRunnerDir(runnerId: string): Promise<void> {
     await fs.mkdir(this.getRunnerDir(runnerId), { recursive: true });
@@ -483,16 +559,13 @@ export class RunnerLogStorageService {
           `Failed writing runner logs for ${runnerId}: ${error?.message || error}`,
         );
       });
-
     this.writeQueues.set(runnerId, next);
     return next;
   }
 
   private clearRunnerBuffers(runnerId: string) {
     for (const key of this.lineBuffers.keys()) {
-      if (key.startsWith(`${runnerId}:`)) {
-        this.lineBuffers.delete(key);
-      }
+      if (key.startsWith(`${runnerId}:`)) this.lineBuffers.delete(key);
     }
   }
 
@@ -507,4 +580,20 @@ export class RunnerLogStorageService {
   private getRunnerLogPath(runnerId: string): string {
     return path.join(this.getRunnerDir(runnerId), 'events.ndjson');
   }
+
+  private getTempRunnerDir(runnerId: string): string {
+    return path.join(this.tempDir, runnerId);
+  }
+
+  private getTempLogPath(runnerId: string): string {
+    return path.join(this.getTempRunnerDir(runnerId), 'events.ndjson');
+  }
+}
+
+async function streamToString(readable: Readable): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of readable) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
+  }
+  return Buffer.concat(chunks).toString('utf8');
 }

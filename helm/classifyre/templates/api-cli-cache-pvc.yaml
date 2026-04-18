@@ -15,21 +15,3 @@ spec:
   storageClassName: {{ . | quote }}
   {{- end }}
 {{- end }}
-{{- if and .Values.api.runnerLogs.enabled (not .Values.api.runnerLogs.existingClaim) }}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ printf "%s-runner-logs" (include "classifyre.fullname" .) }}
-  labels:
-    {{- include "classifyre.commonLabels" . | nindent 4 }}
-spec:
-  accessModes:
-    {{- toYaml .Values.api.runnerLogs.accessModes | nindent 4 }}
-  resources:
-    requests:
-      storage: {{ .Values.api.runnerLogs.size }}
-  {{- with .Values.api.runnerLogs.storageClassName }}
-  storageClassName: {{ . | quote }}
-  {{- end }}
-{{- end }}

@@ -240,3 +240,91 @@
 | serviceAccount.automount | bool | `true` | Mount service account token into API pods (required for Kubernetes CLI jobs). |
 | serviceAccount.create | bool | `true` | Create the API service account. |
 | serviceAccount.name | string | `""` | Existing service account name to use when `create=false`. |
+
+## Object Storage (S3-compatible)
+
+Classifyre stores runner execution logs in S3-compatible object storage. This removes the need for a `ReadWriteMany` PVC and allows API replicas to scale horizontally on any standard `ReadWriteOnce` StorageClass.
+
+### Default: embedded SeaweedFS
+
+By default, the chart deploys [SeaweedFS](https://github.com/seaweedfs/seaweedfs) as an in-cluster S3 provider. No external configuration is required.
+
+```yaml
+objectStorage:
+  seaweedfs:
+    enabled: true   # default
+```
+
+SeaweedFS credentials are auto-generated and stored in a Kubernetes Secret (`<release>-s3-credentials`).
+
+### Switching to AWS S3
+
+```yaml
+objectStorage:
+  bucket: my-classifyre-logs
+  region: us-east-1
+  forcePathStyle: false    # AWS S3 uses virtual-hosted style
+
+  seaweedfs:
+    enabled: false         # disable embedded SeaweedFS
+
+  external:
+    endpoint: ""           # leave empty — AWS SDK resolves from region
+    accessKeyId: AKIA...
+    secretAccessKey: "..."
+
+# Or use an existing Kubernetes Secret:
+# objectStorage:
+#   external:
+#     existingSecret: my-s3-secret   # keys: access-key-id, secret-access-key
+```
+
+### Switching to MinIO (self-hosted)
+
+```yaml
+objectStorage:
+  bucket: classifyre-logs
+  seaweedfs:
+    enabled: false
+  external:
+    endpoint: http://minio.minio-ns.svc.cluster.local:9000
+    accessKeyId: minioadmin
+    secretAccessKey: minioadmin
+```
+
+### Switching to Azure Blob Storage (S3 compatibility layer)
+
+```yaml
+objectStorage:
+  bucket: classifyre-logs
+  forcePathStyle: false
+  seaweedfs:
+    enabled: false
+  external:
+    endpoint: https://<account>.blob.core.windows.net
+    accessKeyId: <storage-account-name>
+    secretAccessKey: <storage-account-key>
+```
+
+### Production SeaweedFS tuning
+
+For durable production data, replace emptyDir volumes with PVCs in the SeaweedFS subchart:
+
+```yaml
+seaweedfs:
+  master:
+    data:
+      type: "persistentVolumeClaim"
+      size: "5Gi"
+  filer:
+    data:
+      type: "persistentVolumeClaim"
+      size: "10Gi"
+  volume:
+    dataDirs:
+      - name: data
+        type: "persistentVolumeClaim"
+        size: "100Gi"
+```
+
+Refer to the [SeaweedFS Helm chart](https://github.com/seaweedfs/seaweedfs/tree/master/k8s/charts/seaweedfs) for the full list of configuration options.

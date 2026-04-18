@@ -70,7 +70,7 @@ api:
     ENVIRONMENT: kubernetes
     # -- Temporary directory used by API.
     TEMP_DIR: /tmp
-    # -- Filesystem directory for runner execution logs.
+    # -- Filesystem directory for runner execution logs (filesystem backend only; unused when S3 is configured).
     RUNNER_LOGS_DIR: /var/lib/classifyre/runner-logs
     # -- Enable read-only demo mode. When "true" all mutating API operations return 403.
     DEMO_MODE: "false"
@@ -296,7 +296,7 @@ api:
     extraEnv: []
 
     uvCache:
-      # -- Enable shared PVC for uv cache.
+      # -- Enable shared PVC for uv cache (pip package cache shared across CLI jobs).
       enabled: true
       # -- Mount path for uv cache in CLI job container.
       mountPath: /cache/uv
@@ -304,26 +304,12 @@ api:
       existingClaim: ""
       # -- Storage class for uv cache PVC.
       storageClassName: ""
-      # -- Access modes for uv cache PVC.
+      # -- Access modes for uv cache PVC. ReadWriteOnce works on any standard StorageClass.
+      # -- Use ReadWriteMany only if your cluster has a shared filesystem StorageClass (e.g. EFS, NFS).
       accessModes:
-        - ReadWriteMany
+        - ReadWriteOnce
       # -- Requested size for uv cache PVC.
       size: 20Gi
-
-  runnerLogs:
-    # -- Enable PVC-backed storage for runner logs.
-    enabled: true
-    # -- Mount path for runner logs directory.
-    mountPath: /var/lib/classifyre/runner-logs
-    # -- Existing PVC name for runner logs. Empty creates a new PVC.
-    existingClaim: ""
-    # -- Storage class for runner logs PVC.
-    storageClassName: ""
-    # -- Access modes for runner logs PVC.
-    accessModes:
-      - ReadWriteMany
-    # -- Requested size for runner logs PVC.
-    size: 20Gi
 
 frontend:
   # -- Number of web replicas when autoscaling is disabled.
@@ -666,3 +652,131 @@ telemetry:
     existingConfigMap: ""
     # -- Key inside the ConfigMap that holds the UUID string.
     configMapKey: instance-id
+
+# ── Object Storage (S3-compatible) ───────────────────────────────────────────
+# Classifyre uses S3-compatible object storage for runner log persistence.
+# This removes the need for a ReadWriteMany PVC and enables horizontal scaling
+# of API replicas without shared filesystem requirements.
+#
+# Supported backends:
+#   • SeaweedFS (default) — embedded subchart, zero-dependency, runs in-cluster
+#   • External S3         — AWS S3, Azure Blob (with S3 compat), GCS, MinIO, etc.
+#
+# To switch to AWS S3:
+#   objectStorage:
+#     seaweedfs:
+#       enabled: false
+#     external:
+#       endpoint: ""          # leave empty for AWS S3
+#       region: us-east-1
+#       bucket: my-classifyre-logs
+#       accessKeyId: AKIA...
+#       secretAccessKey: ...  # or use existingSecret
+#
+# To switch to MinIO (self-hosted):
+#   objectStorage:
+#     seaweedfs:
+#       enabled: false
+#     external:
+#       endpoint: http://minio.minio-ns.svc.cluster.local:9000
+#       bucket: classifyre-logs
+#       accessKeyId: minioadmin
+#       secretAccessKey: minioadmin
+#
+# To switch to Azure Blob Storage (via S3 compat layer):
+#   objectStorage:
+#     seaweedfs:
+#       enabled: false
+#     external:
+#       endpoint: https://<account>.blob.core.windows.net
+#       bucket: classifyre-logs
+#       accessKeyId: <account>
+#       secretAccessKey: <key>
+#       forcePathStyle: false
+objectStorage:
+  # -- S3 bucket used for runner logs.
+  bucket: classifyre-logs
+  # -- S3 object key prefix for runner logs.
+  logPrefix: "runner-logs/"
+  # -- AWS region (ignored by SeaweedFS; required for AWS S3).
+  region: us-east-1
+  # -- Force path-style S3 URLs. Required for SeaweedFS, MinIO, and most non-AWS providers.
+  forcePathStyle: true
+
+  seaweedfs:
+    # -- Deploy SeaweedFS as the S3 backend. Set to false to use an external S3 provider.
+    enabled: true
+    # -- SeaweedFS S3 service port (inside the cluster).
+    s3Port: 8333
+    # -- Override the S3 endpoint injected into the API. Auto-computed when empty.
+    endpointOverride: ""
+    # -- Access key ID for the SeaweedFS S3 API.
+    # -- A random key is auto-generated and persisted in a Secret when empty.
+    accessKeyId: ""
+    # -- Secret access key for the SeaweedFS S3 API.
+    secretAccessKey: ""
+    # -- Existing secret containing SeaweedFS credentials.
+    # -- Must have keys matching seaweedfs.existingSecretAccessKeyIdKey and seaweedfs.existingSecretSecretAccessKeyKey.
+    existingSecret: ""
+    existingSecretAccessKeyIdKey: access-key-id
+    existingSecretSecretAccessKeyKey: secret-access-key
+
+  external:
+    # -- External S3 endpoint URL. Leave empty for AWS S3 (SDK auto-resolves region-based endpoint).
+    endpoint: ""
+    # -- Access key ID for the external S3 provider.
+    accessKeyId: ""
+    # -- Secret access key for the external S3 provider.
+    secretAccessKey: ""
+    # -- Existing secret with external S3 credentials. When set, accessKeyId/secretAccessKey are ignored.
+    existingSecret: ""
+    existingSecretAccessKeyIdKey: access-key-id
+    existingSecretSecretAccessKeyKey: secret-access-key
+
+# ── SeaweedFS subchart values ─────────────────────────────────────────────────
+# These are passed directly to the seaweedfs subchart when objectStorage.seaweedfs.enabled=true.
+# Refer to https://github.com/seaweedfs/seaweedfs/tree/master/k8s/charts/seaweedfs for all options.
+seaweedfs:
+  global:
+    createClusterRole: true
+    enableSecurity: false
+    monitoring:
+      enabled: false
+    replicationPlacementLabel: ""
+
+  master:
+    enabled: true
+    replicas: 1
+    # Store master metadata in an emptyDir for simplicity.
+    # For production use, switch to persistentVolumeClaim with an appropriate size.
+    data:
+      type: "emptyDir"
+    logs:
+      type: "emptyDir"
+
+  volume:
+    enabled: true
+    replicas: 1
+    # PVC for log blob storage — ReadWriteOnce works with any standard StorageClass.
+    dataDirs:
+      - name: data
+        type: "persistentVolumeClaim"
+        size: "20Gi"
+        storageClass: ""
+    idx:
+      type: "emptyDir"
+
+  filer:
+    enabled: true
+    replicas: 1
+    # Store filer metadata in an emptyDir.  Use a PVC for durability in production.
+    data:
+      type: "emptyDir"
+
+  s3:
+    enabled: true
+    port: 8333
+    httpsPort: 0
+    # Auth is handled via iam.json configured by an init container; disable built-in auth flag.
+    enableAuth: false
+    allowEmptyFolder: true

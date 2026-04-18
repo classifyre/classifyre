@@ -27,24 +27,10 @@ api:
       repository: classifyre/cli
       tag: "develop"
       pullPolicy: Always
-    resources:
-      requests:
-        cpu: 500m
-        memory: 1Gi
-        ephemeral-storage: 15Gi
-      limits:
-        cpu: "2"
-        memory: 4Gi
-        ephemeral-storage: 20Gi
+    # local-path leaves these cache PVCs pending until a job consumes them, which
+    # blocks `helm upgrade --wait` during deploy even though the app is healthy.
     uvCache:
-      enabled: true
-      size: 30Gi
-      accessModes:
-        - ReadWriteOnce
-
-  runnerLogs:
-    accessModes:
-      - ReadWriteOnce
+      enabled: false
 
   migration:
     # Published API image currently keeps Prisma engine files under root-owned Bun modules.
@@ -84,3 +70,16 @@ postgres:
     persistence:
       accessModes:
         - ReadWriteOnce
+
+objectStorage:
+  bucket: classifyre-logs
+  seaweedfs:
+    enabled: true
+
+seaweedfs:
+  volume:
+    dataDirs:
+      - name: data
+        type: "persistentVolumeClaim"
+        size: "10Gi"
+        storageClass: ""

@@ -1,12 +1,12 @@
 ---
-# Source: classifyre/templates/pdb-api.yaml
+# Source: classifyre-core/templates/pdb-api.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: api
@@ -18,14 +18,14 @@ spec:
       app.kubernetes.io/instance: classifyre
       app.kubernetes.io/component: api
 ---
-# Source: classifyre/templates/pdb-web.yaml
+# Source: classifyre-core/templates/pdb-web.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: classifyre-web
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: web
@@ -37,54 +37,103 @@ spec:
       app.kubernetes.io/instance: classifyre
       app.kubernetes.io/component: web
 ---
-# Source: classifyre/templates/serviceaccount.yaml
+# Source: classifyre-core/charts/seaweedfs/templates/shared/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: seaweedfs
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: classifyre
+automountServiceAccountToken: true
+---
+# Source: classifyre-core/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
-# Source: classifyre/templates/api-secrets.yaml
+# Source: classifyre-core/templates/api-secrets.yaml
 apiVersion: v1
 kind: Secret
 metadata:
   name: classifyre-api-secrets
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 type: Opaque
 stringData:
   CLASSIFYRE_MASKED_CONFIG_KEY: "snapshot-classifyre-masked-key-0001"
 ---
-# Source: classifyre/templates/database-secrets.yaml
+# Source: classifyre-core/templates/database-secrets.yaml
 apiVersion: v1
 kind: Secret
 metadata:
   name: classifyre-db
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 type: Opaque
 stringData:
   password: "postgres"
 ---
-# Source: classifyre/templates/api-cli-job-template-configmap.yaml
+# Source: classifyre-core/templates/object-storage-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: classifyre-s3-credentials
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-core-0.2.35
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    # These credentials are for the in-cluster SeaweedFS S3 endpoint only.
+    # They are generated at install time and reused across upgrades.
+    helm.sh/resource-policy: keep
+type: Opaque
+stringData:
+  access-key-id: "snapshot-access-key"
+  secret-access-key: "snapshot-secret-key"
+---
+# Source: classifyre-core/charts/seaweedfs/templates/master/master-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: classifyre-seaweedfs-master-config
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: classifyre
+data:
+  master.toml: |-
+    
+    # Enter any extra configuration for master.toml here.
+    # It may be a multi-line string.
+---
+# Source: classifyre-core/templates/api-cli-job-template-configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: classifyre-api-cli-job-template
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 data:
@@ -142,19 +191,41 @@ data:
                   {
                     "name": "UV_CACHE_DIR",
                     "value": "/cache/uv"
-                  }
+                  },
+                  {
+                    "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                    "value": "https://otel.classifyre.com"
+                  },
+                  {
+                    "name": "OTEL_EXPORTER_OTLP_PROTOCOL",
+                    "value": "http/protobuf"
+                  },
+                  {
+                    "name": "OTEL_SERVICE_NAME",
+                    "value": "classifyre-cli"
+                  },
+                  {
+                    "name": "DEPLOY_ENV",
+                    "value": "production"
+                  },
+                  {
+                    "name": "CLASSIFYRE_INSTANCE_ID",
+                    "valueFrom": {
+                      "configMapKeyRef": {
+                        "name": "classifyre-instance-id",
+                        "key": "instance-id",
+                        "optional": true
+                      }
+                    }
                   }
                 ],
                 "volumeMounts": [
                   {
                     "name": "uv-cache",
                     "mountPath": "/cache/uv"
-                  },
-                  {
-                    "name": "runner-logs",
-                    "mountPath": "/var/lib/classifyre/runner-logs"
                   }
-                ]
+                ],
+                "workingDir": "/app/apps/cli"
               }
             ],
             "volumes": [
@@ -163,12 +234,6 @@ data:
                 "persistentVolumeClaim": {
                   "claimName": "classifyre-cli-uv-cache"
                 }
-              },
-              {
-                "name": "runner-logs",
-                "persistentVolumeClaim": {
-                  "claimName": "classifyre-runner-logs"
-                }
               }
             ]
           }
@@ -176,14 +241,31 @@ data:
       }
     }
 ---
-# Source: classifyre/templates/api-cli-cache-pvc.yaml
+# Source: classifyre-core/templates/telemetry-instance-id.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: classifyre-instance-id
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-core-0.2.35
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: telemetry
+  annotations:
+    # Preserve this ConfigMap across `helm upgrade` so the instance ID stays stable.
+    "helm.sh/resource-policy": keep
+data:
+  instance-id: "f770f038-6854-40dc-8a2d-b44c74063b1c"
+---
+# Source: classifyre-core/templates/api-cli-cache-pvc.yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: classifyre-cli-uv-cache
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 spec:
@@ -193,31 +275,48 @@ spec:
     requests:
       storage: 5Gi
 ---
-# Source: classifyre/templates/api-cli-cache-pvc.yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
+# Source: classifyre-core/charts/seaweedfs/templates/shared/cluster-role.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: classifyre-runner-logs
+  name: classifyre-seaweedfs-rw-cr
   labels:
-    app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
-    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/name: seaweedfs
+    helm.sh/chart: seaweedfs-4.0.413
     app.kubernetes.io/managed-by: Helm
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
+    app.kubernetes.io/instance: classifyre
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
-# Source: classifyre/templates/rbac.yaml
+# Source: classifyre-core/charts/seaweedfs/templates/shared/cluster-role.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: classifyre-seaweedfs-rw-crb
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: classifyre
+subjects:
+  - kind: ServiceAccount
+    name: seaweedfs
+    namespace: classifyre-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: classifyre-seaweedfs-rw-cr
+---
+# Source: classifyre-core/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: classifyre-api-job-manager
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 rules:
@@ -231,14 +330,14 @@ rules:
     resources: ["pods/log"]
     verbs: ["get"]
 ---
-# Source: classifyre/templates/rbac.yaml
+# Source: classifyre-core/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: classifyre-api-job-manager
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 subjects:
@@ -249,14 +348,177 @@ roleRef:
   kind: Role
   name: classifyre-api-job-manager
 ---
-# Source: classifyre/templates/postgres-embedded.yaml
+# Source: classifyre-core/charts/seaweedfs/templates/filer/filer-service-client.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: classifyre-seaweedfs-filer-client
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: filer
+    monitoring: "true"
+spec:
+  clusterIP: None
+  ports:
+  - name: "swfs-filer"
+    port: 8888
+    targetPort: 8888
+    protocol: TCP
+  - name: "swfs-filer-grpc"
+    port: 18888
+    targetPort: 18888
+    protocol: TCP
+  - name: "metrics"
+    port: 9327
+    targetPort: 9327
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: filer
+---
+# Source: classifyre-core/charts/seaweedfs/templates/filer/filer-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  name: classifyre-seaweedfs-filer
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: filer
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+  - name: "swfs-filer"
+    port: 8888
+    targetPort: 8888
+    protocol: TCP
+  - name: "swfs-filer-grpc"
+    port: 18888
+    targetPort: 18888
+    protocol: TCP
+  - name: "metrics"
+    port: 9327
+    targetPort: 9327
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: filer
+---
+# Source: classifyre-core/charts/seaweedfs/templates/master/master-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: classifyre-seaweedfs-master
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: master
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: classifyre
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+  - name: "swfs-master"
+    port: 9333
+    targetPort: 9333
+    protocol: TCP
+  - name: "swfs-master-grpc"
+    port: 19333
+    targetPort: 19333
+    protocol: TCP
+  - name: "metrics"
+    port: 9327
+    targetPort: 9327
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: master
+---
+# Source: classifyre-core/charts/seaweedfs/templates/s3/s3-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: classifyre-seaweedfs-s3
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: s3
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: classifyre
+spec:
+  internalTrafficPolicy: Cluster
+  ports:
+  - name: "swfs-s3"
+    port: 8333
+    targetPort: 8333
+    protocol: TCP
+  - name: "metrics"
+    port: 9327
+    targetPort: 9327
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: s3
+---
+# Source: classifyre-core/charts/seaweedfs/templates/volume/volume-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: classifyre-seaweedfs-volume
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: volume
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterIP: None
+  internalTrafficPolicy: Cluster
+  ports:
+  - name: "swfs-volume"
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: "swfs-volume-18080"
+    port: 18080
+    targetPort: 18080
+    protocol: TCP
+  - name: "metrics"
+    port: 9327
+    targetPort: 9327
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: volume
+---
+# Source: classifyre-core/templates/postgres-embedded.yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: classifyre-postgres
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: postgres
@@ -272,14 +534,14 @@ spec:
       targetPort: pg
       protocol: TCP
 ---
-# Source: classifyre/templates/service-api.yaml
+# Source: classifyre-core/templates/service-api.yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: api
@@ -295,14 +557,14 @@ spec:
       targetPort: http
       protocol: TCP
 ---
-# Source: classifyre/templates/service-web.yaml
+# Source: classifyre-core/templates/service-web.yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: classifyre-web
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: web
@@ -318,14 +580,120 @@ spec:
       targetPort: http
       protocol: TCP
 ---
-# Source: classifyre/templates/deployment-api.yaml
+# Source: classifyre-core/charts/seaweedfs/templates/s3/s3-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: classifyre-seaweedfs-s3
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: s3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/instance: classifyre
+      app.kubernetes.io/component: s3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        helm.sh/chart: seaweedfs-4.0.413
+        app.kubernetes.io/instance: classifyre
+        app.kubernetes.io/component: s3
+      
+      annotations:
+      
+    spec:
+      restartPolicy: Always
+      
+      terminationGracePeriodSeconds: 10
+      enableServiceLinks: false
+      containers:
+        - name: seaweedfs
+          image: chrislusf/seaweedfs:4.13
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: SEAWEEDFS_FULLNAME
+              value: "classifyre-seaweedfs"
+            - name: WEED_CLUSTER_DEFAULT
+              value: "sw"
+            - name: WEED_CLUSTER_SW_FILER
+              value: "classifyre-seaweedfs-filer-client.classifyre-dev:8888"
+            - name: WEED_CLUSTER_SW_MASTER
+              value: "classifyre-seaweedfs-master.classifyre-dev:9333"
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              exec /usr/bin/weed \
+              -logdir=/logs \
+              -v=1 \
+              s3 \
+              -ip.bind=0.0.0.0 \
+              -port=8333 \
+              -metricsPort 9327 \
+              -filer=classifyre-seaweedfs-filer-client.classifyre-dev:8888 \
+          volumeMounts:
+            - name: logs
+              mountPath: "/logs/"
+            
+          ports:
+            - containerPort: 8333
+              name: swfs-s3
+            - containerPort: 9327
+              name: metrics
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8333
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            successThreshold: 1
+            failureThreshold: 100
+            timeoutSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: 8333
+              scheme: HTTP
+            initialDelaySeconds: 20
+            periodSeconds: 60
+            successThreshold: 1
+            failureThreshold: 20
+            timeoutSeconds: 10
+      volumes:
+        - name: logs
+          hostPath:
+            path: /storage/logs/seaweedfs/s3
+            type: DirectoryOrCreate
+---
+# Source: classifyre-core/templates/deployment-api.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: api
@@ -344,7 +712,7 @@ spec:
         app.kubernetes.io/instance: classifyre
         app.kubernetes.io/component: api
       annotations:
-        checksum/cli-job-template: 65cf5eb769a09acd19d8b0190daf68cc8a01319ff222a1a6f64de64215a15f38
+        checksum/cli-job-template: 461230852ce1dd22a563b071e05952edcd51009c8d5ad08deb2ad3c14536f3b9
     spec:
       serviceAccountName: classifyre-api
       automountServiceAccountToken: true
@@ -442,6 +810,8 @@ spec:
                 secretKeyRef:
                   name: classifyre-api-secrets
                   key: CLASSIFYRE_MASKED_CONFIG_KEY
+            - name: DEMO_MODE
+              value: "false"
             - name: ENVIRONMENT
               value: "kubernetes"
             - name: NODE_ENV
@@ -459,7 +829,7 @@ spec:
             - name: K8S_JOBS_ENABLED
               value: "1"
             - name: K8S_JOBS_NAMESPACE
-              value: "default"
+              value: "classifyre-dev"
             - name: K8S_CLI_JOB_TEMPLATE_PATH
               value: /etc/classifyre/cli-job-template/job-template.json
             - name: K8S_CLI_JOB_WAIT_TIMEOUT_SECONDS
@@ -470,12 +840,42 @@ spec:
               value: "always"
             - name: K8S_CLI_JOB_WORKDIR
               value: "/app/apps/cli"
+            - name: S3_BUCKET
+              value: "classifyre-logs"
+            - name: S3_LOG_PREFIX
+              value: "runner-logs/"
+            - name: S3_REGION
+              value: "us-east-1"
+            - name: S3_FORCE_PATH_STYLE
+              value: "true"
+            - name: S3_ENDPOINT
+              value: "http://classifyre-seaweedfs-s3.classifyre-dev.svc.cluster.local:8333"
+            - name: S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: classifyre-s3-credentials
+                  key: access-key-id
+            - name: S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: classifyre-s3-credentials
+                  key: secret-access-key
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "https://otel.classifyre.com"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: DEPLOY_ENV
+              value: "production"
+            - name: CLASSIFYRE_INSTANCE_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: classifyre-instance-id
+                  key: instance-id
+                  optional: true
           volumeMounts:
             - name: cli-job-template
               mountPath: /etc/classifyre/cli-job-template
               readOnly: true
-            - name: runner-logs
-              mountPath: "/var/lib/classifyre/runner-logs"
           resources:
             limits:
               cpu: "1"
@@ -523,9 +923,6 @@ spec:
         - name: cli-job-template
           configMap:
             name: classifyre-api-cli-job-template
-        - name: runner-logs
-          persistentVolumeClaim:
-            claimName: classifyre-runner-logs
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -547,14 +944,14 @@ spec:
               app.kubernetes.io/instance: classifyre
               app.kubernetes.io/component: api
 ---
-# Source: classifyre/templates/deployment-web.yaml
+# Source: classifyre-core/templates/deployment-web.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: classifyre-web
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: web
@@ -607,6 +1004,18 @@ spec:
               value: "production"
             - name: PORT
               value: "3100"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "https://otel.classifyre.com"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: DEPLOY_ENV
+              value: "production"
+            - name: CLASSIFYRE_INSTANCE_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: classifyre-instance-id
+                  key: instance-id
+                  optional: true
           resources:
             limits:
               cpu: "1"
@@ -671,14 +1080,14 @@ spec:
               app.kubernetes.io/instance: classifyre
               app.kubernetes.io/component: web
 ---
-# Source: classifyre/templates/postgres-embedded.yaml
+# Source: classifyre-core/templates/postgres-embedded.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: classifyre-postgres
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.2.35
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: postgres
@@ -761,3 +1170,543 @@ spec:
       volumes:
         - name: postgres-data
           emptyDir: {}
+---
+# Source: classifyre-core/charts/seaweedfs/templates/filer/filer-statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: classifyre-seaweedfs-filer
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: filer
+spec:
+  serviceName: classifyre-seaweedfs-filer
+  podManagementPolicy: Parallel
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/instance: classifyre
+      app.kubernetes.io/component: filer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        helm.sh/chart: seaweedfs-4.0.413
+        app.kubernetes.io/instance: classifyre
+        app.kubernetes.io/component: filer
+      annotations:
+        checksum/s3config: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    spec:
+      restartPolicy: Always
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: seaweedfs
+                  app.kubernetes.io/instance: classifyre
+                  app.kubernetes.io/component: filer
+              topologyKey: kubernetes.io/hostname
+      
+      serviceAccountName: "seaweedfs" # for deleting statefulset pods after migration
+      terminationGracePeriodSeconds: 60
+      enableServiceLinks: false
+      containers:
+        - name: seaweedfs
+          image: chrislusf/seaweedfs:4.13
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: WEED_MYSQL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: classifyre-seaweedfs-db-secret
+                  key: user
+                  optional: true
+            - name: WEED_MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: classifyre-seaweedfs-db-secret
+                  key: password
+                  optional: true
+            - name: SEAWEEDFS_FULLNAME
+              value: "classifyre-seaweedfs"
+            - name: WEED_FILER_BUCKETS_FOLDER
+              value: "/buckets"
+            - name: WEED_FILER_OPTIONS_RECURSIVE_DELETE
+              value: "false"
+            - name: WEED_LEVELDB2_ENABLED
+              value: "true"
+            - name: WEED_MYSQL_CONNECTION_MAX_IDLE
+              value: "5"
+            - name: WEED_MYSQL_CONNECTION_MAX_LIFETIME_SECONDS
+              value: "600"
+            - name: WEED_MYSQL_CONNECTION_MAX_OPEN
+              value: "75"
+            - name: WEED_MYSQL_DATABASE
+              value: "sw_database"
+            - name: WEED_MYSQL_ENABLED
+              value: "false"
+            - name: WEED_MYSQL_HOSTNAME
+              value: "mysql-db-host"
+            - name: WEED_MYSQL_INTERPOLATEPARAMS
+              value: "true"
+            - name: WEED_MYSQL_PORT
+              value: "3306"
+            - name: WEED_CLUSTER_DEFAULT
+              value: "sw"
+            - name: WEED_CLUSTER_SW_FILER
+              value: "classifyre-seaweedfs-filer-client.classifyre-dev:8888"
+            - name: WEED_CLUSTER_SW_MASTER
+              value: "classifyre-seaweedfs-master.classifyre-dev:9333"
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              exec /usr/bin/weed \
+              -logdir=/logs \
+              -v=1 \
+              filer \
+              -port=8888 \
+              -metricsPort=9327 \
+              -dirListLimit=100000 \
+              -defaultReplicaPlacement=000 \
+              -ip=${POD_IP} \
+              -ip.bind=0.0.0.0 \
+              -master=classifyre-seaweedfs-master-0.classifyre-seaweedfs-master.classifyre-dev:9333 \
+          volumeMounts:
+            - name: seaweedfs-filer-log-volume
+              mountPath: "/logs/"
+            - name: data-filer
+              mountPath: /data
+            
+          ports:
+            - containerPort: 8888
+              name: swfs-filer
+            - containerPort: 9327
+              name: metrics
+            - containerPort: 18888
+              #name: swfs-filer-grpc
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8888
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            successThreshold: 1
+            failureThreshold: 100
+            timeoutSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8888
+              scheme: HTTP
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            successThreshold: 1
+            failureThreshold: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: seaweedfs-filer-log-volume
+          hostPath:
+            path: /storage/logs/seaweedfs/filer
+            type: DirectoryOrCreate
+        - name: data-filer
+          emptyDir: {}
+        - name: db-schema-config-volume
+          configMap:
+            name: classifyre-seaweedfs-db-init-config
+---
+# Source: classifyre-core/charts/seaweedfs/templates/master/master-statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: classifyre-seaweedfs-master
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: master
+spec:
+  serviceName: classifyre-seaweedfs-master
+  podManagementPolicy: Parallel
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/instance: classifyre
+      app.kubernetes.io/component: master
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        helm.sh/chart: seaweedfs-4.0.413
+        app.kubernetes.io/instance: classifyre
+        app.kubernetes.io/component: master
+      
+      annotations:
+      
+    spec:
+      restartPolicy: Always
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: seaweedfs
+                  app.kubernetes.io/instance: classifyre
+                  app.kubernetes.io/component: master
+              topologyKey: kubernetes.io/hostname
+      
+      terminationGracePeriodSeconds: 60
+      enableServiceLinks: false
+      serviceAccountName: "seaweedfs" # for deleting statefulset pods after migration
+      containers:
+        - name: seaweedfs
+          image: chrislusf/seaweedfs:4.13
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: SEAWEEDFS_FULLNAME
+              value: "classifyre-seaweedfs"
+            - name: WEED_MASTER_VOLUME_GROWTH_COPY_1
+              value: "7"
+            - name: WEED_MASTER_VOLUME_GROWTH_COPY_2
+              value: "6"
+            - name: WEED_MASTER_VOLUME_GROWTH_COPY_3
+              value: "3"
+            - name: WEED_MASTER_VOLUME_GROWTH_COPY_OTHER
+              value: "1"
+            - name: WEED_CLUSTER_DEFAULT
+              value: "sw"
+            - name: WEED_CLUSTER_SW_FILER
+              value: "classifyre-seaweedfs-filer-client.classifyre-dev:8888"
+            - name: WEED_CLUSTER_SW_MASTER
+              value: "classifyre-seaweedfs-master.classifyre-dev:9333"
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              exec /usr/bin/weed \
+              -logdir=/logs \
+              -v=1 \
+              master \
+              -port=9333 \
+              -mdir=/data \
+              -ip.bind=0.0.0.0 \
+              -defaultReplication=000 \
+              -metricsPort=9327 \
+              -volumeSizeLimitMB=1000 \
+              -electionTimeout=10s \
+              -heartbeatInterval=300ms \
+              -ip=${POD_NAME}.classifyre-seaweedfs-master.classifyre-dev \
+              -peers=classifyre-seaweedfs-master-0.classifyre-seaweedfs-master.classifyre-dev:9333 \
+          volumeMounts:
+            - name : data-classifyre-dev
+              mountPath: /data
+            - name: seaweedfs-master-log-volume
+              mountPath: "/logs/"
+            - name: master-config
+              readOnly: true
+              mountPath: /etc/seaweedfs/master.toml
+              subPath: master.toml
+            
+          ports:
+            - containerPort: 9333
+              name: swfs-master
+            - containerPort: 19333
+              #name: swfs-master-grpc
+          readinessProbe:
+            httpGet:
+              path: /cluster/status
+              port: 9333
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 45
+            successThreshold: 2
+            failureThreshold: 100
+            timeoutSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /cluster/status
+              port: 9333
+              scheme: HTTP
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            successThreshold: 1
+            failureThreshold: 4
+            timeoutSeconds: 10
+      volumes:
+        - name: seaweedfs-master-log-volume
+          emptyDir: {}
+        - name: data-classifyre-dev
+          emptyDir: {}
+        - name: master-config
+          configMap:
+            name: classifyre-seaweedfs-master-config
+---
+# Source: classifyre-core/charts/seaweedfs/templates/volume/volume-statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: classifyre-seaweedfs-volume
+  namespace: classifyre-dev
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: volume
+spec:
+  serviceName: classifyre-seaweedfs-volume
+  replicas: 1
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/instance: classifyre
+      app.kubernetes.io/component: volume
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        helm.sh/chart: seaweedfs-4.0.413
+        app.kubernetes.io/instance: classifyre
+        app.kubernetes.io/component: volume
+      
+      annotations:
+      
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: seaweedfs
+                  app.kubernetes.io/instance: classifyre
+                  app.kubernetes.io/component: volume
+              topologyKey: kubernetes.io/hostname
+      restartPolicy: Always
+      
+      terminationGracePeriodSeconds: 150
+      enableServiceLinks: false
+      serviceAccountName: "seaweedfs" # for deleting statefulset pods after migration
+      initContainers:
+        - name: seaweedfs-vol-move-idx
+          image: chrislusf/seaweedfs:4.13
+          imagePullPolicy: IfNotPresent
+          command: [ '/bin/sh', '-c' ]
+          args: [ 'if ls /data/*.idx  >/dev/null 2>&1; then mv /data/*.idx /idx/ ; fi; ' ]
+          volumeMounts:
+            - name: idx
+              mountPath: /idx
+            - name: data
+              mountPath: /data
+      containers:
+        - name: seaweedfs
+          image: chrislusf/seaweedfs:4.13
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: SEAWEEDFS_FULLNAME
+              value: "classifyre-seaweedfs"
+            - name: WEED_CLUSTER_DEFAULT
+              value: "sw"
+            - name: WEED_CLUSTER_SW_FILER
+              value: "classifyre-seaweedfs-filer-client.classifyre-dev:8888"
+            - name: WEED_CLUSTER_SW_MASTER
+              value: "classifyre-seaweedfs-master.classifyre-dev:9333"
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              exec /usr/bin/weed \
+                -logtostderr=true \
+                -v=1 \
+                volume \
+                -port=8080 \
+                -metricsPort=9327 \
+                -dir /data \
+                -dir.idx=/idx \
+                -max 7 \
+                -ip.bind=0.0.0.0 \
+                -readMode=proxy \
+                -minFreeSpacePercent=1 \
+                -ip=${POD_NAME}.classifyre-seaweedfs-volume.classifyre-dev \
+                -compactionMBps=50 \
+                -master=classifyre-seaweedfs-master-0.classifyre-seaweedfs-master.classifyre-dev:9333 \
+          volumeMounts:
+            - name: data
+              mountPath: "/data/"
+            - name: idx
+              mountPath: "/idx/"
+            
+          ports:
+            - containerPort: 8080
+              name: swfs-vol
+            - containerPort: 9327
+              name: metrics
+            - containerPort: 18080
+              name: swfs-vol-grpc
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            successThreshold: 1
+            failureThreshold: 100
+            timeoutSeconds: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 20
+            periodSeconds: 90
+            successThreshold: 1
+            failureThreshold: 4
+            timeoutSeconds: 30
+      volumes:
+        - name: idx
+          emptyDir: {}
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: 
+        resources:
+          requests:
+            storage: 5Gi
+---
+# Source: classifyre-core/charts/seaweedfs/templates/shared/cluster-role.yaml
+#hack for delete pod master after migration
+---
+# Source: classifyre-core/charts/seaweedfs/templates/shared/secret-seaweedfs-db.yaml
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: classifyre-seaweedfs-db-secret
+  namespace: classifyre-dev
+  annotations:
+    "helm.sh/resource-policy": keep
+    "helm.sh/hook": "pre-install"
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    helm.sh/chart: seaweedfs-4.0.413
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: classifyre
+stringData:
+  user: "YourSWUser"
+  # auto-generated password
+  password: YTgzMjgwYWQ1MzU3ZGYwZWVjY2NhODZj
+---
+# Source: classifyre-core/templates/seaweedfs-init-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: classifyre-seaweedfs-init
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-core-0.2.35
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: seaweedfs-init
+  annotations:
+    # Run this job on every install/upgrade so the bucket is always present.
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: classifyre
+        app.kubernetes.io/instance: classifyre
+        app.kubernetes.io/component: seaweedfs-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init
+          image: curlimages/curl:8.11.1
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              S3_HOST="http://classifyre-seaweedfs-s3.classifyre-dev.svc.cluster.local:8333"
+              BUCKET="classifyre-logs"
+
+              echo "Waiting for SeaweedFS S3 at ${S3_HOST}..."
+              for i in $(seq 1 60); do
+                if curl -fsS --max-time 3 "${S3_HOST}/" >/dev/null 2>&1 || \
+                   curl -fsS --max-time 3 "${S3_HOST}/" 2>&1 | grep -q "NoSuchBucket\|AccessDenied\|ListBuckets"; then
+                  break
+                fi
+                echo "  attempt ${i}/60 — not ready yet"
+                sleep 5
+              done
+
+              echo "Creating bucket ${BUCKET}..."
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                -X PUT "${S3_HOST}/${BUCKET}" 2>&1)
+              if echo "${HTTP_CODE}" | grep -qE "^(200|409)"; then
+                echo "Bucket ${BUCKET} ready (HTTP ${HTTP_CODE})."
+              else
+                echo "Unexpected HTTP ${HTTP_CODE} creating bucket — continuing anyway."
+              fi
+              echo "SeaweedFS init complete."
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
