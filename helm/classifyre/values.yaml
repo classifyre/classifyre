@@ -696,6 +696,8 @@ telemetry:
 objectStorage:
   # -- S3 bucket used for runner logs.
   bucket: classifyre-logs
+  # -- S3 bucket used for sandbox uploaded files.
+  sandboxBucket: classifyre-sandbox
   # -- S3 object key prefix for runner logs.
   logPrefix: "runner-logs/"
   # -- AWS region (ignored by SeaweedFS; required for AWS S3).
