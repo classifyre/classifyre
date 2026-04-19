@@ -557,23 +557,60 @@ export default function RunnerDetailPage() {
             </Card>
           )}
 
-          {runner.status === "ERROR" && runner.errorMessage && (
+          {runner.status === "ERROR" && (
             <Card className="border-destructive/30 bg-destructive/5 rounded-[6px]">
               <CardHeader className="pb-2">
                 <CardTitle className="text-destructive text-base">
                   Run failed
                 </CardTitle>
-                <CardDescription className="text-destructive/80">
-                  {runner.errorMessage}
-                </CardDescription>
+                {runner.errorMessage && (
+                  <CardDescription className="text-destructive/80">
+                    {runner.errorMessage}
+                  </CardDescription>
+                )}
+                {runner.errorDetails &&
+                  typeof runner.errorDetails === "object" && (
+                    <div className="flex flex-wrap gap-3 mt-2 text-xs text-destructive/70">
+                      {typeof (runner.errorDetails as Record<string, unknown>)
+                        .exitCode === "number" && (
+                        <span className="font-mono bg-destructive/10 px-1.5 py-0.5 rounded">
+                          exit&nbsp;
+                          {String(
+                            (runner.errorDetails as Record<string, unknown>)
+                              .exitCode
+                          )}
+                        </span>
+                      )}
+                      {typeof (runner.errorDetails as Record<string, unknown>)
+                        .jobName === "string" && (
+                        <span className="font-mono bg-destructive/10 px-1.5 py-0.5 rounded truncate max-w-xs">
+                          {String(
+                            (runner.errorDetails as Record<string, unknown>)
+                              .jobName
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  )}
               </CardHeader>
-              {runner.errorDetails && (
-                <CardContent>
-                  <pre className="text-xs text-destructive/80 bg-destructive/5 p-2 rounded max-h-64 overflow-auto break-all whitespace-pre-wrap">
-                    {JSON.stringify(runner.errorDetails, null, 2)}
-                  </pre>
-                </CardContent>
-              )}
+              {runner.errorDetails &&
+                typeof runner.errorDetails === "object" &&
+                typeof (runner.errorDetails as Record<string, unknown>)
+                  .output === "string" && (
+                  <CardContent>
+                    <details className="group">
+                      <summary className="cursor-pointer text-xs text-destructive/60 hover:text-destructive/80 mb-1 select-none">
+                        Show job output
+                      </summary>
+                      <pre className="text-xs text-destructive/80 bg-destructive/5 p-2 rounded max-h-64 overflow-auto break-all whitespace-pre-wrap">
+                        {String(
+                          (runner.errorDetails as Record<string, unknown>)
+                            .output
+                        )}
+                      </pre>
+                    </details>
+                  </CardContent>
+                )}
             </Card>
           )}
 

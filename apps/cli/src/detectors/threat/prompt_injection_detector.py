@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import DetectorConfig, PromptInjectionDetectorConfig, Severity
 from ...models.generated_single_asset_scan_results import (
     DetectionResult,
     DetectorType,
@@ -20,19 +20,26 @@ class PromptInjectionDetector(BaseDetector):
     detector_type = "prompt_injection"
     detector_name = "prompt_injection"
 
+    _DEFAULT_MODEL = "protectai/deberta-v3-base-prompt-injection-v2"
+
     def __init__(self, config: DetectorConfig | None = None):
         super().__init__(config)
         self.classifier: Any | None = None
         self._transformers: Any | None = None
-        self._model_id = "protectai/deberta-v3-base-prompt-injection-v2"
+        cfg_model = (
+            getattr(self.config, "model", None)
+            if isinstance(self.config, PromptInjectionDetectorConfig)
+            else None
+        )
+        self._model_id = cfg_model or self._DEFAULT_MODEL
         self._max_length = 512
 
         try:
-            ensure_torch("prompt_injection", ["security", "detectors"])
+            ensure_torch("prompt_injection", ["threat-ml", "security", "detectors"])
             self._transformers = require_module(
                 "transformers",
                 "prompt_injection",
-                ["security", "detectors"],
+                ["threat-ml", "security", "detectors"],
             )
         except MissingDependencyError:
             raise

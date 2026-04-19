@@ -5,7 +5,7 @@ import logging
 from types import ModuleType
 from typing import Any
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import DetectorConfig, NSFWDetectorConfig, Severity
 from ...models.generated_single_asset_scan_results import (
     DetectionResult,
     DetectorType,
@@ -31,12 +31,19 @@ class NSFWDetector(BaseDetector):
     detector_type = "nsfw"
     detector_name = "nsfw"
 
+    _DEFAULT_MODEL = "Falconsai/nsfw_image_detection"
+
     def __init__(self, config: DetectorConfig | None = None):
         """Initialize NSFW image detector."""
         super().__init__(config)
         self.classifier: Any | None = None
         self._image_module: ModuleType | None = None
-        self._model_id: str = "Falconsai/nsfw_image_detection"
+        cfg_model = (
+            getattr(self.config, "model", None)
+            if isinstance(self.config, NSFWDetectorConfig)
+            else None
+        )
+        self._model_id: str = cfg_model or self._DEFAULT_MODEL
 
         try:
             ensure_torch("nsfw", ["content", "detectors"])

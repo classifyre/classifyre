@@ -14,14 +14,14 @@ class AssetType(StrEnum):
     Canonical type of the asset payload
     """
 
-    TXT = 'TXT'
-    TABLE = 'TABLE'
-    IMAGE = 'IMAGE'
-    VIDEO = 'VIDEO'
-    AUDIO = 'AUDIO'
-    URL = 'URL'
-    BINARY = 'BINARY'
-    OTHER = 'OTHER'
+    TXT = "TXT"
+    TABLE = "TABLE"
+    IMAGE = "IMAGE"
+    VIDEO = "VIDEO"
+    AUDIO = "AUDIO"
+    URL = "URL"
+    BINARY = "BINARY"
+    OTHER = "OTHER"
 
 
 class DetectorType(StrEnum):
@@ -29,31 +29,31 @@ class DetectorType(StrEnum):
     Type of detector for content analysis
     """
 
-    SECRETS = 'SECRETS'
-    PII = 'PII'
-    TOXIC = 'TOXIC'
-    NSFW = 'NSFW'
-    YARA = 'YARA'
-    BROKEN_LINKS = 'BROKEN_LINKS'
-    PROMPT_INJECTION = 'PROMPT_INJECTION'
-    PHISHING_URL = 'PHISHING_URL'
-    SPAM = 'SPAM'
-    LANGUAGE = 'LANGUAGE'
-    CODE_SECURITY = 'CODE_SECURITY'
-    PLAGIARISM = 'PLAGIARISM'
-    IMAGE_VIOLENCE = 'IMAGE_VIOLENCE'
-    OCR_PII = 'OCR_PII'
-    DEID_SCORE = 'DEID_SCORE'
-    HATE_SPEECH = 'HATE_SPEECH'
-    AI_GENERATED = 'AI_GENERATED'
-    CONTENT_QUALITY = 'CONTENT_QUALITY'
-    BIAS = 'BIAS'
-    DUPLICATE = 'DUPLICATE'
-    DOMAIN_CLASS = 'DOMAIN_CLASS'
-    CONTENT_TYPE = 'CONTENT_TYPE'
-    SENSITIVITY_TIER = 'SENSITIVITY_TIER'
-    JURISDICTION_TAG = 'JURISDICTION_TAG'
-    CUSTOM = 'CUSTOM'
+    SECRETS = "SECRETS"
+    PII = "PII"
+    TOXIC = "TOXIC"
+    NSFW = "NSFW"
+    YARA = "YARA"
+    BROKEN_LINKS = "BROKEN_LINKS"
+    PROMPT_INJECTION = "PROMPT_INJECTION"
+    PHISHING_URL = "PHISHING_URL"
+    SPAM = "SPAM"
+    LANGUAGE = "LANGUAGE"
+    CODE_SECURITY = "CODE_SECURITY"
+    PLAGIARISM = "PLAGIARISM"
+    IMAGE_VIOLENCE = "IMAGE_VIOLENCE"
+    OCR_PII = "OCR_PII"
+    DEID_SCORE = "DEID_SCORE"
+    HATE_SPEECH = "HATE_SPEECH"
+    AI_GENERATED = "AI_GENERATED"
+    CONTENT_QUALITY = "CONTENT_QUALITY"
+    BIAS = "BIAS"
+    DUPLICATE = "DUPLICATE"
+    DOMAIN_CLASS = "DOMAIN_CLASS"
+    CONTENT_TYPE = "CONTENT_TYPE"
+    SENSITIVITY_TIER = "SENSITIVITY_TIER"
+    JURISDICTION_TAG = "JURISDICTION_TAG"
+    CUSTOM = "CUSTOM"
 
 
 class FindingCategory(StrEnum):
@@ -61,16 +61,16 @@ class FindingCategory(StrEnum):
     Normalized finding category for reporting and filtering
     """
 
-    SECURITY = 'SECURITY'
-    PRIVACY = 'PRIVACY'
-    THREAT = 'THREAT'
-    CONTENT = 'CONTENT'
-    QUALITY = 'QUALITY'
-    FAIRNESS = 'FAIRNESS'
-    COMPLIANCE = 'COMPLIANCE'
-    SECRETS = 'SECRETS'
-    PII = 'PII'
-    CLASSIFICATION = 'CLASSIFICATION'
+    SECURITY = "SECURITY"
+    PRIVACY = "PRIVACY"
+    THREAT = "THREAT"
+    CONTENT = "CONTENT"
+    QUALITY = "QUALITY"
+    FAIRNESS = "FAIRNESS"
+    COMPLIANCE = "COMPLIANCE"
+    SECRETS = "SECRETS"
+    PII = "PII"
+    CLASSIFICATION = "CLASSIFICATION"
 
 
 class Severity(StrEnum):
@@ -78,11 +78,11 @@ class Severity(StrEnum):
     Severity level of finding
     """
 
-    critical = 'critical'
-    high = 'high'
-    medium = 'medium'
-    low = 'low'
-    info = 'info'
+    critical = "critical"
+    high = "high"
+    medium = "medium"
+    low = "low"
+    info = "info"
 
 
 class Location(BaseModel):
@@ -93,17 +93,17 @@ class Location(BaseModel):
     path: str | None = Field(
         None,
         description="Human-readable source reference: 'schema.table, row N' for tabular, URL for web/Slack",
-        title='Path',
+        title="Path",
     )
     description: str | None = Field(
         None,
-        description='Additional detail, e.g. column name where value was found',
-        title='Description',
+        description="Additional detail, e.g. column name where value was found",
+        title="Description",
     )
-    line: int | None = Field(None, description='Line number (1-indexed)')
-    column: int | None = Field(None, description='Column number (1-indexed)')
-    start: int | None = Field(None, description='Start offset (0-indexed)')
-    end: int | None = Field(None, description='End offset (0-indexed)')
+    line: int | None = Field(None, description="Line number (1-indexed)")
+    column: int | None = Field(None, description="Column number (1-indexed)")
+    start: int | None = Field(None, description="Start offset (0-indexed)")
+    end: int | None = Field(None, description="End offset (0-indexed)")
 
 
 class ScanStats(BaseModel):
@@ -111,19 +111,13 @@ class ScanStats(BaseModel):
     Statistics about detector scan for an asset
     """
 
-    scanned_at: AwareDatetime = Field(
-        ..., description='Timestamp when the scan started'
-    )
-    duration_ms: int = Field(..., description='Duration of the scan in milliseconds')
+    scanned_at: AwareDatetime = Field(..., description="Timestamp when the scan started")
+    duration_ms: int = Field(..., description="Duration of the scan in milliseconds")
     detectors_run: list[DetectorType] = Field(
-        ..., description='List of detector types that were run'
+        ..., description="List of detector types that were run"
     )
-    content_size_bytes: int | None = Field(
-        None, description='Size of the content that was scanned'
-    )
-    findings_count: int | None = Field(
-        None, description='Total number of findings detected'
-    )
+    content_size_bytes: int | None = Field(None, description="Size of the content that was scanned")
+    findings_count: int | None = Field(None, description="Total number of findings detected")
 
 
 class DetectionResult(BaseModel):
@@ -132,76 +126,74 @@ class DetectionResult(BaseModel):
     """
 
     detector_type: DetectorType = Field(
-        ..., description='Type of detector that found this', title='Detector Type'
+        ..., description="Type of detector that found this", title="Detector Type"
     )
     finding_type: str = Field(
         ...,
         description="Type of finding (e.g., 'aws_key', 'ssn', 'toxicity')",
-        title='Finding Type',
+        title="Finding Type",
     )
     category: FindingCategory | str = Field(
         ...,
-        description='Category of finding (normalized category preferred, string allowed for compatibility)',
-        title='Category',
+        description="Category of finding (normalized category preferred, string allowed for compatibility)",
+        title="Category",
     )
     severity: Severity
     confidence: float = Field(
-        ..., description='Confidence score (0-1)', ge=0.0, le=1.0, title='Confidence'
+        ..., description="Confidence score (0-1)", ge=0.0, le=1.0, title="Confidence"
     )
     matched_content: str = Field(
-        ..., description='The content that matched', title='Matched Content'
+        ..., description="The content that matched", title="Matched Content"
     )
     redacted_content: str | None = Field(
         None,
-        description='Redacted version of matched content',
-        title='Redacted Content',
+        description="Redacted version of matched content",
+        title="Redacted Content",
     )
-    location: Location | None = Field(
-        None, description='Location of finding in content'
-    )
+    location: Location | None = Field(None, description="Location of finding in content")
     context_before: str | None = Field(
-        None, description='Text before the match', title='Context Before'
+        None, description="Text before the match", title="Context Before"
     )
     context_after: str | None = Field(
-        None, description='Text after the match', title='Context After'
+        None, description="Text after the match", title="Context After"
     )
     runner_id: str | None = Field(
         None,
-        description='ID of the runner that detected this finding',
-        title='Runner Id',
+        description="ID of the runner that detected this finding",
+        title="Runner Id",
     )
     custom_detector_id: str | None = Field(
         None,
-        description='Database ID of custom detector instance when detector_type is CUSTOM',
-        title='Custom Detector Id',
+        description="Database ID of custom detector instance when detector_type is CUSTOM",
+        title="Custom Detector Id",
     )
     custom_detector_key: str | None = Field(
         None,
-        description='Stable key of custom detector instance when detector_type is CUSTOM',
-        title='Custom Detector Key',
+        description="Stable key of custom detector instance when detector_type is CUSTOM",
+        title="Custom Detector Key",
     )
     custom_detector_name: str | None = Field(
         None,
-        description='Display name of custom detector instance when detector_type is CUSTOM',
-        title='Custom Detector Name',
+        description="Display name of custom detector instance when detector_type is CUSTOM",
+        title="Custom Detector Name",
     )
     detected_at: AwareDatetime | None = Field(
         None,
-        description='Timestamp when this finding was detected',
-        title='Detected At',
+        description="Timestamp when this finding was detected",
+        title="Detected At",
     )
     metadata: dict[str, Any] | None = Field(
-        None, description='Additional detector-specific metadata', title='Metadata'
+        None, description="Additional detector-specific metadata", title="Metadata"
     )
     extracted_data: dict[str, Any] | None = Field(
         None,
-        description='Structured field values extracted from matched content',
-        title='Extracted Data',
+        description="Structured field values extracted from matched content",
+        title="Extracted Data",
     )
     extraction_method: str | None = Field(
         None,
-        description='Which extraction strategy was used: REGEX, GLINER, CLASSIFIER_GLINER',
-        title='Extraction Method',
+        description="Which extraction strategy was used: REGEX, GLINER, CLASSIFIER_GLINER",
+        title="Extraction Method",
     )
 
 
@@ -210,45 +202,43 @@ class SingleAssetScanResults(BaseModel):
     Single asset scan results with detector findings
     """
 
-    hash: str = Field(..., description='Unique stable hash of the asset', title='Hash')
+    hash: str = Field(..., description="Unique stable hash of the asset", title="Hash")
     checksum: str = Field(
         ...,
-        description='SHA-256 checksum of the asset metadata to detect changes',
-        title='Checksum',
+        description="SHA-256 checksum of the asset metadata to detect changes",
+        title="Checksum",
     )
-    name: str = Field(..., description='Name of the asset', title='Name')
-    external_url: str = Field(
-        ..., description='External URL of the asset', title='External Url'
-    )
+    name: str = Field(..., description="Name of the asset", title="Name")
+    external_url: str = Field(..., description="External URL of the asset", title="External Url")
     links: list[str] = Field(
-        ..., description='Linked asset hashes referenced by this asset', title='Links'
+        ..., description="Linked asset hashes referenced by this asset", title="Links"
     )
     asset_type: AssetType = Field(
-        ..., description='Canonical asset content type', title='Asset Type'
+        ..., description="Canonical asset content type", title="Asset Type"
     )
     source_id: str | None = Field(
         None,
-        description='ID of the source this asset belongs to (optional for local runs)',
-        title='Source Id',
+        description="ID of the source this asset belongs to (optional for local runs)",
+        title="Source Id",
     )
     created_at: AwareDatetime = Field(
-        ..., description='The date and time the asset was created', title='Created At'
+        ..., description="The date and time the asset was created", title="Created At"
     )
     updated_at: AwareDatetime = Field(
         ...,
-        description='The date and time the asset was last updated',
-        title='Updated At',
+        description="The date and time the asset was last updated",
+        title="Updated At",
     )
     runner_id: str | None = Field(
         None,
-        description='ID of the runner that produced this asset (optional for local runs)',
-        title='Runner Id',
+        description="ID of the runner that produced this asset (optional for local runs)",
+        title="Runner Id",
     )
     findings: list[DetectionResult] | None = Field(
-        None, description='Detector findings for this asset', title='Findings'
+        None, description="Detector findings for this asset", title="Findings"
     )
     scan_stats: ScanStats | None = Field(
         None,
-        description='Statistics about the detector scan for this asset',
-        title='Scan Stats',
+        description="Statistics about the detector scan for this asset",
+        title="Scan Stats",
     )

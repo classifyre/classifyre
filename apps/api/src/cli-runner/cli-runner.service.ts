@@ -1014,12 +1014,29 @@ export class CliRunnerService implements OnApplicationBootstrap {
       return;
     }
 
-    await this.failRunner(runnerId, output || 'CLI Kubernetes Job failed', {
-      exitCode: result.exitCode,
-      output,
-      jobName: result.jobName,
-      namespace: result.namespace,
-    });
+    await this.failRunner(
+      runnerId,
+      this.kubernetesExitMessage(result.exitCode),
+      {
+        exitCode: result.exitCode,
+        output,
+        jobName: result.jobName,
+        namespace: result.namespace,
+      },
+    );
+  }
+
+  private kubernetesExitMessage(exitCode: number): string {
+    if (exitCode === 137) {
+      return 'Job was killed by the system (OOMKilled: process exceeded the memory limit). Try disabling memory-intensive detectors such as PII or Secrets.';
+    }
+    if (exitCode === 143) {
+      return 'Job was terminated (SIGTERM: deadline or manual stop exceeded).';
+    }
+    if (exitCode === 1) {
+      return 'Job exited with an error. See the details panel for the full output.';
+    }
+    return `Job failed with exit code ${exitCode}. See the details panel for the full output.`;
   }
 
   private async persistKubernetesExecutionIdentity(

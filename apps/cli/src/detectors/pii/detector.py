@@ -296,13 +296,30 @@ class PIIDetector(BaseDetector):
                     self._supported_entities = self.analyzer.get_supported_entities()
                     return
 
-                # Try to load spaCy model directly
+                cfg_model: str = getattr(self.config, "spacy_model", None) or "en_core_web_sm"
+                cfg_model_url: str | None = getattr(self.config, "spacy_model_url", None)
+
+                # Install model from URL if provided and model not yet available
+                if cfg_model_url:
+                    try:
+                        spacy.load(cfg_model)
+                    except OSError:
+                        logger.info("spaCy model '%s' not found; installing from URL...", cfg_model)
+                        import subprocess
+                        import sys
+
+                        subprocess.run(
+                            [sys.executable, "-m", "pip", "install", cfg_model_url],
+                            check=True,
+                            capture_output=True,
+                        )
+                        importlib.invalidate_caches()
+
                 try:
-                    nlp = spacy.load("en_core_web_sm")
-                    logger.debug("Loaded spaCy model en_core_web_sm")
+                    nlp = spacy.load(cfg_model)
+                    logger.debug("Loaded spaCy model %s", cfg_model)
                 except OSError:
-                    # Model not found, try to create a basic analyzer without NLP
-                    logger.warning("spaCy model not found, using basic analyzer")
+                    logger.warning("spaCy model '%s' not found, using basic analyzer", cfg_model)
                     self.analyzer = AnalyzerEngine()
                     self._supported_entities = self.analyzer.get_supported_entities()
                     return
@@ -341,7 +358,7 @@ class PIIDetector(BaseDetector):
                     low_score_entity_names=ner_config_module.LOW_SCORE_ENTITY_NAMES,
                 )
                 nlp_engine = SpacyNlpEngine(
-                    models=[{"lang_code": "en", "model_name": "en_core_web_sm"}],
+                    models=[{"lang_code": "en", "model_name": cfg_model}],
                     ner_model_configuration=ner_config,
                 )
                 nlp_engine.nlp = {"en": nlp}  # Set the loaded model directly
