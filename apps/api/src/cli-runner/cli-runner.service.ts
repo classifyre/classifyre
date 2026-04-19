@@ -1225,13 +1225,21 @@ export class CliRunnerService implements OnApplicationBootstrap {
           this.logger.warn(`Failed to parse CLI test output: ${error.message}`);
           payload = {
             status: 'FAILURE',
-            message: 'Failed to parse CLI test output.',
+            message: `Failed to parse CLI test output: ${trimmedOutput.substring(0, 1000)}${trimmedOutput.length > 1000 ? '...' : ''}`,
           };
         }
       }
 
-      if (exitCode !== 0 && payload.status !== 'FAILURE') {
-        payload.status = 'FAILURE';
+      if (exitCode !== 0) {
+        if (payload.status !== 'FAILURE') {
+          payload.status = 'FAILURE';
+        }
+        if (
+          (payload.message === 'Connection test failed.' || !payload.message) &&
+          stderr?.trim()
+        ) {
+          payload.message = stderr.trim();
+        }
       }
 
       return payload;
@@ -1263,6 +1271,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           : 'Connection test failed.',
     };
 
+    const nonJsonLines: string[] = [];
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) {
@@ -1274,13 +1283,23 @@ export class CliRunnerService implements OnApplicationBootstrap {
           payload = parsed as Record<string, any>;
         }
       } catch {
-        // Ignore non-JSON log lines.
+        nonJsonLines.push(trimmed);
       }
     }
 
-    if (result.exitCode !== 0 && payload.status !== 'FAILURE') {
-      payload.status = 'FAILURE';
+    if (result.exitCode !== 0) {
+      if (payload.status !== 'FAILURE') {
+        payload.status = 'FAILURE';
+      }
+      if (
+        (payload.message === 'Connection test failed.' || !payload.message) &&
+        nonJsonLines.length > 0
+      ) {
+        // Use last 20 non-JSON lines as error message
+        payload.message = nonJsonLines.slice(-20).join('\n');
+      }
     }
+
     if (!payload.message) {
       payload.message =
         result.exitCode === 0

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import ssl as ssl_module
 from collections.abc import AsyncGenerator
 from contextlib import closing
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from ...models.generated_input import (
     MySQLInput,
     MySQLOptionalConnection,
     MySQLOptionalScope,
+    MySQLSSLMode,
     SamplingConfig,
     SamplingStrategy,
 )
@@ -99,6 +101,35 @@ class MySQLSource(BaseSource):
     def _password(self) -> str:
         return self.config.masked.password
 
+    def _build_ssl_kwargs(self, connection_options: MySQLOptionalConnection) -> dict[str, Any]:
+        ssl_mode = connection_options.ssl_mode or MySQLSSLMode.PREFERRED
+        ssl_ca_pem = self.config.masked.ssl_ca
+
+        if ssl_mode == MySQLSSLMode.DISABLED:
+            return {"ssl_disabled": True}
+
+        if ssl_mode == MySQLSSLMode.PREFERRED and not ssl_ca_pem:
+            return {}
+
+        ctx = ssl_module.create_default_context()
+        if ssl_ca_pem:
+            # Normalize PEM: fix escaped newlines from JSON/env round-trips, strip whitespace
+            normalized = ssl_ca_pem.replace("\\n", "\n").replace("\r\n", "\n").strip()
+            ctx.load_verify_locations(cadata=normalized)
+
+        if ssl_mode == MySQLSSLMode.VERIFY_IDENTITY:
+            ctx.check_hostname = True
+            ctx.verify_mode = ssl_module.CERT_REQUIRED
+        elif ssl_mode == MySQLSSLMode.VERIFY_CA:
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl_module.CERT_REQUIRED
+        else:
+            # REQUIRED or PREFERRED with a CA cert — encrypt but don't verify
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl_module.CERT_NONE
+
+        return {"ssl": ctx}
+
     def _connect(self, database: str | None = None):
         connection_options = self._connection_options()
         connect_kwargs: dict[str, Any] = {
@@ -110,6 +141,11 @@ class MySQLSource(BaseSource):
         }
         if database:
             connect_kwargs["database"] = database
+
+        connect_kwargs.update(self._build_ssl_kwargs(connection_options))
+
+        if connection_options.allow_public_key_retrieval:
+            connect_kwargs["allow_public_key_retrieval"] = True
 
         connection = self._pymysql.connect(**connect_kwargs)
         connection.autocommit(True)

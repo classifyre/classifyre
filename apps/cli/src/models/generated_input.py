@@ -641,6 +641,18 @@ class PostgreSQLOptional(BaseModel):
     scope: PostgreSQLOptionalScope | None = None
 
 
+class MySQLSSLMode(StrEnum):
+    """
+    SSL/TLS connection mode. DISABLED: no TLS; PREFERRED: TLS when available (default); REQUIRED: mandate TLS without certificate verification; VERIFY_CA: mandate TLS and verify the CA certificate (requires ssl_ca); VERIFY_IDENTITY: mandate TLS, verify CA, and verify server hostname.
+    """
+
+    DISABLED = 'DISABLED'
+    PREFERRED = 'PREFERRED'
+    REQUIRED = 'REQUIRED'
+    VERIFY_CA = 'VERIFY_CA'
+    VERIFY_IDENTITY = 'VERIFY_IDENTITY'
+
+
 class MySQLRequired(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -655,6 +667,10 @@ class MySQLMasked(BaseModel):
     )
     username: str = Field(..., description='Database username')
     password: str = Field(..., description='Database password')
+    ssl_ca: str | None = Field(
+        None,
+        description='PEM-encoded CA certificate for SSL/TLS verification. Paste the full certificate content (-----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----). Required when ssl_mode is VERIFY_CA or VERIFY_IDENTITY.',
+    )
 
 
 class MySQLOptionalConnection(BaseModel):
@@ -667,6 +683,11 @@ class MySQLOptionalConnection(BaseModel):
     )
     connect_timeout_seconds: int | None = Field(
         10, description='Connection timeout in seconds', ge=1, le=120
+    )
+    ssl_mode: MySQLSSLMode | None = 'PREFERRED'
+    allow_public_key_retrieval: bool | None = Field(
+        False,
+        description='Allow automatic RSA public key retrieval from the server for caching_sha2_password authentication (MySQL 8+). Only needed when not using SSL and connecting to MySQL 8 servers using the default authentication plugin.',
     )
 
 
