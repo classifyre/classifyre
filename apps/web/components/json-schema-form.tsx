@@ -1598,22 +1598,22 @@ function SchemaField({
             </FormLabel>
           )}
           <FormControl>
-            {isPassword ? (
+            {isLongField ? (
+              <Textarea
+                placeholder={formatPlaceholder(name, normalizedSchema)}
+                {...field}
+                value={field.value ?? ""}
+                autoComplete="off"
+                disabled={disabled}
+                data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+              />
+            ) : isPassword ? (
               <Input
                 type="password"
                 placeholder={formatPlaceholder(name, normalizedSchema)}
                 {...field}
                 value={field.value ?? ""}
                 autoComplete="new-password"
-                disabled={disabled}
-                data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
-              />
-            ) : isLongField ? (
-              <Textarea
-                placeholder={formatPlaceholder(name, normalizedSchema)}
-                {...field}
-                value={field.value ?? ""}
-                autoComplete="off"
                 disabled={disabled}
                 data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
               />
