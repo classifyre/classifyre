@@ -497,7 +497,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.2.34"
+version = "0.2.36"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -792,7 +792,7 @@ tableau = [{ name = "tableauserverclient", specifier = ">=0.38,<1.0.0" }]
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.2.34"
+version = "0.2.36"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
