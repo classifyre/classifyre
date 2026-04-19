@@ -1557,7 +1557,10 @@ function SchemaField({
                 {...field}
                 value={field.value ?? ""}
                 onChange={(event) => {
-                  field.onChange(coerceNumberInput(event.target.value));
+                  const raw = event.target.value;
+                  // Store "" directly so RHF doesn't reset to the registered default.
+                  // The zod preprocess converts "" → undefined on validation/submit.
+                  field.onChange(raw === "" ? "" : coerceNumberInput(raw));
                 }}
                 autoComplete="off"
                 disabled={disabled}
