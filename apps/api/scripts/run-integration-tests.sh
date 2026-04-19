@@ -62,7 +62,11 @@ if [[ -n "${INTEGRATION_TEST_SCHEMA_KEY:-}" ]]; then
   echo "Using integration schema ${INTEGRATION_TEST_SCHEMA}"
 fi
 
-if [[ "${INTEGRATION_TEST_RESET_DB:-0}" == "1" ]]; then
+if [[ -n "${INTEGRATION_TEST_SCHEMA:-}" ]]; then
+  # Schema was freshly created by the prepare step — deploy directly.
+  echo "Applying migrations to fresh integration schema..."
+  bun run prisma:deploy
+elif [[ "${INTEGRATION_TEST_RESET_DB:-0}" == "1" ]]; then
   echo "Resetting integration database..."
   bunx prisma migrate reset --force
 else
