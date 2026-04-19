@@ -251,9 +251,7 @@ class TestGlinerExtraction:
         class MockGliner:
             def extract_entities(self, content: str, labels: dict[str, str], **_kwargs) -> dict:
                 return {
-                    "entities": {
-                        label: [{"text": "pizza", "confidence": 0.9}] for label in labels
-                    }
+                    "entities": {label: [{"text": "pizza", "confidence": 0.9}] for label in labels}
                 }
 
         ex._gliner_model = MockGliner()
