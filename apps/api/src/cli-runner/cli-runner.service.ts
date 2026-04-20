@@ -1014,9 +1014,14 @@ export class CliRunnerService implements OnApplicationBootstrap {
       return;
     }
 
+    const baseMessage = this.kubernetesExitMessage(result.exitCode);
+    const errorMessage = result.failureContext
+      ? `${baseMessage}\n\n${result.failureContext}`
+      : baseMessage;
+
     await this.failRunner(
       runnerId,
-      this.kubernetesExitMessage(result.exitCode),
+      errorMessage,
       {
         exitCode: result.exitCode,
         output,

@@ -22,6 +22,7 @@ interface CliJobResult {
   output: string;
   jobName: string;
   namespace: string;
+  failureContext?: string;
 }
 
 type CliJobLogHandler = (chunk: string) => Promise<void> | void;
@@ -531,7 +532,7 @@ export class KubernetesCliJobService {
     namespace: string,
     jobName: string,
     onLogChunk?: CliJobLogHandler,
-  ): Promise<{ succeeded: boolean; exitCode?: number; output: string }> {
+  ): Promise<{ succeeded: boolean; exitCode?: number; output: string; failureContext?: string }> {
     if (!this.batchApi) {
       throw new Error('Kubernetes batch API is not initialized');
     }
@@ -572,7 +573,12 @@ export class KubernetesCliJobService {
           latestOutput,
           onLogChunk,
         );
-        return { succeeded: false, exitCode, output: latestOutput };
+        const failureContext = await this.buildFailureContext(
+          namespace,
+          pod,
+          exitCode,
+        );
+        return { succeeded: false, exitCode, output: latestOutput, failureContext };
       }
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }
@@ -678,6 +684,70 @@ export class KubernetesCliJobService {
       }
     }
     return undefined;
+  }
+
+  private extractTerminationReason(pod?: V1Pod): string | undefined {
+    const statuses = pod?.status?.containerStatuses || [];
+    for (const status of statuses) {
+      const reason =
+        status.state?.terminated?.reason ||
+        status.lastState?.terminated?.reason;
+      if (reason) {
+        return reason;
+      }
+    }
+    return undefined;
+  }
+
+  private async fetchPodWarningEvents(
+    namespace: string,
+    podName: string,
+  ): Promise<string> {
+    if (!this.coreApi) {
+      return '';
+    }
+    try {
+      const response = await (this.coreApi as any).listNamespacedEvent({
+        namespace,
+        fieldSelector: `involvedObject.name=${podName},type=Warning`,
+      });
+      const eventList = this.unwrapBody<any>(response);
+      const items: any[] = eventList?.items || [];
+      if (items.length === 0) {
+        return '';
+      }
+      return items
+        .map((e: any) => `  [${e.reason ?? 'Unknown'}] ${e.message ?? ''}`.trimEnd())
+        .join('\n');
+    } catch {
+      return '';
+    }
+  }
+
+  private async buildFailureContext(
+    namespace: string,
+    pod: V1Pod | undefined,
+    exitCode: number | undefined,
+  ): Promise<string> {
+    const lines: string[] = [];
+
+    const reason = this.extractTerminationReason(pod);
+    if (reason) {
+      lines.push(`Termination reason: ${reason}`);
+    }
+
+    if (pod?.metadata?.name) {
+      const events = await this.fetchPodWarningEvents(namespace, pod.metadata.name);
+      if (events) {
+        lines.push(`Kubernetes warning events:\n${events}`);
+      }
+    }
+
+    if (lines.length === 0 && exitCode !== undefined) {
+      lines.push(`Pod exited with code ${exitCode}`);
+    }
+
+    return lines.join('\n\n');
   }
 
   private intEnv(name: string, defaultValue: number): number {
