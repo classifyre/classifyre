@@ -1059,8 +1059,6 @@ class DatabricksSource(BaseSource):
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
         sampling = self._sampling()
         batch_size = int(sampling.content_batch_size or self.CONTENT_BATCH_SIZE)
-        max_total_chars = int(sampling.max_total_chars or 20000)
-        max_columns = int(sampling.max_columns or 25)
 
         all_rows: list[tuple[Any, ...]] = []
         column_names: list[str] = []
@@ -1093,19 +1091,6 @@ class DatabricksSource(BaseSource):
                 offset += batch_size
 
                 if len(batch) < batch_size:
-                    break
-
-                estimated_chars = len(all_rows) * max_columns * 50
-                if estimated_chars >= max_total_chars:
-                    logger.info(
-                        "Content fetch capped at %d rows for %s.%s.%s: "
-                        "estimated size exceeds max_total_chars=%d",
-                        len(all_rows),
-                        table_ref.catalog,
-                        table_ref.schema,
-                        table_ref.table,
-                        max_total_chars,
-                    )
                     break
 
         logger.info(

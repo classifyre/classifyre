@@ -108,6 +108,7 @@ const getApiBase = () =>
     : (process.env.API_URL ?? "http://localhost:8000");
 
 export default function SourceViewPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useParams();
   const sourceId = params.id as string;
@@ -413,7 +414,7 @@ export default function SourceViewPage() {
                       data-icon="inline-start"
                     />
                   )}
-                  {getRunnerStatusBadgeLabel(source.runnerStatus)}
+                  {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
                 </Badge>
               </div>
             </div>
@@ -496,7 +497,7 @@ export default function SourceViewPage() {
                       data-icon="inline-start"
                     />
                   )}
-                  {getRunnerStatusBadgeLabel(source.runnerStatus)}
+                  {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
                 </Badge>
               </div>
               <div className="space-y-1">
@@ -578,7 +579,7 @@ export default function SourceViewPage() {
                         data-icon="inline-start"
                       />
                     )}
-                    {getRunnerStatusBadgeLabel(lastRunner.status)}
+                    {t(getRunnerStatusBadgeLabel(lastRunner.status))}
                   </Badge>
                 ) : (
                   <p className="text-sm">—</p>
@@ -738,7 +739,7 @@ export default function SourceViewPage() {
                                 data-icon="inline-start"
                               />
                             )}
-                            {getRunnerStatusBadgeLabel(runner.status)}
+                            {t(getRunnerStatusBadgeLabel(runner.status))}
                           </Badge>
                           <span className="truncate text-xs text-muted-foreground">
                             {formatRelative(runner.triggeredAt)}

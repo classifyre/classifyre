@@ -532,7 +532,12 @@ export class KubernetesCliJobService {
     namespace: string,
     jobName: string,
     onLogChunk?: CliJobLogHandler,
-  ): Promise<{ succeeded: boolean; exitCode?: number; output: string; failureContext?: string }> {
+  ): Promise<{
+    succeeded: boolean;
+    exitCode?: number;
+    output: string;
+    failureContext?: string;
+  }> {
     if (!this.batchApi) {
       throw new Error('Kubernetes batch API is not initialized');
     }
@@ -578,7 +583,12 @@ export class KubernetesCliJobService {
           pod,
           exitCode,
         );
-        return { succeeded: false, exitCode, output: latestOutput, failureContext };
+        return {
+          succeeded: false,
+          exitCode,
+          output: latestOutput,
+          failureContext,
+        };
       }
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }
@@ -717,7 +727,9 @@ export class KubernetesCliJobService {
         return '';
       }
       return items
-        .map((e: any) => `  [${e.reason ?? 'Unknown'}] ${e.message ?? ''}`.trimEnd())
+        .map((e: any) =>
+          `  [${e.reason ?? 'Unknown'}] ${e.message ?? ''}`.trimEnd(),
+        )
         .join('\n');
     } catch {
       return '';
@@ -737,7 +749,10 @@ export class KubernetesCliJobService {
     }
 
     if (pod?.metadata?.name) {
-      const events = await this.fetchPodWarningEvents(namespace, pod.metadata.name);
+      const events = await this.fetchPodWarningEvents(
+        namespace,
+        pod.metadata.name,
+      );
       if (events) {
         lines.push(`Kubernetes warning events:\n${events}`);
       }

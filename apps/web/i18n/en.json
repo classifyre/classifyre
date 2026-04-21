@@ -31,6 +31,7 @@
     "delete": "Delete",
     "edit": "Edit",
     "create": "Create",
+    "submit": "Submit",
     "send": "Send",
     "total": "Total",
     "type": "Type",
@@ -75,7 +76,14 @@
     "starting": "Starting...",
     "runningLabel": "Running...",
     "deleting": "Deleting...",
-    "training": "Training..."
+    "training": "Training...",
+    "of": "of",
+    "noItems": "0 {{label}}",
+    "finding": "finding",
+    "findings": "findings",
+    "statusError": "Error",
+    "statusPending": "Pending",
+    "notSet": "Not set"
   },
   "settings": {
     "title": "Settings",
@@ -100,6 +108,8 @@
   },
   "sources": {
     "title": "Sources",
+    "description": "Manage your data sources and connections",
+    "addSource": "Add Source",
     "totalSources": "Total Sources",
     "connectedSources": "Connected sources",
     "healthy": "Healthy",
@@ -695,6 +705,12 @@
     "noRuns": "No runs found",
     "noRunsHint": "Adjust filters to broaden the run search.",
     "loading": "Loading runs...",
+    "status": {
+      "completed": "Completed",
+      "running": "Running",
+      "pending": "Pending",
+      "error": "Error"
+    },
     "logs": {
       "search": "Search message",
       "noLogs": "No Logs Available",
@@ -719,7 +735,14 @@
     "createSource": "Create Source",
     "saveChanges": "Save Changes",
     "testConnection": "Test Connection",
-    "namePlaceholder": "Give your source a memorable name to identify it"
+    "namePlaceholder": "Give your source a memorable name to identify it",
+    "optionalParameters": "Optional Parameters",
+    "optionalParametersDesc": "Additional settings you can configure when the default connection setup is not enough.",
+    "validationFailed": "Validation failed. Complete all required fields before testing or saving.",
+    "noItemsAdded": "No {{label}} added yet.",
+    "addItem": "Add {{label}}",
+    "enterValue": "Enter value",
+    "itemIndex": "Item {{index}}"
   },
   "ai": {
     "ask": "Ask a question about this section...",

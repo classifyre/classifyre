@@ -178,6 +178,24 @@ export const SearchAssetsSortOrderEnum = {
 export type SearchAssetsSortOrder =
   (typeof SearchAssetsSortOrderEnum)[keyof typeof SearchAssetsSortOrderEnum];
 
+export const SearchSourcesSortByEnum = {
+  Name: "NAME",
+  Type: "TYPE",
+  Status: "STATUS",
+  CreatedAt: "CREATED_AT",
+  UpdatedAt: "UPDATED_AT",
+  LastRunAt: "LAST_RUN_AT",
+} as const;
+export type SearchSourcesSortBy =
+  (typeof SearchSourcesSortByEnum)[keyof typeof SearchSourcesSortByEnum];
+
+export const SearchSourcesSortOrderEnum = {
+  Asc: "ASC",
+  Desc: "DESC",
+} as const;
+export type SearchSourcesSortOrder =
+  (typeof SearchSourcesSortOrderEnum)[keyof typeof SearchSourcesSortOrderEnum];
+
 export type SearchAssetsPageInputDto = GeneratedSearchAssetsPageDto & {
   sortBy?: SearchAssetsSortBy;
   sortOrder?: SearchAssetsSortOrder;

@@ -31,6 +31,7 @@
     "delete": "Löschen",
     "edit": "Bearbeiten",
     "create": "Erstellen",
+    "submit": "Absenden",
     "send": "Senden",
     "total": "Gesamt",
     "type": "Typ",
@@ -75,7 +76,14 @@
     "starting": "Wird gestartet...",
     "runningLabel": "Läuft...",
     "deleting": "Wird gelöscht...",
-    "training": "Wird trainiert..."
+    "training": "Wird trainiert...",
+    "of": "von",
+    "noItems": "0 {{label}}",
+    "finding": "Befund",
+    "findings": "Befunde",
+    "statusError": "Fehler",
+    "statusPending": "Ausstehend",
+    "notSet": "Nicht festgelegt"
   },
   "settings": {
     "title": "Einstellungen",
@@ -100,6 +108,8 @@
   },
   "sources": {
     "title": "Quellen",
+    "description": "Datenquellen und Verbindungen verwalten",
+    "addSource": "Quelle hinzufügen",
     "totalSources": "Quellen gesamt",
     "connectedSources": "Verbundene Quellen",
     "healthy": "Fehlerfrei",
@@ -695,6 +705,12 @@
     "noRuns": "Keine Ausführungen gefunden",
     "noRunsHint": "Filter anpassen, um die Suche zu erweitern.",
     "loading": "Ausführungen werden geladen...",
+    "status": {
+      "completed": "Abgeschlossen",
+      "running": "Läuft...",
+      "pending": "Ausstehend",
+      "error": "Fehler"
+    },
     "logs": {
       "search": "Nachricht suchen",
       "noLogs": "Keine Protokolle verfügbar",
@@ -719,7 +735,14 @@
     "createSource": "Quelle erstellen",
     "saveChanges": "Änderungen speichern",
     "testConnection": "Verbindung testen",
-    "namePlaceholder": "Einen einprägsamen Namen für diese Quelle vergeben"
+    "namePlaceholder": "Einen einprägsamen Namen für diese Quelle vergeben",
+    "optionalParameters": "Optionale Parameter",
+    "optionalParametersDesc": "Zusätzliche Einstellungen, die konfiguriert werden können, wenn die Standardverbindung nicht ausreicht.",
+    "validationFailed": "Validierung fehlgeschlagen. Füllen Sie alle erforderlichen Felder aus, bevor Sie testen oder speichern.",
+    "noItemsAdded": "Noch keine {{label}} hinzugefügt.",
+    "addItem": "{{label}} hinzufügen",
+    "enterValue": "Wert eingeben",
+    "itemIndex": "Element {{index}}"
   },
   "ai": {
     "ask": "Eine Frage zu diesem Abschnitt stellen...",

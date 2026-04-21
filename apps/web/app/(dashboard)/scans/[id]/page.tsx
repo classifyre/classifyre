@@ -454,7 +454,7 @@ export default function RunnerDetailPage() {
                     data-icon="inline-start"
                   />
                 )}
-                {getRunnerStatusBadgeLabel(runner.status)}
+                {t(getRunnerStatusBadgeLabel(runner.status))}
               </Badge>
               <Badge variant="outline" className="rounded-[4px]">
                 {runner.triggerType}

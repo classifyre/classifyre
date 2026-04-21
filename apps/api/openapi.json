@@ -4457,6 +4457,26 @@
           "limit": {
             "type": "number",
             "default": 25
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "NAME",
+              "TYPE",
+              "STATUS",
+              "CREATED_AT",
+              "UPDATED_AT",
+              "LAST_RUN_AT"
+            ],
+            "default": "CREATED_AT"
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "default": "DESC"
           }
         }
       },
