@@ -728,29 +728,104 @@ class SnowflakeSource(BaseSource):
             },
         )
 
-    def _sample_table_rows(self, table_ref: TableRef) -> tuple[str, str] | None:
-        columns = self._available_columns(table_ref)
-        query, params = self._build_sampling_query(table_ref, columns)
-
-        with closing(self._connect()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query, params)
-                rows = cursor.fetchall()
-                description = getattr(cursor, "description", None) or []
-                column_names = [
-                    str(col[0]) for col in description if isinstance(col, tuple) and col
-                ]
-
-        normalized_rows: list[tuple[Any, ...]] = []
+    def _normalize_rows(self, rows: list[Any], column_names: list[str]) -> list[tuple[Any, ...]]:
+        normalized: list[tuple[Any, ...]] = []
         for row in rows:
             if isinstance(row, tuple):
-                normalized_rows.append(row)
+                normalized.append(row)
             elif isinstance(row, dict):
-                normalized_rows.append(tuple(row.get(column) for column in column_names))
+                normalized.append(tuple(row.get(column) for column in column_names))
+        return normalized
+
+    def _fetch_all_rows_batched(
+        self, table_ref: TableRef, base_query: str
+    ) -> tuple[list[tuple[Any, ...]], list[str]]:
+        sampling = self._sampling()
+        batch_size = int(sampling.content_batch_size or self.CONTENT_BATCH_SIZE)
+        max_total_chars = int(sampling.max_total_chars or 20000)
+        max_columns = int(sampling.max_columns or 25)
+
+        all_rows: list[tuple[Any, ...]] = []
+        column_names: list[str] = []
+        offset = 0
+        batch_num = 0
+
+        with closing(self._connect()) as conn:
+            while True:
+                paginated_query = f"{base_query} LIMIT {batch_size} OFFSET {offset}"
+                with conn.cursor() as cursor:
+                    cursor.execute(paginated_query, [])
+                    raw_batch = list(cursor.fetchall())
+                    if not column_names:
+                        description = getattr(cursor, "description", None) or []
+                        column_names = [
+                            str(col[0]) for col in description if isinstance(col, tuple) and col
+                        ]
+
+                if not raw_batch:
+                    break
+
+                batch = self._normalize_rows(raw_batch, column_names)
+                batch_num += 1
+                logger.debug(
+                    "Content batch %d: fetched %d rows from %s.%s.%s (offset=%d)",
+                    batch_num,
+                    len(batch),
+                    table_ref.database,
+                    table_ref.schema,
+                    table_ref.table,
+                    offset,
+                )
+                all_rows.extend(batch)
+                offset += batch_size
+
+                if len(raw_batch) < batch_size:
+                    break
+
+                estimated_chars = len(all_rows) * max_columns * 50
+                if estimated_chars >= max_total_chars:
+                    logger.info(
+                        "Content fetch capped at %d rows for %s.%s.%s: "
+                        "estimated size exceeds max_total_chars=%d",
+                        len(all_rows),
+                        table_ref.database,
+                        table_ref.schema,
+                        table_ref.table,
+                        max_total_chars,
+                    )
+                    break
+
+        logger.info(
+            "Fetched %d rows from %s.%s.%s in %d content batch(es)",
+            len(all_rows),
+            table_ref.database,
+            table_ref.schema,
+            table_ref.table,
+            batch_num,
+        )
+        return all_rows, column_names
+
+    def _sample_table_rows(self, table_ref: TableRef) -> tuple[str, str] | None:
+        columns = self._available_columns(table_ref)
+        sampling = self._sampling()
+        query, params = self._build_sampling_query(table_ref, columns)
+
+        if sampling.strategy == SamplingStrategy.ALL:
+            rows, column_names = self._fetch_all_rows_batched(table_ref, query)
+        else:
+            with closing(self._connect()) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query, params)
+                    raw_rows = cursor.fetchall()
+                    description = getattr(cursor, "description", None) or []
+                    column_names = [
+                        str(col[0]) for col in description if isinstance(col, tuple) and col
+                    ]
+            rows = self._normalize_rows(raw_rows, column_names)
 
         if not column_names:
             return None
-        return self._format_sample_content(table_ref, column_names, normalized_rows)
+        return self._format_sample_content(table_ref, column_names, rows)
 
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
         cached = self._content_cache.get(asset_id)

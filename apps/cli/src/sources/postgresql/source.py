@@ -532,15 +532,83 @@ class PostgreSQLSource(BaseSource):
             },
         )
 
-    def _sample_table_rows(self, table_ref: TableRef) -> tuple[str, str] | None:
-        columns = self._available_columns(table_ref)
-        query, params = self._build_sampling_query(table_ref, columns)
+    def _fetch_all_rows_batched(
+        self, table_ref: TableRef, base_query: str
+    ) -> tuple[list[tuple[Any, ...]], list[str]]:
+        sampling = self._sampling()
+        batch_size = int(sampling.content_batch_size or self.CONTENT_BATCH_SIZE)
+        max_total_chars = int(sampling.max_total_chars or 20000)
+        max_columns = int(sampling.max_columns or 25)
+
+        all_rows: list[tuple[Any, ...]] = []
+        column_names: list[str] = []
+        offset = 0
+        batch_num = 0
 
         with self._connect(table_ref.database) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query, params if params else None)
-                rows = cursor.fetchall()
-                column_names = [desc[0] for desc in cursor.description or []]
+            while True:
+                paginated_query = f"{base_query} LIMIT %s OFFSET %s"
+                with conn.cursor() as cursor:
+                    cursor.execute(paginated_query, [batch_size, offset])
+                    batch = list(cursor.fetchall())
+                    if not column_names and cursor.description:
+                        column_names = [desc[0] for desc in cursor.description]
+
+                if not batch:
+                    break
+
+                batch_num += 1
+                logger.debug(
+                    "Content batch %d: fetched %d rows from %s.%s.%s (offset=%d)",
+                    batch_num,
+                    len(batch),
+                    table_ref.database,
+                    table_ref.schema,
+                    table_ref.table,
+                    offset,
+                )
+                all_rows.extend(batch)
+                offset += batch_size
+
+                if len(batch) < batch_size:
+                    break
+
+                estimated_chars = len(all_rows) * max_columns * 50
+                if estimated_chars >= max_total_chars:
+                    logger.info(
+                        "Content fetch capped at %d rows for %s.%s.%s: "
+                        "estimated size exceeds max_total_chars=%d",
+                        len(all_rows),
+                        table_ref.database,
+                        table_ref.schema,
+                        table_ref.table,
+                        max_total_chars,
+                    )
+                    break
+
+        logger.info(
+            "Fetched %d rows from %s.%s.%s in %d content batch(es)",
+            len(all_rows),
+            table_ref.database,
+            table_ref.schema,
+            table_ref.table,
+            batch_num,
+        )
+        return all_rows, column_names
+
+    def _sample_table_rows(self, table_ref: TableRef) -> tuple[str, str] | None:
+        columns = self._available_columns(table_ref)
+        sampling = self._sampling()
+        query, params = self._build_sampling_query(table_ref, columns)
+
+        if sampling.strategy == SamplingStrategy.ALL:
+            rows, column_names = self._fetch_all_rows_batched(table_ref, query)
+        else:
+            with self._connect(table_ref.database) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query, params if params else None)
+                    rows = cursor.fetchall()
+                    column_names = [desc[0] for desc in cursor.description or []]
 
         if not column_names:
             return None

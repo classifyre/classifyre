@@ -342,3 +342,81 @@ def test_mssql_collect_dependency_links_respects_table_lineage_toggle(
     links = source._collect_dependency_links([])
 
     assert links == {}
+
+
+def test_mssql_sample_table_rows_batches_for_all_strategy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With strategy=ALL, _sample_table_rows must paginate via OFFSET/FETCH batches."""
+    source = MSSQLSource(
+        _recipe(
+            sampling={
+                "strategy": "ALL",
+                "content_batch_size": 10,
+                "max_total_chars": 20000,
+                "max_columns": 5,
+            }
+        )
+    )
+    table_ref = TableRef(
+        database="some_db", schema="some_schema", table="users", object_type="TABLE"
+    )
+
+    all_rows: list[tuple[Any, ...]] = [(i, f"item{i}") for i in range(1, 13)]
+    queries_issued: list[str] = []
+
+    class _BatchCursor:
+        def __init__(self) -> None:
+            self.description = [
+                ("id", None, None, None, None, None, None),
+                ("name", None, None, None, None, None, None),
+            ]
+            self._rows: list[tuple[Any, ...]] = []
+
+        def execute(self, query: str, params: Any = None) -> None:
+            queries_issued.append(query)
+            import re
+
+            m = re.search(r"OFFSET\s+(\d+)\s+ROWS\s+FETCH\s+NEXT\s+(\d+)", query, re.IGNORECASE)
+            if m:
+                offset, batch_size = int(m.group(1)), int(m.group(2))
+            else:
+                offset, batch_size = 0, len(all_rows)
+            self._rows = all_rows[offset : offset + batch_size]
+
+        def fetchall(self) -> list[tuple[Any, ...]]:
+            return list(self._rows)
+
+        def __enter__(self) -> _BatchCursor:
+            return self
+
+        def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+            return None
+
+    class _BatchConnection:
+        def cursor(self) -> _BatchCursor:
+            return _BatchCursor()
+
+        def autocommit(self, _enabled: bool) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+        def __enter__(self) -> _BatchConnection:
+            return self
+
+        def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+            return None
+
+    monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
+    monkeypatch.setattr(source, "_connect", lambda _db=None: _BatchConnection())
+
+    result = source._sample_table_rows(table_ref)
+
+    assert result is not None
+    _raw, text_content = result
+    assert len(queries_issued) == 2
+    assert all("OFFSET" in q and "FETCH NEXT" in q for q in queries_issued)
+    assert "item1" in text_content
+    assert "item12" in text_content

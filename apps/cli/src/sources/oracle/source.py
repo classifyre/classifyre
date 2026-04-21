@@ -691,15 +691,82 @@ class OracleSource(BaseSource):
             },
         )
 
-    def _sample_object_rows(self, object_ref: ObjectRef) -> tuple[str, str] | None:
-        columns = self._available_columns(object_ref)
-        query, _params = self._build_sampling_query(object_ref, columns)
+    def _fetch_all_rows_batched(
+        self, object_ref: ObjectRef, base_query: str
+    ) -> tuple[list[tuple[Any, ...]], list[str]]:
+        sampling = self._sampling()
+        batch_size = int(sampling.content_batch_size or self.CONTENT_BATCH_SIZE)
+        max_total_chars = int(sampling.max_total_chars or 20000)
+        max_columns = int(sampling.max_columns or 25)
+
+        all_rows: list[tuple[Any, ...]] = []
+        column_names: list[str] = []
+        offset = 0
+        batch_num = 0
 
         with closing(self._connect()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query)
-                rows = cursor.fetchall()
-                column_names = [desc[0] for desc in cursor.description or []]
+            while True:
+                paginated_query = (
+                    f"{base_query} OFFSET {offset} ROWS FETCH NEXT {batch_size} ROWS ONLY"
+                )
+                with conn.cursor() as cursor:
+                    cursor.execute(paginated_query)
+                    batch = list(cursor.fetchall())
+                    if not column_names and cursor.description:
+                        column_names = [desc[0] for desc in cursor.description]
+
+                if not batch:
+                    break
+
+                batch_num += 1
+                logger.debug(
+                    "Content batch %d: fetched %d rows from %s.%s (offset=%d)",
+                    batch_num,
+                    len(batch),
+                    object_ref.schema,
+                    object_ref.name,
+                    offset,
+                )
+                all_rows.extend(batch)
+                offset += batch_size
+
+                if len(batch) < batch_size:
+                    break
+
+                estimated_chars = len(all_rows) * max_columns * 50
+                if estimated_chars >= max_total_chars:
+                    logger.info(
+                        "Content fetch capped at %d rows for %s.%s: "
+                        "estimated size exceeds max_total_chars=%d",
+                        len(all_rows),
+                        object_ref.schema,
+                        object_ref.name,
+                        max_total_chars,
+                    )
+                    break
+
+        logger.info(
+            "Fetched %d rows from %s.%s in %d content batch(es)",
+            len(all_rows),
+            object_ref.schema,
+            object_ref.name,
+            batch_num,
+        )
+        return all_rows, column_names
+
+    def _sample_object_rows(self, object_ref: ObjectRef) -> tuple[str, str] | None:
+        columns = self._available_columns(object_ref)
+        sampling = self._sampling()
+        query, _params = self._build_sampling_query(object_ref, columns)
+
+        if sampling.strategy == SamplingStrategy.ALL:
+            rows, column_names = self._fetch_all_rows_batched(object_ref, query)
+        else:
+            with closing(self._connect()) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query)
+                    rows = cursor.fetchall()
+                    column_names = [desc[0] for desc in cursor.description or []]
 
         if not column_names:
             return None

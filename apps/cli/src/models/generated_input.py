@@ -165,6 +165,12 @@ class SamplingConfig(BaseModel):
         True,
         description='Tabular sources only. Include column names in sampled detector payload rows.',
     )
+    content_batch_size: int | None = Field(
+        500,
+        description='Tabular sources only. Number of rows fetched per round-trip when scanning content with strategy ALL. Prevents out-of-memory errors on large tables by paginating the fetch instead of loading all rows at once.',
+        ge=10,
+        le=10000,
+    )
 
 
 class Detector(BaseModel):

@@ -49,7 +49,7 @@ data:
               matcherRegex: '"trace_id":"(\w+)"'
               url: "$${__value.raw}"
               datasourceUid: tempo
-        isDefault: false
+        isDefault: {{ if not (index .Values "mimir-distributed" "enabled") }}true{{ else }}false{{ end }}
         editable: true
       {{- end }}
       {{- if index .Values "mimir-distributed" "enabled" }}
@@ -64,6 +64,15 @@ data:
             - name: traceID
               datasourceUid: tempo
         isDefault: true
+        editable: true
+      {{- end }}
+      {{- if and (index .Values "opentelemetry-collector" "enabled") (not (index .Values "mimir-distributed" "enabled")) }}
+      - name: Prometheus (OTel self-metrics)
+        type: prometheus
+        uid: prometheus
+        access: proxy
+        url: http://{{ $releaseName }}-opentelemetry-collector:8888
+        isDefault: false
         editable: true
       {{- end }}
 {{- end }}

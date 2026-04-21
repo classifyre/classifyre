@@ -14,8 +14,11 @@ class BaseSource(ABC):
     Abstract base class for all metadata extraction sources.
     """
 
-    # Default batch size for streaming results
+    # Default batch size for streaming asset results
     BATCH_SIZE: int = 50
+    # Default rows fetched per DB round-trip when scanning content with strategy ALL.
+    # Tabular sources must respect this to prevent OOM on large tables.
+    CONTENT_BATCH_SIZE: int = 500
     HAS_SUCCESSFUL_RUN_ENV = "CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN"
 
     def __init__(
