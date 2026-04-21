@@ -206,6 +206,13 @@
           "type": "boolean",
           "default": true,
           "description": "Tabular sources only. Include column names in sampled detector payload rows."
+        },
+        "content_batch_size": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 10000,
+          "default": 500,
+          "description": "Tabular sources only. Number of rows fetched per round-trip when scanning content with strategy ALL. Prevents out-of-memory errors on large tables by paginating the fetch instead of loading all rows at once."
         }
       },
       "required": [
@@ -219,7 +226,8 @@
         "max_columns": 25,
         "max_cell_chars": 512,
         "max_total_chars": 20000,
-        "include_column_names": true
+        "include_column_names": true,
+        "content_batch_size": 500
       },
       "additionalProperties": false
     },
