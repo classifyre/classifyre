@@ -398,14 +398,14 @@ export default function RunnerDetailPage() {
         <Card className="border-2 border-border rounded-[6px]">
           <CardContent className="py-12 text-center">
             <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Run Not Found</h3>
+            <h3 className="text-lg font-semibold mb-2">{t("scans.runNotFound")}</h3>
             <p className="text-muted-foreground mb-4">{error}</p>
             <Button
               variant="outline"
               className="rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
               onClick={() => router.push("/scans")}
             >
-              View All Scans
+              {t("scans.viewAllScans")}
             </Button>
           </CardContent>
         </Card>
@@ -473,7 +473,7 @@ export default function RunnerDetailPage() {
             disabled={!sourceDetailsId}
           >
             <FileText className="h-4 w-4" />
-            Source Details
+            {t("sources.detail.sourceDetails")}
           </Button>
           <Button
             variant="outline"
@@ -483,7 +483,7 @@ export default function RunnerDetailPage() {
             disabled={!sourceDetailsId}
           >
             <Pencil className="h-4 w-4" />
-            Edit Source
+            {t("sources.editSource")}
           </Button>
           <Button
             variant="outline"
@@ -525,10 +525,10 @@ export default function RunnerDetailPage() {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="h-auto rounded-[4px] border-2 border-black bg-background p-1">
           <TabsTrigger value="overview" className="rounded-[3px]" data-testid="tab-overview">
-            Overview
+            {t("scans.tabOverview")}
           </TabsTrigger>
           <TabsTrigger value="findings" className="rounded-[3px]" data-testid="tab-findings">
-            Findings
+            {t("scans.tabFindings")}
             {findingsTotal > 0 && (
               <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold">
                 {findingsTotal}
@@ -536,7 +536,7 @@ export default function RunnerDetailPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="assets" className="rounded-[3px]" data-testid="tab-assets">
-            Assets
+            {t("scans.tabAssets")}
             {assetsTotal > 0 && (
               <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold">
                 {assetsTotal}
@@ -544,7 +544,7 @@ export default function RunnerDetailPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="logs" className="rounded-[3px]" data-testid="tab-logs">
-            Logs
+            {t("scans.tabLogs")}
           </TabsTrigger>
         </TabsList>
 
@@ -561,7 +561,7 @@ export default function RunnerDetailPage() {
             <Card className="border-destructive/30 bg-destructive/5 rounded-[6px]">
               <CardHeader className="pb-2">
                 <CardTitle className="text-destructive text-base">
-                  Run failed
+                  {t("scans.runFailed")}
                 </CardTitle>
                 {runner.errorMessage && (
                   <CardDescription className="text-destructive/80">
@@ -600,7 +600,7 @@ export default function RunnerDetailPage() {
                   <CardContent>
                     <details className="group">
                       <summary className="cursor-pointer text-xs text-destructive/60 hover:text-destructive/80 mb-1 select-none">
-                        Show job output
+                        {t("scans.showJobOutput")}
                       </summary>
                       <pre className="text-xs text-destructive/80 bg-destructive/5 p-2 rounded max-h-64 overflow-auto break-all whitespace-pre-wrap">
                         {String(
@@ -737,7 +737,7 @@ export default function RunnerDetailPage() {
                   </span>
                 </div>
                 <div className="pt-1 flex items-center justify-between border-t">
-                  <span className="text-muted-foreground">Total Assets</span>
+                  <span className="text-muted-foreground">{t("sources.totalAssets")}</span>
                   <span className="font-semibold">
                     {assetsCharts.totals.totalAssets.toLocaleString()}
                   </span>
@@ -779,7 +779,7 @@ export default function RunnerDetailPage() {
           {isOverviewRefreshing && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Updating overview...
+              {t("scans.updatingOverview")}
             </div>
           )}
         </TabsContent>
