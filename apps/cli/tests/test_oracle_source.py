@@ -13,7 +13,7 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
         "type": "ORACLE",
         "required": {
             "host": "localhost",
-            "port": 1521,
+            "port": 11021,
             "service_name": "some_db",
         },
         "masked": {
@@ -175,7 +175,7 @@ def test_oracle_latest_sampling_falls_back_to_random() -> None:
         _recipe(
             sampling={
                 "strategy": "LATEST",
-                "rows_per_page": 5,
+                "rows_per_page": 10,
                 "fallback_to_random": True,
             },
         )
@@ -187,7 +187,7 @@ def test_oracle_latest_sampling_falls_back_to_random() -> None:
     query, params = source._build_sampling_query(object_ref, ["ID", "NAME"])
 
     assert "ORDER BY DBMS_RANDOM.VALUE" in query
-    assert "FETCH FIRST 5 ROWS ONLY" in query
+    assert "FETCH FIRST 10 ROWS ONLY" in query
     assert params == []
 
 
@@ -316,8 +316,9 @@ async def test_oracle_fetch_content_pages_batches_for_all_strategy(
 
     pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
 
-    assert len(queries_issued) == 2
-    assert all("OFFSET" in q and "FETCH NEXT" in q for q in queries_issued)
+    assert len(queries_issued) == 3
+    assert "COUNT" in queries_issued[0]
+    assert all("OFFSET" in q and "FETCH NEXT" in q for q in queries_issued[1:])
     assert len(pages) == 2
     assert "item1" in pages[0]
     assert "item12" in pages[1]

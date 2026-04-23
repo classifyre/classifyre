@@ -560,11 +560,10 @@ class PowerBISource(BaseSource):
         if sampling.strategy == SamplingStrategy.ALL:
             return refs
 
-        limit = int(sampling.rows_per_page or 100)
-        if limit >= len(refs):
-            return refs
-
         if sampling.strategy == SamplingStrategy.RANDOM:
+            limit = int(sampling.rows_per_page or 100)
+            if limit >= len(refs):
+                return refs
             generator = random.Random(0)
             sampled_indexes = sorted(generator.sample(range(len(refs)), k=limit))
             return [refs[index] for index in sampled_indexes]
@@ -575,6 +574,7 @@ class PowerBISource(BaseSource):
 
         if not has_order_values and sampling.fallback_to_random is not False:
             generator = random.Random(0)
+            limit = int(sampling.rows_per_page or 100)
             sampled_indexes = sorted(generator.sample(range(len(refs)), k=limit))
             return [refs[index] for index in sampled_indexes]
 
@@ -584,6 +584,7 @@ class PowerBISource(BaseSource):
             scored.append((parsed is not None, effective, ref))
 
         scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        limit = int(sampling.rows_per_page or 100)
         return [item[2] for item in scored[:limit]]
 
     def _asset_from_ref(

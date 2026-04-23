@@ -44,7 +44,7 @@ def test_normalize_source_recipe_copies_fetch_all_flag_from_optional_sampling():
             "optional": {
                 "sampling": {
                     "mode": "latest",
-                    "rows_per_page": 7,
+                    "rows_per_page": 15,
                     "fetch_all_until_first_success": True,
                 }
             },
@@ -52,7 +52,7 @@ def test_normalize_source_recipe_copies_fetch_all_flag_from_optional_sampling():
     )
 
     assert normalized["sampling"]["strategy"] == "LATEST"
-    assert normalized["sampling"]["rows_per_page"] == 7
+    assert normalized["sampling"]["rows_per_page"] == 15
     assert normalized["sampling"]["fetch_all_until_first_success"] is True
 
 

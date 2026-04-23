@@ -174,7 +174,7 @@ def test_mysql_latest_sampling_falls_back_to_random() -> None:
         _recipe(
             sampling={
                 "strategy": "LATEST",
-                "rows_per_page": 5,
+                "rows_per_page": 10,
                 "fallback_to_random": True,
             }
         )
@@ -184,7 +184,7 @@ def test_mysql_latest_sampling_falls_back_to_random() -> None:
     query, params = source._build_sampling_query(table_ref, ["id", "email"])
 
     assert "ORDER BY RAND()" in query
-    assert params == [5]
+    assert params == [10]
 
 
 @pytest.mark.asyncio
@@ -251,8 +251,9 @@ async def test_mysql_fetch_content_pages_batches_for_all_strategy(
 
     pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
 
-    assert len(queries_issued) == 2
-    assert all("LIMIT" in q and "OFFSET" in q for q, _ in queries_issued)
+    assert len(queries_issued) == 3
+    assert "COUNT" in queries_issued[0][0]
+    assert all("LIMIT" in q and "OFFSET" in q for q, _ in queries_issued[1:])
     assert len(pages) == 2
     assert "user1" in pages[0]
     assert "user12" in pages[1]
@@ -262,7 +263,7 @@ def test_mysql_sample_table_rows_no_batching_for_random_strategy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """With strategy=RANDOM, a single LIMIT query is used — no OFFSET batching."""
-    source = MySQLSource(_recipe(sampling={"strategy": "RANDOM", "rows_per_page": 5}))
+    source = MySQLSource(_recipe(sampling={"strategy": "RANDOM", "rows_per_page": 10}))
     table_ref = TableRef(database="app_db", table="users")
 
     queries_issued: list[str] = []

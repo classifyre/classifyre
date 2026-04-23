@@ -169,7 +169,7 @@ def test_hive_latest_sampling_falls_back_to_random() -> None:
         _recipe(
             sampling={
                 "strategy": "LATEST",
-                "rows_per_page": 5,
+                "rows_per_page": 10,
                 "fallback_to_random": True,
             },
         )
@@ -179,7 +179,7 @@ def test_hive_latest_sampling_falls_back_to_random() -> None:
     query, params = source._build_sampling_query(table_ref, ["id", "name"])
 
     assert "ORDER BY rand()" in query
-    assert "LIMIT 5" in query
+    assert "LIMIT 10" in query
     assert params == []
 
 
@@ -298,8 +298,9 @@ async def test_hive_fetch_content_pages_batches_for_all_strategy(
 
     pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
 
-    assert len(queries_issued) == 2
-    assert all("LIMIT" in q and "OFFSET" in q for q in queries_issued)
+    assert len(queries_issued) == 3
+    assert "COUNT" in queries_issued[0]
+    assert all("LIMIT" in q and "OFFSET" in q for q in queries_issued[1:])
     assert len(pages) == 2
     assert "item1" in pages[0]
     assert "item12" in pages[1]
