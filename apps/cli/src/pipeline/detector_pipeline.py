@@ -61,14 +61,8 @@ class DetectorPipeline:
         results: list[SingleAssetScanResults] = []
 
         for asset in assets:
-            try:
-                asset_with_findings = await self._process_single_asset(asset)
-                results.append(asset_with_findings)
-            except Exception as e:
-                logger.error(f"Failed to process asset {asset.name}: {e}")
-                # Still add asset without findings
-                asset.findings = []
-                results.append(asset)
+            asset_with_findings = await self._process_single_asset(asset)
+            results.append(asset_with_findings)
 
         return results
 
@@ -84,39 +78,64 @@ class DetectorPipeline:
         primary_content_type = self._asset_type_to_content_type(asset.asset_type)
         link_content = self._build_links_payload(asset.links)
 
-        needs_text_content = any(
-            self._supports_content_type(
-                detector.get_supported_content_types(), primary_content_type
-            )
+        text_detectors = [
+            detector
             for detector in self.detectors
-        )
+            if self._supports_content_type(
+                detector.get_supported_content_types(),
+                primary_content_type,
+            )
+        ]
+        link_detectors = [
+            detector
+            for detector in self.detectors
+            if link_content
+            and self._supports_content_type(
+                detector.get_supported_content_types(),
+                "application/x.asset-links",
+            )
+        ]
 
-        content = ""
-        content_size = 0
-        if needs_text_content:
-            content, _ = await self._fetch_content(asset)
-            content_size = len(content)
+        detector_names = [d.__class__.__name__ for d in text_detectors + link_detectors]
+        logger.info("Scanning %s [%s]", asset.name, ", ".join(detector_names))
 
-            if content_size > self.content_size_limit:
-                logger.warning(
-                    f"Content size ({content_size} bytes) exceeds limit "
-                    f"({self.content_size_limit} bytes) for {asset.name}"
-                )
-                content = content[: self.content_size_limit]
+        findings: list[DetectionResult] = []
+        detector_types_run: list[DetectorType] = []
 
-            if not content:
-                logger.warning(f"No content available for asset {asset.name}")
+        if text_detectors:
+            (
+                text_findings,
+                text_detector_types_run,
+                content_size,
+            ) = await self._run_text_detectors_for_asset(
+                asset=asset,
+                text_content_type=primary_content_type,
+                detectors=text_detectors,
+            )
+            findings.extend(text_findings)
+            detector_types_run = self._merge_detector_types(
+                detector_types_run,
+                text_detector_types_run,
+            )
+            if content_size == 0:
+                logger.warning("No content available for asset %s", asset.name)
+        else:
+            content_size = 0
 
-        # 3. Run detectors in parallel across supported payload types.
-        findings, detector_types_run = await self._run_detectors(
-            text_content=content,
-            text_content_type=primary_content_type,
-            link_content=link_content,
-        )
+        if link_detectors:
+            link_findings, link_detector_types_run = await self._run_detectors(
+                detectors=link_detectors,
+                content=link_content,
+                content_type="application/x.asset-links",
+            )
+            findings.extend(link_findings)
+            detector_types_run = self._merge_detector_types(
+                detector_types_run,
+                link_detector_types_run,
+            )
 
-        # 4. Enrich finding locations with source-specific human-readable references
-        for finding in findings:
-            self.source.enrich_finding_location(finding, asset, content)
+            for finding in link_findings:
+                self.source.enrich_finding_location(finding, asset, "")
 
         # 5. Calculate duration
         scan_duration = int((datetime.now(UTC) - scan_started).total_seconds() * 1000)
@@ -133,11 +152,60 @@ class DetectorPipeline:
             findings_count=len(findings),
         )
 
+        if findings:
+            logger.info(
+                "Scanned %s: %d finding(s) in %dms",
+                asset.name,
+                len(findings),
+                scan_duration,
+            )
+        else:
+            logger.info("Scanned %s: no findings (%dms)", asset.name, scan_duration)
+
         return asset
 
-    async def _fetch_content(self, asset: SingleAssetScanResults) -> tuple[str, str]:
-        """Fetch content for an asset."""
-        content_type = self._asset_type_to_content_type(asset.asset_type)
+    async def _run_text_detectors_for_asset(
+        self,
+        *,
+        asset: SingleAssetScanResults,
+        text_content_type: str,
+        detectors: list[BaseDetector],
+    ) -> tuple[list[DetectionResult], list[DetectorType], int]:
+        findings: list[DetectionResult] = []
+        detector_types_run: list[DetectorType] = []
+        content_size = 0
+
+        async for text_content in self._iter_text_content_pages(asset):
+            content_size += len(text_content)
+
+            detector_content = text_content
+            if len(detector_content) > self.content_size_limit:
+                logger.warning(
+                    f"Content size ({len(detector_content)} bytes) exceeds limit "
+                    f"({self.content_size_limit} bytes) for {asset.name}"
+                )
+                detector_content = detector_content[: self.content_size_limit]
+
+            if not detector_content:
+                continue
+
+            page_findings, page_detector_types_run = await self._run_detectors(
+                detectors=detectors,
+                content=detector_content,
+                content_type=text_content_type,
+            )
+            findings.extend(page_findings)
+            detector_types_run = self._merge_detector_types(
+                detector_types_run,
+                page_detector_types_run,
+            )
+
+            for finding in page_findings:
+                self.source.enrich_finding_location(finding, asset, detector_content)
+
+        return findings, detector_types_run, content_size
+
+    async def _iter_text_content_pages(self, asset: SingleAssetScanResults):
         candidate_ids: list[str] = []
 
         for candidate in (asset.external_url, asset.hash):
@@ -147,49 +215,57 @@ class DetectorPipeline:
             candidate_ids.append(value)
 
         for candidate_id in candidate_ids:
-            try:
-                result = await self.source.fetch_content(candidate_id)
-            except Exception as e:
-                logger.error(f"Failed to fetch content for candidate {candidate_id}: {e}")
-                continue
+            saw_candidate_content = False
+            async for _raw_content, text_content in self.source.fetch_content_pages(candidate_id):
+                if not text_content:
+                    continue
+                saw_candidate_content = True
+                yield text_content
 
-            if result is None:
-                continue
+            if saw_candidate_content:
+                return
 
-            _raw, text_content = result
-            if text_content:
-                return text_content, content_type
+    @staticmethod
+    def _merge_detector_types(
+        existing: list[DetectorType],
+        incoming: list[DetectorType],
+    ) -> list[DetectorType]:
+        merged = list(existing)
+        seen = set(existing)
+        for detector_type in incoming:
+            if detector_type in seen:
+                continue
+            seen.add(detector_type)
+            merged.append(detector_type)
+        return merged
+
+    async def _fetch_content(self, asset: SingleAssetScanResults) -> tuple[str, str]:
+        """Fetch content for an asset."""
+        content_type = self._asset_type_to_content_type(asset.asset_type)
+
+        async for text_content in self._iter_text_content_pages(asset):
+            return text_content, content_type
 
         return "", content_type
 
     async def _run_detectors(
         self,
         *,
-        text_content: str,
-        text_content_type: str,
-        link_content: str,
+        detectors: list[BaseDetector],
+        content: str,
+        content_type: str,
     ) -> tuple[list[DetectionResult], list[DetectorType]]:
-        """Run all compatible detectors in parallel."""
+        """Run all compatible detectors in parallel for a single payload."""
+        if not content:
+            return [], []
+
         tasks = []
         runnable_detectors: list[BaseDetector] = []
 
-        for detector in self.detectors:
+        for detector in detectors:
             supported = detector.get_supported_content_types()
-            if text_content and self._supports_content_type(supported, text_content_type):
-                tasks.append(self._run_single_detector(detector, text_content, text_content_type))
-                runnable_detectors.append(detector)
-
-            if link_content and self._supports_content_type(
-                supported,
-                "application/x.asset-links",
-            ):
-                tasks.append(
-                    self._run_single_detector(
-                        detector,
-                        link_content,
-                        "application/x.asset-links",
-                    )
-                )
+            if self._supports_content_type(supported, content_type):
+                tasks.append(self._run_single_detector(detector, content, content_type))
                 runnable_detectors.append(detector)
 
         if not tasks:
@@ -218,24 +294,33 @@ class DetectorPipeline:
         detected_at = datetime.now(UTC)
 
         for detector, result in zip(runnable_detectors, results, strict=False):
+            detector_name = detector.__class__.__name__
             if isinstance(result, Exception):
-                error_msg = f"Detector {detector.__class__.__name__} failed: {result}"
-                logger.error(error_msg)
+                logger.error("Detector %s failed: %s", detector_name, result)
                 continue
 
-            # Result is list[DetectionResult] - add runner_id and detected_at
+            detector_findings: list[DetectionResult] = []
             if isinstance(result, list):
                 for finding in result:
-                    # Ensure it's a DetectionResult object
                     if isinstance(finding, DetectionResult):
-                        # Create new instance with runner_id and detected_at
                         finding_with_meta = finding.model_copy(
                             update={
                                 "runner_id": self.runner_id,
                                 "detected_at": detected_at,
                             }
                         )
-                        all_findings.append(finding_with_meta)
+                        detector_findings.append(finding_with_meta)
+
+            if detector_findings:
+                logger.info(
+                    "  %s: %d finding(s)",
+                    detector_name,
+                    len(detector_findings),
+                )
+            else:
+                logger.info("  %s: no findings", detector_name)
+
+            all_findings.extend(detector_findings)
 
         return all_findings, detector_types_run
 

@@ -2,6 +2,7 @@
 
 import pytest
 
+from src.detectors.dependencies import MissingDependencyError
 from src.detectors.pii.detector import PIIDetector, _RegexPIIAnalyzer
 from src.models.generated_detectors import DetectorConfig, PIIDetectorConfig, Severity
 from src.sources.tabular_utils import format_tabular_sample_content
@@ -248,6 +249,27 @@ async def test_detect_falls_back_when_presidio_runtime_module_data_is_missing():
 
 
 @pytest.mark.asyncio
+async def test_detector_initialization_falls_back_when_presidio_import_is_broken(monkeypatch):
+    def _broken_require_module(*_args, **_kwargs):
+        raise MissingDependencyError(
+            detector_name="pii",
+            dependencies=["presidio_analyzer"],
+            uv_groups=["privacy", "detectors"],
+            detail="numpy.core.multiarray failed to import",
+        )
+
+    monkeypatch.setattr("src.detectors.pii.detector.require_module", _broken_require_module)
+
+    detector = PIIDetector()
+
+    assert isinstance(detector.analyzer, _RegexPIIAnalyzer)
+
+    results = await detector.detect("Contact: jane.doe@example.com")
+
+    assert any(result.finding_type == "EMAIL_ADDRESS" for result in results)
+
+
+@pytest.mark.asyncio
 async def test_enabled_patterns_filters_out_unconfigured_entities():
     class _StubAnalyzer:
         def analyze(self, text: str, language: str = "en"):
@@ -355,7 +377,6 @@ async def test_tabular_detection_scans_per_cell_and_filters_entities_by_column()
         ],
         column_names=["name", "email", "url", "company", "text"],
         serialize_cell=str,
-        max_total_chars=5_000,
         include_column_names=True,
     )
 
@@ -435,7 +456,6 @@ async def test_tabular_detection_drops_single_token_person_noise_from_text_colum
         rows=[("Patrick Clark", "Moore, Powell and Carter")],
         column_names=["name", "text"],
         serialize_cell=str,
-        max_total_chars=5_000,
         include_column_names=True,
     )
 

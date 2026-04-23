@@ -2322,7 +2322,7 @@ export const JsonSchemaForm = React.forwardRef<
         {samplingBlock && (
           <FormField
             control={form.control}
-            name={samplingBlock.key as never}
+            name={samplingBlock.key}
             render={({ field }) => (
               <SamplingCard
                 value={field.value as SamplingValue}

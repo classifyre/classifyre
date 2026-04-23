@@ -573,7 +573,10 @@ function SourceEditStepperContent({
   ) => {
     const validation = await sourceFormRef.current?.validate();
     if (!validation?.isValid) {
-      toast.error(t("sources.new.incompleteSettings"));
+      const errorMsg = validation?.errors?.length 
+        ? `${t("sources.new.incompleteSettings")}: ${validation.errors.slice(0, 3).join(", ")}`
+        : t("sources.new.incompleteSettings");
+      toast.error(errorMsg);
       scrollToSection("config");
       return;
     }

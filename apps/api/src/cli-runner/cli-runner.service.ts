@@ -968,14 +968,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         runnerId,
       );
 
-      const latestRunner = await this.prisma.runner.findUnique({
-        where: { id: runnerId },
-        select: { status: true },
-      });
-      if (!latestRunner || latestRunner.status !== RunnerStatus.RUNNING) {
-        this.logger.log(
-          `Runner ${runnerId} exited with code ${exitCode} after status changed to ${latestRunner?.status ?? 'MISSING'}; skipping final transition.`,
-        );
+      if (await this.shouldSkipRunnerFinalTransition(runnerId, exitCode)) {
         return;
       }
 
@@ -1009,6 +1002,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
         this.persistKubernetesExecutionIdentity(runnerId, jobName, namespace),
     );
     const output = result.output || '';
+    if (await this.shouldSkipRunnerFinalTransition(runnerId, result.exitCode)) {
+      return;
+    }
     if (result.exitCode === 0) {
       await this.completeRunner(runnerId);
       return;
@@ -1025,6 +1021,25 @@ export class CliRunnerService implements OnApplicationBootstrap {
       jobName: result.jobName,
       namespace: result.namespace,
     });
+  }
+
+  private async shouldSkipRunnerFinalTransition(
+    runnerId: string,
+    exitCode: number,
+  ): Promise<boolean> {
+    const latestRunner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { status: true },
+    });
+
+    if (!latestRunner || latestRunner.status !== RunnerStatus.RUNNING) {
+      this.logger.log(
+        `Runner ${runnerId} exited with code ${exitCode} after status changed to ${latestRunner?.status ?? 'MISSING'}; skipping final transition.`,
+      );
+      return true;
+    }
+
+    return false;
   }
 
   private kubernetesExitMessage(exitCode: number): string {

@@ -23,7 +23,7 @@ def _servicedesk_recipe(
             "account_email": "user@example.com",
         },
         "masked": {"api_token": "token"},
-        "sampling": {"strategy": strategy, "limit": 100},
+        "sampling": {"strategy": strategy},
     }
     if optional is not None:
         recipe["optional"] = optional

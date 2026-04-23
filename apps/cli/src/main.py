@@ -191,12 +191,14 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     raise
 
         except Exception as e:
-            logger.error("An error occurred during %s: %s", args.command, e, exc_info=True)
+            logger.debug("Traceback for %s failure:", args.command, exc_info=True)
+            logger.error("SCAN FAILED: %s", e)
             sys.exit(1)
         finally:
             source.cleanup()
     except Exception as e:
-        logger.error("Fatal error: %s", e, exc_info=True)
+        logger.debug("Traceback for fatal error:", exc_info=True)
+        logger.error("FATAL: %s", e)
         sys.exit(1)
 
 

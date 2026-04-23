@@ -254,11 +254,46 @@ class PIIDetector(BaseDetector):
             return True
         if "phonenumbers.data.region_" in error_text:
             return True
+        if "numpy.core.multiarray failed to import" in error_text:
+            return True
+        if "numpy.import_array" in error_text:
+            return True
+        if "dtype size changed" in error_text:
+            return True
         return False
+
+    def _activate_regex_fallback(
+        self,
+        error: Exception,
+        *,
+        initialization_error: bool = False,
+    ) -> None:
+        if initialization_error:
+            logger.warning(
+                "Presidio initialization unavailable for PII detector; using regex fallback: %s",
+                error,
+            )
+        else:
+            logger.error(f"Failed to initialize Presidio analyzer: {error}")
+            logger.exception(error)
+
+        self.analyzer = _RegexPIIAnalyzer()
+        self._supported_entities = self.analyzer.get_supported_entities()
+        logger.warning("PII detector initialized with regex fallback analyzer")
 
     def __init__(self, config: DetectorConfig | None = None):
         """Initialize PII detector with Presidio."""
         super().__init__(config)
+
+        native_pii_enabled = os.environ.get("CLASSIFYRE_ENABLE_NATIVE_PII", "").strip().lower()
+        if native_pii_enabled not in {"1", "true", "yes"}:
+            self.analyzer = _RegexPIIAnalyzer()
+            self._supported_entities = self.analyzer.get_supported_entities()
+            logger.info(
+                "PII detector using regex fallback analyzer by default; "
+                "set CLASSIFYRE_ENABLE_NATIVE_PII=1 to enable native Presidio."
+            )
+            return
 
         # Initialize Presidio analyzer
         try:
@@ -372,18 +407,10 @@ class PIIDetector(BaseDetector):
                     f"Initialized PII detector with {len(self._supported_entities)} entity types"
                 )
 
-        except MissingDependencyError:
-            raise
+        except MissingDependencyError as e:
+            self._activate_regex_fallback(e, initialization_error=True)
         except Exception as e:
-            logger.error(f"Failed to initialize Presidio analyzer: {e}")
-            logger.exception(e)
-            # Fallback to a lightweight regex analyzer so detector remains usable
-            # even when Presidio package data is missing in the runtime image.
-            self.analyzer = _RegexPIIAnalyzer()
-            self._supported_entities = self.analyzer.get_supported_entities()
-            logger.warning(
-                "PII detector initialized with regex fallback analyzer due to Presidio setup error"
-            )
+            self._activate_regex_fallback(e)
 
     def _enabled_pattern_keys(self) -> set[str] | None:
         configured = getattr(self.config, "enabled_patterns", None)
@@ -525,10 +552,14 @@ class PIIDetector(BaseDetector):
             analyzer_results = _RegexPIIAnalyzer().analyze(text=content, language="en")
             return self._filter_results_by_entity_types(analyzer_results, allowed_entity_types)
 
-        supported_entity_types = set(self._supported_entities or [])
-        filtered_entity_types = allowed_entity_types & supported_entity_types
-        if not filtered_entity_types:
-            return []
+        filtered_entity_types = allowed_entity_types
+        get_supported_entities = getattr(self.analyzer, "get_supported_entities", None)
+        if callable(get_supported_entities):
+            supported_entity_types = set(self._supported_entities or [])
+            if supported_entity_types:
+                filtered_entity_types = allowed_entity_types & supported_entity_types
+                if not filtered_entity_types:
+                    return []
 
         return self._analyze_content(content, entities=sorted(filtered_entity_types))
 

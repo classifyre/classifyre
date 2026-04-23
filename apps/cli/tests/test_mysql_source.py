@@ -18,12 +18,9 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
         },
         "optional": {
             "scope": {"database": "app_db"},
-            "sampling": {
-                "rows": 10,
-                "strategy": "RANDOM",
-                "max_columns": 10,
-                "max_cell_chars": 256,
-            },
+        },
+        "sampling": {
+            "strategy": "RANDOM",
         },
     }
     base.update(overrides)
@@ -175,13 +172,10 @@ async def test_mysql_fetch_content_uses_cache(
 def test_mysql_latest_sampling_falls_back_to_random() -> None:
     source = MySQLSource(
         _recipe(
-            optional={
-                "scope": {"database": "app_db"},
-                "sampling": {
-                    "rows": 5,
-                    "strategy": "LATEST",
-                    "fallback_to_random": True,
-                },
+            sampling={
+                "strategy": "LATEST",
+                "rows_per_page": 5,
+                "fallback_to_random": True,
             }
         )
     )
@@ -193,23 +187,22 @@ def test_mysql_latest_sampling_falls_back_to_random() -> None:
     assert params == [5]
 
 
-def test_mysql_sample_table_rows_batches_for_all_strategy(
+@pytest.mark.asyncio
+async def test_mysql_fetch_content_pages_batches_for_all_strategy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """With strategy=ALL, _sample_table_rows must paginate via LIMIT/OFFSET batches."""
+    """With strategy=ALL, fetch_content_pages must paginate via LIMIT/OFFSET batches."""
     source = MySQLSource(
         _recipe(
             sampling={
                 "strategy": "ALL",
-                "content_batch_size": 10,
-                "max_total_chars": 20000,
-                "max_columns": 5,
+                "rows_per_page": 10,
             }
         )
     )
     table_ref = TableRef(database="app_db", table="users")
+    asset = source._table_to_asset(table_ref)
 
-    # 12 rows total → 2 batches (10 + 2)
     all_rows: list[tuple[Any, ...]] = [(i, f"user{i}") for i in range(1, 13)]
     queries_issued: list[tuple[str, list[Any]]] = []
 
@@ -256,23 +249,20 @@ def test_mysql_sample_table_rows_batches_for_all_strategy(
     monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
     monkeypatch.setattr(source, "_connect", lambda _db=None: _BatchConnection())
 
-    result = source._sample_table_rows(table_ref)
+    pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
 
-    assert result is not None
-    _raw_json, text_content = result
-    # Two batches: rows [0:10] and [10:20] (last returns 2 rows → stops)
     assert len(queries_issued) == 2
     assert all("LIMIT" in q and "OFFSET" in q for q, _ in queries_issued)
-    # First and last rows must appear in the formatted content
-    assert "user1" in text_content
-    assert "user12" in text_content
+    assert len(pages) == 2
+    assert "user1" in pages[0]
+    assert "user12" in pages[1]
 
 
 def test_mysql_sample_table_rows_no_batching_for_random_strategy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """With strategy=RANDOM, a single LIMIT query is used — no OFFSET batching."""
-    source = MySQLSource(_recipe(sampling={"strategy": "RANDOM", "limit": 5}))
+    source = MySQLSource(_recipe(sampling={"strategy": "RANDOM", "rows_per_page": 5}))
     table_ref = TableRef(database="app_db", table="users")
 
     queries_issued: list[str] = []

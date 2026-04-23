@@ -8,14 +8,6 @@ from typing import Any
 from ..models.generated_single_asset_scan_results import Location
 
 
-def _truncate_text(value: str, max_chars: int) -> str:
-    if len(value) <= max_chars:
-        return value
-    if max_chars <= 3:
-        return value[:max_chars]
-    return f"{value[: max_chars - 3]}..."
-
-
 @dataclass(frozen=True)
 class TabularCellMatch:
     row_index: int
@@ -31,7 +23,6 @@ def format_tabular_sample_content(
     rows: list[tuple[Any, ...]],
     column_names: list[str],
     serialize_cell: Any,
-    max_total_chars: int,
     include_column_names: bool,
     object_type: str | None = None,
     raw_metadata: dict[str, Any] | None = None,
@@ -73,7 +64,7 @@ def format_tabular_sample_content(
     if object_type:
         raw_payload["object_type"] = object_type
 
-    text_content = _truncate_text("\n".join(lines).rstrip(), max_total_chars)
+    text_content = "\n".join(lines).rstrip()
     return json.dumps(raw_payload, ensure_ascii=False), text_content
 
 

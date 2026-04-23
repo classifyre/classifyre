@@ -22,12 +22,9 @@ export type SamplingStrategy = "RANDOM" | "LATEST" | "ALL";
 export type SamplingValue = {
   strategy: SamplingStrategy;
   fetch_all_until_first_success?: boolean | undefined;
-  limit?: number | undefined;
   order_by_column?: string | undefined;
   fallback_to_random?: boolean | undefined;
-  max_columns?: number | undefined;
-  max_cell_chars?: number | undefined;
-  max_total_chars?: number | undefined;
+  rows_per_page?: number | undefined;
   include_column_names?: boolean | undefined;
 };
 
@@ -82,11 +79,6 @@ export function SamplingCard({
     onChange({ ...value, strategy });
   };
 
-  const handleLimitChange = (raw: string) => {
-    const parsed = parseInt(raw, 10);
-    onChange({ ...value, limit: isNaN(parsed) ? undefined : parsed });
-  };
-
   const handleFetchAllUntilFirstSuccessChange = (checked: boolean) => {
     onChange({ ...value, fetch_all_until_first_success: checked });
   };
@@ -95,22 +87,11 @@ export function SamplingCard({
     onChange({ ...value, order_by_column: raw || undefined });
   };
 
-  const handleMaxColumnsChange = (raw: string) => {
+  const handleRowsPerPageChange = (raw: string) => {
     const parsed = parseInt(raw, 10);
-    onChange({ ...value, max_columns: isNaN(parsed) ? undefined : parsed });
+    onChange({ ...value, rows_per_page: isNaN(parsed) ? undefined : parsed });
   };
 
-  const handleMaxCellCharsChange = (raw: string) => {
-    const parsed = parseInt(raw, 10);
-    onChange({ ...value, max_cell_chars: isNaN(parsed) ? undefined : parsed });
-  };
-
-  const handleMaxTotalCharsChange = (raw: string) => {
-    const parsed = parseInt(raw, 10);
-    onChange({ ...value, max_total_chars: isNaN(parsed) ? undefined : parsed });
-  };
-
-  const showLimit = value.strategy !== "ALL";
   const showOrderByColumn = isTabular && value.strategy === "LATEST";
 
   return (
@@ -213,29 +194,6 @@ export function SamplingCard({
           </div>
         </div>
 
-        {showLimit && (
-          <>
-            <div className="space-y-1.5">
-              <Label className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
-                {t("sources.sampling.limit")}
-              </Label>
-              <Input
-                type="number"
-                min={1}
-                max={100000}
-                placeholder="100"
-                value={value.limit ?? ""}
-                onChange={(e) => handleLimitChange(e.target.value)}
-                disabled={disabled}
-                className="font-mono text-xs border-2 border-border/40 focus:border-border rounded-[4px] h-9"
-              />
-              <p className="text-[10px] text-muted-foreground font-mono pl-0.5">
-                {t("sources.sampling.maxItems")}
-              </p>
-            </div>
-          </>
-        )}
-
         {/* ── Tabular advanced ───────────────────────────────────────────────── */}
         {isTabular && (
           <Accordion type="multiple">
@@ -267,55 +225,22 @@ export function SamplingCard({
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                      {t("sources.sampling.maxColumns")}
-                    </Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={500}
-                      placeholder="25"
-                      value={value.max_columns ?? ""}
-                      onChange={(e) => handleMaxColumnsChange(e.target.value)}
-                      disabled={disabled}
-                      className="font-mono text-xs border-2 border-border/40 focus:border-border rounded-[4px] h-9"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                      {t("sources.sampling.maxCellChars")}
-                    </Label>
-                    <Input
-                      type="number"
-                      min={16}
-                      max={50000}
-                      placeholder="512"
-                      value={value.max_cell_chars ?? ""}
-                      onChange={(e) => handleMaxCellCharsChange(e.target.value)}
-                      disabled={disabled}
-                      className="font-mono text-xs border-2 border-border/40 focus:border-border rounded-[4px] h-9"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-1">
                   <Label className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                    {t("sources.sampling.maxTotalChars")}
+                    {t("sources.sampling.rowsPerPage")}
                   </Label>
                   <Input
                     type="number"
-                    min={128}
-                    max={500000}
-                    placeholder="20000"
-                    value={value.max_total_chars ?? ""}
-                    onChange={(e) => handleMaxTotalCharsChange(e.target.value)}
+                    min={10}
+                    max={10000}
+                    placeholder="100"
+                    value={value.rows_per_page ?? ""}
+                    onChange={(e) => handleRowsPerPageChange(e.target.value)}
                     disabled={disabled}
                     className="font-mono text-xs border-2 border-border/40 focus:border-border rounded-[4px] h-9"
                   />
                   <p className="text-[10px] text-muted-foreground font-mono pl-0.5">
-                    {t("sources.sampling.maxTotalCharsDesc")}
+                    {t("sources.sampling.rowsPerPageDesc")}
                   </p>
                 </div>
               </AccordionContent>
@@ -339,24 +264,18 @@ export function SamplingCard({
 export function defaultSamplingValue(sampling?: {
   strategy?: string;
   fetch_all_until_first_success?: boolean;
-  limit?: number;
   order_by_column?: string;
   fallback_to_random?: boolean;
-  max_columns?: number;
-  max_cell_chars?: number;
-  max_total_chars?: number;
+  rows_per_page?: number;
   include_column_names?: boolean;
 }): SamplingValue {
   return {
     strategy: (sampling?.strategy as SamplingStrategy) ?? "RANDOM",
     fetch_all_until_first_success:
       sampling?.fetch_all_until_first_success ?? false,
-    limit: sampling?.limit ?? 100,
     order_by_column: sampling?.order_by_column,
     fallback_to_random: sampling?.fallback_to_random,
-    max_columns: sampling?.max_columns,
-    max_cell_chars: sampling?.max_cell_chars,
-    max_total_chars: sampling?.max_total_chars,
+    rows_per_page: sampling?.rows_per_page,
     include_column_names: sampling?.include_column_names,
   };
 }

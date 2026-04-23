@@ -155,7 +155,7 @@
     "SamplingConfig": {
       "title": "SamplingConfig",
       "type": "object",
-      "description": "Controls how much content is extracted from each source. Apply to every source type: for tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake) limit is rows per table; for unstructured/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk) limit is items/pages/documents/assets per run.",
+      "description": "Controls how content is extracted from each source. For tabular sources rows_per_page controls both sample size for RANDOM/LATEST and pagination batch size for ALL.",
       "properties": {
         "strategy": {
           "$ref": "#/definitions/SamplingStrategy"
@@ -163,14 +163,7 @@
         "fetch_all_until_first_success": {
           "type": "boolean",
           "default": false,
-          "description": "When true, force strategy ALL until this source gets its first successful run. After the first successful run, use strategy/limit as configured."
-        },
-        "limit": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 100000,
-          "default": 100,
-          "description": "Maximum number of items to sample per asset (rows for tabular, pages/items for unstructured). Ignored when strategy is ALL."
+          "description": "When true, force strategy ALL until this source gets its first successful run. After the first successful run, use the configured strategy."
         },
         "order_by_column": {
           "type": "string",
@@ -181,38 +174,17 @@
           "default": true,
           "description": "Tabular sources only. Fallback to RANDOM ordering when LATEST mode cannot resolve an ordering column."
         },
-        "max_columns": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 500,
-          "default": 25,
-          "description": "Tabular sources only. Maximum number of columns to include per sampled row."
-        },
-        "max_cell_chars": {
-          "type": "integer",
-          "minimum": 16,
-          "maximum": 50000,
-          "default": 512,
-          "description": "Tabular sources only. Maximum characters per cell in detector payload formatting."
-        },
-        "max_total_chars": {
-          "type": "integer",
-          "minimum": 128,
-          "maximum": 500000,
-          "default": 20000,
-          "description": "Tabular sources only. Maximum total formatted payload size sent to detectors per asset."
-        },
         "include_column_names": {
           "type": "boolean",
           "default": true,
           "description": "Tabular sources only. Include column names in sampled detector payload rows."
         },
-        "content_batch_size": {
+        "rows_per_page": {
           "type": "integer",
           "minimum": 10,
           "maximum": 10000,
-          "default": 500,
-          "description": "Tabular sources only. Number of rows fetched per round-trip when scanning content with strategy ALL. Prevents out-of-memory errors on large tables by paginating the fetch instead of loading all rows at once."
+          "default": 100,
+          "description": "Tabular sources only. Number of rows per sample (RANDOM/LATEST) or per pagination batch (ALL). Controls memory usage during large table scans."
         }
       },
       "required": [
@@ -221,13 +193,9 @@
       "default": {
         "strategy": "RANDOM",
         "fetch_all_until_first_success": false,
-        "limit": 100,
         "fallback_to_random": true,
-        "max_columns": 25,
-        "max_cell_chars": 512,
-        "max_total_chars": 20000,
         "include_column_names": true,
-        "content_batch_size": 500
+        "rows_per_page": 100
       },
       "additionalProperties": false
     },

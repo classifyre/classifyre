@@ -16,9 +16,6 @@ class BaseSource(ABC):
 
     # Default batch size for streaming asset results
     BATCH_SIZE: int = 50
-    # Default rows fetched per DB round-trip when scanning content with strategy ALL.
-    # Tabular sources must respect this to prevent OOM on large tables.
-    CONTENT_BATCH_SIZE: int = 500
     HAS_SUCCESSFUL_RUN_ENV = "CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN"
 
     def __init__(
@@ -57,7 +54,6 @@ class BaseSource(ABC):
             return
 
         sampling["strategy"] = "ALL"
-        sampling.pop("limit", None)
 
     @staticmethod
     def _read_bool_env(name: str) -> bool | None:
@@ -166,6 +162,17 @@ class BaseSource(ABC):
                 return fallback_value
 
         raise ValueError("Asset external_url is required")
+
+    async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
+        """
+        Async generator yielding (raw_content, text_content) pages for an asset.
+
+        Default: yields a single result from fetch_content.
+        Tabular sources override this to stream pages for ALL strategy.
+        """
+        result = await self.fetch_content(asset_id)
+        if result:
+            yield result
 
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
         """

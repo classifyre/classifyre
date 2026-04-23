@@ -203,20 +203,9 @@ function normalizeSampling(config: JsonRecord) {
     normalizeSamplingStrategy(optionalSampling?.mode) ??
     'RANDOM';
 
-  const limit =
-    asPositiveInteger(sampling.limit) ??
-    asPositiveInteger(optionalSampling?.limit) ??
-    asPositiveInteger(optionalContent?.limit_total_items) ??
-    asPositiveInteger(optionalCrawl?.max_pages) ??
-    asPositiveInteger(optionalIngestion?.limit_total_messages) ??
-    100;
-
   sampling.strategy = strategy;
-  if (strategy !== 'ALL') {
-    sampling.limit = limit;
-  } else {
-    delete sampling.limit;
-  }
+  delete sampling.limit;
+  delete sampling.max_columns;
 
   const orderByColumn =
     typeof sampling.order_by_column === 'string'
@@ -238,25 +227,11 @@ function normalizeSampling(config: JsonRecord) {
     sampling.fallback_to_random = fallbackToRandom;
   }
 
-  const maxColumns =
-    asPositiveInteger(sampling.max_columns) ??
-    asPositiveInteger(optionalSampling?.max_columns);
-  if (maxColumns !== undefined) {
-    sampling.max_columns = maxColumns;
-  }
-
-  const maxCellChars =
-    asPositiveInteger(sampling.max_cell_chars) ??
-    asPositiveInteger(optionalSampling?.max_cell_chars);
-  if (maxCellChars !== undefined) {
-    sampling.max_cell_chars = maxCellChars;
-  }
-
-  const maxTotalChars =
-    asPositiveInteger(sampling.max_total_chars) ??
-    asPositiveInteger(optionalSampling?.max_total_chars);
-  if (maxTotalChars !== undefined) {
-    sampling.max_total_chars = maxTotalChars;
+  const rowsPerPage =
+    asPositiveInteger(sampling.rows_per_page) ??
+    asPositiveInteger(optionalSampling?.rows_per_page);
+  if (rowsPerPage !== undefined) {
+    sampling.rows_per_page = rowsPerPage;
   }
 
   const includeColumnNames =

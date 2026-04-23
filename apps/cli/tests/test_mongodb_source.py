@@ -31,7 +31,6 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
         },
         "sampling": {
             "strategy": "RANDOM",
-            "limit": 10,
         },
     }
     base.update(overrides)
@@ -259,7 +258,7 @@ async def test_mongodb_fetch_content_uses_cache(
 
 
 def test_mongodb_random_sampling_uses_sample_pipeline() -> None:
-    source = MongoDBSource(_recipe(sampling={"strategy": "RANDOM", "limit": 3}))
+    source = MongoDBSource(_recipe(sampling={"strategy": "RANDOM", "rows_per_page": 3}))
     collection = _FakeCollection([{"_id": i, "value": f"v-{i}"} for i in range(10)])
     fake_client = _FakeMongoClient({"finanzen": _FakeDatabase({"transactions": collection})})
     source._mongo_client = fake_client
@@ -277,7 +276,7 @@ def test_mongodb_latest_sampling_falls_back_to_random_when_order_column_missing(
         _recipe(
             sampling={
                 "strategy": "LATEST",
-                "limit": 2,
+                "rows_per_page": 2,
                 "order_by_column": "updated_at",
                 "fallback_to_random": True,
             }

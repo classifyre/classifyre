@@ -279,10 +279,6 @@ describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
           },
           sampling: {
             strategy: 'RANDOM',
-            limit: 100,
-            max_columns: 25,
-            max_cell_chars: 1024,
-            max_total_chars: 100000,
             fallback_to_random: true,
             include_column_names: true,
           },

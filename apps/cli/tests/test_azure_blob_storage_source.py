@@ -24,7 +24,6 @@ def _recipe() -> dict:
         },
         "sampling": {
             "strategy": "LATEST",
-            "limit": 5,
         },
     }
 

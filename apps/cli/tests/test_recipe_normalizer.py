@@ -8,13 +8,31 @@ def test_normalize_source_recipe_keeps_fetch_all_until_first_success():
             "required": {"host": "db.local", "port": 5432},
             "sampling": {
                 "strategy": "RANDOM",
-                "limit": 5,
                 "fetch_all_until_first_success": True,
             },
         }
     )
 
     assert normalized["sampling"]["strategy"] == "RANDOM"
+    assert normalized["sampling"]["fetch_all_until_first_success"] is True
+
+
+def test_normalize_source_recipe_strips_legacy_limit_and_max_columns():
+    normalized = normalize_source_recipe(
+        {
+            "type": "POSTGRESQL",
+            "required": {"host": "db.local", "port": 5432},
+            "sampling": {
+                "strategy": "RANDOM",
+                "limit": 50,
+                "max_columns": 10,
+                "fetch_all_until_first_success": True,
+            },
+        }
+    )
+
+    assert "limit" not in normalized["sampling"]
+    assert "max_columns" not in normalized["sampling"]
     assert normalized["sampling"]["fetch_all_until_first_success"] is True
 
 
@@ -26,7 +44,7 @@ def test_normalize_source_recipe_copies_fetch_all_flag_from_optional_sampling():
             "optional": {
                 "sampling": {
                     "mode": "latest",
-                    "limit": 7,
+                    "rows_per_page": 7,
                     "fetch_all_until_first_success": True,
                 }
             },
@@ -34,7 +52,7 @@ def test_normalize_source_recipe_copies_fetch_all_flag_from_optional_sampling():
     )
 
     assert normalized["sampling"]["strategy"] == "LATEST"
-    assert normalized["sampling"]["limit"] == 7
+    assert normalized["sampling"]["rows_per_page"] == 7
     assert normalized["sampling"]["fetch_all_until_first_success"] is True
 
 

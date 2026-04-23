@@ -258,7 +258,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         if strategy == SamplingStrategy.ALL:
             return refs
 
-        limit = int(self.config.sampling.limit or 100)
+        limit = int(self.config.sampling.rows_per_page or 100)
         if limit >= len(refs):
             return refs
 

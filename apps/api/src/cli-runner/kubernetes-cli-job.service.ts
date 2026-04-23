@@ -144,6 +144,9 @@ export class KubernetesCliJobService {
       });
     } catch (error: any) {
       if (this.isNotFound(error)) {
+        this.logger.warn(
+          `CLI Job ${jobRef.namespace}/${jobRef.jobName} not found - may have been stopped manually or already removed`,
+        );
         return;
       }
       throw error;

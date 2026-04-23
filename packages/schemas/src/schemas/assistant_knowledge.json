@@ -305,7 +305,7 @@
             "Use LATEST with order_by_column=updated_at to focus on recently changed rows.",
             "Use RANDOM for a broad, unbiased sample across all tables.",
             "Use ALL to read every row \u2014 only suitable for small tables or targeted audits.",
-            "Tune max_columns and max_cell_chars to control content size per row."
+            "Use rows_per_page to control sample size for RANDOM/LATEST and pagination batch size for ALL strategy."
           ]
         }
       }
@@ -357,7 +357,7 @@
             "Use LATEST with order_by_column=updated_at to focus on recently changed rows.",
             "Use RANDOM for a broad, unbiased sample across all tables.",
             "Use ALL to read every row \u2014 only suitable for small tables or targeted audits.",
-            "Tune max_columns and max_cell_chars to control content size per row."
+            "Use rows_per_page to control sample size for RANDOM/LATEST and pagination batch size for ALL strategy."
           ]
         }
       }
@@ -413,7 +413,7 @@
             "Use LATEST with order_by_column=updated_at to focus on recently changed rows.",
             "Use RANDOM for a broad, unbiased sample across tables and views.",
             "Use ALL to read every row \u2014 only suitable for small datasets or targeted audits.",
-            "Tune max_columns and max_cell_chars to control content size per row."
+            "Use rows_per_page to control sample size for RANDOM/LATEST and pagination batch size for ALL strategy."
           ]
         }
       }
@@ -466,7 +466,7 @@
             "Use LATEST with order_by_column=updated_at to focus on recently changed rows.",
             "Use RANDOM for a broad, unbiased sample across tables and views.",
             "Use ALL to read every row \u2014 only suitable for small datasets or targeted audits.",
-            "Tune max_columns and max_cell_chars to control content size per row."
+            "Use rows_per_page to control sample size for RANDOM/LATEST and pagination batch size for ALL strategy."
           ]
         }
       }
@@ -520,7 +520,7 @@
             "Use LATEST with order_by_column=updated_at when tables store recency fields.",
             "Use RANDOM for broad coverage across Hive objects.",
             "Use ALL for complete scans on small datasets or targeted audits.",
-            "Tune max_columns and max_cell_chars to cap detector payload size."
+            "Use rows_per_page to control sample size for RANDOM/LATEST and pagination batch size for ALL strategy."
           ]
         }
       }
@@ -686,7 +686,7 @@
             "Use ALL only for small, targeted collections — reads every document.",
             "Set limit (default 100) to the number of documents per collection; lower values (10-30) for large clusters, higher (200+) for focused audits.",
             "Set order_by_column to a timestamp field (e.g. updated_at) combined with LATEST to get truly recent documents; set fallback_to_random=true so collections without that field still get sampled.",
-            "Tune max_total_chars (default 20000) and max_cell_chars to control content size sent to detectors."
+            "Use rows_per_page to control sample size for RANDOM/LATEST and pagination batch size for ALL strategy."
           ]
         },
         "detectors": {
@@ -1002,7 +1002,7 @@
       "For MongoDB, LATEST uses newest documents first (by _id ordering) and RANDOM uses document-level random sampling per collection.",
       "For PowerBI, sampling applies to discovered workspaces/datasets/reports/dashboards: LATEST sorts by metadata timestamps when available, RANDOM samples assets uniformly, and ALL keeps full inventory coverage.",
       "For Tableau, sampling applies to discovered workbooks and datasources: LATEST uses metadata timestamps (for example updated_at), RANDOM samples assets uniformly, and ALL keeps the full inventory.",
-      "max_columns, max_cell_chars, and max_total_chars cap content size per row for tabular sources."
+      "For tabular sources, rows_per_page controls sample size for RANDOM/LATEST and pagination batch size for ALL strategy."
     ],
     "strategies": {
       "RANDOM": "Pick a random subset of items each run. Provides broad, unbiased coverage.",

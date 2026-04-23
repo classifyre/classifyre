@@ -22,9 +22,6 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
         },
         "sampling": {
             "strategy": "RANDOM",
-            "limit": 10,
-            "max_columns": 10,
-            "max_cell_chars": 256,
         },
     }
     base.update(overrides)
@@ -220,7 +217,7 @@ def test_mssql_latest_sampling_falls_back_to_random() -> None:
         _recipe(
             sampling={
                 "strategy": "LATEST",
-                "limit": 5,
+                "rows_per_page": 5,
                 "fallback_to_random": True,
             },
         )
@@ -344,23 +341,23 @@ def test_mssql_collect_dependency_links_respects_table_lineage_toggle(
     assert links == {}
 
 
-def test_mssql_sample_table_rows_batches_for_all_strategy(
+@pytest.mark.asyncio
+async def test_mssql_fetch_content_pages_batches_for_all_strategy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """With strategy=ALL, _sample_table_rows must paginate via OFFSET/FETCH batches."""
+    """With strategy=ALL, fetch_content_pages must paginate via OFFSET/FETCH batches."""
     source = MSSQLSource(
         _recipe(
             sampling={
                 "strategy": "ALL",
-                "content_batch_size": 10,
-                "max_total_chars": 20000,
-                "max_columns": 5,
+                "rows_per_page": 10,
             }
         )
     )
     table_ref = TableRef(
         database="some_db", schema="some_schema", table="users", object_type="TABLE"
     )
+    asset = source._table_to_asset(table_ref)
 
     all_rows: list[tuple[Any, ...]] = [(i, f"item{i}") for i in range(1, 13)]
     queries_issued: list[str] = []
@@ -412,11 +409,10 @@ def test_mssql_sample_table_rows_batches_for_all_strategy(
     monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
     monkeypatch.setattr(source, "_connect", lambda _db=None: _BatchConnection())
 
-    result = source._sample_table_rows(table_ref)
+    pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
 
-    assert result is not None
-    _raw, text_content = result
     assert len(queries_issued) == 2
     assert all("OFFSET" in q and "FETCH NEXT" in q for q in queries_issued)
-    assert "item1" in text_content
-    assert "item12" in text_content
+    assert len(pages) == 2
+    assert "item1" in pages[0]
+    assert "item12" in pages[1]

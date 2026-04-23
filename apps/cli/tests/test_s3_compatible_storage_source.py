@@ -10,10 +10,10 @@ from src.sources.s3_compatible_storage.source import S3CompatibleStorageSource
 from src.utils.file_parser import ParsedBytes
 
 
-def _recipe(*, strategy: str = "LATEST", limit: int | None = 2) -> dict:
+def _recipe(*, strategy: str = "LATEST", rows_per_page: int | None = 2) -> dict:
     sampling: dict[str, object] = {"strategy": strategy}
-    if limit is not None:
-        sampling["limit"] = limit
+    if rows_per_page is not None:
+        sampling["rows_per_page"] = rows_per_page
 
     return {
         "type": "S3_COMPATIBLE_STORAGE",
@@ -39,7 +39,7 @@ def _ref(key: str, *, days_ago: int, size: int = 128) -> ObjectRef:
 
 
 def test_s3_storage_sampling_random_is_deterministic():
-    source = S3CompatibleStorageSource(_recipe(strategy="RANDOM", limit=2))
+    source = S3CompatibleStorageSource(_recipe(strategy="RANDOM", rows_per_page=2))
     refs = [
         _ref("exports/a.txt", days_ago=4),
         _ref("exports/b.txt", days_ago=3),
@@ -57,7 +57,7 @@ def test_s3_storage_sampling_random_is_deterministic():
 
 @pytest.mark.asyncio
 async def test_s3_storage_extract_applies_latest_sampling_and_asset_types(monkeypatch):
-    source = S3CompatibleStorageSource(_recipe(strategy="LATEST", limit=2))
+    source = S3CompatibleStorageSource(_recipe(strategy="LATEST", rows_per_page=2))
     refs = [
         _ref("exports/old.csv", days_ago=10),
         _ref("exports/new.csv", days_ago=0),

@@ -212,53 +212,6 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [
-    "detect_secrets.*",
-    "cryptography.*",
-    "presidio_analyzer.*",
-    "presidio_anonymizer.*",
-    "spacy.*",
-    "phonenumbers.*",
-    "detoxify.*",
-    "transformers.*",
-    "torch.*",
-    "yara.*",
-    "nudenet.*",
-    "fast_langdetect.*",
-    "bandit.*",
-    "datasketch.*",
-    "sentence_transformers.*",
-    "pytesseract.*",
-    "optimum.*",
-    "onnxruntime.*",
-    "timm.*",
-]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = ["filetype.*", "pdfplumber.*", "docx.*", "openpyxl.*", "chardet.*", "pyarrow.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = ["opentelemetry.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = [
-    "src.models.generated_input",
-    "src.models.generated_detectors",
-    "src.models.generated_single_asset_scan_results",
-    "scripts.*",
-]
-# Generated files — suppress all mypy errors
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = ["tests.*"]
-# Tests don't need full strict typing
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = [
     "src.detectors.*",
     "src.models.detectors.*",
     "src.sources.*",
@@ -266,8 +219,6 @@ module = [
     "src.utils.*",
     "src.outputs.*",
 ]
-# Disable remaining false positives after pydantic plugin
-disable_error_code = ["call-arg", "assignment", "no-untyped-def", "no-untyped-call", "no-any-return", "union-attr", "attr-defined", "arg-type", "misc", "list-item", "comparison-overlap", "type-arg", "return-value", "dict-item", "unused-ignore"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

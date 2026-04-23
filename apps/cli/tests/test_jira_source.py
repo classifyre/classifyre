@@ -31,7 +31,7 @@ def _jira_recipe(
         },
         "masked": {"api_token": "token"},
         **({"optional": optional} if optional else {}),
-        "sampling": {"strategy": strategy, "limit": 100},
+        "sampling": {"strategy": strategy},
     }
 
 

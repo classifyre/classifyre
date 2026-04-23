@@ -23,7 +23,7 @@ def _confluence_recipe(
         },
         "masked": {"api_token": "token"},
         "optional": optional or {},
-        "sampling": {"strategy": strategy, "limit": 100},
+        "sampling": {"strategy": strategy},
     }
 
 

@@ -123,9 +123,6 @@ def normalize_source_recipe(
         normalized["type"] = source_type_value
 
     optional = _as_dict(normalized.get("optional"))
-    optional_content = _as_dict(optional.get("content"))
-    optional_crawl = _as_dict(optional.get("crawl"))
-    optional_ingestion = _as_dict(optional.get("ingestion"))
     optional_sampling = _as_dict(optional.get("sampling"))
     sampling = _as_dict(normalized.get("sampling"))
 
@@ -135,28 +132,16 @@ def normalize_source_recipe(
         _normalize_sampling_strategy(optional_sampling.get("mode")),
         "RANDOM",
     )
-    limit = _pick(
-        _as_positive_int(sampling.get("limit")),
-        _as_positive_int(optional_sampling.get("limit")),
-        _as_positive_int(optional_sampling.get("rows")),
-        _as_positive_int(optional_content.get("limit_total_items")),
-        _as_positive_int(optional_crawl.get("max_pages")),
-        _as_positive_int(optional_ingestion.get("limit_total_messages")),
-        100,
-    )
 
     sampling["strategy"] = strategy
-    if strategy != "ALL":
-        sampling["limit"] = limit
-    else:
-        sampling.pop("limit", None)
+    # Strip removed fields so legacy recipes with limit/max_columns don't fail validation
+    sampling.pop("limit", None)
+    sampling.pop("max_columns", None)
 
     for key in (
         "order_by_column",
         "fallback_to_random",
-        "max_columns",
-        "max_cell_chars",
-        "max_total_chars",
+        "rows_per_page",
         "include_column_names",
     ):
         if key not in sampling and key in optional_sampling:
@@ -174,9 +159,6 @@ def normalize_source_recipe(
     normalized["sampling"] = sampling
 
     optional.pop("sampling", None)
-    optional_content.pop("limit_total_items", None)
-    optional_crawl.pop("max_pages", None)
-    optional_ingestion.pop("limit_total_messages", None)
 
     if optional:
         normalized["optional"] = optional
