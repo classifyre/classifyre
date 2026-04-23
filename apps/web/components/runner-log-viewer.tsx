@@ -15,8 +15,18 @@ import { Checkbox } from "@workspace/ui/components/checkbox";
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { Input } from "@workspace/ui/components/input";
 import { Toggle } from "@workspace/ui/components/toggle";
+import {
+  MultiSelect,
+  MultiSelectContent,
+  MultiSelectGroup,
+  MultiSelectItem,
+  MultiSelectTrigger,
+  MultiSelectValue,
+} from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
 import {
+  ArrowDown,
+  ArrowUp,
   Copy,
   Download,
   FileText,
@@ -36,6 +46,8 @@ type LogLevel =
   | "ERROR"
   | "FATAL"
   | "UNKNOWN";
+
+type SortOrder = "newest-first" | "oldest-first";
 
 type ParsedLogEntry = {
   entry: RunnerLogEntryDto;
@@ -68,6 +80,16 @@ const LEVEL_CLASS: Record<LogLevel, string> = {
   FATAL: "border-red-700/50 text-red-700 dark:text-red-300",
   UNKNOWN: "border-muted-foreground/30 text-muted-foreground",
 };
+
+const ALL_LEVELS: LogLevel[] = [
+  "TRACE",
+  "DEBUG",
+  "INFO",
+  "WARN",
+  "ERROR",
+  "FATAL",
+  "UNKNOWN",
+];
 
 function parseStructuredPayload(
   message: string,
@@ -207,6 +229,8 @@ export function RunnerLogViewer({
 }: RunnerLogViewerProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
+  const [levelFilter, setLevelFilter] = useState<LogLevel[]>([]);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("newest-first");
   const [selectedCursor, setSelectedCursor] = useState<string | null>(null);
   const [selectedCursors, setSelectedCursors] = useState<Set<string>>(
     () => new Set(),
@@ -233,13 +257,17 @@ export function RunnerLogViewer({
 
   const filteredEntries = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return parsedEntries.filter((item) => {
-      if (!normalizedQuery) {
-        return true;
+    const base = parsedEntries.filter((item) => {
+      if (normalizedQuery && !item.searchText.includes(normalizedQuery)) {
+        return false;
       }
-      return item.searchText.includes(normalizedQuery);
+      if (levelFilter.length > 0 && !levelFilter.includes(item.level)) {
+        return false;
+      }
+      return true;
     });
-  }, [parsedEntries, query]);
+    return sortOrder === "newest-first" ? [...base].reverse() : base;
+  }, [parsedEntries, query, levelFilter, sortOrder]);
 
   const selectedEntry = useMemo(() => {
     if (!selectedCursor) {
@@ -259,25 +287,38 @@ export function RunnerLogViewer({
     return filteredEntries.filter((item) => selected.has(item.entry.cursor));
   }, [filteredEntries, selectedCursors]);
 
+  // Reset to "following latest" when sort order changes
+  useEffect(() => {
+    setFollowing(true);
+  }, [sortOrder]);
+
   const handleScroll = useCallback(() => {
     const container = listRef.current;
     if (!container) {
       return;
     }
-    const nearBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight <
-      36;
-    setFollowing(nearBottom);
-  }, []);
+    if (sortOrder === "newest-first") {
+      setFollowing(container.scrollTop < 36);
+    } else {
+      const nearBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight <
+        36;
+      setFollowing(nearBottom);
+    }
+  }, [sortOrder]);
 
   const jumpToLatest = useCallback(() => {
     const container = listRef.current;
     if (!container) {
       return;
     }
-    container.scrollTop = container.scrollHeight;
+    if (sortOrder === "newest-first") {
+      container.scrollTop = 0;
+    } else {
+      container.scrollTop = container.scrollHeight;
+    }
     setFollowing(true);
-  }, []);
+  }, [sortOrder]);
 
   useEffect(() => {
     if (!following) {
@@ -287,8 +328,12 @@ export function RunnerLogViewer({
     if (!container) {
       return;
     }
-    container.scrollTop = container.scrollHeight;
-  }, [following, filteredEntries.length]);
+    if (sortOrder === "newest-first") {
+      container.scrollTop = 0;
+    } else {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [following, filteredEntries.length, sortOrder]);
 
   const exportRows = useCallback((rows: ParsedLogEntry[]) => {
     return rows
@@ -408,15 +453,21 @@ export function RunnerLogViewer({
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">Auto refresh</span>
-            <Toggle
-              variant="outline"
-              size="sm"
-              pressed={autoRefreshEnabled}
-              onPressedChange={onAutoRefreshChange}
-            >
-              {autoRefreshEnabled ? "On" : "Off"}
-            </Toggle>
+            {isRunning && (
+              <>
+                <span className="text-xs text-muted-foreground">
+                  Auto refresh
+                </span>
+                <Toggle
+                  variant="outline"
+                  size="sm"
+                  pressed={autoRefreshEnabled}
+                  onPressedChange={onAutoRefreshChange}
+                >
+                  {autoRefreshEnabled ? "On" : "Off"}
+                </Toggle>
+              </>
+            )}
             <span className="text-xs text-muted-foreground">Wrap lines</span>
             <Toggle
               variant="outline"
@@ -455,14 +506,69 @@ export function RunnerLogViewer({
           </div>
         </div>
 
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search message"
-            className="pl-8"
-          />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search message"
+              className="pl-8"
+            />
+          </div>
+
+          <MultiSelect
+            values={levelFilter}
+            onValuesChange={(values) => setLevelFilter(values as LogLevel[])}
+          >
+            <MultiSelectTrigger className="h-9 w-[160px]">
+              <MultiSelectValue placeholder="All levels" />
+            </MultiSelectTrigger>
+            <MultiSelectContent
+              search={{
+                placeholder: "Search levels...",
+                emptyMessage: "No levels found",
+              }}
+            >
+              <MultiSelectGroup>
+                {ALL_LEVELS.map((level) => (
+                  <MultiSelectItem key={level} value={level}>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 text-xs font-mono",
+                        LEVEL_CLASS[level],
+                      )}
+                    >
+                      {level}
+                    </span>
+                  </MultiSelectItem>
+                ))}
+              </MultiSelectGroup>
+            </MultiSelectContent>
+          </MultiSelect>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            onClick={() =>
+              setSortOrder((prev) =>
+                prev === "newest-first" ? "oldest-first" : "newest-first",
+              )
+            }
+          >
+            {sortOrder === "newest-first" ? (
+              <>
+                <ArrowDown className="h-3.5 w-3.5" />
+                Newest first
+              </>
+            ) : (
+              <>
+                <ArrowUp className="h-3.5 w-3.5" />
+                Oldest first
+              </>
+            )}
+          </Button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -676,7 +782,7 @@ export function RunnerLogViewer({
                 {loadingMore ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Load Newer
+                Load More
               </Button>
             )}
           </div>
