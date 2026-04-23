@@ -118,7 +118,7 @@ class WordPressSource(BaseSource):
         content_options = self._content_options()
         sampling = self.config.sampling
         limit: int | None = (
-            None if sampling.strategy == SamplingStrategy.ALL else (sampling.limit or 100)
+            None if sampling.strategy == SamplingStrategy.ALL else int(sampling.rows_per_page or 100)
         )
         total_items_extracted = 0
 
