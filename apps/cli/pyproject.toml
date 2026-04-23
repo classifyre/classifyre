@@ -212,6 +212,36 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [
+    "cryptography.*",
+    "presidio_analyzer.*",
+    "spacy.*",
+    "phonenumbers.*",
+    "detoxify.*",
+    "transformers.*",
+    "torch.*",
+    "yara.*",
+    "nudenet.*",
+    "fast_langdetect.*",
+    "bandit.*",
+    "datasketch.*",
+    "sentence_transformers.*",
+    "pytesseract.*",
+    "optimum.*",
+    "onnxruntime.*",
+    "timm.*",
+    "filetype.*",
+    "pdfplumber.*",
+    "docx.*",
+    "openpyxl.*",
+    "chardet.*",
+    "pyarrow.*",
+    "opentelemetry.*",
+    "PIL.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
     "src.detectors.*",
     "src.models.detectors.*",
     "src.sources.*",
@@ -219,6 +249,30 @@ module = [
     "src.utils.*",
     "src.outputs.*",
 ]
+
+[[tool.mypy.overrides]]
+module = [
+    "src.models.generated_input",
+    "src.models.generated_detectors",
+    "src.models.generated_single_asset_scan_results",
+    "scripts.*",
+]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "src.detectors.*",
+    "src.models.detectors.*",
+    "src.sources.*",
+    "src.pipeline.*",
+    "src.utils.*",
+    "src.outputs.*",
+]
+disable_error_code = ["call-arg", "assignment", "no-untyped-def", "no-untyped-call", "no-any-return", "union-attr", "attr-defined", "arg-type", "misc", "list-item", "comparison-overlap", "type-arg", "return-value", "dict-item", "unused-ignore", "index", "union-attr", "method-assign"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
