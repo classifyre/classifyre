@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-cli"
-version = "0.3.0"
+version = "0.3.1"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
 requires-python = ">=3.12"
