@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import { createReadStream, type Stats } from 'fs';
 import * as path from 'path';
@@ -420,12 +420,7 @@ export class RunnerLogStorageService {
   private parseByteCursor(cursor?: string): number {
     if (!cursor || cursor.startsWith('i:')) return 0;
     const parsed = Number.parseInt(cursor, 10);
-    if (!Number.isInteger(parsed) || parsed < 0) {
-      throw new BadRequestException(
-        'Invalid cursor. Must be a non-negative integer string.',
-      );
-    }
-    return parsed;
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
   }
 
   private parseIndexCursor(cursor?: string): number {

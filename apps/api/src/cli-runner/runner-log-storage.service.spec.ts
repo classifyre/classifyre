@@ -1,7 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { BadRequestException } from '@nestjs/common';
 import { RunnerLogStorageService } from './runner-log-storage.service';
 
 describe('RunnerLogStorageService', () => {
@@ -60,11 +59,18 @@ describe('RunnerLogStorageService', () => {
     ]);
   });
 
-  it('rejects non-numeric cursors', async () => {
+  it('treats unrecognised cursors as start-of-file', async () => {
     const service = new RunnerLogStorageService();
-    await expect(
-      service.listLogs({ runnerId: 'runner-invalid-cursor', cursor: 'abc' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const runnerId = 'runner-invalid-cursor';
+    await service.initializeRunner(runnerId);
+    await service.appendChunk(runnerId, 'line\n', 'stderr');
+    await service.finalizeRunner(runnerId);
+
+    // An unrecognised cursor (neither a byte-offset number nor 'i:N') is
+    // treated as offset 0, so the full log is returned rather than throwing.
+    const result = await service.listLogs({ runnerId, cursor: 'abc' });
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].message).toBe('line');
   });
 
   it('removes runner log directory when deleteRunnerLogs is called', async () => {
