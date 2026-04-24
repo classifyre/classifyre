@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface RunnerLogEntryDto {
     /**
-     * Byte offset cursor for this log entry
+     * Opaque pagination cursor for this entry
      * @type {string}
      * @memberof RunnerLogEntryDto
      */
@@ -43,6 +43,12 @@ export interface RunnerLogEntryDto {
      * @memberof RunnerLogEntryDto
      */
     message: string;
+    /**
+     * Inferred log level
+     * @type {string}
+     * @memberof RunnerLogEntryDto
+     */
+    level: RunnerLogEntryDtoLevelEnum;
 }
 
 
@@ -56,6 +62,20 @@ export const RunnerLogEntryDtoStreamEnum = {
 } as const;
 export type RunnerLogEntryDtoStreamEnum = typeof RunnerLogEntryDtoStreamEnum[keyof typeof RunnerLogEntryDtoStreamEnum];
 
+/**
+ * @export
+ */
+export const RunnerLogEntryDtoLevelEnum = {
+    Trace: 'TRACE',
+    Debug: 'DEBUG',
+    Info: 'INFO',
+    Warn: 'WARN',
+    Error: 'ERROR',
+    Fatal: 'FATAL',
+    Unknown: 'UNKNOWN'
+} as const;
+export type RunnerLogEntryDtoLevelEnum = typeof RunnerLogEntryDtoLevelEnum[keyof typeof RunnerLogEntryDtoLevelEnum];
+
 
 /**
  * Check if a given object implements the RunnerLogEntryDto interface.
@@ -64,6 +84,7 @@ export function instanceOfRunnerLogEntryDto(value: object): value is RunnerLogEn
     if (!('cursor' in value) || value['cursor'] === undefined) return false;
     if (!('stream' in value) || value['stream'] === undefined) return false;
     if (!('message' in value) || value['message'] === undefined) return false;
+    if (!('level' in value) || value['level'] === undefined) return false;
     return true;
 }
 
@@ -81,6 +102,7 @@ export function RunnerLogEntryDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'timestamp': json['timestamp'] == null ? undefined : json['timestamp'],
         'stream': json['stream'],
         'message': json['message'],
+        'level': json['level'],
     };
 }
 
@@ -99,6 +121,7 @@ export function RunnerLogEntryDtoToJSONTyped(value?: RunnerLogEntryDto | null, i
         'timestamp': value['timestamp'],
         'stream': value['stream'],
         'message': value['message'],
+        'level': value['level'],
     };
 }
 

@@ -113,6 +113,7 @@ docs/SearchFindingsPageDto.md
 docs/SearchFindingsRequestDto.md
 docs/SearchFindingsResponseDto.md
 docs/SearchRunnerItemDto.md
+docs/SearchRunnerLogsBodyDto.md
 docs/SearchRunnersChartsOptionsDto.md
 docs/SearchRunnersChartsRequestDto.md
 docs/SearchRunnersChartsResponseDto.md
@@ -267,6 +268,7 @@ src/models/SearchFindingsPageDto.ts
 src/models/SearchFindingsRequestDto.ts
 src/models/SearchFindingsResponseDto.ts
 src/models/SearchRunnerItemDto.ts
+src/models/SearchRunnerLogsBodyDto.ts
 src/models/SearchRunnersChartsOptionsDto.ts
 src/models/SearchRunnersChartsRequestDto.ts
 src/models/SearchRunnersChartsResponseDto.ts

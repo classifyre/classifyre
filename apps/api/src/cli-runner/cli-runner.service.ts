@@ -1970,7 +1970,11 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
   }
 
-  async updateRunnerStatus(runnerId: string, status: RunnerStatus, errorMessage?: string) {
+  async updateRunnerStatus(
+    runnerId: string,
+    status: RunnerStatus,
+    errorMessage?: string,
+  ) {
     const runner = await this.prisma.runner.findUnique({
       where: { id: runnerId },
       select: {
@@ -2138,6 +2142,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
     runnerId: string;
     cursor?: string;
     take?: number | string;
+    search?: string;
+    levels?: string[];
+    sortOrder?: 'asc' | 'desc';
+    streams?: string[];
   }) {
     const runner = await this.prisma.runner.findUnique({
       where: { id: params.runnerId },

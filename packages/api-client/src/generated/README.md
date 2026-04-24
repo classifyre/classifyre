@@ -104,9 +104,9 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**cliRunnerControllerCreateExternalRunner**](docs/RunnersApi.md#clirunnercontrollercreateexternalrunner) | **POST** /sources/{sourceId}/runners/external | Create runner record for external CLI REST ingestion
 *RunnersApi* | [**cliRunnerControllerDeleteRunner**](docs/RunnersApi.md#clirunnercontrollerdeleterunner) | **DELETE** /runners/{runnerId} | Delete runner metadata and cleanup filesystem logs for this runner
 *RunnersApi* | [**cliRunnerControllerGetRunner**](docs/RunnersApi.md#clirunnercontrollergetrunner) | **GET** /runners/{runnerId} | Get runner status and details
-*RunnersApi* | [**cliRunnerControllerGetRunnerLogs**](docs/RunnersApi.md#clirunnercontrollergetrunnerlogs) | **GET** /runners/{runnerId}/logs | Get paginated runner logs from filesystem storage (ordered oldest to newest)
 *RunnersApi* | [**cliRunnerControllerListRunners**](docs/RunnersApi.md#clirunnercontrollerlistrunners) | **GET** /runners | List all runners
 *RunnersApi* | [**cliRunnerControllerListSourceRunners**](docs/RunnersApi.md#clirunnercontrollerlistsourcerunners) | **GET** /sources/{sourceId}/runners | List runners for source
+*RunnersApi* | [**cliRunnerControllerSearchRunnerLogs**](docs/RunnersApi.md#clirunnercontrollersearchrunnerlogs) | **POST** /runners/{runnerId}/logs | Search runner logs with server-side filtering, full-text search, and sort
 *RunnersApi* | [**cliRunnerControllerStartRunner**](docs/RunnersApi.md#clirunnercontrollerstartrunner) | **POST** /sources/{sourceId}/run | Start CLI runner for source
 *RunnersApi* | [**cliRunnerControllerStopRunner**](docs/RunnersApi.md#clirunnercontrollerstoprunner) | **PATCH** /runners/{runnerId}/stop | Stop running CLI process
 *RunnersApi* | [**cliRunnerControllerUpdateRunnerStatus**](docs/RunnersApi.md#clirunnercontrollerupdaterunnerstatusoperation) | **PATCH** /runners/{runnerId}/status | Update runner status
@@ -249,6 +249,7 @@ All URIs are relative to *http://localhost*
 - [SearchFindingsRequestDto](docs/SearchFindingsRequestDto.md)
 - [SearchFindingsResponseDto](docs/SearchFindingsResponseDto.md)
 - [SearchRunnerItemDto](docs/SearchRunnerItemDto.md)
+- [SearchRunnerLogsBodyDto](docs/SearchRunnerLogsBodyDto.md)
 - [SearchRunnersChartsOptionsDto](docs/SearchRunnersChartsOptionsDto.md)
 - [SearchRunnersChartsRequestDto](docs/SearchRunnersChartsRequestDto.md)
 - [SearchRunnersChartsResponseDto](docs/SearchRunnersChartsResponseDto.md)

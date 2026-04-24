@@ -719,16 +719,40 @@
       "error": "Fehler"
     },
     "logs": {
+      "title": "Protokolle",
+      "description": "Geparste Runner-Protokolle mit Level-Erkennung",
       "search": "Nachricht suchen",
+      "allLevels": "Alle Level",
+      "searchLevels": "Level suchen…",
+      "noLevelsFound": "Keine Level gefunden",
+      "newestFirst": "Neueste zuerst",
+      "oldestFirst": "Älteste zuerst",
       "noLogs": "Keine Protokolle verfügbar",
-      "noLogsSearch": "Keine Protokolleinträge entsprechen Ihrer Suche.",
+      "noLogsHint": "Keine Protokolleinträge entsprechen Ihrer Suche.",
       "autoRefresh": "Automatische Aktualisierung",
       "wrapLines": "Zeilenumbruch",
+      "refresh": "Aktualisieren",
+      "downloadVisible": "Sichtbare herunterladen",
+      "downloadAll": "Alle herunterladen",
+      "loadMore": "Mehr laden",
+      "jumpToLatest": "Zum Neuesten springen",
+      "showing": "{{filtered}} / {{total}} geladen angezeigt",
+      "autoRefreshEnabled": "Automatische Aktualisierung aktiviert (alle 2 Sek.)",
+      "autoRefreshPaused": "Automatische Aktualisierung pausiert",
+      "runnerCompleted": "Runner abgeschlossen",
+      "copyRow": "Zeile kopieren",
+      "copied": "Kopiert",
       "downloaded": "Sichtbare Protokolle heruntergeladen",
       "downloadedCount": "{{count}} Protokolleinträge heruntergeladen",
       "copiedRows": "{{count}} Protokollzeilen kopiert",
       "noLogsDownload": "Keine Protokolle zum Herunterladen verfügbar",
-      "noRowsToCopy": "Mindestens eine Zeile zum Kopieren auswählen"
+      "noRowsToCopy": "Mindestens eine Zeile zum Kopieren auswählen",
+      "loadedEntries": "geladen",
+      "columns": {
+        "time": "Zeit",
+        "level": "Level",
+        "message": "Nachricht"
+      }
     }
   },
   "forms": {

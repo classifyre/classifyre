@@ -3145,6 +3145,9 @@
                       "COMPLETED",
                       "ERROR"
                     ]
+                  },
+                  "errorMessage": {
+                    "type": "string"
                   }
                 }
               }
@@ -3163,8 +3166,8 @@
       }
     },
     "/runners/{runnerId}/logs": {
-      "get": {
-        "operationId": "CliRunnerController_getRunnerLogs",
+      "post": {
+        "operationId": "CliRunnerController_searchRunnerLogs",
         "parameters": [
           {
             "name": "runnerId",
@@ -3173,28 +3176,18 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "cursor",
-            "required": false,
-            "in": "query",
-            "description": "Byte cursor returned by previous page",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "take",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 1000,
-              "default": 200,
-              "type": "number"
-            }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRunnerLogsBodyDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -3207,7 +3200,7 @@
             }
           }
         },
-        "summary": "Get paginated runner logs from filesystem storage (ordered oldest to newest)",
+        "summary": "Search runner logs with server-side filtering, full-text search, and sort",
         "tags": [
           "Runners"
         ]
@@ -8107,12 +8100,68 @@
           "message"
         ]
       },
+      "SearchRunnerLogsBodyDto": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "Opaque pagination cursor"
+          },
+          "take": {
+            "type": "number",
+            "default": 200,
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "search": {
+            "type": "string",
+            "description": "Full-text search on message"
+          },
+          "levels": {
+            "type": "array",
+            "description": "Filter by log levels",
+            "items": {
+              "type": "string",
+              "enum": [
+                "TRACE",
+                "DEBUG",
+                "INFO",
+                "WARN",
+                "ERROR",
+                "FATAL",
+                "UNKNOWN"
+              ]
+            }
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "default": "asc",
+            "description": "asc = oldest first (cursor-based), desc = newest first (index-based)"
+          },
+          "streams": {
+            "type": "array",
+            "description": "Filter by stream type",
+            "items": {
+              "type": "string",
+              "enum": [
+                "stderr",
+                "stdout",
+                "combined"
+              ]
+            }
+          }
+        }
+      },
       "RunnerLogEntryDto": {
         "type": "object",
         "properties": {
           "cursor": {
             "type": "string",
-            "description": "Byte offset cursor for this log entry"
+            "description": "Opaque pagination cursor for this entry"
           },
           "timestamp": {
             "type": "string",
@@ -8130,12 +8179,26 @@
           },
           "message": {
             "type": "string"
+          },
+          "level": {
+            "type": "string",
+            "description": "Inferred log level",
+            "enum": [
+              "TRACE",
+              "DEBUG",
+              "INFO",
+              "WARN",
+              "ERROR",
+              "FATAL",
+              "UNKNOWN"
+            ]
           }
         },
         "required": [
           "cursor",
           "stream",
-          "message"
+          "message",
+          "level"
         ]
       },
       "RunnerLogsResponseDto": {

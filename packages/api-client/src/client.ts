@@ -56,6 +56,7 @@ export type {
   DeleteRunnerResponseDto,
   RunnerLogEntryDto,
   RunnerLogsResponseDto,
+  SearchRunnerLogsBodyDto,
   SourceInfoDto,
   StopRunnerResponseDto,
   StartRunnerDto,
@@ -145,6 +146,7 @@ export {
   UpdateAiProviderConfigDtoProviderEnum,
   SandboxRunDtoContentTypeEnum,
   SandboxRunDtoStatusEnum,
+  RunnerLogEntryDtoLevelEnum,
   // Finding enums used by web components
   FindingResponseDtoDetectorTypeEnum,
   FindingResponseDtoSeverityEnum,

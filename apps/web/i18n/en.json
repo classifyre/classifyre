@@ -719,16 +719,40 @@
       "error": "Error"
     },
     "logs": {
+      "title": "Logs",
+      "description": "Parsed runner logs with level extraction",
       "search": "Search message",
+      "allLevels": "All levels",
+      "searchLevels": "Search levels…",
+      "noLevelsFound": "No levels found",
+      "newestFirst": "Newest first",
+      "oldestFirst": "Oldest first",
       "noLogs": "No Logs Available",
-      "noLogsSearch": "No log entries match your search.",
+      "noLogsHint": "No log entries match your search.",
       "autoRefresh": "Auto refresh",
       "wrapLines": "Wrap lines",
+      "refresh": "Refresh",
+      "downloadVisible": "Download Visible",
+      "downloadAll": "Download All",
+      "loadMore": "Load More",
+      "jumpToLatest": "Jump To Latest",
+      "showing": "Showing {{filtered}} / {{total}} loaded",
+      "autoRefreshEnabled": "Auto refresh enabled (every 2s)",
+      "autoRefreshPaused": "Auto refresh paused",
+      "runnerCompleted": "Runner completed",
+      "copyRow": "Copy row",
+      "copied": "Copied",
       "downloaded": "Visible logs downloaded",
       "downloadedCount": "Downloaded {{count}} log entries",
       "copiedRows": "Copied {{count}} log rows",
       "noLogsDownload": "No logs available for download",
-      "noRowsToCopy": "Select at least one row to copy"
+      "noRowsToCopy": "Select at least one row to copy",
+      "loadedEntries": "loaded",
+      "columns": {
+        "time": "Time",
+        "level": "Level",
+        "message": "Message"
+      }
     }
   },
   "forms": {

@@ -28,7 +28,7 @@ import {
   ListRunnersResponseDto,
   StopRunnerResponseDto,
   DeleteRunnerResponseDto,
-  ListRunnerLogsQueryDto,
+  SearchRunnerLogsBodyDto,
   RunnerLogsResponseDto,
 } from './dto';
 import { SearchRunnersRequestDto } from '../dto/search-runners-request.dto';
@@ -112,7 +112,11 @@ export class CliRunnerController {
     @Param('runnerId') runnerId: string,
     @Body() body: { status: RunnerStatus; errorMessage?: string },
   ) {
-    return this.cliRunnerService.updateRunnerStatus(runnerId, body.status, body.errorMessage);
+    return this.cliRunnerService.updateRunnerStatus(
+      runnerId,
+      body.status,
+      body.errorMessage,
+    );
   }
 
   @Get('runners/:runnerId')
@@ -122,27 +126,25 @@ export class CliRunnerController {
     return this.cliRunnerService.getRunnerStatus(runnerId);
   }
 
-  @Get('runners/:runnerId/logs')
+  @Post('runners/:runnerId/logs')
   @ApiOperation({
     summary:
-      'Get paginated runner logs from filesystem storage (ordered oldest to newest)',
+      'Search runner logs with server-side filtering, full-text search, and sort',
   })
-  @ApiQuery({
-    name: 'cursor',
-    required: false,
-    type: String,
-    description: 'Byte cursor returned by previous page',
-  })
-  @ApiQuery({ name: 'take', required: false, type: Number })
+  @ApiBody({ type: SearchRunnerLogsBodyDto })
   @ApiResponse({ status: 200, type: RunnerLogsResponseDto })
-  async getRunnerLogs(
+  async searchRunnerLogs(
     @Param('runnerId') runnerId: string,
-    @Query() query: ListRunnerLogsQueryDto,
+    @Body() body: SearchRunnerLogsBodyDto,
   ) {
     return this.cliRunnerService.getRunnerLogs({
       runnerId,
-      cursor: query.cursor,
-      take: query.take,
+      cursor: body.cursor,
+      take: body.take,
+      search: body.search,
+      levels: body.levels,
+      sortOrder: body.sortOrder,
+      streams: body.streams,
     });
   }
 

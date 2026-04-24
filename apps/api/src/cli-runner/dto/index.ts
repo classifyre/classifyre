@@ -6,9 +6,26 @@ import {
   IsString,
   IsInt,
   Min,
-  IsNumberString,
+  IsArray,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export const LOG_LEVELS = [
+  'TRACE',
+  'DEBUG',
+  'INFO',
+  'WARN',
+  'ERROR',
+  'FATAL',
+  'UNKNOWN',
+] as const;
+export type LogLevel = (typeof LOG_LEVELS)[number];
+
+export const LOG_SORT_ORDERS = ['asc', 'desc'] as const;
+export type LogSortOrder = (typeof LOG_SORT_ORDERS)[number];
+
+export const LOG_STREAMS = ['stderr', 'stdout', 'combined'] as const;
+export type LogStream = (typeof LOG_STREAMS)[number];
 
 export class StartRunnerDto {
   @ApiProperty({ required: false })
@@ -162,10 +179,10 @@ export class DeleteRunnerResponseDto {
   message: string;
 }
 
-export class ListRunnerLogsQueryDto {
-  @ApiProperty({ required: false, description: 'Byte cursor for next page' })
+export class SearchRunnerLogsBodyDto {
+  @ApiProperty({ required: false, description: 'Opaque pagination cursor' })
   @IsOptional()
-  @IsNumberString()
+  @IsString()
   cursor?: string;
 
   @ApiProperty({ required: false, default: 200, minimum: 1, maximum: 1000 })
@@ -174,10 +191,48 @@ export class ListRunnerLogsQueryDto {
   @IsInt()
   @Min(1)
   take?: number = 200;
+
+  @ApiProperty({ required: false, description: 'Full-text search on message' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    enum: LOG_LEVELS,
+    description: 'Filter by log levels',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  levels?: string[];
+
+  @ApiProperty({
+    required: false,
+    enum: LOG_SORT_ORDERS,
+    default: 'asc',
+    description:
+      'asc = oldest first (cursor-based), desc = newest first (index-based)',
+  })
+  @IsOptional()
+  @IsString()
+  sortOrder?: LogSortOrder = 'asc';
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    enum: LOG_STREAMS,
+    description: 'Filter by stream type',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  streams?: string[];
 }
 
 export class RunnerLogEntryDto {
-  @ApiProperty({ description: 'Byte offset cursor for this log entry' })
+  @ApiProperty({ description: 'Opaque pagination cursor for this entry' })
   cursor: string;
 
   @ApiProperty({
@@ -189,12 +244,18 @@ export class RunnerLogEntryDto {
 
   @ApiProperty({
     description: 'Log stream source',
-    enum: ['stderr', 'stdout', 'combined'],
+    enum: LOG_STREAMS,
   })
   stream: 'stderr' | 'stdout' | 'combined';
 
   @ApiProperty()
   message: string;
+
+  @ApiProperty({
+    description: 'Inferred log level',
+    enum: LOG_LEVELS,
+  })
+  level: LogLevel;
 }
 
 export class RunnerLogsResponseDto {

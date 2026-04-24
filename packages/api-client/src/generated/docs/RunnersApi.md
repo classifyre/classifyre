@@ -7,9 +7,9 @@ All URIs are relative to *http://localhost*
 | [**cliRunnerControllerCreateExternalRunner**](RunnersApi.md#clirunnercontrollercreateexternalrunner) | **POST** /sources/{sourceId}/runners/external | Create runner record for external CLI REST ingestion |
 | [**cliRunnerControllerDeleteRunner**](RunnersApi.md#clirunnercontrollerdeleterunner) | **DELETE** /runners/{runnerId} | Delete runner metadata and cleanup filesystem logs for this runner |
 | [**cliRunnerControllerGetRunner**](RunnersApi.md#clirunnercontrollergetrunner) | **GET** /runners/{runnerId} | Get runner status and details |
-| [**cliRunnerControllerGetRunnerLogs**](RunnersApi.md#clirunnercontrollergetrunnerlogs) | **GET** /runners/{runnerId}/logs | Get paginated runner logs from filesystem storage (ordered oldest to newest) |
 | [**cliRunnerControllerListRunners**](RunnersApi.md#clirunnercontrollerlistrunners) | **GET** /runners | List all runners |
 | [**cliRunnerControllerListSourceRunners**](RunnersApi.md#clirunnercontrollerlistsourcerunners) | **GET** /sources/{sourceId}/runners | List runners for source |
+| [**cliRunnerControllerSearchRunnerLogs**](RunnersApi.md#clirunnercontrollersearchrunnerlogs) | **POST** /runners/{runnerId}/logs | Search runner logs with server-side filtering, full-text search, and sort |
 | [**cliRunnerControllerStartRunner**](RunnersApi.md#clirunnercontrollerstartrunner) | **POST** /sources/{sourceId}/run | Start CLI runner for source |
 | [**cliRunnerControllerStopRunner**](RunnersApi.md#clirunnercontrollerstoprunner) | **PATCH** /runners/{runnerId}/stop | Stop running CLI process |
 | [**cliRunnerControllerUpdateRunnerStatus**](RunnersApi.md#clirunnercontrollerupdaterunnerstatusoperation) | **PATCH** /runners/{runnerId}/status | Update runner status |
@@ -216,77 +216,6 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
-## cliRunnerControllerGetRunnerLogs
-
-> RunnerLogsResponseDto cliRunnerControllerGetRunnerLogs(runnerId, cursor, take)
-
-Get paginated runner logs from filesystem storage (ordered oldest to newest)
-
-### Example
-
-```ts
-import {
-  Configuration,
-  RunnersApi,
-} from '@workspace/api-client';
-import type { CliRunnerControllerGetRunnerLogsRequest } from '@workspace/api-client';
-
-async function example() {
-  console.log("🚀 Testing @workspace/api-client SDK...");
-  const api = new RunnersApi();
-
-  const body = {
-    // string
-    runnerId: runnerId_example,
-    // string | Byte cursor returned by previous page (optional)
-    cursor: cursor_example,
-    // number (optional)
-    take: 8.14,
-  } satisfies CliRunnerControllerGetRunnerLogsRequest;
-
-  try {
-    const data = await api.cliRunnerControllerGetRunnerLogs(body);
-    console.log(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-// Run the test
-example().catch(console.error);
-```
-
-### Parameters
-
-
-| Name | Type | Description  | Notes |
-|------------- | ------------- | ------------- | -------------|
-| **runnerId** | `string` |  | [Defaults to `undefined`] |
-| **cursor** | `string` | Byte cursor returned by previous page | [Optional] [Defaults to `undefined`] |
-| **take** | `number` |  | [Optional] [Defaults to `200`] |
-
-### Return type
-
-[**RunnerLogsResponseDto**](RunnerLogsResponseDto.md)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
-- **Accept**: `application/json`
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-| **200** |  |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
-
-
 ## cliRunnerControllerListRunners
 
 > ListRunnersResponseDto cliRunnerControllerListRunners(sourceId, status, skip, take)
@@ -427,6 +356,74 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## cliRunnerControllerSearchRunnerLogs
+
+> RunnerLogsResponseDto cliRunnerControllerSearchRunnerLogs(runnerId, searchRunnerLogsBodyDto)
+
+Search runner logs with server-side filtering, full-text search, and sort
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerSearchRunnerLogsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string
+    runnerId: runnerId_example,
+    // SearchRunnerLogsBodyDto
+    searchRunnerLogsBodyDto: ...,
+  } satisfies CliRunnerControllerSearchRunnerLogsRequest;
+
+  try {
+    const data = await api.cliRunnerControllerSearchRunnerLogs(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Defaults to `undefined`] |
+| **searchRunnerLogsBodyDto** | [SearchRunnerLogsBodyDto](SearchRunnerLogsBodyDto.md) |  | |
+
+### Return type
+
+[**RunnerLogsResponseDto**](RunnerLogsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
 - **Accept**: `application/json`
 
 

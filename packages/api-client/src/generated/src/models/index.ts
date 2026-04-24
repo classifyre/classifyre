@@ -100,6 +100,7 @@ export * from './SearchFindingsPageDto';
 export * from './SearchFindingsRequestDto';
 export * from './SearchFindingsResponseDto';
 export * from './SearchRunnerItemDto';
+export * from './SearchRunnerLogsBodyDto';
 export * from './SearchRunnersChartsOptionsDto';
 export * from './SearchRunnersChartsRequestDto';
 export * from './SearchRunnersChartsResponseDto';
