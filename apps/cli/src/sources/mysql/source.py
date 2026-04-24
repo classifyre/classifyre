@@ -407,14 +407,18 @@ class MySQLSource(BaseSource):
 
             if len(batch) >= self.BATCH_SIZE:
                 if pipeline:
-                    batch = await pipeline.process(batch)
-                yield batch
+                    async for processed in pipeline.process_stream(batch):
+                        yield [processed]
+                else:
+                    yield batch
                 batch = []
 
         if batch:
             if pipeline:
-                batch = await pipeline.process(batch)
-            yield batch
+                async for processed in pipeline.process_stream(batch):
+                    yield [processed]
+            else:
+                yield batch
 
     def generate_hash_id(self, asset_id: str) -> str:
         return hash_id(self._asset_type_value(), asset_id)

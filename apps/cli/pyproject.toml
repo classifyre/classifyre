@@ -44,6 +44,7 @@ privacy = [
     "presidio-analyzer>=2.2.361",
     "spacy>=3.8.11",
     "phonenumbers>=9.0.25",
+    "numpy>=1.26.0,<2.0.0",
 ]
 security = [
     "detect-secrets>=1.5.0",

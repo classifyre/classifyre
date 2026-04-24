@@ -30,6 +30,7 @@ class _PresidioNoiseFilter(logging.Filter):
         "model_to_presidio_entity_mapping is missing from configuration",
         "low_score_entity_names is missing from configuration",
         "labels_to_ignore is missing from configuration",
+        "Fetching all recognizers for language",
     )
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -168,10 +169,15 @@ class PIIDetector(BaseDetector):
     _TABULAR_CELL_RE: ClassVar[re.Pattern[str]] = re.compile(r"^  ([^:]+):(?: ?(.*))?$")
     _TABULAR_CONTINUATION_RE: ClassVar[re.Pattern[str]] = re.compile(r"^    (.*)$")
 
+    # Fall back to full-text analysis when a page has more than this many cells.
+    # Per-cell analysis at scale causes O(rows×columns) Presidio calls per page.
+    _TABULAR_CELL_LIMIT: ClassVar[int] = 200
+
     def __init__(self, config: DetectorConfig | None = None) -> None:
         super().__init__(config)
         self._init_error: MissingDependencyError | None = None
         self.analyzer: Any = None
+        self._supported_entities_cache: frozenset[str] | None = None
         try:
             self._initialize_analyzer()
         except MissingDependencyError as exc:
@@ -219,9 +225,10 @@ class PIIDetector(BaseDetector):
 
             self._register_custom_recognizers(presidio_module)
 
+            self._supported_entities_cache = frozenset(self.analyzer.get_supported_entities())
             logger.debug(
                 "PII detector initialized — %d built-in entity types, %d custom recognizers",
-                len(self.analyzer.get_supported_entities()),
+                len(self._supported_entities_cache),
                 len(getattr(self.config, "custom_recognizers", None) or []),
             )
 
@@ -406,14 +413,23 @@ class PIIDetector(BaseDetector):
             logger.exception(e)
             return []
 
+    def _analyzer_supported_entities(self) -> frozenset[str]:
+        if self._supported_entities_cache is not None:
+            return self._supported_entities_cache
+        if self.analyzer is None:
+            return frozenset()
+        self._supported_entities_cache = frozenset(self.analyzer.get_supported_entities())
+        return self._supported_entities_cache
+
     def _analyze_structured_cell(
         self, content: str, *, allowed_entity_types: set[str]
     ) -> list[Any]:
-        if not allowed_entity_types:
+        if not allowed_entity_types or self.analyzer is None:
+            if self.analyzer is None and self._init_error is not None:
+                raise self._init_error
             return []
 
-        supported = set(self.analyzer.get_supported_entities())
-        entities = sorted(allowed_entity_types & supported)
+        entities = sorted(allowed_entity_types & self._analyzer_supported_entities())
         if not entities:
             return []
 
@@ -511,6 +527,15 @@ class PIIDetector(BaseDetector):
     def _detect_tabular_content(self, content: str) -> list[DetectionResult] | None:
         cells = self._extract_tabular_cells(content)
         if not cells:
+            return None
+
+        # For very wide/long pages fall back to full-text analysis to avoid O(N) Presidio calls.
+        if len(cells) > self._TABULAR_CELL_LIMIT:
+            logger.debug(
+                "Page has %d cells (> %d limit); using full-text analysis instead of per-cell",
+                len(cells),
+                self._TABULAR_CELL_LIMIT,
+            )
             return None
 
         threshold = self.config.confidence_threshold or 0.7
