@@ -74,14 +74,6 @@ def _quote_literal(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
-def _truncate_text(value: str, max_chars: int) -> str:
-    if len(value) <= max_chars:
-        return value
-    if max_chars <= 3:
-        return value[:max_chars]
-    return f"{value[: max_chars - 3]}..."
-
-
 class DatabricksSource(BaseSource):
     source_type = "databricks"
 
@@ -727,7 +719,6 @@ class DatabricksSource(BaseSource):
             "table": table_ref.table,
             "object_type": table_ref.object_type,
             "sampling": {
-                "limit": int(self._sampling().limit or 100),
                 "strategy": str(self._sampling().strategy),
             },
         }
@@ -763,16 +754,13 @@ class DatabricksSource(BaseSource):
         }
 
         raw_content = json.dumps(metadata, ensure_ascii=False)
-        text_content = _truncate_text(
-            "\n".join(
-                [
-                    "kind=notebook",
-                    f"path={notebook.path}",
-                    f"language={notebook.language or 'unknown'}",
-                    f"object_id={notebook.object_id or 'unknown'}",
-                ]
-            ),
-            int(self._sampling().max_total_chars or 20000),
+        text_content = "\n".join(
+            [
+                "kind=notebook",
+                f"path={notebook.path}",
+                f"language={notebook.language or 'unknown'}",
+                f"object_id={notebook.object_id or 'unknown'}",
+            ]
         )
         self._content_cache[asset_hash] = (raw_content, text_content)
 
@@ -805,16 +793,13 @@ class DatabricksSource(BaseSource):
         }
 
         raw_content = json.dumps(metadata, ensure_ascii=False)
-        text_content = _truncate_text(
-            "\n".join(
-                [
-                    "kind=pipeline",
-                    f"pipeline_id={pipeline.pipeline_id}",
-                    f"name={pipeline.name}",
-                    f"state={pipeline.state or 'unknown'}",
-                ]
-            ),
-            int(self._sampling().max_total_chars or 20000),
+        text_content = "\n".join(
+            [
+                "kind=pipeline",
+                f"pipeline_id={pipeline.pipeline_id}",
+                f"name={pipeline.name}",
+                f"state={pipeline.state or 'unknown'}",
+            ]
         )
         self._content_cache[asset_hash] = (raw_content, text_content)
 
@@ -987,14 +972,12 @@ class DatabricksSource(BaseSource):
     ) -> tuple[str, list[Any]]:
         sampling = self._sampling()
 
-        max_columns = int(sampling.max_columns or 25)
-        selected_columns = columns[:max_columns] if columns else []
-        if not selected_columns:
+        if not columns:
             raise ValueError(
                 f"Table {table_ref.catalog}.{table_ref.schema}.{table_ref.table} has no readable columns"
             )
 
-        quoted_columns = ", ".join(_quote_identifier(column) for column in selected_columns)
+        quoted_columns = ", ".join(_quote_identifier(column) for column in columns)
         from_expr = (
             f"{_quote_identifier(table_ref.catalog)}."
             f"{_quote_identifier(table_ref.schema)}."
@@ -1005,7 +988,7 @@ class DatabricksSource(BaseSource):
 
         strategy = sampling.strategy
         if strategy == SamplingStrategy.LATEST:
-            order_column = self._resolve_latest_order_column(selected_columns)
+            order_column = self._resolve_latest_order_column(columns)
             if order_column:
                 query += f" ORDER BY {_quote_identifier(order_column)} DESC"
             elif sampling.fallback_to_random is not False:
@@ -1014,21 +997,30 @@ class DatabricksSource(BaseSource):
             query += " ORDER BY rand()"
 
         if strategy != SamplingStrategy.ALL:
-            query += f" LIMIT {int(sampling.limit or 100)}"
+            query += f" LIMIT {int(sampling.rows_per_page or 100)}"
 
         return query, []
 
-    def _serialize_cell(self, value: Any) -> str:
-        max_cell_chars = int(self._sampling().max_cell_chars or 512)
+    def _count_table_rows(self, table_ref: TableRef) -> int | None:
+        try:
+            with closing(self._connect_sql()) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.catalog)}.{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
+                    )
+                    row = cursor.fetchone()
+                    return int(row[0]) if row else None
+        except Exception:
+            return None
 
+    def _serialize_cell(self, value: Any) -> str:
         if value is None:
             return "null"
         if isinstance(value, (bytes, bytearray, memoryview)):
-            rendered = f"<{len(bytes(value))} bytes>"
-            return _truncate_text(rendered, max_cell_chars)
+            return f"<{len(bytes(value))} bytes>"
         if isinstance(value, datetime):
-            return _truncate_text(value.isoformat(), max_cell_chars)
-        return _truncate_text(str(value), max_cell_chars)
+            return value.isoformat()
+        return str(value)
 
     def _format_sample_content(
         self,
@@ -1044,7 +1036,6 @@ class DatabricksSource(BaseSource):
             rows=rows,
             column_names=column_names,
             serialize_cell=self._serialize_cell,
-            max_total_chars=int(sampling.max_total_chars or 20000),
             include_column_names=sampling.include_column_names is not False,
             object_type=table_ref.object_type,
             raw_metadata={
@@ -1054,15 +1045,33 @@ class DatabricksSource(BaseSource):
             },
         )
 
+    def _fetch_one_page(
+        self, table_ref: TableRef, base_query: str, page_size: int, offset: int
+    ) -> tuple[list[tuple[Any, ...]], list[str]]:
+        with closing(self._connect_sql()) as conn:
+            paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
+            with conn.cursor() as cursor:
+                cursor.execute(paginated_query)
+                rows = list(cursor.fetchall())
+                column_names = (
+                    [desc[0] for desc in cursor.description] if cursor.description else []
+                )
+        return rows, column_names
+
     def _sample_table_rows(self, table_ref: TableRef) -> tuple[str, str] | None:
         columns = self._available_columns(table_ref)
+        sampling = self._sampling()
         query, _params = self._build_sampling_query(table_ref, columns)
 
-        with closing(self._connect_sql()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query)
-                rows = cursor.fetchall()
-                column_names = [desc[0] for desc in cursor.description or []]
+        if sampling.strategy == SamplingStrategy.ALL:
+            rows_per_page = int(sampling.rows_per_page or 100)
+            rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
+        else:
+            with closing(self._connect_sql()) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query)
+                    rows = cursor.fetchall()
+                    column_names = [desc[0] for desc in cursor.description or []]
 
         if not column_names:
             return None
@@ -1078,23 +1087,62 @@ class DatabricksSource(BaseSource):
         if not table_ref:
             return None
 
-        try:
-            sampled = self._sample_table_rows(table_ref)
-        except Exception as exc:
-            logger.error(
-                "Failed to sample content for Databricks table %s.%s.%s: %s",
-                table_ref.catalog,
-                table_ref.schema,
-                table_ref.table,
-                exc,
-            )
-            return None
+        sampled = self._sample_table_rows(table_ref)
 
         if sampled is None:
             return None
 
         self._content_cache[asset_id] = sampled
         return sampled
+
+    async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
+        sampling = self._sampling()
+
+        if sampling.strategy != SamplingStrategy.ALL:
+            result = await self.fetch_content(asset_id)
+            if result:
+                yield result
+            return
+
+        table_ref = self._parse_table_ref_from_asset_id(asset_id)
+        if not table_ref:
+            return
+
+        columns = self._available_columns(table_ref)
+        query, _ = self._build_sampling_query(table_ref, columns)
+        rows_per_page = int(sampling.rows_per_page or 100)
+        table_label = f"{table_ref.catalog}.{table_ref.schema}.{table_ref.table}"
+
+        total_rows = self._count_table_rows(table_ref)
+        total_batches = ((total_rows + rows_per_page - 1) // rows_per_page) if total_rows else None
+        if total_rows is not None and total_batches is not None:
+            logger.info(
+                "Full scan %s: %d rows, %d batches of %d",
+                table_label,
+                total_rows,
+                total_batches,
+                rows_per_page,
+            )
+
+        offset = 0
+        page_num = 1
+
+        while not self._aborted:
+            if total_batches is not None:
+                logger.info("%s batch %d/%d", table_label, page_num, total_batches)
+            rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, offset)
+            if not rows or not column_names:
+                break
+
+            result = self._format_sample_content(table_ref, column_names, rows)
+            if result:
+                self._content_cache[asset_id] = result
+                yield result
+
+            offset += rows_per_page
+            page_num += 1
+            if len(rows) < rows_per_page:
+                break
 
     def enrich_finding_location(
         self,

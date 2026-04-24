@@ -13,8 +13,12 @@ from ..models.generated_detectors import (
     CustomDetectorConfig,
     DeidScoreDetectorConfig,
     DetectorConfig,
+    NSFWDetectorConfig,
+    PhishingUrlDetectorConfig,
     PIIDetectorConfig,
+    PromptInjectionDetectorConfig,
     SecretsDetectorConfig,
+    SpamDetectorConfig,
     ThreatDetectorConfig,
 )
 
@@ -30,6 +34,10 @@ type DetectorTypedConfig = (
     | PIIDetectorConfig
     | ThreatDetectorConfig
     | BrokenLinksDetectorConfig
+    | SpamDetectorConfig
+    | NSFWDetectorConfig
+    | PhishingUrlDetectorConfig
+    | PromptInjectionDetectorConfig
 )
 
 _DETECTOR_NAME_BY_TYPE: dict[str, str] = {
@@ -62,7 +70,7 @@ _DETECTOR_NAME_BY_TYPE: dict[str, str] = {
 
 _DETECTOR_CONFIG_BY_TYPE: dict[str, type[DetectorConfig]] = {
     "TOXIC": ContentDetectorConfig,
-    "NSFW": ContentDetectorConfig,
+    "NSFW": NSFWDetectorConfig,
     "SECRETS": SecretsDetectorConfig,
     "PII": PIIDetectorConfig,
     "OCR_PII": PIIDetectorConfig,
@@ -76,6 +84,9 @@ _DETECTOR_CONFIG_BY_TYPE: dict[str, type[DetectorConfig]] = {
     "YARA": ThreatDetectorConfig,
     "BROKEN_LINKS": BrokenLinksDetectorConfig,
     "CUSTOM": CustomDetectorConfig,
+    "SPAM": SpamDetectorConfig,
+    "PHISHING_URL": PhishingUrlDetectorConfig,
+    "PROMPT_INJECTION": PromptInjectionDetectorConfig,
 }
 
 

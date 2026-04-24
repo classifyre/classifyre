@@ -34,6 +34,18 @@
       "$ref": "#/definitions/CustomDetectorConfig"
     },
     {
+      "$ref": "#/definitions/SpamDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/NSFWDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/PhishingUrlDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/PromptInjectionDetectorConfig"
+    },
+    {
       "$ref": "#/definitions/GenericDetectorConfig"
     }
   ],
@@ -834,6 +846,22 @@
               "type": "string",
               "default": "en",
               "description": "Language code for NER models"
+            },
+            "spacy_model": {
+              "anyOf": [
+                { "type": "string" },
+                { "type": "null" }
+              ],
+              "default": null,
+              "description": "spaCy model name to load (e.g. en_core_web_sm, en_core_web_lg). Defaults to en_core_web_sm when null."
+            },
+            "spacy_model_url": {
+              "anyOf": [
+                { "type": "string" },
+                { "type": "null" }
+              ],
+              "default": null,
+              "description": "Wheel download URL for the spaCy model. When set and the model is not already installed the CLI installs it at runtime. Example: https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl"
             }
           }
         }
@@ -864,6 +892,94 @@
               "type": "integer",
               "default": 60,
               "description": "Timeout for YARA scanning in seconds"
+            }
+          }
+        }
+      ]
+    },
+    "SpamDetectorConfig": {
+      "title": "SpamDetectorConfig",
+      "description": "Configuration for spam detector",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "model": {
+              "anyOf": [
+                { "type": "string" },
+                { "type": "null" }
+              ],
+              "default": null,
+              "description": "HuggingFace model ID for spam classification. Defaults to mrm8488/bert-tiny-finetuned-sms-spam-detection when null."
+            }
+          }
+        }
+      ]
+    },
+    "NSFWDetectorConfig": {
+      "title": "NSFWDetectorConfig",
+      "description": "Configuration for NSFW image detector",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "model": {
+              "anyOf": [
+                { "type": "string" },
+                { "type": "null" }
+              ],
+              "default": null,
+              "description": "HuggingFace model ID for NSFW image classification. Defaults to Falconsai/nsfw_image_detection when null."
+            }
+          }
+        }
+      ]
+    },
+    "PhishingUrlDetectorConfig": {
+      "title": "PhishingUrlDetectorConfig",
+      "description": "Configuration for phishing URL detector",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "model": {
+              "anyOf": [
+                { "type": "string" },
+                { "type": "null" }
+              ],
+              "default": null,
+              "description": "HuggingFace model ID for phishing URL classification. Defaults to CrabInHoney/urlbert-tiny-phishing-classifier when null."
+            }
+          }
+        }
+      ]
+    },
+    "PromptInjectionDetectorConfig": {
+      "title": "PromptInjectionDetectorConfig",
+      "description": "Configuration for prompt injection detector",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "model": {
+              "anyOf": [
+                { "type": "string" },
+                { "type": "null" }
+              ],
+              "default": null,
+              "description": "HuggingFace model ID for prompt injection detection. Defaults to protectai/deberta-v3-base-prompt-injection-v2 when null."
             }
           }
         }
@@ -1097,7 +1213,7 @@
         },
         "entity_label": {
           "type": "string",
-          "description": "GLiNER entity label (ENTITY and CLASSIFIER methods)"
+          "description": "GLiNER2 schema label used for extraction (ENTITY and CLASSIFIER methods)"
         },
         "regex_pattern": {
           "type": "string",
@@ -1149,7 +1265,7 @@
         },
         "gliner_model": {
           "type": "string",
-          "default": "urchade/gliner_multi-v2.1"
+          "default": "fastino/gliner2-base-v1"
         },
         "content_limit": {
           "type": "integer",
@@ -1273,9 +1389,17 @@
           },
           "default": []
         },
+        "entity_descriptions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Optional GLiNER2 schema descriptions keyed by entity label"
+        },
         "model": {
           "type": "string",
-          "default": "urchade/gliner_multi-v2.1"
+          "default": "fastino/gliner2-base-v1"
         }
       },
       "additionalProperties": false

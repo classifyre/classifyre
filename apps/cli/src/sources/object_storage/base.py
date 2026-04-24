@@ -258,11 +258,11 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         if strategy == SamplingStrategy.ALL:
             return refs
 
-        limit = int(self.config.sampling.limit or 100)
-        if limit >= len(refs):
-            return refs
+        limit = int(self.config.sampling.rows_per_page or 100)
 
         if strategy == SamplingStrategy.RANDOM:
+            if limit >= len(refs):
+                return refs
             generator = random.Random(0)
             indexes = sorted(generator.sample(range(len(refs)), k=limit))
             return [refs[index] for index in indexes]

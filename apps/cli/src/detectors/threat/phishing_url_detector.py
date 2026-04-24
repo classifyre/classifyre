@@ -4,7 +4,7 @@ import json
 import logging
 from urllib.parse import urlparse
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import DetectorConfig, PhishingUrlDetectorConfig, Severity
 from ...models.generated_single_asset_scan_results import (
     DetectionResult,
     DetectorType,
@@ -21,18 +21,25 @@ class PhishingURLDetector(BaseDetector):
     detector_type = "phishing_url"
     detector_name = "phishing_url"
 
+    _DEFAULT_MODEL = "CrabInHoney/urlbert-tiny-phishing-classifier"
+
     def __init__(self, config: DetectorConfig | None = None):
         super().__init__(config)
         self.classifier = None
         self._transformers = None
-        self._model_id = "CrabInHoney/urlbert-tiny-phishing-classifier"
+        cfg_model = (
+            getattr(self.config, "model", None)
+            if isinstance(self.config, PhishingUrlDetectorConfig)
+            else None
+        )
+        self._model_id = cfg_model or self._DEFAULT_MODEL
 
         try:
-            ensure_torch("phishing_url", ["security", "detectors"])
+            ensure_torch("phishing_url", ["threat-ml", "security", "detectors"])
             self._transformers = require_module(
                 "transformers",
                 "phishing_url",
-                ["security", "detectors"],
+                ["threat-ml", "security", "detectors"],
             )
         except MissingDependencyError:
             raise

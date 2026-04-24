@@ -9,10 +9,10 @@ from src.sources.google_cloud_storage.source import GoogleCloudStorageSource
 from src.sources.object_storage.base import ContentSnapshot, ObjectRef
 
 
-def _recipe(*, strategy: str = "ALL", limit: int | None = None) -> dict:
+def _recipe(*, strategy: str = "ALL", rows_per_page: int | None = None) -> dict:
     sampling: dict[str, object] = {"strategy": strategy}
-    if limit is not None:
-        sampling["limit"] = limit
+    if rows_per_page is not None:
+        sampling["rows_per_page"] = rows_per_page
 
     return {
         "type": "GOOGLE_CLOUD_STORAGE",

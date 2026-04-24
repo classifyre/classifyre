@@ -31,7 +31,43 @@ export interface SearchSourcesPageDto {
      * @memberof SearchSourcesPageDto
      */
     limit?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof SearchSourcesPageDto
+     */
+    sortBy?: SearchSourcesPageDtoSortByEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof SearchSourcesPageDto
+     */
+    sortOrder?: SearchSourcesPageDtoSortOrderEnum;
 }
+
+
+/**
+ * @export
+ */
+export const SearchSourcesPageDtoSortByEnum = {
+    Name: 'NAME',
+    Type: 'TYPE',
+    Status: 'STATUS',
+    CreatedAt: 'CREATED_AT',
+    UpdatedAt: 'UPDATED_AT',
+    LastRunAt: 'LAST_RUN_AT'
+} as const;
+export type SearchSourcesPageDtoSortByEnum = typeof SearchSourcesPageDtoSortByEnum[keyof typeof SearchSourcesPageDtoSortByEnum];
+
+/**
+ * @export
+ */
+export const SearchSourcesPageDtoSortOrderEnum = {
+    Asc: 'ASC',
+    Desc: 'DESC'
+} as const;
+export type SearchSourcesPageDtoSortOrderEnum = typeof SearchSourcesPageDtoSortOrderEnum[keyof typeof SearchSourcesPageDtoSortOrderEnum];
+
 
 /**
  * Check if a given object implements the SearchSourcesPageDto interface.
@@ -52,6 +88,8 @@ export function SearchSourcesPageDtoFromJSONTyped(json: any, ignoreDiscriminator
         
         'skip': json['skip'] == null ? undefined : json['skip'],
         'limit': json['limit'] == null ? undefined : json['limit'],
+        'sortBy': json['sortBy'] == null ? undefined : json['sortBy'],
+        'sortOrder': json['sortOrder'] == null ? undefined : json['sortOrder'],
     };
 }
 
@@ -68,6 +106,8 @@ export function SearchSourcesPageDtoToJSONTyped(value?: SearchSourcesPageDto | n
         
         'skip': value['skip'],
         'limit': value['limit'],
+        'sortBy': value['sortBy'],
+        'sortOrder': value['sortOrder'],
     };
 }
 

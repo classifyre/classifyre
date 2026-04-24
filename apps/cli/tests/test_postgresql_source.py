@@ -24,9 +24,6 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
         },
         "sampling": {
             "strategy": "RANDOM",
-            "limit": 10,
-            "max_columns": 10,
-            "max_cell_chars": 256,
         },
     }
     base.update(overrides)
@@ -369,7 +366,7 @@ def test_postgresql_latest_sampling_falls_back_to_random() -> None:
         _recipe(
             sampling={
                 "strategy": "LATEST",
-                "limit": 5,
+                "rows_per_page": 50,
                 "fallback_to_random": True,
             },
         )
@@ -379,7 +376,7 @@ def test_postgresql_latest_sampling_falls_back_to_random() -> None:
     query, params = source._build_sampling_query(table_ref, ["id", "email"])
 
     assert "ORDER BY RANDOM()" in query
-    assert params == [5]
+    assert params == [50]
 
 
 def test_postgresql_all_strategy_omits_limit() -> None:
@@ -439,3 +436,71 @@ async def test_postgresql_extract_runs_detector_pipeline_when_enabled(
 
     assert [len(batch) for batch in batches] == [1]
     assert processed_batches == [1]
+
+
+@pytest.mark.asyncio
+async def test_postgresql_fetch_content_pages_batches_for_all_strategy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With strategy=ALL, fetch_content_pages must paginate via LIMIT/OFFSET batches."""
+    from src.sources.postgresql.source import TableRef as PGTableRef
+
+    source = PostgreSQLSource(
+        _recipe(
+            sampling={
+                "strategy": "ALL",
+                "rows_per_page": 10,
+            }
+        )
+    )
+    table_ref = PGTableRef(database="postgres", schema="public", table="users")
+    asset = source._table_to_asset(table_ref)
+
+    all_rows: list[tuple[Any, ...]] = [(i, f"user{i}") for i in range(1, 13)]
+    queries_issued: list[tuple[str, list[Any]]] = []
+
+    class _BatchCursor:
+        def __init__(self) -> None:
+            self.description = [
+                ("id", None, None, None, None, None, None),
+                ("name", None, None, None, None, None, None),
+            ]
+            self._rows: list[tuple[Any, ...]] = []
+
+        def execute(self, query: str, params: Any = None) -> None:
+            p = list(params) if params else []
+            queries_issued.append((query, p))
+            batch_size = int(p[0]) if len(p) > 0 else len(all_rows)
+            offset = int(p[1]) if len(p) > 1 else 0
+            self._rows = all_rows[offset : offset + batch_size]
+
+        def fetchall(self) -> list[tuple[Any, ...]]:
+            return list(self._rows)
+
+        def __enter__(self) -> _BatchCursor:
+            return self
+
+        def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+            return None
+
+    class _BatchConnection:
+        def cursor(self) -> _BatchCursor:
+            return _BatchCursor()
+
+        def __enter__(self) -> _BatchConnection:
+            return self
+
+        def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+            return None
+
+    monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
+    monkeypatch.setattr(source, "_connect", lambda _db: _BatchConnection())
+    monkeypatch.setattr(source, "_count_table_rows", lambda _ref: None)
+
+    pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
+
+    assert len(queries_issued) == 2
+    assert all("LIMIT" in q and "OFFSET" in q for q, _ in queries_issued)
+    assert len(pages) == 2
+    assert "user1" in pages[0]
+    assert "user12" in pages[1]

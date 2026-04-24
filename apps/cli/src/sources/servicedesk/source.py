@@ -216,7 +216,7 @@ class ServiceDeskSource(BaseSource):
         if sampling.strategy == SamplingStrategy.ALL:
             return requests
 
-        limit = int(sampling.limit or 100)
+        limit = int(sampling.rows_per_page or 100)
         if limit >= len(requests):
             return requests
 

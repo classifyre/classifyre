@@ -968,14 +968,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         runnerId,
       );
 
-      const latestRunner = await this.prisma.runner.findUnique({
-        where: { id: runnerId },
-        select: { status: true },
-      });
-      if (!latestRunner || latestRunner.status !== RunnerStatus.RUNNING) {
-        this.logger.log(
-          `Runner ${runnerId} exited with code ${exitCode} after status changed to ${latestRunner?.status ?? 'MISSING'}; skipping final transition.`,
-        );
+      if (await this.shouldSkipRunnerFinalTransition(runnerId, exitCode)) {
         return;
       }
 
@@ -1009,17 +1002,57 @@ export class CliRunnerService implements OnApplicationBootstrap {
         this.persistKubernetesExecutionIdentity(runnerId, jobName, namespace),
     );
     const output = result.output || '';
+    if (await this.shouldSkipRunnerFinalTransition(runnerId, result.exitCode)) {
+      return;
+    }
     if (result.exitCode === 0) {
       await this.completeRunner(runnerId);
       return;
     }
 
-    await this.failRunner(runnerId, output || 'CLI Kubernetes Job failed', {
+    const baseMessage = this.kubernetesExitMessage(result.exitCode);
+    const errorMessage = result.failureContext
+      ? `${baseMessage}\n\n${result.failureContext}`
+      : baseMessage;
+
+    await this.failRunner(runnerId, errorMessage, {
       exitCode: result.exitCode,
       output,
       jobName: result.jobName,
       namespace: result.namespace,
     });
+  }
+
+  private async shouldSkipRunnerFinalTransition(
+    runnerId: string,
+    exitCode: number,
+  ): Promise<boolean> {
+    const latestRunner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { status: true },
+    });
+
+    if (!latestRunner || latestRunner.status !== RunnerStatus.RUNNING) {
+      this.logger.log(
+        `Runner ${runnerId} exited with code ${exitCode} after status changed to ${latestRunner?.status ?? 'MISSING'}; skipping final transition.`,
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  private kubernetesExitMessage(exitCode: number): string {
+    if (exitCode === 137) {
+      return 'Job was killed by the system (OOMKilled: process exceeded the memory limit).';
+    }
+    if (exitCode === 143) {
+      return 'Job was terminated (SIGTERM: deadline or manual stop exceeded).';
+    }
+    if (exitCode === 1) {
+      return 'Job exited with an error. See the details panel for the full output.';
+    }
+    return `Job failed with exit code ${exitCode}. See the details panel for the full output.`;
   }
 
   private async persistKubernetesExecutionIdentity(
@@ -1225,13 +1258,21 @@ export class CliRunnerService implements OnApplicationBootstrap {
           this.logger.warn(`Failed to parse CLI test output: ${error.message}`);
           payload = {
             status: 'FAILURE',
-            message: 'Failed to parse CLI test output.',
+            message: `Failed to parse CLI test output: ${trimmedOutput.substring(0, 1000)}${trimmedOutput.length > 1000 ? '...' : ''}`,
           };
         }
       }
 
-      if (exitCode !== 0 && payload.status !== 'FAILURE') {
-        payload.status = 'FAILURE';
+      if (exitCode !== 0) {
+        if (payload.status !== 'FAILURE') {
+          payload.status = 'FAILURE';
+        }
+        if (
+          (payload.message === 'Connection test failed.' || !payload.message) &&
+          stderr?.trim()
+        ) {
+          payload.message = stderr.trim();
+        }
       }
 
       return payload;
@@ -1263,6 +1304,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           : 'Connection test failed.',
     };
 
+    const nonJsonLines: string[] = [];
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) {
@@ -1274,13 +1316,23 @@ export class CliRunnerService implements OnApplicationBootstrap {
           payload = parsed as Record<string, any>;
         }
       } catch {
-        // Ignore non-JSON log lines.
+        nonJsonLines.push(trimmed);
       }
     }
 
-    if (result.exitCode !== 0 && payload.status !== 'FAILURE') {
-      payload.status = 'FAILURE';
+    if (result.exitCode !== 0) {
+      if (payload.status !== 'FAILURE') {
+        payload.status = 'FAILURE';
+      }
+      if (
+        (payload.message === 'Connection test failed.' || !payload.message) &&
+        nonJsonLines.length > 0
+      ) {
+        // Use last 20 non-JSON lines as error message
+        payload.message = nonJsonLines.slice(-20).join('\n');
+      }
     }
+
     if (!payload.message) {
       payload.message =
         result.exitCode === 0
@@ -1918,7 +1970,11 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
   }
 
-  async updateRunnerStatus(runnerId: string, status: RunnerStatus) {
+  async updateRunnerStatus(
+    runnerId: string,
+    status: RunnerStatus,
+    errorMessage?: string,
+  ) {
     const runner = await this.prisma.runner.findUnique({
       where: { id: runnerId },
       select: {
@@ -1944,17 +2000,11 @@ export class CliRunnerService implements OnApplicationBootstrap {
       return this.getRunnerStatus(runnerId);
     }
 
-    await this.runnerLogStorage.finalizeRunner(runnerId);
-    await this.transitionRunnerToTerminalState({
+    await this.failRunner(
       runnerId,
-      sourceId: runner.sourceId,
-      sourceStatus: status,
-      runnerData: {
-        status,
-        completedAt: new Date(),
-        errorMessage: 'Runner marked as ERROR by upstream executor',
-      },
-    });
+      errorMessage ?? 'Runner marked as ERROR by upstream executor',
+      { source: 'upstream_executor' },
+    );
 
     const runnerDto = await this.getRunnerStatus(runnerId);
 
@@ -2092,6 +2142,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
     runnerId: string;
     cursor?: string;
     take?: number | string;
+    search?: string;
+    levels?: string[];
+    sortOrder?: 'asc' | 'desc';
+    streams?: string[];
   }) {
     const runner = await this.prisma.runner.findUnique({
       where: { id: params.runnerId },

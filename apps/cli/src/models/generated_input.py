@@ -118,7 +118,7 @@ class SamplingStrategy(StrEnum):
 
 class SamplingConfig(BaseModel):
     """
-    Controls how much content is extracted from each source. Apply to every source type: for tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake) limit is rows per table; for unstructured/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk) limit is items/pages/documents/assets per run.
+    Controls how content is extracted from each source. For tabular sources rows_per_page controls both sample size for RANDOM/LATEST and pagination batch size for ALL.
     """
 
     model_config = ConfigDict(
@@ -127,13 +127,7 @@ class SamplingConfig(BaseModel):
     strategy: SamplingStrategy
     fetch_all_until_first_success: bool | None = Field(
         False,
-        description='When true, force strategy ALL until this source gets its first successful run. After the first successful run, use strategy/limit as configured.',
-    )
-    limit: int | None = Field(
-        100,
-        description='Maximum number of items to sample per asset (rows for tabular, pages/items for unstructured). Ignored when strategy is ALL.',
-        ge=1,
-        le=100000,
+        description='When true, force strategy ALL until this source gets its first successful run. After the first successful run, use the configured strategy.',
     )
     order_by_column: str | None = Field(
         None,
@@ -143,27 +137,15 @@ class SamplingConfig(BaseModel):
         True,
         description='Tabular sources only. Fallback to RANDOM ordering when LATEST mode cannot resolve an ordering column.',
     )
-    max_columns: int | None = Field(
-        25,
-        description='Tabular sources only. Maximum number of columns to include per sampled row.',
-        ge=1,
-        le=500,
-    )
-    max_cell_chars: int | None = Field(
-        512,
-        description='Tabular sources only. Maximum characters per cell in detector payload formatting.',
-        ge=16,
-        le=50000,
-    )
-    max_total_chars: int | None = Field(
-        20000,
-        description='Tabular sources only. Maximum total formatted payload size sent to detectors per asset.',
-        ge=128,
-        le=500000,
-    )
     include_column_names: bool | None = Field(
         True,
         description='Tabular sources only. Include column names in sampled detector payload rows.',
+    )
+    rows_per_page: int | None = Field(
+        100,
+        description='Tabular sources only. Number of rows per sample (RANDOM/LATEST) or per pagination batch (ALL). Controls memory usage during large table scans.',
+        ge=10,
+        le=10000,
     )
 
 
@@ -641,6 +623,18 @@ class PostgreSQLOptional(BaseModel):
     scope: PostgreSQLOptionalScope | None = None
 
 
+class MySQLSSLMode(StrEnum):
+    """
+    SSL/TLS connection mode. DISABLED: no TLS; PREFERRED: TLS when available (default); REQUIRED: mandate TLS without certificate verification; VERIFY_CA: mandate TLS and verify the CA certificate (requires ssl_ca); VERIFY_IDENTITY: mandate TLS, verify CA, and verify server hostname.
+    """
+
+    DISABLED = 'DISABLED'
+    PREFERRED = 'PREFERRED'
+    REQUIRED = 'REQUIRED'
+    VERIFY_CA = 'VERIFY_CA'
+    VERIFY_IDENTITY = 'VERIFY_IDENTITY'
+
+
 class MySQLRequired(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -655,6 +649,10 @@ class MySQLMasked(BaseModel):
     )
     username: str = Field(..., description='Database username')
     password: str = Field(..., description='Database password')
+    ssl_ca: str | None = Field(
+        None,
+        description='PEM-encoded CA certificate for SSL/TLS verification. Paste the full certificate content (-----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----). Required when ssl_mode is VERIFY_CA or VERIFY_IDENTITY.',
+    )
 
 
 class MySQLOptionalConnection(BaseModel):
@@ -667,6 +665,11 @@ class MySQLOptionalConnection(BaseModel):
     )
     connect_timeout_seconds: int | None = Field(
         10, description='Connection timeout in seconds', ge=1, le=120
+    )
+    ssl_mode: MySQLSSLMode | None = 'PREFERRED'
+    allow_public_key_retrieval: bool | None = Field(
+        False,
+        description='Allow automatic RSA public key retrieval from the server for caching_sha2_password authentication (MySQL 8+). Only needed when not using SSL and connecting to MySQL 8 servers using the default authentication plugin.',
     )
 
 

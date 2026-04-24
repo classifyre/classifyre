@@ -317,9 +317,7 @@ class SlackSource(BaseSource):
         ingestion_options = self._ingestion_options()
         time_range_options = self._time_range_options()
         sampling = self.config.sampling
-        max_total: int | None = (
-            None if sampling.strategy == SamplingStrategy.ALL else (sampling.limit or 100)
-        )
+        max_total: int | None = None if sampling.strategy == SamplingStrategy.ALL else 100
         oldest = self._normalize_ts(time_range_options.oldest)
         latest = self._normalize_ts(time_range_options.latest)
         batch_size = min(int(ingestion_options.batch_size or 200), 200)

@@ -121,7 +121,7 @@ describe('Custom Detectors (e2e)', () => {
           type: 'WORDPRESS',
           required: { url: 'https://example.com' },
           masked: {},
-          sampling: { strategy: 'RANDOM', limit: 5 },
+          sampling: { strategy: 'RANDOM' },
           custom_detectors: [detectorId],
         },
       })
@@ -136,7 +136,7 @@ describe('Custom Detectors (e2e)', () => {
           type: 'WORDPRESS',
           required: { url: 'https://example.org' },
           masked: {},
-          sampling: { strategy: 'RANDOM', limit: 5 },
+          sampling: { strategy: 'RANDOM' },
           custom_detectors: ['missing-detector-id'],
         },
       })

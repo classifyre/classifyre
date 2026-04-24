@@ -352,6 +352,7 @@ function DetectorConfigCard({
               variant="outline"
               className="rounded-[4px] border-2 border-black"
               onClick={handleEnableCustom}
+              data-testid={`btn-customize-${detector.type}`}
             >
               {t("sources.scanConfig.customize")}
             </Button>
@@ -361,10 +362,10 @@ function DetectorConfigCard({
               variant="outline"
               className="rounded-[4px] border-2 border-black"
               onClick={handleResetDefaults}
+              data-testid={`btn-reset-${detector.type}`}
             >
               {t("sources.scanConfig.reset")}
-            </Button>
-          </div>
+            </Button>          </div>
         </div>
 
         {presetOptions.length > 0 && (
@@ -512,6 +513,7 @@ function CustomDetectorCatalogCard({
           pressed={enabled}
           onPressedChange={onToggle}
           className="cursor-pointer"
+          data-testid={`toggle-custom-detector-${detector.key}`}
         >
           {enabled ? t("sources.scanConfig.on") : t("sources.scanConfig.off")}
         </Toggle>
@@ -832,7 +834,7 @@ export function SourceScanConfig({
     visibleGroupSummary.length > 0 || visibleCustomDetectors.length > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="scan-config-section">
       <Card className="p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">

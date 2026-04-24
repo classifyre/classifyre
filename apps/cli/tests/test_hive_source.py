@@ -26,9 +26,6 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
         },
         "sampling": {
             "strategy": "RANDOM",
-            "limit": 10,
-            "max_columns": 10,
-            "max_cell_chars": 256,
         },
     }
     base.update(overrides)
@@ -172,7 +169,7 @@ def test_hive_latest_sampling_falls_back_to_random() -> None:
         _recipe(
             sampling={
                 "strategy": "LATEST",
-                "limit": 5,
+                "rows_per_page": 10,
                 "fallback_to_random": True,
             },
         )
@@ -182,7 +179,7 @@ def test_hive_latest_sampling_falls_back_to_random() -> None:
     query, params = source._build_sampling_query(table_ref, ["id", "name"])
 
     assert "ORDER BY rand()" in query
-    assert "LIMIT 5" in query
+    assert "LIMIT 10" in query
     assert params == []
 
 
@@ -234,3 +231,76 @@ async def test_hive_extract_runs_detector_pipeline_when_enabled(
 
     assert [len(batch) for batch in batches] == [1]
     assert processed_batches == [1]
+
+
+@pytest.mark.asyncio
+async def test_hive_fetch_content_pages_batches_for_all_strategy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With strategy=ALL, fetch_content_pages must paginate via LIMIT/OFFSET batches."""
+    source = HiveSource(
+        _recipe(
+            sampling={
+                "strategy": "ALL",
+                "rows_per_page": 10,
+            }
+        )
+    )
+    table_ref = TableRef(database="app_db", table="events", object_type="TABLE")
+    asset = source._table_to_asset(table_ref)
+
+    all_rows: list[tuple[Any, ...]] = [(i, f"item{i}") for i in range(1, 13)]
+    queries_issued: list[str] = []
+
+    class _BatchCursor:
+        def __init__(self) -> None:
+            self.description = [
+                ("id", None, None, None, None, None, None),
+                ("name", None, None, None, None, None, None),
+            ]
+            self._rows: list[tuple[Any, ...]] = []
+
+        def execute(self, query: str, params: Any = None) -> None:
+            queries_issued.append(query)
+            import re
+
+            m = re.search(r"LIMIT\s+(\d+)\s+OFFSET\s+(\d+)", query, re.IGNORECASE)
+            if m:
+                batch_size, offset = int(m.group(1)), int(m.group(2))
+            else:
+                offset, batch_size = 0, len(all_rows)
+            self._rows = all_rows[offset : offset + batch_size]
+
+        def fetchall(self) -> list[tuple[Any, ...]]:
+            return list(self._rows)
+
+        def __enter__(self) -> _BatchCursor:
+            return self
+
+        def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+            return None
+
+    class _BatchConnection:
+        def cursor(self) -> _BatchCursor:
+            return _BatchCursor()
+
+        def close(self) -> None:
+            return None
+
+        def __enter__(self) -> _BatchConnection:
+            return self
+
+        def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+            return None
+
+    monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
+    monkeypatch.setattr(source, "_connect", lambda _db=None: _BatchConnection())
+
+    pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
+
+    assert len(queries_issued) == 3
+    assert "COUNT" in queries_issued[0]
+    assert all("LIMIT" in q and "OFFSET" in q for q in queries_issued[1:])
+    assert len(pages) == 2
+    assert "item1" in pages[0]
+    assert "item12" in pages[1]

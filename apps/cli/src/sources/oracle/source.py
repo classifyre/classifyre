@@ -54,14 +54,6 @@ def _quote_identifier(identifier: str) -> str:
     return '"' + identifier.replace('"', '""') + '"'
 
 
-def _truncate_text(value: str, max_chars: int) -> str:
-    if len(value) <= max_chars:
-        return value
-    if max_chars <= 3:
-        return value[:max_chars]
-    return f"{value[: max_chars - 3]}..."
-
-
 class OracleSource(BaseSource):
     source_type = "oracle"
 
@@ -453,7 +445,6 @@ class OracleSource(BaseSource):
                 ),
             },
             "sampling": {
-                "limit": int(self._sampling().limit or 100),
                 "strategy": str(self._sampling().strategy),
             },
         }
@@ -615,14 +606,12 @@ class OracleSource(BaseSource):
         self, object_ref: ObjectRef, columns: list[str]
     ) -> tuple[str, list[Any]]:
         sampling = self._sampling()
-        max_columns = int(sampling.max_columns or 25)
-        selected_columns = columns[:max_columns] if columns else []
-        if not selected_columns:
+        if not columns:
             raise ValueError(
                 f"Object {object_ref.service_name}.{object_ref.schema}.{object_ref.name} has no readable columns"
             )
 
-        quoted_columns = ", ".join(_quote_identifier(column) for column in selected_columns)
+        quoted_columns = ", ".join(_quote_identifier(column) for column in columns)
         quoted_object = (
             f"{_quote_identifier(object_ref.schema)}.{_quote_identifier(object_ref.name)}"
         )
@@ -631,11 +620,11 @@ class OracleSource(BaseSource):
         if strategy == SamplingStrategy.ALL:
             return f"SELECT {quoted_columns} FROM {quoted_object}", []
 
-        limit = int(sampling.limit or 100)
+        rows_per_page = int(sampling.rows_per_page or 100)
         query = f"SELECT {quoted_columns} FROM {quoted_object}"
 
         if strategy == SamplingStrategy.LATEST:
-            order_column = self._resolve_latest_order_column(selected_columns)
+            order_column = self._resolve_latest_order_column(columns)
             if order_column:
                 query += f" ORDER BY {_quote_identifier(order_column)} DESC"
             elif sampling.fallback_to_random is not False:
@@ -643,12 +632,22 @@ class OracleSource(BaseSource):
         elif strategy == SamplingStrategy.RANDOM:
             query += " ORDER BY DBMS_RANDOM.VALUE"
 
-        query += f" FETCH FIRST {limit} ROWS ONLY"
+        query += f" FETCH FIRST {rows_per_page} ROWS ONLY"
         return query, []
 
-    def _serialize_cell(self, value: Any) -> str:
-        max_cell_chars = int(self._sampling().max_cell_chars or 512)
+    def _count_table_rows(self, object_ref: ObjectRef) -> int | None:
+        try:
+            with closing(self._connect()) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        f"SELECT COUNT(*) FROM {_quote_identifier(object_ref.schema)}.{_quote_identifier(object_ref.name)}"
+                    )
+                    row = cursor.fetchone()
+                    return int(row[0]) if row else None
+        except Exception:
+            return None
 
+    def _serialize_cell(self, value: Any) -> str:
         if value is None:
             return "null"
         if isinstance(value, memoryview):
@@ -661,11 +660,10 @@ class OracleSource(BaseSource):
                 value = str(value)
 
         if isinstance(value, (bytes, bytearray)):
-            rendered = f"<{len(value)} bytes>"
-            return _truncate_text(rendered, max_cell_chars)
+            return f"<{len(value)} bytes>"
         if isinstance(value, datetime):
-            return _truncate_text(value.isoformat(), max_cell_chars)
-        return _truncate_text(str(value), max_cell_chars)
+            return value.isoformat()
+        return str(value)
 
     def _format_sample_content(
         self,
@@ -681,7 +679,6 @@ class OracleSource(BaseSource):
             rows=rows,
             column_names=column_names,
             serialize_cell=self._serialize_cell,
-            max_total_chars=int(sampling.max_total_chars or 20000),
             include_column_names=sampling.include_column_names is not False,
             object_type=object_ref.object_type,
             raw_metadata={
@@ -691,15 +688,33 @@ class OracleSource(BaseSource):
             },
         )
 
+    def _fetch_one_page(
+        self, object_ref: ObjectRef, base_query: str, page_size: int, offset: int
+    ) -> tuple[list[tuple[Any, ...]], list[str]]:
+        with closing(self._connect()) as conn:
+            paginated_query = f"{base_query} OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
+            with conn.cursor() as cursor:
+                cursor.execute(paginated_query)
+                rows = list(cursor.fetchall())
+                column_names = (
+                    [desc[0] for desc in cursor.description] if cursor.description else []
+                )
+        return rows, column_names
+
     def _sample_object_rows(self, object_ref: ObjectRef) -> tuple[str, str] | None:
         columns = self._available_columns(object_ref)
+        sampling = self._sampling()
         query, _params = self._build_sampling_query(object_ref, columns)
 
-        with closing(self._connect()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query)
-                rows = cursor.fetchall()
-                column_names = [desc[0] for desc in cursor.description or []]
+        if sampling.strategy == SamplingStrategy.ALL:
+            rows_per_page = int(sampling.rows_per_page or 100)
+            rows, column_names = self._fetch_one_page(object_ref, query, rows_per_page, 0)
+        else:
+            with closing(self._connect()) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query)
+                    rows = cursor.fetchall()
+                    column_names = [desc[0] for desc in cursor.description or []]
 
         if not column_names:
             return None
@@ -714,23 +729,62 @@ class OracleSource(BaseSource):
         if not object_ref:
             return None
 
-        try:
-            sampled = self._sample_object_rows(object_ref)
-        except Exception as exc:
-            logger.error(
-                "Failed to sample content for object %s.%s.%s: %s",
-                object_ref.service_name,
-                object_ref.schema,
-                object_ref.name,
-                exc,
-            )
-            return None
+        sampled = self._sample_object_rows(object_ref)
 
         if sampled is None:
             return None
 
         self._content_cache[asset_id] = sampled
         return sampled
+
+    async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
+        sampling = self._sampling()
+
+        if sampling.strategy != SamplingStrategy.ALL:
+            result = await self.fetch_content(asset_id)
+            if result:
+                yield result
+            return
+
+        object_ref = self._parse_object_ref_from_asset_id(asset_id)
+        if not object_ref:
+            return
+
+        columns = self._available_columns(object_ref)
+        query, _ = self._build_sampling_query(object_ref, columns)
+        rows_per_page = int(sampling.rows_per_page or 100)
+        object_label = f"{object_ref.service_name}.{object_ref.schema}.{object_ref.name}"
+
+        total_rows = self._count_table_rows(object_ref)
+        total_batches = ((total_rows + rows_per_page - 1) // rows_per_page) if total_rows else None
+        if total_rows is not None and total_batches is not None:
+            logger.info(
+                "Full scan %s: %d rows, %d batches of %d",
+                object_label,
+                total_rows,
+                total_batches,
+                rows_per_page,
+            )
+
+        offset = 0
+        page_num = 1
+
+        while not self._aborted:
+            if total_batches is not None:
+                logger.info("%s batch %d/%d", object_label, page_num, total_batches)
+            rows, column_names = self._fetch_one_page(object_ref, query, rows_per_page, offset)
+            if not rows or not column_names:
+                break
+
+            result = self._format_sample_content(object_ref, column_names, rows)
+            if result:
+                self._content_cache[asset_id] = result
+                yield result
+
+            offset += rows_per_page
+            page_num += 1
+            if len(rows) < rows_per_page:
+                break
 
     def _get_primary_key_columns(self, object_ref: ObjectRef) -> list[str]:
         cache_key = (object_ref.schema, object_ref.name)

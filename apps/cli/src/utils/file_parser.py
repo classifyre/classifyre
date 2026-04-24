@@ -110,6 +110,23 @@ def _is_text_like_mime_type(mime_type: str) -> bool:
     return normalized_mime.startswith("text/") or normalized_mime in _TEXT_RAW_MIME_TYPES
 
 
+def _detect_magic_mime_type(file_bytes: bytes) -> str | None:
+    signatures: tuple[tuple[bytes, str], ...] = (
+        (b"\x89PNG\r\n\x1a\n", "image/png"),
+        (b"%PDF-", "application/pdf"),
+        (b"\xff\xd8\xff", "image/jpeg"),
+        (b"GIF87a", "image/gif"),
+        (b"GIF89a", "image/gif"),
+        (b"PK\x03\x04", "application/zip"),
+    )
+
+    for signature, mime_type in signatures:
+        if file_bytes.startswith(signature):
+            return mime_type
+
+    return None
+
+
 def _sniff_text_mime(file_bytes: bytes) -> str:
     """Fallback MIME detection for text formats not handled by filetype."""
     # Check for null bytes → binary
@@ -156,6 +173,10 @@ def detect_mime_type(file_bytes: bytes) -> str:
     """
     if not file_bytes:
         return "application/octet-stream"
+
+    magic_mime_type = _detect_magic_mime_type(file_bytes)
+    if magic_mime_type:
+        return magic_mime_type
 
     try:
         import filetype

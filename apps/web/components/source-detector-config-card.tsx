@@ -21,6 +21,7 @@ export function SourceDetectorConfigCard({
   onSave,
   onSaveAndScan,
   saveAndScanTestId,
+  showActions = true,
 }: {
   children: ReactNode;
   visibleCount: number;
@@ -30,6 +31,7 @@ export function SourceDetectorConfigCard({
   onSave: () => void;
   onSaveAndScan: () => void;
   saveAndScanTestId?: string;
+  showActions?: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -62,34 +64,36 @@ export function SourceDetectorConfigCard({
       <CardContent className="space-y-6 pt-6">
         {children}
 
-        <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <Button
-            variant="outline"
-            className="rounded-[4px] border-2 border-black"
-            onClick={onBack}
-            disabled={isSaving}
-          >
-            {t("sources.edit.back")}
-          </Button>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {showActions && (
+          <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
             <Button
               variant="outline"
               className="rounded-[4px] border-2 border-black"
-              onClick={onSave}
+              onClick={onBack}
               disabled={isSaving}
             >
-              {t("common.save")}
+              {t("sources.edit.back")}
             </Button>
-            <Button
-              className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
-              onClick={onSaveAndScan}
-              disabled={isSaving}
-              data-testid={saveAndScanTestId}
-            >
-              {t("sources.edit.saveAndScan")}
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Button
+                variant="outline"
+                className="rounded-[4px] border-2 border-black"
+                onClick={onSave}
+                disabled={isSaving}
+              >
+                {t("common.save")}
+              </Button>
+              <Button
+                className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+                onClick={onSaveAndScan}
+                disabled={isSaving}
+                data-testid={saveAndScanTestId}
+              >
+                {t("sources.edit.saveAndScan")}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

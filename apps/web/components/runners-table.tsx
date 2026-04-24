@@ -541,7 +541,7 @@ export function RunnersTable({
                               data-icon="inline-start"
                             />
                           )}
-                          {getRunnerStatusBadgeLabel(runner.status)}
+                          {t(getRunnerStatusBadgeLabel(runner.status))}
                         </Badge>
                       </TableCell>
                       <TableCell className="py-2">

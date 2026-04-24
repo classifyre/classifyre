@@ -220,6 +220,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
           onChange={(e) => set("name", e.target.value)}
           placeholder="e.g. Should match IBAN"
           required
+          data-testid="input-test-name"
         />
       </div>
 
@@ -231,6 +232,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
           onChange={(e) => set("inputText", e.target.value)}
           placeholder="Paste text to test against the detector..."
           required
+          data-testid="textarea-test-input"
         />
       </div>
 
@@ -244,6 +246,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
                 type="radio"
                 checked={form.shouldMatch}
                 onChange={() => set("shouldMatch", true)}
+                data-testid="radio-test-match-true"
               />
               Should match
             </label>
@@ -252,6 +255,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
                 type="radio"
                 checked={!form.shouldMatch}
                 onChange={() => set("shouldMatch", false)}
+                data-testid="radio-test-match-false"
               />
               Should not match
             </label>
@@ -268,6 +272,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
                 onChange={(e) => set("label", e.target.value)}
                 placeholder="e.g. advice"
                 required
+                data-testid="input-test-label"
               />
             </div>
             <div className="w-40 space-y-1">
@@ -283,6 +288,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
                 min="0"
                 max="1"
                 step="0.05"
+                data-testid="input-test-confidence"
               />
             </div>
           </div>
@@ -331,7 +337,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
         <Button type="button" variant="outline" size="sm" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" disabled={saving}>
+        <Button type="submit" size="sm" disabled={saving} data-testid="btn-save-test-scenario">
           {saving && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
           Add Scenario
         </Button>
@@ -383,6 +389,7 @@ function ScenarioRow({
           onClick={onDelete}
           className="text-stone-400 hover:text-red-600 transition-colors"
           aria-label="Delete scenario"
+          data-testid="btn-delete-test-scenario"
         >
           <Trash2 className="h-4 w-4" />
         </button>
@@ -520,17 +527,17 @@ export function CustomDetectorTests({ detectorId, method }: Props) {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {runResults.size > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-green-600 font-medium">
+            <div className="flex items-center gap-2 text-sm" data-testid="test-run-summary" data-passed={passCount} data-failed={failCount} data-errored={errorCount}>
+              <span className="text-green-600 font-medium" data-testid="test-run-passed">
                 {passCount} passed
               </span>
               {failCount > 0 && (
-                <span className="text-red-600 font-medium">
+                <span className="text-red-600 font-medium" data-testid="test-run-failed">
                   {failCount} failed
                 </span>
               )}
               {errorCount > 0 && (
-                <span className="text-orange-500 font-medium">
+                <span className="text-orange-500 font-medium" data-testid="test-run-errored">
                   {errorCount} errored
                 </span>
               )}
@@ -542,6 +549,7 @@ export function CustomDetectorTests({ detectorId, method }: Props) {
             variant="outline"
             size="sm"
             onClick={() => setShowAddForm((v) => !v)}
+            data-testid="btn-show-add-test"
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Test
@@ -553,6 +561,7 @@ export function CustomDetectorTests({ detectorId, method }: Props) {
               void handleRunAll();
             }}
             disabled={running || scenarios.length === 0}
+            data-testid="btn-run-all-tests"
           >
             {running ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

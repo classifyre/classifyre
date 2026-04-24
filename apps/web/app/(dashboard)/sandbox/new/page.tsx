@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   FileText,
@@ -26,8 +26,9 @@ import {
   type DetectorConfigInput,
 } from "@/components/source-scan-config";
 import {
-  SandboxStepperHeader,
-  sandboxStepper,
+  HorizontalSandboxStepperNav,
+  VerticalSandboxStepperNav,
+  type SandboxStepId,
 } from "@/components/sandbox-stepper";
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -60,7 +61,6 @@ function fileKey(file: File) {
 export default function NewSandboxScanPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const stepper = sandboxStepper.useStepper();
 
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -73,12 +73,12 @@ export default function NewSandboxScanPage() {
     enabledCount: 0,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeStepId, setActiveStepId] = useState<SandboxStepId>("upload");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
-
-  const showUploadStep = stepper.flow.is("upload");
-  const showDetectorStep = stepper.flow.is("detectors");
+  const uploadRef = useRef<HTMLElement>(null);
+  const detectorsRef = useRef<HTMLElement>(null);
   const enabledDetectors = useMemo(
     () => normalizeDetectors(detectors),
     [detectors],
@@ -265,6 +265,40 @@ export default function NewSandboxScanPage() {
     }
   }, [canRun, enabledDetectors, files, router, selectedCustomDetectorIds]);
 
+  useEffect(() => {
+    const sections = [
+      { id: "upload" as SandboxStepId, el: uploadRef.current },
+      { id: "detectors" as SandboxStepId, el: detectorsRef.current },
+    ].filter(
+      (section): section is { id: SandboxStepId; el: HTMLElement } =>
+        section.el !== null,
+    );
+
+    const map = new Map<Element, SandboxStepId>(
+      sections.map(({ id, el }) => [el, id]),
+    );
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const id = map.get(entry.target);
+            if (id) setActiveStepId(id);
+          }
+        }
+      },
+      { rootMargin: "0px 0px -60% 0px", threshold: 0 },
+    );
+
+    sections.forEach(({ el }) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  const scrollToSection = (id: SandboxStepId) => {
+    const section = id === "upload" ? uploadRef.current : detectorsRef.current;
+    section?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -286,9 +320,17 @@ export default function NewSandboxScanPage() {
         </div>
       </div>
 
-      <SandboxStepperHeader canNavigateToDetectors={canNavigateToDetectors} />
+      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-black bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
+        <HorizontalSandboxStepperNav
+          activeStepId={activeStepId}
+          canNavigateToDetectors={canNavigateToDetectors}
+          onNavigate={scrollToSection}
+        />
+      </div>
 
-      <div className={showUploadStep ? "block" : "hidden"}>
+      <div className="flex gap-8 lg:gap-12">
+        <div className="min-w-0 flex-1 space-y-16 pb-10">
+          <section ref={uploadRef}>
         <Card>
           <CardHeader>
             <CardTitle>{t("sandbox.uploadFiles")}</CardTitle>
@@ -299,6 +341,7 @@ export default function NewSandboxScanPage() {
               role="button"
               tabIndex={0}
               aria-label={t("sandbox.dropFiles")}
+              data-testid="file-upload-area"
               onDragEnter={onDragEnter}
               onDragLeave={onDragLeave}
               onDragOver={onDragOver}
@@ -317,6 +360,7 @@ export default function NewSandboxScanPage() {
                 type="file"
                 multiple
                 className="sr-only"
+                data-testid="file-input"
                 onChange={onFileChange}
               />
 
@@ -362,10 +406,12 @@ export default function NewSandboxScanPage() {
                   No files selected yet.
                 </div>
               ) : (
-                <ul className="max-h-64 divide-y overflow-auto">
+                <ul className="max-h-64 divide-y overflow-auto" data-testid="file-list">
                   {files.map((file) => (
                     <li
                       key={fileKey(file)}
+                      data-testid="file-item"
+                      data-filename={file.name}
                       className="flex items-center gap-3 px-3 py-2"
                     >
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -391,21 +437,11 @@ export default function NewSandboxScanPage() {
                 </ul>
               )}
             </div>
-
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                onClick={() => stepper.navigation.next()}
-                disabled={!canNavigateToDetectors}
-                className="w-full sm:w-auto"
-              >
-                Continue to detectors
-              </Button>
-            </div>
           </CardContent>
         </Card>
-      </div>
+          </section>
 
-      <div className={showDetectorStep ? "block" : "hidden"}>
+          <section ref={detectorsRef}>
         <Card>
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -431,20 +467,16 @@ export default function NewSandboxScanPage() {
               selectedCustomDetectorIds={selectedCustomDetectorIds}
               onCustomDetectorsChange={setSelectedCustomDetectorIds}
             />
+          </CardContent>
+        </Card>
+          </section>
 
-            <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <Button
-                variant="outline"
-                onClick={() => stepper.navigation.prev()}
-                disabled={isSubmitting}
-                className="w-full sm:w-auto"
-              >
-                Back
-              </Button>
-
+          <Card className="sticky bottom-0 z-30 p-4">
+            <div className="flex justify-end">
               <Button
                 onClick={() => void handleRun()}
                 disabled={!canRun}
+                data-testid="btn-run-sandbox"
                 className="w-full sm:w-auto"
               >
                 {isSubmitting ? (
@@ -460,8 +492,16 @@ export default function NewSandboxScanPage() {
                 )}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </Card>
+        </div>
+
+        <aside className="hidden self-start md:sticky md:top-6 md:block md:w-44 lg:w-52">
+          <VerticalSandboxStepperNav
+            activeStepId={activeStepId}
+            canNavigateToDetectors={canNavigateToDetectors}
+            onNavigate={scrollToSection}
+          />
+        </aside>
       </div>
     </div>
   );

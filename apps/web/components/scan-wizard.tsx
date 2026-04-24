@@ -207,9 +207,7 @@ export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
                                   data-icon="inline-start"
                                 />
                               )}
-                              {getRunnerStatusBadgeLabel(
-                                normalizedRunnerStatus,
-                              )}
+                              {t(getRunnerStatusBadgeLabel(normalizedRunnerStatus))}
                             </Badge>
                           </TableCell>
                         </TableRow>

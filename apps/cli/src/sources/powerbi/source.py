@@ -36,14 +36,6 @@ from ..base import BaseSource
 logger = logging.getLogger(__name__)
 
 
-def _truncate_text(value: str, max_chars: int) -> str:
-    if len(value) <= max_chars:
-        return value
-    if max_chars <= 3:
-        return value[:max_chars]
-    return f"{value[: max_chars - 3]}..."
-
-
 @dataclass(frozen=True)
 class PowerBIAssetRef:
     raw_id: str
@@ -568,11 +560,10 @@ class PowerBISource(BaseSource):
         if sampling.strategy == SamplingStrategy.ALL:
             return refs
 
-        limit = int(sampling.limit or 100)
-        if limit >= len(refs):
-            return refs
-
         if sampling.strategy == SamplingStrategy.RANDOM:
+            limit = int(sampling.rows_per_page or 100)
+            if limit >= len(refs):
+                return refs
             generator = random.Random(0)
             sampled_indexes = sorted(generator.sample(range(len(refs)), k=limit))
             return [refs[index] for index in sampled_indexes]
@@ -583,6 +574,7 @@ class PowerBISource(BaseSource):
 
         if not has_order_values and sampling.fallback_to_random is not False:
             generator = random.Random(0)
+            limit = int(sampling.rows_per_page or 100)
             sampled_indexes = sorted(generator.sample(range(len(refs)), k=limit))
             return [refs[index] for index in sampled_indexes]
 
@@ -592,6 +584,7 @@ class PowerBISource(BaseSource):
             scored.append((parsed is not None, effective, ref))
 
         scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        limit = int(sampling.rows_per_page or 100)
         return [item[2] for item in scored[:limit]]
 
     def _asset_from_ref(
@@ -692,8 +685,6 @@ class PowerBISource(BaseSource):
 
     def _format_asset_content(self, ref: PowerBIAssetRef) -> tuple[str, str]:
         sampling = self._sampling()
-        max_total_chars = int(sampling.max_total_chars or 20000)
-
         lines: list[str] = [
             f"workspace={ref.workspace_name}",
             f"workspace_id={ref.workspace_id}",
@@ -725,7 +716,7 @@ class PowerBISource(BaseSource):
             if dataset_id:
                 lines.append(f"dataset_id={dataset_id}")
 
-        text_content = _truncate_text("\n".join(lines), max_total_chars)
+        text_content = "\n".join(lines)
         raw_content = json.dumps(
             {
                 "kind": ref.kind,

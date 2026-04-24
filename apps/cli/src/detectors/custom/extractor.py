@@ -16,6 +16,8 @@ from ..dependencies import MissingDependencyError, require_module
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_GLINER2_MODEL = "fastino/gliner2-base-v1"
+
 # Extraction method tags sent to the API via DetectionResult.extraction_method
 EXTRACTION_METHOD_REGEX = "REGEX"
 EXTRACTION_METHOD_GLINER = "GLINER"
@@ -44,8 +46,8 @@ class CustomExtractor:
 
     Strategy selection:
       RULESET     → REGEX    (named capture groups in field.regex_pattern)
-      ENTITY      → GLINER   (group entity spans by entity_label into fields)
-      CLASSIFIER  → CLASSIFIER_GLINER  (second GLiNER pass on wider content slice)
+      ENTITY      → GLINER   (group GLiNER2 entity spans by entity_label into fields)
+      CLASSIFIER  → CLASSIFIER_GLINER  (second GLiNER2 pass on wider content slice)
     """
 
     def __init__(
@@ -139,7 +141,7 @@ class CustomExtractor:
             logger.warning("CustomExtractor: invalid regex pattern '%s': %s", pattern, exc)
             return None
 
-    # ── ENTITY / CLASSIFIER — GLiNER entity spans ────────────────────────────
+    # ── ENTITY / CLASSIFIER — GLiNER2 entity spans ───────────────────────────
 
     def _extract_gliner(self, content: str, method_tag: str) -> ExtractionResult | None:
         label_to_fields: dict[str, list[CustomExtractorField]] = {}
@@ -148,57 +150,81 @@ class CustomExtractor:
                 label_to_fields.setdefault(f.entity_label, []).append(f)
 
         if not label_to_fields:
-            logger.debug("CustomExtractor: no fields with entity_label — skipping GLiNER")
+            logger.debug("CustomExtractor: no fields with entity_label — skipping GLiNER2")
             return None
 
         model = self._load_gliner()
         if model is None:
             return None
 
-        entity_labels = list(label_to_fields.keys())
+        entity_schema = {
+            label: next(
+                (
+                    field.description
+                    for field in fields
+                    if isinstance(field.description, str) and field.description.strip()
+                ),
+                "",
+            )
+            for label, fields in label_to_fields.items()
+        }
         try:
-            entities = model.predict_entities(content, entity_labels)
+            result = model.extract_entities(
+                content,
+                entity_schema,
+                threshold=0.0,
+                include_confidence=True,
+            )
         except Exception as exc:  # pragma: no cover
-            logger.warning("CustomExtractor: GLiNER prediction failed: %s", exc)
+            logger.warning("CustomExtractor: GLiNER2 extraction failed: %s", exc)
             return None
 
-        # Group spans by label, filtered by per-field min_confidence
-        spans_by_label: dict[str, list[str]] = {}
-        for entity in entities:
-            score = float(entity.get("score", 0.0))
-            label = str(entity.get("label", "")).strip()
-            text = str(entity.get("text", "")).strip()
-            if not label or not text:
-                continue
-            for f in label_to_fields.get(label, []):
-                threshold = f.min_confidence if f.min_confidence is not None else 0.4
-                if score >= threshold:
-                    spans_by_label.setdefault(label, []).append(text)
-                    break  # one field matched — avoid double-counting
+        entities = result.get("entities", {})
+        if not isinstance(entities, dict):
+            return None
 
-        # Map grouped spans → output fields
         data: dict[str, Any] = {}
         for entity_label, fields in label_to_fields.items():
-            spans = spans_by_label.get(entity_label, [])
+            raw_spans = entities.get(entity_label, [])
+            if not isinstance(raw_spans, list):
+                raw_spans = [raw_spans]
+
             for f in fields:
-                value = self._aggregate(spans, f) if spans else None
+                threshold = f.min_confidence if f.min_confidence is not None else 0.4
+                values = self._filter_gliner2_values(raw_spans, threshold)
+                value = self._aggregate(values, f) if values else None
                 if value is not None:
                     data[f.name] = value
 
         return self._finalize(data, method_tag)
 
+    def _filter_gliner2_values(self, raw_spans: list[Any], threshold: float) -> list[str]:
+        values: list[str] = []
+        for raw_span in raw_spans:
+            if isinstance(raw_span, dict):
+                score = float(raw_span.get("confidence", raw_span.get("score", 0.0)))
+                text = str(raw_span.get("text", "")).strip()
+            else:
+                score = 1.0
+                text = str(raw_span).strip()
+
+            if score >= threshold and text:
+                values.append(text)
+
+        return values
+
     def _load_gliner(self) -> Any | None:
         if self._gliner_model is not None:
             return self._gliner_model
         try:
-            gliner_module = require_module("gliner", "custom", ["classification", "detectors"])
-            model_name = self._config.gliner_model or "urchade/gliner_multi-v2.1"
-            self._gliner_model = gliner_module.GLiNER.from_pretrained(model_name)
+            gliner2_module = require_module("gliner2", "custom", ["classification", "detectors"])
+            model_name = self._config.gliner_model or _DEFAULT_GLINER2_MODEL
+            self._gliner_model = gliner2_module.GLiNER2.from_pretrained(model_name)
             return self._gliner_model
         except MissingDependencyError:
             raise
         except Exception as exc:  # pragma: no cover
-            logger.warning("CustomExtractor: failed to load GLiNER: %s", exc)
+            logger.warning("CustomExtractor: failed to load GLiNER2: %s", exc)
             return None
 
     # ── Shared helpers ────────────────────────────────────────────────────────

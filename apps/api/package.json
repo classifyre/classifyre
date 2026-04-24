@@ -27,7 +27,16 @@
     "test:i18n": "jest src/i18n/i18n-keys.spec.ts --no-coverage"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.82.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.72.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.214.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.214.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.214.0",
+    "@opentelemetry/resources": "^2.6.1",
+    "@opentelemetry/sdk-logs": "^0.214.0",
+    "@opentelemetry/sdk-metrics": "^2.6.1",
+    "@opentelemetry/sdk-node": "^0.214.0",
+    "@anthropic-ai/sdk": "^0.88.0",
     "@fastify/multipart": "^9.4.0",
     "@fastify/static": "^9.0.0",
     "@google/genai": "^1.48.0",
@@ -56,6 +65,7 @@
     "rxjs": "^7.8.2",
     "socket.io": "^4.8.3",
     "uuid": "^13.0.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -64,7 +74,7 @@
     "@nestjs/cli": "^11.0.17",
     "@nestjs/schematics": "^11.0.10",
     "@nestjs/testing": "^11.1.18",
-    "@prisma/client-runtime-utils": "7.6.0",
+    "@prisma/client-runtime-utils": "7.7.0",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.5.2",

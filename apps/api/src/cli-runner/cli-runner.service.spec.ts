@@ -694,6 +694,48 @@ describe('CliRunnerService', () => {
     });
   });
 
+  it('does not overwrite a terminal runner state after kubernetes job exit', async () => {
+    const kubernetesCliJobService = {
+      isEnabled: jest.fn().mockReturnValue(true),
+      runExtractJob: jest.fn().mockResolvedValue({
+        exitCode: 1,
+        output: 'job output',
+        jobName: 'job-1',
+        namespace: 'classifyre',
+      }),
+    };
+    const { service, prisma } = createService({
+      kubernetesCliJobService,
+    });
+    prisma.runner.findUnique.mockResolvedValue({
+      status: RunnerStatus.COMPLETED,
+    });
+
+    const completeRunnerSpy = jest.spyOn(service as any, 'completeRunner');
+    const failRunnerSpy = jest.spyOn(service as any, 'failRunner');
+
+    await (service as any).executeCliInKubernetes(
+      'runner-1',
+      { id: 'source-1' },
+      false,
+    );
+
+    const runExtractJobCall =
+      kubernetesCliJobService.runExtractJob.mock.calls[0];
+    expect(runExtractJobCall[0]).toBe('runner-1');
+    expect(runExtractJobCall[1]).toBe('source-1');
+    expect(runExtractJobCall[2]).toBeUndefined();
+    expect(runExtractJobCall[4]).toBe(false);
+    expect(runExtractJobCall[5]).toEqual(expect.any(Function));
+    expect(runExtractJobCall[6]).toEqual(expect.any(Function));
+    expect(prisma.runner.findUnique).toHaveBeenCalledWith({
+      where: { id: 'runner-1' },
+      select: { status: true },
+    });
+    expect(completeRunnerSpy).not.toHaveBeenCalled();
+    expect(failRunnerSpy).not.toHaveBeenCalled();
+  });
+
   it('terminates tracked local process when stopping a running runner', async () => {
     jest.useFakeTimers();
     try {

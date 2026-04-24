@@ -28,7 +28,7 @@ def _recipe() -> dict[str, Any]:
         "required": {"host": "db.local", "port": 5432},
         "sampling": {
             "strategy": "LATEST",
-            "limit": 10,
+            "rows_per_page": 10,
             "fetch_all_until_first_success": True,
         },
     }
@@ -49,7 +49,7 @@ def test_sampling_keeps_configured_strategy_after_first_success(monkeypatch) -> 
     source = _DummySource(_recipe())
 
     assert source.recipe["sampling"]["strategy"] == "LATEST"
-    assert source.recipe["sampling"]["limit"] == 10
+    assert source.recipe["sampling"]["rows_per_page"] == 10
 
 
 def test_sampling_keeps_configured_strategy_without_run_context(monkeypatch) -> None:
@@ -57,4 +57,4 @@ def test_sampling_keeps_configured_strategy_without_run_context(monkeypatch) -> 
     source = _DummySource(_recipe())
 
     assert source.recipe["sampling"]["strategy"] == "LATEST"
-    assert source.recipe["sampling"]["limit"] == 10
+    assert source.recipe["sampling"]["rows_per_page"] == 10

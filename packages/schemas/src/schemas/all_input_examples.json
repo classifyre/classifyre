@@ -22,8 +22,7 @@
           }
         },
         "sampling": {
-          "strategy": "LATEST",
-          "limit": 100
+          "strategy": "LATEST"
         },
         "detectors": [
           {
@@ -55,8 +54,7 @@
           }
         },
         "sampling": {
-          "strategy": "LATEST",
-          "limit": 200
+          "strategy": "LATEST"
         }
       }
     },
@@ -124,8 +122,7 @@
           }
         },
         "sampling": {
-          "strategy": "LATEST",
-          "limit": 500
+          "strategy": "LATEST"
         }
       }
     },
@@ -157,8 +154,7 @@
           }
         },
         "sampling": {
-          "strategy": "LATEST",
-          "limit": 200
+          "strategy": "LATEST"
         }
       }
     },
@@ -238,8 +234,7 @@
           }
         },
         "sampling": {
-          "strategy": "LATEST",
-          "limit": 100
+          "strategy": "LATEST"
         }
       }
     },
@@ -273,8 +268,7 @@
           }
         },
         "sampling": {
-          "strategy": "LATEST",
-          "limit": 100
+          "strategy": "LATEST"
         }
       }
     }
@@ -313,8 +307,7 @@
           }
         },
         "sampling": {
-          "strategy": "RANDOM",
-          "limit": 25
+          "strategy": "RANDOM"
         }
       }
     }
@@ -376,9 +369,7 @@
         },
         "sampling": {
           "strategy": "RANDOM",
-          "limit": 20,
-          "max_columns": 20,
-          "max_cell_chars": 512
+          "rows_per_page": 20
         }
       }
     },
@@ -409,9 +400,9 @@
         },
         "sampling": {
           "strategy": "LATEST",
-          "limit": 30,
           "order_by_column": "updated_at",
-          "fallback_to_random": true
+          "fallback_to_random": true,
+          "rows_per_page": 30
         }
       }
     },
@@ -450,8 +441,7 @@
         },
         "sampling": {
           "strategy": "RANDOM",
-          "limit": 15,
-          "max_total_chars": 15000
+          "rows_per_page": 15
         },
         "detectors": [
           {
@@ -493,9 +483,7 @@
         },
         "sampling": {
           "strategy": "RANDOM",
-          "limit": 20,
-          "max_columns": 20,
-          "max_cell_chars": 512
+          "rows_per_page": 20
         }
       }
     },
@@ -531,9 +519,9 @@
         },
         "sampling": {
           "strategy": "LATEST",
-          "limit": 30,
           "order_by_column": "updated_at",
-          "fallback_to_random": true
+          "fallback_to_random": true,
+          "rows_per_page": 30
         }
       }
     },
@@ -567,8 +555,7 @@
         },
         "sampling": {
           "strategy": "RANDOM",
-          "limit": 15,
-          "max_total_chars": 15000
+          "rows_per_page": 15
         },
         "detectors": [
           {
@@ -624,9 +611,7 @@
         },
         "sampling": {
           "strategy": "RANDOM",
-          "limit": 25,
-          "max_columns": 20,
-          "max_cell_chars": 512
+          "rows_per_page": 25
         }
       }
     },
@@ -680,9 +665,9 @@
         },
         "sampling": {
           "strategy": "LATEST",
-          "limit": 30,
           "order_by_column": "updated_at",
-          "fallback_to_random": true
+          "fallback_to_random": true,
+          "rows_per_page": 30
         }
       }
     }
@@ -718,9 +703,7 @@
         },
         "sampling": {
           "strategy": "RANDOM",
-          "limit": 25,
-          "max_columns": 20,
-          "max_cell_chars": 512
+          "rows_per_page": 25
         }
       }
     },
@@ -757,9 +740,9 @@
         },
         "sampling": {
           "strategy": "LATEST",
-          "limit": 20,
           "order_by_column": "LAST_UPDATE_DATE",
-          "fallback_to_random": true
+          "fallback_to_random": true,
+          "rows_per_page": 20
         }
       }
     }
@@ -799,9 +782,7 @@
         },
         "sampling": {
           "strategy": "RANDOM",
-          "limit": 25,
-          "max_columns": 20,
-          "max_cell_chars": 512
+          "rows_per_page": 25
         }
       }
     },
@@ -839,9 +820,9 @@
         },
         "sampling": {
           "strategy": "LATEST",
-          "limit": 30,
           "order_by_column": "updated_at",
-          "fallback_to_random": true
+          "fallback_to_random": true,
+          "rows_per_page": 30
         }
       }
     }
@@ -881,9 +862,7 @@
         },
         "sampling": {
           "strategy": "RANDOM",
-          "limit": 20,
-          "max_columns": 20,
-          "max_cell_chars": 512
+          "rows_per_page": 20
         }
       }
     },
@@ -924,9 +903,9 @@
         },
         "sampling": {
           "strategy": "LATEST",
-          "limit": 30,
           "order_by_column": "updated_at",
-          "fallback_to_random": true
+          "fallback_to_random": true,
+          "rows_per_page": 30
         }
       }
     }
@@ -969,9 +948,7 @@
         },
         "sampling": {
           "strategy": "RANDOM",
-          "limit": 20,
-          "max_columns": 20,
-          "max_cell_chars": 512
+          "rows_per_page": 20
         }
       }
     },
@@ -1013,9 +990,9 @@
         },
         "sampling": {
           "strategy": "LATEST",
-          "limit": 30,
           "order_by_column": "UPDATED_AT",
-          "fallback_to_random": true
+          "fallback_to_random": true,
+          "rows_per_page": 30
         }
       }
     }
@@ -1056,7 +1033,7 @@
         },
         "sampling": {
           "strategy": "RANDOM",
-          "limit": 30
+          "rows_per_page": 30
         }
       }
     },
@@ -1095,7 +1072,7 @@
         },
         "sampling": {
           "strategy": "LATEST",
-          "limit": 25
+          "rows_per_page": 25
         }
       }
     },
@@ -1124,12 +1101,16 @@
           },
           "scope": {
             "include_all_databases": true,
-            "exclude_databases": ["admin", "config", "local"]
+            "exclude_databases": [
+              "admin",
+              "config",
+              "local"
+            ]
           }
         },
         "sampling": {
           "strategy": "RANDOM",
-          "limit": 20
+          "rows_per_page": 20
         },
         "detectors": [
           {
@@ -1171,7 +1152,6 @@
         },
         "sampling": {
           "strategy": "LATEST",
-          "limit": 100,
           "order_by_column": "modifiedDateTime"
         }
       }
@@ -1207,8 +1187,7 @@
           }
         },
         "sampling": {
-          "strategy": "RANDOM",
-          "limit": 40
+          "strategy": "RANDOM"
         }
       }
     }
@@ -1243,7 +1222,6 @@
         },
         "sampling": {
           "strategy": "LATEST",
-          "limit": 50,
           "order_by_column": "updated_at"
         }
       }
@@ -1326,8 +1304,7 @@
           }
         },
         "sampling": {
-          "strategy": "LATEST",
-          "limit": 100
+          "strategy": "LATEST"
         }
       }
     },
@@ -1411,8 +1388,7 @@
           }
         },
         "sampling": {
-          "strategy": "LATEST",
-          "limit": 150
+          "strategy": "LATEST"
         }
       }
     },
@@ -1441,8 +1417,7 @@
           }
         },
         "sampling": {
-          "strategy": "RANDOM",
-          "limit": 50
+          "strategy": "RANDOM"
         }
       }
     }
@@ -1480,8 +1455,7 @@
           }
         },
         "sampling": {
-          "strategy": "LATEST",
-          "limit": 100
+          "strategy": "LATEST"
         }
       }
     },
@@ -1510,8 +1484,7 @@
           }
         },
         "sampling": {
-          "strategy": "RANDOM",
-          "limit": 60
+          "strategy": "RANDOM"
         }
       }
     }

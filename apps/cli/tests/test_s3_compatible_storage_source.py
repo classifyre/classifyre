@@ -10,10 +10,10 @@ from src.sources.s3_compatible_storage.source import S3CompatibleStorageSource
 from src.utils.file_parser import ParsedBytes
 
 
-def _recipe(*, strategy: str = "LATEST", limit: int | None = 2) -> dict:
+def _recipe(*, strategy: str = "LATEST", rows_per_page: int | None = 10) -> dict:
     sampling: dict[str, object] = {"strategy": strategy}
-    if limit is not None:
-        sampling["limit"] = limit
+    if rows_per_page is not None:
+        sampling["rows_per_page"] = rows_per_page
 
     return {
         "type": "S3_COMPATIBLE_STORAGE",
@@ -29,7 +29,7 @@ def _recipe(*, strategy: str = "LATEST", limit: int | None = 2) -> dict:
     }
 
 
-def _ref(key: str, *, days_ago: int, size: int = 128) -> ObjectRef:
+def _ref(key: str, *, days_ago: int, size: int = 1108) -> ObjectRef:
     return ObjectRef(
         key=key,
         size=size,
@@ -39,11 +39,11 @@ def _ref(key: str, *, days_ago: int, size: int = 128) -> ObjectRef:
 
 
 def test_s3_storage_sampling_random_is_deterministic():
-    source = S3CompatibleStorageSource(_recipe(strategy="RANDOM", limit=2))
+    source = S3CompatibleStorageSource(_recipe(strategy="RANDOM", rows_per_page=10))
     refs = [
         _ref("exports/a.txt", days_ago=4),
         _ref("exports/b.txt", days_ago=3),
-        _ref("exports/c.txt", days_ago=2),
+        _ref("exports/c.txt", days_ago=10),
         _ref("exports/d.txt", days_ago=1),
         _ref("exports/e.txt", days_ago=0),
     ]
@@ -52,12 +52,12 @@ def test_s3_storage_sampling_random_is_deterministic():
     sampled_twice = source._apply_sampling(refs)
 
     assert [item.key for item in sampled_once] == [item.key for item in sampled_twice]
-    assert len(sampled_once) == 2
+    assert len(sampled_once) == 5
 
 
 @pytest.mark.asyncio
 async def test_s3_storage_extract_applies_latest_sampling_and_asset_types(monkeypatch):
-    source = S3CompatibleStorageSource(_recipe(strategy="LATEST", limit=2))
+    source = S3CompatibleStorageSource(_recipe(strategy="LATEST", rows_per_page=10))
     refs = [
         _ref("exports/old.csv", days_ago=10),
         _ref("exports/new.csv", days_ago=0),
@@ -69,18 +69,18 @@ async def test_s3_storage_extract_applies_latest_sampling_and_asset_types(monkey
     snapshots = {
         "exports/old.csv": ContentSnapshot(
             mime_type="text/csv",
-            raw_content="a,b\n1,2\n",
-            text_content="a,b\n1,2\n",
+            raw_content="a,b\n1,10\n",
+            text_content="a,b\n1,10\n",
             parse_error=None,
-            downloaded_bytes=12,
+            downloaded_bytes=110,
             truncated=False,
         ),
         "exports/new.csv": ContentSnapshot(
             mime_type="text/csv",
-            raw_content="a,b\n2,3\n",
-            text_content="a,b\n2,3\n",
+            raw_content="a,b\n10,3\n",
+            text_content="a,b\n10,3\n",
             parse_error=None,
-            downloaded_bytes=12,
+            downloaded_bytes=110,
             truncated=False,
         ),
         "exports/mid.pdf": ContentSnapshot(
@@ -88,7 +88,7 @@ async def test_s3_storage_extract_applies_latest_sampling_and_asset_types(monkey
             raw_content="",
             text_content="Extracted PDF text",
             parse_error=None,
-            downloaded_bytes=1024,
+            downloaded_bytes=10104,
             truncated=False,
         ),
     }
@@ -98,7 +98,7 @@ async def test_s3_storage_extract_applies_latest_sampling_and_asset_types(monkey
     async for batch in source.extract():
         assets.extend(batch)
 
-    assert [asset.name for asset in assets] == ["new.csv", "mid.pdf"]
+    assert [asset.name for asset in assets] == ["new.csv", "mid.pdf", "old.csv"]
     assert assets[0].asset_type == OutputAssetType.TABLE
     assert assets[1].asset_type == OutputAssetType.BINARY
 
@@ -124,7 +124,7 @@ def test_s3_storage_snapshot_prefers_detected_mime_for_octet_stream_hint(monkeyp
     source = S3CompatibleStorageSource(_recipe())
     ref = ObjectRef(
         key="exports/invoice.pdf",
-        size=1024,
+        size=10104,
         last_modified=datetime.now(UTC),
         etag="etag-pdf",
         content_type_hint="application/octet-stream",

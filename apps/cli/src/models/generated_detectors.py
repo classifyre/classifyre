@@ -297,6 +297,14 @@ class PIIDetectorConfig(DetectorConfig):
         None, description='Specific PII types to detect'
     )
     language: str | None = Field('en', description='Language code for NER models')
+    spacy_model: str | None = Field(
+        None,
+        description='spaCy model name to load (e.g. en_core_web_sm, en_core_web_lg). Defaults to en_core_web_sm when null.',
+    )
+    spacy_model_url: str | None = Field(
+        None,
+        description='Wheel download URL for the spaCy model. When set and the model is not already installed the CLI installs it at runtime. Example: https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl',
+    )
 
 
 class ThreatDetectorConfig(DetectorConfig):
@@ -311,6 +319,50 @@ class ThreatDetectorConfig(DetectorConfig):
         None, description='Path to custom YARA rules directory'
     )
     timeout: int | None = Field(60, description='Timeout for YARA scanning in seconds')
+
+
+class SpamDetectorConfig(DetectorConfig):
+    """
+    Configuration for spam detector
+    """
+
+    model: str | None = Field(
+        None,
+        description='HuggingFace model ID for spam classification. Defaults to mrm8488/bert-tiny-finetuned-sms-spam-detection when null.',
+    )
+
+
+class NSFWDetectorConfig(DetectorConfig):
+    """
+    Configuration for NSFW image detector
+    """
+
+    model: str | None = Field(
+        None,
+        description='HuggingFace model ID for NSFW image classification. Defaults to Falconsai/nsfw_image_detection when null.',
+    )
+
+
+class PhishingUrlDetectorConfig(DetectorConfig):
+    """
+    Configuration for phishing URL detector
+    """
+
+    model: str | None = Field(
+        None,
+        description='HuggingFace model ID for phishing URL classification. Defaults to CrabInHoney/urlbert-tiny-phishing-classifier when null.',
+    )
+
+
+class PromptInjectionDetectorConfig(DetectorConfig):
+    """
+    Configuration for prompt injection detector
+    """
+
+    model: str | None = Field(
+        None,
+        description='HuggingFace model ID for prompt injection detection. Defaults to protectai/deberta-v3-base-prompt-injection-v2 when null.',
+    )
 
 
 class BrokenLinksDetectorConfig(BaseModel):
@@ -467,7 +519,8 @@ class CustomExtractorField(BaseModel):
     )
     type: Type | None = 'string'
     entity_label: str | None = Field(
-        None, description='GLiNER entity label (ENTITY and CLASSIFIER methods)'
+        None,
+        description='GLiNER2 schema label used for extraction (ENTITY and CLASSIFIER methods)',
     )
     regex_pattern: str | None = Field(
         None,
@@ -498,7 +551,7 @@ class CustomExtractorConfig(BaseModel):
     )
     enabled: bool | None = True
     fields: list[CustomExtractorField] = Field(..., min_length=1)
-    gliner_model: str | None = 'urchade/gliner_multi-v2.1'
+    gliner_model: str | None = 'fastino/gliner2-base-v1'
     content_limit: int | None = Field(
         4000,
         description='Chars of content to pass to extractor (classifier matched_content is only 320 chars)',
@@ -557,7 +610,10 @@ class CustomEntityConfig(BaseModel):
         extra='forbid',
     )
     entity_labels: list[str] | None = []
-    model: str | None = 'urchade/gliner_multi-v2.1'
+    entity_descriptions: dict[str, str] | None = Field(
+        {}, description='Optional GLiNER2 schema descriptions keyed by entity label'
+    )
+    model: str | None = 'fastino/gliner2-base-v1'
 
 
 class CustomDetectorConfig(DetectorConfig):
@@ -598,6 +654,10 @@ class DetectorsRefactored(
         | DeidScoreDetectorConfig
         | BiasDetectorConfig
         | CustomDetectorConfig
+        | SpamDetectorConfig
+        | NSFWDetectorConfig
+        | PhishingUrlDetectorConfig
+        | PromptInjectionDetectorConfig
         | GenericDetectorConfig
     ]
 ):
@@ -612,6 +672,10 @@ class DetectorsRefactored(
         | DeidScoreDetectorConfig
         | BiasDetectorConfig
         | CustomDetectorConfig
+        | SpamDetectorConfig
+        | NSFWDetectorConfig
+        | PhishingUrlDetectorConfig
+        | PromptInjectionDetectorConfig
         | GenericDetectorConfig
     ) = Field(
         ...,

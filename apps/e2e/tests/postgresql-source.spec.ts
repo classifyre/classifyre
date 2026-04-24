@@ -252,16 +252,13 @@ test.describe("PostgreSQL Source", () => {
       password: PG_PASSWORD,
     });
 
-    // Save to advance to step 2
+    // Save source config first (sets the sourceId for the subsequent save-and-scan)
     await page.locator('[data-testid="btn-save-source"]').click();
 
-    // Wait for step 2 (detector configuration) — default tab is Secrets & Credentials
-    await expect(page.locator('[data-testid="tab-secrets_credentials"]')).toBeVisible({
+    // Wait for the scan config section to be ready (detectors are on the same page now)
+    await expect(page.locator('[data-testid="scan-config-section"]')).toBeVisible({
       timeout: 15_000,
     });
-
-    // Navigate to the Privacy & PII tab
-    await page.locator('[data-testid="tab-privacy_pii"]').click();
 
     // Find and enable PII detector
     const piiToggle = page.locator('[data-testid="detector-toggle-PII"]');

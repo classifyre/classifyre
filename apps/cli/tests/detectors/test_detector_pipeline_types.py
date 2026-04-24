@@ -49,6 +49,15 @@ class TestDetectorPipelineTypes:
         except (ModuleNotFoundError, ValueError):
             return False
 
+    @staticmethod
+    def _is_torch_available() -> bool:
+        try:
+            import torch
+
+            return hasattr(torch, "no_grad")
+        except Exception:
+            return False
+
     @pytest.fixture
     def mock_source(self):
         """Create a mock source for testing."""
@@ -114,14 +123,7 @@ class TestDetectorPipelineTypes:
 
     def test_pipeline_from_recipe_toxic(self, mock_source):
         """Test pipeline creation with TOXIC detector."""
-        try:
-            import torch
-
-            has_torch = hasattr(torch, "no_grad")
-        except ImportError:
-            has_torch = False
-
-        if not has_torch:
+        if not self._is_torch_available():
             pytest.skip("PyTorch not installed, skipping toxic detector test")
 
         recipe = {
@@ -151,14 +153,7 @@ class TestDetectorPipelineTypes:
 
     def test_pipeline_from_recipe_nsfw(self, mock_source):
         """Test pipeline creation with NSFW detector."""
-        try:
-            import torch
-
-            has_torch = hasattr(torch, "no_grad")
-        except ImportError:
-            has_torch = False
-
-        if not has_torch:
+        if not self._is_torch_available():
             pytest.skip("PyTorch not installed, skipping nsfw detector test")
 
         recipe = {
@@ -229,14 +224,7 @@ class TestDetectorPipelineTypes:
 
     def test_pipeline_from_recipe_prompt_injection(self, mock_source):
         """Test pipeline creation with PROMPT_INJECTION detector."""
-        try:
-            import torch
-
-            has_torch = hasattr(torch, "no_grad")
-        except ImportError:
-            has_torch = False
-
-        if not has_torch or not self._is_dependency_available("transformers"):
+        if not self._is_torch_available() or not self._is_dependency_available("transformers"):
             pytest.skip("transformers/torch not installed, skipping prompt injection test")
 
         recipe = {
@@ -258,14 +246,7 @@ class TestDetectorPipelineTypes:
 
     def test_pipeline_from_recipe_phishing_url(self, mock_source):
         """Test pipeline creation with PHISHING_URL detector."""
-        try:
-            import torch
-
-            has_torch = hasattr(torch, "no_grad")
-        except ImportError:
-            has_torch = False
-
-        if not has_torch or not self._is_dependency_available("transformers"):
+        if not self._is_torch_available() or not self._is_dependency_available("transformers"):
             pytest.skip("transformers/torch not installed, skipping phishing URL test")
 
         recipe = {
@@ -287,14 +268,7 @@ class TestDetectorPipelineTypes:
 
     def test_pipeline_from_recipe_spam(self, mock_source):
         """Test pipeline creation with SPAM detector."""
-        try:
-            import torch
-
-            has_torch = hasattr(torch, "no_grad")
-        except ImportError:
-            has_torch = False
-
-        if not has_torch or not self._is_dependency_available("transformers"):
+        if not self._is_torch_available() or not self._is_dependency_available("transformers"):
             pytest.skip("transformers/torch not installed, skipping spam test")
 
         recipe = {

@@ -25,6 +25,12 @@ export interface CliRunnerControllerUpdateRunnerStatusRequest {
      * @memberof CliRunnerControllerUpdateRunnerStatusRequest
      */
     status?: CliRunnerControllerUpdateRunnerStatusRequestStatusEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof CliRunnerControllerUpdateRunnerStatusRequest
+     */
+    errorMessage?: string;
 }
 
 
@@ -56,6 +62,7 @@ export function CliRunnerControllerUpdateRunnerStatusRequestFromJSONTyped(json: 
     return {
         
         'status': json['status'] == null ? undefined : json['status'],
+        'errorMessage': json['errorMessage'] == null ? undefined : json['errorMessage'],
     };
 }
 
@@ -71,6 +78,7 @@ export function CliRunnerControllerUpdateRunnerStatusRequestToJSONTyped(value?: 
     return {
         
         'status': value['status'],
+        'errorMessage': value['errorMessage'],
     };
 }
 

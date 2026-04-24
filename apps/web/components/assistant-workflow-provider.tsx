@@ -508,7 +508,7 @@ export function AssistantWorkflowProvider({
             <input
               ref={uploadInputRef}
               type="file"
-              accept=".csv,.tsv,.txt,.md,.log,.json,text/plain,text/csv,application/json"
+              accept=".csv,.tsv,.txt,.md,.log,.json,.xlsx,text/plain,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               className="hidden"
               onChange={(event) => void handleFileUpload(event)}
             />

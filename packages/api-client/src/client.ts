@@ -56,6 +56,7 @@ export type {
   DeleteRunnerResponseDto,
   RunnerLogEntryDto,
   RunnerLogsResponseDto,
+  SearchRunnerLogsBodyDto,
   SourceInfoDto,
   StopRunnerResponseDto,
   StartRunnerDto,
@@ -145,6 +146,7 @@ export {
   UpdateAiProviderConfigDtoProviderEnum,
   SandboxRunDtoContentTypeEnum,
   SandboxRunDtoStatusEnum,
+  RunnerLogEntryDtoLevelEnum,
   // Finding enums used by web components
   FindingResponseDtoDetectorTypeEnum,
   FindingResponseDtoSeverityEnum,
@@ -177,6 +179,24 @@ export const SearchAssetsSortOrderEnum = {
 } as const;
 export type SearchAssetsSortOrder =
   (typeof SearchAssetsSortOrderEnum)[keyof typeof SearchAssetsSortOrderEnum];
+
+export const SearchSourcesSortByEnum = {
+  Name: "NAME",
+  Type: "TYPE",
+  Status: "STATUS",
+  CreatedAt: "CREATED_AT",
+  UpdatedAt: "UPDATED_AT",
+  LastRunAt: "LAST_RUN_AT",
+} as const;
+export type SearchSourcesSortBy =
+  (typeof SearchSourcesSortByEnum)[keyof typeof SearchSourcesSortByEnum];
+
+export const SearchSourcesSortOrderEnum = {
+  Asc: "ASC",
+  Desc: "DESC",
+} as const;
+export type SearchSourcesSortOrder =
+  (typeof SearchSourcesSortOrderEnum)[keyof typeof SearchSourcesSortOrderEnum];
 
 export type SearchAssetsPageInputDto = GeneratedSearchAssetsPageDto & {
   sortBy?: SearchAssetsSortBy;
@@ -524,6 +544,10 @@ export type ParseTrainingExamplesResponseDto = {
   skippedRows: number;
   warnings: string[];
   examples: ParsedTrainingExampleDto[];
+  availableColumns?: string[];
+  detectedLabelColumn?: string;
+  detectedTextColumn?: string;
+  skippedReasons?: { missingLabel: number; missingText: number; duplicates: number };
 };
 
 export type CustomDetectorExtractionDto = {
@@ -942,6 +966,7 @@ class ApiClient {
   async parseCustomDetectorTrainingExamples(
     file: File | Blob,
     fileName?: string,
+    opts: { labelColumn?: string; textColumn?: string } = {},
   ): Promise<ParseTrainingExamplesResponseDto> {
     const basePath = this.config.basePath.replace(/\/$/, "");
     const formData = new FormData();
@@ -951,6 +976,8 @@ class ApiClient {
         ? file.name
         : "training-data.txt");
     formData.set("file", file, fallbackName);
+    if (opts.labelColumn) formData.set("labelColumn", opts.labelColumn);
+    if (opts.textColumn) formData.set("textColumn", opts.textColumn);
 
     const response = await fetch(
       `${basePath}/custom-detectors/training-examples/parse`,

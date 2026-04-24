@@ -75,6 +75,7 @@ docs/NotificationsApi.md
 docs/NotificationsControllerDeleteNotification200Response.md
 docs/NotificationsControllerMarkAllRead200Response.md
 docs/ParseTrainingExamplesResponseDto.md
+docs/ParseTrainingExamplesSkippedReasonsDto.md
 docs/ParsedTrainingExampleDto.md
 docs/QueryDashboardMetricsDto.md
 docs/QueryMetricDto.md
@@ -112,6 +113,7 @@ docs/SearchFindingsPageDto.md
 docs/SearchFindingsRequestDto.md
 docs/SearchFindingsResponseDto.md
 docs/SearchRunnerItemDto.md
+docs/SearchRunnerLogsBodyDto.md
 docs/SearchRunnersChartsOptionsDto.md
 docs/SearchRunnersChartsRequestDto.md
 docs/SearchRunnersChartsResponseDto.md
@@ -230,6 +232,7 @@ src/models/NotificationResponseDto.ts
 src/models/NotificationsControllerDeleteNotification200Response.ts
 src/models/NotificationsControllerMarkAllRead200Response.ts
 src/models/ParseTrainingExamplesResponseDto.ts
+src/models/ParseTrainingExamplesSkippedReasonsDto.ts
 src/models/ParsedTrainingExampleDto.ts
 src/models/QueryDashboardMetricsDto.ts
 src/models/QueryMetricDto.ts
@@ -265,6 +268,7 @@ src/models/SearchFindingsPageDto.ts
 src/models/SearchFindingsRequestDto.ts
 src/models/SearchFindingsResponseDto.ts
 src/models/SearchRunnerItemDto.ts
+src/models/SearchRunnerLogsBodyDto.ts
 src/models/SearchRunnersChartsOptionsDto.ts
 src/models/SearchRunnersChartsRequestDto.ts
 src/models/SearchRunnersChartsResponseDto.ts

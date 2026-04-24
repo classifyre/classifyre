@@ -1033,6 +1033,7 @@ export function FindingsTable({
                     <Fragment key={finding.id}>
                       <TableRow
                         className={isSelected ? "bg-[#b7ff00]/5" : undefined}
+                        data-testid="finding-row"
                       >
                         <TableCell className="py-2">
                           <div className="flex items-center justify-center">
@@ -1105,6 +1106,7 @@ export function FindingsTable({
                                 onClick={() =>
                                   router.push(`/findings/${finding.id}`)
                                 }
+                                data-testid="finding-type"
                               >
                                 <span className="truncate text-sm font-medium">
                                   {finding.findingType}

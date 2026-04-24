@@ -31,7 +31,6 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
         },
         "sampling": {
             "strategy": "RANDOM",
-            "limit": 10,
         },
     }
     base.update(overrides)
@@ -134,12 +133,12 @@ def test_mongodb_builds_expected_connection_uris() -> None:
     atlas_source = MongoDBSource(_recipe())
     onprem_source = MongoDBSource(
         _recipe(
-            required={"deployment": "ON_PREM", "host": "mongo.local", "port": 27018},
+            required={"deployment": "ON_PREM", "host": "mongo.local", "port": 27017},
         )
     )
 
     assert atlas_source._build_connection_uri() == "mongodb+srv://finanzen.rtlj1gu.mongodb.net"
-    assert onprem_source._build_connection_uri() == "mongodb://mongo.local:27018"
+    assert onprem_source._build_connection_uri() == "mongodb://mongo.local:27017"
 
 
 def test_mongodb_full_uri_in_cluster_host_is_normalised() -> None:
@@ -148,12 +147,12 @@ def test_mongodb_full_uri_in_cluster_host_is_normalised() -> None:
         _recipe(
             required={
                 "deployment": "ATLAS",
-                "cluster_host": "mongodb+srv://user:secret@cluster.abc123.mongodb.net/?retryWrites=true&w=majority",
+                "cluster_host": "mongodb+srv://user:secret@cluster.abc11010.mongodb.net/?retryWrites=true&w=majority",
             }
         )
     )
-    assert full_uri_source._atlas_cluster_host() == "cluster.abc123.mongodb.net"
-    assert full_uri_source._build_connection_uri() == "mongodb+srv://cluster.abc123.mongodb.net"
+    assert full_uri_source._atlas_cluster_host() == "cluster.abc11010.mongodb.net"
+    assert full_uri_source._build_connection_uri() == "mongodb+srv://cluster.abc11010.mongodb.net"
 
 
 def test_mongodb_connection_kwargs_include_masked_credentials() -> None:
@@ -259,7 +258,7 @@ async def test_mongodb_fetch_content_uses_cache(
 
 
 def test_mongodb_random_sampling_uses_sample_pipeline() -> None:
-    source = MongoDBSource(_recipe(sampling={"strategy": "RANDOM", "limit": 3}))
+    source = MongoDBSource(_recipe(sampling={"strategy": "RANDOM", "rows_per_page": 10}))
     collection = _FakeCollection([{"_id": i, "value": f"v-{i}"} for i in range(10)])
     fake_client = _FakeMongoClient({"finanzen": _FakeDatabase({"transactions": collection})})
     source._mongo_client = fake_client
@@ -268,8 +267,8 @@ def test_mongodb_random_sampling_uses_sample_pipeline() -> None:
         CollectionRef(database="finanzen", collection="transactions")
     )
 
-    assert len(docs) == 3
-    assert collection.last_pipeline == [{"$sample": {"size": 3}}]
+    assert len(docs) == 10
+    assert collection.last_pipeline == [{"$sample": {"size": 10}}]
 
 
 def test_mongodb_latest_sampling_falls_back_to_random_when_order_column_missing() -> None:
@@ -277,14 +276,14 @@ def test_mongodb_latest_sampling_falls_back_to_random_when_order_column_missing(
         _recipe(
             sampling={
                 "strategy": "LATEST",
-                "limit": 2,
+                "rows_per_page": 10,
                 "order_by_column": "updated_at",
                 "fallback_to_random": True,
             }
         )
     )
     collection = _FakeCollection(
-        [{"_id": 1, "value": "one"}, {"_id": 2, "value": "two"}, {"_id": 3, "value": "three"}]
+        [{"_id": 1, "value": "one"}, {"_id": 10, "value": "two"}, {"_id": 10, "value": "three"}]
     )
     fake_client = _FakeMongoClient({"finanzen": _FakeDatabase({"transactions": collection})})
     source._mongo_client = fake_client
@@ -293,13 +292,13 @@ def test_mongodb_latest_sampling_falls_back_to_random_when_order_column_missing(
         CollectionRef(database="finanzen", collection="transactions")
     )
 
-    assert len(docs) == 2
-    assert collection.last_pipeline == [{"$sample": {"size": 2}}]
+    assert len(docs) == 3
+    assert collection.last_pipeline == [{"$sample": {"size": 10}}]
 
 
 def test_mongodb_all_sampling_reads_entire_collection() -> None:
     source = MongoDBSource(_recipe(sampling={"strategy": "ALL"}))
-    collection = _FakeCollection([{"_id": 1, "value": "one"}, {"_id": 2, "value": "two"}])
+    collection = _FakeCollection([{"_id": 1, "value": "one"}, {"_id": 10, "value": "two"}])
     fake_client = _FakeMongoClient({"finanzen": _FakeDatabase({"transactions": collection})})
     source._mongo_client = fake_client
 

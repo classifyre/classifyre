@@ -5,7 +5,7 @@ import os
 import re
 from typing import Any
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import DetectorConfig, Severity, SpamDetectorConfig
 from ...models.generated_single_asset_scan_results import (
     DetectionResult,
     DetectorType,
@@ -22,11 +22,18 @@ class SpamDetector(BaseDetector):
     detector_type = "spam"
     detector_name = "spam"
 
+    _DEFAULT_MODEL = "mrm8488/bert-tiny-finetuned-sms-spam-detection"
+
     def __init__(self, config: DetectorConfig | None = None):
         super().__init__(config)
         self.classifier: Any | None = None
         self._transformers: Any | None = None
-        self._model_id = "mrm8488/bert-tiny-finetuned-sms-spam-detection"
+        cfg_model = (
+            getattr(self.config, "model", None)
+            if isinstance(self.config, SpamDetectorConfig)
+            else None
+        )
+        self._model_id = cfg_model or self._DEFAULT_MODEL
         self._max_length = 512
         # Model inference for this detector has proven unstable in some runtime
         # environments (native crashes). Keep robust heuristic detection enabled

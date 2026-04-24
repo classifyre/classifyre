@@ -62,6 +62,41 @@ data:
                     "name": "UV_CACHE_DIR",
                     "value": "{{ if .Values.api.cliJobs.uvCache.enabled }}{{ .Values.api.cliJobs.uvCache.mountPath }}{{ else }}/tmp/uv-cache{{ end }}"
                   }
+                  {{- if .Values.telemetry.enabled }},
+                  {
+                    "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                    "value": {{ include "classifyre.otelEndpoint" . | quote }}
+                  },
+                  {
+                    "name": "OTEL_EXPORTER_OTLP_PROTOCOL",
+                    "value": {{ .Values.telemetry.otlpProtocol | quote }}
+                  },
+                  {
+                    "name": "OTEL_SERVICE_NAME",
+                    "value": "classifyre-cli"
+                  },
+                  {
+                    "name": "DEPLOY_ENV",
+                    "value": {{ .Values.telemetry.deployEnv | quote }}
+                  }
+                  {{- if .Values.telemetry.instanceId.enabled }},
+                  {
+                    "name": "CLASSIFYRE_INSTANCE_ID",
+                    "valueFrom": {
+                      "configMapKeyRef": {
+                        "name": {{ include "classifyre.instanceIdConfigMapName" . | quote }},
+                        "key": {{ .Values.telemetry.instanceId.configMapKey | quote }},
+                        "optional": true
+                      }
+                    }
+                  }
+                  {{- end }}
+                  {{- else }},
+                  {
+                    "name": "TELEMETRY_DISABLED",
+                    "value": "1"
+                  }
+                  {{- end }}
                   {{- range .Values.api.cliJobs.extraEnv }},
                   {{ . | toJson }}
                   {{- end }}

@@ -45,6 +45,16 @@ class NoFetchSource(DummySource):
         raise AssertionError(f"fetch_content must not be called for asset {asset_id}")
 
 
+class PagedSource(NoFetchSource):
+    def __init__(self, recipe: dict[str, Any], pages: list[str]) -> None:
+        super().__init__(recipe, content="")
+        self.pages = pages
+
+    async def fetch_content_pages(self, asset_id: str):
+        for index, page in enumerate(self.pages, start=1):
+            yield (f"<p>raw-{index}</p>", page)
+
+
 class HashResolvingSource(NoFetchSource):
     def __init__(
         self,
@@ -138,14 +148,18 @@ def make_url_asset(
     )
 
 
-def make_table_asset(asset_id: str = "table-1") -> SingleAssetScanResults:
+def make_table_asset(
+    asset_id: str = "table-1",
+    *,
+    links: list[str] | None = None,
+) -> SingleAssetScanResults:
     now = datetime.now(UTC)
     return SingleAssetScanResults(
         hash=asset_id,
         checksum="checksum",
         name=f"asset-{asset_id}",
         external_url=f"urn:test/{asset_id}",
-        links=[],
+        links=links or [],
         asset_type=AssetType.TABLE,
         created_at=now,
         updated_at=now,
@@ -292,6 +306,56 @@ async def test_pipeline_runs_text_and_link_detectors_together() -> None:
     assert asset.scan_stats is not None
     assert DetectorType.SECRETS in asset.scan_stats.detectors_run
     assert DetectorType.BROKEN_LINKS in asset.scan_stats.detectors_run
+
+
+@pytest.mark.asyncio
+async def test_pipeline_processes_text_content_page_by_page_and_links_once() -> None:
+    source = PagedSource({"type": "DUMMY"}, pages=["page one", "page two"])
+    text_detector = RecordingDetector(["text/plain"])
+    link_detector = LinkRecordingDetector()
+    pipeline = DetectorPipeline(
+        detectors=[text_detector, link_detector],
+        source=source,
+        runner_id="runner-paged",
+    )
+
+    [asset] = await pipeline.process(
+        [make_table_asset(links=["https://example.com/a", "https://example.com/b"])]
+    )
+
+    assert text_detector.seen == ["page one", "page two"]
+    assert text_detector.seen_content_types == ["text/plain", "text/plain"]
+    assert link_detector.seen == [
+        (
+            "application/x.asset-links",
+            "https://example.com/a\nhttps://example.com/b",
+        )
+    ]
+    assert asset.findings is not None
+    assert len(asset.findings) == 2
+    assert asset.scan_stats is not None
+    assert asset.scan_stats.content_size_bytes == len("page one") + len("page two")
+    assert DetectorType.SECRETS in asset.scan_stats.detectors_run
+    assert DetectorType.BROKEN_LINKS in asset.scan_stats.detectors_run
+
+
+@pytest.mark.asyncio
+async def test_pipeline_fails_scan_when_content_fetch_raises() -> None:
+    """A connection error during content fetch must propagate and fail the scan."""
+
+    class FailingSource(NoFetchSource):
+        async def fetch_content_pages(self, asset_id: str):
+            raise ConnectionError("Can't connect to MySQL server (timed out)")
+            yield  # make it an async generator
+
+    source = FailingSource({"type": "DUMMY"}, content="")
+    detector = RecordingDetector(["text/plain"])
+    pipeline = DetectorPipeline(detectors=[detector], source=source, runner_id="runner-fail")
+
+    with pytest.raises(ConnectionError, match="timed out"):
+        await pipeline.process([make_asset()])
+
+    assert detector.seen == []
 
 
 @pytest.mark.asyncio

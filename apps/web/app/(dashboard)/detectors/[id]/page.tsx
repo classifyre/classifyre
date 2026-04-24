@@ -162,6 +162,7 @@ export default function CustomDetectorDetailsPage() {
               size="sm"
               onClick={handleTrain}
               disabled={isTraining}
+              data-testid="btn-train-detector"
             >
               <Play className="h-4 w-4" />
               {isTraining ? t("common.training") : t("detectors.trainNow")}
@@ -171,6 +172,7 @@ export default function CustomDetectorDetailsPage() {
             size="sm"
             className="rounded-[4px] border-2 border-black bg-[#ff2b2b] text-white shadow-[3px_3px_0_#000] hover:bg-[#e62626]"
             onClick={() => setShowDeleteDialog(true)}
+            data-testid="btn-delete-detector"
           >
             <Trash2 className="h-4 w-4" />
             {t("common.delete")}
@@ -264,7 +266,7 @@ export default function CustomDetectorDetailsPage() {
       )}
 
       {detector.method !== "RULESET" && (
-        <section className="space-y-4">
+        <section data-testid="training-history-section" className="space-y-4">
           <div>
             <h2 className="font-serif text-2xl font-black uppercase tracking-[0.06em]">
               {t("detectors.trainingHistoryTab")}
@@ -326,6 +328,7 @@ export default function CustomDetectorDetailsPage() {
               variant="destructive"
               onClick={handleDelete}
               disabled={isDeleting}
+              data-testid="btn-delete-detector-confirm"
             >
               {isDeleting
                 ? t("detectors.deleting")

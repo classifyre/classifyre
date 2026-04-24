@@ -87,7 +87,7 @@ test("extractor fields textarea does not normalize typed text back into template
           extractor: {
             enabled: true,
             fields: [],
-            gliner_model: "urchade/gliner_multi-v2.1",
+            gliner_model: "fastino/gliner2-base-v1",
             content_limit: 4000,
           },
         },
@@ -95,8 +95,6 @@ test("extractor fields textarea does not normalize typed text back into template
       onSubmit={() => {}}
     />,
   );
-
-  await component.getByRole("button", { name: /^next$/i }).click();
 
   const extractorFieldsInput = component.getByPlaceholder(
     "vendor_name|string|vendor name||required\ninvoice_id|string||\\bINV-\\d+\\b|optional",
@@ -137,7 +135,7 @@ test("extractor content limit can be cleared and retyped without snapping back m
           extractor: {
             enabled: true,
             fields: [],
-            gliner_model: "urchade/gliner_multi-v2.1",
+            gliner_model: "fastino/gliner2-base-v1",
             content_limit: 4000,
           },
         },
@@ -145,8 +143,6 @@ test("extractor content limit can be cleared and retyped without snapping back m
       onSubmit={() => {}}
     />,
   );
-
-  await component.getByRole("button", { name: /^next$/i }).click();
 
   const numberInputs = component.locator('input[type="number"]');
   await expect(numberInputs).toHaveCount(3);
@@ -201,11 +197,10 @@ test("step 1 blocks advancing when required identity fields are empty", async ({
 
   await component.getByPlaceholder("Detector name").fill("");
   await component.getByPlaceholder("cust_detector_key").fill("");
-  await component.getByRole("button", { name: /^next$/i }).click();
+  await component.getByRole("button", { name: /save detector/i }).click();
 
   await expect(component.getByText("Name is required.")).toBeVisible();
   await expect(component.getByText("Key is required.")).toBeVisible();
-  await expect(component.getByText("Detection Policy")).toHaveCount(0);
 });
 
 test("step 1 blocks advancing when key already exists", async ({
@@ -259,12 +254,11 @@ test("step 1 blocks advancing when key already exists", async ({
   );
 
   await component.getByPlaceholder("cust_detector_key").fill("cust_duplicate");
-  await component.getByRole("button", { name: /^next$/i }).click();
+  await component.getByRole("button", { name: /save detector/i }).click();
 
   await expect(
     component.getByText("This key is already used by another custom detector."),
   ).toBeVisible();
-  await expect(component.getByText("Detection Policy")).toHaveCount(0);
 });
 
 test("json mode is available and disables the step workflow", async ({
@@ -304,11 +298,6 @@ test("json mode is available and disables the step workflow", async ({
   await component.getByRole("button", { name: /^json$/i }).click();
 
   await expect(component.getByText("JSON Editor")).toBeVisible();
-  await expect(component.getByText("Config JSON")).toBeVisible();
-  await expect(
-    component.getByRole("button", { name: /step 1/i }),
-  ).toBeDisabled();
-  await expect(
-    component.getByRole("button", { name: /step 2/i }),
-  ).toBeDisabled();
+  await expect(component.getByText("Method setup")).not.toBeVisible();
+  await expect(component.getByText("Pattern & severity")).not.toBeVisible();
 });

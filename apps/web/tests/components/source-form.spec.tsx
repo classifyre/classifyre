@@ -178,3 +178,32 @@ test("sampling checkbox submits fetch_all_until_first_success", async ({
   const sampling = payload["sampling"] as Record<string, unknown> | undefined;
   expect(sampling?.["fetch_all_until_first_success"]).toBe(true);
 });
+
+test("rows per page only appears for tabular full scans", async ({ mount }) => {
+  const component = await mount(
+    <SourceForm
+      sourceType="POSTGRESQL"
+      mode="create"
+      defaultValues={{
+        name: "new-source",
+        required: {
+          host: "db.local",
+          port: 5432,
+        },
+        masked: {
+          username: "postgres",
+          password: "secret",
+        },
+        sampling: { strategy: "RANDOM" },
+      }}
+      onSubmit={() => {}}
+      showCancel={false}
+    />,
+  );
+
+  await expect(component.getByText(/rows per page/i)).toHaveCount(0);
+
+  await component.getByTestId("sampling-strategy-ALL").click();
+  await component.getByRole("button", { name: /advanced/i }).click();
+  await expect(component.getByText(/rows per page/i)).toHaveCount(1);
+});

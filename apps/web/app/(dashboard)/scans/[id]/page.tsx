@@ -25,6 +25,7 @@ import {
   type SearchFindingsChartsResponseDto,
   type StartRunnerDto,
 } from "@workspace/api-client";
+import type { LogFetchParams } from "@/components/runner-log-viewer";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
 import { AssetsTable } from "@/components/assets-table";
@@ -117,6 +118,7 @@ export default function RunnerDetailPage() {
 
   const [logEntries, setLogEntries] = useState<RunnerLogEntryDto[]>([]);
   const [logsCursor, setLogsCursor] = useState("0");
+  const [logsNextCursor, setLogsNextCursor] = useState<string | null>(null);
   const [logsHasMore, setLogsHasMore] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsLoadingMore, setLogsLoadingMore] = useState(false);
@@ -187,7 +189,11 @@ export default function RunnerDetailPage() {
   );
 
   const fetchLogsPage = useCallback(
-    async (scanRunnerId: string, cursor?: string, append = false) => {
+    async (
+      scanRunnerId: string,
+      params: LogFetchParams,
+      append = false,
+    ) => {
       try {
         if (append) {
           setLogsLoadingMore(true);
@@ -195,14 +201,21 @@ export default function RunnerDetailPage() {
           setLogsLoading(true);
         }
 
-        const response = await api.runners.cliRunnerControllerGetRunnerLogs({
-          runnerId: scanRunnerId,
-          cursor,
-          take: 200,
-        });
+        const response =
+          await api.runners.cliRunnerControllerSearchRunnerLogs({
+            runnerId: scanRunnerId,
+            searchRunnerLogsBodyDto: {
+              cursor: params.cursor,
+              take: params.take ?? 200,
+              search: params.search,
+              levels: params.levels as any,
+              sortOrder: params.sortOrder,
+            },
+          });
 
         const entries = response.entries ?? [];
-        setLogsCursor(response.cursor || cursor || "0");
+        setLogsCursor(response.cursor || params.cursor || "0");
+        setLogsNextCursor(response.nextCursor ?? null);
         setLogsHasMore(Boolean(response.hasMore));
         setLogEntries((prev) => (append ? [...prev, ...entries] : entries));
       } catch (err) {
@@ -211,6 +224,7 @@ export default function RunnerDetailPage() {
           setLogEntries([]);
           setLogsHasMore(false);
           setLogsCursor("0");
+          setLogsNextCursor(null);
         }
       } finally {
         if (append) {
@@ -231,14 +245,14 @@ export default function RunnerDetailPage() {
       }
       await Promise.all([
         fetchOverview(currentRunner),
-        fetchLogsPage(currentRunner.id),
+        fetchLogsPage(currentRunner.id, { cursor: "0" }),
       ]);
     };
 
     if (runnerId) {
       void load();
     }
-  }, [runnerId, fetchRunner, fetchOverview, fetchLogsPage]);
+  }, [runnerId, fetchRunner, fetchOverview, fetchLogsPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshRunnerState = useCallback(async () => {
     const nextRunner = await fetchRunner(false);
@@ -262,7 +276,7 @@ export default function RunnerDetailPage() {
     const interval = setInterval(() => {
       void refreshRunnerState();
       if (!logsLoading && !logsLoadingMore) {
-        void fetchLogsPage(runnerId, logsCursor, true);
+        void fetchLogsPage(runnerId, { cursor: logsCursor }, true);
       }
     }, 2500);
 
@@ -320,20 +334,11 @@ export default function RunnerDetailPage() {
     }
   };
 
-  const handleLoadMoreLogs = async () => {
-    if (!runnerId || !logsHasMore || logsLoadingMore) {
-      return;
-    }
-    await fetchLogsPage(runnerId, logsCursor, true);
-  };
-
   const handleRefreshLogs = useCallback(async () => {
-    if (!runnerId) {
-      return;
-    }
+    if (!runnerId) return;
     await refreshRunnerState();
     if (!logsLoading && !logsLoadingMore) {
-      await fetchLogsPage(runnerId, logsCursor, true);
+      await fetchLogsPage(runnerId, { cursor: logsCursor }, true);
     }
   }, [
     fetchLogsPage,
@@ -358,11 +363,11 @@ export default function RunnerDetailPage() {
     let pageCount = 0;
 
     while (hasMore && pageCount < 1000) {
-      const response = await api.runners.cliRunnerControllerGetRunnerLogs({
-        runnerId,
-        cursor,
-        take: 1000,
-      });
+      const response =
+        await api.runners.cliRunnerControllerSearchRunnerLogs({
+          runnerId,
+          searchRunnerLogsBodyDto: { cursor, take: 1000 },
+        });
 
       for (const entry of response.entries ?? []) {
         if (seen.has(entry.cursor)) {
@@ -398,14 +403,14 @@ export default function RunnerDetailPage() {
         <Card className="border-2 border-border rounded-[6px]">
           <CardContent className="py-12 text-center">
             <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Run Not Found</h3>
+            <h3 className="text-lg font-semibold mb-2">{t("scans.runNotFound")}</h3>
             <p className="text-muted-foreground mb-4">{error}</p>
             <Button
               variant="outline"
               className="rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
               onClick={() => router.push("/scans")}
             >
-              View All Scans
+              {t("scans.viewAllScans")}
             </Button>
           </CardContent>
         </Card>
@@ -445,6 +450,7 @@ export default function RunnerDetailPage() {
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <Badge
                 className={`rounded-[4px] border ${getRunnerStatusBadgeTone(runner.status)}`}
+                data-testid="scan-status-badge"
               >
                 {isRunnerStatusRunning(runner.status) && (
                   <Spinner
@@ -453,7 +459,7 @@ export default function RunnerDetailPage() {
                     data-icon="inline-start"
                   />
                 )}
-                {getRunnerStatusBadgeLabel(runner.status)}
+                {t(getRunnerStatusBadgeLabel(runner.status))}
               </Badge>
               <Badge variant="outline" className="rounded-[4px]">
                 {runner.triggerType}
@@ -472,7 +478,7 @@ export default function RunnerDetailPage() {
             disabled={!sourceDetailsId}
           >
             <FileText className="h-4 w-4" />
-            Source Details
+            {t("sources.detail.sourceDetails")}
           </Button>
           <Button
             variant="outline"
@@ -482,7 +488,7 @@ export default function RunnerDetailPage() {
             disabled={!sourceDetailsId}
           >
             <Pencil className="h-4 w-4" />
-            Edit Source
+            {t("sources.editSource")}
           </Button>
           <Button
             variant="outline"
@@ -523,27 +529,27 @@ export default function RunnerDetailPage() {
 
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="h-auto rounded-[4px] border-2 border-black bg-background p-1">
-          <TabsTrigger value="overview" className="rounded-[3px]">
-            Overview
+          <TabsTrigger value="overview" className="rounded-[3px]" data-testid="tab-overview">
+            {t("scans.tabOverview")}
           </TabsTrigger>
-          <TabsTrigger value="findings" className="rounded-[3px]">
-            Findings
+          <TabsTrigger value="findings" className="rounded-[3px]" data-testid="tab-findings">
+            {t("scans.tabFindings")}
             {findingsTotal > 0 && (
               <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold">
                 {findingsTotal}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="assets" className="rounded-[3px]">
-            Assets
+          <TabsTrigger value="assets" className="rounded-[3px]" data-testid="tab-assets">
+            {t("scans.tabAssets")}
             {assetsTotal > 0 && (
               <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold">
                 {assetsTotal}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="logs" className="rounded-[3px]">
-            Logs
+          <TabsTrigger value="logs" className="rounded-[3px]" data-testid="tab-logs">
+            {t("scans.tabLogs")}
           </TabsTrigger>
         </TabsList>
 
@@ -556,23 +562,60 @@ export default function RunnerDetailPage() {
             </Card>
           )}
 
-          {runner.status === "ERROR" && runner.errorMessage && (
+          {runner.status === "ERROR" && (
             <Card className="border-destructive/30 bg-destructive/5 rounded-[6px]">
               <CardHeader className="pb-2">
                 <CardTitle className="text-destructive text-base">
-                  Run failed
+                  {t("scans.runFailed")}
                 </CardTitle>
-                <CardDescription className="text-destructive/80">
-                  {runner.errorMessage}
-                </CardDescription>
+                {runner.errorMessage && (
+                  <CardDescription className="text-destructive/80">
+                    {runner.errorMessage}
+                  </CardDescription>
+                )}
+                {runner.errorDetails &&
+                  typeof runner.errorDetails === "object" && (
+                    <div className="flex flex-wrap gap-3 mt-2 text-xs text-destructive/70">
+                      {typeof (runner.errorDetails as Record<string, unknown>)
+                        .exitCode === "number" && (
+                        <span className="font-mono bg-destructive/10 px-1.5 py-0.5 rounded">
+                          exit&nbsp;
+                          {String(
+                            (runner.errorDetails as Record<string, unknown>)
+                              .exitCode
+                          )}
+                        </span>
+                      )}
+                      {typeof (runner.errorDetails as Record<string, unknown>)
+                        .jobName === "string" && (
+                        <span className="font-mono bg-destructive/10 px-1.5 py-0.5 rounded truncate max-w-xs">
+                          {String(
+                            (runner.errorDetails as Record<string, unknown>)
+                              .jobName
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  )}
               </CardHeader>
-              {runner.errorDetails && (
-                <CardContent>
-                  <pre className="text-xs text-destructive/80 bg-destructive/5 p-2 rounded max-h-64 overflow-auto break-all whitespace-pre-wrap">
-                    {JSON.stringify(runner.errorDetails, null, 2)}
-                  </pre>
-                </CardContent>
-              )}
+              {runner.errorDetails &&
+                typeof runner.errorDetails === "object" &&
+                typeof (runner.errorDetails as Record<string, unknown>)
+                  .output === "string" && (
+                  <CardContent>
+                    <details className="group">
+                      <summary className="cursor-pointer text-xs text-destructive/60 hover:text-destructive/80 mb-1 select-none">
+                        {t("scans.showJobOutput")}
+                      </summary>
+                      <pre className="text-xs text-destructive/80 bg-destructive/5 p-2 rounded max-h-64 overflow-auto break-all whitespace-pre-wrap">
+                        {String(
+                          (runner.errorDetails as Record<string, unknown>)
+                            .output
+                        )}
+                      </pre>
+                    </details>
+                  </CardContent>
+                )}
             </Card>
           )}
 
@@ -591,6 +634,7 @@ export default function RunnerDetailPage() {
               <Card
                 key={item.label}
                 className="border-2 border-border rounded-[6px]"
+                data-testid={`stats-card-${item.label.toLowerCase().replace(/ \+ /g, "-")}`}
               >
                 <CardContent className="p-4">
                   <p className="text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
@@ -599,6 +643,7 @@ export default function RunnerDetailPage() {
                   <p
                     className="mt-1 text-3xl font-black"
                     style={{ fontFamily: "var(--font-hero)" }}
+                    data-testid="stats-value"
                   >
                     {item.value.toLocaleString()}
                   </p>
@@ -697,7 +742,7 @@ export default function RunnerDetailPage() {
                   </span>
                 </div>
                 <div className="pt-1 flex items-center justify-between border-t">
-                  <span className="text-muted-foreground">Total Assets</span>
+                  <span className="text-muted-foreground">{t("sources.totalAssets")}</span>
                   <span className="font-semibold">
                     {assetsCharts.totals.totalAssets.toLocaleString()}
                   </span>
@@ -739,7 +784,7 @@ export default function RunnerDetailPage() {
           {isOverviewRefreshing && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Updating overview...
+              {t("scans.updatingOverview")}
             </div>
           )}
         </TabsContent>
@@ -768,6 +813,7 @@ export default function RunnerDetailPage() {
             runnerId={runnerId}
             entries={logEntries}
             hasMore={logsHasMore}
+            nextCursor={logsNextCursor}
             loading={logsLoading}
             loadingMore={logsLoadingMore}
             isRunning={
@@ -775,8 +821,9 @@ export default function RunnerDetailPage() {
             }
             autoRefreshEnabled={autoRefreshEnabled}
             onAutoRefreshChange={setAutoRefreshEnabled}
-            onLoadMore={handleLoadMoreLogs}
-            onRefreshNow={handleRefreshLogs}
+            onFetch={(params, append) =>
+              fetchLogsPage(runnerId, params, append)
+            }
             onDownloadAll={handleDownloadAllLogs}
           />
         </TabsContent>

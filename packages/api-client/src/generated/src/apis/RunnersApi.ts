@@ -21,6 +21,7 @@ import type {
   ListRunnersResponseDto,
   RunnerDto,
   RunnerLogsResponseDto,
+  SearchRunnerLogsBodyDto,
   SearchRunnersChartsRequestDto,
   SearchRunnersChartsResponseDto,
   SearchRunnersRequestDto,
@@ -41,6 +42,8 @@ import {
     RunnerDtoToJSON,
     RunnerLogsResponseDtoFromJSON,
     RunnerLogsResponseDtoToJSON,
+    SearchRunnerLogsBodyDtoFromJSON,
+    SearchRunnerLogsBodyDtoToJSON,
     SearchRunnersChartsRequestDtoFromJSON,
     SearchRunnersChartsRequestDtoToJSON,
     SearchRunnersChartsResponseDtoFromJSON,
@@ -68,12 +71,6 @@ export interface CliRunnerControllerGetRunnerRequest {
     runnerId: string;
 }
 
-export interface CliRunnerControllerGetRunnerLogsRequest {
-    runnerId: string;
-    cursor?: string;
-    take?: number;
-}
-
 export interface CliRunnerControllerListRunnersRequest {
     sourceId?: string;
     status?: CliRunnerControllerListRunnersStatusEnum;
@@ -87,6 +84,11 @@ export interface CliRunnerControllerListSourceRunnersRequest {
     status?: CliRunnerControllerListSourceRunnersStatusEnum;
     skip?: number;
     take?: number;
+}
+
+export interface CliRunnerControllerSearchRunnerLogsRequest {
+    runnerId: string;
+    searchRunnerLogsBodyDto: SearchRunnerLogsBodyDto;
 }
 
 export interface CliRunnerControllerStartRunnerRequest {
@@ -231,51 +233,6 @@ export class RunnersApi extends runtime.BaseAPI {
     }
 
     /**
-     * Get paginated runner logs from filesystem storage (ordered oldest to newest)
-     */
-    async cliRunnerControllerGetRunnerLogsRaw(requestParameters: CliRunnerControllerGetRunnerLogsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerLogsResponseDto>> {
-        if (requestParameters['runnerId'] == null) {
-            throw new runtime.RequiredError(
-                'runnerId',
-                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerGetRunnerLogs().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        if (requestParameters['cursor'] != null) {
-            queryParameters['cursor'] = requestParameters['cursor'];
-        }
-
-        if (requestParameters['take'] != null) {
-            queryParameters['take'] = requestParameters['take'];
-        }
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/runners/{runnerId}/logs`;
-        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => RunnerLogsResponseDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * Get paginated runner logs from filesystem storage (ordered oldest to newest)
-     */
-    async cliRunnerControllerGetRunnerLogs(requestParameters: CliRunnerControllerGetRunnerLogsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerLogsResponseDto> {
-        const response = await this.cliRunnerControllerGetRunnerLogsRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
      * List all runners
      */
     async cliRunnerControllerListRunnersRaw(requestParameters: CliRunnerControllerListRunnersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ListRunnersResponseDto>> {
@@ -370,6 +327,53 @@ export class RunnersApi extends runtime.BaseAPI {
      */
     async cliRunnerControllerListSourceRunners(requestParameters: CliRunnerControllerListSourceRunnersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ListRunnersResponseDto> {
         const response = await this.cliRunnerControllerListSourceRunnersRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Search runner logs with server-side filtering, full-text search, and sort
+     */
+    async cliRunnerControllerSearchRunnerLogsRaw(requestParameters: CliRunnerControllerSearchRunnerLogsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerLogsResponseDto>> {
+        if (requestParameters['runnerId'] == null) {
+            throw new runtime.RequiredError(
+                'runnerId',
+                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerSearchRunnerLogs().'
+            );
+        }
+
+        if (requestParameters['searchRunnerLogsBodyDto'] == null) {
+            throw new runtime.RequiredError(
+                'searchRunnerLogsBodyDto',
+                'Required parameter "searchRunnerLogsBodyDto" was null or undefined when calling cliRunnerControllerSearchRunnerLogs().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/runners/{runnerId}/logs`;
+        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SearchRunnerLogsBodyDtoToJSON(requestParameters['searchRunnerLogsBodyDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RunnerLogsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Search runner logs with server-side filtering, full-text search, and sort
+     */
+    async cliRunnerControllerSearchRunnerLogs(requestParameters: CliRunnerControllerSearchRunnerLogsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerLogsResponseDto> {
+        const response = await this.cliRunnerControllerSearchRunnerLogsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

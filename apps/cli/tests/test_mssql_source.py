@@ -22,9 +22,6 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
         },
         "sampling": {
             "strategy": "RANDOM",
-            "limit": 10,
-            "max_columns": 10,
-            "max_cell_chars": 256,
         },
     }
     base.update(overrides)
@@ -220,7 +217,7 @@ def test_mssql_latest_sampling_falls_back_to_random() -> None:
         _recipe(
             sampling={
                 "strategy": "LATEST",
-                "limit": 5,
+                "rows_per_page": 10,
                 "fallback_to_random": True,
             },
         )
@@ -232,7 +229,7 @@ def test_mssql_latest_sampling_falls_back_to_random() -> None:
     query, params = source._build_sampling_query(table_ref, ["id", "name"])
 
     assert "ORDER BY NEWID()" in query
-    assert "TOP 5" in query
+    assert "TOP 10" in query
     assert params == []
 
 
@@ -342,3 +339,81 @@ def test_mssql_collect_dependency_links_respects_table_lineage_toggle(
     links = source._collect_dependency_links([])
 
     assert links == {}
+
+
+@pytest.mark.asyncio
+async def test_mssql_fetch_content_pages_batches_for_all_strategy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With strategy=ALL, fetch_content_pages must paginate via OFFSET/FETCH batches."""
+    source = MSSQLSource(
+        _recipe(
+            sampling={
+                "strategy": "ALL",
+                "rows_per_page": 10,
+            }
+        )
+    )
+    table_ref = TableRef(
+        database="some_db", schema="some_schema", table="users", object_type="TABLE"
+    )
+    asset = source._table_to_asset(table_ref)
+
+    all_rows: list[tuple[Any, ...]] = [(i, f"item{i}") for i in range(1, 13)]
+    queries_issued: list[str] = []
+
+    class _BatchCursor:
+        def __init__(self) -> None:
+            self.description = [
+                ("id", None, None, None, None, None, None),
+                ("name", None, None, None, None, None, None),
+            ]
+            self._rows: list[tuple[Any, ...]] = []
+
+        def execute(self, query: str, params: Any = None) -> None:
+            queries_issued.append(query)
+            import re
+
+            m = re.search(r"OFFSET\s+(\d+)\s+ROWS\s+FETCH\s+NEXT\s+(\d+)", query, re.IGNORECASE)
+            if m:
+                offset, batch_size = int(m.group(1)), int(m.group(2))
+            else:
+                offset, batch_size = 0, len(all_rows)
+            self._rows = all_rows[offset : offset + batch_size]
+
+        def fetchall(self) -> list[tuple[Any, ...]]:
+            return list(self._rows)
+
+        def __enter__(self) -> _BatchCursor:
+            return self
+
+        def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+            return None
+
+    class _BatchConnection:
+        def cursor(self) -> _BatchCursor:
+            return _BatchCursor()
+
+        def autocommit(self, _enabled: bool) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+        def __enter__(self) -> _BatchConnection:
+            return self
+
+        def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+            return None
+
+    monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
+    monkeypatch.setattr(source, "_connect", lambda _db=None: _BatchConnection())
+
+    pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
+
+    assert len(queries_issued) == 3
+    assert "COUNT" in queries_issued[0]
+    assert all("OFFSET" in q and "FETCH NEXT" in q for q in queries_issued[1:])
+    assert len(pages) == 2
+    assert "item1" in pages[0]
+    assert "item12" in pages[1]
