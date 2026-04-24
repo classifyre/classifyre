@@ -94,7 +94,7 @@ class PostgreSQLSource(BaseSource):
             "user": self._username(),
             "password": self._password(),
             "dbname": database,
-            "connect_timeout": int(connection_options.connect_timeout_seconds or 10),
+            "connect_timeout": int(connection_options.connect_timeout_seconds or 30),
             "sslmode": str(connection_options.ssl_mode or "prefer"),
         }
         connection = self._psycopg2.connect(**connect_kwargs)

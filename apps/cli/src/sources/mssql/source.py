@@ -139,8 +139,8 @@ class MSSQLSource(BaseSource):
             "port": int(self._port),
             "user": self._username(),
             "password": self._password(),
-            "login_timeout": int(connection_options.connect_timeout_seconds or 10),
-            "timeout": int(connection_options.connect_timeout_seconds or 10),
+            "login_timeout": int(connection_options.connect_timeout_seconds or 30),
+            "timeout": int(connection_options.connect_timeout_seconds or 30),
         }
         if database:
             connect_kwargs["database"] = database

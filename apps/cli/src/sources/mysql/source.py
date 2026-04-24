@@ -129,7 +129,7 @@ class MySQLSource(BaseSource):
             "port": int(self.config.required.port),
             "user": self._username(),
             "password": self._password(),
-            "connect_timeout": int(connection_options.connect_timeout_seconds or 10),
+            "connect_timeout": int(connection_options.connect_timeout_seconds or 30),
         }
         if database:
             connect_kwargs["database"] = database

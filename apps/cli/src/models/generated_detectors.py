@@ -216,24 +216,108 @@ class SecretsEnabledPattern(StrEnum):
 
 class PIIEnabledPattern(StrEnum):
     """
-    PII detector pattern types
+    Presidio entity types for PII detection. Global: CREDIT_CARD, CRYPTO, DATE_TIME, EMAIL_ADDRESS, IBAN_CODE, IP_ADDRESS, NRP, LOCATION, PERSON, PHONE_NUMBER, MEDICAL_LICENSE, URL. USA: US_BANK_NUMBER, US_DRIVER_LICENSE, US_ITIN, US_PASSPORT, US_SSN. UK: UK_NHS. Spain: ES_NIF, ES_NIE. Italy: IT_FISCAL_CODE, IT_DRIVER_LICENSE, IT_VAR_CODE, IT_PASSPORT, IT_IDENTITY_CARD. Singapore: SG_NRIC_FIN, SG_UEN. Australia: AU_ABN, AU_ACN, AU_TFN, AU_MEDICARE. India: IN_PAN, IN_AADHAAR, IN_VEHICLE_REGISTRATION, IN_VOTER. Finland: FI_PERSONAL_IDENTITY_CODE. Poland: PL_PESEL. DACH: AT_SVNR, CH_AHV, DE_TAX_ID, EU_NATIONAL_ID.
     """
 
-    credit_card = 'credit_card'
-    ssn = 'ssn'
-    email = 'email'
-    phone_number = 'phone_number'
-    person = 'person'
-    location = 'location'
-    ip_address = 'ip_address'
-    iban_code = 'iban_code'
-    us_passport = 'us_passport'
-    us_driver_license = 'us_driver_license'
-    austrian_svnr = 'austrian_svnr'
-    swiss_ahv = 'swiss_ahv'
-    german_tax_id = 'german_tax_id'
-    eu_national_id = 'eu_national_id'
-    date_of_birth = 'date_of_birth'
+    CREDIT_CARD = 'CREDIT_CARD'
+    CRYPTO = 'CRYPTO'
+    DATE_TIME = 'DATE_TIME'
+    EMAIL_ADDRESS = 'EMAIL_ADDRESS'
+    IBAN_CODE = 'IBAN_CODE'
+    IP_ADDRESS = 'IP_ADDRESS'
+    NRP = 'NRP'
+    LOCATION = 'LOCATION'
+    PERSON = 'PERSON'
+    PHONE_NUMBER = 'PHONE_NUMBER'
+    MEDICAL_LICENSE = 'MEDICAL_LICENSE'
+    URL = 'URL'
+    US_BANK_NUMBER = 'US_BANK_NUMBER'
+    US_DRIVER_LICENSE = 'US_DRIVER_LICENSE'
+    US_ITIN = 'US_ITIN'
+    US_PASSPORT = 'US_PASSPORT'
+    US_SSN = 'US_SSN'
+    UK_NHS = 'UK_NHS'
+    ES_NIF = 'ES_NIF'
+    ES_NIE = 'ES_NIE'
+    IT_FISCAL_CODE = 'IT_FISCAL_CODE'
+    IT_DRIVER_LICENSE = 'IT_DRIVER_LICENSE'
+    IT_VAR_CODE = 'IT_VAR_CODE'
+    IT_PASSPORT = 'IT_PASSPORT'
+    IT_IDENTITY_CARD = 'IT_IDENTITY_CARD'
+    SG_NRIC_FIN = 'SG_NRIC_FIN'
+    SG_UEN = 'SG_UEN'
+    AU_ABN = 'AU_ABN'
+    AU_ACN = 'AU_ACN'
+    AU_TFN = 'AU_TFN'
+    AU_MEDICARE = 'AU_MEDICARE'
+    IN_PAN = 'IN_PAN'
+    IN_AADHAAR = 'IN_AADHAAR'
+    IN_VEHICLE_REGISTRATION = 'IN_VEHICLE_REGISTRATION'
+    IN_VOTER = 'IN_VOTER'
+    FI_PERSONAL_IDENTITY_CODE = 'FI_PERSONAL_IDENTITY_CODE'
+    PL_PESEL = 'PL_PESEL'
+    AT_SVNR = 'AT_SVNR'
+    CH_AHV = 'CH_AHV'
+    DE_TAX_ID = 'DE_TAX_ID'
+    EU_NATIONAL_ID = 'EU_NATIONAL_ID'
+
+
+class PIIRecognizerPattern(BaseModel):
+    """
+    Regex pattern entry for a custom Presidio recognizer
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str = Field(..., description='Human-readable name for this pattern')
+    regex: str = Field(..., description='Regular expression to match the entity')
+    score: float = Field(
+        ...,
+        description='Confidence score assigned when this pattern matches (0-1)',
+        ge=0.0,
+        le=1.0,
+    )
+
+
+class Patterns(RootModel[list[PIIRecognizerPattern]]):
+    root: list[PIIRecognizerPattern] = Field(
+        ..., description='Regex patterns for this recognizer', min_length=1
+    )
+
+
+class DenyList(RootModel[list[str]]):
+    root: list[str] = Field(
+        ..., description='Exact-match deny-list terms for this recognizer', min_length=1
+    )
+
+
+class PIICustomRecognizer(BaseModel):
+    """
+    Ad-hoc Presidio recognizer added at runtime. Supports regex patterns, deny-list terms, or both. The recognizer is registered in the analyzer engine and applies to all scans with this config.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str = Field(..., description='Unique name for this recognizer')
+    supported_entity: str = Field(
+        ...,
+        description='Entity label produced when this recognizer fires (e.g. MY_EMPLOYEE_ID)',
+    )
+    supported_language: str | None = Field(
+        'en', description='BCP-47 language code this recognizer applies to'
+    )
+    patterns: Patterns | None = Field(
+        None, description='Regex patterns for this recognizer'
+    )
+    deny_list: DenyList | None = Field(
+        None, description='Exact-match deny-list terms for this recognizer'
+    )
+    context: list[str] | None = Field(
+        None,
+        description="Context words that boost the score when found near a match (e.g. ['zip', 'code'])",
+    )
 
 
 class DetectorConfig(BaseModel):
@@ -290,20 +374,27 @@ class SecretsDetectorConfig(DetectorConfig):
 
 class PIIDetectorConfig(DetectorConfig):
     """
-    Configuration for PII detector
+    Configuration for PII detector powered by Microsoft Presidio
     """
 
     enabled_patterns: list[PIIEnabledPattern] | None = Field(
-        None, description='Specific PII types to detect'
+        None,
+        description='Presidio entity types to detect. When null, all supported entities are enabled. Use PIIEnabledPattern values (e.g. EMAIL_ADDRESS, US_SSN, CREDIT_CARD).',
     )
-    language: str | None = Field('en', description='Language code for NER models')
+    language: str | None = Field(
+        'en', description='BCP-47 language code for NER models (e.g. en, de, es)'
+    )
     spacy_model: str | None = Field(
         None,
-        description='spaCy model name to load (e.g. en_core_web_sm, en_core_web_lg). Defaults to en_core_web_sm when null.',
+        description='spaCy model to load (e.g. en_core_web_sm, en_core_web_lg). Defaults to en_core_web_sm when null.',
     )
     spacy_model_url: str | None = Field(
         None,
-        description='Wheel download URL for the spaCy model. When set and the model is not already installed the CLI installs it at runtime. Example: https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl',
+        description='Wheel URL for the spaCy model. When set and the model is not installed, the CLI installs it at runtime.',
+    )
+    custom_recognizers: list[PIICustomRecognizer] | None = Field(
+        None,
+        description='Ad-hoc recognizers added to the Presidio registry at runtime. Each entry defines a regex-pattern or deny-list recognizer for a custom entity type.',
     )
 
 
@@ -423,7 +514,7 @@ class DeidScoreDetectorConfig(PIIDetectorConfig):
     )
     quasi_identifiers: list[PIIEnabledPattern] | None = Field(
         None,
-        description='Quasi-identifiers used for re-identification risk calculations',
+        description='Presidio entity types used as quasi-identifiers for re-identification risk calculations (e.g. DATE_TIME, LOCATION, PERSON, IP_ADDRESS)',
     )
 
 

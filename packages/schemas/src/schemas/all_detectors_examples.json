@@ -50,61 +50,285 @@
   ],
   "PII": [
     {
-      "name": "High Risk PII",
-      "description": "Find critical identity and financial details first.",
+      "name": "Global Coverage",
+      "description": "Detect all globally-recognized PII patterns: emails, phones, credit cards, crypto wallets, IP addresses, IBANs, URLs, and named entities (persons, locations, dates, NRP). Suitable as a broad baseline across any data source.",
       "config": {
         "enabled_patterns": [
-          "ssn",
-          "credit_card",
-          "iban_code",
-          "us_passport",
-          "us_driver_license",
-          "austrian_svnr",
-          "swiss_ahv",
-          "german_tax_id"
+          "CREDIT_CARD",
+          "CRYPTO",
+          "DATE_TIME",
+          "EMAIL_ADDRESS",
+          "IBAN_CODE",
+          "IP_ADDRESS",
+          "NRP",
+          "LOCATION",
+          "PERSON",
+          "PHONE_NUMBER",
+          "MEDICAL_LICENSE",
+          "URL"
+        ],
+        "confidence_threshold": 0.7
+      }
+    },
+    {
+      "name": "US & North America",
+      "description": "US-specific government and financial identifiers: Social Security Numbers, driver licenses, passports, ITINs, and bank account numbers. Pair with Global Coverage for complete US compliance.",
+      "config": {
+        "enabled_patterns": [
+          "US_SSN",
+          "US_DRIVER_LICENSE",
+          "US_PASSPORT",
+          "US_ITIN",
+          "US_BANK_NUMBER",
+          "CREDIT_CARD",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER"
         ],
         "severity_threshold": "high",
         "confidence_threshold": 0.8
       }
     },
     {
-      "name": "Contact PII",
-      "description": "Focus on personal contact details and location clues.",
+      "name": "European Union / GDPR",
+      "description": "GDPR-relevant entity types covering EU national identifiers, IBAN codes, medical licenses, and contact details. Designed for Article 5 data minimization and Article 35 DPIA workflows.",
       "config": {
         "enabled_patterns": [
-          "email",
-          "phone_number",
-          "person",
-          "location",
-          "date_of_birth"
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "LOCATION",
+          "IP_ADDRESS",
+          "DATE_TIME",
+          "IBAN_CODE",
+          "MEDICAL_LICENSE",
+          "EU_NATIONAL_ID",
+          "NRP"
         ],
-        "severity_threshold": "medium",
+        "confidence_threshold": 0.7
+      }
+    },
+    {
+      "name": "DACH — Germany, Austria, Switzerland",
+      "description": "DACH-specific national identifiers for German tax IDs (DE_TAX_ID), Austrian social insurance numbers (AT_SVNR), and Swiss AHV pension numbers (CH_AHV), alongside EU-wide patterns for comprehensive DSGVO/DSG compliance.",
+      "config": {
+        "enabled_patterns": [
+          "DE_TAX_ID",
+          "AT_SVNR",
+          "CH_AHV",
+          "EU_NATIONAL_ID",
+          "IBAN_CODE",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "DATE_TIME"
+        ],
         "confidence_threshold": 0.75
       }
     },
     {
-      "name": "Full PII Coverage",
-      "description": "Run broad privacy checks across all supported personal data patterns.",
+      "name": "Spain",
+      "description": "Spanish national identifiers: NIF (Número de Identificación Fiscal) for citizens and NIE (Número de Identidad de Extranjero) for foreign residents. Combined with global contact patterns for full coverage.",
       "config": {
         "enabled_patterns": [
-          "credit_card",
-          "ssn",
-          "email",
-          "phone_number",
-          "person",
-          "location",
-          "ip_address",
-          "iban_code",
-          "us_passport",
-          "us_driver_license",
-          "austrian_svnr",
-          "swiss_ahv",
-          "german_tax_id",
-          "eu_national_id",
-          "date_of_birth"
+          "ES_NIF",
+          "ES_NIE",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "IBAN_CODE"
         ],
-        "severity_threshold": "low",
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Italy",
+      "description": "Italian national identifiers: fiscal codes, passports, driver licenses, identity cards, and VAT codes. Covers compliance with Italy's Codice della Privacy and GDPR implementation.",
+      "config": {
+        "enabled_patterns": [
+          "IT_FISCAL_CODE",
+          "IT_PASSPORT",
+          "IT_DRIVER_LICENSE",
+          "IT_IDENTITY_CARD",
+          "IT_VAR_CODE",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "IBAN_CODE"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "United Kingdom",
+      "description": "UK-specific PII including NHS numbers, combined with global contact and financial patterns. Covers UK GDPR and NHS data governance requirements.",
+      "config": {
+        "enabled_patterns": [
+          "UK_NHS",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "CREDIT_CARD",
+          "IBAN_CODE",
+          "IP_ADDRESS"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Australia",
+      "description": "Australian identifiers: Tax File Numbers (TFN), Medicare cards, ABN, and ACN. Supports compliance with the Privacy Act 1988 and Australian Privacy Principles.",
+      "config": {
+        "enabled_patterns": [
+          "AU_TFN",
+          "AU_MEDICARE",
+          "AU_ABN",
+          "AU_ACN",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Singapore",
+      "description": "Singapore identifiers: NRIC/FIN national registration numbers and UEN (Unique Entity Numbers for businesses). Supports PDPA compliance.",
+      "config": {
+        "enabled_patterns": [
+          "SG_NRIC_FIN",
+          "SG_UEN",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "India",
+      "description": "Indian identifiers: PAN cards, Aadhaar biometric IDs, voter IDs, and vehicle registration numbers. Supports compliance with DPDP Act 2023 and IT Act requirements.",
+      "config": {
+        "enabled_patterns": [
+          "IN_PAN",
+          "IN_AADHAAR",
+          "IN_VOTER",
+          "IN_VEHICLE_REGISTRATION",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Nordic — Finland & Poland",
+      "description": "Finnish personal identity codes (HETU) and Polish PESEL numbers, alongside contact identifiers. Covers local privacy law requirements for Scandinavian and Polish markets.",
+      "config": {
+        "enabled_patterns": [
+          "FI_PERSONAL_IDENTITY_CODE",
+          "PL_PESEL",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "IBAN_CODE"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Medical / Clinical",
+      "description": "Health-sector PII: medical license numbers, named persons, dates (appointments, DOB), locations (clinics, addresses), and contact details. Applies to clinical notes, patient records, and health system exports.",
+      "config": {
+        "enabled_patterns": [
+          "MEDICAL_LICENSE",
+          "PERSON",
+          "DATE_TIME",
+          "LOCATION",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "UK_NHS",
+          "AU_MEDICARE",
+          "US_SSN"
+        ],
         "confidence_threshold": 0.7
+      }
+    },
+    {
+      "name": "Finance & Banking",
+      "description": "Financial PII: credit cards, IBAN codes, crypto wallet addresses, bank account numbers, and tax identifiers. Suitable for PCI-DSS scope assessments and financial audit workflows.",
+      "config": {
+        "enabled_patterns": [
+          "CREDIT_CARD",
+          "IBAN_CODE",
+          "CRYPTO",
+          "US_BANK_NUMBER",
+          "US_SSN",
+          "US_ITIN",
+          "DE_TAX_ID",
+          "AT_SVNR",
+          "CH_AHV",
+          "AU_TFN",
+          "IN_PAN",
+          "PERSON"
+        ],
+        "severity_threshold": "high",
+        "confidence_threshold": 0.8
+      }
+    },
+    {
+      "name": "High Confidence Global",
+      "description": "Maximum-precision scan across all supported entity types with an elevated confidence threshold. Best for automated enforcement pipelines where false positives are costly.",
+      "config": {
+        "enabled_patterns": null,
+        "severity_threshold": "high",
+        "confidence_threshold": 0.85
+      }
+    },
+    {
+      "name": "Custom Recognizer — Employee ID",
+      "description": "Extends the built-in PII detector with a regex recognizer for internal employee IDs (format EMP-XXXXXX). Demonstrates how to detect proprietary identifiers alongside standard PII.",
+      "config": {
+        "enabled_patterns": [
+          "PERSON",
+          "EMAIL_ADDRESS"
+        ],
+        "confidence_threshold": 0.7,
+        "custom_recognizers": [
+          {
+            "name": "Employee ID Recognizer",
+            "supported_entity": "EMPLOYEE_ID",
+            "supported_language": "en",
+            "patterns": [
+              {
+                "name": "employee id (strong)",
+                "regex": "\\bEMP-\\d{6}\\b",
+                "score": 0.9
+              }
+            ],
+            "context": ["employee", "staff", "id", "identifier"]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Custom Recognizer — Deny List",
+      "description": "Deny-list recognizer for internal code names or sensitive project terms that should be treated as PII in external communications.",
+      "config": {
+        "enabled_patterns": [
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER"
+        ],
+        "confidence_threshold": 0.7,
+        "custom_recognizers": [
+          {
+            "name": "Internal Project Name Recognizer",
+            "supported_entity": "INTERNAL_PROJECT",
+            "supported_language": "en",
+            "deny_list": ["Project Phoenix", "Operation Sunrise", "Codename Atlas"],
+            "context": ["project", "operation", "codename"]
+          }
+        ]
       }
     }
   ],
@@ -287,10 +511,10 @@
       "description": "Extract text from images and detect personal identifiers.",
       "config": {
         "enabled_patterns": [
-          "email",
-          "phone_number",
-          "credit_card",
-          "date_of_birth"
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "CREDIT_CARD",
+          "DATE_TIME"
         ],
         "confidence_threshold": 0.75
       }
@@ -302,12 +526,12 @@
       "description": "Score how safely content was anonymized before sharing.",
       "config": {
         "enabled_patterns": [
-          "person",
-          "date_of_birth",
-          "location",
-          "email",
-          "phone_number",
-          "ip_address"
+          "PERSON",
+          "DATE_TIME",
+          "LOCATION",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "IP_ADDRESS"
         ],
         "confidence_threshold": 0.7
       }
@@ -317,17 +541,17 @@
       "description": "Verify right-to-erasure requests were fully executed across core EU and DACH identifiers.",
       "config": {
         "enabled_patterns": [
-          "person",
-          "email",
-          "phone_number",
-          "location",
-          "date_of_birth",
-          "ip_address",
-          "iban_code",
-          "austrian_svnr",
-          "swiss_ahv",
-          "german_tax_id",
-          "eu_national_id"
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "LOCATION",
+          "DATE_TIME",
+          "IP_ADDRESS",
+          "IBAN_CODE",
+          "AT_SVNR",
+          "CH_AHV",
+          "DE_TAX_ID",
+          "EU_NATIONAL_ID"
         ],
         "confidence_threshold": 0.65,
         "min_k_anonymity": 5,
@@ -339,14 +563,20 @@
       "description": "Focus on quasi-identifiers that can still re-identify people after masking.",
       "config": {
         "enabled_patterns": [
-          "date_of_birth",
-          "location",
-          "person",
-          "ip_address"
+          "DATE_TIME",
+          "LOCATION",
+          "PERSON",
+          "IP_ADDRESS"
         ],
         "confidence_threshold": 0.6,
         "min_k_anonymity": 8,
-        "min_l_diversity": 3
+        "min_l_diversity": 3,
+        "quasi_identifiers": [
+          "DATE_TIME",
+          "LOCATION",
+          "PERSON",
+          "IP_ADDRESS"
+        ]
       }
     }
   ],

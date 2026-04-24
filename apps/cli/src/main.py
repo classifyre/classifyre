@@ -15,6 +15,23 @@ logger = logging.getLogger(__name__)
 _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
 
 
+_TIMEOUT_PHRASES = ("timed out", "timeout", "connection reset", "errno 110", "connection refused")
+_TIMEOUT_MYSQL_CODES = {2003, 2006, 2013}
+
+
+def _is_timeout_error(exc: BaseException) -> bool:
+    """Return True when exc represents a connection/read timeout or unreachable host."""
+    exc_str = str(exc).lower()
+    if any(phrase in exc_str for phrase in _TIMEOUT_PHRASES):
+        return True
+    if "timeout" in type(exc).__name__.lower():
+        return True
+    args = getattr(exc, "args", ())
+    if args and isinstance(args[0], int) and args[0] in _TIMEOUT_MYSQL_CODES:
+        return True
+    return False
+
+
 def _sanitize_for_json(value: Any) -> Any:
     """Recursively replace isolated surrogate code points before JSON encoding."""
     if isinstance(value, str):
@@ -129,7 +146,11 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
             elif args.command == "extract":
                 result = source.test_connection()
                 if result.get("status") == "FAILURE":
-                    logger.error("Aborting: Connection test failed: %s", result.get("message"))
+                    msg = result.get("message", "")
+                    if _is_timeout_error(Exception(msg)):
+                        logger.warning("Source unreachable (timeout), skipping: %s", msg)
+                        return
+                    logger.error("Aborting: Connection test failed: %s", msg)
                     sys.exit(1)
 
                 logger.info("Starting extraction...")
@@ -181,6 +202,16 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         output_batch_count,
                     )
                 except Exception as extraction_error:
+                    if _is_timeout_error(extraction_error):
+                        logger.warning(
+                            "Source timed out during extraction, partial results flushed: %s",
+                            extraction_error,
+                        )
+                        if buffer:
+                            await sink.emit_batch(buffer)
+                            total_assets += len(buffer)
+                        await sink.finish()
+                        return
                     if sink_started:
                         try:
                             await sink.fail(extraction_error)
@@ -192,6 +223,9 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
 
         except Exception as e:
             logger.debug("Traceback for %s failure:", args.command, exc_info=True)
+            if _is_timeout_error(e):
+                logger.warning("SCAN TIMED OUT (source unreachable): %s", e)
+                return
             logger.error("SCAN FAILED: %s", e)
             sys.exit(1)
         finally:

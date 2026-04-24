@@ -117,7 +117,7 @@ class MongoDBSource(BaseSource):
         username, password = self._username_password()
 
         kwargs: dict[str, Any] = {
-            "connectTimeoutMS": int(options.connect_timeout_ms or 10000),
+            "connectTimeoutMS": int(options.connect_timeout_ms or 30000),
         }
         if username:
             kwargs["username"] = username

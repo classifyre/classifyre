@@ -177,7 +177,7 @@ class SnowflakeSource(BaseSource):
         connect_kwargs: dict[str, Any] = {
             "account": self._account_locator(),
             "user": self._username(),
-            "login_timeout": int(connection_options.connect_timeout_seconds or 15),
+            "login_timeout": int(connection_options.connect_timeout_seconds or 30),
             "session_parameters": {
                 "QUERY_TAG": "classifyre-snowflake-source",
             },

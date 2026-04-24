@@ -119,7 +119,7 @@ class OracleSource(BaseSource):
             "user": self._username(),
             "password": self._password(),
             "dsn": self._dsn(),
-            "tcp_connect_timeout": int(connection_options.connect_timeout_seconds or 10),
+            "tcp_connect_timeout": int(connection_options.connect_timeout_seconds or 30),
         }
 
         try:
