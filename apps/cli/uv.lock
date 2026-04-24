@@ -488,7 +488,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.2.36"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -761,7 +761,7 @@ threat-ml = [
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.2.36"
+version = "0.3.0"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
