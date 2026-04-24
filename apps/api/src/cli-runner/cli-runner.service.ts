@@ -1970,7 +1970,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
   }
 
-  async updateRunnerStatus(runnerId: string, status: RunnerStatus) {
+  async updateRunnerStatus(runnerId: string, status: RunnerStatus, errorMessage?: string) {
     const runner = await this.prisma.runner.findUnique({
       where: { id: runnerId },
       select: {
@@ -1996,17 +1996,11 @@ export class CliRunnerService implements OnApplicationBootstrap {
       return this.getRunnerStatus(runnerId);
     }
 
-    await this.runnerLogStorage.finalizeRunner(runnerId);
-    await this.transitionRunnerToTerminalState({
+    await this.failRunner(
       runnerId,
-      sourceId: runner.sourceId,
-      sourceStatus: status,
-      runnerData: {
-        status,
-        completedAt: new Date(),
-        errorMessage: 'Runner marked as ERROR by upstream executor',
-      },
-    });
+      errorMessage ?? 'Runner marked as ERROR by upstream executor',
+      { source: 'upstream_executor' },
+    );
 
     const runnerDto = await this.getRunnerStatus(runnerId);
 

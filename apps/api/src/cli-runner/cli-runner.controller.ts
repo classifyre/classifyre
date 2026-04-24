@@ -101,13 +101,18 @@ export class CliRunnerController {
   @Patch('runners/:runnerId/status')
   @ApiOperation({ summary: 'Update runner status' })
   @ApiBody({
-    schema: { properties: { status: { enum: ['COMPLETED', 'ERROR'] } } },
+    schema: {
+      properties: {
+        status: { enum: ['COMPLETED', 'ERROR'] },
+        errorMessage: { type: 'string' },
+      },
+    },
   })
   async updateRunnerStatus(
     @Param('runnerId') runnerId: string,
-    @Body() body: { status: RunnerStatus },
+    @Body() body: { status: RunnerStatus; errorMessage?: string },
   ) {
-    return this.cliRunnerService.updateRunnerStatus(runnerId, body.status);
+    return this.cliRunnerService.updateRunnerStatus(runnerId, body.status, body.errorMessage);
   }
 
   @Get('runners/:runnerId')

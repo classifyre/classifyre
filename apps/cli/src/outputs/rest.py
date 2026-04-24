@@ -36,7 +36,10 @@ class FinalizeIngestRunRequest(BaseModel):
 
 
 class UpdateRunnerStatusRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     status: Literal["COMPLETED", "ERROR"]
+    error_message: str | None = Field(None, serialization_alias="errorMessage")
 
 
 class ExternalRunnerResponse(BaseModel):
@@ -155,12 +158,13 @@ class RestOutputSink:
         if not self._runner_id:
             return
 
+        error_message = f"{type(error).__name__}: {error}"
         try:
-            payload = UpdateRunnerStatusRequest(status="ERROR")
+            payload = UpdateRunnerStatusRequest(status="ERROR", error_message=error_message)
             self._request_json(
                 "PATCH",
                 f"/runners/{self._runner_id}/status",
-                payload.model_dump(mode="json"),
+                payload.model_dump(mode="json", by_alias=True, exclude_none=True),
             )
         except Exception as update_error:
             logger.warning(
