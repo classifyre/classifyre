@@ -72,15 +72,6 @@ const detectorDotClass: Partial<Record<DetectorType, string>> = {
   YARA: "bg-emerald-500",
   BROKEN_LINKS: "bg-orange-500",
   PROMPT_INJECTION: "bg-violet-500",
-  HATE_SPEECH: "bg-rose-700",
-  AI_GENERATED: "bg-slate-500",
-  BIAS: "bg-lime-700",
-  CONTENT_QUALITY: "bg-sky-600",
-  DUPLICATE: "bg-teal-600",
-  DOMAIN_CLASS: "bg-cyan-700",
-  CONTENT_TYPE: "bg-blue-700",
-  SENSITIVITY_TIER: "bg-yellow-700",
-  JURISDICTION_TAG: "bg-violet-700",
   CUSTOM: "bg-indigo-600",
 };
 
@@ -92,15 +83,6 @@ const detectorLabels: Partial<Record<DetectorType, string>> = {
   YARA: "YARA",
   BROKEN_LINKS: "Broken Links",
   PROMPT_INJECTION: "Prompt Injection",
-  HATE_SPEECH: "Hate Speech",
-  AI_GENERATED: "AI Generated",
-  BIAS: "Bias",
-  CONTENT_QUALITY: "Content Quality",
-  DUPLICATE: "Duplicate",
-  DOMAIN_CLASS: "Domain Class",
-  CONTENT_TYPE: "Content Type",
-  SENSITIVITY_TIER: "Sensitivity Tier",
-  JURISDICTION_TAG: "Jurisdiction Tag",
   CUSTOM: "Custom Detector",
 };
 

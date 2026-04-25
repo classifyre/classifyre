@@ -153,19 +153,6 @@ export const CreateFindingDtoDetectorTypeEnum = {
     Spam: 'SPAM',
     Language: 'LANGUAGE',
     CodeSecurity: 'CODE_SECURITY',
-    Plagiarism: 'PLAGIARISM',
-    ImageViolence: 'IMAGE_VIOLENCE',
-    OcrPii: 'OCR_PII',
-    DeidScore: 'DEID_SCORE',
-    HateSpeech: 'HATE_SPEECH',
-    AiGenerated: 'AI_GENERATED',
-    ContentQuality: 'CONTENT_QUALITY',
-    Bias: 'BIAS',
-    Duplicate: 'DUPLICATE',
-    DomainClass: 'DOMAIN_CLASS',
-    ContentType: 'CONTENT_TYPE',
-    SensitivityTier: 'SENSITIVITY_TIER',
-    JurisdictionTag: 'JURISDICTION_TAG',
     Custom: 'CUSTOM'
 } as const;
 export type CreateFindingDtoDetectorTypeEnum = typeof CreateFindingDtoDetectorTypeEnum[keyof typeof CreateFindingDtoDetectorTypeEnum];

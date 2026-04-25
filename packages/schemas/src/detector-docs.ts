@@ -319,15 +319,7 @@ const DETECTOR_TYPE_TO_DEFINITION: Record<string, string> = {
   NSFW: "ContentDetectorConfig",
   YARA: "ThreatDetectorConfig",
   BROKEN_LINKS: "BrokenLinksDetectorConfig",
-  CONTENT_QUALITY: "ContentQualityDetectorConfig",
-  DEID_SCORE: "DeidScoreDetectorConfig",
-  BIAS: "BiasDetectorConfig",
   CUSTOM: "CustomDetectorConfig",
-  DOMAIN_CLASS: "ClassificationDetectorConfig",
-  CONTENT_TYPE: "ClassificationDetectorConfig",
-  SENSITIVITY_TIER: "ClassificationDetectorConfig",
-  JURISDICTION_TAG: "ClassificationDetectorConfig",
-  OCR_PII: "PIIDetectorConfig",
 };
 
 const DETECTOR_TYPE_LABELS: Record<string, string> = {
@@ -342,19 +334,6 @@ const DETECTOR_TYPE_LABELS: Record<string, string> = {
   SPAM: "Spam",
   LANGUAGE: "Language",
   CODE_SECURITY: "Code Security",
-  PLAGIARISM: "Plagiarism",
-  IMAGE_VIOLENCE: "Image Violence",
-  OCR_PII: "OCR PII",
-  DEID_SCORE: "De-ID Score",
-  HATE_SPEECH: "Hate Speech",
-  AI_GENERATED: "AI Generated",
-  CONTENT_QUALITY: "Content Quality",
-  BIAS: "Bias",
-  DUPLICATE: "Duplicate",
-  DOMAIN_CLASS: "Domain Class",
-  CONTENT_TYPE: "Content Type",
-  SENSITIVITY_TIER: "Sensitivity Tier",
-  JURISDICTION_TAG: "Jurisdiction Tag",
   CUSTOM: "Custom",
 };
 

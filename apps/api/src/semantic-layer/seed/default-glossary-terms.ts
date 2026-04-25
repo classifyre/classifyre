@@ -20,7 +20,7 @@ export const DEFAULT_GLOSSARY_TERMS = [
       'Personal Identifiable Information detected in scanned content, including names, emails, SSNs, phone numbers, and health records.',
     category: 'Privacy',
     filterMapping: {
-      detectorTypes: ['PII', 'OCR_PII', 'DEID_SCORE'],
+      detectorTypes: ['PII'],
     },
     color: '#f59e0b',
     icon: 'user-x',
@@ -31,7 +31,7 @@ export const DEFAULT_GLOSSARY_TERMS = [
       'Findings that indicate potential regulatory non-compliance including GDPR, HIPAA, PCI-DSS, and jurisdiction-specific violations.',
     category: 'Compliance',
     filterMapping: {
-      detectorTypes: ['SENSITIVITY_TIER', 'JURISDICTION_TAG'],
+      detectorTypes: ['CUSTOM'],
     },
     color: '#8b5cf6',
     icon: 'scale',
@@ -42,7 +42,7 @@ export const DEFAULT_GLOSSARY_TERMS = [
       'Toxic, NSFW, biased, hateful, or otherwise inappropriate content detected in scanned sources.',
     category: 'Content Safety',
     filterMapping: {
-      detectorTypes: ['TOXIC', 'NSFW', 'BIAS', 'HATE_SPEECH', 'IMAGE_VIOLENCE'],
+      detectorTypes: ['TOXIC', 'NSFW'],
     },
     color: '#ef4444',
     icon: 'alert-triangle',
@@ -75,13 +75,7 @@ export const DEFAULT_GLOSSARY_TERMS = [
       'Findings related to data quality including broken links, duplicates, stale content, and content quality issues.',
     category: 'Quality',
     filterMapping: {
-      detectorTypes: [
-        'BROKEN_LINKS',
-        'DUPLICATE',
-        'CONTENT_QUALITY',
-        'SPAM',
-        'PLAGIARISM',
-      ],
+      detectorTypes: ['BROKEN_LINKS', 'SPAM'],
     },
     color: '#06b6d4',
     icon: 'database',

@@ -1,13 +1,17 @@
 """Tests for PII detector."""
 
+from pathlib import Path
+
 import pytest
 
 from src.detectors.pii.detector import PIIDetector
 from src.models.generated_detectors import DetectorConfig, PIIDetectorConfig, Severity
 from src.sources.tabular_utils import format_tabular_sample_content
+from src.utils.file_parser import parse_bytes
 
-from .conftest import requires_presidio
+from .conftest import requires_pdfplumber, requires_presidio
 
+_FIXTURES_DIR = Path(__file__).parent
 
 # ---------------------------------------------------------------------------
 # Integration tests — require a working Presidio installation
@@ -90,8 +94,7 @@ async def test_detect_person_names(sample_person_name):
     results = await detector.detect(sample_person_name)
 
     name_findings = [
-        r for r in results
-        if "PERSON" in r.finding_type.upper() or "NAME" in r.finding_type.upper()
+        r for r in results if "PERSON" in r.finding_type.upper() or "NAME" in r.finding_type.upper()
     ]
     if name_findings:
         for finding in name_findings:
@@ -313,7 +316,12 @@ async def test_tabular_detection_scans_per_cell_and_filters_entities_by_column()
                 email_start = text.index("carlacherry@example.org")
                 return [
                     _make_result("PERSON", 0, len("Patrick Clark"), 0.96),
-                    _make_result("EMAIL_ADDRESS", email_start, email_start + len("carlacherry@example.org"), 0.99),
+                    _make_result(
+                        "EMAIL_ADDRESS",
+                        email_start,
+                        email_start + len("carlacherry@example.org"),
+                        0.99,
+                    ),
                 ]
             return []
 
@@ -389,16 +397,13 @@ async def test_tabular_detection_drops_single_token_person_noise_from_text_colum
         include_column_names=True,
     )
 
-    detector = PIIDetector(
-        PIIDetectorConfig(enabled_patterns=["PERSON"], confidence_threshold=0.0)
-    )
+    detector = PIIDetector(PIIDetectorConfig(enabled_patterns=["PERSON"], confidence_threshold=0.0))
     detector.analyzer = _StubAnalyzer()
 
     results = await detector.detect(text_content)
 
     assert {
-        (result.matched_content, result.metadata["tabular_column_name"])
-        for result in results
+        (result.matched_content, result.metadata["tabular_column_name"]) for result in results
     } == {
         ("Patrick Clark", "name"),
         ("Moore, Powell", "text"),
@@ -459,3 +464,48 @@ async def test_custom_deny_list_recognizer_config_is_parsed() -> None:
     assert "Project Phoenix" in deny_list
     assert "Operation Sunrise" in deny_list
     assert rec.patterns is None
+
+
+# ---------------------------------------------------------------------------
+# PDF parsing + PII detection integration
+# ---------------------------------------------------------------------------
+
+
+@requires_pdfplumber
+def test_pdf_parse_extracts_text() -> None:
+    """file_parser.parse_bytes must extract non-empty text from a real PDF invoice."""
+    pdf_bytes = (_FIXTURES_DIR / "sample_invoice.pdf").read_bytes()
+    result = parse_bytes(pdf_bytes, file_name="sample_invoice.pdf")
+
+    assert result.mime_type == "application/pdf"
+    assert result.text_content, "Expected non-empty text from PDF"
+    # The invoice contains a known person name and location
+    assert "Natalie Webber" in result.text_content
+    assert "Abidjan" in result.text_content
+
+
+@requires_pdfplumber
+@requires_presidio
+@pytest.mark.asyncio
+async def test_pii_detector_on_pdf_content() -> None:
+    """PII detector must find PERSON and LOCATION in text extracted from a PDF invoice."""
+    pdf_bytes = (_FIXTURES_DIR / "sample_invoice.pdf").read_bytes()
+    parsed = parse_bytes(pdf_bytes, file_name="sample_invoice.pdf")
+
+    assert parsed.text_content, "PDF text extraction prerequisite failed"
+
+    detector = PIIDetector()
+    results = await detector.detect(parsed.text_content)
+
+    finding_types = {r.finding_type for r in results}
+    assert "PERSON" in finding_types, f"Expected PERSON finding in invoice, got: {finding_types}"
+    assert "LOCATION" in finding_types, (
+        f"Expected LOCATION finding in invoice, got: {finding_types}"
+    )
+
+    person_findings = [r for r in results if r.finding_type == "PERSON"]
+    assert any(
+        "Natalie" in r.matched_content or "Webber" in r.matched_content for r in person_findings
+    ), (
+        f"Expected 'Natalie Webber' in PERSON findings, got: {[r.matched_content for r in person_findings]}"
+    )

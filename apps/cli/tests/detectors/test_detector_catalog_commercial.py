@@ -22,17 +22,6 @@ def test_catalog_excludes_known_non_verified_models() -> None:
     assert blocked.isdisjoint(recommended)
 
 
-def test_catalog_marks_unverified_detectors_as_experimental() -> None:
-    catalog = _load_detector_catalog()
-
-    by_type = {entry["detector_type"]: entry for entry in catalog}
-    entry = by_type["IMAGE_VIOLENCE"]
-    assert entry["lifecycle_status"] == "experimental"
-    notes = entry.get("notes", "").lower()
-    assert "license" in notes
-    assert "deferred" in notes
-
-
 def test_catalog_categories_are_uppercase_enum_values() -> None:
     catalog = _load_detector_catalog()
     allowed = {

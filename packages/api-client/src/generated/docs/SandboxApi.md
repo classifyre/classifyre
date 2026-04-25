@@ -239,7 +239,7 @@ async function example() {
     status: ...,
     // Array<'TXT' | 'TABLE' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'URL' | 'BINARY' | 'OTHER'> | Filter by one or more content types (optional)
     contentType: ...,
-    // Array<'SECRETS' | 'PII' | 'TOXIC' | 'NSFW' | 'YARA' | 'BROKEN_LINKS' | 'PROMPT_INJECTION' | 'PHISHING_URL' | 'SPAM' | 'LANGUAGE' | 'CODE_SECURITY' | 'PLAGIARISM' | 'IMAGE_VIOLENCE' | 'OCR_PII' | 'DEID_SCORE' | 'HATE_SPEECH' | 'AI_GENERATED' | 'CONTENT_QUALITY' | 'BIAS' | 'DUPLICATE' | 'DOMAIN_CLASS' | 'CONTENT_TYPE' | 'SENSITIVITY_TIER' | 'JURISDICTION_TAG' | 'CUSTOM'> | Filter by detectors used in the run configuration or reported findings (optional)
+    // Array<'SECRETS' | 'PII' | 'TOXIC' | 'NSFW' | 'YARA' | 'BROKEN_LINKS' | 'PROMPT_INJECTION' | 'PHISHING_URL' | 'SPAM' | 'LANGUAGE' | 'CODE_SECURITY' | 'CUSTOM'> | Filter by detectors used in the run configuration or reported findings (optional)
     detectorType: ...,
     // boolean | Filter by whether findings exist (optional)
     hasFindings: true,
@@ -273,7 +273,7 @@ example().catch(console.error);
 | **search** | `string` | Search by file name or MIME type | [Optional] [Defaults to `undefined`] |
 | **status** | `PENDING`, `RUNNING`, `COMPLETED`, `ERROR` | Filter by one or more run statuses | [Optional] [Enum: PENDING, RUNNING, COMPLETED, ERROR] |
 | **contentType** | `TXT`, `TABLE`, `IMAGE`, `VIDEO`, `AUDIO`, `URL`, `BINARY`, `OTHER` | Filter by one or more content types | [Optional] [Enum: TXT, TABLE, IMAGE, VIDEO, AUDIO, URL, BINARY, OTHER] |
-| **detectorType** | `SECRETS`, `PII`, `TOXIC`, `NSFW`, `YARA`, `BROKEN_LINKS`, `PROMPT_INJECTION`, `PHISHING_URL`, `SPAM`, `LANGUAGE`, `CODE_SECURITY`, `PLAGIARISM`, `IMAGE_VIOLENCE`, `OCR_PII`, `DEID_SCORE`, `HATE_SPEECH`, `AI_GENERATED`, `CONTENT_QUALITY`, `BIAS`, `DUPLICATE`, `DOMAIN_CLASS`, `CONTENT_TYPE`, `SENSITIVITY_TIER`, `JURISDICTION_TAG`, `CUSTOM` | Filter by detectors used in the run configuration or reported findings | [Optional] [Enum: SECRETS, PII, TOXIC, NSFW, YARA, BROKEN_LINKS, PROMPT_INJECTION, PHISHING_URL, SPAM, LANGUAGE, CODE_SECURITY, PLAGIARISM, IMAGE_VIOLENCE, OCR_PII, DEID_SCORE, HATE_SPEECH, AI_GENERATED, CONTENT_QUALITY, BIAS, DUPLICATE, DOMAIN_CLASS, CONTENT_TYPE, SENSITIVITY_TIER, JURISDICTION_TAG, CUSTOM] |
+| **detectorType** | `SECRETS`, `PII`, `TOXIC`, `NSFW`, `YARA`, `BROKEN_LINKS`, `PROMPT_INJECTION`, `PHISHING_URL`, `SPAM`, `LANGUAGE`, `CODE_SECURITY`, `CUSTOM` | Filter by detectors used in the run configuration or reported findings | [Optional] [Enum: SECRETS, PII, TOXIC, NSFW, YARA, BROKEN_LINKS, PROMPT_INJECTION, PHISHING_URL, SPAM, LANGUAGE, CODE_SECURITY, CUSTOM] |
 | **hasFindings** | `boolean` | Filter by whether findings exist | [Optional] [Defaults to `undefined`] |
 | **sortBy** | `CREATED_AT`, `FILE_NAME`, `STATUS`, `FILE_SIZE_BYTES`, `DURATION_MS`, `FINDINGS_COUNT` | Sort field | [Optional] [Defaults to `&#39;CREATED_AT&#39;`] [Enum: CREATED_AT, FILE_NAME, STATUS, FILE_SIZE_BYTES, DURATION_MS, FINDINGS_COUNT] |
 | **sortOrder** | `ASC`, `DESC` | Sort direction | [Optional] [Defaults to `&#39;DESC&#39;`] [Enum: ASC, DESC] |

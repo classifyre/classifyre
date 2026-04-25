@@ -37,7 +37,10 @@ class _PresidioNoiseFilter(logging.Filter):
         msg = record.getMessage()
         if any(s in msg for s in self._SUPPRESSED):
             return False
-        if "Entity " in msg and "is not mapped to a Presidio entity" in msg:
+        if "Entity " in msg and (
+            "is not mapped to a Presidio entity" in msg
+            or "doesn't have the corresponding recognizer in language" in msg
+        ):
             return False
         return True
 
@@ -67,29 +70,57 @@ class PIIDetector(BaseDetector):
     # All entity types supported by built-in Presidio recognizers.
     _ALL_SUPPORTED_ENTITIES: ClassVar[set[str]] = {
         # Global
-        "CREDIT_CARD", "CRYPTO", "DATE_TIME", "EMAIL_ADDRESS", "IBAN_CODE",
-        "IP_ADDRESS", "NRP", "LOCATION", "PERSON", "PHONE_NUMBER",
-        "MEDICAL_LICENSE", "URL",
+        "CREDIT_CARD",
+        "CRYPTO",
+        "DATE_TIME",
+        "EMAIL_ADDRESS",
+        "IBAN_CODE",
+        "IP_ADDRESS",
+        "NRP",
+        "LOCATION",
+        "PERSON",
+        "PHONE_NUMBER",
+        "MEDICAL_LICENSE",
+        "URL",
         # USA
-        "US_BANK_NUMBER", "US_DRIVER_LICENSE", "US_ITIN", "US_PASSPORT", "US_SSN",
+        "US_BANK_NUMBER",
+        "US_DRIVER_LICENSE",
+        "US_ITIN",
+        "US_PASSPORT",
+        "US_SSN",
         # UK
         "UK_NHS",
         # Spain
-        "ES_NIF", "ES_NIE",
+        "ES_NIF",
+        "ES_NIE",
         # Italy
-        "IT_FISCAL_CODE", "IT_DRIVER_LICENSE", "IT_VAR_CODE", "IT_PASSPORT", "IT_IDENTITY_CARD",
+        "IT_FISCAL_CODE",
+        "IT_DRIVER_LICENSE",
+        "IT_VAR_CODE",
+        "IT_PASSPORT",
+        "IT_IDENTITY_CARD",
         # Singapore
-        "SG_NRIC_FIN", "SG_UEN",
+        "SG_NRIC_FIN",
+        "SG_UEN",
         # Australia
-        "AU_ABN", "AU_ACN", "AU_TFN", "AU_MEDICARE",
+        "AU_ABN",
+        "AU_ACN",
+        "AU_TFN",
+        "AU_MEDICARE",
         # India
-        "IN_PAN", "IN_AADHAAR", "IN_VEHICLE_REGISTRATION", "IN_VOTER",
+        "IN_PAN",
+        "IN_AADHAAR",
+        "IN_VEHICLE_REGISTRATION",
+        "IN_VOTER",
         # Finland
         "FI_PERSONAL_IDENTITY_CODE",
         # Poland
         "PL_PESEL",
         # DACH
-        "AT_SVNR", "CH_AHV", "DE_TAX_ID", "EU_NATIONAL_ID",
+        "AT_SVNR",
+        "CH_AHV",
+        "DE_TAX_ID",
+        "EU_NATIONAL_ID",
     }
 
     # Entity types that carry low signal in structured column values unless the column
@@ -150,17 +181,41 @@ class PIIDetector(BaseDetector):
     }
 
     _FREE_TEXT_COLUMN_TOKENS: ClassVar[set[str]] = {
-        "text", "body", "content", "description", "message", "comment",
-        "comments", "note", "notes", "summary", "details", "bio",
+        "text",
+        "body",
+        "content",
+        "description",
+        "message",
+        "comment",
+        "comments",
+        "note",
+        "notes",
+        "summary",
+        "details",
+        "bio",
     }
     _NAME_COLUMN_TOKENS: ClassVar[set[str]] = {
-        "name", "first", "last", "middle", "full", "person", "contact",
+        "name",
+        "first",
+        "last",
+        "middle",
+        "full",
+        "person",
+        "contact",
     }
     _EMAIL_COLUMN_TOKENS: ClassVar[set[str]] = {"email", "mail"}
     _PHONE_COLUMN_TOKENS: ClassVar[set[str]] = {"phone", "mobile", "tel", "telephone", "fax"}
     _ADDRESS_COLUMN_TOKENS: ClassVar[set[str]] = {
-        "address", "street", "city", "state", "country", "postal",
-        "postcode", "zipcode", "zip", "location",
+        "address",
+        "street",
+        "city",
+        "state",
+        "country",
+        "postal",
+        "postcode",
+        "zipcode",
+        "zip",
+        "location",
     }
     _URL_COLUMN_TOKENS: ClassVar[set[str]] = {"url", "uri", "website", "web", "link", "domain"}
     _ID_COLUMN_TOKENS: ClassVar[set[str]] = {"id", "uuid", "guid", "key", "source", "row"}
@@ -170,7 +225,7 @@ class PIIDetector(BaseDetector):
     _TABULAR_CONTINUATION_RE: ClassVar[re.Pattern[str]] = re.compile(r"^    (.*)$")
 
     # Fall back to full-text analysis when a page has more than this many cells.
-    # Per-cell analysis at scale causes O(rows×columns) Presidio calls per page.
+    # Per-cell analysis at scale causes O(rowsxcolumns) Presidio calls per page.
     _TABULAR_CELL_LIMIT: ClassVar[int] = 200
 
     def __init__(self, config: DetectorConfig | None = None) -> None:
@@ -217,13 +272,12 @@ class PIIDetector(BaseDetector):
 
             nlp_engine = self._build_nlp_engine(presidio_module)
             if nlp_engine is not None:
-                self.analyzer = AnalyzerEngine(
-                    nlp_engine=nlp_engine, supported_languages=["en"]
-                )
+                self.analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en"])
             else:
                 self.analyzer = AnalyzerEngine()
 
             self._register_custom_recognizers(presidio_module)
+            self._probe_phone_recognizer()
 
             self._supported_entities_cache = frozenset(self.analyzer.get_supported_entities())
             logger.debug(
@@ -247,7 +301,9 @@ class PIIDetector(BaseDetector):
             try:
                 spacy.load(cfg_model)
             except OSError:
-                logger.info("spaCy model '%s' not found; installing from %s", cfg_model, cfg_model_url)
+                logger.info(
+                    "spaCy model '%s' not found; installing from %s", cfg_model, cfg_model_url
+                )
                 subprocess.run(
                     [sys.executable, "-m", "pip", "install", cfg_model_url],
                     check=True,
@@ -274,8 +330,17 @@ class PIIDetector(BaseDetector):
 
         ner_config = nlp_engine_module.NerModelConfiguration(
             labels_to_ignore=[
-                "CARDINAL", "ORDINAL", "QUANTITY", "FAC", "WORK_OF_ART",
-                "PRODUCT", "EVENT", "LAW", "LANGUAGE", "PERCENT", "MONEY",
+                "CARDINAL",
+                "ORDINAL",
+                "QUANTITY",
+                "FAC",
+                "WORK_OF_ART",
+                "PRODUCT",
+                "EVENT",
+                "LAW",
+                "LANGUAGE",
+                "PERCENT",
+                "MONEY",
             ],
             model_to_presidio_entity_mapping=ner_config_module.MODEL_TO_PRESIDIO_ENTITY_MAPPING,
             low_score_entity_names=ner_config_module.LOW_SCORE_ENTITY_NAMES,
@@ -299,10 +364,7 @@ class PIIDetector(BaseDetector):
 
         for rec in custom_recognizers:
             raw_patterns = getattr(rec.patterns, "root", rec.patterns) or []
-            patterns = [
-                Pattern(name=p.name, regex=p.regex, score=p.score)
-                for p in raw_patterns
-            ]
+            patterns = [Pattern(name=p.name, regex=p.regex, score=p.score) for p in raw_patterns]
             raw_deny_list = getattr(rec.deny_list, "root", rec.deny_list)
             deny_list = list(raw_deny_list) if raw_deny_list else None
             context = list(rec.context) if rec.context else None
@@ -321,6 +383,32 @@ class PIIDetector(BaseDetector):
                 rec.name,
                 rec.supported_entity,
             )
+
+    def _probe_phone_recognizer(self) -> None:
+        """Verify phonenumbers regional data loads correctly; remove PhoneRecognizer if broken.
+
+        phonenumbers >=9 uses __import__ with level=1 for lazy region loading, which can fail
+        in certain execution contexts (e.g. frozen environments, some uv/venv setups).
+        Probing once at init avoids per-call ModuleNotFoundError spam.
+        """
+        if self.analyzer is None:
+            return
+        try:
+            import phonenumbers
+
+            phonenumbers.parse("+12025551234", None)
+        except ModuleNotFoundError as exc:
+            logger.warning(
+                "phonenumbers regional data unavailable (%s) — PHONE_NUMBER entity disabled", exc
+            )
+            self.analyzer.registry.recognizers = [
+                r
+                for r in self.analyzer.registry.recognizers
+                if "phone" not in r.name.lower()
+            ]
+            self._ALL_SUPPORTED_ENTITIES = self._ALL_SUPPORTED_ENTITIES - {"PHONE_NUMBER"}
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Entity filtering
@@ -408,6 +496,21 @@ class PIIDetector(BaseDetector):
             return []
         try:
             return self.analyzer.analyze(text=content, language="en", entities=entities)
+        except ModuleNotFoundError as exc:
+            if "phonenumbers" in str(exc):
+                logger.warning("phonenumbers data missing mid-run; disabling PHONE_NUMBER entity")
+                self._probe_phone_recognizer()
+                # Retry without the now-removed phone recognizer
+                retry_entities = (
+                    [e for e in entities if e != "PHONE_NUMBER"] if entities is not None else None
+                )
+                try:
+                    return self.analyzer.analyze(text=content, language="en", entities=retry_entities)
+                except Exception:
+                    return []
+            logger.error("PII analysis failed: %s", exc)
+            logger.exception(exc)
+            return []
         except Exception as e:
             logger.error("PII analysis failed: %s", e)
             logger.exception(e)
@@ -622,15 +725,30 @@ class PIIDetector(BaseDetector):
 
         # Critical — government IDs, financial account numbers, biometric IDs
         if e in {
-            "CREDIT_CARD", "CRYPTO", "IBAN_CODE",
-            "US_SSN", "US_PASSPORT", "US_DRIVER_LICENSE", "US_BANK_NUMBER", "US_ITIN",
+            "CREDIT_CARD",
+            "CRYPTO",
+            "IBAN_CODE",
+            "US_SSN",
+            "US_PASSPORT",
+            "US_DRIVER_LICENSE",
+            "US_BANK_NUMBER",
+            "US_ITIN",
             "UK_NHS",
-            "AT_SVNR", "CH_AHV", "DE_TAX_ID", "EU_NATIONAL_ID",
-            "ES_NIF", "ES_NIE",
-            "IT_FISCAL_CODE", "IT_PASSPORT", "IT_DRIVER_LICENSE", "IT_IDENTITY_CARD",
+            "AT_SVNR",
+            "CH_AHV",
+            "DE_TAX_ID",
+            "EU_NATIONAL_ID",
+            "ES_NIF",
+            "ES_NIE",
+            "IT_FISCAL_CODE",
+            "IT_PASSPORT",
+            "IT_DRIVER_LICENSE",
+            "IT_IDENTITY_CARD",
             "SG_NRIC_FIN",
-            "AU_TFN", "AU_MEDICARE",
-            "IN_PAN", "IN_AADHAAR",
+            "AU_TFN",
+            "AU_MEDICARE",
+            "IN_PAN",
+            "IN_AADHAAR",
             "FI_PERSONAL_IDENTITY_CODE",
             "PL_PESEL",
         }:
@@ -638,11 +756,16 @@ class PIIDetector(BaseDetector):
 
         # High — contact identifiers, business numbers, less-direct personal IDs
         if e in {
-            "EMAIL_ADDRESS", "PHONE_NUMBER", "IP_ADDRESS", "MEDICAL_LICENSE",
-            "AU_ABN", "AU_ACN",
+            "EMAIL_ADDRESS",
+            "PHONE_NUMBER",
+            "IP_ADDRESS",
+            "MEDICAL_LICENSE",
+            "AU_ABN",
+            "AU_ACN",
             "SG_UEN",
             "IT_VAR_CODE",
-            "IN_VOTER", "IN_VEHICLE_REGISTRATION",
+            "IN_VOTER",
+            "IN_VEHICLE_REGISTRATION",
         }:
             return Severity.high
 

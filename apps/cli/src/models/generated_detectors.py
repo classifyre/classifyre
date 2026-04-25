@@ -24,19 +24,6 @@ class DetectorType(StrEnum):
     SPAM = 'SPAM'
     LANGUAGE = 'LANGUAGE'
     CODE_SECURITY = 'CODE_SECURITY'
-    PLAGIARISM = 'PLAGIARISM'
-    IMAGE_VIOLENCE = 'IMAGE_VIOLENCE'
-    OCR_PII = 'OCR_PII'
-    DEID_SCORE = 'DEID_SCORE'
-    HATE_SPEECH = 'HATE_SPEECH'
-    AI_GENERATED = 'AI_GENERATED'
-    CONTENT_QUALITY = 'CONTENT_QUALITY'
-    BIAS = 'BIAS'
-    DUPLICATE = 'DUPLICATE'
-    DOMAIN_CLASS = 'DOMAIN_CLASS'
-    CONTENT_TYPE = 'CONTENT_TYPE'
-    SENSITIVITY_TIER = 'SENSITIVITY_TIER'
-    JURISDICTION_TAG = 'JURISDICTION_TAG'
     CUSTOM = 'CUSTOM'
 
 
@@ -462,84 +449,6 @@ class BrokenLinksDetectorConfig(BaseModel):
     """
 
 
-class ContentQualityDetectorConfig(DetectorConfig):
-    """
-    Configuration for content quality scoring detectors
-    """
-
-    readability_weight: float | None = Field(
-        0.4,
-        description='Weight applied to readability signal in composite score',
-        ge=0.0,
-        le=1.0,
-    )
-    coherence_weight: float | None = Field(
-        0.35,
-        description='Weight applied to coherence signal in composite score',
-        ge=0.0,
-        le=1.0,
-    )
-    density_weight: float | None = Field(
-        0.25,
-        description='Weight applied to information-density signal in composite score',
-        ge=0.0,
-        le=1.0,
-    )
-    min_score_threshold: float | None = Field(
-        40, description='Minimum quality score threshold to report', ge=0.0, le=100.0
-    )
-
-
-class ClassificationDetectorConfig(DetectorConfig):
-    """
-    Configuration for classification and tagging detectors
-    """
-
-    enabled_patterns: list[str] | None = Field(
-        None,
-        description='Optional subset of labels/tags to include for this classifier',
-    )
-
-
-class DeidScoreDetectorConfig(PIIDetectorConfig):
-    """
-    Configuration for de-identification completeness scoring detector
-    """
-
-    min_k_anonymity: int | None = Field(
-        5, description='Minimum target k-anonymity threshold for risk evaluation', ge=1
-    )
-    min_l_diversity: int | None = Field(
-        2, description='Minimum target l-diversity threshold for risk evaluation', ge=1
-    )
-    quasi_identifiers: list[PIIEnabledPattern] | None = Field(
-        None,
-        description='Presidio entity types used as quasi-identifiers for re-identification risk calculations (e.g. DATE_TIME, LOCATION, PERSON, IP_ADDRESS)',
-    )
-
-
-class BiasEnabledPattern(StrEnum):
-    """
-    Bias detector pattern types
-    """
-
-    gender_bias = 'gender_bias'
-    racial_bias = 'racial_bias'
-    age_bias = 'age_bias'
-    religious_bias = 'religious_bias'
-    political_bias = 'political_bias'
-
-
-class BiasDetectorConfig(DetectorConfig):
-    """
-    Configuration for fairness and bias detector
-    """
-
-    enabled_patterns: list[BiasEnabledPattern] | None = Field(
-        None, description='Specific bias signals to detect'
-    )
-
-
 class CustomDetectorMethod(StrEnum):
     """
     Execution method for custom detector logic
@@ -740,10 +649,6 @@ class DetectorsRefactored(
         | PIIDetectorConfig
         | ThreatDetectorConfig
         | BrokenLinksDetectorConfig
-        | ContentQualityDetectorConfig
-        | ClassificationDetectorConfig
-        | DeidScoreDetectorConfig
-        | BiasDetectorConfig
         | CustomDetectorConfig
         | SpamDetectorConfig
         | NSFWDetectorConfig
@@ -758,10 +663,6 @@ class DetectorsRefactored(
         | PIIDetectorConfig
         | ThreatDetectorConfig
         | BrokenLinksDetectorConfig
-        | ContentQualityDetectorConfig
-        | ClassificationDetectorConfig
-        | DeidScoreDetectorConfig
-        | BiasDetectorConfig
         | CustomDetectorConfig
         | SpamDetectorConfig
         | NSFWDetectorConfig

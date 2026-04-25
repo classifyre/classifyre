@@ -1935,19 +1935,6 @@
                 "SPAM",
                 "LANGUAGE",
                 "CODE_SECURITY",
-                "PLAGIARISM",
-                "IMAGE_VIOLENCE",
-                "OCR_PII",
-                "DEID_SCORE",
-                "HATE_SPEECH",
-                "AI_GENERATED",
-                "CONTENT_QUALITY",
-                "BIAS",
-                "DUPLICATE",
-                "DOMAIN_CLASS",
-                "CONTENT_TYPE",
-                "SENSITIVITY_TIER",
-                "JURISDICTION_TAG",
                 "CUSTOM"
               ]
             }
@@ -2741,7 +2728,7 @@
         ]
       },
       "put": {
-        "description": "Update any combination of provider, model, API key (plaintext — stored encrypted), and base URL. Pass apiKey as an empty string to clear a stored key.",
+        "description": "Update any combination of provider, model, API key (plaintext \u2014 stored encrypted), and base URL. Pass apiKey as an empty string to clear a stored key.",
         "operationId": "AiProviderConfigController_updateConfig",
         "parameters": [],
         "requestBody": {
@@ -3415,7 +3402,7 @@
     },
     "/sandbox/runs": {
       "post": {
-        "description": "Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, …) and run one\nor more detectors against its extracted text.\n\n**`detectors`** is a JSON string containing an array of detector config objects.\nEach object has the shape:\n```json\n{ \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } }\n```\n\n### Detector types & sample configs\n\n| Type | What it finds |\n|------|---------------|\n| `SECRETS` | API keys, tokens, private keys |\n| `PII` | Emails, SSNs, credit cards, phone numbers |\n| `TOXIC` | Toxic / hateful text (Detoxify model) |\n| `NSFW` | Sexually explicit content |\n| `YARA` | Custom YARA rule matches |\n| `BROKEN_LINKS` | Unreachable URLs in text |\n\n**Minimal — secrets only (all patterns):**\n```json\n[{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}]\n```\n\n**PII with specific patterns:**\n```json\n[{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}]\n```\n\n**Secrets + PII combined:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}}\n]\n```\n\n**Toxic content (multilingual model):**\n```json\n[{\"type\":\"TOXIC\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"toxicity\",\"severe_toxicity\",\"insult\"],\"model_name\":\"multilingual\"}}]\n```\n\n**Full scan — all detectors:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},\n  {\"type\":\"TOXIC\",\"enabled\":true,\"config\":{}},\n  {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}}\n]\n```",
+        "description": "Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, \u2026) and run one\nor more detectors against its extracted text.\n\n**`detectors`** is a JSON string containing an array of detector config objects.\nEach object has the shape:\n```json\n{ \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } }\n```\n\n### Detector types & sample configs\n\n| Type | What it finds |\n|------|---------------|\n| `SECRETS` | API keys, tokens, private keys |\n| `PII` | Emails, SSNs, credit cards, phone numbers |\n| `TOXIC` | Toxic / hateful text (Detoxify model) |\n| `NSFW` | Sexually explicit content |\n| `YARA` | Custom YARA rule matches |\n| `BROKEN_LINKS` | Unreachable URLs in text |\n\n**Minimal \u2014 secrets only (all patterns):**\n```json\n[{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}]\n```\n\n**PII with specific patterns:**\n```json\n[{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}]\n```\n\n**Secrets + PII combined:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}}\n]\n```\n\n**Toxic content (multilingual model):**\n```json\n[{\"type\":\"TOXIC\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"toxicity\",\"severe_toxicity\",\"insult\"],\"model_name\":\"multilingual\"}}]\n```\n\n**Full scan \u2014 all detectors:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},\n  {\"type\":\"TOXIC\",\"enabled\":true,\"config\":{}},\n  {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}}\n]\n```",
         "operationId": "SandboxController_createRun",
         "parameters": [],
         "requestBody": {
@@ -3534,19 +3521,6 @@
                   "SPAM",
                   "LANGUAGE",
                   "CODE_SECURITY",
-                  "PLAGIARISM",
-                  "IMAGE_VIOLENCE",
-                  "OCR_PII",
-                  "DEID_SCORE",
-                  "HATE_SPEECH",
-                  "AI_GENERATED",
-                  "CONTENT_QUALITY",
-                  "BIAS",
-                  "DUPLICATE",
-                  "DOMAIN_CLASS",
-                  "CONTENT_TYPE",
-                  "SENSITIVITY_TIER",
-                  "JURISDICTION_TAG",
                   "CUSTOM"
                 ]
               }
@@ -4000,7 +3974,7 @@
             "description": ""
           }
         },
-        "summary": "Certify a metric (DRAFT → ACTIVE)",
+        "summary": "Certify a metric (DRAFT \u2192 ACTIVE)",
         "tags": [
           "Semantic Layer - Metrics"
         ]
@@ -4844,19 +4818,6 @@
                 "SPAM",
                 "LANGUAGE",
                 "CODE_SECURITY",
-                "PLAGIARISM",
-                "IMAGE_VIOLENCE",
-                "OCR_PII",
-                "DEID_SCORE",
-                "HATE_SPEECH",
-                "AI_GENERATED",
-                "CONTENT_QUALITY",
-                "BIAS",
-                "DUPLICATE",
-                "DOMAIN_CLASS",
-                "CONTENT_TYPE",
-                "SENSITIVITY_TIER",
-                "JURISDICTION_TAG",
                 "CUSTOM"
               ]
             }
@@ -5063,19 +5024,6 @@
               "SPAM",
               "LANGUAGE",
               "CODE_SECURITY",
-              "PLAGIARISM",
-              "IMAGE_VIOLENCE",
-              "OCR_PII",
-              "DEID_SCORE",
-              "HATE_SPEECH",
-              "AI_GENERATED",
-              "CONTENT_QUALITY",
-              "BIAS",
-              "DUPLICATE",
-              "DOMAIN_CLASS",
-              "CONTENT_TYPE",
-              "SENSITIVITY_TIER",
-              "JURISDICTION_TAG",
               "CUSTOM"
             ]
           },
@@ -5414,19 +5362,6 @@
                 "SPAM",
                 "LANGUAGE",
                 "CODE_SECURITY",
-                "PLAGIARISM",
-                "IMAGE_VIOLENCE",
-                "OCR_PII",
-                "DEID_SCORE",
-                "HATE_SPEECH",
-                "AI_GENERATED",
-                "CONTENT_QUALITY",
-                "BIAS",
-                "DUPLICATE",
-                "DOMAIN_CLASS",
-                "CONTENT_TYPE",
-                "SENSITIVITY_TIER",
-                "JURISDICTION_TAG",
                 "CUSTOM"
               ]
             }
@@ -5680,19 +5615,6 @@
               "SPAM",
               "LANGUAGE",
               "CODE_SECURITY",
-              "PLAGIARISM",
-              "IMAGE_VIOLENCE",
-              "OCR_PII",
-              "DEID_SCORE",
-              "HATE_SPEECH",
-              "AI_GENERATED",
-              "CONTENT_QUALITY",
-              "BIAS",
-              "DUPLICATE",
-              "DOMAIN_CLASS",
-              "CONTENT_TYPE",
-              "SENSITIVITY_TIER",
-              "JURISDICTION_TAG",
               "CUSTOM"
             ]
           },
@@ -6541,19 +6463,6 @@
               "SPAM",
               "LANGUAGE",
               "CODE_SECURITY",
-              "PLAGIARISM",
-              "IMAGE_VIOLENCE",
-              "OCR_PII",
-              "DEID_SCORE",
-              "HATE_SPEECH",
-              "AI_GENERATED",
-              "CONTENT_QUALITY",
-              "BIAS",
-              "DUPLICATE",
-              "DOMAIN_CLASS",
-              "CONTENT_TYPE",
-              "SENSITIVITY_TIER",
-              "JURISDICTION_TAG",
               "CUSTOM"
             ]
           },
@@ -6693,19 +6602,6 @@
               "SPAM",
               "LANGUAGE",
               "CODE_SECURITY",
-              "PLAGIARISM",
-              "IMAGE_VIOLENCE",
-              "OCR_PII",
-              "DEID_SCORE",
-              "HATE_SPEECH",
-              "AI_GENERATED",
-              "CONTENT_QUALITY",
-              "BIAS",
-              "DUPLICATE",
-              "DOMAIN_CLASS",
-              "CONTENT_TYPE",
-              "SENSITIVITY_TIER",
-              "JURISDICTION_TAG",
               "CUSTOM"
             ]
           },

@@ -244,19 +244,6 @@ class TestDetectorTypesMatchSchema:
             "SPAM",
             "LANGUAGE",
             "CODE_SECURITY",
-            "PLAGIARISM",
-            "IMAGE_VIOLENCE",
-            "OCR_PII",
-            "DEID_SCORE",
-            "HATE_SPEECH",
-            "AI_GENERATED",
-            "CONTENT_QUALITY",
-            "BIAS",
-            "DUPLICATE",
-            "DOMAIN_CLASS",
-            "CONTENT_TYPE",
-            "SENSITIVITY_TIER",
-            "JURISDICTION_TAG",
             "CUSTOM",
         }
         actual_types = {dt.value for dt in DetectorType}
@@ -293,7 +280,7 @@ class TestDetectorConfigMapping:
         """Test PIIDetector accepts PIIDetectorConfig."""
         try:
             config = PIIDetectorConfig(
-                enabled_patterns=["email", "phone_number"], confidence_threshold=0.75
+                enabled_patterns=["EMAIL_ADDRESS", "PHONE_NUMBER"], confidence_threshold=0.75
             )
             detector = PIIDetector(config)
             assert detector.config == config

@@ -365,7 +365,7 @@ async function example() {
   const api = new FindingsApi();
 
   const body = {
-    // 'SECRETS' | 'PII' | 'TOXIC' | 'NSFW' | 'YARA' | 'BROKEN_LINKS' | 'PROMPT_INJECTION' | 'PHISHING_URL' | 'SPAM' | 'LANGUAGE' | 'CODE_SECURITY' | 'PLAGIARISM' | 'IMAGE_VIOLENCE' | 'OCR_PII' | 'DEID_SCORE' | 'HATE_SPEECH' | 'AI_GENERATED' | 'CONTENT_QUALITY' | 'BIAS' | 'DUPLICATE' | 'DOMAIN_CLASS' | 'CONTENT_TYPE' | 'SENSITIVITY_TIER' | 'JURISDICTION_TAG' | 'CUSTOM' (optional)
+    // 'SECRETS' | 'PII' | 'TOXIC' | 'NSFW' | 'YARA' | 'BROKEN_LINKS' | 'PROMPT_INJECTION' | 'PHISHING_URL' | 'SPAM' | 'LANGUAGE' | 'CODE_SECURITY' | 'CUSTOM' (optional)
     detectorType: detectorType_example,
     // string (optional)
     sourceId: sourceId_example,
@@ -412,7 +412,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **detectorType** | `SECRETS`, `PII`, `TOXIC`, `NSFW`, `YARA`, `BROKEN_LINKS`, `PROMPT_INJECTION`, `PHISHING_URL`, `SPAM`, `LANGUAGE`, `CODE_SECURITY`, `PLAGIARISM`, `IMAGE_VIOLENCE`, `OCR_PII`, `DEID_SCORE`, `HATE_SPEECH`, `AI_GENERATED`, `CONTENT_QUALITY`, `BIAS`, `DUPLICATE`, `DOMAIN_CLASS`, `CONTENT_TYPE`, `SENSITIVITY_TIER`, `JURISDICTION_TAG`, `CUSTOM` |  | [Optional] [Defaults to `undefined`] [Enum: SECRETS, PII, TOXIC, NSFW, YARA, BROKEN_LINKS, PROMPT_INJECTION, PHISHING_URL, SPAM, LANGUAGE, CODE_SECURITY, PLAGIARISM, IMAGE_VIOLENCE, OCR_PII, DEID_SCORE, HATE_SPEECH, AI_GENERATED, CONTENT_QUALITY, BIAS, DUPLICATE, DOMAIN_CLASS, CONTENT_TYPE, SENSITIVITY_TIER, JURISDICTION_TAG, CUSTOM] |
+| **detectorType** | `SECRETS`, `PII`, `TOXIC`, `NSFW`, `YARA`, `BROKEN_LINKS`, `PROMPT_INJECTION`, `PHISHING_URL`, `SPAM`, `LANGUAGE`, `CODE_SECURITY`, `CUSTOM` |  | [Optional] [Defaults to `undefined`] [Enum: SECRETS, PII, TOXIC, NSFW, YARA, BROKEN_LINKS, PROMPT_INJECTION, PHISHING_URL, SPAM, LANGUAGE, CODE_SECURITY, CUSTOM] |
 | **sourceId** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **assetId** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **runnerId** | `string` |  | [Optional] [Defaults to `undefined`] |
