@@ -20,7 +20,6 @@ class DetectorType(StrEnum):
     YARA = 'YARA'
     BROKEN_LINKS = 'BROKEN_LINKS'
     PROMPT_INJECTION = 'PROMPT_INJECTION'
-    PHISHING_URL = 'PHISHING_URL'
     SPAM = 'SPAM'
     LANGUAGE = 'LANGUAGE'
     CODE_SECURITY = 'CODE_SECURITY'
@@ -421,17 +420,6 @@ class NSFWDetectorConfig(DetectorConfig):
     )
 
 
-class PhishingUrlDetectorConfig(DetectorConfig):
-    """
-    Configuration for phishing URL detector
-    """
-
-    model: str | None = Field(
-        None,
-        description='HuggingFace model ID for phishing URL classification. Defaults to CrabInHoney/urlbert-tiny-phishing-classifier when null.',
-    )
-
-
 class PromptInjectionDetectorConfig(DetectorConfig):
     """
     Configuration for prompt injection detector
@@ -652,7 +640,6 @@ class DetectorsRefactored(
         | CustomDetectorConfig
         | SpamDetectorConfig
         | NSFWDetectorConfig
-        | PhishingUrlDetectorConfig
         | PromptInjectionDetectorConfig
         | GenericDetectorConfig
     ]
@@ -666,7 +653,6 @@ class DetectorsRefactored(
         | CustomDetectorConfig
         | SpamDetectorConfig
         | NSFWDetectorConfig
-        | PhishingUrlDetectorConfig
         | PromptInjectionDetectorConfig
         | GenericDetectorConfig
     ) = Field(
