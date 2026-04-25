@@ -402,9 +402,7 @@ class PIIDetector(BaseDetector):
                 "phonenumbers regional data unavailable (%s) — PHONE_NUMBER entity disabled", exc
             )
             self.analyzer.registry.recognizers = [
-                r
-                for r in self.analyzer.registry.recognizers
-                if "phone" not in r.name.lower()
+                r for r in self.analyzer.registry.recognizers if "phone" not in r.name.lower()
             ]
             self._ALL_SUPPORTED_ENTITIES = self._ALL_SUPPORTED_ENTITIES - {"PHONE_NUMBER"}
         except Exception:
@@ -505,7 +503,9 @@ class PIIDetector(BaseDetector):
                     [e for e in entities if e != "PHONE_NUMBER"] if entities is not None else None
                 )
                 try:
-                    return self.analyzer.analyze(text=content, language="en", entities=retry_entities)
+                    return self.analyzer.analyze(
+                        text=content, language="en", entities=retry_entities
+                    )
                 except Exception:
                     return []
             logger.error("PII analysis failed: %s", exc)
