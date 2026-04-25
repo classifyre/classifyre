@@ -1834,7 +1834,9 @@ export class AssetService {
         // sampling may not cover every detection on every run.
         if (isFullScan) {
           const hasManualStatusOverride = (finding: any) => {
-            const history = Array.isArray(finding.history) ? finding.history : [];
+            const history = Array.isArray(finding.history)
+              ? finding.history
+              : [];
             const lastStatusChange = [...history]
               .reverse()
               .find(
