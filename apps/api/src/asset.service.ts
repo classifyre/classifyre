@@ -1202,9 +1202,11 @@ export class AssetService {
     assets: Record<string, any>[],
     options?: {
       finalizeRun?: boolean;
+      isFullScan?: boolean;
     },
   ) {
     const finalizeRun = options?.finalizeRun ?? true;
+    const isFullScan = options?.isFullScan ?? true;
     const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
 
     // Process in batches to avoid transaction timeout
@@ -1241,6 +1243,7 @@ export class AssetService {
         runnerId,
         source.type,
         existingAssetsMap,
+        isFullScan,
       );
 
       totalCreated += result.created;
@@ -1401,6 +1404,7 @@ export class AssetService {
     runnerId: string,
     sourceType: AssetType,
     existingAssetsMap: Map<string, Asset>,
+    isFullScan: boolean = true,
   ): Promise<{
     created: number;
     updated: number;
@@ -1823,49 +1827,55 @@ export class AssetService {
           }
         }
 
-        // Resolve findings not in current scan
-        const hasManualStatusOverride = (finding: any) => {
-          const history = Array.isArray(finding.history) ? finding.history : [];
-          const lastStatusChange = [...history]
-            .reverse()
-            .find(
-              (entry: any) =>
-                entry.eventType === HistoryEventType.STATUS_CHANGED,
-            );
-          return lastStatusChange
-            ? lastStatusChange.status !== FindingStatus.OPEN
-            : false;
-        };
+        // For full scans (strategy=ALL), resolve findings that were not re-detected
+        // on scanned assets — absence means the finding is genuinely gone.
+        // For partial scans (RANDOM/LATEST), skip this: only matched findings are
+        // updated; unmatched findings on sampled assets are left open because the
+        // sampling may not cover every detection on every run.
+        if (isFullScan) {
+          const hasManualStatusOverride = (finding: any) => {
+            const history = Array.isArray(finding.history) ? finding.history : [];
+            const lastStatusChange = [...history]
+              .reverse()
+              .find(
+                (entry: any) =>
+                  entry.eventType === HistoryEventType.STATUS_CHANGED,
+              );
+            return lastStatusChange
+              ? lastStatusChange.status !== FindingStatus.OPEN
+              : false;
+          };
 
-        const toResolve = Array.from(existingMap.values()).filter(
-          (f: any) =>
-            f.status === FindingStatus.OPEN && !hasManualStatusOverride(f),
-        );
+          const toResolve = Array.from(existingMap.values()).filter(
+            (f: any) =>
+              f.status === FindingStatus.OPEN && !hasManualStatusOverride(f),
+          );
 
-        for (const finding of toResolve) {
-          const currentHistory = Array.isArray(finding.history)
-            ? finding.history
-            : [];
+          for (const finding of toResolve) {
+            const currentHistory = Array.isArray(finding.history)
+              ? finding.history
+              : [];
 
-          await tx.finding.update({
-            where: { id: finding.id },
-            data: {
-              status: FindingStatus.RESOLVED,
-              runnerId,
-              resolvedAt: new Date(),
-              resolutionReason: 'Detection no longer present in scan',
-              history: [
-                ...currentHistory,
-                {
-                  timestamp: new Date(),
-                  runnerId,
-                  eventType: HistoryEventType.RESOLVED,
-                  status: FindingStatus.RESOLVED,
-                  changeReason: 'Detection no longer present in scan',
-                },
-              ],
-            },
-          });
+            await tx.finding.update({
+              where: { id: finding.id },
+              data: {
+                status: FindingStatus.RESOLVED,
+                runnerId,
+                resolvedAt: new Date(),
+                resolutionReason: 'Detection no longer present in scan',
+                history: [
+                  ...currentHistory,
+                  {
+                    timestamp: new Date(),
+                    runnerId,
+                    eventType: HistoryEventType.RESOLVED,
+                    status: FindingStatus.RESOLVED,
+                    changeReason: 'Detection no longer present in scan',
+                  },
+                ],
+              },
+            });
+          }
         }
 
         return {
