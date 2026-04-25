@@ -11,31 +11,31 @@ export const detectorUiGroups = [
     id: "privacy_pii",
     label: "Privacy & PII",
     description:
-      "Personal data detection, OCR privacy, and de-identification checks.",
+      "Personal data detection across global and regional PII entity types.",
   },
   {
     id: "threats_attacks",
     label: "Threats & Attacks",
     description:
-      "Active threat indicators such as prompt attacks and phishing URLs.",
+      "Active threat indicators such as prompt injection attacks.",
   },
   {
     id: "harmful_content",
     label: "Harmful Content",
     description:
-      "Toxicity, hate speech, NSFW, violence, and AI-generated content checks.",
+      "Toxicity and NSFW content checks.",
   },
   {
     id: "content_quality",
     label: "Content Quality",
     description:
-      "Spam, duplicates, plagiarism, readability, and language quality signals.",
+      "Spam, broken links, and language quality signals.",
   },
   {
     id: "classification",
     label: "Classification & Tagging",
     description:
-      "Domain, content type, sensitivity tiers, and jurisdiction tagging.",
+      "Custom detector results and classification-style findings.",
   },
 ] as const;
 
@@ -45,60 +45,16 @@ type DetectorTypeEnumValue =
   (typeof SearchFindingsFiltersInputDtoDetectorTypeEnum)[keyof typeof SearchFindingsFiltersInputDtoDetectorTypeEnum];
 
 const groupByDetectorTypeEntries = [
-  [
-    SearchFindingsFiltersInputDtoDetectorTypeEnum.Secrets,
-    "secrets_credentials",
-  ],
-  [
-    SearchFindingsFiltersInputDtoDetectorTypeEnum.CodeSecurity,
-    "secrets_credentials",
-  ],
+  [SearchFindingsFiltersInputDtoDetectorTypeEnum.Secrets, "secrets_credentials"],
+  [SearchFindingsFiltersInputDtoDetectorTypeEnum.CodeSecurity, "secrets_credentials"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Pii, "privacy_pii"],
-  [SearchFindingsFiltersInputDtoDetectorTypeEnum.OcrPii, "privacy_pii"],
-  [SearchFindingsFiltersInputDtoDetectorTypeEnum.DeidScore, "privacy_pii"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Yara, "threats_attacks"],
-  [
-    SearchFindingsFiltersInputDtoDetectorTypeEnum.PromptInjection,
-    "threats_attacks",
-  ],
-  [
-    SearchFindingsFiltersInputDtoDetectorTypeEnum.PhishingUrl,
-    "threats_attacks",
-  ],
+  [SearchFindingsFiltersInputDtoDetectorTypeEnum.PromptInjection, "threats_attacks"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Toxic, "harmful_content"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Nsfw, "harmful_content"],
-  [
-    SearchFindingsFiltersInputDtoDetectorTypeEnum.ImageViolence,
-    "harmful_content",
-  ],
-  [SearchFindingsFiltersInputDtoDetectorTypeEnum.HateSpeech, "harmful_content"],
-  [
-    SearchFindingsFiltersInputDtoDetectorTypeEnum.AiGenerated,
-    "harmful_content",
-  ],
-  [SearchFindingsFiltersInputDtoDetectorTypeEnum.Bias, "harmful_content"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Spam, "content_quality"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Language, "content_quality"],
-  [SearchFindingsFiltersInputDtoDetectorTypeEnum.Plagiarism, "content_quality"],
-  [
-    SearchFindingsFiltersInputDtoDetectorTypeEnum.ContentQuality,
-    "content_quality",
-  ],
-  [SearchFindingsFiltersInputDtoDetectorTypeEnum.Duplicate, "content_quality"],
-  [
-    SearchFindingsFiltersInputDtoDetectorTypeEnum.BrokenLinks,
-    "content_quality",
-  ],
-  [SearchFindingsFiltersInputDtoDetectorTypeEnum.DomainClass, "classification"],
-  [SearchFindingsFiltersInputDtoDetectorTypeEnum.ContentType, "classification"],
-  [
-    SearchFindingsFiltersInputDtoDetectorTypeEnum.SensitivityTier,
-    "classification",
-  ],
-  [
-    SearchFindingsFiltersInputDtoDetectorTypeEnum.JurisdictionTag,
-    "classification",
-  ],
+  [SearchFindingsFiltersInputDtoDetectorTypeEnum.BrokenLinks, "content_quality"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Custom, "classification"],
 ] as const satisfies readonly (readonly [
   DetectorTypeEnumValue,
@@ -121,7 +77,7 @@ const detectorAiExamplesByGroup = {
     "Use broad PII coverage for compliance review before publishing.",
   ],
   threats_attacks: [
-    "Harden prompt attack and phishing detection for external content.",
+    "Harden prompt injection detection for external content.",
     "Use balanced threat detection with medium confidence.",
     "Prioritize critical threat findings and keep output concise.",
   ],

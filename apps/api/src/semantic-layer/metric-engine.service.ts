@@ -538,7 +538,6 @@ export class MetricEngineService {
       'YARA',
       'BROKEN_LINKS',
       'PROMPT_INJECTION',
-      'PHISHING_URL',
       'SPAM',
       'LANGUAGE',
       'CODE_SECURITY',

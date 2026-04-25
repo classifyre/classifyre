@@ -12,7 +12,6 @@ from src.detectors.dependencies import MissingDependencyError
 from src.detectors.pii.detector import PIIDetector
 from src.detectors.secrets.detector import SecretsDetector
 from src.detectors.threat.code_security_detector import CodeSecurityDetector
-from src.detectors.threat.phishing_url_detector import PhishingURLDetector
 from src.detectors.threat.prompt_injection_detector import PromptInjectionDetector
 from src.detectors.threat.yara_detector import YaraDetector
 from src.models.generated_detectors import (
@@ -140,19 +139,6 @@ class TestDetectorTypesMatchSchema:
         except MissingDependencyError:
             pytest.skip("transformers/torch not installed, skipping prompt injection test")
 
-    def test_phishing_url_detector_type(self):
-        """Test PhishingURLDetector has correct detector_type."""
-        try:
-            detector = PhishingURLDetector()
-            assert detector.detector_type == "phishing_url"
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.PHISHING_URL
-            assert (
-                ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.PHISHING_URL
-            )
-        except MissingDependencyError:
-            pytest.skip("transformers/torch not installed, skipping phishing URL test")
-
     def test_spam_detector_type(self):
         """Test SpamDetector has correct detector_type."""
         try:
@@ -202,7 +188,6 @@ class TestDetectorTypesMatchSchema:
             (YaraDetector, ThreatDetectorConfig()),
             (BrokenLinksDetector, BrokenLinksDetectorConfig()),
             (PromptInjectionDetector, None),
-            (PhishingURLDetector, None),
             (SpamDetector, None),
             (LanguageDetector, None),
             (CodeSecurityDetector, None),
@@ -240,7 +225,6 @@ class TestDetectorTypesMatchSchema:
             "YARA",
             "BROKEN_LINKS",
             "PROMPT_INJECTION",
-            "PHISHING_URL",
             "SPAM",
             "LANGUAGE",
             "CODE_SECURITY",
@@ -352,7 +336,6 @@ class TestDetectorNames:
             (YaraDetector, ThreatDetectorConfig(), "yara"),
             (BrokenLinksDetector, BrokenLinksDetectorConfig(), "broken_links"),
             (PromptInjectionDetector, DetectorConfig(), "prompt_injection"),
-            (PhishingURLDetector, DetectorConfig(), "phishing_url"),
             (SpamDetector, DetectorConfig(), "spam"),
             (LanguageDetector, DetectorConfig(), "language"),
             (CodeSecurityDetector, DetectorConfig(), "code_security"),

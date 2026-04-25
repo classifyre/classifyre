@@ -330,7 +330,6 @@ const DETECTOR_TYPE_LABELS: Record<string, string> = {
   YARA: "YARA",
   BROKEN_LINKS: "Broken Links",
   PROMPT_INJECTION: "Prompt Injection",
-  PHISHING_URL: "Phishing URL",
   SPAM: "Spam",
   LANGUAGE: "Language",
   CODE_SECURITY: "Code Security",

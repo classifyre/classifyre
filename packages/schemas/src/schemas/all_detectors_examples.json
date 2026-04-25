@@ -108,7 +108,7 @@
       }
     },
     {
-      "name": "DACH — Germany, Austria, Switzerland",
+      "name": "DACH \u2014 Germany, Austria, Switzerland",
       "description": "DACH-specific national identifiers for German tax IDs (DE_TAX_ID), Austrian social insurance numbers (AT_SVNR), and Swiss AHV pension numbers (CH_AHV), alongside EU-wide patterns for comprehensive DSGVO/DSG compliance.",
       "config": {
         "enabled_patterns": [
@@ -127,7 +127,7 @@
     },
     {
       "name": "Spain",
-      "description": "Spanish national identifiers: NIF (Número de Identificación Fiscal) for citizens and NIE (Número de Identidad de Extranjero) for foreign residents. Combined with global contact patterns for full coverage.",
+      "description": "Spanish national identifiers: NIF (N\u00famero de Identificaci\u00f3n Fiscal) for citizens and NIE (N\u00famero de Identidad de Extranjero) for foreign residents. Combined with global contact patterns for full coverage.",
       "config": {
         "enabled_patterns": [
           "ES_NIF",
@@ -221,7 +221,7 @@
       }
     },
     {
-      "name": "Nordic — Finland & Poland",
+      "name": "Nordic \u2014 Finland & Poland",
       "description": "Finnish personal identity codes (HETU) and Polish PESEL numbers, alongside contact identifiers. Covers local privacy law requirements for Scandinavian and Polish markets.",
       "config": {
         "enabled_patterns": [
@@ -285,7 +285,7 @@
       }
     },
     {
-      "name": "Custom Recognizer — Employee ID",
+      "name": "Custom Recognizer \u2014 Employee ID",
       "description": "Extends the built-in PII detector with a regex recognizer for internal employee IDs (format EMP-XXXXXX). Demonstrates how to detect proprietary identifiers alongside standard PII.",
       "config": {
         "enabled_patterns": [
@@ -305,13 +305,18 @@
                 "score": 0.9
               }
             ],
-            "context": ["employee", "staff", "id", "identifier"]
+            "context": [
+              "employee",
+              "staff",
+              "id",
+              "identifier"
+            ]
           }
         ]
       }
     },
     {
-      "name": "Custom Recognizer — Deny List",
+      "name": "Custom Recognizer \u2014 Deny List",
       "description": "Deny-list recognizer for internal code names or sensitive project terms that should be treated as PII in external communications.",
       "config": {
         "enabled_patterns": [
@@ -325,8 +330,16 @@
             "name": "Internal Project Name Recognizer",
             "supported_entity": "INTERNAL_PROJECT",
             "supported_language": "en",
-            "deny_list": ["Project Phoenix", "Operation Sunrise", "Codename Atlas"],
-            "context": ["project", "operation", "codename"]
+            "deny_list": [
+              "Project Phoenix",
+              "Operation Sunrise",
+              "Codename Atlas"
+            ],
+            "context": [
+              "project",
+              "operation",
+              "codename"
+            ]
           }
         ]
       }
@@ -427,16 +440,6 @@
       "description": "Heuristic baseline for instruction override and prompt exfiltration attempts.",
       "config": {
         "confidence_threshold": 0.7,
-        "max_findings": 25
-      }
-    }
-  ],
-  "PHISHING_URL": [
-    {
-      "name": "Phishing URL Baseline",
-      "description": "Classify extracted URLs for phishing and malware intent.",
-      "config": {
-        "confidence_threshold": 0.75,
         "max_findings": 25
       }
     }
@@ -952,7 +955,7 @@
             {
               "id": "paragraph_ref",
               "name": "Austrian Law Paragraph Citation",
-              "pattern": "§\\s*\\d+\\s*(Abs\\.?\\s*\\d+\\s*)?(ABGB|UGB|DSG|StGB|GmbHG|AktG|ZPO)",
+              "pattern": "\u00a7\\s*\\d+\\s*(Abs\\.?\\s*\\d+\\s*)?(ABGB|UGB|DSG|StGB|GmbHG|AktG|ZPO)",
               "severity": "info"
             },
             {
@@ -1008,8 +1011,8 @@
             "German law citation",
             "regulatory fine amount",
             "compliance deadline",
-            "Bußgeld",
-            "Aufsichtsbehörde"
+            "Bu\u00dfgeld",
+            "Aufsichtsbeh\u00f6rde"
           ],
           "model": "fastino/gliner2-base-v1"
         }

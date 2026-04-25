@@ -10,7 +10,6 @@ from ..models.generated_detectors import (
     CustomDetectorConfig,
     DetectorConfig,
     NSFWDetectorConfig,
-    PhishingUrlDetectorConfig,
     PIIDetectorConfig,
     PromptInjectionDetectorConfig,
     SecretsDetectorConfig,
@@ -28,7 +27,6 @@ type DetectorTypedConfig = (
     | BrokenLinksDetectorConfig
     | SpamDetectorConfig
     | NSFWDetectorConfig
-    | PhishingUrlDetectorConfig
     | PromptInjectionDetectorConfig
 )
 
@@ -40,7 +38,6 @@ _DETECTOR_NAME_BY_TYPE: dict[str, str] = {
     "YARA": "yara",
     "BROKEN_LINKS": "broken_links",
     "PROMPT_INJECTION": "prompt_injection",
-    "PHISHING_URL": "phishing_url",
     "SPAM": "spam",
     "LANGUAGE": "language",
     "CODE_SECURITY": "code_security",
@@ -56,7 +53,6 @@ _DETECTOR_CONFIG_BY_TYPE: dict[str, type[DetectorConfig]] = {
     "BROKEN_LINKS": BrokenLinksDetectorConfig,
     "CUSTOM": CustomDetectorConfig,
     "SPAM": SpamDetectorConfig,
-    "PHISHING_URL": PhishingUrlDetectorConfig,
     "PROMPT_INJECTION": PromptInjectionDetectorConfig,
 }
 

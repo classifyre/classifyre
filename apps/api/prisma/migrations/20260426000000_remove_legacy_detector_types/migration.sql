@@ -1,10 +1,11 @@
 -- Remove legacy stub detector types that were never production-ready.
--- These were regex/keyword heuristics replaced by the CustomDetector system
--- (RULESET, CLASSIFIER, ENTITY methods backed by GLiNER2 / mDeBERTa).
+-- These were regex/keyword heuristics or ML models requiring external tokens,
+-- replaced by the CustomDetector system (RULESET, CLASSIFIER, ENTITY methods
+-- backed by GLiNER2 / mDeBERTa).
 --
 -- Types removed: PLAGIARISM, IMAGE_VIOLENCE, OCR_PII, DEID_SCORE, HATE_SPEECH,
 --   AI_GENERATED, CONTENT_QUALITY, BIAS, DUPLICATE, DOMAIN_CLASS, CONTENT_TYPE,
---   SENSITIVITY_TIER, JURISDICTION_TAG
+--   SENSITIVITY_TIER, JURISDICTION_TAG, PHISHING_URL
 
 -- 1. Delete any findings that used these legacy types (stub detectors — no real data expected).
 DELETE FROM "Finding"
@@ -21,7 +22,8 @@ WHERE "detector_type" IN (
   'DOMAIN_CLASS',
   'CONTENT_TYPE',
   'SENSITIVITY_TIER',
-  'JURISDICTION_TAG'
+  'JURISDICTION_TAG',
+  'PHISHING_URL'
 );
 
 -- 2. Recreate the DetectorType enum without the removed values.
@@ -36,7 +38,6 @@ CREATE TYPE "DetectorType" AS ENUM (
   'YARA',
   'BROKEN_LINKS',
   'PROMPT_INJECTION',
-  'PHISHING_URL',
   'SPAM',
   'LANGUAGE',
   'CODE_SECURITY',

@@ -28,9 +28,6 @@
       "$ref": "#/definitions/NSFWDetectorConfig"
     },
     {
-      "$ref": "#/definitions/PhishingUrlDetectorConfig"
-    },
-    {
       "$ref": "#/definitions/PromptInjectionDetectorConfig"
     },
     {
@@ -48,7 +45,6 @@
         "YARA",
         "BROKEN_LINKS",
         "PROMPT_INJECTION",
-        "PHISHING_URL",
         "SPAM",
         "LANGUAGE",
         "CODE_SECURITY",
@@ -325,22 +321,6 @@
           "notes": "Detects attempts to manipulate AI systems with malicious or hidden instructions."
         },
         {
-          "detector_type": "PHISHING_URL",
-          "lifecycle_status": "active",
-          "priority": "P2",
-          "categories": [
-            "THREAT",
-            "SECURITY"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "CrabInHoney/urlbert-tiny-phishing-classifier",
-          "notes": "Identifies suspicious links designed to steal credentials or sensitive information."
-        },
-        {
           "detector_type": "SPAM",
           "lifecycle_status": "active",
           "priority": "P2",
@@ -541,7 +521,11 @@
           "description": "Confidence score assigned when this pattern matches (0-1)"
         }
       },
-      "required": ["name", "regex", "score"],
+      "required": [
+        "name",
+        "regex",
+        "score"
+      ],
       "additionalProperties": false
     },
     "PIICustomRecognizer": {
@@ -609,7 +593,10 @@
           "description": "Context words that boost the score when found near a match (e.g. ['zip', 'code'])"
         }
       },
-      "required": ["name", "supported_entity"],
+      "required": [
+        "name",
+        "supported_entity"
+      ],
       "additionalProperties": false
     },
     "DetectorConfig": {
@@ -749,16 +736,24 @@
             },
             "spacy_model": {
               "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
               "default": null,
               "description": "spaCy model to load (e.g. en_core_web_sm, en_core_web_lg). Defaults to en_core_web_sm when null."
             },
             "spacy_model_url": {
               "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
               "default": null,
               "description": "Wheel URL for the spaCy model. When set and the model is not installed, the CLI installs it at runtime."
@@ -824,8 +819,12 @@
           "properties": {
             "model": {
               "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
               "default": null,
               "description": "HuggingFace model ID for spam classification. Defaults to mrm8488/bert-tiny-finetuned-sms-spam-detection when null."
@@ -846,33 +845,15 @@
           "properties": {
             "model": {
               "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
               "default": null,
               "description": "HuggingFace model ID for NSFW image classification. Defaults to Falconsai/nsfw_image_detection when null."
-            }
-          }
-        }
-      ]
-    },
-    "PhishingUrlDetectorConfig": {
-      "title": "PhishingUrlDetectorConfig",
-      "description": "Configuration for phishing URL detector",
-      "allOf": [
-        {
-          "$ref": "#/definitions/DetectorConfig"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "model": {
-              "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
-              ],
-              "default": null,
-              "description": "HuggingFace model ID for phishing URL classification. Defaults to CrabInHoney/urlbert-tiny-phishing-classifier when null."
             }
           }
         }
@@ -890,8 +871,12 @@
           "properties": {
             "model": {
               "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
               "default": null,
               "description": "HuggingFace model ID for prompt injection detection. Defaults to protectai/deberta-v3-base-prompt-injection-v2 when null."
@@ -987,7 +972,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Output field name — becomes a key in extracted_data JSON"
+          "description": "Output field name \u2014 becomes a key in extracted_data JSON"
         },
         "description": {
           "type": "string",
@@ -995,7 +980,13 @@
         },
         "type": {
           "type": "string",
-          "enum": ["string", "number", "boolean", "list[string]", "list[number]"],
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "list[string]",
+            "list[number]"
+          ],
           "default": "string"
         },
         "entity_label": {
@@ -1013,7 +1004,13 @@
         },
         "aggregate": {
           "type": "string",
-          "enum": ["first", "last", "list", "join", "count"],
+          "enum": [
+            "first",
+            "last",
+            "list",
+            "join",
+            "count"
+          ],
           "default": "list",
           "description": "How to aggregate multiple matches"
         },
@@ -1034,12 +1031,14 @@
           "description": "If true, skip saving extraction when this field is empty"
         }
       },
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "additionalProperties": false
     },
     "CustomExtractorConfig": {
       "type": "object",
-      "description": "Structured extraction — runs after detection fires on the same content",
+      "description": "Structured extraction \u2014 runs after detection fires on the same content",
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -1047,7 +1046,9 @@
         },
         "fields": {
           "type": "array",
-          "items": { "$ref": "#/definitions/CustomExtractorField" },
+          "items": {
+            "$ref": "#/definitions/CustomExtractorField"
+          },
           "minItems": 1
         },
         "gliner_model": {
@@ -1062,7 +1063,9 @@
           "description": "Chars of content to pass to extractor (classifier matched_content is only 320 chars)"
         }
       },
-      "required": ["fields"],
+      "required": [
+        "fields"
+      ],
       "additionalProperties": false
     },
     "CustomRulesetConfig": {
@@ -1237,7 +1240,7 @@
             },
             "extractor": {
               "$ref": "#/definitions/CustomExtractorConfig",
-              "description": "Optional structured extraction — runs when detector fires"
+              "description": "Optional structured extraction \u2014 runs when detector fires"
             }
           },
           "required": [

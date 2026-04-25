@@ -140,7 +140,6 @@
         "YARA",
         "BROKEN_LINKS",
         "PROMPT_INJECTION",
-        "PHISHING_URL",
         "SPAM",
         "LANGUAGE",
         "CODE_SECURITY",
@@ -425,8 +424,13 @@
         },
         "extracted_data": {
           "anyOf": [
-            { "additionalProperties": true, "type": "object" },
-            { "type": "null" }
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
           ],
           "default": null,
           "description": "Structured field values extracted from matched content",
@@ -434,8 +438,12 @@
         },
         "extraction_method": {
           "anyOf": [
-            { "type": "string" },
-            { "type": "null" }
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
           ],
           "default": null,
           "description": "Which extraction strategy was used: REGEX, GLINER, CLASSIFIER_GLINER",

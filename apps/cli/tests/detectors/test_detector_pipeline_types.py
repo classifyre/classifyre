@@ -244,28 +244,6 @@ class TestDetectorPipelineTypes:
         assert detector.detector_type == "prompt_injection"
         assert DetectorType(detector.detector_type.upper()) == DetectorType.PROMPT_INJECTION
 
-    def test_pipeline_from_recipe_phishing_url(self, mock_source):
-        """Test pipeline creation with PHISHING_URL detector."""
-        if not self._is_torch_available() or not self._is_dependency_available("transformers"):
-            pytest.skip("transformers/torch not installed, skipping phishing URL test")
-
-        recipe = {
-            "detectors": [
-                {
-                    "type": "PHISHING_URL",
-                    "enabled": True,
-                    "config": {"confidence_threshold": 0.8},
-                }
-            ]
-        }
-
-        pipeline = DetectorPipeline.from_recipe(recipe, source=mock_source, runner_id="test-runner")
-
-        assert len(pipeline.detectors) == 1
-        detector = pipeline.detectors[0]
-        assert detector.detector_type == "phishing_url"
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.PHISHING_URL
-
     def test_pipeline_from_recipe_spam(self, mock_source):
         """Test pipeline creation with SPAM detector."""
         if not self._is_torch_available() or not self._is_dependency_available("transformers"):
@@ -480,7 +458,6 @@ class TestDetectorPipelineTypes:
             "YARA",
             "BROKEN_LINKS",
             "PROMPT_INJECTION",
-            "PHISHING_URL",
             "SPAM",
             "LANGUAGE",
             "CODE_SECURITY",

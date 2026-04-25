@@ -22,7 +22,6 @@ const DETECTOR_TYPE_GROUP_MAP: Record<string, string> = {
   PII: "privacy_pii",
   YARA: "threats_attacks",
   PROMPT_INJECTION: "threats_attacks",
-  PHISHING_URL: "threats_attacks",
   TOXIC: "harmful_content",
   NSFW: "harmful_content",
   SPAM: "content_quality",
@@ -47,7 +46,7 @@ export const detectorCatalogGroups: readonly DetectorCatalogGroup[] = [
     id: "threats_attacks",
     label: "Threats & Attacks",
     description:
-      "Active threat indicators such as prompt attacks and phishing URLs.",
+      "Active threat indicators such as prompt injection attacks.",
   },
   {
     id: "harmful_content",

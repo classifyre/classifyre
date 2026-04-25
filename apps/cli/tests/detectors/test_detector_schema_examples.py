@@ -154,16 +154,6 @@ class TestDetectorSchemaExamples:
             config = DetectorConfig.model_validate(config_data)
             assert config is not None
 
-    def test_phishing_url_examples_are_valid(self, examples: dict):
-        """Test all PHISHING_URL examples validate against DetectorConfig."""
-        phishing_examples = examples.get("PHISHING_URL", [])
-        assert len(phishing_examples) > 0, "No PHISHING_URL examples found"
-
-        for example in phishing_examples:
-            config_data = example.get("config", {})
-            config = DetectorConfig.model_validate(config_data)
-            assert config is not None
-
     def test_spam_examples_are_valid(self, examples: dict):
         """Test all SPAM examples validate against DetectorConfig."""
         spam_examples = examples.get("SPAM", [])

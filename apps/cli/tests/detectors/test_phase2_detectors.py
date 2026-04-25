@@ -5,7 +5,6 @@ import pytest
 from src.detectors.base import BaseDetector
 from src.detectors.content.language_detector import LanguageDetector
 from src.detectors.content.spam_detector import SpamDetector
-from src.detectors.threat.phishing_url_detector import PhishingURLDetector
 from src.models.generated_detectors import DetectorConfig
 from src.models.generated_single_asset_scan_results import DetectorType
 
@@ -16,15 +15,6 @@ def _stub_spam_detector(predictions):
     detector.classifier = lambda *_args, **_kwargs: predictions
     detector._model_id = "stub/spam"
     detector._max_length = 512
-    detector._transformers = None
-    return detector
-
-
-def _stub_phishing_detector(predictions):
-    detector = PhishingURLDetector.__new__(PhishingURLDetector)
-    BaseDetector.__init__(detector, DetectorConfig(confidence_threshold=0.7))
-    detector.classifier = lambda *_args, **_kwargs: predictions
-    detector._model_id = "stub/phishing"
     detector._transformers = None
     return detector
 
@@ -52,20 +42,6 @@ async def test_spam_detector_emits_quality_finding() -> None:
     assert findings
     assert findings[0].detector_type == DetectorType.SPAM
     assert findings[0].category == "QUALITY"
-
-
-@pytest.mark.asyncio
-async def test_phishing_url_detector_emits_threat_finding() -> None:
-    detector = _stub_phishing_detector(
-        [{"label": "phishing", "score": 0.92}, {"label": "benign", "score": 0.08}]
-    )
-
-    content = "Go to https://secure-login-example.com to confirm your account."
-    findings = await detector.detect(content, content_type="text/plain")
-
-    assert findings
-    assert findings[0].detector_type == DetectorType.PHISHING_URL
-    assert findings[0].category == "THREAT"
 
 
 @pytest.mark.asyncio

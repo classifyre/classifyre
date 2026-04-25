@@ -445,7 +445,6 @@
       "yara": "YARA",
       "brokenLinks": "Broken Links",
       "promptInjection": "Prompt Injection",
-      "phishingUrl": "Phishing URL",
       "spam": "Spam",
       "language": "Language",
       "codeSecurity": "Code Security",

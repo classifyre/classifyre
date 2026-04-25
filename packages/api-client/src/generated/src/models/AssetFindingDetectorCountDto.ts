@@ -45,7 +45,6 @@ export const AssetFindingDetectorCountDtoDetectorTypeEnum = {
     Yara: 'YARA',
     BrokenLinks: 'BROKEN_LINKS',
     PromptInjection: 'PROMPT_INJECTION',
-    PhishingUrl: 'PHISHING_URL',
     Spam: 'SPAM',
     Language: 'LANGUAGE',
     CodeSecurity: 'CODE_SECURITY',

@@ -50,11 +50,6 @@ def test_catalog_phase2_detectors_are_active_with_safe_models() -> None:
     catalog = _load_detector_catalog()
     by_type = {entry["detector_type"]: entry for entry in catalog}
 
-    assert by_type["PHISHING_URL"]["lifecycle_status"] == "active"
-    assert by_type["PHISHING_URL"]["recommended_model"] == (
-        "CrabInHoney/urlbert-tiny-phishing-classifier"
-    )
-
     assert by_type["SPAM"]["lifecycle_status"] == "active"
     assert by_type["SPAM"]["recommended_model"] == (
         "mrm8488/bert-tiny-finetuned-sms-spam-detection"
