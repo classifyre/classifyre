@@ -6,11 +6,6 @@ import { PgBossService } from './pg-boss.service';
 import { PrismaService } from '../prisma.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
 
-jest.mock('../cli-runner/cli-runner.service', () => ({
-  CliRunnerService: class CliRunnerService {
-    startRun = jest.fn();
-  },
-}));
 
 const mockBoss = {
   createQueue: jest.fn().mockResolvedValue(undefined),
