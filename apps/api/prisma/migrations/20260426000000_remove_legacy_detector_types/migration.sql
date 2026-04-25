@@ -8,8 +8,8 @@
 --   SENSITIVITY_TIER, JURISDICTION_TAG, PHISHING_URL
 
 -- 1. Delete any findings that used these legacy types (stub detectors — no real data expected).
-DELETE FROM "Finding"
-WHERE "detector_type" IN (
+DELETE FROM "findings"
+WHERE "detector_type"::text IN (
   'PLAGIARISM',
   'IMAGE_VIOLENCE',
   'OCR_PII',
@@ -44,8 +44,8 @@ CREATE TYPE "DetectorType" AS ENUM (
   'CUSTOM'
 );
 
--- 3. Migrate the Finding table column to the new type.
-ALTER TABLE "Finding"
+-- 3. Migrate the findings table column to the new type.
+ALTER TABLE "findings"
   ALTER COLUMN "detector_type" TYPE "DetectorType"
   USING "detector_type"::text::"DetectorType";
 
