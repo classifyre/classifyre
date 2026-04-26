@@ -311,25 +311,23 @@ class TestDetectorPipelineTypes:
         assert DetectorType(detector.detector_type.upper()) == DetectorType.CODE_SECURITY
 
     def test_pipeline_from_recipe_custom_ruleset(self, mock_source):
-        """Test pipeline creation with CUSTOM detector."""
+        """Test pipeline creation with CUSTOM (REGEX) detector."""
         recipe = {
             "detectors": [
                 {
                     "type": "CUSTOM",
                     "enabled": True,
                     "config": {
-                        "custom_detector_key": "cust_pipeline_ruleset",
-                        "name": "Pipeline Custom",
-                        "method": "RULESET",
-                        "ruleset": {
-                            "keyword_rules": [
-                                {
-                                    "id": "kw_1",
-                                    "name": "Primary keywords",
-                                    "keywords": ["risk", "vertrag"],
+                        "custom_detector_key": "cust_pipeline_regex",
+                        "name": "Pipeline Custom Regex",
+                        "pipeline_schema": {
+                            "type": "REGEX",
+                            "patterns": {
+                                "keyword": {
+                                    "pattern": r"(?i)\b(?:risk|vertrag)\b",
+                                    "description": "Risk or contract keyword",
                                 }
-                            ],
-                            "regex_rules": [],
+                            },
                         },
                     },
                 }

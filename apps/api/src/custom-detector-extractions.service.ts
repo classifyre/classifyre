@@ -1,10 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import {
   CustomDetectorExtractionDto,
-  ExtractionCoverageDto,
-  ExtractionFieldCoverageDto,
   SearchExtractionsQueryDto,
 } from './dto/custom-detector-extraction.dto';
 
@@ -20,11 +17,8 @@ export class CustomDetectorExtractionsService {
     sourceId: string;
     assetId: string;
     runnerId: string | null;
-    extractionMethod: string;
     detectorVersion: number;
-    fieldCount: number;
-    populatedFields: string[];
-    extractedData: unknown;
+    pipelineResult: unknown;
     extractedAt: Date;
     createdAt: Date;
   }): CustomDetectorExtractionDto {
@@ -36,11 +30,8 @@ export class CustomDetectorExtractionsService {
       sourceId: row.sourceId,
       assetId: row.assetId,
       runnerId: row.runnerId,
-      extractionMethod: row.extractionMethod,
       detectorVersion: row.detectorVersion,
-      fieldCount: row.fieldCount,
-      populatedFields: row.populatedFields,
-      extractedData: row.extractedData as Record<string, unknown>,
+      pipelineResult: row.pipelineResult as Record<string, unknown>,
       extractedAt: row.extractedAt,
       createdAt: row.createdAt,
     };
@@ -52,13 +43,13 @@ export class CustomDetectorExtractionsService {
     const row = await this.prisma.customDetectorExtraction.findUnique({
       where: { findingId },
     });
-    return row ? this.toDto(row) : null;
+    return row ? this.toDto(row as any) : null;
   }
 
   async search(
     query: SearchExtractionsQueryDto,
   ): Promise<{ items: CustomDetectorExtractionDto[]; total: number }> {
-    const where: Prisma.CustomDetectorExtractionWhereInput = {};
+    const where: Record<string, unknown> = {};
 
     if (query.customDetectorKey) {
       where.customDetectorKey = query.customDetectorKey;
@@ -71,15 +62,6 @@ export class CustomDetectorExtractionsService {
     }
     if (query.assetId) {
       where.assetId = query.assetId;
-    }
-    if (query.populatedField) {
-      where.populatedFields = { has: query.populatedField };
-    }
-    if (query.fieldFilter && Object.keys(query.fieldFilter).length > 0) {
-      where.extractedData = {
-        path: [],
-        equals: query.fieldFilter as Prisma.InputJsonValue,
-      };
     }
 
     const take = Math.min(query.take ?? 50, 200);
@@ -95,10 +77,16 @@ export class CustomDetectorExtractionsService {
       this.prisma.customDetectorExtraction.count({ where }),
     ]);
 
-    return { items: items.map((r) => this.toDto(r)), total };
+    return { items: items.map((r) => this.toDto(r as any)), total };
   }
 
-  async getCoverage(customDetectorId: string): Promise<ExtractionCoverageDto> {
+  async getCoverage(customDetectorId: string): Promise<{
+    customDetectorId: string;
+    customDetectorKey: string;
+    totalFindings: number;
+    findingsWithExtraction: number;
+    coverageRate: number;
+  }> {
     const detector = await this.prisma.customDetector.findUnique({
       where: { id: customDetectorId },
       select: { id: true, key: true },
@@ -109,36 +97,13 @@ export class CustomDetectorExtractionsService {
       );
     }
 
-    const [totalFindings, extractions] = await Promise.all([
+    const [totalFindings, findingsWithExtraction] = await Promise.all([
       this.prisma.finding.count({ where: { customDetectorId } }),
-      this.prisma.customDetectorExtraction.findMany({
-        where: { customDetectorId },
-        select: { populatedFields: true },
-      }),
+      this.prisma.customDetectorExtraction.count({ where: { customDetectorId } }),
     ]);
 
-    const findingsWithExtraction = extractions.length;
     const coverageRate =
       totalFindings > 0 ? findingsWithExtraction / totalFindings : 0;
-
-    // Tally per-field population counts
-    const fieldCounts = new Map<string, number>();
-    for (const row of extractions) {
-      for (const field of row.populatedFields) {
-        fieldCounts.set(field, (fieldCounts.get(field) ?? 0) + 1);
-      }
-    }
-
-    const fieldCoverage: ExtractionFieldCoverageDto[] = Array.from(
-      fieldCounts.entries(),
-    )
-      .sort((a, b) => b[1] - a[1])
-      .map(([f, count]) => ({
-        field: f,
-        populated: count,
-        total: findingsWithExtraction,
-        rate: findingsWithExtraction > 0 ? count / findingsWithExtraction : 0,
-      }));
 
     return {
       customDetectorId,
@@ -146,7 +111,6 @@ export class CustomDetectorExtractionsService {
       totalFindings,
       findingsWithExtraction,
       coverageRate,
-      fieldCoverage,
     };
   }
 
@@ -157,22 +121,11 @@ export class CustomDetectorExtractionsService {
     sourceId: string;
     assetId: string;
     runnerId: string | null;
-    extractionMethod: string;
     detectorVersion: number;
-    extractedData: Record<string, unknown>;
+    pipelineResult: Record<string, unknown>;
     extractedAt: Date;
   }): Promise<void> {
-    const populatedFields = Object.entries(data.extractedData)
-      .filter(
-        ([, v]) =>
-          v !== null &&
-          v !== undefined &&
-          v !== '' &&
-          !(Array.isArray(v) && v.length === 0),
-      )
-      .map(([k]) => k);
-
-    await this.prisma.customDetectorExtraction.upsert({
+    await (this.prisma.customDetectorExtraction.upsert as any)({
       where: { findingId: data.findingId },
       create: {
         findingId: data.findingId,
@@ -181,19 +134,13 @@ export class CustomDetectorExtractionsService {
         sourceId: data.sourceId,
         assetId: data.assetId,
         runnerId: data.runnerId,
-        extractionMethod: data.extractionMethod,
         detectorVersion: data.detectorVersion,
-        fieldCount: Object.keys(data.extractedData).length,
-        populatedFields,
-        extractedData: data.extractedData as Prisma.InputJsonValue,
+        pipelineResult: data.pipelineResult,
         extractedAt: data.extractedAt,
       },
       update: {
-        extractionMethod: data.extractionMethod,
         detectorVersion: data.detectorVersion,
-        fieldCount: Object.keys(data.extractedData).length,
-        populatedFields,
-        extractedData: data.extractedData as Prisma.InputJsonValue,
+        pipelineResult: data.pipelineResult,
         extractedAt: data.extractedAt,
       },
     });

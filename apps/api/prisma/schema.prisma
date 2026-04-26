@@ -137,11 +137,8 @@ model CustomDetectorExtraction {
   assetId           String   @map("asset_id")
   runnerId          String?  @map("runner_id")
 
-  extractionMethod  String   @map("extraction_method")
   detectorVersion   Int      @default(1) @map("detector_version")
-  fieldCount        Int      @default(0) @map("field_count")
-  populatedFields   String[] @default([]) @map("populated_fields")
-  extractedData     Json     @db.JsonB @map("extracted_data")
+  pipelineResult    Json     @db.JsonB @map("pipeline_result")
 
   extractedAt       DateTime @map("extracted_at")
   createdAt         DateTime @default(now()) @map("created_at")
@@ -189,8 +186,7 @@ model CustomDetector {
   key                 String                      @unique
   name                String
   description         String?                     @db.Text
-  method              CustomDetectorMethod
-  config              Json                        @db.JsonB
+  pipelineSchema      Json                        @map("pipeline_schema") @db.JsonB
   isActive            Boolean                     @default(true) @map("is_active")
   version             Int                         @default(1)
   lastTrainedAt       DateTime?                   @map("last_trained_at")
@@ -201,12 +197,28 @@ model CustomDetector {
   findings            Finding[]
   feedback            CustomDetectorFeedback[]
   trainingRuns        CustomDetectorTrainingRun[]
+  trainingExamples    CustomDetectorTrainingExample[]
   extractions         CustomDetectorExtraction[]
   testScenarios       CustomDetectorTestScenario[]
 
-  @@index([method])
   @@index([isActive])
   @@map("custom_detectors")
+}
+
+model CustomDetectorTrainingExample {
+  id               String   @id @default(uuid())
+  customDetectorId String   @map("custom_detector_id")
+  label            String
+  text             String   @db.Text
+  value            String?  @db.Text
+  accepted         Boolean  @default(true)
+  source           String?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  customDetector CustomDetector @relation(fields: [customDetectorId], references: [id], onDelete: Cascade)
+
+  @@index([customDetectorId, label])
+  @@map("custom_detector_training_examples")
 }
 
 model CustomDetectorTrainingRun {
@@ -466,12 +478,6 @@ enum DetectorType {
   LANGUAGE
   CODE_SECURITY
   CUSTOM
-}
-
-enum CustomDetectorMethod {
-  RULESET
-  CLASSIFIER
-  ENTITY
 }
 
 enum CustomDetectorTrainingStatus {

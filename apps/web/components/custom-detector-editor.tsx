@@ -52,8 +52,10 @@ import { CustomDetectorTests } from "@/components/custom-detector-tests";
 import {
   HorizontalCustomDetectorStepperNav,
   VerticalCustomDetectorStepperNav,
-  type CustomDetectorStepId,
 } from "@/components/custom-detector-stepper";
+
+// This editor has its own 3-step flow independent of the creation stepper
+type CustomDetectorStepId = "method" | "policy" | "tests";
 
 export type CustomDetectorEditorSubmit = {
   name: string;

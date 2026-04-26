@@ -137,8 +137,7 @@ export class CustomDetectorTestsService {
       id: string;
       key: string;
       name: string;
-      method: string;
-      config: unknown;
+      pipelineSchema: unknown;
       version: number;
     },
     scenario: { id: string; inputText: string; expectedOutcome: unknown },
@@ -147,28 +146,19 @@ export class CustomDetectorTestsService {
     const start = Date.now();
 
     try {
-      let actualOutput: Record<string, unknown>;
-
-      if (detector.method === 'RULESET') {
-        actualOutput = this.evaluateRuleset(
-          detector.config as Record<string, unknown>,
-          scenario.inputText,
-        );
-      } else {
-        actualOutput = await this.evaluateViaCli(
-          {
-            key: detector.key,
-            name: detector.name,
-            method: detector.method,
-            config: detector.config as Record<string, unknown>,
-          },
-          scenario.inputText,
-        );
-      }
+      const actualOutput = await this.evaluateViaCli(
+        {
+          key: detector.key,
+          name: detector.name,
+          pipelineSchema: detector.pipelineSchema as Record<string, unknown>,
+        },
+        scenario.inputText,
+      );
 
       const expected = scenario.expectedOutcome as Record<string, unknown>;
+      const schema = detector.pipelineSchema as Record<string, unknown>;
       const status = this.compareOutcome(
-        detector.method,
+        schema,
         expected,
         actualOutput,
       );
@@ -268,13 +258,11 @@ export class CustomDetectorTestsService {
     };
   }
 
-  // CLASSIFIER / ENTITY: write temp file and call CLI sandbox via K8s job or local process
   private async evaluateViaCli(
     detector: {
       key: string;
       name: string;
-      method: string;
-      config: Record<string, unknown>;
+      pipelineSchema: Record<string, unknown>;
     },
     inputText: string,
   ): Promise<Record<string, unknown>> {
@@ -298,17 +286,13 @@ export class CustomDetectorTestsService {
       await fs.mkdir(tmpDir, { recursive: true });
       await fs.writeFile(textFile, inputText, 'utf8');
 
-      // Use the same detectors.json format as the sandbox runner.
-      // CLI CustomDetectorConfig requires custom_detector_key, name, and method
-      // inside the `config` dict.
       const detectorEntry = {
         type: 'CUSTOM',
         enabled: true,
         config: {
-          ...detector.config,
           custom_detector_key: detector.key,
           name: detector.name,
-          method: detector.method,
+          pipeline_schema: detector.pipelineSchema,
         },
       };
       await fs.writeFile(
@@ -385,19 +369,23 @@ export class CustomDetectorTestsService {
       : '/app/cli';
   }
 
-  // Compare expected vs actual — returns PASS or FAIL
+  // Compare expected vs actual — returns PASS or FAIL.
+  // Dispatches on pipeline schema type; falls back to expected outcome shape.
   private compareOutcome(
-    method: string,
+    pipelineSchema: Record<string, unknown>,
     expected: Record<string, unknown>,
     actual: Record<string, unknown>,
   ): 'PASS' | 'FAIL' {
-    if (method === 'RULESET') {
+    const schemaType = (pipelineSchema.type as string | undefined) ?? '';
+
+    if (schemaType === 'REGEX') {
       const shouldMatch = Boolean(expected.shouldMatch);
       const didMatch = Boolean(actual.matched);
       return shouldMatch === didMatch ? 'PASS' : 'FAIL';
     }
 
-    if (method === 'CLASSIFIER') {
+    // For GLINER2 and unknown types: infer comparison from expected outcome shape.
+    if ('label' in expected) {
       const expectedLabel = (
         (expected.label as string | undefined) ?? ''
       ).toLowerCase();
@@ -441,7 +429,7 @@ export class CustomDetectorTestsService {
       return hit ? 'PASS' : 'FAIL';
     }
 
-    if (method === 'ENTITY') {
+    if ('entities' in expected) {
       const expectedEntities = Array.isArray(expected.entities)
         ? (expected.entities as Array<Record<string, unknown>>)
         : [];

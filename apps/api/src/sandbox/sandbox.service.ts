@@ -762,7 +762,7 @@ export class SandboxService {
 
     const records = await this.prisma.customDetector.findMany({
       where: { key: { in: keys } },
-      select: { key: true, name: true, method: true, config: true },
+      select: { key: true, name: true, pipelineSchema: true },
     });
 
     const byKey = new Map(records.map((r) => [r.key, r]));
@@ -796,13 +796,12 @@ export class SandboxService {
       return {
         ...item,
         config: {
-          ...(record.config as Record<string, unknown>),
           // caller-supplied overrides DB defaults, but identity fields are pinned
           ...existingConfig,
           // identity fields always come from DB to ensure correctness
           custom_detector_key: record.key,
           name: record.name,
-          method: record.method,
+          pipeline_schema: record.pipelineSchema,
         },
       };
     });

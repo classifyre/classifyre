@@ -148,23 +148,21 @@ export class McpServerFactoryService {
         argsSchema: {
           useCase: z.string(),
           dataExamples: z.string().optional(),
-          preferredMethod: z
-            .enum(['RULESET', 'CLASSIFIER', 'ENTITY'])
-            .optional(),
         },
       },
-      ({ useCase, dataExamples, preferredMethod }) => ({
+      ({ useCase, dataExamples }) => ({
         messages: [
           {
             role: 'user',
             content: {
               type: 'text',
               text:
-                `Design an Classifyre custom detector for this use case: ${useCase}.\n` +
-                `Prefer one of RULESET, CLASSIFIER, or ENTITY${
-                  preferredMethod ? ` (${preferredMethod})` : ''
-                }.\n` +
-                `Return practical guidance for detector config, training data, and follow-up MCP tool calls.\n` +
+                `Design a Classifyre GLiNER2 pipeline detector for this use case: ${useCase}.\n` +
+                `The detector uses a unified GLiNER2 pipeline schema with three optional sections:\n` +
+                `- entities: named entities to extract (label → {description, required})\n` +
+                `- classification: zero-shot tasks (task → {labels, multi_label})\n` +
+                `- validation: post-processing rules (confidence_threshold, regex rules)\n` +
+                `Return a complete pipeline_schema JSON and follow-up MCP tool calls to create the detector.\n` +
                 (dataExamples
                   ? `Relevant examples or patterns:\n${dataExamples}\n`
                   : ''),
@@ -413,37 +411,47 @@ export class McpServerFactoryService {
       {
         title: 'Create Custom Detector',
         description:
-          'Create a custom detector for ruleset, classifier, or entity methods.',
+          'Create a GLiNER2-powered custom detector. Supply a pipeline_schema with entities, classification, and/or validation sections. At least one entity or classification task is required.',
         inputSchema: {
           key: z.string().optional(),
           name: z.string(),
           description: z.string().optional(),
-          method: z.enum(['RULESET', 'CLASSIFIER', 'ENTITY']),
-          config: jsonObjectSchema.optional(),
+          pipeline_schema: jsonObjectSchema.describe(
+            'GLiNER2 pipeline schema. Example: { model: { name: "fastino/gliner2-base-v1" }, entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } }, validation: { confidence_threshold: 0.8, rules: [] } }',
+          ),
           isActive: z.boolean().optional(),
         },
       },
-      async (args) =>
-        jsonResult(await this.mcpToolExecutor.createCustomDetector(args)),
+      async ({ pipeline_schema, ...rest }) =>
+        jsonResult(
+          await this.mcpToolExecutor.createCustomDetector({
+            ...rest,
+            pipelineSchema: pipeline_schema as Record<string, unknown>,
+          }),
+        ),
     );
 
     server.registerTool(
       'update_custom_detector',
       {
         title: 'Update Custom Detector',
-        description: 'Update detector metadata, config, or activation status.',
+        description: 'Update detector metadata, pipeline schema, or activation status.',
         inputSchema: {
           id: z.string().uuid(),
           key: z.string().optional(),
           name: z.string().optional(),
           description: z.string().nullable().optional(),
-          method: z.enum(['RULESET', 'CLASSIFIER', 'ENTITY']).optional(),
-          config: jsonObjectSchema.optional(),
+          pipeline_schema: jsonObjectSchema.optional().describe('Updated GLiNER2 pipeline schema'),
           isActive: z.boolean().optional(),
         },
       },
       async ({ id, ...rest }) =>
-        jsonResult(await this.customDetectorsService.update(id, rest as any)),
+        jsonResult(
+          await this.customDetectorsService.update(id, {
+            ...rest,
+            pipelineSchema: (rest as any).pipeline_schema,
+          } as any),
+        ),
     );
 
     server.registerTool(
@@ -523,7 +531,7 @@ export class McpServerFactoryService {
       {
         title: 'Create Detector Test Scenario',
         description:
-          'Create a test scenario for a custom detector. Provide expected outcome matching the detector method: RULESET={shouldMatch:bool}, CLASSIFIER={label:string,minConfidence?:number}, ENTITY={entities:[{label,text?}]}.',
+          'Create a test scenario for a custom detector. Expected outcome mirrors the unified pipeline output: { entities: { label: [{value, confidence}] }, classification: { task: {label, confidence} } }.',
         inputSchema: {
           detector_id: z.string(),
           name: z.string().describe('Short scenario name'),
@@ -605,10 +613,6 @@ export class McpServerFactoryService {
           custom_detector_key: z.string().optional(),
           custom_detector_id: z.string().uuid().optional(),
           source_id: z.string().uuid().optional(),
-          populated_field: z
-            .string()
-            .optional()
-            .describe('Only return extractions where this field is populated'),
           take: z.number().int().min(1).max(200).default(50).optional(),
           skip: z.number().int().min(0).default(0).optional(),
         },
@@ -622,7 +626,6 @@ export class McpServerFactoryService {
           customDetectorKey: params.custom_detector_key,
           customDetectorId: params.custom_detector_id,
           sourceId: params.source_id,
-          populatedField: params.populated_field,
           take: params.take,
           skip: params.skip,
         });
@@ -667,15 +670,13 @@ export class McpServerFactoryService {
       async ({ custom_detector_id }) => {
         const detector =
           await customDetectorsService.getById(custom_detector_id);
-        const config = detector.config;
-        const extractor = config.extractor ?? null;
         const recent = await extractionsService.search({
           customDetectorId: custom_detector_id,
           take: 1,
         });
         const result = {
-          extractor_config: extractor,
-          recent_example: recent.items[0]?.extractedData ?? null,
+          pipeline_schema: detector.pipelineSchema,
+          recent_pipeline_result: recent.items[0]?.pipelineResult ?? null,
           total_extractions: recent.total,
         };
         return jsonResult(result);

@@ -1,19 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
-  IsEnum,
   IsObject,
   IsOptional,
   IsString,
   Matches,
   MinLength,
 } from 'class-validator';
-import { CustomDetectorMethod } from '@prisma/client';
 
 export class CreateCustomDetectorDto {
   @ApiProperty({
     description: 'Human-friendly detector name',
-    example: 'DACH Contract Risk Terms',
+    example: 'Support Ticket Extractor',
   })
   @IsString()
   @MinLength(2)
@@ -21,7 +19,7 @@ export class CreateCustomDetectorDto {
 
   @ApiPropertyOptional({
     description: 'Stable key override. If omitted, generated from name.',
-    example: 'cust_dach_contract_risk',
+    example: 'cust_support_ticket_extractor',
   })
   @IsOptional()
   @IsString()
@@ -33,19 +31,11 @@ export class CreateCustomDetectorDto {
 
   @ApiPropertyOptional({
     description: 'Optional detector description',
-    example: 'Detect legal/compliance risk language in contracts',
+    example: 'Extracts order IDs, amounts, and intent from support tickets',
   })
   @IsOptional()
   @IsString()
   description?: string;
-
-  @ApiProperty({
-    enum: CustomDetectorMethod,
-    description: 'Execution method for this custom detector',
-    example: CustomDetectorMethod.CLASSIFIER,
-  })
-  @IsEnum(CustomDetectorMethod)
-  method: CustomDetectorMethod;
 
   @ApiPropertyOptional({
     description: 'Whether this detector can be selected in sources',
@@ -56,10 +46,8 @@ export class CreateCustomDetectorDto {
   isActive?: boolean;
 
   @ApiProperty({
-    description: 'Custom detector config payload',
-    type: 'object',
-    additionalProperties: true,
+    description: 'Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)',
   })
   @IsObject()
-  config: Record<string, unknown>;
+  pipelineSchema: Record<string, unknown>;
 }

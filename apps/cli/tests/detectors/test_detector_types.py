@@ -21,6 +21,8 @@ from src.models.generated_detectors import (
     DetectorConfig,
     DetectorType,
     PIIDetectorConfig,
+    RegexPatternDefinition,
+    RegexPipelineSchema,
     SecretsDetectorConfig,
     ThreatDetectorConfig,
 )
@@ -117,7 +119,9 @@ class TestDetectorTypesMatchSchema:
             CustomDetectorConfig(
                 custom_detector_key="cust_test_rules",
                 name="Test Custom Rules",
-                method="RULESET",
+                pipeline_schema=RegexPipelineSchema(
+                    patterns={"x": RegexPatternDefinition(pattern=r"\d+")}
+                ),
             )
         )
         assert detector.detector_type == "custom"
@@ -317,7 +321,9 @@ class TestDetectorConfigMapping:
         config = CustomDetectorConfig(
             custom_detector_key="cust_test_classifier",
             name="Test Custom Classifier",
-            method="CLASSIFIER",
+            pipeline_schema=RegexPipelineSchema(
+                patterns={"x": RegexPatternDefinition(pattern=r"\d+")}
+            ),
         )
         detector = CustomDetector(config)
         assert detector.config == config
@@ -344,7 +350,9 @@ class TestDetectorNames:
                 CustomDetectorConfig(
                     custom_detector_key="cust_test_names",
                     name="Custom Name Test",
-                    method="RULESET",
+                    pipeline_schema=RegexPipelineSchema(
+                        patterns={"x": RegexPatternDefinition(pattern=r"\d+")}
+                    ),
                 ),
                 "custom",
             ),

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import deque
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -569,11 +569,10 @@ class DatabricksSource(BaseSource):
 
         return links
 
-    def _list_notebooks(self) -> list[NotebookRef]:
+    def _iter_notebooks(self) -> Generator[NotebookRef, None, None]:
         if not self._extraction_options().include_notebooks:
-            return []
+            return
 
-        notebooks: list[NotebookRef] = []
         queue: deque[str] = deque(["/"])
         visited_paths: set[str] = set()
 
@@ -617,54 +616,60 @@ class DatabricksSource(BaseSource):
                     continue
 
                 object_id = obj.get("object_id")
-                notebooks.append(
-                    NotebookRef(
-                        path=object_path,
-                        object_id=str(object_id) if object_id is not None else None,
-                        language=(
-                            str(obj.get("language")) if obj.get("language") is not None else None
-                        ),
-                        created_at_ms=(
-                            int(obj["created_at"])
-                            if isinstance(obj.get("created_at"), int)
-                            else None
-                        ),
-                        modified_at_ms=(
-                            int(obj["modified_at"])
-                            if isinstance(obj.get("modified_at"), int)
-                            else None
-                        ),
-                    )
+                yield NotebookRef(
+                    path=object_path,
+                    object_id=str(object_id) if object_id is not None else None,
+                    language=(
+                        str(obj.get("language")) if obj.get("language") is not None else None
+                    ),
+                    created_at_ms=(
+                        int(obj["created_at"]) if isinstance(obj.get("created_at"), int) else None
+                    ),
+                    modified_at_ms=(
+                        int(obj["modified_at"]) if isinstance(obj.get("modified_at"), int) else None
+                    ),
                 )
 
-        return notebooks
-
-    def _list_pipelines(self) -> list[PipelineRef]:
+    def _iter_pipelines(self) -> Generator[PipelineRef, None, None]:
         if not self._extraction_options().include_pipelines:
-            return []
+            return
 
-        values = self._paged_values(
-            "/api/2.0/pipelines",
-            value_keys=("statuses", "pipelines", "value", "items"),
-        )
+        next_page_token: str | None = None
+        while True:
+            params = {}
+            if next_page_token:
+                params["page_token"] = next_page_token
 
-        pipelines: list[PipelineRef] = []
-        for entry in values:
-            pipeline_id = entry.get("pipeline_id") or entry.get("id")
-            if not isinstance(pipeline_id, str) or not pipeline_id:
-                continue
+            try:
+                payload = self._request_json("get", "/api/2.0/pipelines", params=params)
+            except Exception as exc:
+                logger.warning("Could not list Databricks pipelines: %s", exc)
+                break
 
-            name = entry.get("name")
-            state = entry.get("state") or entry.get("health")
-            pipelines.append(
-                PipelineRef(
+            values: list[dict[str, Any]] = []
+            for key in ("statuses", "pipelines", "value", "items"):
+                candidate = payload.get(key)
+                if isinstance(candidate, list):
+                    values = candidate
+                    break
+
+            for entry in values:
+                pipeline_id = entry.get("pipeline_id") or entry.get("id")
+                if not isinstance(pipeline_id, str) or not pipeline_id:
+                    continue
+
+                name = entry.get("name")
+                state = entry.get("state") or entry.get("health")
+                yield PipelineRef(
                     pipeline_id=pipeline_id,
                     name=str(name) if isinstance(name, str) and name else pipeline_id,
                     state=str(state) if isinstance(state, str) and state else None,
                 )
-            )
 
-        return pipelines
+            token = payload.get("next_page_token")
+            if not isinstance(token, str) or not token.strip():
+                break
+            next_page_token = token
 
     def test_connection(self) -> dict[str, Any]:
         logger.info("Testing connection to Databricks Unity Catalog...")
@@ -827,72 +832,83 @@ class DatabricksSource(BaseSource):
 
             pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
+        # 1. Discover all tables first to establish the scope for lineage links
         tables = self._iter_tables()
-
         table_hash_by_key: dict[tuple[str, str, str], str] = {
             self._table_key(table_ref): self.generate_hash_id(self._table_raw_id(table_ref))
             for table_ref in tables
         }
 
-        lineage_links = self._collect_table_lineage_links(tables)
-
+        # 2. Process tables
+        include_lineage = self._extraction_options().include_table_lineage
         batch: list[SingleAssetScanResults] = []
 
         for table_ref in tables:
             if self._aborted:
                 return
 
-            key = self._table_key(table_ref)
-            linked_hashes = [
-                table_hash_by_key[target]
-                for target in sorted(lineage_links.get(key, set()))
-                if target in table_hash_by_key
-            ]
+            linked_hashes: list[str] = []
+            if include_lineage:
+                try:
+                    upstream_refs = self._lineage_refs_for_table(table_ref)
+                    linked_hashes = [
+                        table_hash_by_key[target]
+                        for target in sorted(upstream_refs)
+                        if target in table_hash_by_key
+                    ]
+                except Exception as exc:
+                    logger.warning(
+                        "Could not resolve Databricks lineage for %s.%s.%s: %s",
+                        table_ref.catalog,
+                        table_ref.schema,
+                        table_ref.table,
+                        exc,
+                    )
 
             asset = self._table_to_asset(table_ref, links=linked_hashes)
             self._table_lookup[asset.hash] = table_ref
-            batch.append(asset)
 
-            if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    async for processed in pipeline.process_stream(batch):
-                        yield [processed]
-                else:
-                    yield batch
-                batch = []
-
-        for notebook in self._list_notebooks():
-            if self._aborted:
-                return
-
-            batch.append(self._notebook_to_asset(notebook))
-            if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    async for processed in pipeline.process_stream(batch):
-                        yield [processed]
-                else:
-                    yield batch
-                batch = []
-
-        for pipeline_ref in self._list_pipelines():
-            if self._aborted:
-                return
-
-            batch.append(self._pipeline_to_asset(pipeline_ref))
-            if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    async for processed in pipeline.process_stream(batch):
-                        yield [processed]
-                else:
-                    yield batch
-                batch = []
-
-        if batch:
             if pipeline:
-                async for processed in pipeline.process_stream(batch):
+                async for processed in pipeline.process_stream([asset]):
                     yield [processed]
             else:
-                yield batch
+                batch.append(asset)
+                if len(batch) >= self.BATCH_SIZE:
+                    yield batch
+                    batch = []
+
+        # 3. Process notebooks
+        for notebook in self._iter_notebooks():
+            if self._aborted:
+                break
+
+            asset = self._notebook_to_asset(notebook)
+            if pipeline:
+                async for processed in pipeline.process_stream([asset]):
+                    yield [processed]
+            else:
+                batch.append(asset)
+                if len(batch) >= self.BATCH_SIZE:
+                    yield batch
+                    batch = []
+
+        # 4. Process pipelines
+        for pipeline_ref in self._iter_pipelines():
+            if self._aborted:
+                break
+
+            asset = self._pipeline_to_asset(pipeline_ref)
+            if pipeline:
+                async for processed in pipeline.process_stream([asset]):
+                    yield [processed]
+            else:
+                batch.append(asset)
+                if len(batch) >= self.BATCH_SIZE:
+                    yield batch
+                    batch = []
+
+        if batch:
+            yield batch
 
     def generate_hash_id(self, asset_id: str) -> str:
         return hash_id(self._asset_type_value(), asset_id)

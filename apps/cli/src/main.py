@@ -243,6 +243,41 @@ def run_command(args: argparse.Namespace, recipe: dict[str, Any]) -> None:
     asyncio.run(run_command_async(args, recipe))
 
 
+def run_train_command(args: argparse.Namespace) -> None:
+    """Fine-tune detector models on labeled training examples.
+
+    Reads pipeline_schema and examples from JSON files, runs GLiNER2 NER
+    fine-tuning and/or SetFit classification training, saves artifacts to
+    output_dir, and prints a JSON result to stdout for the API to consume.
+    """
+    import json
+    from pathlib import Path
+
+    from .detectors.custom.trainer import GLiNER2Trainer
+
+    schema_path = Path(args.pipeline_schema)
+    examples_path = Path(args.examples)
+    output_dir = Path(args.output_dir)
+
+    if not schema_path.exists():
+        logger.error("Pipeline schema file not found: %s", schema_path)
+        sys.exit(1)
+    if not examples_path.exists():
+        logger.error("Examples file not found: %s", examples_path)
+        sys.exit(1)
+
+    try:
+        pipeline_schema: dict[str, Any] = json.loads(schema_path.read_text())
+        examples_raw: list[dict[str, Any]] = json.loads(examples_path.read_text())
+    except json.JSONDecodeError as e:
+        logger.error("Invalid JSON in input files: %s", e)
+        sys.exit(1)
+
+    trainer = GLiNER2Trainer(pipeline_schema, examples_raw, output_dir)
+    result = trainer.train()
+    print(json.dumps(result.to_dict()))
+
+
 def run_sandbox_command(args: argparse.Namespace) -> None:
     """Execute the sandbox command: parse file + run detectors."""
     from .sandbox import SandboxRunner
@@ -298,7 +333,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Classifyre Metadata Extraction CLI")
     parser.add_argument(
         "command",
-        choices=["test", "extract", "discover", "sandbox"],
+        choices=["test", "extract", "discover", "sandbox", "train"],
         help="Command to run",
     )
     parser.add_argument(
@@ -345,6 +380,22 @@ def main() -> None:
         default=None,
         help="Path to JSON file with detector configs (sandbox command only)",
     )
+    # train-command arguments
+    parser.add_argument(
+        "--pipeline-schema",
+        default=None,
+        help="Path to pipeline schema JSON file (train command only)",
+    )
+    parser.add_argument(
+        "--examples",
+        default=None,
+        help="Path to training examples JSON file (train command only)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory to write trained model artifacts (train command only)",
+    )
 
     args = parser.parse_args()
 
@@ -353,6 +404,13 @@ def main() -> None:
 
     if args.command == "sandbox":
         run_sandbox_command(args)
+        return
+
+    if args.command == "train":
+        if not args.pipeline_schema or not args.examples or not args.output_dir:
+            logger.error("train requires --pipeline-schema, --examples, and --output-dir")
+            sys.exit(1)
+        run_train_command(args)
         return
 
     if not args.recipe:

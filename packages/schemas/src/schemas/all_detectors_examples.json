@@ -108,7 +108,7 @@
       }
     },
     {
-      "name": "DACH \u2014 Germany, Austria, Switzerland",
+      "name": "DACH — Germany, Austria, Switzerland",
       "description": "DACH-specific national identifiers for German tax IDs (DE_TAX_ID), Austrian social insurance numbers (AT_SVNR), and Swiss AHV pension numbers (CH_AHV), alongside EU-wide patterns for comprehensive DSGVO/DSG compliance.",
       "config": {
         "enabled_patterns": [
@@ -127,7 +127,7 @@
     },
     {
       "name": "Spain",
-      "description": "Spanish national identifiers: NIF (N\u00famero de Identificaci\u00f3n Fiscal) for citizens and NIE (N\u00famero de Identidad de Extranjero) for foreign residents. Combined with global contact patterns for full coverage.",
+      "description": "Spanish national identifiers: NIF (Número de Identificación Fiscal) for citizens and NIE (Número de Identidad de Extranjero) for foreign residents. Combined with global contact patterns for full coverage.",
       "config": {
         "enabled_patterns": [
           "ES_NIF",
@@ -221,7 +221,7 @@
       }
     },
     {
-      "name": "Nordic \u2014 Finland & Poland",
+      "name": "Nordic — Finland & Poland",
       "description": "Finnish personal identity codes (HETU) and Polish PESEL numbers, alongside contact identifiers. Covers local privacy law requirements for Scandinavian and Polish markets.",
       "config": {
         "enabled_patterns": [
@@ -285,7 +285,7 @@
       }
     },
     {
-      "name": "Custom Recognizer \u2014 Employee ID",
+      "name": "Custom Recognizer — Employee ID",
       "description": "Extends the built-in PII detector with a regex recognizer for internal employee IDs (format EMP-XXXXXX). Demonstrates how to detect proprietary identifiers alongside standard PII.",
       "config": {
         "enabled_patterns": [
@@ -316,7 +316,7 @@
       }
     },
     {
-      "name": "Custom Recognizer \u2014 Deny List",
+      "name": "Custom Recognizer — Deny List",
       "description": "Deny-list recognizer for internal code names or sensitive project terms that should be treated as PII in external communications.",
       "config": {
         "enabled_patterns": [
@@ -490,533 +490,275 @@
   ],
   "CUSTOM": [
     {
-      "name": "DACH Contract Risk Terms",
-      "description": "Multilingual classifier for legal/compliance contract risk wording.",
+      "description": "GLINER2 support ticket extractor — entities + classification in one pass",
       "config": {
-        "custom_detector_key": "cust_dach_contract_risk",
-        "name": "DACH Contract Risk Terms",
-        "description": "Detect legal/compliance risk language",
-        "method": "CLASSIFIER",
+        "custom_detector_key": "cust_support_ticket",
+        "name": "Support Ticket Extractor",
+        "description": "Extract order IDs, amounts, and intent from support tickets",
         "languages": [
           "de",
           "en"
         ],
-        "confidence_threshold": 0.7,
-        "max_findings": 100,
-        "ruleset": {
-          "regex_rules": [],
-          "keyword_rules": []
-        },
-        "classifier": {
-          "labels": [
-            {
-              "id": "risk_term",
-              "name": "Risk Term",
-              "description": "Potential legal risk wording"
+        "pipeline_schema": {
+          "type": "GLINER2",
+          "model": {
+            "name": "fastino/gliner2-base-v1",
+            "path": null
+          },
+          "entities": {
+            "order_id": {
+              "description": "Order ID like ORD-123",
+              "required": true
+            },
+            "amount": {
+              "description": "Monetary value like 50€",
+              "required": false
             }
-          ],
-          "zero_shot_model": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli",
-          "hypothesis_template": "This text contains {}.",
-          "training_examples": [],
-          "min_examples_per_label": 8,
-          "setfit_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-        },
-        "entity": {
-          "entity_labels": [],
-          "model": "fastino/gliner2-base-v1"
+          },
+          "classification": {
+            "intent": {
+              "labels": [
+                "refund",
+                "bug",
+                "question"
+              ],
+              "multi_label": false
+            }
+          },
+          "validation": {
+            "confidence_threshold": 0.8,
+            "rules": []
+          }
         }
-      }
+      },
+      "name": "Support Ticket Extractor"
     },
     {
-      "name": "DACH Regulatory Entity Extractor",
-      "description": "Extract custom regulatory entities using GLiNER labels.",
+      "description": "GLINER2 DACH regulatory entity extractor — entities only",
       "config": {
         "custom_detector_key": "cust_dach_entity_extractor",
         "name": "DACH Regulatory Entity Extractor",
-        "method": "ENTITY",
+        "description": "Extract regulatory entities (GDPR articles, supervisory bodies, risk terms)",
         "languages": [
           "de",
           "en"
         ],
         "confidence_threshold": 0.72,
-        "entity": {
-          "entity_labels": [
-            "handelsregisternummer",
-            "w-idnr",
-            "steuernummer",
-            "finma_identifier"
-          ],
-          "model": "fastino/gliner2-base-v1"
+        "pipeline_schema": {
+          "type": "GLINER2",
+          "entities": {
+            "regulatory_body": {
+              "description": "Supervisory authority like BaFin, FINMA, FMA",
+              "required": false
+            },
+            "gdpr_article": {
+              "description": "GDPR article reference like 'Art. 6 DSGVO'",
+              "required": false
+            },
+            "risk_term": {
+              "description": "Legal risk term like 'Haftung ausgeschlossen'",
+              "required": false
+            }
+          },
+          "classification": {},
+          "validation": {
+            "confidence_threshold": 0.72,
+            "rules": []
+          }
         }
-      }
+      },
+      "name": "DACH Regulatory Entity Extractor"
     },
     {
-      "name": "German Compound Ruleset",
-      "description": "Regex and keyword rules tailored for German compliance phrases.",
+      "description": "GLINER2 contract risk classifier — classification only",
       "config": {
-        "custom_detector_key": "cust_de_compound_ruleset",
-        "name": "German Compound Ruleset",
-        "method": "RULESET",
+        "custom_detector_key": "cust_dach_contract_risk",
+        "name": "DACH Contract Risk Terms",
+        "description": "Detect legal/compliance risk language in DACH contracts",
         "languages": [
-          "de"
+          "de",
+          "en"
         ],
-        "confidence_threshold": 0.75,
-        "ruleset": {
-          "regex_rules": [
-            {
-              "id": "de_handelsregister",
-              "name": "Handelsregister Number",
-              "pattern": "\\b(?:HRB|HRA)\\s?\\d{2,8}\\b",
-              "flags": "i",
-              "severity": "medium"
-            }
-          ],
-          "keyword_rules": [
-            {
-              "id": "de_data_protection",
-              "name": "Data Protection Officer",
-              "keywords": [
-                "datenschutzbeauftragter",
-                "datenschutzfolgeabschatzung"
+        "pipeline_schema": {
+          "type": "GLINER2",
+          "entities": {},
+          "classification": {
+            "risk_category": {
+              "labels": [
+                "liability",
+                "data_protection",
+                "termination",
+                "indemnification",
+                "none"
               ],
-              "case_sensitive": false,
-              "severity": "low"
+              "multi_label": true
             }
-          ]
+          },
+          "validation": {
+            "confidence_threshold": 0.75,
+            "rules": []
+          }
         }
-      }
+      },
+      "name": "DACH Contract Risk Terms"
     },
     {
-      "name": "NetzDG Illegal Content Signals",
-      "description": "Classifier labels for policy review queues aligned to NetzDG categories.",
-      "config": {
-        "custom_detector_key": "cust_netzdg_content_signals",
-        "name": "NetzDG Illegal Content Signals",
-        "method": "CLASSIFIER",
-        "languages": [
-          "de"
-        ],
-        "classifier": {
-          "labels": [
-            {
-              "id": "hate_speech",
-              "name": "Hate Speech"
-            },
-            {
-              "id": "threat_of_violence",
-              "name": "Threat of Violence"
-            },
-            {
-              "id": "incitement",
-              "name": "Incitement"
-            }
-          ],
-          "min_examples_per_label": 8,
-          "training_examples": [
-            {
-              "text": "Wir werden euch morgen angreifen.",
-              "label": "threat_of_violence",
-              "accepted": true
-            }
-          ],
-          "hypothesis_template": "This text contains {}."
-        }
-      }
-    },
-    {
-      "name": "German Invoice PII Ruleset",
-      "description": "Ruleset for invoice and procurement text (IBAN, VAT, tax IDs).",
-      "config": {
-        "custom_detector_key": "cust_invoice_pii_ruleset",
-        "name": "German Invoice PII Ruleset",
-        "method": "RULESET",
-        "languages": [
-          "de",
-          "en"
-        ],
-        "ruleset": {
-          "regex_rules": [
-            {
-              "id": "iban_de",
-              "name": "German IBAN",
-              "pattern": "\\bDE\\d{20}\\b",
-              "flags": "i",
-              "severity": "high"
-            },
-            {
-              "id": "ust_id",
-              "name": "EU VAT ID",
-              "pattern": "\\bDE\\d{9}\\b",
-              "flags": "i",
-              "severity": "medium"
-            }
-          ],
-          "keyword_rules": [
-            {
-              "id": "invoice_words",
-              "name": "Invoice Terms",
-              "keywords": [
-                "rechnung",
-                "kundennummer",
-                "umsatzsteuer"
-              ],
-              "case_sensitive": false,
-              "severity": "low"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "name": "Swiss Financial Entity Extractor",
-      "description": "Entity extraction labels for Swiss regulatory and financial text.",
-      "config": {
-        "custom_detector_key": "cust_swiss_financial_entities",
-        "name": "Swiss Financial Entity Extractor",
-        "method": "ENTITY",
-        "languages": [
-          "de",
-          "fr",
-          "it",
-          "en"
-        ],
-        "entity": {
-          "entity_labels": [
-            "ahv_number",
-            "finma_reference",
-            "iban_ch",
-            "counterparty_name"
-          ],
-          "model": "fastino/gliner2-base-v1"
-        }
-      }
-    },
-    {
-      "name": "Sarcasm & Irony Detector",
-      "description": "Detects sarcastic or ironic language with zero-shot fallback and few-shot adaptation.",
-      "config": {
-        "custom_detector_key": "sarcasm_detector",
-        "name": "Sarcasm & Irony Detector",
-        "method": "CLASSIFIER",
-        "languages": [
-          "en",
-          "de"
-        ],
-        "confidence_threshold": 0.72,
-        "classifier": {
-          "labels": [
-            {
-              "id": "sarcastic",
-              "name": "Sarcastic or Ironic",
-              "description": "Text expressing opposite intent for humor or criticism"
-            },
-            {
-              "id": "sincere",
-              "name": "Sincere",
-              "description": "Straightforward literal language"
-            }
-          ],
-          "zero_shot_model": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli",
-          "hypothesis_template": "This text is written sarcastically or ironically {}.",
-          "training_examples": [],
-          "min_examples_per_label": 8,
-          "setfit_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-        }
-      }
-    },
-    {
-      "name": "High Anger / Aggression Signal",
-      "description": "Classifier signal for emotionally escalated user comments.",
-      "config": {
-        "custom_detector_key": "high_anger_signal",
-        "name": "High Anger / Aggression Signal",
-        "method": "CLASSIFIER",
-        "confidence_threshold": 0.78,
-        "classifier": {
-          "labels": [
-            {
-              "id": "angry",
-              "name": "Angry or Aggressive",
-              "description": "Hostile, frustrated, threatening tone"
-            },
-            {
-              "id": "neutral",
-              "name": "Neutral or Positive",
-              "description": "Calm, constructive, or neutral language"
-            }
-          ],
-          "hypothesis_template": "This text expresses anger or aggression {}.",
-          "min_examples_per_label": 8
-        }
-      }
-    },
-    {
-      "name": "Passive-Aggressive Tone",
-      "description": "Detects indirect hostility in workplace communications.",
-      "config": {
-        "custom_detector_key": "passive_aggressive",
-        "name": "Passive-Aggressive Tone",
-        "method": "CLASSIFIER",
-        "confidence_threshold": 0.7,
-        "classifier": {
-          "labels": [
-            {
-              "id": "passive_aggressive",
-              "name": "Passive-Aggressive",
-              "description": "Indirect hostility veiled as politeness"
-            },
-            {
-              "id": "direct",
-              "name": "Direct Communication",
-              "description": "Clear neutral or constructive communication"
-            }
-          ],
-          "hypothesis_template": "This text contains passive-aggressive or indirectly hostile communication {}.",
-          "min_examples_per_label": 8
-        }
-      }
-    },
-    {
-      "name": "Undisclosed Promotional Content",
-      "description": "Flags likely promotional text disguised as organic review content.",
-      "config": {
-        "custom_detector_key": "fake_review_signal",
-        "name": "Undisclosed Promotional Content",
-        "method": "CLASSIFIER",
-        "confidence_threshold": 0.73,
-        "classifier": {
-          "labels": [
-            {
-              "id": "promotional",
-              "name": "Promotional / Advertising",
-              "description": "Paid endorsement or marketing-style copy"
-            },
-            {
-              "id": "organic",
-              "name": "Organic Opinion",
-              "description": "Genuine balanced user review"
-            }
-          ],
-          "hypothesis_template": "This text is promotional or advertising content {}.",
-          "min_examples_per_label": 8
-        }
-      }
-    },
-    {
-      "name": "Unlicensed Financial Advice Signal",
-      "description": "Flags text that resembles direct investment advice.",
-      "config": {
-        "custom_detector_key": "unlicensed_financial_advice",
-        "name": "Unlicensed Financial Advice Signal",
-        "method": "CLASSIFIER",
-        "confidence_threshold": 0.75,
-        "classifier": {
-          "labels": [
-            {
-              "id": "financial_advice",
-              "name": "Specific Financial Advice",
-              "description": "Buy/sell or portfolio recommendations"
-            },
-            {
-              "id": "general_info",
-              "name": "General Financial Information",
-              "description": "Educational or informational finance content"
-            }
-          ],
-          "hypothesis_template": "This text contains specific financial or investment advice {}.",
-          "min_examples_per_label": 8
-        }
-      }
-    },
-    {
-      "name": "Medical Misinformation Signal",
-      "description": "Classifier for potentially misleading medical claims.",
-      "config": {
-        "custom_detector_key": "medical_misinfo",
-        "name": "Medical Misinformation Signal",
-        "method": "CLASSIFIER",
-        "confidence_threshold": 0.72,
-        "classifier": {
-          "labels": [
-            {
-              "id": "misinformation",
-              "name": "Potential Medical Misinformation",
-              "description": "Unproven cures or contradictory health claims"
-            },
-            {
-              "id": "accurate",
-              "name": "Medically Accurate or Neutral",
-              "description": "Consensus-aligned or neutral medical text"
-            }
-          ],
-          "hypothesis_template": "This text contains medical misinformation or unproven health claims {}.",
-          "min_examples_per_label": 10
-        }
-      }
-    },
-    {
-      "name": "User Distress Signal",
-      "description": "Detects potential crisis language for human escalation workflows.",
-      "config": {
-        "custom_detector_key": "distress_signal",
-        "name": "User Distress Signal",
-        "method": "CLASSIFIER",
-        "confidence_threshold": 0.65,
-        "max_findings": 5,
-        "classifier": {
-          "labels": [
-            {
-              "id": "distress",
-              "name": "Distress or Crisis Signal",
-              "description": "Hopelessness or self-harm indicators"
-            },
-            {
-              "id": "not_distress",
-              "name": "Not a Distress Signal",
-              "description": "Non-crisis frustration or hyperbole"
-            }
-          ],
-          "hypothesis_template": "This text expresses genuine personal distress or a mental health crisis {}.",
-          "min_examples_per_label": 15
-        }
-      }
-    },
-    {
-      "name": "Internal Product Code Detector",
-      "description": "Detects internal SKU/project identifiers in user-facing content.",
+      "description": "REGEX internal product code detector — no ML required",
       "config": {
         "custom_detector_key": "internal_product_codes",
         "name": "Internal Product Code Detector",
-        "method": "RULESET",
+        "description": "Detect internal SKU and project code leakage in public docs",
         "languages": [
           "en",
           "de"
         ],
         "confidence_threshold": 0.9,
-        "ruleset": {
-          "regex_rules": [
-            {
-              "id": "sku_format",
-              "name": "Internal SKU Pattern",
-              "pattern": "\\bINT-[A-Z]{2,4}-\\d{4,6}\\b",
-              "severity": "high"
+        "pipeline_schema": {
+          "type": "REGEX",
+          "patterns": {
+            "sku_format": {
+              "pattern": "INT-[A-Z]{3}-\\d{5}",
+              "description": "Internal SKU format INT-OPS-12345"
             },
-            {
-              "id": "project_code",
-              "name": "Internal Project Code",
-              "pattern": "\\bPROJ-[A-Z0-9]{6,10}\\b",
-              "severity": "medium"
+            "project_code": {
+              "pattern": "PROJ-[A-Z]{2}\\d{2}[A-Z]{2}\\d{2}",
+              "description": "Internal project code PROJ-AB12CD34"
             }
-          ],
-          "keyword_rules": []
+          },
+          "validation": {
+            "confidence_threshold": 0.7,
+            "rules": []
+          }
         }
-      }
+      },
+      "name": "Internal Product Code Detector"
     },
     {
-      "name": "Competitor Brand Mention",
-      "description": "Flags known competitor mentions for policy review.",
+      "description": "REGEX German invoice PII — postal codes, IBANs, dates",
       "config": {
-        "custom_detector_key": "competitor_mentions",
-        "name": "Competitor Brand Mention",
-        "method": "RULESET",
-        "confidence_threshold": 0.95,
-        "ruleset": {
-          "regex_rules": [],
-          "keyword_rules": [
-            {
-              "id": "competitors",
-              "name": "Known Competitors",
-              "keywords": [
-                "CompetitorA",
-                "CompetitorB GmbH",
-                "RivalProduct",
-                "OtherBrand AG"
-              ],
-              "case_sensitive": false,
-              "severity": "medium"
+        "custom_detector_key": "cust_invoice_pii_ruleset",
+        "name": "German Invoice PII Ruleset",
+        "languages": [
+          "de",
+          "en"
+        ],
+        "pipeline_schema": {
+          "type": "REGEX",
+          "patterns": {
+            "iban": {
+              "pattern": "\\bDE\\d{2}[\\s]?\\d{4}[\\s]?\\d{4}[\\s]?\\d{4}[\\s]?\\d{4}[\\s]?\\d{2}\\b",
+              "description": "German IBAN"
+            },
+            "zip_city": {
+              "pattern": "\\b\\d{5}\\s+[A-ZÄÖÜ][a-zäöüß]+\\b",
+              "description": "German postal code + city"
+            },
+            "invoice_date": {
+              "pattern": "\\b\\d{2}\\.\\d{2}\\.\\d{4}\\b",
+              "description": "Date in DD.MM.YYYY format"
             }
-          ]
+          },
+          "validation": {
+            "confidence_threshold": 0.7,
+            "rules": []
+          }
         }
-      }
+      },
+      "name": "German Invoice PII Ruleset"
     },
     {
-      "name": "Austrian Legal Citation Detector",
-      "description": "Detects Austrian legal references in German texts.",
+      "description": "REGEX Austrian legal citation detector",
       "config": {
         "custom_detector_key": "at_legal_refs",
         "name": "Austrian Legal Citation Detector",
-        "method": "RULESET",
+        "description": "Detect references to Austrian laws and regulations",
         "languages": [
           "de"
         ],
         "confidence_threshold": 0.9,
-        "ruleset": {
-          "regex_rules": [
-            {
-              "id": "paragraph_ref",
-              "name": "Austrian Law Paragraph Citation",
-              "pattern": "\u00a7\\s*\\d+\\s*(Abs\\.?\\s*\\d+\\s*)?(ABGB|UGB|DSG|StGB|GmbHG|AktG|ZPO)",
-              "severity": "info"
+        "pipeline_schema": {
+          "type": "REGEX",
+          "patterns": {
+            "bgb_ref": {
+              "pattern": "§\\s*\\d+(?:\\s+Abs\\.\\s*\\d+)?\\s+(?:ABGB|UGB|ZPO|StGB|AktG|GmbHG)",
+              "description": "Austrian law paragraph reference"
             },
-            {
-              "id": "bgbl_ref",
-              "name": "Federal Law Gazette Reference",
-              "pattern": "BGBl\\.?\\s+(I|II|III)?\\s*Nr\\.\\s*\\d+/\\d{4}",
-              "severity": "info"
+            "bgbl_ref": {
+              "pattern": "BGBl\\.\\s*(?:I|II|III)?\\s*Nr\\.\\s*\\d+/\\d{4}",
+              "description": "Austrian Federal Law Gazette reference"
             }
-          ],
-          "keyword_rules": []
+          },
+          "validation": {
+            "confidence_threshold": 0.9,
+            "rules": []
+          }
         }
-      }
+      },
+      "name": "Austrian Legal Citation Detector"
     },
     {
-      "name": "Vendor & Supplier Entity Extractor",
-      "description": "Extracts supplier and contractor entities from procurement text.",
+      "description": "GLINER2 sarcasm & irony detector — classification",
+      "config": {
+        "custom_detector_key": "sarcasm_detector",
+        "name": "Sarcasm & Irony Detector",
+        "description": "Detect sarcasm and irony in user-generated content",
+        "languages": [
+          "en",
+          "de"
+        ],
+        "confidence_threshold": 0.72,
+        "pipeline_schema": {
+          "type": "GLINER2",
+          "entities": {},
+          "classification": {
+            "tone": {
+              "labels": [
+                "sarcastic",
+                "ironic",
+                "sincere"
+              ],
+              "multi_label": false
+            }
+          },
+          "validation": {
+            "confidence_threshold": 0.72,
+            "rules": []
+          }
+        }
+      },
+      "name": "Sarcasm & Irony Detector"
+    },
+    {
+      "description": "GLINER2 vendor & supplier entity extractor",
       "config": {
         "custom_detector_key": "vendor_entity_extractor",
         "name": "Vendor & Supplier Entity Extractor",
-        "method": "ENTITY",
+        "description": "Extract vendor names, contract values, and delivery terms",
         "confidence_threshold": 0.55,
-        "entity": {
-          "entity_labels": [
-            "vendor name",
-            "supplier company",
-            "contractor",
-            "subcontractor",
-            "service provider",
-            "Auftragnehmer",
-            "Lieferant"
-          ],
-          "model": "fastino/gliner2-base-v1"
+        "pipeline_schema": {
+          "type": "GLINER2",
+          "entities": {
+            "vendor_name": {
+              "description": "Company or vendor name",
+              "required": false
+            },
+            "contract_value": {
+              "description": "Contract value like 50.000 EUR",
+              "required": false
+            },
+            "delivery_term": {
+              "description": "Incoterms like FOB, CIF, DDP",
+              "required": false
+            }
+          },
+          "classification": {},
+          "validation": {
+            "confidence_threshold": 0.55,
+            "rules": []
+          }
         }
-      }
-    },
-    {
-      "name": "DACH Regulatory Term Extractor",
-      "description": "Extracts regulator and regulation mentions for compliance indexing.",
-      "config": {
-        "custom_detector_key": "dach_regulatory_terms",
-        "name": "DACH Regulatory Term Extractor",
-        "method": "ENTITY",
-        "languages": [
-          "de"
-        ],
-        "confidence_threshold": 0.6,
-        "entity": {
-          "entity_labels": [
-            "German supervisory authority",
-            "Austrian supervisory authority",
-            "Swiss supervisory authority",
-            "GDPR article reference",
-            "German law citation",
-            "regulatory fine amount",
-            "compliance deadline",
-            "Bu\u00dfgeld",
-            "Aufsichtsbeh\u00f6rde"
-          ],
-          "model": "fastino/gliner2-base-v1"
-        }
-      }
+      },
+      "name": "Vendor & Supplier Entity Extractor"
     }
   ]
 }

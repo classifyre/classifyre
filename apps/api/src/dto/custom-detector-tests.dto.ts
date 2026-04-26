@@ -1,32 +1,31 @@
 import { z } from 'zod/v4';
 
-// ── Expected outcome shapes per method ──────────────────────────────────────
+// ── Expected outcome shape — unified pipeline output ─────────────────────────
+//
+// The expected outcome mirrors the standard pipeline result format so that
+// test comparators can do field-by-field matching without knowing the detector
+// type.  Both `entities` and `classification` are optional: a scenario may
+// assert only entities, only classification, or both.
 
-export const rulesetExpectedOutcomeSchema = z.object({
-  shouldMatch: z.boolean(),
+export const entityMatchSchema = z.object({
+  value: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional(),
 });
 
-export const classifierExpectedOutcomeSchema = z.object({
-  label: z.string().min(1),
-  minConfidence: z.number().min(0).max(1).optional(),
-});
-
-export const entityExpectedOutcomeSchema = z.object({
+export const expectedOutcomeSchema = z.object({
   entities: z
-    .array(
+    .record(z.string(), z.array(entityMatchSchema))
+    .optional(),
+  classification: z
+    .record(
+      z.string(),
       z.object({
-        label: z.string().min(1),
-        text: z.string().optional(), // if provided, must be found in extraction
+        label: z.string().optional(),
+        confidence: z.number().min(0).max(1).optional(),
       }),
     )
-    .min(1),
+    .optional(),
 });
-
-export const expectedOutcomeSchema = z.union([
-  rulesetExpectedOutcomeSchema,
-  classifierExpectedOutcomeSchema,
-  entityExpectedOutcomeSchema,
-]);
 
 // ── Request DTOs ─────────────────────────────────────────────────────────────
 
@@ -38,6 +37,7 @@ export const createTestScenarioSchema = z.object({
 });
 
 export type CreateTestScenarioDto = z.infer<typeof createTestScenarioSchema>;
+export type ExpectedOutcomeDto = z.infer<typeof expectedOutcomeSchema>;
 
 // ── Response DTOs ─────────────────────────────────────────────────────────────
 

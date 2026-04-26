@@ -29,29 +29,25 @@ describe('CustomDetectorExtractionsService', () => {
     sourceId: 'src-1',
     assetId: 'asset-1',
     runnerId: 'run-1',
-    extractionMethod: 'CLASSIFIER_GLINER',
     detectorVersion: 1,
-    fieldCount: 2,
-    populatedFields: ['dishes', 'cuisine'],
-    extractedData: { dishes: ['pasta carbonara'], cuisine: 'Italian' },
+    pipelineResult: {
+      entities: [{ label: 'dish', text: 'pasta carbonara', score: 0.9 }],
+      classification: {},
+      metadata: { runner: 'GLINER2' },
+    },
     extractedAt: new Date('2026-03-08T12:00:00Z'),
     createdAt: new Date('2026-03-08T12:00:00Z'),
   };
 
   it('getByFinding returns extraction when found', async () => {
     const { service, prisma } = createService();
-    prisma.customDetectorExtraction.findUnique.mockResolvedValue(
-      mockExtraction,
-    );
+    prisma.customDetectorExtraction.findUnique.mockResolvedValue(mockExtraction);
 
     const result = await service.getByFinding('find-1');
 
     expect(result).not.toBeNull();
     expect(result!.findingId).toBe('find-1');
-    expect(result!.extractedData).toEqual({
-      dishes: ['pasta carbonara'],
-      cuisine: 'Italian',
-    });
+    expect(result!.pipelineResult).toEqual(mockExtraction.pipelineResult);
   });
 
   it('getByFinding returns null when not found', async () => {
@@ -64,41 +60,43 @@ describe('CustomDetectorExtractionsService', () => {
 
   it('search filters by customDetectorKey', async () => {
     const { service, prisma } = createService();
-    prisma.customDetectorExtraction.findMany.mockResolvedValue([
-      mockExtraction,
-    ]);
+    prisma.customDetectorExtraction.findMany.mockResolvedValue([mockExtraction]);
     prisma.customDetectorExtraction.count.mockResolvedValue(1);
 
-    const result = await service.search({
-      customDetectorKey: 'food_discussion',
-    });
+    const result = await service.search({ customDetectorKey: 'food_discussion' });
 
     expect(result.total).toBe(1);
     expect(result.items[0]?.customDetectorKey).toBe('food_discussion');
     expect(prisma.customDetectorExtraction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
-          customDetectorKey: 'food_discussion',
-        }),
+        where: expect.objectContaining({ customDetectorKey: 'food_discussion' }),
       }),
     );
   });
 
-  it('search filters by populatedField', async () => {
+  it('search filters by sourceId', async () => {
     const { service, prisma } = createService();
-    prisma.customDetectorExtraction.findMany.mockResolvedValue([
-      mockExtraction,
-    ]);
+    prisma.customDetectorExtraction.findMany.mockResolvedValue([mockExtraction]);
     prisma.customDetectorExtraction.count.mockResolvedValue(1);
 
-    await service.search({ populatedField: 'cuisine' });
+    await service.search({ sourceId: 'src-1' });
 
     expect(prisma.customDetectorExtraction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
-          populatedFields: { has: 'cuisine' },
-        }),
+        where: expect.objectContaining({ sourceId: 'src-1' }),
       }),
+    );
+  });
+
+  it('search respects take/skip pagination', async () => {
+    const { service, prisma } = createService();
+    prisma.customDetectorExtraction.findMany.mockResolvedValue([]);
+    prisma.customDetectorExtraction.count.mockResolvedValue(0);
+
+    await service.search({ take: 10, skip: 20 });
+
+    expect(prisma.customDetectorExtraction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 10, skip: 20 }),
     );
   });
 
@@ -106,37 +104,42 @@ describe('CustomDetectorExtractionsService', () => {
     const { service, prisma } = createService();
     prisma.customDetector.findUnique.mockResolvedValue(null);
 
-    await expect(service.getCoverage('missing')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(service.getCoverage('missing')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('getCoverage computes rates correctly', async () => {
     const { service, prisma } = createService();
-    prisma.customDetector.findUnique.mockResolvedValue({
-      id: 'det-1',
-      key: 'food_discussion',
-    });
+    prisma.customDetector.findUnique.mockResolvedValue({ id: 'det-1', key: 'food_discussion' });
     prisma.finding.count.mockResolvedValue(100);
-    prisma.customDetectorExtraction.findMany.mockResolvedValue([
-      { populatedFields: ['dishes', 'cuisine'] },
-      { populatedFields: ['dishes'] },
-      { populatedFields: ['dishes', 'cuisine', 'ingredients'] },
-    ]);
+    prisma.customDetectorExtraction.count.mockResolvedValue(3);
 
     const result = await service.getCoverage('det-1');
 
     expect(result.totalFindings).toBe(100);
     expect(result.findingsWithExtraction).toBe(3);
     expect(result.coverageRate).toBeCloseTo(0.03);
-    const dishField = result.fieldCoverage.find((f) => f.field === 'dishes');
-    expect(dishField?.populated).toBe(3);
-    expect(dishField?.rate).toBe(1.0);
+    expect(result.customDetectorKey).toBe('food_discussion');
   });
 
-  it('createFromIngestion computes populatedFields and upserts', async () => {
+  it('getCoverage returns zero coverageRate when no findings', async () => {
+    const { service, prisma } = createService();
+    prisma.customDetector.findUnique.mockResolvedValue({ id: 'det-1', key: 'empty_detector' });
+    prisma.finding.count.mockResolvedValue(0);
+    prisma.customDetectorExtraction.count.mockResolvedValue(0);
+
+    const result = await service.getCoverage('det-1');
+
+    expect(result.coverageRate).toBe(0);
+  });
+
+  it('createFromIngestion upserts with pipelineResult', async () => {
     const { service, prisma } = createService();
     prisma.customDetectorExtraction.upsert.mockResolvedValue({});
+    const pipelineResult = {
+      entities: [{ label: 'dish', text: 'pizza', score: 0.95 }],
+      classification: {},
+      metadata: { runner: 'GLINER2' },
+    };
 
     await service.createFromIngestion({
       findingId: 'find-2',
@@ -145,23 +148,13 @@ describe('CustomDetectorExtractionsService', () => {
       sourceId: 'src-1',
       assetId: 'asset-1',
       runnerId: null,
-      extractionMethod: 'CLASSIFIER_GLINER',
       detectorVersion: 2,
-      extractedData: {
-        dishes: ['pizza'],
-        empty_list: [],
-        nullable: null,
-        cuisine: 'Italian',
-      },
+      pipelineResult,
       extractedAt: new Date(),
     });
 
     const upsertCall = prisma.customDetectorExtraction.upsert.mock.calls[0][0];
-    expect(upsertCall.create.populatedFields).toEqual(
-      expect.arrayContaining(['dishes', 'cuisine']),
-    );
-    expect(upsertCall.create.populatedFields).not.toContain('empty_list');
-    expect(upsertCall.create.populatedFields).not.toContain('nullable');
-    expect(upsertCall.create.fieldCount).toBe(4);
+    expect(upsertCall.create.pipelineResult).toEqual(pipelineResult);
+    expect(upsertCall.create.findingId).toBe('find-2');
   });
 });

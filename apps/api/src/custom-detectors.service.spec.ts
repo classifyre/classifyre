@@ -6,9 +6,7 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  CustomDetectorMethod,
   CustomDetectorTrainingStatus,
-  FindingStatus,
 } from '@prisma/client';
 import { CustomDetectorsService } from './custom-detectors.service';
 
@@ -42,22 +40,24 @@ describe('CustomDetectorsService', () => {
     return { service, prisma };
   }
 
-  it('creates a custom detector with canonicalized custom config', async () => {
+  it('creates a custom detector with a GLINER2 pipeline schema', async () => {
     const { service, prisma } = createService();
+
+    const pipelineSchema = {
+      type: 'GLINER2',
+      entities: { risk_term: { description: 'Legal risk term', required: false } },
+      classification: {},
+      validation: { confidence_threshold: 0.8, rules: [] },
+    };
 
     prisma.customDetector.create.mockResolvedValue({
       id: 'det-1',
       key: 'cust_legal_risk',
       name: 'Legal Risk Detector',
       description: 'Detect risk terms',
-      method: CustomDetectorMethod.CLASSIFIER,
       isActive: true,
       version: 1,
-      config: {
-        custom_detector_key: 'cust_legal_risk',
-        name: 'Legal Risk Detector',
-        method: 'CLASSIFIER',
-      },
+      pipelineSchema,
       lastTrainedAt: null,
       lastTrainingSummary: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -69,17 +69,12 @@ describe('CustomDetectorsService', () => {
     const result = await service.create({
       name: 'Legal Risk Detector',
       key: 'cust_legal_risk',
-      method: CustomDetectorMethod.CLASSIFIER,
-      config: {
-        classifier: {
-          labels: [{ id: 'risk', name: 'Risk' }],
-        },
-      },
+      pipelineSchema,
     });
 
     expect(prisma.customDetector.create).toHaveBeenCalled();
     expect(result.key).toBe('cust_legal_risk');
-    expect(result.method).toBe(CustomDetectorMethod.CLASSIFIER);
+    expect(result.pipelineSchema).toEqual(pipelineSchema);
   });
 
   it('rejects unknown IDs in assertActiveDetectorIds', async () => {
@@ -100,11 +95,9 @@ describe('CustomDetectorsService', () => {
       service.create({
         name: 'Duplicate key detector',
         key: 'cust_duplicate',
-        method: CustomDetectorMethod.RULESET,
-        config: {
-          custom_detector_key: 'cust_duplicate',
-          name: 'Duplicate key detector',
-          method: 'RULESET',
+        pipelineSchema: {
+          type: 'REGEX',
+          patterns: { x: { pattern: '\\d+' } },
         },
       }),
     ).rejects.toBeInstanceOf(ConflictException);
@@ -113,20 +106,25 @@ describe('CustomDetectorsService', () => {
   it('builds runtime custom detector payloads in requested order', async () => {
     const { service, prisma } = createService();
 
+    const regexSchema = {
+      type: 'REGEX',
+      patterns: { x: { pattern: '\\d+', description: 'digits' } },
+    };
+    const gliner2Schema = {
+      type: 'GLINER2',
+      entities: { entity: { description: 'any entity', required: false } },
+      classification: {},
+    };
+
     prisma.customDetector.findMany.mockResolvedValue([
       {
         id: 'det-2',
         key: 'cust_second',
         name: 'Second',
         description: null,
-        method: CustomDetectorMethod.RULESET,
         isActive: true,
         version: 1,
-        config: {
-          custom_detector_key: 'cust_second',
-          name: 'Second',
-          method: 'RULESET',
-        },
+        pipelineSchema: regexSchema,
         lastTrainedAt: null,
         lastTrainingSummary: null,
         createdAt: new Date(),
@@ -137,14 +135,9 @@ describe('CustomDetectorsService', () => {
         key: 'cust_first',
         name: 'First',
         description: null,
-        method: CustomDetectorMethod.ENTITY,
         isActive: true,
         version: 1,
-        config: {
-          custom_detector_key: 'cust_first',
-          name: 'First',
-          method: 'ENTITY',
-        },
+        pipelineSchema: gliner2Schema,
         lastTrainedAt: null,
         lastTrainingSummary: null,
         createdAt: new Date(),
@@ -171,13 +164,11 @@ describe('CustomDetectorsService', () => {
         key: 'cust_usage_1',
         name: 'Usage Detector',
         description: null,
-        method: CustomDetectorMethod.RULESET,
         isActive: true,
         version: 1,
-        config: {
-          custom_detector_key: 'cust_usage_1',
-          name: 'Usage Detector',
-          method: 'RULESET',
+        pipelineSchema: {
+          type: 'REGEX',
+          patterns: { x: { pattern: '\\d+', description: 'digits' } },
         },
         lastTrainedAt: null,
         lastTrainingSummary: null,
@@ -211,33 +202,29 @@ describe('CustomDetectorsService', () => {
     expect(result[0]?.recentSourceNames).toEqual(['Source A', 'Source B']);
   });
 
-  it('trains classifier with SETFIT strategy when label threshold is met', async () => {
+  it('trains GLiNER2 pipeline detector with GLINER2_PIPELINE strategy', async () => {
     const { service, prisma } = createService();
+
+    const pipelineSchema = {
+      type: 'GLINER2',
+      entities: {
+        order_id: { description: 'Order ID like ORD-123', required: true },
+        amount: { description: 'Monetary value like 50€', required: false },
+      },
+      classification: {
+        intent: { labels: ['refund', 'question'], multi_label: false },
+      },
+      validation: { confidence_threshold: 0.8, rules: [] },
+    };
 
     prisma.customDetector.findUnique.mockResolvedValue({
       id: 'det-1',
-      key: 'cust_classifier',
-      name: 'Classifier',
+      key: 'cust_pipeline',
+      name: 'Pipeline Detector',
       description: null,
-      method: CustomDetectorMethod.CLASSIFIER,
       isActive: true,
       version: 1,
-      config: {
-        custom_detector_key: 'cust_classifier',
-        name: 'Classifier',
-        method: 'CLASSIFIER',
-        classifier: {
-          min_examples_per_label: 2,
-          labels: [
-            { id: 'risk', name: 'Risk' },
-            { id: 'safe', name: 'Safe' },
-          ],
-          training_examples: [
-            { text: 'a', label: 'risk', accepted: true },
-            { text: 'b', label: 'safe', accepted: true },
-          ],
-        },
-      },
+      pipelineSchema,
       lastTrainedAt: null,
       lastTrainingSummary: null,
       createdAt: new Date(),
@@ -263,27 +250,6 @@ describe('CustomDetectorsService', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-
-    prisma.customDetectorFeedback.findMany.mockResolvedValue([
-      {
-        id: 'fb-1',
-        customDetectorId: 'det-1',
-        customDetectorKey: 'cust_classifier',
-        sourceId: 'src-1',
-        status: FindingStatus.RESOLVED,
-        label: 'risk',
-        findingType: 'class:risk',
-      },
-      {
-        id: 'fb-2',
-        customDetectorId: 'det-1',
-        customDetectorKey: 'cust_classifier',
-        sourceId: 'src-1',
-        status: FindingStatus.RESOLVED,
-        label: 'safe',
-        findingType: 'class:safe',
-      },
-    ]);
 
     prisma.customDetectorTrainingRun.update.mockImplementation(
       ({ data }: { data: Record<string, unknown> }) => ({
@@ -312,26 +278,36 @@ describe('CustomDetectorsService', () => {
     const run = await service.train('det-1', {});
 
     expect(run.status).toBe(CustomDetectorTrainingStatus.SUCCEEDED);
-    expect(run.strategy).toBe('SETFIT');
+    expect(run.strategy).toBe('GLINER2_PIPELINE');
     expect(prisma.customDetector.update).toHaveBeenCalled();
   });
 
-  it('normalizes plain-string classifier labels to {id, name} objects on create', async () => {
+  it('stores the pipeline schema verbatim on create and reflects it in response', async () => {
     const { service, prisma } = createService();
 
-    let capturedConfig: Record<string, unknown> | null = null;
+    const pipelineSchema = {
+      type: 'REGEX',
+      patterns: {
+        food_mention: {
+          pattern: '\\b(?:pasta|pizza|sushi|burger)\\b',
+          description: 'Food keyword',
+        },
+      },
+      validation: { confidence_threshold: 0.7, rules: [] },
+    };
+
+    let capturedPipelineSchema: unknown = null;
     prisma.customDetector.create.mockImplementation(
       ({ data }: { data: Record<string, unknown> }) => {
-        capturedConfig = data.config as Record<string, unknown>;
+        capturedPipelineSchema = data.pipelineSchema;
         return Promise.resolve({
           id: 'det-norm',
           key: 'food_detector',
           name: 'Food Detector',
           description: null,
-          method: CustomDetectorMethod.CLASSIFIER,
           isActive: true,
           version: 1,
-          config: data.config,
+          pipelineSchema: data.pipelineSchema,
           lastTrainedAt: null,
           lastTrainingSummary: null,
           createdAt: new Date(),
@@ -342,43 +318,14 @@ describe('CustomDetectorsService', () => {
       },
     );
 
-    await service.create({
+    const result = await service.create({
       name: 'Food Detector',
       key: 'food_detector',
-      method: CustomDetectorMethod.CLASSIFIER,
-      config: {
-        classifier: {
-          // Plain string labels — legacy format that the CLI cannot parse
-          labels: ['food discussion', 'not food discussion'],
-          training_examples: [
-            {
-              text: 'I made pasta last night.',
-              label: 'food discussion',
-              accepted: true,
-            },
-            {
-              text: 'Quarterly earnings are up.',
-              label: 'not food discussion',
-              accepted: true,
-            },
-          ],
-        },
-      },
+      pipelineSchema,
     });
 
-    const classifier = capturedConfig!['classifier'] as Record<string, unknown>;
-    const labels = classifier?.labels as Array<Record<string, unknown>>;
-    expect(labels).toEqual([
-      { id: 'food_discussion', name: 'food discussion' },
-      { id: 'not_food_discussion', name: 'not food discussion' },
-    ]);
-
-    // Training example labels must be remapped to IDs
-    const examples = classifier?.training_examples as Array<
-      Record<string, unknown>
-    >;
-    expect(examples[0]?.label).toBe('food_discussion');
-    expect(examples[1]?.label).toBe('not_food_discussion');
+    expect(capturedPipelineSchema).toMatchObject({ type: 'REGEX' });
+    expect(result.pipelineSchema).toMatchObject({ type: 'REGEX' });
   });
 
   it('throws for training history lookup on missing detector', async () => {

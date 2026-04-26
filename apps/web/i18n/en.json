@@ -624,7 +624,21 @@
     "deleteButton": "Delete detector",
     "deleting": "Deleting...",
     "loadingLabel": "Loading...",
-    "findingsCount": "Findings: {{count}}"
+    "findingsCount": "Findings: {{count}}",
+    "stepper": {
+      "identity": "Identity",
+      "identityDesc": "Name, key and status",
+      "entities": "Entities",
+      "entitiesDesc": "Named entities to extract",
+      "classification": "Classification",
+      "classificationDesc": "Zero-shot classification tasks",
+      "validation": "Validation",
+      "validationDesc": "Rules and confidence thresholds",
+      "model": "Model",
+      "modelDesc": "GLiNER2 model selection",
+      "training": "Training",
+      "trainingDesc": "Upload examples and fine-tune"
+    }
   },
   "scans": {
     "title": "Scans",

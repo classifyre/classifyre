@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
-import { CustomDetectorMethod } from '@prisma/client';
 import * as path from 'path';
 import {
   assistantChatRequestSchema,
@@ -1068,7 +1067,10 @@ function buildUpdateSourceArgs(context: AssistantPageContext) {
 
 function buildCreateDetectorArgs(context: AssistantPageContext) {
   const metadata = getAssistantMetadata(context);
-  const config = ensureRecord(metadata.config, 'context.metadata.config');
+  const pipelineSchema = ensureRecord(
+    metadata.pipeline_schema ?? metadata.pipelineSchema,
+    'context.metadata.pipeline_schema',
+  );
 
   return {
     name: ensureString(metadata.name, 'context.metadata.name'),
@@ -1078,9 +1080,8 @@ function buildCreateDetectorArgs(context: AssistantPageContext) {
       metadata.description.length > 0
         ? metadata.description
         : undefined,
-    method: ensureDetectorMethod(metadata.method, 'context.metadata.method'),
     isActive: typeof metadata.isActive === 'boolean' ? metadata.isActive : true,
-    config,
+    pipelineSchema,
   };
 }
 
@@ -1207,23 +1208,6 @@ function ensureString(value: unknown, label: string): string {
   throw new BadRequestException(`${label} must be a non-empty string`);
 }
 
-function ensureDetectorMethod(
-  value: unknown,
-  label: string,
-): CustomDetectorMethod {
-  const normalized = ensureString(value, label).toUpperCase();
-  if (
-    normalized === CustomDetectorMethod.RULESET ||
-    normalized === CustomDetectorMethod.CLASSIFIER ||
-    normalized === CustomDetectorMethod.ENTITY
-  ) {
-    return normalized;
-  }
-
-  throw new BadRequestException(
-    `${label} must be one of RULESET, CLASSIFIER, ENTITY`,
-  );
-}
 
 function toDisplayString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;

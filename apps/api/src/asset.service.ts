@@ -1562,8 +1562,7 @@ export class AssetService {
                   contextAfter: finding.context_after || null,
                   location: finding.location || null,
                   detectedAt: new Date(finding.detected_at || Date.now()),
-                  extractedData: finding.extracted_data || null,
-                  extractionMethod: finding.extraction_method || null,
+                  pipelineResult: finding.pipeline_result || finding.extracted_data || null,
                 });
               }
             }
@@ -1635,7 +1634,7 @@ export class AssetService {
             // Strip extraction-only fields that don't belong on the Finding model
             const findingData = Object.fromEntries(
               Object.entries(detection as Record<string, unknown>).filter(
-                ([k]) => k !== 'extractedData' && k !== 'extractionMethod',
+                ([k]) => k !== 'pipelineResult',
               ),
             );
             toCreate.push({
@@ -1795,7 +1794,7 @@ export class AssetService {
         // We need to look up the finding IDs after createMany since Prisma doesn't return them
         const detectionsWithExtraction = Array.from(
           incomingDetections.values(),
-        ).filter((d) => d.extractedData != null && d.customDetectorKey);
+        ).filter((d) => d.pipelineResult != null && d.customDetectorKey);
         if (detectionsWithExtraction.length > 0) {
           const identities = detectionsWithExtraction.map(
             (d) => d.detectionIdentity,
@@ -1819,9 +1818,8 @@ export class AssetService {
               sourceId: detection.sourceId,
               assetId: detection.assetId,
               runnerId: detection.runnerId ?? null,
-              extractionMethod: detection.extractionMethod ?? 'UNKNOWN',
               detectorVersion: 1,
-              extractedData: detection.extractedData,
+              pipelineResult: detection.pipelineResult,
               extractedAt: detection.detectedAt ?? new Date(),
             });
           }
