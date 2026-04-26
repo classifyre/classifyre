@@ -166,19 +166,26 @@ test.describe("GLiNER2 Pipeline Detector — Fortune 500 NER", () => {
       await descInput.fill(entity.description);
     }
 
-    // ── Upload normalized training CSV ────────────────────────────────────────
+    // ── Scroll to Training section then upload normalized CSV ────────────────
+    // The Training section is the 6th step — scroll it into view first.
+    // Raw fortune_500.csv is NOT usable directly (source data columns, not text/label/value).
+    // fortune_500_training.csv is the pre-normalized fixture: 100 rows, 5 entity types.
 
-    // Use the pre-normalized fixture (fortune_500_training.csv)
-    // Raw fortune_500.csv is NOT usable directly — it has source columns, not text/label/value
+    // Click the Training nav step to scroll into view
+    await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="gliner2-training-file-input"]');
+      el?.scrollIntoView({ behavior: "instant", block: "center" });
+    });
+
     await page.locator('[data-testid="gliner2-training-file-input"]').setInputFiles(
       FORTUNE_500_TRAINING_CSV,
     );
 
-    // Toast should confirm examples were parsed
-    await waitForToast(page, /parsed|imported|example/i);
+    // Parse result appears inline (no toast) — wait for it
+    await expect(page.locator('[data-testid="gliner2-parse-result"]')).toBeVisible({ timeout: 30_000 });
 
-    // Staged examples list should appear
-    await expect(page.locator('[data-testid="gliner2-training-file-input"]')).toBeAttached();
+    // Staged examples list must also appear
+    await expect(page.locator('[data-testid="gliner2-staged-examples"]')).toBeVisible({ timeout: 10_000 });
 
     // ── Save the detector ─────────────────────────────────────────────────────
 

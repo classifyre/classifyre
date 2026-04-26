@@ -781,7 +781,7 @@ function TrainingSection({
           {state.isParsing ? "Parsing…" : "Upload CSV / TSV / XLSX / JSON"}
         </Button>
         {state.parseResult && (
-          <p className="mt-1.5 text-[11px] text-muted-foreground">
+          <p data-testid="gliner2-parse-result" className="mt-1.5 text-[11px] text-muted-foreground">
             Parsed {state.parseResult.importedRows} rows
             {state.parseResult.skippedRows > 0 && `, ${state.parseResult.skippedRows} skipped`}
             {" "}from <span className="font-mono">{state.parseResult.format}</span>
@@ -791,7 +791,7 @@ function TrainingSection({
 
       {/* Staged examples preview */}
       {state.staged.length > 0 && (
-        <div className="space-y-2">
+        <div data-testid="gliner2-staged-examples" className="space-y-2">
           <div className="flex items-center justify-between">
             <Label className="text-xs uppercase tracking-wide">
               Staged — {state.staged.length} examples
