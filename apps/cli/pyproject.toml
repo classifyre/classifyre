@@ -237,6 +237,14 @@ module = [
     "pyarrow.*",
     "opentelemetry.*",
     "PIL.*",
+    "gliner.*",
+    "gliner",
+    "datasets.*",
+    "datasets",
+    "setfit.*",
+    "setfit",
+    "sklearn.*",
+    "sklearn",
 ]
 ignore_missing_imports = true
 
