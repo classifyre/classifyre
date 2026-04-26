@@ -218,6 +218,7 @@ function EntitiesSection({
           <div className="space-y-1.5">
             <Label className="text-xs uppercase tracking-wide">Description</Label>
             <Input
+              data-testid={`gliner2-entity-desc-${label}`}
               value={defn.description}
               onChange={(e) => updateEntity(label, { description: e.target.value })}
               placeholder='e.g. "Order ID like ORD-123"'
@@ -243,6 +244,7 @@ function EntitiesSection({
 
       <div className="flex gap-2">
         <Input
+          data-testid="gliner2-entity-label-input"
           value={newLabel}
           onChange={(e) => setNewLabel(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addEntity()}
@@ -254,6 +256,7 @@ function EntitiesSection({
           variant="outline"
           size="sm"
           onClick={addEntity}
+          data-testid="gliner2-add-entity-btn"
           className="h-9 whitespace-nowrap"
         >
           <Plus className="mr-1 h-3.5 w-3.5" />
@@ -759,6 +762,7 @@ function TrainingSection({
           type="file"
           accept=".csv,.tsv,.txt,.json,.xlsx,.md,.log"
           className="hidden"
+          data-testid="gliner2-training-file-input"
           onChange={(e) => void handleFileChange(e)}
         />
         <Button
@@ -1132,6 +1136,7 @@ export function PipelineDetectorEditor({
                     </Label>
                     <Input
                       id="detector-name"
+                      data-testid="gliner2-name"
                       value={name}
                       onChange={(e) => {
                         setName(e.target.value);
@@ -1148,6 +1153,7 @@ export function PipelineDetectorEditor({
                     </Label>
                     <Input
                       id="detector-key"
+                      data-testid="gliner2-key"
                       value={key}
                       onChange={(e) => setKey(e.target.value)}
                       placeholder="cust_support_ticket_extractor"
@@ -1282,6 +1288,7 @@ export function PipelineDetectorEditor({
           </div>
           <Button
             type="button"
+            data-testid="gliner2-submit-btn"
             onClick={() => void handleSubmit()}
             disabled={isSubmitting}
             className="h-10 rounded-[4px] border-2 border-black bg-[#b7ff00] text-black shadow-[4px_4px_0_#000] hover:-translate-y-[1px] hover:shadow-[6px_6px_0_#000] transition-all font-mono font-bold uppercase tracking-[0.12em]"

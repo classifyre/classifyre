@@ -426,7 +426,7 @@ export class McpServerFactoryService {
         jsonResult(
           await this.mcpToolExecutor.createCustomDetector({
             ...rest,
-            pipelineSchema: pipeline_schema as Record<string, unknown>,
+            pipelineSchema: pipeline_schema,
           }),
         ),
     );
@@ -435,13 +435,16 @@ export class McpServerFactoryService {
       'update_custom_detector',
       {
         title: 'Update Custom Detector',
-        description: 'Update detector metadata, pipeline schema, or activation status.',
+        description:
+          'Update detector metadata, pipeline schema, or activation status.',
         inputSchema: {
           id: z.string().uuid(),
           key: z.string().optional(),
           name: z.string().optional(),
           description: z.string().nullable().optional(),
-          pipeline_schema: jsonObjectSchema.optional().describe('Updated GLiNER2 pipeline schema'),
+          pipeline_schema: jsonObjectSchema
+            .optional()
+            .describe('Updated GLiNER2 pipeline schema'),
           isActive: z.boolean().optional(),
         },
       },

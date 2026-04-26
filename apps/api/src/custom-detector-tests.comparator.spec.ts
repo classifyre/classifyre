@@ -15,7 +15,12 @@
 // Comparator logic — mirrors CustomDetectorTestsService.compareOutcome()
 // ─────────────────────────────────────────────────────────────────────────────
 
-type PipelineEntitySpan = { value?: string; confidence?: number; start?: number; end?: number };
+type PipelineEntitySpan = {
+  value?: string;
+  confidence?: number;
+  start?: number;
+  end?: number;
+};
 type PipelineClassificationOutcome = { label?: string; confidence?: number };
 type PipelineResult = {
   entities: Record<string, PipelineEntitySpan[]>;
@@ -35,15 +40,24 @@ function comparePipelineOutcome(
   actual: PipelineResult,
 ): 'PASS' | 'FAIL' {
   // Check entities
-  for (const [label, expectedSpans] of Object.entries(expected.entities ?? {})) {
+  for (const [label, expectedSpans] of Object.entries(
+    expected.entities ?? {},
+  )) {
     const actualSpans = actual.entities[label] ?? [];
     for (const expectedSpan of expectedSpans) {
-      const minConf = typeof expectedSpan.confidence === 'number' ? expectedSpan.confidence : 0;
+      const minConf =
+        typeof expectedSpan.confidence === 'number'
+          ? expectedSpan.confidence
+          : 0;
       const hit = actualSpans.some((span) => {
         const confOk =
-          typeof span.confidence === 'number' ? span.confidence >= minConf : true;
+          typeof span.confidence === 'number'
+            ? span.confidence >= minConf
+            : true;
         const valueOk = expectedSpan.value
-          ? (span.value ?? '').toLowerCase().includes(expectedSpan.value.toLowerCase())
+          ? (span.value ?? '')
+              .toLowerCase()
+              .includes(expectedSpan.value.toLowerCase())
           : true;
         return confOk && valueOk;
       });
@@ -52,10 +66,15 @@ function comparePipelineOutcome(
   }
 
   // Check classification
-  for (const [task, expectedOutcome] of Object.entries(expected.classification ?? {})) {
+  for (const [task, expectedOutcome] of Object.entries(
+    expected.classification ?? {},
+  )) {
     const actualOutcome = actual.classification[task];
     if (!actualOutcome) return 'FAIL';
-    if (expectedOutcome.label && actualOutcome.label !== expectedOutcome.label) {
+    if (
+      expectedOutcome.label &&
+      actualOutcome.label !== expectedOutcome.label
+    ) {
       return 'FAIL';
     }
     if (

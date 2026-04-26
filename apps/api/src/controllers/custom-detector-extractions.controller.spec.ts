@@ -53,14 +53,18 @@ describe('getByFinding', () => {
     const { controller, service } = createController();
     service.getByFinding.mockResolvedValue(null);
 
-    await expect(controller.getByFinding('find-missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      controller.getByFinding('find-missing'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('NotFoundException message includes the finding id', async () => {
     const { controller, service } = createController();
     service.getByFinding.mockResolvedValue(null);
 
-    await expect(controller.getByFinding('find-abc')).rejects.toThrow('find-abc');
+    await expect(controller.getByFinding('find-abc')).rejects.toThrow(
+      'find-abc',
+    );
   });
 });
 
@@ -124,9 +128,13 @@ describe('coverage', () => {
 
   it('propagates NotFoundException from service for unknown detector', async () => {
     const { controller, service } = createController();
-    service.getCoverage.mockRejectedValue(new NotFoundException('Detector not found'));
+    service.getCoverage.mockRejectedValue(
+      new NotFoundException('Detector not found'),
+    );
 
-    await expect(controller.coverage('unknown-det')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(controller.coverage('unknown-det')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('returns zero-coverage for detector with no extractions', async () => {

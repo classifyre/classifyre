@@ -1208,7 +1208,6 @@ function ensureString(value: unknown, label: string): string {
   throw new BadRequestException(`${label} must be a non-empty string`);
 }
 
-
 function toDisplayString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }

@@ -62,6 +62,7 @@ function DetectorTypeSelector({
               key={dt.id}
               type="button"
               disabled={!dt.available}
+              data-testid={`method-card-${dt.id}`}
               onClick={() => dt.available && onSelect(dt.id as DetectorKind)}
               className={cn(
                 "group relative flex flex-col items-start rounded-[6px] border-2 p-5 text-left transition-all",

@@ -157,11 +157,7 @@ export class CustomDetectorTestsService {
 
       const expected = scenario.expectedOutcome as Record<string, unknown>;
       const schema = detector.pipelineSchema as Record<string, unknown>;
-      const status = this.compareOutcome(
-        schema,
-        expected,
-        actualOutput,
-      );
+      const status = this.compareOutcome(schema, expected, actualOutput);
 
       const result = await this.prisma.customDetectorTestResult.create({
         data: {

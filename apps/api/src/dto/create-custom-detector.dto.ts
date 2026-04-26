@@ -46,7 +46,8 @@ export class CreateCustomDetectorDto {
   isActive?: boolean;
 
   @ApiProperty({
-    description: 'Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)',
+    description:
+      'Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)',
   })
   @IsObject()
   pipelineSchema: Record<string, unknown>;

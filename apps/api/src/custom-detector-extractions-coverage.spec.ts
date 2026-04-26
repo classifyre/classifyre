@@ -30,7 +30,10 @@ function createService() {
 describe('getCoverage — rate computations', () => {
   it('computes coverageRate as findingsWithExtraction / totalFindings', async () => {
     const { service, prisma } = createService();
-    prisma.customDetector.findUnique.mockResolvedValue({ id: 'det-1', key: 'food_discussion' });
+    prisma.customDetector.findUnique.mockResolvedValue({
+      id: 'det-1',
+      key: 'food_discussion',
+    });
     prisma.finding.count.mockResolvedValue(100);
     prisma.customDetectorExtraction.count.mockResolvedValue(3);
 
@@ -45,7 +48,10 @@ describe('getCoverage — rate computations', () => {
 
   it('returns coverageRate = 0 when no findings exist', async () => {
     const { service, prisma } = createService();
-    prisma.customDetector.findUnique.mockResolvedValue({ id: 'det-1', key: 'food_discussion' });
+    prisma.customDetector.findUnique.mockResolvedValue({
+      id: 'det-1',
+      key: 'food_discussion',
+    });
     prisma.finding.count.mockResolvedValue(0);
     prisma.customDetectorExtraction.count.mockResolvedValue(0);
 
@@ -57,7 +63,10 @@ describe('getCoverage — rate computations', () => {
 
   it('returns coverageRate = 1.0 when all findings have extractions', async () => {
     const { service, prisma } = createService();
-    prisma.customDetector.findUnique.mockResolvedValue({ id: 'det-1', key: 'food_discussion' });
+    prisma.customDetector.findUnique.mockResolvedValue({
+      id: 'det-1',
+      key: 'food_discussion',
+    });
     prisma.finding.count.mockResolvedValue(5);
     prisma.customDetectorExtraction.count.mockResolvedValue(5);
 
@@ -70,7 +79,9 @@ describe('getCoverage — rate computations', () => {
     const { service, prisma } = createService();
     prisma.customDetector.findUnique.mockResolvedValue(null);
 
-    await expect(service.getCoverage('missing-det')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.getCoverage('missing-det')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });
 
@@ -84,7 +95,11 @@ describe('search — filter combinations', () => {
     assetId: 'asset-1',
     runnerId: null,
     detectorVersion: 1,
-    pipelineResult: { entities: [], classification: {}, metadata: { runner: 'REGEX' } },
+    pipelineResult: {
+      entities: [],
+      classification: {},
+      metadata: { runner: 'REGEX' },
+    },
     extractedAt: new Date(),
     createdAt: new Date(),
   };
@@ -98,7 +113,9 @@ describe('search — filter combinations', () => {
 
     expect(prisma.customDetectorExtraction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ customDetectorKey: 'food_discussion' }),
+        where: expect.objectContaining({
+          customDetectorKey: 'food_discussion',
+        }),
       }),
     );
   });
@@ -170,7 +187,11 @@ describe('createFromIngestion — pipelineResult storage', () => {
   it('updates pipelineResult and detectorVersion on conflict', async () => {
     const { service, prisma } = createService();
     prisma.customDetectorExtraction.upsert.mockResolvedValue({});
-    const pipelineResult = { entities: [], classification: {}, metadata: { runner: 'GLINER2' } };
+    const pipelineResult = {
+      entities: [],
+      classification: {},
+      metadata: { runner: 'GLINER2' },
+    };
 
     await service.createFromIngestion({
       findingId: 'find-existing',

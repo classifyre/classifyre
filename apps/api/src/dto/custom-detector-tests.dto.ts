@@ -13,9 +13,7 @@ export const entityMatchSchema = z.object({
 });
 
 export const expectedOutcomeSchema = z.object({
-  entities: z
-    .record(z.string(), z.array(entityMatchSchema))
-    .optional(),
+  entities: z.record(z.string(), z.array(entityMatchSchema)).optional(),
   classification: z
     .record(
       z.string(),

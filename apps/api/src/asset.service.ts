@@ -1562,7 +1562,8 @@ export class AssetService {
                   contextAfter: finding.context_after || null,
                   location: finding.location || null,
                   detectedAt: new Date(finding.detected_at || Date.now()),
-                  pipelineResult: finding.pipeline_result || finding.extracted_data || null,
+                  pipelineResult:
+                    finding.pipeline_result || finding.extracted_data || null,
                 });
               }
             }

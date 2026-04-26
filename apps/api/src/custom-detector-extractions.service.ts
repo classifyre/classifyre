@@ -99,7 +99,9 @@ export class CustomDetectorExtractionsService {
 
     const [totalFindings, findingsWithExtraction] = await Promise.all([
       this.prisma.finding.count({ where: { customDetectorId } }),
-      this.prisma.customDetectorExtraction.count({ where: { customDetectorId } }),
+      this.prisma.customDetectorExtraction.count({
+        where: { customDetectorId },
+      }),
     ]);
 
     const coverageRate =

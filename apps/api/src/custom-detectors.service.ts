@@ -101,15 +101,6 @@ function asString(value: unknown): string | null {
     : null;
 }
 
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map((entry) => asString(entry))
-    .filter((entry): entry is string => Boolean(entry));
-}
-
 function normalizeHeaderCell(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, '_');
 }
@@ -771,16 +762,20 @@ export class CustomDetectorsService {
       const hasPatterns =
         schema.patterns &&
         typeof schema.patterns === 'object' &&
-        Object.keys(schema.patterns as object).length > 0;
+        Object.keys(schema.patterns).length > 0;
       if (!hasPatterns) {
-        throw new BadRequestException('REGEX pipeline schema must define at least one pattern');
+        throw new BadRequestException(
+          'REGEX pipeline schema must define at least one pattern',
+        );
       }
       return;
     }
 
     if (schemaType === 'LLM') {
       if (!schema.prompt || typeof schema.prompt !== 'string') {
-        throw new BadRequestException('LLM pipeline schema must define a prompt string');
+        throw new BadRequestException(
+          'LLM pipeline schema must define a prompt string',
+        );
       }
       return;
     }
@@ -789,11 +784,11 @@ export class CustomDetectorsService {
     const hasEntities =
       schema.entities &&
       typeof schema.entities === 'object' &&
-      Object.keys(schema.entities as object).length > 0;
+      Object.keys(schema.entities).length > 0;
     const hasClassification =
       schema.classification &&
       typeof schema.classification === 'object' &&
-      Object.keys(schema.classification as object).length > 0;
+      Object.keys(schema.classification).length > 0;
 
     if (!hasEntities && !hasClassification) {
       throw new BadRequestException(
@@ -801,7 +796,6 @@ export class CustomDetectorsService {
       );
     }
   }
-
 
   private toTrainingRunDto(
     run: CustomDetectorTrainingRun,
@@ -1040,14 +1034,18 @@ export class CustomDetectorsService {
     const nextPipelineSchema =
       dto.pipelineSchema !== undefined
         ? dto.pipelineSchema
-        : (asRecord((existing as any).pipelineSchema) as Record<string, unknown>);
+        : (asRecord((existing as any).pipelineSchema) as Record<
+            string,
+            unknown
+          >);
 
     if (dto.pipelineSchema !== undefined) {
       this.validatePipelineSchema(nextPipelineSchema);
     }
 
     const nextVersion =
-      stableStringify(nextPipelineSchema) !== stableStringify((existing as any).pipelineSchema)
+      stableStringify(nextPipelineSchema) !==
+      stableStringify((existing as any).pipelineSchema)
         ? existing.version + 1
         : existing.version;
 
@@ -1132,8 +1130,7 @@ export class CustomDetectorsService {
       .map((raw) => asRecord(raw))
       .map((example) => ({
         name: asString(example.name) ?? 'Custom Detector Example',
-        description:
-          asString(example.description) ?? 'Custom detector example',
+        description: asString(example.description) ?? 'Custom detector example',
         pipelineSchema: asRecord(example.pipelineSchema ?? example.config),
       }));
   }
@@ -1319,7 +1316,9 @@ export class CustomDetectorsService {
     return { saved: dto.examples.length };
   }
 
-  async listTrainingExamples(detectorId: string): Promise<TrainingExampleDto[]> {
+  async listTrainingExamples(
+    detectorId: string,
+  ): Promise<TrainingExampleDto[]> {
     const detector = await this.prisma.customDetector.findUnique({
       where: { id: detectorId },
       select: { id: true },
@@ -1334,7 +1333,9 @@ export class CustomDetectorsService {
     });
   }
 
-  async getTrainingExamplesStats(detectorId: string): Promise<TrainingExamplesStatsDto> {
+  async getTrainingExamplesStats(
+    detectorId: string,
+  ): Promise<TrainingExamplesStatsDto> {
     const examples = await this.prisma.customDetectorTrainingExample.findMany({
       where: { customDetectorId: detectorId },
       select: { label: true, accepted: true },
@@ -1343,24 +1344,31 @@ export class CustomDetectorsService {
     const byLabel: Record<string, { positive: number; negative: number }> = {};
     for (const ex of examples) {
       if (!byLabel[ex.label]) byLabel[ex.label] = { positive: 0, negative: 0 };
-      if (ex.accepted) byLabel[ex.label]!.positive++;
-      else byLabel[ex.label]!.negative++;
+      if (ex.accepted) byLabel[ex.label].positive++;
+      else byLabel[ex.label].negative++;
     }
 
     return { total: examples.length, byLabel };
   }
 
-  async deleteTrainingExample(detectorId: string, exampleId: string): Promise<void> {
+  async deleteTrainingExample(
+    detectorId: string,
+    exampleId: string,
+  ): Promise<void> {
     const example = await this.prisma.customDetectorTrainingExample.findFirst({
       where: { id: exampleId, customDetectorId: detectorId },
     });
     if (!example) {
       throw new NotFoundException(`Training example ${exampleId} not found`);
     }
-    await this.prisma.customDetectorTrainingExample.delete({ where: { id: exampleId } });
+    await this.prisma.customDetectorTrainingExample.delete({
+      where: { id: exampleId },
+    });
   }
 
-  async clearTrainingExamples(detectorId: string): Promise<{ deleted: number }> {
+  async clearTrainingExamples(
+    detectorId: string,
+  ): Promise<{ deleted: number }> {
     const result = await this.prisma.customDetectorTrainingExample.deleteMany({
       where: { customDetectorId: detectorId },
     });
@@ -1373,8 +1381,11 @@ export class CustomDetectorsService {
     id: string,
     dto: TrainCustomDetectorDto,
   ): Promise<CustomDetectorTrainingRunDto> {
-    const detector = await this.prisma.customDetector.findUnique({ where: { id } });
-    if (!detector) throw new NotFoundException(`Custom detector ${id} not found`);
+    const detector = await this.prisma.customDetector.findUnique({
+      where: { id },
+    });
+    if (!detector)
+      throw new NotFoundException(`Custom detector ${id} not found`);
 
     if (dto.sourceId) {
       const source = await this.prisma.source.findUnique({
@@ -1432,8 +1443,11 @@ export class CustomDetectorsService {
       const summary = {
         strategy,
         config_hash: configHash,
-        entity_count: Object.keys(asRecord(pipelineSchema.entities ?? {})).length,
-        classification_task_count: Object.keys(asRecord(pipelineSchema.classification ?? {})).length,
+        entity_count: Object.keys(asRecord(pipelineSchema.entities ?? {}))
+          .length,
+        classification_task_count: Object.keys(
+          asRecord(pipelineSchema.classification ?? {}),
+        ).length,
         trained_examples: cliResult.trained_examples,
       };
 
@@ -1447,7 +1461,10 @@ export class CustomDetectorsService {
           trainedExamples: cliResult.trained_examples,
           positiveExamples: cliResult.positive_examples,
           negativeExamples: cliResult.negative_examples,
-          metrics: { ...summary, ...(cliResult.metrics ?? {}) } as Prisma.InputJsonValue,
+          metrics: {
+            ...summary,
+            ...(cliResult.metrics ?? {}),
+          } as Prisma.InputJsonValue,
           configHash,
           modelArtifactPath: cliResult.model_artifact_path,
         },
@@ -1457,7 +1474,7 @@ export class CustomDetectorsService {
       const updatedSchema = {
         ...pipelineSchema,
         model: {
-          ...(asRecord(pipelineSchema.model ?? {})),
+          ...asRecord(pipelineSchema.model ?? {}),
           path: cliResult.model_artifact_path,
         },
       };
@@ -1519,23 +1536,39 @@ export class CustomDetectorsService {
       const child = spawn(
         pythonBin,
         [
-          '-m', 'classifyre',
+          '-m',
+          'classifyre',
           'train',
-          '--pipeline-schema', schemaPath,
-          '--examples', examplesPath,
-          '--output-dir', params.outputDir,
+          '--pipeline-schema',
+          schemaPath,
+          '--examples',
+          examplesPath,
+          '--output-dir',
+          params.outputDir,
         ],
         { stdio: ['ignore', 'pipe', 'pipe'] },
       );
 
       let stdout = '';
       let stderr = '';
-      child.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
-      child.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+      child.stdout.on('data', (d: Buffer) => {
+        stdout += d.toString();
+      });
+      child.stderr.on('data', (d: Buffer) => {
+        stderr += d.toString();
+      });
 
       const cleanup = () => {
-        try { fs.unlinkSync(schemaPath); } catch { /* ignore */ }
-        try { fs.unlinkSync(examplesPath); } catch { /* ignore */ }
+        try {
+          fs.unlinkSync(schemaPath);
+        } catch {
+          /* ignore */
+        }
+        try {
+          fs.unlinkSync(examplesPath);
+        } catch {
+          /* ignore */
+        }
       };
 
       child.on('close', (code) => {
@@ -1547,7 +1580,11 @@ export class CustomDetectorsService {
         try {
           resolve(JSON.parse(stdout.trim()));
         } catch {
-          reject(new Error(`CLI train produced invalid JSON output: ${stdout.slice(-500)}`));
+          reject(
+            new Error(
+              `CLI train produced invalid JSON output: ${stdout.slice(-500)}`,
+            ),
+          );
         }
       });
 
@@ -1566,7 +1603,8 @@ export class CustomDetectorsService {
       where: { id },
       select: { id: true },
     });
-    if (!detector) throw new NotFoundException(`Custom detector ${id} not found`);
+    if (!detector)
+      throw new NotFoundException(`Custom detector ${id} not found`);
 
     const runs = await this.prisma.customDetectorTrainingRun.findMany({
       where: { customDetectorId: id },

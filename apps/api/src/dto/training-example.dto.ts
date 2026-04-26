@@ -13,7 +13,9 @@ export class TrainingExampleItemDto {
   @IsString()
   label: string;
 
-  @ApiProperty({ description: 'Context text containing the entity or to classify' })
+  @ApiProperty({
+    description: 'Context text containing the entity or to classify',
+  })
   @IsString()
   text: string;
 
@@ -25,7 +27,9 @@ export class TrainingExampleItemDto {
   @IsString()
   value?: string;
 
-  @ApiProperty({ description: 'true = positive example, false = negative / false-positive' })
+  @ApiProperty({
+    description: 'true = positive example, false = negative / false-positive',
+  })
   @IsBoolean()
   accepted: boolean;
 

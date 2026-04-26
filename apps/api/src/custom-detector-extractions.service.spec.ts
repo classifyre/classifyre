@@ -41,7 +41,9 @@ describe('CustomDetectorExtractionsService', () => {
 
   it('getByFinding returns extraction when found', async () => {
     const { service, prisma } = createService();
-    prisma.customDetectorExtraction.findUnique.mockResolvedValue(mockExtraction);
+    prisma.customDetectorExtraction.findUnique.mockResolvedValue(
+      mockExtraction,
+    );
 
     const result = await service.getByFinding('find-1');
 
@@ -60,23 +62,31 @@ describe('CustomDetectorExtractionsService', () => {
 
   it('search filters by customDetectorKey', async () => {
     const { service, prisma } = createService();
-    prisma.customDetectorExtraction.findMany.mockResolvedValue([mockExtraction]);
+    prisma.customDetectorExtraction.findMany.mockResolvedValue([
+      mockExtraction,
+    ]);
     prisma.customDetectorExtraction.count.mockResolvedValue(1);
 
-    const result = await service.search({ customDetectorKey: 'food_discussion' });
+    const result = await service.search({
+      customDetectorKey: 'food_discussion',
+    });
 
     expect(result.total).toBe(1);
     expect(result.items[0]?.customDetectorKey).toBe('food_discussion');
     expect(prisma.customDetectorExtraction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ customDetectorKey: 'food_discussion' }),
+        where: expect.objectContaining({
+          customDetectorKey: 'food_discussion',
+        }),
       }),
     );
   });
 
   it('search filters by sourceId', async () => {
     const { service, prisma } = createService();
-    prisma.customDetectorExtraction.findMany.mockResolvedValue([mockExtraction]);
+    prisma.customDetectorExtraction.findMany.mockResolvedValue([
+      mockExtraction,
+    ]);
     prisma.customDetectorExtraction.count.mockResolvedValue(1);
 
     await service.search({ sourceId: 'src-1' });
@@ -104,12 +114,17 @@ describe('CustomDetectorExtractionsService', () => {
     const { service, prisma } = createService();
     prisma.customDetector.findUnique.mockResolvedValue(null);
 
-    await expect(service.getCoverage('missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.getCoverage('missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('getCoverage computes rates correctly', async () => {
     const { service, prisma } = createService();
-    prisma.customDetector.findUnique.mockResolvedValue({ id: 'det-1', key: 'food_discussion' });
+    prisma.customDetector.findUnique.mockResolvedValue({
+      id: 'det-1',
+      key: 'food_discussion',
+    });
     prisma.finding.count.mockResolvedValue(100);
     prisma.customDetectorExtraction.count.mockResolvedValue(3);
 
@@ -123,7 +138,10 @@ describe('CustomDetectorExtractionsService', () => {
 
   it('getCoverage returns zero coverageRate when no findings', async () => {
     const { service, prisma } = createService();
-    prisma.customDetector.findUnique.mockResolvedValue({ id: 'det-1', key: 'empty_detector' });
+    prisma.customDetector.findUnique.mockResolvedValue({
+      id: 'det-1',
+      key: 'empty_detector',
+    });
     prisma.finding.count.mockResolvedValue(0);
     prisma.customDetectorExtraction.count.mockResolvedValue(0);
 

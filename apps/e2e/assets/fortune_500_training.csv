@@ -1,0 +1,101 @@
+text,label,value,accepted
+"Walmart ranked #1 in the Fortune 500 with revenues of $4,85,873 million and 23,00,000 employees, earning $13,643.0 million in profits.",company_name,Walmart,true
+"Walmart ranked #1 in the Fortune 500 with revenues of $4,85,873 million and 23,00,000 employees, earning $13,643.0 million in profits.",revenue,$4,85,873,true
+"Walmart ranked #1 in the Fortune 500 with revenues of $4,85,873 million and 23,00,000 employees, earning $13,643.0 million in profits.",rank,1,true
+"Walmart ranked #1 in the Fortune 500 with revenues of $4,85,873 million and 23,00,000 employees, earning $13,643.0 million in profits.",employees,23,00,000,true
+"Walmart ranked #1 in the Fortune 500 with revenues of $4,85,873 million and 23,00,000 employees, earning $13,643.0 million in profits.",profits,$13,643.0,true
+"Berkshire Hathaway ranked #2 in the Fortune 500 with revenues of $2,23,604 million and 3,67,700 employees, earning $24,074.0 million in profits.",company_name,Berkshire Hathaway,true
+"Berkshire Hathaway ranked #2 in the Fortune 500 with revenues of $2,23,604 million and 3,67,700 employees, earning $24,074.0 million in profits.",revenue,$2,23,604,true
+"Berkshire Hathaway ranked #2 in the Fortune 500 with revenues of $2,23,604 million and 3,67,700 employees, earning $24,074.0 million in profits.",rank,2,true
+"Berkshire Hathaway ranked #2 in the Fortune 500 with revenues of $2,23,604 million and 3,67,700 employees, earning $24,074.0 million in profits.",employees,3,67,700,true
+"Berkshire Hathaway ranked #2 in the Fortune 500 with revenues of $2,23,604 million and 3,67,700 employees, earning $24,074.0 million in profits.",profits,$24,074.0,true
+"Apple ranked #3 in the Fortune 500 with revenues of $2,15,639 million and 1,16,000 employees, earning $45,687.0 million in profits.",company_name,Apple,true
+"Apple ranked #3 in the Fortune 500 with revenues of $2,15,639 million and 1,16,000 employees, earning $45,687.0 million in profits.",revenue,$2,15,639,true
+"Apple ranked #3 in the Fortune 500 with revenues of $2,15,639 million and 1,16,000 employees, earning $45,687.0 million in profits.",rank,3,true
+"Apple ranked #3 in the Fortune 500 with revenues of $2,15,639 million and 1,16,000 employees, earning $45,687.0 million in profits.",employees,1,16,000,true
+"Apple ranked #3 in the Fortune 500 with revenues of $2,15,639 million and 1,16,000 employees, earning $45,687.0 million in profits.",profits,$45,687.0,true
+"Exxon Mobil ranked #4 in the Fortune 500 with revenues of $2,05,004 million and 72,700 employees, earning $7,840.0 million in profits.",company_name,Exxon Mobil,true
+"Exxon Mobil ranked #4 in the Fortune 500 with revenues of $2,05,004 million and 72,700 employees, earning $7,840.0 million in profits.",revenue,$2,05,004,true
+"Exxon Mobil ranked #4 in the Fortune 500 with revenues of $2,05,004 million and 72,700 employees, earning $7,840.0 million in profits.",rank,4,true
+"Exxon Mobil ranked #4 in the Fortune 500 with revenues of $2,05,004 million and 72,700 employees, earning $7,840.0 million in profits.",employees,72,700,true
+"Exxon Mobil ranked #4 in the Fortune 500 with revenues of $2,05,004 million and 72,700 employees, earning $7,840.0 million in profits.",profits,$7,840.0,true
+"McKesson ranked #5 in the Fortune 500 with revenues of $1,92,487 million and 68,000 employees, earning $2,258.0 million in profits.",company_name,McKesson,true
+"McKesson ranked #5 in the Fortune 500 with revenues of $1,92,487 million and 68,000 employees, earning $2,258.0 million in profits.",revenue,$1,92,487,true
+"McKesson ranked #5 in the Fortune 500 with revenues of $1,92,487 million and 68,000 employees, earning $2,258.0 million in profits.",rank,5,true
+"McKesson ranked #5 in the Fortune 500 with revenues of $1,92,487 million and 68,000 employees, earning $2,258.0 million in profits.",employees,68,000,true
+"McKesson ranked #5 in the Fortune 500 with revenues of $1,92,487 million and 68,000 employees, earning $2,258.0 million in profits.",profits,$2,258.0,true
+"UnitedHealth Group ranked #6 in the Fortune 500 with revenues of $1,84,840 million and 2,30,000 employees, earning $7,017.0 million in profits.",company_name,UnitedHealth Group,true
+"UnitedHealth Group ranked #6 in the Fortune 500 with revenues of $1,84,840 million and 2,30,000 employees, earning $7,017.0 million in profits.",revenue,$1,84,840,true
+"UnitedHealth Group ranked #6 in the Fortune 500 with revenues of $1,84,840 million and 2,30,000 employees, earning $7,017.0 million in profits.",rank,6,true
+"UnitedHealth Group ranked #6 in the Fortune 500 with revenues of $1,84,840 million and 2,30,000 employees, earning $7,017.0 million in profits.",employees,2,30,000,true
+"UnitedHealth Group ranked #6 in the Fortune 500 with revenues of $1,84,840 million and 2,30,000 employees, earning $7,017.0 million in profits.",profits,$7,017.0,true
+"CVS Health ranked #7 in the Fortune 500 with revenues of $1,77,526 million and 2,04,000 employees, earning $5,317.0 million in profits.",company_name,CVS Health,true
+"CVS Health ranked #7 in the Fortune 500 with revenues of $1,77,526 million and 2,04,000 employees, earning $5,317.0 million in profits.",revenue,$1,77,526,true
+"CVS Health ranked #7 in the Fortune 500 with revenues of $1,77,526 million and 2,04,000 employees, earning $5,317.0 million in profits.",rank,7,true
+"CVS Health ranked #7 in the Fortune 500 with revenues of $1,77,526 million and 2,04,000 employees, earning $5,317.0 million in profits.",employees,2,04,000,true
+"CVS Health ranked #7 in the Fortune 500 with revenues of $1,77,526 million and 2,04,000 employees, earning $5,317.0 million in profits.",profits,$5,317.0,true
+"General Motors ranked #8 in the Fortune 500 with revenues of $1,66,380 million and 2,25,000 employees, earning $9,427.0 million in profits.",company_name,General Motors,true
+"General Motors ranked #8 in the Fortune 500 with revenues of $1,66,380 million and 2,25,000 employees, earning $9,427.0 million in profits.",revenue,$1,66,380,true
+"General Motors ranked #8 in the Fortune 500 with revenues of $1,66,380 million and 2,25,000 employees, earning $9,427.0 million in profits.",rank,8,true
+"General Motors ranked #8 in the Fortune 500 with revenues of $1,66,380 million and 2,25,000 employees, earning $9,427.0 million in profits.",employees,2,25,000,true
+"General Motors ranked #8 in the Fortune 500 with revenues of $1,66,380 million and 2,25,000 employees, earning $9,427.0 million in profits.",profits,$9,427.0,true
+"AT&T ranked #9 in the Fortune 500 with revenues of $1,63,786 million and 2,68,540 employees, earning $12,976.0 million in profits.",company_name,AT&T,true
+"AT&T ranked #9 in the Fortune 500 with revenues of $1,63,786 million and 2,68,540 employees, earning $12,976.0 million in profits.",revenue,$1,63,786,true
+"AT&T ranked #9 in the Fortune 500 with revenues of $1,63,786 million and 2,68,540 employees, earning $12,976.0 million in profits.",rank,9,true
+"AT&T ranked #9 in the Fortune 500 with revenues of $1,63,786 million and 2,68,540 employees, earning $12,976.0 million in profits.",employees,2,68,540,true
+"AT&T ranked #9 in the Fortune 500 with revenues of $1,63,786 million and 2,68,540 employees, earning $12,976.0 million in profits.",profits,$12,976.0,true
+"Ford Motor ranked #10 in the Fortune 500 with revenues of $1,51,800 million and 2,01,000 employees, earning $4,596.0 million in profits.",company_name,Ford Motor,true
+"Ford Motor ranked #10 in the Fortune 500 with revenues of $1,51,800 million and 2,01,000 employees, earning $4,596.0 million in profits.",revenue,$1,51,800,true
+"Ford Motor ranked #10 in the Fortune 500 with revenues of $1,51,800 million and 2,01,000 employees, earning $4,596.0 million in profits.",rank,10,true
+"Ford Motor ranked #10 in the Fortune 500 with revenues of $1,51,800 million and 2,01,000 employees, earning $4,596.0 million in profits.",employees,2,01,000,true
+"Ford Motor ranked #10 in the Fortune 500 with revenues of $1,51,800 million and 2,01,000 employees, earning $4,596.0 million in profits.",profits,$4,596.0,true
+"AmerisourceBergen ranked #11 in the Fortune 500 with revenues of $1,46,850 million and 18,500 employees, earning $1,427.9 million in profits.",company_name,AmerisourceBergen,true
+"AmerisourceBergen ranked #11 in the Fortune 500 with revenues of $1,46,850 million and 18,500 employees, earning $1,427.9 million in profits.",revenue,$1,46,850,true
+"AmerisourceBergen ranked #11 in the Fortune 500 with revenues of $1,46,850 million and 18,500 employees, earning $1,427.9 million in profits.",rank,11,true
+"AmerisourceBergen ranked #11 in the Fortune 500 with revenues of $1,46,850 million and 18,500 employees, earning $1,427.9 million in profits.",employees,18,500,true
+"AmerisourceBergen ranked #11 in the Fortune 500 with revenues of $1,46,850 million and 18,500 employees, earning $1,427.9 million in profits.",profits,$1,427.9,true
+"Amazon.com ranked #12 in the Fortune 500 with revenues of $1,35,987 million and 3,41,400 employees, earning $2,371.0 million in profits.",company_name,Amazon.com,true
+"Amazon.com ranked #12 in the Fortune 500 with revenues of $1,35,987 million and 3,41,400 employees, earning $2,371.0 million in profits.",revenue,$1,35,987,true
+"Amazon.com ranked #12 in the Fortune 500 with revenues of $1,35,987 million and 3,41,400 employees, earning $2,371.0 million in profits.",rank,12,true
+"Amazon.com ranked #12 in the Fortune 500 with revenues of $1,35,987 million and 3,41,400 employees, earning $2,371.0 million in profits.",employees,3,41,400,true
+"Amazon.com ranked #12 in the Fortune 500 with revenues of $1,35,987 million and 3,41,400 employees, earning $2,371.0 million in profits.",profits,$2,371.0,true
+"General Electric ranked #13 in the Fortune 500 with revenues of $1,26,661 million and 2,95,000 employees, earning $8,831.0 million in profits.",company_name,General Electric,true
+"General Electric ranked #13 in the Fortune 500 with revenues of $1,26,661 million and 2,95,000 employees, earning $8,831.0 million in profits.",revenue,$1,26,661,true
+"General Electric ranked #13 in the Fortune 500 with revenues of $1,26,661 million and 2,95,000 employees, earning $8,831.0 million in profits.",rank,13,true
+"General Electric ranked #13 in the Fortune 500 with revenues of $1,26,661 million and 2,95,000 employees, earning $8,831.0 million in profits.",employees,2,95,000,true
+"General Electric ranked #13 in the Fortune 500 with revenues of $1,26,661 million and 2,95,000 employees, earning $8,831.0 million in profits.",profits,$8,831.0,true
+"Verizon ranked #14 in the Fortune 500 with revenues of $1,25,980 million and 1,60,900 employees, earning $13,127.0 million in profits.",company_name,Verizon,true
+"Verizon ranked #14 in the Fortune 500 with revenues of $1,25,980 million and 1,60,900 employees, earning $13,127.0 million in profits.",revenue,$1,25,980,true
+"Verizon ranked #14 in the Fortune 500 with revenues of $1,25,980 million and 1,60,900 employees, earning $13,127.0 million in profits.",rank,14,true
+"Verizon ranked #14 in the Fortune 500 with revenues of $1,25,980 million and 1,60,900 employees, earning $13,127.0 million in profits.",employees,1,60,900,true
+"Verizon ranked #14 in the Fortune 500 with revenues of $1,25,980 million and 1,60,900 employees, earning $13,127.0 million in profits.",profits,$13,127.0,true
+"Cardinal Health ranked #15 in the Fortune 500 with revenues of $1,21,546 million and 37,300 employees, earning $1,427.0 million in profits.",company_name,Cardinal Health,true
+"Cardinal Health ranked #15 in the Fortune 500 with revenues of $1,21,546 million and 37,300 employees, earning $1,427.0 million in profits.",revenue,$1,21,546,true
+"Cardinal Health ranked #15 in the Fortune 500 with revenues of $1,21,546 million and 37,300 employees, earning $1,427.0 million in profits.",rank,15,true
+"Cardinal Health ranked #15 in the Fortune 500 with revenues of $1,21,546 million and 37,300 employees, earning $1,427.0 million in profits.",employees,37,300,true
+"Cardinal Health ranked #15 in the Fortune 500 with revenues of $1,21,546 million and 37,300 employees, earning $1,427.0 million in profits.",profits,$1,427.0,true
+"Costco ranked #16 in the Fortune 500 with revenues of $1,18,719 million and 1,72,000 employees, earning $2,350.0 million in profits.",company_name,Costco,true
+"Costco ranked #16 in the Fortune 500 with revenues of $1,18,719 million and 1,72,000 employees, earning $2,350.0 million in profits.",revenue,$1,18,719,true
+"Costco ranked #16 in the Fortune 500 with revenues of $1,18,719 million and 1,72,000 employees, earning $2,350.0 million in profits.",rank,16,true
+"Costco ranked #16 in the Fortune 500 with revenues of $1,18,719 million and 1,72,000 employees, earning $2,350.0 million in profits.",employees,1,72,000,true
+"Costco ranked #16 in the Fortune 500 with revenues of $1,18,719 million and 1,72,000 employees, earning $2,350.0 million in profits.",profits,$2,350.0,true
+"Walgreens Boots Alliance ranked #17 in the Fortune 500 with revenues of $1,17,351 million and 3,00,000 employees, earning $4,173.0 million in profits.",company_name,Walgreens Boots Alliance,true
+"Walgreens Boots Alliance ranked #17 in the Fortune 500 with revenues of $1,17,351 million and 3,00,000 employees, earning $4,173.0 million in profits.",revenue,$1,17,351,true
+"Walgreens Boots Alliance ranked #17 in the Fortune 500 with revenues of $1,17,351 million and 3,00,000 employees, earning $4,173.0 million in profits.",rank,17,true
+"Walgreens Boots Alliance ranked #17 in the Fortune 500 with revenues of $1,17,351 million and 3,00,000 employees, earning $4,173.0 million in profits.",employees,3,00,000,true
+"Walgreens Boots Alliance ranked #17 in the Fortune 500 with revenues of $1,17,351 million and 3,00,000 employees, earning $4,173.0 million in profits.",profits,$4,173.0,true
+"Kroger ranked #18 in the Fortune 500 with revenues of $1,15,337 million and 4,43,000 employees, earning $1,975.0 million in profits.",company_name,Kroger,true
+"Kroger ranked #18 in the Fortune 500 with revenues of $1,15,337 million and 4,43,000 employees, earning $1,975.0 million in profits.",revenue,$1,15,337,true
+"Kroger ranked #18 in the Fortune 500 with revenues of $1,15,337 million and 4,43,000 employees, earning $1,975.0 million in profits.",rank,18,true
+"Kroger ranked #18 in the Fortune 500 with revenues of $1,15,337 million and 4,43,000 employees, earning $1,975.0 million in profits.",employees,4,43,000,true
+"Kroger ranked #18 in the Fortune 500 with revenues of $1,15,337 million and 4,43,000 employees, earning $1,975.0 million in profits.",profits,$1,975.0,true
+"Chevron ranked #19 in the Fortune 500 with revenues of $1,07,567 million and 55,200 employees, earning -$497.0 million in profits.",company_name,Chevron,true
+"Chevron ranked #19 in the Fortune 500 with revenues of $1,07,567 million and 55,200 employees, earning -$497.0 million in profits.",revenue,$1,07,567,true
+"Chevron ranked #19 in the Fortune 500 with revenues of $1,07,567 million and 55,200 employees, earning -$497.0 million in profits.",rank,19,true
+"Chevron ranked #19 in the Fortune 500 with revenues of $1,07,567 million and 55,200 employees, earning -$497.0 million in profits.",employees,55,200,true
+"Chevron ranked #19 in the Fortune 500 with revenues of $1,07,567 million and 55,200 employees, earning -$497.0 million in profits.",profits,-$497.0,true
+"Fannie Mae ranked #20 in the Fortune 500 with revenues of $1,07,162 million and 7,000 employees, earning $12,313.0 million in profits.",company_name,Fannie Mae,true
+"Fannie Mae ranked #20 in the Fortune 500 with revenues of $1,07,162 million and 7,000 employees, earning $12,313.0 million in profits.",revenue,$1,07,162,true
+"Fannie Mae ranked #20 in the Fortune 500 with revenues of $1,07,162 million and 7,000 employees, earning $12,313.0 million in profits.",rank,20,true
+"Fannie Mae ranked #20 in the Fortune 500 with revenues of $1,07,162 million and 7,000 employees, earning $12,313.0 million in profits.",employees,7,000,true
+"Fannie Mae ranked #20 in the Fortune 500 with revenues of $1,07,162 million and 7,000 employees, earning $12,313.0 million in profits.",profits,$12,313.0,true

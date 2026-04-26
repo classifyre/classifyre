@@ -5,9 +5,7 @@ import {
 } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  CustomDetectorTrainingStatus,
-} from '@prisma/client';
+import { CustomDetectorTrainingStatus } from '@prisma/client';
 import { CustomDetectorsService } from './custom-detectors.service';
 
 describe('CustomDetectorsService', () => {
@@ -45,7 +43,9 @@ describe('CustomDetectorsService', () => {
 
     const pipelineSchema = {
       type: 'GLINER2',
-      entities: { risk_term: { description: 'Legal risk term', required: false } },
+      entities: {
+        risk_term: { description: 'Legal risk term', required: false },
+      },
       classification: {},
       validation: { confidence_threshold: 0.8, rules: [] },
     };
