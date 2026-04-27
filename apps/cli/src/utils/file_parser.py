@@ -432,11 +432,25 @@ def _iter_text_lines(text: str, batch_size: int) -> Generator[str, None, None]:
             yield chunk
 
 
+_PARQUET_MAGIC = b"PAR1"
+
+
 def _iter_parquet_pages(
     file_bytes: bytes,
     batch_size: int,
     include_column_names: bool,
 ) -> Generator[str, None, None]:
+    # Parquet files begin AND end with the 4-byte magic "PAR1".  If the footer
+    # is missing the bytes were truncated mid-download; pyarrow's C++ thread
+    # pool will hang indefinitely trying to read schema metadata that isn't
+    # there, locking all worker threads on a futex.  Bail out early instead.
+    if len(file_bytes) < 8 or file_bytes[-4:] != _PARQUET_MAGIC:
+        logger.warning(
+            "Parquet bytes appear truncated (footer magic missing, %d bytes); skipping",
+            len(file_bytes),
+        )
+        return
+
     try:
         import io
 

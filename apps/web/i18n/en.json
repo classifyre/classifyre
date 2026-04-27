@@ -292,7 +292,7 @@
       "orderByPlaceholder": "e.g. updated_at",
       "orderByDesc": "Column for date ordering (auto-detected if blank)",
       "rowsPerPage": "Rows per page",
-      "rowsPerPageDesc": "Sample size for RANDOM/LATEST; batch size per page for ALL strategy",
+      "rowsPerPageDesc": "Databases: sample size (RANDOM/LATEST) or batch size (ALL). Files: rows/lines per detector page.",
       "hintRandom2": "Picks a random subset of items each run",
       "hintLatest2": "Fetches the most recently modified items first",
       "hintAll2": "Scans every item — use with care on large sources"
