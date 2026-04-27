@@ -222,6 +222,8 @@ module = [
     "yara.*",
     "nudenet.*",
     "fast_langdetect.*",
+    "detect_secrets.*",
+    "detect_secrets",
     "bandit.*",
     "datasketch.*",
     "sentence_transformers.*",
