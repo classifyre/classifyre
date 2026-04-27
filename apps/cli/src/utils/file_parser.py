@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -321,20 +322,18 @@ def _decode_bytes(file_bytes: bytes) -> str:
         return file_bytes.decode("utf-8", errors="replace")
 
 
-def parse_bytes(
+def resolve_mime_type(
     file_bytes: bytes,
     *,
     declared_mime_type: str | None = None,
     file_name: str = "",
-) -> ParsedBytes:
+) -> str:
     """
-    Parse in-memory bytes: choose MIME type and extract raw/text content.
+    Resolve effective MIME type from declared hint, magic-byte detection, and file extension.
 
-    This function is the shared parser used by sandbox and any source that
-    downloads blob/file content.
+    Kept separate from full parsing so callers can detect format cheaply without
+    paying for text extraction (e.g. when content will be streamed in pages later).
     """
-    file_size_bytes = len(file_bytes)
-
     declared_mime = _normalize_mime_type(declared_mime_type)
     detected_mime = _normalize_mime_type(detect_mime_type(file_bytes))
     inferred_mime = infer_mime_type_from_file_name(file_name)
@@ -351,6 +350,25 @@ def parse_bytes(
     mime_type = normalize_detected_mime_type(mime_type, file_name)
     if mime_type == "application/octet-stream" and inferred_mime != "application/octet-stream":
         mime_type = inferred_mime
+
+    return mime_type
+
+
+def parse_bytes(
+    file_bytes: bytes,
+    *,
+    declared_mime_type: str | None = None,
+    file_name: str = "",
+) -> ParsedBytes:
+    """
+    Parse in-memory bytes: resolve MIME type and extract raw/text content.
+
+    Used by the sandbox and any caller that needs a complete ParsedBytes in one shot.
+    Object-storage sources prefer resolve_mime_type() + iter_file_pages() to avoid
+    loading all content into memory before detector scanning.
+    """
+    file_size_bytes = len(file_bytes)
+    mime_type = resolve_mime_type(file_bytes, declared_mime_type=declared_mime_type, file_name=file_name)
 
     text_content, parse_error = extract_text(file_bytes, mime_type)
     raw_content = _decode_bytes(file_bytes) if _is_text_like_mime_type(mime_type) else ""
@@ -373,6 +391,123 @@ def parse_bytes(
         file_size_bytes=file_size_bytes,
         parse_error=parse_error,
     )
+
+
+def iter_file_pages(
+    file_bytes: bytes,
+    mime_type: str,
+    batch_size: int = 100,
+    include_column_names: bool = True,
+) -> Generator[str, None, None]:
+    """
+    Iterate over file content in pages of up to batch_size rows or lines.
+
+    Parquet / CSV / TSV  → yields batch_size *rows* per page with labelled columns.
+    All other extractable types (PDF, DOCX, TXT, JSON, XML, XLSX, …) → extracts the
+    full text once via extract_text(), then yields batch_size *lines* per page.
+    Non-extractable types (images, audio, video, unknown binary) → yields nothing.
+
+    New file formats only need to be added to extract_text() — not here.
+    """
+    normalized = _normalize_mime_type(mime_type)
+
+    if normalized in ("application/parquet", "application/vnd.apache.parquet"):
+        yield from _iter_parquet_pages(file_bytes, batch_size, include_column_names)
+    elif normalized in ("text/csv", "text/tab-separated-values"):
+        yield from _iter_csv_pages(file_bytes, batch_size, include_column_names)
+    else:
+        text, error = extract_text(file_bytes, normalized)
+        if error:
+            logger.warning("Text extraction error (%s): %s", mime_type, error)
+        if text:
+            yield from _iter_text_lines(text, batch_size)
+
+
+def _iter_text_lines(text: str, batch_size: int) -> Generator[str, None, None]:
+    """Yield non-empty text in chunks of batch_size lines."""
+    lines = text.splitlines(keepends=True)
+    for start in range(0, len(lines), batch_size):
+        chunk = "".join(lines[start : start + batch_size])
+        if chunk.strip():
+            yield chunk
+
+
+def _iter_parquet_pages(
+    file_bytes: bytes,
+    batch_size: int,
+    include_column_names: bool,
+) -> Generator[str, None, None]:
+    try:
+        import io
+
+        import pyarrow.parquet as pq  # type: ignore[import-not-found, import-untyped]
+
+        table = pq.read_table(io.BytesIO(file_bytes))
+        column_names = table.schema.names
+        total_rows = table.num_rows
+
+        for batch_start in range(0, total_rows, batch_size):
+            batch = table.slice(batch_start, min(batch_size, total_rows - batch_start))
+            lines: list[str] = []
+            for local_idx in range(batch.num_rows):
+                abs_row = batch_start + local_idx
+                lines.append(f"row_{abs_row + 1}:")
+                for col in column_names:
+                    cell = batch.column(col)[local_idx].as_py()
+                    cell_str = "" if cell is None else str(cell)
+                    first, *rest = cell_str.splitlines() or [""]
+                    lines.append(f"  {col}: {first}" if include_column_names else f"  {first}")
+                    lines.extend(f"    {c}" for c in rest)
+                lines.append("")
+            yield "\n".join(lines)
+    except Exception as exc:
+        logger.warning("Parquet page iteration failed: %s", exc)
+
+
+def _iter_csv_pages(
+    file_bytes: bytes,
+    batch_size: int,
+    include_column_names: bool,
+) -> Generator[str, None, None]:
+    import csv
+    import io
+
+    try:
+        text = _decode_bytes(file_bytes)
+        reader = csv.DictReader(io.StringIO(text))
+        headers = list(reader.fieldnames or [])
+
+        batch: list[dict[str, str]] = []
+        total_seen = 0
+
+        for row in reader:
+            batch.append(dict(row))
+            total_seen += 1
+            if len(batch) >= batch_size:
+                yield _format_tabular_page(batch, headers, total_seen - len(batch) + 1, include_column_names)
+                batch = []
+
+        if batch:
+            yield _format_tabular_page(batch, headers, total_seen - len(batch) + 1, include_column_names)
+    except Exception as exc:
+        logger.warning("CSV page iteration failed: %s", exc)
+
+
+def _format_tabular_page(
+    rows: list[dict[str, str]],
+    headers: list[str],
+    abs_row_start: int,
+    include_column_names: bool,
+) -> str:
+    lines: list[str] = []
+    for i, row in enumerate(rows):
+        lines.append(f"row_{abs_row_start + i}:")
+        for col in headers:
+            first, *rest = (row.get(col) or "").splitlines() or [""]
+            lines.append(f"  {col}: {first}" if include_column_names else f"  {first}")
+            lines.extend(f"    {c}" for c in rest)
+        lines.append("")
+    return "\n".join(lines)
 
 
 def parse_file(file_path: Path) -> ParsedFile:

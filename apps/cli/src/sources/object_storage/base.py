@@ -18,7 +18,7 @@ from ...models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
 )
-from ...utils.file_parser import infer_mime_type_from_file_name, parse_bytes
+from ...utils.file_parser import infer_mime_type_from_file_name, iter_file_pages, resolve_mime_type
 from ...utils.hashing import hash_id, unhash_id
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -41,6 +41,7 @@ _TABULAR_MIME_TYPES = {
     "application/parquet",
     "application/vnd.apache.parquet",
 }
+
 
 _FILE_EXTENSION_HINTS: dict[str, OutputAssetType] = {
     ".png": OutputAssetType.IMAGE,
@@ -101,6 +102,9 @@ class ContentSnapshot:
     parse_error: str | None
     downloaded_bytes: int
     truncated: bool
+    # Raw bytes retained for batchable tabular files so fetch_content_pages() can
+    # iterate rows in configurable-sized pages instead of one monolithic text blob.
+    raw_bytes: bytes | None = None
 
 
 class ObjectStorageSourceBase(BaseSource, ABC):
@@ -125,6 +129,9 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._hash_to_uri: dict[str, str] = {}
         self._object_ref_by_hash: dict[str, ObjectRef] = {}
         self._file_processing_deps_checked = False
+        # Keyed by both asset_hash and external_url for O(1) lookup from either.
+        self._bytes_cache: dict[str, bytes] = {}
+        self._mime_cache: dict[str, str] = {}
 
     def _asset_type_value(self) -> str:
         type_value = self.config.type
@@ -349,19 +356,29 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             )
 
         self._ensure_file_processing_dependencies()
-        parsed = parse_bytes(
+        mime_type = resolve_mime_type(
             file_bytes,
             declared_mime_type=content_type_hint or ref.content_type_hint or "",
             file_name=ref.key,
         )
+        normalized_mime = mime_type.split(";", 1)[0].strip().lower()
+
+        # Non-extractable types (images, audio, video, opaque binary) carry no text.
+        # Everything else defers extraction to fetch_content_pages() so detectors
+        # receive content in configurable-sized pages instead of one monolithic blob.
+        is_non_extractable = normalized_mime.startswith(("image/", "audio/", "video/")) or normalized_mime in (
+            "application/octet-stream",
+            "application/zip",
+        )
 
         return ContentSnapshot(
-            mime_type=parsed.mime_type,
-            raw_content=parsed.raw_content,
-            text_content=parsed.text_content,
-            parse_error=parsed.parse_error,
-            downloaded_bytes=parsed.file_size_bytes,
+            mime_type=mime_type,
+            raw_content="",
+            text_content="",
+            parse_error=None,
+            downloaded_bytes=len(file_bytes),
             truncated=truncated,
+            raw_bytes=None if is_non_extractable else file_bytes,
         )
 
     def _to_asset(self, ref: ObjectRef) -> SingleAssetScanResults:
@@ -373,6 +390,13 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
         if snapshot.text_content:
             self._content_cache[asset_hash] = (snapshot.raw_content, snapshot.text_content)
+        if snapshot.raw_bytes is not None:
+            # Store under both keys (asset_hash and external_url) so fetch_content_pages()
+            # resolves with O(1) regardless of which candidate_id the pipeline supplies.
+            self._bytes_cache[asset_hash] = snapshot.raw_bytes
+            self._bytes_cache[external_url] = snapshot.raw_bytes
+            self._mime_cache[asset_hash] = snapshot.mime_type
+            self._mime_cache[external_url] = snapshot.mime_type
 
         metadata: dict[str, Any] = {
             "provider": self.provider_label,
@@ -433,6 +457,8 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._content_cache = {}
         self._hash_to_uri = {}
         self._object_ref_by_hash = {}
+        self._bytes_cache = {}
+        self._mime_cache = {}
 
         pipeline = None
         if self.config.detectors and any(detector.enabled for detector in self.config.detectors):
@@ -472,6 +498,26 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 batch = await pipeline.process(batch)
             if batch:
                 yield batch
+
+    async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
+        raw_bytes = self._bytes_cache.get(asset_id)
+        mime = self._mime_cache.get(asset_id, "")
+
+        if raw_bytes is not None:
+            sampling = self.config.sampling
+            batch_size = int(sampling.rows_per_page or 100)
+            include_col_names = bool(
+                sampling.include_column_names
+                if sampling.include_column_names is not None
+                else True
+            )
+            for batch_text in iter_file_pages(raw_bytes, mime, batch_size, include_col_names):
+                yield "", batch_text
+            return
+
+        result = await self.fetch_content(asset_id)
+        if result:
+            yield result
 
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
         if asset_id in self._content_cache:
