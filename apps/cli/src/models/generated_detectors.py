@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
@@ -14,17 +13,17 @@ class DetectorType(StrEnum):
     Type of detector for content analysis
     """
 
-    SECRETS = "SECRETS"
-    PII = "PII"
-    TOXIC = "TOXIC"
-    NSFW = "NSFW"
-    YARA = "YARA"
-    BROKEN_LINKS = "BROKEN_LINKS"
-    PROMPT_INJECTION = "PROMPT_INJECTION"
-    SPAM = "SPAM"
-    LANGUAGE = "LANGUAGE"
-    CODE_SECURITY = "CODE_SECURITY"
-    CUSTOM = "CUSTOM"
+    SECRETS = 'SECRETS'
+    PII = 'PII'
+    TOXIC = 'TOXIC'
+    NSFW = 'NSFW'
+    YARA = 'YARA'
+    BROKEN_LINKS = 'BROKEN_LINKS'
+    PROMPT_INJECTION = 'PROMPT_INJECTION'
+    SPAM = 'SPAM'
+    LANGUAGE = 'LANGUAGE'
+    CODE_SECURITY = 'CODE_SECURITY'
+    CUSTOM = 'CUSTOM'
 
 
 class DetectorCategory(StrEnum):
@@ -32,14 +31,14 @@ class DetectorCategory(StrEnum):
     High-level detector category for filtering and governance
     """
 
-    SECURITY = "SECURITY"
-    PRIVACY = "PRIVACY"
-    THREAT = "THREAT"
-    CONTENT = "CONTENT"
-    QUALITY = "QUALITY"
-    FAIRNESS = "FAIRNESS"
-    COMPLIANCE = "COMPLIANCE"
-    CLASSIFICATION = "CLASSIFICATION"
+    SECURITY = 'SECURITY'
+    PRIVACY = 'PRIVACY'
+    THREAT = 'THREAT'
+    CONTENT = 'CONTENT'
+    QUALITY = 'QUALITY'
+    FAIRNESS = 'FAIRNESS'
+    COMPLIANCE = 'COMPLIANCE'
+    CLASSIFICATION = 'CLASSIFICATION'
 
 
 class SupportedAssetType(StrEnum):
@@ -47,14 +46,14 @@ class SupportedAssetType(StrEnum):
     Canonical output asset type the detector can process
     """
 
-    TXT = "TXT"
-    TABLE = "TABLE"
-    IMAGE = "IMAGE"
-    VIDEO = "VIDEO"
-    AUDIO = "AUDIO"
-    URL = "URL"
-    BINARY = "BINARY"
-    OTHER = "OTHER"
+    TXT = 'TXT'
+    TABLE = 'TABLE'
+    IMAGE = 'IMAGE'
+    VIDEO = 'VIDEO'
+    AUDIO = 'AUDIO'
+    URL = 'URL'
+    BINARY = 'BINARY'
+    OTHER = 'OTHER'
 
 
 class SourceAssetType(StrEnum):
@@ -62,24 +61,24 @@ class SourceAssetType(StrEnum):
     Source types where detector execution is supported
     """
 
-    WORDPRESS = "WORDPRESS"
-    SLACK = "SLACK"
-    S3_COMPATIBLE_STORAGE = "S3_COMPATIBLE_STORAGE"
-    AZURE_BLOB_STORAGE = "AZURE_BLOB_STORAGE"
-    GOOGLE_CLOUD_STORAGE = "GOOGLE_CLOUD_STORAGE"
-    POSTGRESQL = "POSTGRESQL"
-    MYSQL = "MYSQL"
-    JIRA = "JIRA"
-    CONFLUENCE = "CONFLUENCE"
-    SERVICEDESK = "SERVICEDESK"
-    DATABRICKS = "DATABRICKS"
-    SNOWFLAKE = "SNOWFLAKE"
-    MONGODB = "MONGODB"
-    TABLEAU = "TABLEAU"
-    MSSQL = "MSSQL"
-    ORACLE = "ORACLE"
-    HIVE = "HIVE"
-    POWERBI = "POWERBI"
+    WORDPRESS = 'WORDPRESS'
+    SLACK = 'SLACK'
+    S3_COMPATIBLE_STORAGE = 'S3_COMPATIBLE_STORAGE'
+    AZURE_BLOB_STORAGE = 'AZURE_BLOB_STORAGE'
+    GOOGLE_CLOUD_STORAGE = 'GOOGLE_CLOUD_STORAGE'
+    POSTGRESQL = 'POSTGRESQL'
+    MYSQL = 'MYSQL'
+    JIRA = 'JIRA'
+    CONFLUENCE = 'CONFLUENCE'
+    SERVICEDESK = 'SERVICEDESK'
+    DATABRICKS = 'DATABRICKS'
+    SNOWFLAKE = 'SNOWFLAKE'
+    MONGODB = 'MONGODB'
+    TABLEAU = 'TABLEAU'
+    MSSQL = 'MSSQL'
+    ORACLE = 'ORACLE'
+    HIVE = 'HIVE'
+    POWERBI = 'POWERBI'
 
 
 class DetectorLifecycleStatus(StrEnum):
@@ -87,10 +86,10 @@ class DetectorLifecycleStatus(StrEnum):
     Implementation lifecycle status of a detector
     """
 
-    active = "active"
-    planned = "planned"
-    experimental = "experimental"
-    deprecated = "deprecated"
+    active = 'active'
+    planned = 'planned'
+    experimental = 'experimental'
+    deprecated = 'deprecated'
 
 
 class DetectorPriority(StrEnum):
@@ -98,11 +97,11 @@ class DetectorPriority(StrEnum):
     Roadmap priority for rollout
     """
 
-    P0 = "P0"
-    P1 = "P1"
-    P2 = "P2"
-    P3 = "P3"
-    P4 = "P4"
+    P0 = 'P0'
+    P1 = 'P1'
+    P2 = 'P2'
+    P3 = 'P3'
+    P4 = 'P4'
 
 
 class DetectorCatalogEntry(BaseModel):
@@ -110,27 +109,29 @@ class DetectorCatalogEntry(BaseModel):
     Catalog metadata for one detector type
     """
 
-    detector_type: DetectorType = Field(..., description="Canonical detector identifier")
+    detector_type: DetectorType = Field(
+        ..., description='Canonical detector identifier'
+    )
     lifecycle_status: DetectorLifecycleStatus
     priority: DetectorPriority
     categories: list[DetectorCategory] = Field(
         ...,
-        description="Detector categories used for routing, reporting, and policy",
+        description='Detector categories used for routing, reporting, and policy',
         min_length=1,
     )
     supported_asset_types: list[SupportedAssetType] = Field(
-        ..., description="Asset modalities the detector can scan", min_length=1
+        ..., description='Asset modalities the detector can scan', min_length=1
     )
     supported_source_types: list[SourceAssetType] | None = Field(
-        None, description="Optional source-level compatibility list"
+        None, description='Optional source-level compatibility list'
     )
     supported_mime_types: list[str] | None = Field(
-        None, description="Optional MIME type compatibility list"
+        None, description='Optional MIME type compatibility list'
     )
     recommended_model: str | None = Field(
-        None, description="Recommended model, engine, or package for this detector"
+        None, description='Recommended model, engine, or package for this detector'
     )
-    notes: str | None = Field(None, description="Implementation notes and constraints")
+    notes: str | None = Field(None, description='Implementation notes and constraints')
 
 
 class DetectorCatalog(RootModel[list[DetectorCatalogEntry]]):
@@ -140,7 +141,7 @@ class DetectorCatalog(RootModel[list[DetectorCatalogEntry]]):
 
     root: list[DetectorCatalogEntry] = Field(
         ...,
-        description="Detector capability catalog used for planning and runtime routing",
+        description='Detector capability catalog used for planning and runtime routing',
     )
 
 
@@ -149,11 +150,11 @@ class Severity(StrEnum):
     Severity level of finding
     """
 
-    critical = "critical"
-    high = "high"
-    medium = "medium"
-    low = "low"
-    info = "info"
+    critical = 'critical'
+    high = 'high'
+    medium = 'medium'
+    low = 'low'
+    info = 'info'
 
 
 class Location(BaseModel):
@@ -161,11 +162,11 @@ class Location(BaseModel):
     Location of finding in content
     """
 
-    line: int | None = Field(None, description="Line number (1-indexed)")
-    column: int | None = Field(None, description="Column number (1-indexed)")
-    start: int = Field(..., description="Start offset (0-indexed)")
-    end: int = Field(..., description="End offset (0-indexed)")
-    path: str | None = Field(None, description="File path or identifier")
+    line: int | None = Field(None, description='Line number (1-indexed)')
+    column: int | None = Field(None, description='Column number (1-indexed)')
+    start: int = Field(..., description='Start offset (0-indexed)')
+    end: int = Field(..., description='End offset (0-indexed)')
+    path: str | None = Field(None, description='File path or identifier')
 
 
 class ContentEnabledPattern(StrEnum):
@@ -173,14 +174,14 @@ class ContentEnabledPattern(StrEnum):
     Content detector pattern types
     """
 
-    toxicity = "toxicity"
-    severe_toxicity = "severe_toxicity"
-    obscene = "obscene"
-    threat = "threat"
-    insult = "insult"
-    identity_attack = "identity_attack"
-    nsfw = "nsfw"
-    nsfw_explicit = "nsfw_explicit"
+    toxicity = 'toxicity'
+    severe_toxicity = 'severe_toxicity'
+    obscene = 'obscene'
+    threat = 'threat'
+    insult = 'insult'
+    identity_attack = 'identity_attack'
+    nsfw = 'nsfw'
+    nsfw_explicit = 'nsfw_explicit'
 
 
 class SecretsEnabledPattern(StrEnum):
@@ -188,15 +189,15 @@ class SecretsEnabledPattern(StrEnum):
     Secrets detector pattern types
     """
 
-    aws = "aws"
-    github = "github"
-    slack = "slack"
-    stripe = "stripe"
-    google = "google"
-    azure = "azure"
-    private_key = "private_key"
-    generic_api_key = "generic_api_key"
-    generic_secret = "generic_secret"
+    aws = 'aws'
+    github = 'github'
+    slack = 'slack'
+    stripe = 'stripe'
+    google = 'google'
+    azure = 'azure'
+    private_key = 'private_key'
+    generic_api_key = 'generic_api_key'
+    generic_secret = 'generic_secret'
 
 
 class PIIEnabledPattern(StrEnum):
@@ -204,47 +205,47 @@ class PIIEnabledPattern(StrEnum):
     Presidio entity types for PII detection. Global: CREDIT_CARD, CRYPTO, DATE_TIME, EMAIL_ADDRESS, IBAN_CODE, IP_ADDRESS, NRP, LOCATION, PERSON, PHONE_NUMBER, MEDICAL_LICENSE, URL. USA: US_BANK_NUMBER, US_DRIVER_LICENSE, US_ITIN, US_PASSPORT, US_SSN. UK: UK_NHS. Spain: ES_NIF, ES_NIE. Italy: IT_FISCAL_CODE, IT_DRIVER_LICENSE, IT_VAR_CODE, IT_PASSPORT, IT_IDENTITY_CARD. Singapore: SG_NRIC_FIN, SG_UEN. Australia: AU_ABN, AU_ACN, AU_TFN, AU_MEDICARE. India: IN_PAN, IN_AADHAAR, IN_VEHICLE_REGISTRATION, IN_VOTER. Finland: FI_PERSONAL_IDENTITY_CODE. Poland: PL_PESEL. DACH: AT_SVNR, CH_AHV, DE_TAX_ID, EU_NATIONAL_ID.
     """
 
-    CREDIT_CARD = "CREDIT_CARD"
-    CRYPTO = "CRYPTO"
-    DATE_TIME = "DATE_TIME"
-    EMAIL_ADDRESS = "EMAIL_ADDRESS"
-    IBAN_CODE = "IBAN_CODE"
-    IP_ADDRESS = "IP_ADDRESS"
-    NRP = "NRP"
-    LOCATION = "LOCATION"
-    PERSON = "PERSON"
-    PHONE_NUMBER = "PHONE_NUMBER"
-    MEDICAL_LICENSE = "MEDICAL_LICENSE"
-    URL = "URL"
-    US_BANK_NUMBER = "US_BANK_NUMBER"
-    US_DRIVER_LICENSE = "US_DRIVER_LICENSE"
-    US_ITIN = "US_ITIN"
-    US_PASSPORT = "US_PASSPORT"
-    US_SSN = "US_SSN"
-    UK_NHS = "UK_NHS"
-    ES_NIF = "ES_NIF"
-    ES_NIE = "ES_NIE"
-    IT_FISCAL_CODE = "IT_FISCAL_CODE"
-    IT_DRIVER_LICENSE = "IT_DRIVER_LICENSE"
-    IT_VAR_CODE = "IT_VAR_CODE"
-    IT_PASSPORT = "IT_PASSPORT"
-    IT_IDENTITY_CARD = "IT_IDENTITY_CARD"
-    SG_NRIC_FIN = "SG_NRIC_FIN"
-    SG_UEN = "SG_UEN"
-    AU_ABN = "AU_ABN"
-    AU_ACN = "AU_ACN"
-    AU_TFN = "AU_TFN"
-    AU_MEDICARE = "AU_MEDICARE"
-    IN_PAN = "IN_PAN"
-    IN_AADHAAR = "IN_AADHAAR"
-    IN_VEHICLE_REGISTRATION = "IN_VEHICLE_REGISTRATION"
-    IN_VOTER = "IN_VOTER"
-    FI_PERSONAL_IDENTITY_CODE = "FI_PERSONAL_IDENTITY_CODE"
-    PL_PESEL = "PL_PESEL"
-    AT_SVNR = "AT_SVNR"
-    CH_AHV = "CH_AHV"
-    DE_TAX_ID = "DE_TAX_ID"
-    EU_NATIONAL_ID = "EU_NATIONAL_ID"
+    CREDIT_CARD = 'CREDIT_CARD'
+    CRYPTO = 'CRYPTO'
+    DATE_TIME = 'DATE_TIME'
+    EMAIL_ADDRESS = 'EMAIL_ADDRESS'
+    IBAN_CODE = 'IBAN_CODE'
+    IP_ADDRESS = 'IP_ADDRESS'
+    NRP = 'NRP'
+    LOCATION = 'LOCATION'
+    PERSON = 'PERSON'
+    PHONE_NUMBER = 'PHONE_NUMBER'
+    MEDICAL_LICENSE = 'MEDICAL_LICENSE'
+    URL = 'URL'
+    US_BANK_NUMBER = 'US_BANK_NUMBER'
+    US_DRIVER_LICENSE = 'US_DRIVER_LICENSE'
+    US_ITIN = 'US_ITIN'
+    US_PASSPORT = 'US_PASSPORT'
+    US_SSN = 'US_SSN'
+    UK_NHS = 'UK_NHS'
+    ES_NIF = 'ES_NIF'
+    ES_NIE = 'ES_NIE'
+    IT_FISCAL_CODE = 'IT_FISCAL_CODE'
+    IT_DRIVER_LICENSE = 'IT_DRIVER_LICENSE'
+    IT_VAR_CODE = 'IT_VAR_CODE'
+    IT_PASSPORT = 'IT_PASSPORT'
+    IT_IDENTITY_CARD = 'IT_IDENTITY_CARD'
+    SG_NRIC_FIN = 'SG_NRIC_FIN'
+    SG_UEN = 'SG_UEN'
+    AU_ABN = 'AU_ABN'
+    AU_ACN = 'AU_ACN'
+    AU_TFN = 'AU_TFN'
+    AU_MEDICARE = 'AU_MEDICARE'
+    IN_PAN = 'IN_PAN'
+    IN_AADHAAR = 'IN_AADHAAR'
+    IN_VEHICLE_REGISTRATION = 'IN_VEHICLE_REGISTRATION'
+    IN_VOTER = 'IN_VOTER'
+    FI_PERSONAL_IDENTITY_CODE = 'FI_PERSONAL_IDENTITY_CODE'
+    PL_PESEL = 'PL_PESEL'
+    AT_SVNR = 'AT_SVNR'
+    CH_AHV = 'CH_AHV'
+    DE_TAX_ID = 'DE_TAX_ID'
+    EU_NATIONAL_ID = 'EU_NATIONAL_ID'
 
 
 class PIIRecognizerPattern(BaseModel):
@@ -253,13 +254,13 @@ class PIIRecognizerPattern(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    name: str = Field(..., description="Human-readable name for this pattern")
-    regex: str = Field(..., description="Regular expression to match the entity")
+    name: str = Field(..., description='Human-readable name for this pattern')
+    regex: str = Field(..., description='Regular expression to match the entity')
     score: float = Field(
         ...,
-        description="Confidence score assigned when this pattern matches (0-1)",
+        description='Confidence score assigned when this pattern matches (0-1)',
         ge=0.0,
         le=1.0,
     )
@@ -267,13 +268,13 @@ class PIIRecognizerPattern(BaseModel):
 
 class Patterns(RootModel[list[PIIRecognizerPattern]]):
     root: list[PIIRecognizerPattern] = Field(
-        ..., description="Regex patterns for this recognizer", min_length=1
+        ..., description='Regex patterns for this recognizer', min_length=1
     )
 
 
 class DenyList(RootModel[list[str]]):
     root: list[str] = Field(
-        ..., description="Exact-match deny-list terms for this recognizer", min_length=1
+        ..., description='Exact-match deny-list terms for this recognizer', min_length=1
     )
 
 
@@ -283,19 +284,21 @@ class PIICustomRecognizer(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    name: str = Field(..., description="Unique name for this recognizer")
+    name: str = Field(..., description='Unique name for this recognizer')
     supported_entity: str = Field(
         ...,
-        description="Entity label produced when this recognizer fires (e.g. MY_EMPLOYEE_ID)",
+        description='Entity label produced when this recognizer fires (e.g. MY_EMPLOYEE_ID)',
     )
     supported_language: str | None = Field(
-        "en", description="BCP-47 language code this recognizer applies to"
+        'en', description='BCP-47 language code this recognizer applies to'
     )
-    patterns: Patterns | None = Field(None, description="Regex patterns for this recognizer")
+    patterns: Patterns | None = Field(
+        None, description='Regex patterns for this recognizer'
+    )
     deny_list: DenyList | None = Field(
-        None, description="Exact-match deny-list terms for this recognizer"
+        None, description='Exact-match deny-list terms for this recognizer'
     )
     context: list[str] | None = Field(
         None,
@@ -308,12 +311,18 @@ class DetectorConfig(BaseModel):
     Configuration for detector
     """
 
-    enabled_patterns: list[str] | None = Field(None, description="List of enabled pattern names")
-    severity_threshold: Severity | None = Field(None, description="Minimum severity to report")
-    confidence_threshold: float | None = Field(
-        0.7, description="Minimum confidence to report (0-1)", ge=0.0, le=1.0
+    enabled_patterns: list[str] | None = Field(
+        None, description='List of enabled pattern names'
     )
-    max_findings: int | None = Field(None, description="Maximum number of findings to return")
+    severity_threshold: Severity | None = Field(
+        None, description='Minimum severity to report'
+    )
+    confidence_threshold: float | None = Field(
+        0.7, description='Minimum confidence to report (0-1)', ge=0.0, le=1.0
+    )
+    max_findings: int | None = Field(
+        None, description='Maximum number of findings to return'
+    )
 
 
 class ContentModelName(StrEnum):
@@ -321,9 +330,9 @@ class ContentModelName(StrEnum):
     Detoxify model variant
     """
 
-    original = "original"
-    unbiased = "unbiased"
-    multilingual = "multilingual"
+    original = 'original'
+    unbiased = 'unbiased'
+    multilingual = 'multilingual'
 
 
 class ContentDetectorConfig(DetectorConfig):
@@ -332,10 +341,10 @@ class ContentDetectorConfig(DetectorConfig):
     """
 
     enabled_patterns: list[ContentEnabledPattern] | None = Field(
-        None, description="Specific content types to detect"
+        None, description='Specific content types to detect'
     )
     model_name: ContentModelName | None = Field(
-        "original", description="Detoxify model variant", title="ContentModelName"
+        'original', description='Detoxify model variant', title='ContentModelName'
     )
 
 
@@ -345,7 +354,7 @@ class SecretsDetectorConfig(DetectorConfig):
     """
 
     enabled_patterns: list[SecretsEnabledPattern] | None = Field(
-        None, description="Specific secret types to detect"
+        None, description='Specific secret types to detect'
     )
 
 
@@ -356,22 +365,22 @@ class PIIDetectorConfig(DetectorConfig):
 
     enabled_patterns: list[PIIEnabledPattern] | None = Field(
         None,
-        description="Presidio entity types to detect. When null, all supported entities are enabled. Use PIIEnabledPattern values (e.g. EMAIL_ADDRESS, US_SSN, CREDIT_CARD).",
+        description='Presidio entity types to detect. When null, all supported entities are enabled. Use PIIEnabledPattern values (e.g. EMAIL_ADDRESS, US_SSN, CREDIT_CARD).',
     )
     language: str | None = Field(
-        "en", description="BCP-47 language code for NER models (e.g. en, de, es)"
+        'en', description='BCP-47 language code for NER models (e.g. en, de, es)'
     )
     spacy_model: str | None = Field(
         None,
-        description="spaCy model to load (e.g. en_core_web_sm, en_core_web_lg). Defaults to en_core_web_sm when null.",
+        description='spaCy model to load (e.g. en_core_web_sm, en_core_web_lg). Defaults to en_core_web_sm when null.',
     )
     spacy_model_url: str | None = Field(
         None,
-        description="Wheel URL for the spaCy model. When set and the model is not installed, the CLI installs it at runtime.",
+        description='Wheel URL for the spaCy model. When set and the model is not installed, the CLI installs it at runtime.',
     )
     custom_recognizers: list[PIICustomRecognizer] | None = Field(
         None,
-        description="Ad-hoc recognizers added to the Presidio registry at runtime. Each entry defines a regex-pattern or deny-list recognizer for a custom entity type.",
+        description='Ad-hoc recognizers added to the Presidio registry at runtime. Each entry defines a regex-pattern or deny-list recognizer for a custom entity type.',
     )
 
 
@@ -380,9 +389,13 @@ class ThreatDetectorConfig(DetectorConfig):
     Configuration for threat detector
     """
 
-    enabled_patterns: list[str] | None = Field(None, description="YARA rule names to enable")
-    rules_path: str | None = Field(None, description="Path to custom YARA rules directory")
-    timeout: int | None = Field(60, description="Timeout for YARA scanning in seconds")
+    enabled_patterns: list[str] | None = Field(
+        None, description='YARA rule names to enable'
+    )
+    rules_path: str | None = Field(
+        None, description='Path to custom YARA rules directory'
+    )
+    timeout: int | None = Field(60, description='Timeout for YARA scanning in seconds')
 
 
 class SpamDetectorConfig(DetectorConfig):
@@ -392,7 +405,7 @@ class SpamDetectorConfig(DetectorConfig):
 
     model: str | None = Field(
         None,
-        description="HuggingFace model ID for spam classification. Defaults to mrm8488/bert-tiny-finetuned-sms-spam-detection when null.",
+        description='HuggingFace model ID for spam classification. Defaults to mrm8488/bert-tiny-finetuned-sms-spam-detection when null.',
     )
 
 
@@ -403,7 +416,7 @@ class NSFWDetectorConfig(DetectorConfig):
 
     model: str | None = Field(
         None,
-        description="HuggingFace model ID for NSFW image classification. Defaults to Falconsai/nsfw_image_detection when null.",
+        description='HuggingFace model ID for NSFW image classification. Defaults to Falconsai/nsfw_image_detection when null.',
     )
 
 
@@ -414,7 +427,7 @@ class PromptInjectionDetectorConfig(DetectorConfig):
 
     model: str | None = Field(
         None,
-        description="HuggingFace model ID for prompt injection detection. Defaults to protectai/deberta-v3-base-prompt-injection-v2 when null.",
+        description='HuggingFace model ID for prompt injection detection. Defaults to protectai/deberta-v3-base-prompt-injection-v2 when null.',
     )
 
 
@@ -429,102 +442,41 @@ class CustomDetectorMethod(StrEnum):
     Execution method for custom detector logic
     """
 
-    RULESET = "RULESET"
-    CLASSIFIER = "CLASSIFIER"
-    ENTITY = "ENTITY"
-    PIPELINE = "PIPELINE"
-
-
-class PipelineEntityDefinition(BaseModel):
-    description: str = ""
-    required: bool = False
-
-
-class PipelineModelConfig(BaseModel):
-    path: str | None = None
-    name: str | None = None
-
-
-class PipelineClassificationDefinition(BaseModel):
-    labels: list[str] = []
-    multi_label: bool = False
-
-
-class PipelineValidationRule(BaseModel):
-    field: str = ""
-    type: str = "regex"
-    pattern: str | None = None
-
-
-class PipelineValidationConfig(BaseModel):
-    confidence_threshold: float | None = 0.7
-    rules: list[PipelineValidationRule] | None = None
-
-
-class PipelineResult(BaseModel):
-    entities: dict[str, list[dict[str, Any]]] = {}
-    classification: dict[str, dict[str, Any]] = {}
-    metadata: dict[str, Any] | None = None
-
-
-class GLiNER2PipelineSchema(BaseModel):
-    type: Literal["GLINER2"] = "GLINER2"
-    entities: dict[str, PipelineEntityDefinition] | None = None
-    classification: dict[str, PipelineClassificationDefinition] | None = None
-    model: PipelineModelConfig | None = None
-    validation: PipelineValidationConfig | None = None
-
-
-class RegexPatternDefinition(BaseModel):
-    pattern: str
-    flags: int | str | None = None
-
-
-class RegexPipelineSchema(BaseModel):
-    type: Literal["REGEX"] = "REGEX"
-    patterns: dict[str, RegexPatternDefinition] = {}
-
-
-class LLMPipelineSchema(BaseModel):
-    type: Literal["LLM"] = "LLM"
-
-
-AnyPipelineSchema = Annotated[
-    GLiNER2PipelineSchema | RegexPipelineSchema | LLMPipelineSchema,
-    Field(discriminator="type"),
-]
+    RULESET = 'RULESET'
+    CLASSIFIER = 'CLASSIFIER'
+    ENTITY = 'ENTITY'
 
 
 class CustomRegexRule(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    id: str = Field(..., description="Stable ID for this regex rule")
-    name: str = Field(..., description="Display name for this regex rule")
-    pattern: str = Field(..., description="Regular expression pattern")
-    flags: str | None = Field("", description="Regex flags (for example i, m, s)")
+    id: str = Field(..., description='Stable ID for this regex rule')
+    name: str = Field(..., description='Display name for this regex rule')
+    pattern: str = Field(..., description='Regular expression pattern')
+    flags: str | None = Field('', description='Regex flags (for example i, m, s)')
     severity: Severity | None = None
 
 
 class CustomKeywordRule(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    id: str = Field(..., description="Stable ID for this keyword rule")
-    name: str = Field(..., description="Display name for this keyword rule")
-    keywords: list[str] = Field(..., description="Keyword set to match", min_length=1)
+    id: str = Field(..., description='Stable ID for this keyword rule')
+    name: str = Field(..., description='Display name for this keyword rule')
+    keywords: list[str] = Field(..., description='Keyword set to match', min_length=1)
     case_sensitive: bool | None = Field(
-        False, description="Whether keyword matching is case-sensitive"
+        False, description='Whether keyword matching is case-sensitive'
     )
     severity: Severity | None = None
 
 
 class Type(StrEnum):
-    string = "string"
-    number = "number"
-    boolean = "boolean"
-    list_string_ = "list[string]"
-    list_number_ = "list[number]"
+    string = 'string'
+    number = 'number'
+    boolean = 'boolean'
+    list_string_ = 'list[string]'
+    list_number_ = 'list[number]'
 
 
 class Aggregate(StrEnum):
@@ -532,11 +484,11 @@ class Aggregate(StrEnum):
     How to aggregate multiple matches
     """
 
-    first = "first"
-    last = "last"
-    list = "list"
-    join_ = "join"
-    count_ = "count"
+    first = 'first'
+    last = 'last'
+    list = 'list'
+    join_ = 'join'
+    count_ = 'count'
 
 
 class CustomExtractorField(BaseModel):
@@ -545,31 +497,35 @@ class CustomExtractorField(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
-    name: str = Field(..., description="Output field name — becomes a key in extracted_data JSON")
+    name: str = Field(
+        ..., description='Output field name — becomes a key in extracted_data JSON'
+    )
     description: str | None = Field(
-        None, description="Human-readable hint for what this field captures"
+        None, description='Human-readable hint for what this field captures'
     )
-    type: Type | None = "string"
+    type: Type | None = 'string'
     entity_label: str | None = Field(
         None,
-        description="GLiNER2 schema label used for extraction (ENTITY and CLASSIFIER methods)",
+        description='GLiNER2 schema label used for extraction (ENTITY and CLASSIFIER methods)',
     )
     regex_pattern: str | None = Field(
         None,
-        description="Regex with one named capture group (?P<value>...) for RULESET method",
+        description='Regex with one named capture group (?P<value>...) for RULESET method',
     )
     regex_flags: str | None = Field(
-        "i", description="Regex flags: i=case-insensitive, m=multiline, s=dotall"
+        'i', description='Regex flags: i=case-insensitive, m=multiline, s=dotall'
     )
-    aggregate: Aggregate | None = Field("list", description="How to aggregate multiple matches")
-    join_separator: str | None = ", "
+    aggregate: Aggregate | None = Field(
+        'list', description='How to aggregate multiple matches'
+    )
+    join_separator: str | None = ', '
     min_confidence: float | None = Field(
-        0.4, description="Minimum GLiNER confidence for this field", ge=0.0, le=1.0
+        0.4, description='Minimum GLiNER confidence for this field', ge=0.0, le=1.0
     )
     required: bool | None = Field(
-        False, description="If true, skip saving extraction when this field is empty"
+        False, description='If true, skip saving extraction when this field is empty'
     )
 
 
@@ -579,14 +535,14 @@ class CustomExtractorConfig(BaseModel):
     """
 
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     enabled: bool | None = True
     fields: list[CustomExtractorField] = Field(..., min_length=1)
-    gliner_model: str | None = "fastino/gliner2-base-v1"
+    gliner_model: str | None = 'fastino/gliner2-base-v1'
     content_limit: int | None = Field(
         4000,
-        description="Chars of content to pass to extractor (classifier matched_content is only 320 chars)",
+        description='Chars of content to pass to extractor (classifier matched_content is only 320 chars)',
         ge=320,
         le=8192,
     )
@@ -594,7 +550,7 @@ class CustomExtractorConfig(BaseModel):
 
 class CustomRulesetConfig(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     regex_rules: list[CustomRegexRule] | None = Field(default_factory=list)
     keyword_rules: list[CustomKeywordRule] | None = Field(default_factory=list)
@@ -602,7 +558,7 @@ class CustomRulesetConfig(BaseModel):
 
 class CustomClassifierLabel(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     id: str
     name: str
@@ -611,37 +567,41 @@ class CustomClassifierLabel(BaseModel):
 
 class CustomClassifierTrainingExample(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     text: str
     label: str
     accepted: bool | None = True
     source: str | None = Field(
-        "editor", description="Origin of this example (editor/feedback/import)"
+        'editor', description='Origin of this example (editor/feedback/import)'
     )
 
 
 class CustomClassifierConfig(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     labels: list[CustomClassifierLabel] | None = Field(default_factory=list)
-    zero_shot_model: str | None = "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"
-    hypothesis_template: str | None = "This text contains {}."
-    training_examples: list[CustomClassifierTrainingExample] | None = Field(default_factory=list)
+    zero_shot_model: str | None = 'MoritzLaurer/mDeBERTa-v3-base-mnli-xnli'
+    hypothesis_template: str | None = 'This text contains {}.'
+    training_examples: list[CustomClassifierTrainingExample] | None = Field(
+        default_factory=list
+    )
     min_examples_per_label: int | None = Field(8, ge=1)
-    setfit_model: str | None = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    setfit_model: str | None = (
+        'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
+    )
 
 
 class CustomEntityConfig(BaseModel):
     model_config = ConfigDict(
-        extra="forbid",
+        extra='forbid',
     )
     entity_labels: list[str] | None = []
     entity_descriptions: dict[str, str] | None = Field(
-        {}, description="Optional GLiNER2 schema descriptions keyed by entity label"
+        {}, description='Optional GLiNER2 schema descriptions keyed by entity label'
     )
-    model: str | None = "fastino/gliner2-base-v1"
+    model: str | None = 'fastino/gliner2-base-v1'
 
 
 class CustomDetectorConfig(DetectorConfig):
@@ -650,19 +610,18 @@ class CustomDetectorConfig(DetectorConfig):
     """
 
     custom_detector_key: str = Field(
-        ..., description="Stable key used to identify one custom detector instance"
+        ..., description='Stable key used to identify one custom detector instance'
     )
-    name: str = Field(..., description="User-facing name of custom detector")
+    name: str = Field(..., description='User-facing name of custom detector')
     description: str | None = None
-    method: CustomDetectorMethod | None = None
-    languages: list[str] | None = ["de", "en"]
+    method: CustomDetectorMethod
+    languages: list[str] | None = ['de', 'en']
     ruleset: CustomRulesetConfig | None = None
     classifier: CustomClassifierConfig | None = None
     entity: CustomEntityConfig | None = None
     extractor: CustomExtractorConfig | None = Field(
-        None, description="Optional structured extraction — runs when detector fires"
+        None, description='Optional structured extraction — runs when detector fires'
     )
-    pipeline_schema: AnyPipelineSchema | None = None
 
 
 class GenericDetectorConfig(DetectorConfig):
@@ -698,6 +657,6 @@ class DetectorsRefactored(
         | GenericDetectorConfig
     ) = Field(
         ...,
-        description="Merged detector schemas with all detector types and common definitions",
-        title="DetectorsRefactored",
+        description='Merged detector schemas with all detector types and common definitions',
+        title='DetectorsRefactored',
     )
