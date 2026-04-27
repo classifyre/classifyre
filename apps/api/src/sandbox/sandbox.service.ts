@@ -793,6 +793,11 @@ export class SandboxService {
           ? (item.config as Record<string, unknown>)
           : {};
 
+      const isPipeline =
+        record.pipelineSchema &&
+        typeof record.pipelineSchema === 'object' &&
+        Object.keys(record.pipelineSchema).length > 0;
+
       return {
         ...item,
         config: {
@@ -801,7 +806,9 @@ export class SandboxService {
           // identity fields always come from DB to ensure correctness
           custom_detector_key: record.key,
           name: record.name,
-          pipeline_schema: record.pipelineSchema,
+          ...(isPipeline
+            ? { method: 'PIPELINE', pipeline_schema: record.pipelineSchema }
+            : {}),
         },
       };
     });

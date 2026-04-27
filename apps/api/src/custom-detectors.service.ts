@@ -1411,6 +1411,25 @@ export class CustomDetectorsService {
       },
     });
 
+    // Fire training in the background — return RUNNING immediately so the API
+    // response is not blocked by a potentially long fine-tuning job.
+    void this._runTrainingBackground(detector, run.id, examples, startedAt);
+
+    return this.toTrainingRunDto(run);
+  }
+
+  private async _runTrainingBackground(
+    detector: CustomDetector,
+    runId: string,
+    examples: Array<{
+      label: string;
+      text: string | null;
+      value: string | null | undefined;
+      accepted: boolean;
+      source: string | null | undefined;
+    }>,
+    startedAt: number,
+  ): Promise<void> {
     try {
       const pipelineSchema = asRecord((detector as any).pipelineSchema);
       const configHash = createHash('sha256')
@@ -1431,7 +1450,7 @@ export class CustomDetectorsService {
         pipelineSchema,
         examples: examples.map((e) => ({
           label: e.label,
-          text: e.text,
+          text: e.text ?? '',
           value: e.value,
           accepted: e.accepted,
           source: e.source,
@@ -1451,8 +1470,8 @@ export class CustomDetectorsService {
         trained_examples: cliResult.trained_examples,
       };
 
-      const completed = await this.prisma.customDetectorTrainingRun.update({
-        where: { id: run.id },
+      await this.prisma.customDetectorTrainingRun.update({
+        where: { id: runId },
         data: {
           status: CustomDetectorTrainingStatus.SUCCEEDED,
           strategy,
@@ -1487,21 +1506,24 @@ export class CustomDetectorsService {
           pipelineSchema: updatedSchema as Prisma.InputJsonValue,
         },
       });
-
-      return this.toTrainingRunDto(completed);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Training run ${run.id} failed: ${message}`);
-      const failed = await this.prisma.customDetectorTrainingRun.update({
-        where: { id: run.id },
-        data: {
-          status: CustomDetectorTrainingStatus.FAILED,
-          completedAt: new Date(),
-          durationMs: Date.now() - startedAt,
-          errorMessage: message,
-        },
-      });
-      return this.toTrainingRunDto(failed);
+      this.logger.error(`Training run ${runId} failed: ${message}`);
+      await this.prisma.customDetectorTrainingRun
+        .update({
+          where: { id: runId },
+          data: {
+            status: CustomDetectorTrainingStatus.FAILED,
+            completedAt: new Date(),
+            durationMs: Date.now() - startedAt,
+            errorMessage: message,
+          },
+        })
+        .catch((dbErr: unknown) => {
+          this.logger.error(
+            `Failed to mark training run ${runId} as FAILED: ${String(dbErr)}`,
+          );
+        });
     }
   }
 
@@ -1532,12 +1554,21 @@ export class CustomDetectorsService {
     fs.writeFileSync(examplesPath, JSON.stringify(params.examples));
 
     return new Promise((resolve, reject) => {
-      const pythonBin = process.env.CLASSIFYRE_PYTHON_BIN ?? 'python';
+      // Prefer explicit override, then fall back to the CLI venv python so that
+      // the full custom-detector dependency group (gliner2, setfit, etc.) is available.
+      const defaultCliPath = path.resolve(__dirname, '../../../cli');
+      const cliPath = process.env.CLI_PATH
+        ? path.isAbsolute(process.env.CLI_PATH)
+          ? process.env.CLI_PATH
+          : path.resolve(__dirname, '../..', process.env.CLI_PATH)
+        : defaultCliPath;
+      const venvPython = path.join(cliPath, '.venv', 'bin', 'python');
+      const pythonBin = process.env.CLASSIFYRE_PYTHON_BIN ?? venvPython;
       const child = spawn(
         pythonBin,
         [
           '-m',
-          'classifyre',
+          'src.main',
           'train',
           '--pipeline-schema',
           schemaPath,
@@ -1546,7 +1577,7 @@ export class CustomDetectorsService {
           '--output-dir',
           params.outputDir,
         ],
-        { stdio: ['ignore', 'pipe', 'pipe'] },
+        { stdio: ['ignore', 'pipe', 'pipe'], cwd: cliPath },
       );
 
       let stdout = '';

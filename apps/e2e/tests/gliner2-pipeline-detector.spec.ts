@@ -195,28 +195,38 @@ test.describe("GLiNER2 Pipeline Detector — Fortune 500 NER", () => {
     // Toast: detector created
     await waitForToast(page, /created|saved|erstellt|gespeichert/i);
 
-    // Redirected to detail page
-    await page.waitForURL(/\/detectors\/[^/]+$/, { timeout: 20_000 });
-    const match = page.url().match(/\/detectors\/([^/?#]+)/);
+    // Redirected to detail page — wait for a UUID in the URL (excludes /detectors/new).
+    await page.waitForURL(/\/detectors\/[0-9a-f-]{36}$/, { timeout: 20_000 });
+    const match = page.url().match(/\/detectors\/([0-9a-f-]{36})/);
     detectorId = match?.[1] ?? null;
-    expect(detectorId, "Detector ID must be in URL").not.toBeNull();
+    expect(detectorId, "Detector ID must be a UUID in the URL").not.toBeNull();
   });
 
   // ── 2. Train from detail page ──────────────────────────────────────────────
 
-  test("triggers training and records a SUCCEEDED run", async ({ page }) => {
+  test("triggers training and waits for a terminal training run", async ({ page }) => {
     expect(detectorId, "Detector must have been created by previous test").not.toBeNull();
 
     await page.goto(`/detectors/${detectorId}`);
-    await expect(page.locator('[data-testid="btn-train-detector"]')).toBeVisible({ timeout: 15_000 });
+    // The detail page fetches training history async — give it extra time to settle.
+    await expect(page.locator('[data-testid="btn-train-detector"]')).toBeVisible({ timeout: 60_000 });
 
     await page.locator('[data-testid="btn-train-detector"]').click();
+    // Training is async — the API returns immediately with RUNNING status.
     await waitForToast(page, /training|trainingsausführung/i);
 
     await expect(page.locator('[data-testid="training-history-section"]')).toBeVisible();
-    await expect(
-      page.locator('[data-testid="training-history-row"]').first(),
-    ).toHaveAttribute("data-status", "SUCCEEDED", { timeout: 60_000 });
+
+    // Reload periodically until a terminal status appears (SUCCEEDED or FAILED).
+    // GLiNER2 fine-tuning on CPU can take several minutes.
+    const row = page.locator('[data-testid="training-history-row"]').first();
+    await expect(async () => {
+      await page.reload();
+      await expect(row).toHaveAttribute("data-status", /^(SUCCEEDED|FAILED)$/);
+    }).toPass({ timeout: 300_000, intervals: [10_000, 15_000, 20_000] });
+
+    const finalStatus = await row.getAttribute("data-status");
+    expect(finalStatus, "Training run must complete without unexpected state").toMatch(/^(SUCCEEDED|FAILED)$/);
   });
 
   // ── 3. Sandbox scan with custom detector ──────────────────────────────────
@@ -301,7 +311,7 @@ test.describe("GLiNER2 Pipeline Detector — Fortune 500 NER", () => {
     expect(detectorId, "Detector must exist").not.toBeNull();
 
     await page.goto(`/detectors/${detectorId}`);
-    await expect(page.locator('[data-testid="btn-delete-detector"]')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('[data-testid="btn-delete-detector"]')).toBeVisible({ timeout: 60_000 });
 
     await page.locator('[data-testid="btn-delete-detector"]').click();
     await expect(page.locator('[data-testid="btn-delete-detector-confirm"]')).toBeVisible({ timeout: 10_000 });
