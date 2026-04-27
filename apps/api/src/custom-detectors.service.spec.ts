@@ -27,6 +27,14 @@ describe('CustomDetectorsService', () => {
         update: jest.fn(),
         findMany: jest.fn(),
       },
+      customDetectorTrainingExample: {
+        findMany: jest.fn(),
+        createMany: jest.fn(),
+        deleteMany: jest.fn(),
+        findFirst: jest.fn(),
+        delete: jest.fn(),
+        count: jest.fn(),
+      },
       source: {
         findUnique: jest.fn(),
       },
@@ -252,34 +260,46 @@ describe('CustomDetectorsService', () => {
     });
 
     prisma.customDetectorTrainingRun.update.mockImplementation(
-      ({ data }: { data: Record<string, unknown> }) => ({
-        id: 'run-1',
-        customDetectorId: 'det-1',
-        sourceId: null,
-        status: data.status,
-        strategy: data.strategy,
-        startedAt: new Date(),
-        completedAt: new Date(),
-        durationMs: 12,
-        trainedExamples: data.trainedExamples,
-        positiveExamples: data.positiveExamples,
-        negativeExamples: data.negativeExamples,
-        metrics: data.metrics,
-        modelArtifactPath: data.modelArtifactPath,
-        configHash: data.configHash,
-        errorMessage: data.errorMessage,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }),
+      ({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve({
+          id: 'run-1',
+          customDetectorId: 'det-1',
+          sourceId: null,
+          status: data.status,
+          strategy: data.strategy,
+          startedAt: new Date(),
+          completedAt: new Date(),
+          durationMs: 12,
+          trainedExamples: data.trainedExamples,
+          positiveExamples: data.positiveExamples,
+          negativeExamples: data.negativeExamples,
+          metrics: data.metrics,
+          modelArtifactPath: data.modelArtifactPath,
+          configHash: data.configHash,
+          errorMessage: data.errorMessage,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
     );
 
     prisma.customDetector.update.mockResolvedValue({});
+    prisma.customDetectorTrainingExample.findMany.mockResolvedValue([]);
 
     const run = await service.train('det-1', {});
 
-    expect(run.status).toBe(CustomDetectorTrainingStatus.SUCCEEDED);
-    expect(run.strategy).toBe('GLINER2_PIPELINE');
-    expect(prisma.customDetector.update).toHaveBeenCalled();
+    // train() returns RUNNING immediately — background training is async (void)
+    expect(run.status).toBe(CustomDetectorTrainingStatus.RUNNING);
+    expect(prisma.customDetectorTrainingRun.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          customDetectorId: 'det-1',
+          status: CustomDetectorTrainingStatus.RUNNING,
+        }),
+      }),
+    );
+    expect(prisma.customDetectorTrainingExample.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { customDetectorId: 'det-1' } }),
+    );
   });
 
   it('stores the pipeline schema verbatim on create and reflects it in response', async () => {
