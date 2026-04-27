@@ -366,7 +366,9 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         # Non-extractable types (images, audio, video, opaque binary) carry no text.
         # Everything else defers extraction to fetch_content_pages() so detectors
         # receive content in configurable-sized pages instead of one monolithic blob.
-        is_non_extractable = normalized_mime.startswith(("image/", "audio/", "video/")) or normalized_mime in (
+        is_non_extractable = normalized_mime.startswith(
+            ("image/", "audio/", "video/")
+        ) or normalized_mime in (
             "application/octet-stream",
             "application/zip",
         )
@@ -507,9 +509,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             sampling = self.config.sampling
             batch_size = int(sampling.rows_per_page or 100)
             include_col_names = bool(
-                sampling.include_column_names
-                if sampling.include_column_names is not None
-                else True
+                sampling.include_column_names if sampling.include_column_names is not None else True
             )
             for batch_text in iter_file_pages(raw_bytes, mime, batch_size, include_col_names):
                 yield "", batch_text

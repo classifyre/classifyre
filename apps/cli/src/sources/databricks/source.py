@@ -296,6 +296,7 @@ class DatabricksSource(BaseSource):
             server_hostname=self._workspace_host(),
             http_path=f"/sql/1.0/warehouses/{self._warehouse_id()}",
             access_token=self._access_token_value(),
+            session_configuration={"spark.sql.session.timeZone": "UTC"},
         )
 
     def _catalog_allowlist(self) -> set[str] | None:

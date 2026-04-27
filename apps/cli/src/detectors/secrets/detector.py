@@ -3,6 +3,7 @@
 import logging
 import os
 import tempfile
+from pathlib import Path
 from typing import Any
 
 from ...models.generated_detectors import DetectorConfig, Severity
@@ -51,16 +52,34 @@ _SEVERITY_RULES: list[tuple[Severity, list[str]]] = [
     (
         Severity.critical,
         [
-            "aws", "private key", "github", "gitlab",
-            "slack", "stripe", "azure storage", "google oauth", "openai",
+            "aws",
+            "private key",
+            "github",
+            "gitlab",
+            "slack",
+            "stripe",
+            "azure storage",
+            "google oauth",
+            "openai",
         ],
     ),
     (
         Severity.high,
         [
-            "artifactory", "basic auth", "cloudant", "discord",
-            "ibm", "json web token", "mailchimp", "npm",
-            "pypi", "sendgrid", "softlayer", "square", "telegram", "twilio",
+            "artifactory",
+            "basic auth",
+            "cloudant",
+            "discord",
+            "ibm",
+            "json web token",
+            "mailchimp",
+            "npm",
+            "pypi",
+            "sendgrid",
+            "softlayer",
+            "square",
+            "telegram",
+            "twilio",
         ],
     ),
     (
@@ -75,12 +94,34 @@ _CONFIDENCE_RULES: list[tuple[float, list[str]]] = [
     (
         0.95,
         [
-            "aws", "github", "gitlab", "private key", "slack",
-            "stripe", "azure storage", "openai", "pypi",
+            "aws",
+            "github",
+            "gitlab",
+            "private key",
+            "slack",
+            "stripe",
+            "azure storage",
+            "openai",
+            "pypi",
         ],
     ),
-    (0.85, ["artifactory", "basic auth", "cloudant", "discord", "ibm", "mailchimp",
-            "npm", "sendgrid", "softlayer", "square", "telegram", "twilio"]),
+    (
+        0.85,
+        [
+            "artifactory",
+            "basic auth",
+            "cloudant",
+            "discord",
+            "ibm",
+            "mailchimp",
+            "npm",
+            "sendgrid",
+            "softlayer",
+            "square",
+            "telegram",
+            "twilio",
+        ],
+    ),
     (0.80, ["json web token"]),
     (0.75, ["entropy"]),
     (0.70, ["keyword", "ip public"]),
@@ -114,8 +155,7 @@ class SecretsDetector(BaseDetector):
         """Build the plugins_used list consumed by detect-secrets transient_settings."""
         patterns = self.config.enabled_patterns
         active_patterns: list[str] = (
-            _ALL_PATTERNS if patterns is None
-            else [p for p in patterns if p in _PATTERN_TO_PLUGIN]
+            _ALL_PATTERNS if patterns is None else [p for p in patterns if p in _PATTERN_TO_PLUGIN]
         )
 
         plugins: list[dict[str, Any]] = []
@@ -166,9 +206,7 @@ class SecretsDetector(BaseDetector):
     # Public API
     # ------------------------------------------------------------------
 
-    async def detect(
-        self, content: str, content_type: str = "text/plain"
-    ) -> list[DetectionResult]:
+    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
         try:
             from detect_secrets import SecretsCollection
             from detect_secrets.settings import transient_settings
@@ -238,7 +276,7 @@ class SecretsDetector(BaseDetector):
             logger.exception(exc)
         finally:
             try:
-                os.unlink(tmp_path)
+                Path(tmp_path).unlink()
             except OSError:
                 pass
 

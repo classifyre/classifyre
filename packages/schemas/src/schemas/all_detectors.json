@@ -739,7 +739,7 @@
                 }
               ],
               "default": null,
-              "description": "Entropy threshold for Base64HighEntropyString (0–8). Defaults to detect-secrets built-in of 4.5 when null. Lower values catch more secrets but increase false positives."
+              "description": "Entropy threshold for Base64HighEntropyString (0-8). Defaults to detect-secrets built-in of 4.5 when null. Lower values catch more secrets but increase false positives."
             },
             "entropy_limit_hex": {
               "anyOf": [
@@ -753,7 +753,7 @@
                 }
               ],
               "default": null,
-              "description": "Entropy threshold for HexHighEntropyString (0–8). Defaults to detect-secrets built-in of 3.0 when null. Lower values catch more secrets but increase false positives."
+              "description": "Entropy threshold for HexHighEntropyString (0-8). Defaults to detect-secrets built-in of 3.0 when null. Lower values catch more secrets but increase false positives."
             }
           }
         }

@@ -368,7 +368,9 @@ def parse_bytes(
     loading all content into memory before detector scanning.
     """
     file_size_bytes = len(file_bytes)
-    mime_type = resolve_mime_type(file_bytes, declared_mime_type=declared_mime_type, file_name=file_name)
+    mime_type = resolve_mime_type(
+        file_bytes, declared_mime_type=declared_mime_type, file_name=file_name
+    )
 
     text_content, parse_error = extract_text(file_bytes, mime_type)
     raw_content = _decode_bytes(file_bytes) if _is_text_like_mime_type(mime_type) else ""
@@ -498,11 +500,15 @@ def _iter_csv_pages(
             batch.append(dict(row))
             total_seen += 1
             if len(batch) >= batch_size:
-                yield _format_tabular_page(batch, headers, total_seen - len(batch) + 1, include_column_names)
+                yield _format_tabular_page(
+                    batch, headers, total_seen - len(batch) + 1, include_column_names
+                )
                 batch = []
 
         if batch:
-            yield _format_tabular_page(batch, headers, total_seen - len(batch) + 1, include_column_names)
+            yield _format_tabular_page(
+                batch, headers, total_seen - len(batch) + 1, include_column_names
+            )
     except Exception as exc:
         logger.warning("CSV page iteration failed: %s", exc)
 

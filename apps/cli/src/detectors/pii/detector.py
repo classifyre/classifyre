@@ -2,14 +2,11 @@
 
 import importlib
 import logging
-import os
 import re
 import subprocess
 import sys
-import tempfile
 import warnings
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, ClassVar
 
 from ...models.generated_detectors import DetectorConfig, Severity
@@ -243,6 +240,24 @@ class PIIDetector(BaseDetector):
     # Initialization
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _patch_tldextract_offline() -> None:
+        # tldextract ignores the TLDEXTRACT_CACHE env var; without explicit config it
+        # downloads the public suffix list on first use, hanging pods with no egress.
+        # Replace the module-level extract instance with an offline one (bundled PSL)
+        # before Presidio's UrlRecognizer is loaded so it never makes a network call.
+        try:
+            import tldextract as _tl  # type: ignore[import-not-found, import-untyped]
+
+            offline = _tl.TLDExtract(
+                suffix_list_urls=(),
+                fallback_to_snapshot=True,
+            )
+            offline("example.com")  # force PSL load from bundled snapshot
+            _tl.extract = offline
+        except Exception as exc:
+            logger.debug("tldextract offline patch skipped: %s", exc)
+
     def _initialize_analyzer(self) -> None:
         """Build the Presidio AnalyzerEngine with NLP engine and custom recognizers."""
         global _PRESIDIO_LOG_FILTER_INSTALLED  # noqa: PLW0603
@@ -254,10 +269,7 @@ class PIIDetector(BaseDetector):
                 category=DeprecationWarning,
             )
 
-            if not os.environ.get("TLDEXTRACT_CACHE"):
-                cache = Path(tempfile.gettempdir()) / "tldextract-cache"
-                cache.mkdir(parents=True, exist_ok=True)
-                os.environ["TLDEXTRACT_CACHE"] = str(cache)
+            self._patch_tldextract_offline()
 
             if not _PRESIDIO_LOG_FILTER_INSTALLED:
                 logging.getLogger("presidio-analyzer").addFilter(_PresidioNoiseFilter())
@@ -405,6 +417,10 @@ class PIIDetector(BaseDetector):
                 r for r in self.analyzer.registry.recognizers if "phone" not in r.name.lower()
             ]
             self._ALL_SUPPORTED_ENTITIES = self._ALL_SUPPORTED_ENTITIES - {"PHONE_NUMBER"}
+            if self._supported_entities_cache is not None:
+                self._supported_entities_cache = self._supported_entities_cache - frozenset(
+                    {"PHONE_NUMBER"}
+                )
         except Exception:
             pass
 
