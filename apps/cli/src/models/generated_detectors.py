@@ -187,18 +187,36 @@ class ContentEnabledPattern(StrEnum):
 
 class SecretsEnabledPattern(StrEnum):
     """
-    Secrets detector pattern types
+    Secrets detector pattern types. Each value maps to a detect-secrets plugin: artifactory=ArtifactoryDetector, aws=AWSKeyDetector, azure_storage=AzureStorageKeyDetector, basic_auth=BasicAuthDetector, cloudant=CloudantDetector, discord=DiscordBotTokenDetector, github=GitHubTokenDetector, gitlab=GitLabTokenDetector, high_entropy_base64=Base64HighEntropyString, high_entropy_hex=HexHighEntropyString, ibm_cloud_iam=IbmCloudIamDetector, ibm_cos_hmac=IbmCosHmacDetector, ip_public=IPPublicDetector, jwt=JwtTokenDetector, keyword=KeywordDetector, mailchimp=MailchimpDetector, npm=NpmDetector, openai=OpenAIDetector, private_key=PrivateKeyDetector, pypi=PypiTokenDetector, sendgrid=SendGridDetector, slack=SlackDetector, softlayer=SoftlayerDetector, square_oauth=SquareOAuthDetector, stripe=StripeDetector, telegram=TelegramBotTokenDetector, twilio=TwilioKeyDetector.
     """
 
+    artifactory = 'artifactory'
     aws = 'aws'
+    azure_storage = 'azure_storage'
+    basic_auth = 'basic_auth'
+    cloudant = 'cloudant'
+    discord = 'discord'
     github = 'github'
-    slack = 'slack'
-    stripe = 'stripe'
-    google = 'google'
-    azure = 'azure'
+    gitlab = 'gitlab'
+    high_entropy_base64 = 'high_entropy_base64'
+    high_entropy_hex = 'high_entropy_hex'
+    ibm_cloud_iam = 'ibm_cloud_iam'
+    ibm_cos_hmac = 'ibm_cos_hmac'
+    ip_public = 'ip_public'
+    jwt = 'jwt'
+    keyword = 'keyword'
+    mailchimp = 'mailchimp'
+    npm = 'npm'
+    openai = 'openai'
     private_key = 'private_key'
-    generic_api_key = 'generic_api_key'
-    generic_secret = 'generic_secret'
+    pypi = 'pypi'
+    sendgrid = 'sendgrid'
+    slack = 'slack'
+    softlayer = 'softlayer'
+    square_oauth = 'square_oauth'
+    stripe = 'stripe'
+    telegram = 'telegram'
+    twilio = 'twilio'
 
 
 class PIIEnabledPattern(StrEnum):
@@ -349,13 +367,48 @@ class ContentDetectorConfig(DetectorConfig):
     )
 
 
+class EnabledPatterns(RootModel[list[SecretsEnabledPattern]]):
+    root: list[SecretsEnabledPattern] = Field(
+        ...,
+        description='Subset of detect-secrets plugins to enable. When null all supported plugins are active.',
+        min_length=1,
+    )
+
+
+class EntropyLimitBase64(RootModel[float]):
+    root: float = Field(
+        ...,
+        description='Entropy threshold for Base64HighEntropyString (0–8). Defaults to detect-secrets built-in of 4.5 when null. Lower values catch more secrets but increase false positives.',
+        ge=0.0,
+        le=8.0,
+    )
+
+
+class EntropyLimitHex(RootModel[float]):
+    root: float = Field(
+        ...,
+        description='Entropy threshold for HexHighEntropyString (0–8). Defaults to detect-secrets built-in of 3.0 when null. Lower values catch more secrets but increase false positives.',
+        ge=0.0,
+        le=8.0,
+    )
+
+
 class SecretsDetectorConfig(DetectorConfig):
     """
-    Configuration for secrets detector
+    Configuration for secrets detector powered by detect-secrets
     """
 
-    enabled_patterns: list[SecretsEnabledPattern] | None = Field(
-        None, description='Specific secret types to detect'
+    enabled_patterns: EnabledPatterns | None = Field(
+        None,
+        description='Subset of detect-secrets plugins to enable. When null all supported plugins are active.',
+    )
+    entropy_limit_base64: EntropyLimitBase64 | None = Field(
+        None,
+        description='Entropy threshold for Base64HighEntropyString (0–8). Defaults to detect-secrets built-in of 4.5 when null. Lower values catch more secrets but increase false positives.',
+    )
+    entropy_limit_hex: EntropyLimitHex | None = Field(
+        None,
+        description='Entropy threshold for HexHighEntropyString (0–8). Defaults to detect-secrets built-in of 3.0 when null. Lower values catch more secrets but increase false positives.',
     )
 
 

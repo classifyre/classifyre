@@ -443,17 +443,35 @@
     "SecretsEnabledPattern": {
       "type": "string",
       "enum": [
+        "artifactory",
         "aws",
+        "azure_storage",
+        "basic_auth",
+        "cloudant",
+        "discord",
         "github",
-        "slack",
-        "stripe",
-        "google",
-        "azure",
+        "gitlab",
+        "high_entropy_base64",
+        "high_entropy_hex",
+        "ibm_cloud_iam",
+        "ibm_cos_hmac",
+        "ip_public",
+        "jwt",
+        "keyword",
+        "mailchimp",
+        "npm",
+        "openai",
         "private_key",
-        "generic_api_key",
-        "generic_secret"
+        "pypi",
+        "sendgrid",
+        "slack",
+        "softlayer",
+        "square_oauth",
+        "stripe",
+        "telegram",
+        "twilio"
       ],
-      "description": "Secrets detector pattern types"
+      "description": "Secrets detector pattern types. Each value maps to a detect-secrets plugin: artifactory=ArtifactoryDetector, aws=AWSKeyDetector, azure_storage=AzureStorageKeyDetector, basic_auth=BasicAuthDetector, cloudant=CloudantDetector, discord=DiscordBotTokenDetector, github=GitHubTokenDetector, gitlab=GitLabTokenDetector, high_entropy_base64=Base64HighEntropyString, high_entropy_hex=HexHighEntropyString, ibm_cloud_iam=IbmCloudIamDetector, ibm_cos_hmac=IbmCosHmacDetector, ip_public=IPPublicDetector, jwt=JwtTokenDetector, keyword=KeywordDetector, mailchimp=MailchimpDetector, npm=NpmDetector, openai=OpenAIDetector, private_key=PrivateKeyDetector, pypi=PypiTokenDetector, sendgrid=SendGridDetector, slack=SlackDetector, softlayer=SoftlayerDetector, square_oauth=SquareOAuthDetector, stripe=StripeDetector, telegram=TelegramBotTokenDetector, twilio=TwilioKeyDetector."
     },
     "PIIEnabledPattern": {
       "type": "string",
@@ -685,7 +703,7 @@
     },
     "SecretsDetectorConfig": {
       "title": "SecretsDetectorConfig",
-      "description": "Configuration for secrets detector",
+      "description": "Configuration for secrets detector powered by detect-secrets",
       "allOf": [
         {
           "$ref": "#/definitions/DetectorConfig"
@@ -694,11 +712,48 @@
           "type": "object",
           "properties": {
             "enabled_patterns": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/SecretsEnabledPattern"
-              },
-              "description": "Specific secret types to detect"
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/SecretsEnabledPattern"
+                  },
+                  "minItems": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Subset of detect-secrets plugins to enable. When null all supported plugins are active."
+            },
+            "entropy_limit_base64": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0,
+                  "maximum": 8.0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Entropy threshold for Base64HighEntropyString (0–8). Defaults to detect-secrets built-in of 4.5 when null. Lower values catch more secrets but increase false positives."
+            },
+            "entropy_limit_hex": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0,
+                  "maximum": 8.0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Entropy threshold for HexHighEntropyString (0–8). Defaults to detect-secrets built-in of 3.0 when null. Lower values catch more secrets but increase false positives."
             }
           }
         }

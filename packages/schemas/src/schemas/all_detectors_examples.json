@@ -1,50 +1,144 @@
 {
   "SECRETS": [
     {
-      "name": "Core Secrets",
-      "description": "Common cloud and API credentials with strong signal.",
+      "name": "All Plugins",
+      "description": "Enable every detect-secrets plugin. Maximum recall across all known credential types: cloud providers, SaaS tokens, entropy strings, private keys, and keyword heuristics. Suitable as a broad baseline; tune confidence_threshold or disable noisy plugins (high_entropy_*, keyword) for production enforcement.",
       "config": {
-        "enabled_patterns": [
-          "aws",
-          "github",
-          "slack",
-          "stripe",
-          "google",
-          "azure",
-          "private_key"
-        ],
-        "confidence_threshold": 0.75
+        "enabled_patterns": null,
+        "confidence_threshold": 0.7,
+        "max_findings": 500
       }
     },
     {
-      "name": "Broad Sweep",
-      "description": "Covers all known secret types for wide visibility.",
+      "name": "High-Confidence Cloud Credentials",
+      "description": "Structured, vendor-specific tokens with the highest detection precision: AWS keys, GitHub/GitLab tokens, Slack webhooks, Stripe keys, Azure storage keys, OpenAI keys, PyPI tokens, and private keys. All patterns use regex heuristics built into detect-secrets with near-zero false-positive rates.",
       "config": {
         "enabled_patterns": [
           "aws",
           "github",
+          "gitlab",
           "slack",
           "stripe",
-          "google",
-          "azure",
-          "private_key",
-          "generic_api_key",
-          "generic_secret"
+          "azure_storage",
+          "openai",
+          "pypi",
+          "private_key"
+        ],
+        "confidence_threshold": 0.9,
+        "max_findings": 200
+      }
+    },
+    {
+      "name": "SaaS & Developer Tokens",
+      "description": "Broad SaaS credential coverage for developer-facing content: Artifactory, Cloudant, Discord, IBM Cloud IAM/COS, JWT, Mailchimp, npm, SendGrid, Softlayer, Square OAuth, Telegram, and Twilio. Complements High-Confidence Cloud Credentials for full third-party secret coverage.",
+      "config": {
+        "enabled_patterns": [
+          "artifactory",
+          "basic_auth",
+          "cloudant",
+          "discord",
+          "ibm_cloud_iam",
+          "ibm_cos_hmac",
+          "jwt",
+          "mailchimp",
+          "npm",
+          "sendgrid",
+          "softlayer",
+          "square_oauth",
+          "telegram",
+          "twilio"
+        ],
+        "confidence_threshold": 0.8,
+        "max_findings": 200
+      }
+    },
+    {
+      "name": "Entropy Scanner",
+      "description": "High-entropy string detection for unstructured or custom secret formats: Base64 (limit 4.5) and Hex (limit 3.0) using Shannon entropy. Best used alongside structured plugin scans to catch secrets that don't match any known pattern. Expect higher false-positive rates; pair with a deny-list or manual review step.",
+      "config": {
+        "enabled_patterns": [
+          "high_entropy_base64",
+          "high_entropy_hex"
+        ],
+        "entropy_limit_base64": 4.5,
+        "entropy_limit_hex": 3.0,
+        "confidence_threshold": 0.75,
+        "max_findings": 100
+      }
+    },
+    {
+      "name": "Entropy Scanner — Strict",
+      "description": "Tightened entropy thresholds to reduce false positives at the cost of some recall. Base64 limit raised to 5.5 and Hex to 3.5. Suitable for automated enforcement pipelines where manual review is unavailable.",
+      "config": {
+        "enabled_patterns": [
+          "high_entropy_base64",
+          "high_entropy_hex"
+        ],
+        "entropy_limit_base64": 5.5,
+        "entropy_limit_hex": 3.5,
+        "confidence_threshold": 0.85,
+        "max_findings": 50
+      }
+    },
+    {
+      "name": "Keyword Heuristics",
+      "description": "detect-secrets KeywordDetector flags variable assignments whose names suggest secrets (e.g. password =, api_key =, secret =) regardless of the value. High false-positive rate by design — treat results as candidates for human review rather than confirmed secrets.",
+      "config": {
+        "enabled_patterns": [
+          "keyword"
         ],
         "confidence_threshold": 0.7,
         "max_findings": 200
       }
     },
     {
-      "name": "Lightweight",
-      "description": "Focus on generic keys to reduce noise.",
+      "name": "IP Address Exposure",
+      "description": "Detects public IP addresses embedded in configuration, code, or documents. Useful for data governance audits where internal network topology must not leak into public repositories or documents.",
       "config": {
         "enabled_patterns": [
-          "generic_api_key",
-          "generic_secret"
+          "ip_public"
         ],
-        "confidence_threshold": 0.85,
-        "max_findings": 50
+        "confidence_threshold": 0.7,
+        "max_findings": 100
+      }
+    },
+    {
+      "name": "Enterprise Full Sweep",
+      "description": "All structured credential plugins plus entropy scanning at balanced thresholds. Covers the complete detect-secrets plugin catalog. Designed for periodic scheduled scans across large document corpora where false-positive review capacity exists.",
+      "config": {
+        "enabled_patterns": [
+          "aws",
+          "github",
+          "gitlab",
+          "slack",
+          "stripe",
+          "azure_storage",
+          "openai",
+          "private_key",
+          "artifactory",
+          "basic_auth",
+          "cloudant",
+          "discord",
+          "ibm_cloud_iam",
+          "ibm_cos_hmac",
+          "jwt",
+          "mailchimp",
+          "npm",
+          "pypi",
+          "sendgrid",
+          "softlayer",
+          "square_oauth",
+          "telegram",
+          "twilio",
+          "high_entropy_base64",
+          "high_entropy_hex",
+          "keyword",
+          "ip_public"
+        ],
+        "entropy_limit_base64": 4.5,
+        "entropy_limit_hex": 3.0,
+        "confidence_threshold": 0.7,
+        "max_findings": 1000
       }
     }
   ],
