@@ -180,6 +180,7 @@ export default function NewSandboxScanPage() {
         type: string;
         enabled: boolean;
         config: Record<string, unknown>;
+        custom_detector_key?: string;
       }> = [...enabledDetectors];
 
       if (selectedCustomDetectorIds.length > 0) {
