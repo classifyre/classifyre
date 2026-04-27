@@ -896,7 +896,8 @@
       "enum": [
         "RULESET",
         "CLASSIFIER",
-        "ENTITY"
+        "ENTITY",
+        "PIPELINE"
       ],
       "description": "Execution method for custom detector logic"
     },
@@ -1216,8 +1217,7 @@
               "type": "string"
             },
             "method": {
-              "$ref": "#/definitions/CustomDetectorMethod",
-              "default": "RULESET"
+              "$ref": "#/definitions/CustomDetectorMethod"
             },
             "languages": {
               "type": "array",
@@ -1241,12 +1241,14 @@
             "extractor": {
               "$ref": "#/definitions/CustomExtractorConfig",
               "description": "Optional structured extraction \u2014 runs when detector fires"
+            },
+            "pipeline_schema": {
+              "$ref": "#/definitions/AnyPipelineSchema"
             }
           },
           "required": [
             "custom_detector_key",
-            "name",
-            "method"
+            "name"
           ],
           "additionalProperties": false
         }
@@ -1260,6 +1262,216 @@
           "$ref": "#/definitions/DetectorConfig"
         }
       ]
+    },
+    "PipelineEntityDefinition": {
+      "title": "PipelineEntityDefinition",
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string",
+          "default": ""
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "PipelineModelConfig": {
+      "title": "PipelineModelConfig",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PipelineClassificationDefinition": {
+      "title": "PipelineClassificationDefinition",
+      "type": "object",
+      "properties": {
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "multi_label": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "PipelineValidationRule": {
+      "title": "PipelineValidationRule",
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "default": ""
+        },
+        "type": {
+          "type": "string",
+          "default": "regex"
+        },
+        "pattern": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PipelineValidationConfig": {
+      "title": "PipelineValidationConfig",
+      "type": "object",
+      "properties": {
+        "confidence_threshold": {
+          "type": "number",
+          "default": 0.7
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PipelineValidationRule"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PipelineResult": {
+      "title": "PipelineResult",
+      "type": "object",
+      "properties": {
+        "entities": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "classification": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RegexPatternDefinition": {
+      "title": "RegexPatternDefinition",
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string"
+        },
+        "flags": {},
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the pattern"
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "additionalProperties": false
+    },
+    "GLiNER2PipelineSchema": {
+      "title": "GLiNER2PipelineSchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "GLINER2"
+          ],
+          "default": "GLINER2"
+        },
+        "entities": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/PipelineEntityDefinition"
+          }
+        },
+        "classification": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/PipelineClassificationDefinition"
+          }
+        },
+        "model": {
+          "$ref": "#/definitions/PipelineModelConfig"
+        },
+        "validation": {
+          "$ref": "#/definitions/PipelineValidationConfig"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RegexPipelineSchema": {
+      "title": "RegexPipelineSchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "REGEX"
+          ],
+          "default": "REGEX"
+        },
+        "patterns": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/RegexPatternDefinition"
+          }
+        },
+        "validation": {
+          "$ref": "#/definitions/PipelineValidationConfig"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LLMPipelineSchema": {
+      "title": "LLMPipelineSchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "LLM"
+          ],
+          "default": "LLM"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AnyPipelineSchema": {
+      "title": "AnyPipelineSchema",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/GLiNER2PipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/RegexPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/LLMPipelineSchema"
+        }
+      ],
+      "discriminator": {
+        "propertyName": "type"
+      }
     }
   }
 }

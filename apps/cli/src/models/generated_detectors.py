@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
@@ -445,6 +446,7 @@ class CustomDetectorMethod(StrEnum):
     RULESET = 'RULESET'
     CLASSIFIER = 'CLASSIFIER'
     ENTITY = 'ENTITY'
+    PIPELINE = 'PIPELINE'
 
 
 class CustomRegexRule(BaseModel):
@@ -604,6 +606,112 @@ class CustomEntityConfig(BaseModel):
     model: str | None = 'fastino/gliner2-base-v1'
 
 
+class GenericDetectorConfig(DetectorConfig):
+    """
+    Generic config for detectors without specialised parameters
+    """
+
+
+class PipelineEntityDefinition(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    description: str | None = ''
+    required: bool | None = False
+
+
+class PipelineModelConfig(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    path: str | None = None
+    name: str | None = None
+
+
+class PipelineClassificationDefinition(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    labels: list[str] | None = []
+    multi_label: bool | None = False
+
+
+class PipelineValidationRule(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    field: str | None = ''
+    type: str | None = 'regex'
+    pattern: str | None = None
+
+
+class PipelineValidationConfig(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    confidence_threshold: float | None = 0.7
+    rules: list[PipelineValidationRule] | None = None
+
+
+class PipelineResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    entities: dict[str, list[dict[str, Any]]] | None = None
+    classification: dict[str, dict[str, Any]] | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class RegexPatternDefinition(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    pattern: str
+    flags: Any | None = None
+    description: str | None = Field(
+        None, description='Human-readable description of the pattern'
+    )
+
+
+class Type1(StrEnum):
+    GLINER2 = 'GLINER2'
+
+
+class GLiNER2PipelineSchema(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['GLINER2'] = 'GLINER2'
+    entities: dict[str, PipelineEntityDefinition] | None = None
+    classification: dict[str, PipelineClassificationDefinition] | None = None
+    model: PipelineModelConfig | None = None
+    validation: PipelineValidationConfig | None = None
+
+
+class Type2(StrEnum):
+    REGEX = 'REGEX'
+
+
+class RegexPipelineSchema(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['REGEX'] = 'REGEX'
+    patterns: dict[str, RegexPatternDefinition] | None = None
+    validation: PipelineValidationConfig | None = None
+
+
+class Type3(StrEnum):
+    LLM = 'LLM'
+
+
+class LLMPipelineSchema(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['LLM'] = 'LLM'
+
+
 class CustomDetectorConfig(DetectorConfig):
     """
     Configuration for user-defined detector execution
@@ -614,7 +722,7 @@ class CustomDetectorConfig(DetectorConfig):
     )
     name: str = Field(..., description='User-facing name of custom detector')
     description: str | None = None
-    method: CustomDetectorMethod
+    method: CustomDetectorMethod | None = None
     languages: list[str] | None = ['de', 'en']
     ruleset: CustomRulesetConfig | None = None
     classifier: CustomClassifierConfig | None = None
@@ -622,12 +730,9 @@ class CustomDetectorConfig(DetectorConfig):
     extractor: CustomExtractorConfig | None = Field(
         None, description='Optional structured extraction — runs when detector fires'
     )
-
-
-class GenericDetectorConfig(DetectorConfig):
-    """
-    Generic config for detectors without specialised parameters
-    """
+    pipeline_schema: (
+        GLiNER2PipelineSchema | RegexPipelineSchema | LLMPipelineSchema | None
+    ) = Field(None, discriminator='type', title='AnyPipelineSchema')
 
 
 class DetectorsRefactored(
