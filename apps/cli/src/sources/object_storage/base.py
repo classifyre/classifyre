@@ -513,24 +513,11 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 sampling.include_column_names if sampling.include_column_names is not None else True
             )
             # Run the (potentially blocking) file parsing in a thread so pyarrow /
-            # spaCy / pdfplumber can't freeze the event loop.  The 120 s timeout
-            # guards against corrupted parquet files that cause C++ thread-pool hangs.
-            try:
-                pages: list[str] = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        list,
-                        iter_file_pages(raw_bytes, mime, batch_size, include_col_names),
-                    ),
-                    timeout=120.0,
-                )
-            except asyncio.TimeoutError:
-                logger.warning(
-                    "File content parsing timed out for %s (mime=%s, %d bytes); skipping",
-                    asset_id,
-                    mime,
-                    len(raw_bytes),
-                )
-                return
+            # pdfplumber can't freeze the event loop during large file iteration.
+            pages: list[str] = await asyncio.to_thread(
+                list,
+                iter_file_pages(raw_bytes, mime, batch_size, include_col_names),
+            )
             for batch_text in pages:
                 yield "", batch_text
             return
