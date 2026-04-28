@@ -458,24 +458,26 @@ def _iter_parquet_pages(
 
         import pyarrow.parquet as pq  # type: ignore[import-not-found, import-untyped]
 
-        table = pq.read_table(io.BytesIO(file_bytes))
-        column_names = table.schema.names
-        total_rows = table.num_rows
-
-        for batch_start in range(0, total_rows, batch_size):
-            batch = table.slice(batch_start, min(batch_size, total_rows - batch_start))
+        # ParquetFile + iter_batches() reads one row-group at a time instead of
+        # loading the whole table into memory, and surfaces schema errors early
+        # (before reading any data) so a bad file can't lock the C++ thread pool.
+        pf = pq.ParquetFile(io.BytesIO(file_bytes))
+        abs_row = 0
+        for batch in pf.iter_batches(batch_size=batch_size):
+            col_names = batch.schema.names
             lines: list[str] = []
             for local_idx in range(batch.num_rows):
-                abs_row = batch_start + local_idx
                 lines.append(f"row_{abs_row + 1}:")
-                for col in column_names:
-                    cell = batch.column(col)[local_idx].as_py()
+                for col_i, col in enumerate(col_names):
+                    cell = batch.column(col_i)[local_idx].as_py()
                     cell_str = "" if cell is None else str(cell)
                     first, *rest = cell_str.splitlines() or [""]
                     lines.append(f"  {col}: {first}" if include_column_names else f"  {first}")
                     lines.extend(f"    {c}" for c in rest)
                 lines.append("")
-            yield "\n".join(lines)
+                abs_row += 1
+            if lines:
+                yield "\n".join(lines)
     except Exception as exc:
         logger.warning("Parquet page iteration failed: %s", exc)
 

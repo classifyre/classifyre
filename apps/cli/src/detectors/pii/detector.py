@@ -1,5 +1,6 @@
 """PII detector powered by Microsoft Presidio."""
 
+import asyncio
 import importlib
 import logging
 import re
@@ -797,6 +798,13 @@ class PIIDetector(BaseDetector):
 
     async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
         """Detect PII in *content* and return a list of :class:`DetectionResult` objects."""
+        # Presidio + spaCy NER are CPU-bound synchronous operations.  Running them
+        # directly in the async coroutine blocks the event loop for the duration of
+        # each page (seconds on CPU-limited pods), making the job appear frozen.
+        # Offloading to a thread keeps the loop alive and allows I/O to proceed.
+        return await asyncio.to_thread(self._detect_sync, content)
+
+    def _detect_sync(self, content: str) -> list[DetectionResult]:
         tabular_results = self._detect_tabular_content(content)
         if tabular_results is not None:
             if self.config.max_findings and len(tabular_results) > self.config.max_findings:
