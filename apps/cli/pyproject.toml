@@ -154,6 +154,7 @@ otel = [
 line-length = 100
 target-version = "py312"
 src = ["src"]
+exclude = ["scripts/", "src/models/generated_*.py"]
 
 [tool.ruff.lint]
 select = [
