@@ -201,6 +201,8 @@ const configSchemaByDetectorType: Record<string, string> = {
   TEXT_CLASSIFICATION: "TextClassificationDetectorConfig",
   YARA: "ThreatDetectorConfig",
   BROKEN_LINKS: "BrokenLinksDetectorConfig",
+  CODE_SECURITY: "CodeSecurityDetectorConfig",
+  LANGUAGE: "GenericDetectorConfig",
   CUSTOM: "CustomDetectorConfig",
 };
 

@@ -28,6 +28,12 @@
       "$ref": "#/definitions/ImageClassificationDetectorConfig"
     },
     {
+      "$ref": "#/definitions/CodeSecurityDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/LanguageDetectorConfig"
+    },
+    {
       "$ref": "#/definitions/GenericDetectorConfig"
     }
   ],
@@ -1619,9 +1625,133 @@
         }
       ]
     },
+    "CodeSecurityDetectorConfig": {
+      "title": "CodeSecurityDetectorConfig",
+      "description": "Configuration for the code security detector powered by Bandit static analysis. Use skips/tests to control which Bandit checks run.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "skips": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^B[0-9]+$"
+                  },
+                  "minItems": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Bandit test IDs to skip (e.g. ['B101', 'B105']). When null all tests run. Takes precedence over tests when both are set."
+            },
+            "tests": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^B[0-9]+$"
+                  },
+                  "minItems": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Explicit list of Bandit test IDs to run (e.g. ['B102', 'B301']). When null all tests (minus skips) run."
+            },
+            "severity_threshold": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Severity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Minimum Bandit issue severity to report. Findings below this threshold are suppressed."
+            },
+            "confidence_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.7,
+              "description": "Minimum confidence score to report a finding (0-1)"
+            },
+            "max_findings": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum number of findings to return per asset"
+            }
+          }
+        }
+      ]
+    },
+    "LanguageDetectorConfig": {
+      "title": "LanguageDetectorConfig",
+      "description": "Config for the language detector (fast-langdetect).",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "confidence_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.7,
+              "description": "Minimum confidence score to report a finding (0-1)"
+            },
+            "model": {
+              "type": "string",
+              "enum": ["lite", "full", "auto"],
+              "default": "auto",
+              "description": "Model size: 'lite' (~50 MB, offline-only), 'full' (~190 MB, best accuracy), 'auto' (tries full, falls back to lite on MemoryError)."
+            },
+            "k": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "Number of top language candidates to return."
+            },
+            "max_findings": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum number of findings to return per asset"
+            }
+          }
+        }
+      ]
+    },
     "GenericDetectorConfig": {
       "title": "GenericDetectorConfig",
-      "description": "Generic config for detectors without specialised parameters (e.g. language detection, code security)",
+      "description": "Generic config for detectors without specialised parameters.",
       "allOf": [
         {
           "$ref": "#/definitions/DetectorConfig"
