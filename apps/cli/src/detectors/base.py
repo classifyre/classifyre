@@ -19,13 +19,7 @@ class BaseDetector(ABC):
     detector_name: str = "base"
 
     def __init__(self, config: DetectorConfig | None = None):
-        """
-        Initialize detector with optional configuration.
-
-        Args:
-            config: Detector configuration (confidence threshold, max findings, etc.)
-        """
-        self.config = config or DetectorConfig()
+        self.config: DetectorConfig = config if config is not None else DetectorConfig()
         self._initialized = False
 
     @abstractmethod

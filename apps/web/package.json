@@ -60,5 +60,8 @@
     "ts-jest": "^29.4.9",
     "typescript": "^5.9.3",
     "vite-tsconfig-paths": "^6.1.1"
+  },
+  "overrides": {
+    "@playwright/test": "1.59.1"
   }
 }

@@ -49,7 +49,7 @@ Each object has the shape:
 | \`SECRETS\` | API keys, tokens, private keys |
 | \`PII\` | Emails, SSNs, credit cards, phone numbers |
 | \`TOXIC\` | Toxic / hateful text (Detoxify model) |
-| \`NSFW\` | Sexually explicit content |
+| \`IMAGE_CLASSIFICATION\` | Image content classification (NSFW, etc.) |
 | \`YARA\` | Custom YARA rule matches |
 | \`BROKEN_LINKS\` | Unreachable URLs in text |
 

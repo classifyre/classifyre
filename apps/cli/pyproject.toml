@@ -44,6 +44,7 @@ privacy = [
     "presidio-analyzer>=2.2.361",
     "spacy>=3.8.11",
     "phonenumbers>=9.0.25",
+    "numpy>=1.26.0,<2.0.0",
 ]
 security = [
     "detect-secrets>=1.5.0",
@@ -52,8 +53,6 @@ security = [
 ]
 threat-ml = [
     "transformers>=4.50.0,<6.0.0",
-    "onnxruntime>=1.24.2",
-    "optimum[onnxruntime]>=2.1.0",
     "sentencepiece>=0.2.1",
     "torch>=2.10.0",
 ]
@@ -125,6 +124,7 @@ hive = [
 ]
 databricks = [
     "databricks-sql-connector>=4.0.0,<5.0.0",
+    "pyarrow>=24.0.0",
 ]
 snowflake = [
     "snowflake-connector-python>=4.0.0,<5.0.0",
@@ -154,6 +154,7 @@ otel = [
 line-length = 100
 target-version = "py312"
 src = ["src"]
+exclude = ["scripts/", "src/models/generated_*.py"]
 
 [tool.ruff.lint]
 select = [
@@ -200,7 +201,7 @@ disallow_any_generics = true
 no_implicit_optional = true
 show_error_codes = true
 plugins = ["pydantic.mypy"]
-exclude = ["scripts/"]
+exclude = ["scripts/", ".venv/"]
 
 [[tool.mypy.overrides]]
 module = ["jsonschema.*", "requests.*", "schemas.*"]
@@ -222,6 +223,8 @@ module = [
     "yara.*",
     "nudenet.*",
     "fast_langdetect.*",
+    "detect_secrets.*",
+    "detect_secrets",
     "bandit.*",
     "datasketch.*",
     "sentence_transformers.*",
@@ -237,6 +240,18 @@ module = [
     "pyarrow.*",
     "opentelemetry.*",
     "PIL.*",
+    "gliner.*",
+    "gliner",
+    "datasets.*",
+    "datasets",
+    "setfit.*",
+    "setfit",
+    "sklearn.*",
+    "sklearn",
+    "numpy",
+    "numpy.*",
+    "tldextract",
+    "tldextract.*",
 ]
 ignore_missing_imports = true
 
@@ -272,7 +287,7 @@ module = [
     "src.utils.*",
     "src.outputs.*",
 ]
-disable_error_code = ["call-arg", "assignment", "no-untyped-def", "no-untyped-call", "no-any-return", "union-attr", "attr-defined", "arg-type", "misc", "list-item", "comparison-overlap", "type-arg", "return-value", "dict-item", "unused-ignore", "index", "union-attr", "method-assign"]
+disable_error_code = ["call-arg", "assignment", "no-untyped-def", "no-untyped-call", "no-any-return", "union-attr", "attr-defined", "arg-type", "misc", "list-item", "comparison-overlap", "type-arg", "return-value", "dict-item", "unused-ignore", "index", "union-attr", "method-assign", "import-not-found", "import-untyped"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

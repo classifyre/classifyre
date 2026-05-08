@@ -1037,12 +1037,13 @@
         "Increase confidence_threshold for stricter alerts."
       ]
     },
-    "NSFW": {
-      "title": "NSFW detection",
-      "summary": "Find inappropriate or explicit visual content.",
+    "IMAGE_CLASSIFICATION": {
+      "title": "Image classification",
+      "summary": "Classify images with any HuggingFace-compatible vision model. Use for NSFW detection, product recognition, or custom label sets.",
       "suggestions": [
-        "NSFW Standard works for most cases.",
-        "Use NSFW Explicit for stricter filtering."
+        "Set model to a HuggingFace hub ID or a local directory path.",
+        "Use severity_map to assign severity levels to predicted labels.",
+        "Set device to 'cuda' for GPU inference on large image batches."
       ]
     },
     "YARA": {

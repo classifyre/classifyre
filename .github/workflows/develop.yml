@@ -9,6 +9,14 @@ on:
         description: "Docker image tag to deploy to the develop namespace"
         required: false
         default: "develop"
+      demo_mode:
+        description: "Enable demo mode (true or false)"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
 
 permissions:
   contents: read
@@ -27,6 +35,7 @@ jobs:
       HELM_NAMESPACE: classifyre-develop
       HELM_VALUES_FILE: ./helm/classifyre/values-vps-develop.yaml
       IMAGE_TAG: ${{ inputs.image_tag || 'develop' }}
+      DEMO_MODE: ${{ inputs.demo_mode || 'true' }}
 
     steps:
       - name: Checkout
@@ -60,6 +69,7 @@ jobs:
           echo "API image: ${DOCKER_NAMESPACE}/api:${IMAGE_TAG}"
           echo "Web image: ${DOCKER_NAMESPACE}/web:${IMAGE_TAG}"
           echo "CLI image: ${DOCKER_NAMESPACE}/cli:${IMAGE_TAG}"
+          echo "Demo mode: ${DEMO_MODE}"
 
       - name: Clear pending Helm operation
         run: |
@@ -101,6 +111,7 @@ jobs:
             --set api.cliJobs.image.tag="${IMAGE_TAG}" \
             --set frontend.image.repository="${DOCKER_NAMESPACE}/web" \
             --set frontend.image.tag="${IMAGE_TAG}" \
+            --set-string api.env.DEMO_MODE="${DEMO_MODE}" \
             --wait \
             --timeout 15m
 

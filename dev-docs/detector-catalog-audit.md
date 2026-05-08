@@ -1,115 +1,216 @@
 # Detector Catalog Audit
 
-This note audits `packages/schemas/src/schemas/all_detectors.json` and cross-checks it against the CLI runtime under `apps/cli/src/detectors/` plus detector dependency groups in `apps/cli/pyproject.toml`.
+Audits `packages/schemas/src/schemas/all_detectors.json` against `apps/cli/src/detectors/`.
+
+Last updated: 2026-05-08 (post-refactor, unstaged changes included).
+
+---
 
 ## Snapshot
 
-- Catalog entries: `25`
-- Lifecycle split: `13 active`, `11 planned`, `1 experimental`
-- Duplicate `detector_type` entries: none
-- Exact duplicate `recommended_model` strings: one
-  - `typeform/distilbert-base-uncased-mnli` is reused by `DOMAIN_CLASS`, `CONTENT_TYPE`, and `SENSITIVITY_TIER`
-- Shared model or library components inside composite recommendations:
-  - `presidio-analyzer`: `PII`, `OCR_PII`, `DEID_SCORE`
-  - `fast-langdetect`: `LANGUAGE`, `JURISDICTION_TAG`
-- Intentionally unset recommendation:
-  - `IMAGE_VIOLENCE` has `recommended_model: null` and is marked `experimental`
+- Catalog entries: **10** (down from 25)
+- All 10 are **active** — no planned or experimental entries remain
+- Catalog type names match runtime type names exactly
+- No duplicate `detector_type` entries
 
-## What The Catalog Is Actually Storing
+---
 
-`all_detectors.json` is a capability catalog plus schema bundle. The detector list lives in `definitions.DetectorCatalog.default`. The `recommended_model` field is metadata, not a guaranteed 1:1 runtime download source.
+## What Was Deleted
 
-That matters in a few places:
-
-- `NSFW` says `nudenet` in the catalog, but the runtime currently uses `Falconsai/nsfw_image_detection` and falls back to `google/vit-base-patch16-224`
-- `CUSTOM` says `mDeBERTa-v3 + SetFit + GLiNER` in the catalog, but the runtime pins specific defaults:
-  - zero-shot: `MoritzLaurer/mDeBERTa-v3-base-mnli-xnli`
-  - SetFit: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
-  - entity extraction: `urchade/gliner_multi-v2.1`
-- `SPAM` points at a transformer model in the catalog, but the runtime defaults to a heuristic path unless `CLASSIFYRE_ENABLE_SPAM_MODEL` is enabled
-- Several planned detectors already have lightweight heuristic implementations in `apps/cli/src/detectors/advanced_detectors.py`, even when the catalog recommends a future ML stack
-
-## Detector-Facing Libraries
-
-These are the main detector-facing libraries referenced either directly in `all_detectors.json` or in the CLI dependency groups:
-
-| Library or tool | Where it shows up |
+| Removed | What it was |
 |---|---|
-| `detect-secrets` | `SECRETS` |
-| `presidio-analyzer` | `PII`, `OCR_PII`, `DEID_SCORE` |
-| `presidio-anonymizer` | privacy dependency group; paired with Presidio stack |
-| `spaCy` + `en_core_web_sm` | `PII` runtime |
-| `pytesseract` / Tesseract | `OCR_PII` |
-| `scrubadub` | `DEID_SCORE` |
-| `pycanon` | `DEID_SCORE` |
-| `detoxify` | `TOXIC` |
-| `nudenet` | `NSFW` catalog recommendation only |
-| `transformers` | `PROMPT_INJECTION`, `PHISHING_URL`, optional `SPAM`, `NSFW`, `CUSTOM`, and likely future classifier-style detectors |
-| `yara-python` | `YARA` |
-| `bandit` | `CODE_SECURITY` |
-| `fast-langdetect` | `LANGUAGE`, `JURISDICTION_TAG` |
-| `datasketch` | `PLAGIARISM`, `DUPLICATE` |
-| `sentence-transformers` | `PLAGIARISM`, `CONTENT_QUALITY`, `CUSTOM` SetFit base |
-| `textstat` | `CONTENT_QUALITY` |
-| `setfit` | `CUSTOM` |
-| `gliner` | `CUSTOM` |
-| `datasets` + `scikit-learn` | `CUSTOM` training path |
-| `requests` / HTTP checks | `BROKEN_LINKS` style runtime implied by `HTTP validation engine` |
-| `rules engine` | `JURISDICTION_TAG` |
+| `advanced_detectors.py` (581 lines) | Heuristic stubs for `HATE_SPEECH`, `AI_GENERATED`, `CONTENT_QUALITY`, `BIAS`, `DUPLICATE`, `DOMAIN_CLASS`, `CONTENT_TYPE`, `SENSITIVITY_TIER`, `JURISDICTION_TAG`, `IMAGE_VIOLENCE`, `OCR_PII`, `DEID_SCORE`, `PLAGIARISM` |
+| `PHISHING_URL` + detector | ML detector using `CrabInHoney/urlbert-tiny-phishing-classifier` |
+| `threat/prompt_injection_detector.py` | ML detector using `protectai/deberta-v3-base-prompt-injection-v2` |
+| `content/nsfw_detector.py` | Hardcoded NSFW detector → replaced by generic `IMAGE_CLASSIFICATION` |
+| `content/spam_detector.py` | Heuristic-default spam detector → replaced by generic `TEXT_CLASSIFICATION` |
 
-## Concrete Runtime Pulls Verified In Code
+---
 
-The following model IDs or runtime assets are pinned in code today:
+## Detector Runtime Analysis
 
-| Detector | Concrete runtime pull or asset | Notes |
-|---|---|---|
-| `PII` | `en_core_web_sm` | Loaded through Presidio + spaCy |
-| `TOXIC` | `Detoxify("original")` | Underlying weights are managed by Detoxify |
-| `NSFW` | `Falconsai/nsfw_image_detection` | Fallback: `google/vit-base-patch16-224` |
-| `PROMPT_INJECTION` | `protectai/deberta-v3-base-prompt-injection-v2` | Matches catalog |
-| `PHISHING_URL` | `CrabInHoney/urlbert-tiny-phishing-classifier` | Matches catalog |
-| `SPAM` | `mrm8488/bert-tiny-finetuned-sms-spam-detection` | Only if `CLASSIFYRE_ENABLE_SPAM_MODEL` is enabled |
-| `CUSTOM` zero-shot | `MoritzLaurer/mDeBERTa-v3-base-mnli-xnli` | Generic `mDeBERTa-v3` catalog entry resolves to this |
-| `CUSTOM` SetFit | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Used for trained custom classifiers |
-| `CUSTOM` GLiNER | `urchade/gliner_multi-v2.1` | Used for entity extraction and extraction overlays |
+### SECRETS
 
-For many of the remaining detectors, the runtime exists today as a heuristic implementation rather than a concrete remote model pull.
+| | |
+|---|---|
+| File | `secrets/detector.py` |
+| Library | `detect-secrets` — `SecretsCollection` + `transient_settings` |
+| Config type | `SecretsDetectorConfig` |
+| Initialization | Full: plugin set built from config via `transient_settings({"plugins_used": ...})`; all detection delegated to the library |
+| Regex in our code | **None** — all pattern matching done by detect-secrets plugins |
 
-## Detector Matrix
+---
 
-| Detector | Status | Catalog `recommended_model` | Current read |
+### PII
+
+| | |
+|---|---|
+| File | `pii/detector.py` |
+| Libraries | `presidio_analyzer` (AnalyzerEngine), `presidio_analyzer.nlp_engine` (SpacyNlpEngine + NerModelConfiguration), `spacy` (`en_core_web_sm` or configurable), `tldextract` (offline-patched), `phonenumbers` |
+| Config type | `PIIDetectorConfig` |
+| Initialization | Full: SpacyNlpEngine with filtered NER config, custom recognizers via PatternRecognizer, phone recognizer probe at init |
+| Regex in our code | **Yes — 3 uses, none for entity detection:** |
+
+1. `_TABULAR_ROW_RE` / `_TABULAR_CELL_RE` / `_TABULAR_CONTINUATION_RE` (lines 221–223) — parse the `row_N: / col: value` text format fed to the detector; this is input format parsing
+2. `re.sub(r"[^a-z0-9]+", ...)` (line 449) — normalize column name to tokens for entity-hint lookup
+3. `re.findall(r"[A-Za-z][A-Za-z'-]*", ...)` (line 623) — count word tokens in a PERSON match to filter single-token false positives
+
+All three are structural utilities. None drives entity detection. Replaceable with `str.split()` / `str.isalpha()` if the goal is to eliminate `import re` entirely, but low priority.
+
+---
+
+### TOXIC
+
+| | |
+|---|---|
+| File | `content/toxic_detector.py` |
+| Library | `detoxify` (`Detoxify("original")`), `torch` |
+| Config type | `ContentDetectorConfig` |
+| Initialization | Full: loads Detoxify `original` at construction, covers all 6 toxicity types |
+| Regex in our code | **None** |
+
+---
+
+### IMAGE_CLASSIFICATION
+
+| | |
+|---|---|
+| File | `content/image_classification_detector.py` |
+| Libraries | `transformers` (pipeline `"image-classification"`), `PIL.Image`, `torch` |
+| Config type | `ImageClassificationDetectorConfig` |
+| Default model | `google/vit-base-patch16-224` (configurable via `model` field) |
+| Initialization | Full: builds pipeline with all config fields wired — `model`, `model_revision`, `device`, `top_k`, `function_to_apply` |
+| Regex in our code | **Yes — config-driven severity mapping only:** `re.search(rule.pattern, label_lower)` in `_resolve_severity()` matches user-supplied patterns from `severity_map` config to predicted label strings. This is not detection; it is label → severity translation after the model has already classified the image. **Keep as-is.** |
+
+Replaces the old hardcoded `NSFW` detector. Any vision model can now be wired in via config; NSFW scanning is achieved by pointing `model` at `Falconsai/nsfw_image_detection` and defining appropriate `severity_map` rules.
+
+---
+
+### YARA
+
+| | |
+|---|---|
+| File | `threat/yara_detector.py` |
+| Library | `yara` (yara-python) |
+| Config type | `ThreatDetectorConfig` |
+| Initialization | Full: compiles all active preset rule sources into a single `yara.compile(sources={...})` object |
+| Presets | `secrets`, `malware_indicators`, `suspicious_scripts`, `office_macros`, `pdf_threats`, `supply_chain`, `network_ioc`, `credential_theft` |
+| Regex in our code | **None in Python** — YARA rule strings contain regex as YARA syntax, which is intentional |
+
+---
+
+### BROKEN_LINKS
+
+| | |
+|---|---|
+| File | `broken_links/detector.py` |
+| Library | `requests` (Session with HEAD + streaming GET fallback) |
+| Config type | `BrokenLinksDetectorConfig` |
+| Initialization | Full: `requests.Session` with custom User-Agent, async semaphore, redirect following |
+| Regex in our code | **None** |
+
+---
+
+### TEXT_CLASSIFICATION
+
+| | |
+|---|---|
+| File | `content/text_classification_detector.py` |
+| Library | `transformers` (pipeline `"text-classification"`), `torch` |
+| Config type | `TextClassificationDetectorConfig` |
+| Default model | **None** — `model` is required in config; raises at construction if unset |
+| Initialization | Full: builds pipeline with `model`, `model_revision`, `device`, `top_k`, `function_to_apply`. No heuristic fallback. |
+| Regex in our code | **Yes — config-driven severity mapping only:** same `_resolve_severity()` pattern as `IMAGE_CLASSIFICATION`. User-supplied `severity_map` rules applied after model inference. **Keep as-is.** |
+
+Replaces the old `SPAM` detector. The spam heuristic (keyword matching + exclamation counting + URL regex) is **gone**. Any text classification model can be pointed at this detector via config; spam scanning uses `mrm8488/bert-tiny-finetuned-sms-spam-detection` by setting `model` in config — always model-first, no fallback.
+
+---
+
+### LANGUAGE
+
+| | |
+|---|---|
+| File | `content/language_detector.py` |
+| Library | `fast_langdetect` |
+| Config type | `GenericDetectorConfig` |
+| Initialization | Full: module imported at construction, `fast_langdetect.detect(content)` called directly |
+| Regex in our code | **None** |
+
+---
+
+### CODE_SECURITY
+
+| | |
+|---|---|
+| File | `threat/code_security_detector.py` |
+| Library | `bandit` (subprocess: `python -m bandit -q -f json`) |
+| Config type | `DetectorConfig` |
+| Initialization | Eager availability check at construction; subprocess execution avoids stevedore plugin noise |
+| Regex in our code | **None** |
+
+---
+
+### CUSTOM
+
+| | |
+|---|---|
+| Files | `custom/detector.py`, `custom/runners.py`, `custom/trainer.py` |
+| Libraries | `gliner2` (GLiNER2.from_pretrained), `setfit` (SetFitModel for trained artifact dirs), `torch` |
+| Config type | `CustomDetectorConfig` |
+| Default model | `fastino/gliner2-base-v1` |
+| Runners | `GLiNER2Runner` (default), `RegexRunner`, `LLMRunner` (stub) |
+| Initialization | GLiNER2Runner: lazy model load on first `run()` call; SetFit models loaded per-task from artifact dirs |
+| Regex in our code | **Yes — intentional, it is the feature:** `RegexRunner` compiles user-defined patterns from config and is a first-class pipeline type. Validation rules also support regex. No change needed. |
+
+---
+
+## Regex Summary
+
+| Detector | Regex present | Category | Action |
 |---|---|---|---|
-| `SECRETS` | `active` | `detect-secrets` | Package/tool recommendation; no separate model pull |
-| `PII` | `active` | `presidio-analyzer` | Runtime uses Presidio plus spaCy `en_core_web_sm` |
-| `TOXIC` | `active` | `detoxify` | Runtime loads Detoxify `original` |
-| `NSFW` | `active` | `nudenet` | Catalog/runtime mismatch; runtime uses `Falconsai/nsfw_image_detection` |
-| `YARA` | `active` | `yara-python` | Rule engine / package, not a remote model |
-| `BROKEN_LINKS` | `active` | `HTTP validation engine` | Engine description, not a library package name |
-| `PROMPT_INJECTION` | `active` | `protectai/deberta-v3-base-prompt-injection-v2` | Exact runtime model found |
-| `PHISHING_URL` | `active` | `CrabInHoney/urlbert-tiny-phishing-classifier` | Exact runtime model found |
-| `SPAM` | `active` | `mrm8488/bert-tiny-finetuned-sms-spam-detection` | Exact runtime model exists, but heuristic mode is default |
-| `LANGUAGE` | `active` | `fast-langdetect` | Package-based detector, no remote model ID |
-| `CODE_SECURITY` | `active` | `bandit` | Subprocess tool execution, no remote model |
-| `PLAGIARISM` | `planned` | `datasketch + all-MiniLM-L6-v2` | Runtime currently uses a heuristic repeated-segment detector |
-| `IMAGE_VIOLENCE` | `experimental` | `null` | Catalog intentionally leaves ML unset; runtime currently falls back to heuristic keyword matching |
-| `OCR_PII` | `planned` | `tesseract + presidio-analyzer` | Runtime currently uses regex-style OCR text heuristics, not Tesseract |
-| `DEID_SCORE` | `planned` | `presidio-analyzer + pycanon + scrubadub` | Runtime currently computes a heuristic residual-PII score |
-| `HATE_SPEECH` | `planned` | `facebook/roberta-hate-speech-dynabench-r4-target` | Runtime currently uses keyword heuristics |
-| `AI_GENERATED` | `planned` | `distilbert-base-uncased (RAID fine-tuned)` | Runtime currently uses phrase heuristics |
-| `CONTENT_QUALITY` | `planned` | `sentence-transformers/all-MiniLM-L6-v2 + textstat` | Runtime currently uses heuristic readability-style scoring |
-| `BIAS` | `active` | `valurank/distilroberta-bias` | Runtime exists in `advanced_detectors.py` as keyword heuristics, not the catalog model |
-| `DUPLICATE` | `planned` | `datasketch (MinHash LSH)` | Runtime currently uses repeated-line heuristics |
-| `DOMAIN_CLASS` | `planned` | `typeform/distilbert-base-uncased-mnli` | Runtime currently uses keyword heuristics; catalog model string is reused across three detectors |
-| `CONTENT_TYPE` | `planned` | `typeform/distilbert-base-uncased-mnli` | Runtime currently uses keyword heuristics; catalog model string is reused across three detectors |
-| `SENSITIVITY_TIER` | `planned` | `typeform/distilbert-base-uncased-mnli` | Runtime currently uses rules/keywords; catalog model string is reused across three detectors |
-| `JURISDICTION_TAG` | `planned` | `fast-langdetect + rules engine` | Runtime currently uses keyword heuristics; shares `fast-langdetect` family with `LANGUAGE` |
-| `CUSTOM` | `active` | `mDeBERTa-v3 + SetFit + GLiNER` | Runtime pins concrete defaults for all three parts |
+| `SECRETS` | No | — | — |
+| `PII` | Yes | Input format parsing + token counting; not detection | Low priority; removable with minor refactor |
+| `TOXIC` | No | — | — |
+| `IMAGE_CLASSIFICATION` | Yes | Config-driven label → severity mapping | Keep |
+| `YARA` | YARA syntax only | Part of YARA rule language | Keep |
+| `BROKEN_LINKS` | No | — | — |
+| `TEXT_CLASSIFICATION` | Yes | Config-driven label → severity mapping | Keep |
+| `LANGUAGE` | No | — | — |
+| `CODE_SECURITY` | No | — | — |
+| `CUSTOM` | Yes | `RegexRunner` — intentional feature | Keep |
+
+No detector uses regex as a detection fallback. The old spam heuristic (the main offender) was removed with `spam_detector.py`.
+
+---
+
+## Functional Overlap
+
+### SECRETS vs YARA[secrets]
+
+The only meaningful detection overlap. Both fire on the same secret classes:
+
+| Pattern | SECRETS | YARA[secrets] |
+|---|---|---|
+| AWS Access Key | `AWSKeyDetector` | `Secrets_AWS_Access_Key` |
+| GitHub token | `GitHubTokenDetector` | `Secrets_GitHub_Token` |
+| GitLab token | `GitLabTokenDetector` | `Secrets_GitLab_Token` |
+| Slack token | `SlackDetector` | `Secrets_Slack_Token` |
+| OpenAI key | `OpenAIDetector` | `Secrets_OpenAI_Key` |
+| Stripe live key | `StripeDetector` | `Secrets_Stripe_Live_Key` |
+| PEM private key | `PrivateKeyDetector` | `Secrets_PEM_Private_Key` |
+| JWT | `JwtTokenDetector` | `Secrets_JWT_Token` |
+| Generic credential assignment | `KeywordDetector` | `Secrets_Generic_Credential_Assignment` |
+
+Running both is intentional and worthwhile: `SECRETS` provides line-level precision and extracted secret values; `YARA` provides multi-string condition matching and covers non-secret threat categories in the same pass. The overlap produces duplicate findings for the same content — callers should deduplicate on `(finding_type, matched_content)` if needed.
+
+No other detectors share significant detection surface.
+
+---
 
 ## Bottom Line
 
-- There are no duplicate detector catalog entries.
-- There is one exact duplicate `recommended_model` recommendation reused across three classification detectors.
-- Several detectors share library families even when the full recommendation string differs, especially the Presidio stack and `fast-langdetect`.
-- The catalog is directionally accurate, but it is not always the exact runtime truth.
-- A large part of the gap is that the catalog describes target ML stacks while the runtime still uses heuristic implementations for several planned detectors.
-- The clearest catalog/runtime mismatches today are `NSFW`, `CUSTOM`, `SPAM`, and the advanced heuristic detectors under `advanced_detectors.py`.
+- Catalog is accurate: 10 active detectors, all backed by real library implementations, type names match runtime.
+- No heuristic-only stubs remain.
+- No detection fallback regex anywhere — the old spam heuristic is gone.
+- `NSFW` and `SPAM` are now generic pipelines (`IMAGE_CLASSIFICATION` / `TEXT_CLASSIFICATION`) — any compatible HuggingFace model can be substituted via config.
+- `CUSTOM`'s `recommended_model` field in the catalog (`mDeBERTa-v3 + SetFit + GLiNER`) is outdated — runtime now uses `fastino/gliner2-base-v1` (GLiNER2) as the default, with SetFit only loaded from trained artifact directories.

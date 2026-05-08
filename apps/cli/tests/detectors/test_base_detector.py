@@ -1,7 +1,7 @@
 import pytest
 
 from src.detectors.base import BaseDetector
-from src.models.generated_detectors import DetectorConfig, Severity
+from src.models.generated_detectors import DetectorConfig, GenericDetectorConfig, Severity
 from src.models.generated_single_asset_scan_results import DetectionResult, DetectorType, Location
 
 
@@ -38,10 +38,10 @@ def test_base_detector_initialization():
 
 def test_base_detector_initialization_with_config():
     """Test detector initialization with custom config"""
-    config = DetectorConfig(confidence_threshold=0.9, max_findings=10)
+    config = GenericDetectorConfig(confidence_threshold=0.9, max_findings=10)
     detector = DummyDetector(config)
-    assert detector.config.confidence_threshold == 0.9
-    assert detector.config.max_findings == 10
+    assert isinstance(detector.config, DetectorConfig)
+    assert detector.config is config
 
 
 @pytest.mark.asyncio
