@@ -70,18 +70,9 @@ const detectorLabels: Partial<Record<DetectorType, string>> = {
   SECRETS: "Secrets",
   PII: "PII",
   TOXIC: "Toxic Content",
-  NSFW: "NSFW",
+  IMAGE_CLASSIFICATION: "Image Classification",
   YARA: "YARA",
   BROKEN_LINKS: "Broken Links",
-  HATE_SPEECH: "Hate Speech",
-  AI_GENERATED: "AI Generated",
-  BIAS: "Bias",
-  CONTENT_QUALITY: "Content Quality",
-  DUPLICATE: "Duplicate",
-  DOMAIN_CLASS: "Domain Class",
-  CONTENT_TYPE: "Content Type",
-  SENSITIVITY_TIER: "Sensitivity Tier",
-  JURISDICTION_TAG: "Jurisdiction Tag",
 };
 
 const historyEventLabels: Partial<Record<HistoryEventType, string>> = {

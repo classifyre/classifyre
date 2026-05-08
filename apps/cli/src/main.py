@@ -15,6 +15,23 @@ logger = logging.getLogger(__name__)
 _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
 
 
+_TIMEOUT_PHRASES = ("timed out", "timeout", "connection reset", "errno 110", "connection refused")
+_TIMEOUT_MYSQL_CODES = {2003, 2006, 2013}
+
+
+def _is_timeout_error(exc: BaseException) -> bool:
+    """Return True when exc represents a connection/read timeout or unreachable host."""
+    exc_str = str(exc).lower()
+    if any(phrase in exc_str for phrase in _TIMEOUT_PHRASES):
+        return True
+    if "timeout" in type(exc).__name__.lower():
+        return True
+    args = getattr(exc, "args", ())
+    if args and isinstance(args[0], int) and args[0] in _TIMEOUT_MYSQL_CODES:
+        return True
+    return False
+
+
 def _sanitize_for_json(value: Any) -> Any:
     """Recursively replace isolated surrogate code points before JSON encoding."""
     if isinstance(value, str):
@@ -129,7 +146,11 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
             elif args.command == "extract":
                 result = source.test_connection()
                 if result.get("status") == "FAILURE":
-                    logger.error("Aborting: Connection test failed: %s", result.get("message"))
+                    msg = result.get("message", "")
+                    if _is_timeout_error(Exception(msg)):
+                        logger.warning("Source unreachable (timeout), skipping: %s", msg)
+                        return
+                    logger.error("Aborting: Connection test failed: %s", msg)
                     sys.exit(1)
 
                 logger.info("Starting extraction...")
@@ -181,6 +202,16 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         output_batch_count,
                     )
                 except Exception as extraction_error:
+                    if _is_timeout_error(extraction_error):
+                        logger.warning(
+                            "Source timed out during extraction, partial results flushed: %s",
+                            extraction_error,
+                        )
+                        if buffer:
+                            await sink.emit_batch(buffer)
+                            total_assets += len(buffer)
+                        await sink.finish()
+                        return
                     if sink_started:
                         try:
                             await sink.fail(extraction_error)
@@ -192,6 +223,9 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
 
         except Exception as e:
             logger.debug("Traceback for %s failure:", args.command, exc_info=True)
+            if _is_timeout_error(e):
+                logger.warning("SCAN TIMED OUT (source unreachable): %s", e)
+                return
             logger.error("SCAN FAILED: %s", e)
             sys.exit(1)
         finally:
@@ -207,6 +241,41 @@ def run_command(args: argparse.Namespace, recipe: dict[str, Any]) -> None:
     import asyncio
 
     asyncio.run(run_command_async(args, recipe))
+
+
+def run_train_command(args: argparse.Namespace) -> None:
+    """Fine-tune detector models on labeled training examples.
+
+    Reads pipeline_schema and examples from JSON files, runs GLiNER2 NER
+    fine-tuning and/or SetFit classification training, saves artifacts to
+    output_dir, and prints a JSON result to stdout for the API to consume.
+    """
+    import json
+    from pathlib import Path
+
+    from .detectors.custom.trainer import GLiNER2Trainer
+
+    schema_path = Path(args.pipeline_schema)
+    examples_path = Path(args.examples)
+    output_dir = Path(args.output_dir)
+
+    if not schema_path.exists():
+        logger.error("Pipeline schema file not found: %s", schema_path)
+        sys.exit(1)
+    if not examples_path.exists():
+        logger.error("Examples file not found: %s", examples_path)
+        sys.exit(1)
+
+    try:
+        pipeline_schema: dict[str, Any] = json.loads(schema_path.read_text())
+        examples_raw: list[dict[str, Any]] = json.loads(examples_path.read_text())
+    except json.JSONDecodeError as e:
+        logger.error("Invalid JSON in input files: %s", e)
+        sys.exit(1)
+
+    trainer = GLiNER2Trainer(pipeline_schema, examples_raw, output_dir)
+    result = trainer.train()
+    print(json.dumps(result.to_dict()))
 
 
 def run_sandbox_command(args: argparse.Namespace) -> None:
@@ -264,7 +333,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Classifyre Metadata Extraction CLI")
     parser.add_argument(
         "command",
-        choices=["test", "extract", "discover", "sandbox"],
+        choices=["test", "extract", "discover", "sandbox", "train"],
         help="Command to run",
     )
     parser.add_argument(
@@ -311,6 +380,22 @@ def main() -> None:
         default=None,
         help="Path to JSON file with detector configs (sandbox command only)",
     )
+    # train-command arguments
+    parser.add_argument(
+        "--pipeline-schema",
+        default=None,
+        help="Path to pipeline schema JSON file (train command only)",
+    )
+    parser.add_argument(
+        "--examples",
+        default=None,
+        help="Path to training examples JSON file (train command only)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory to write trained model artifacts (train command only)",
+    )
 
     args = parser.parse_args()
 
@@ -319,6 +404,13 @@ def main() -> None:
 
     if args.command == "sandbox":
         run_sandbox_command(args)
+        return
+
+    if args.command == "train":
+        if not args.pipeline_schema or not args.examples or not args.output_dir:
+            logger.error("train requires --pipeline-schema, --examples, and --output-dir")
+            sys.exit(1)
+        run_train_command(args)
         return
 
     if not args.recipe:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import pytest
@@ -142,6 +143,7 @@ def test_databricks_test_connection_success(monkeypatch: pytest.MonkeyPatch) -> 
     source = DatabricksSource(_pat_recipe())
     monkeypatch.setattr(source, "_list_catalogs", lambda: ["main"])
     monkeypatch.setattr(source, "_connect_sql", _DummyConnection)
+    monkeypatch.setattr(source, "_connect_sql_with_tz", lambda: _DummyConnection())
 
     result = source.test_connection()
 
@@ -174,35 +176,33 @@ async def test_databricks_extract_streams_assets_in_batches(
     ]
 
     monkeypatch.setattr(source, "_iter_tables", lambda: tables)
-    monkeypatch.setattr(
-        source,
-        "_collect_table_lineage_links",
-        lambda _tables: {("main", "finance", "payments"): {("main", "finance", "orders")}},
-    )
-    monkeypatch.setattr(
-        source,
-        "_list_notebooks",
-        lambda: [
-            NotebookRef(
-                path="/Shared/finance_orders",
-                object_id="1001",
-                language="SQL",
-                created_at_ms=1,
-                modified_at_ms=2,
-            )
-        ],
-    )
-    monkeypatch.setattr(
-        source,
-        "_list_pipelines",
-        lambda: [
-            PipelineRef(
-                pipeline_id="pipeline-1",
-                name="daily-finance-pipeline",
-                state="RUNNING",
-            )
-        ],
-    )
+
+    def _fake_lineage(table_ref: TableRef) -> set[tuple[str, str, str]]:
+        if table_ref.table == "payments":
+            return {("main", "finance", "orders")}
+        return set()
+
+    monkeypatch.setattr(source, "_lineage_refs_for_table", _fake_lineage)
+
+    def _fake_notebooks():
+        yield NotebookRef(
+            path="/Shared/finance_orders",
+            object_id="1001",
+            language="SQL",
+            created_at_ms=1,
+            modified_at_ms=2,
+        )
+
+    monkeypatch.setattr(source, "_iter_notebooks", _fake_notebooks)
+
+    def _fake_pipelines():
+        yield PipelineRef(
+            pipeline_id="pipeline-1",
+            name="daily-finance-pipeline",
+            state="RUNNING",
+        )
+
+    monkeypatch.setattr(source, "_iter_pipelines", _fake_pipelines)
 
     original_batch_size = DatabricksSource.BATCH_SIZE
     DatabricksSource.BATCH_SIZE = 2
@@ -231,7 +231,7 @@ async def test_databricks_extract_streams_assets_in_batches(
     assert pipeline_asset.asset_type == OutputAssetType.TXT
 
     orders_hash = source.generate_hash_id("main_#_finance_#_orders")
-    assert orders_hash in batches[0][1].links
+    assert orders_hash in table_assets[1].links
 
 
 @pytest.mark.asyncio
@@ -312,9 +312,9 @@ async def test_databricks_extract_runs_detector_pipeline_when_enabled(
         "_iter_tables",
         lambda: [TableRef(catalog="main", schema="finance", table="orders", object_type="TABLE")],
     )
-    monkeypatch.setattr(source, "_collect_table_lineage_links", lambda _tables: {})
-    monkeypatch.setattr(source, "_list_notebooks", lambda: [])
-    monkeypatch.setattr(source, "_list_pipelines", lambda: [])
+    monkeypatch.setattr(source, "_lineage_refs_for_table", lambda _tr: set())
+    monkeypatch.setattr(source, "_iter_notebooks", lambda: iter([]))
+    monkeypatch.setattr(source, "_iter_pipelines", lambda: iter([]))
 
     processed_batches: list[int] = []
 
@@ -322,6 +322,11 @@ async def test_databricks_extract_runs_detector_pipeline_when_enabled(
         async def process(self, batch: list[Any]) -> list[Any]:
             processed_batches.append(len(batch))
             return batch
+
+        async def process_stream(self, batch: list[Any]) -> AsyncGenerator[Any, None]:
+            processed_batches.append(len(batch))
+            for item in batch:
+                yield item
 
     monkeypatch.setattr(
         "src.pipeline.detector_pipeline.DetectorPipeline.from_recipe",
@@ -398,6 +403,7 @@ async def test_databricks_fetch_content_pages_batches_for_all_strategy(
 
     monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
     monkeypatch.setattr(source, "_connect_sql", lambda: _BatchConnection())
+    monkeypatch.setattr(source, "_connect_sql_with_tz", lambda: _BatchConnection())
 
     pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
 

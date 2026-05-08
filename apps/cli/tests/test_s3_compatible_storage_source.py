@@ -7,7 +7,6 @@ import pytest
 from src.models.generated_single_asset_scan_results import AssetType as OutputAssetType
 from src.sources.object_storage.base import ContentSnapshot, ObjectRef
 from src.sources.s3_compatible_storage.source import S3CompatibleStorageSource
-from src.utils.file_parser import ParsedBytes
 
 
 def _recipe(*, strategy: str = "LATEST", rows_per_page: int | None = 10) -> dict:
@@ -137,18 +136,12 @@ def test_s3_storage_snapshot_prefers_detected_mime_for_octet_stream_hint(monkeyp
         lambda _ref_obj: (b"%PDF-1.4 test", "application/octet-stream", False),
     )
     monkeypatch.setattr(
-        "src.sources.object_storage.base.parse_bytes",
-        lambda _file_bytes, **_kwargs: ParsedBytes(
-            mime_type="application/pdf",
-            raw_content="",
-            text_content="Extracted PDF text",
-            is_binary=False,
-            file_size_bytes=13,
-            parse_error=None,
-        ),
+        "src.sources.object_storage.base.iter_file_pages",
+        lambda _file_bytes, _mime, **_kwargs: [
+            "Extracted PDF text",
+        ],
     )
 
     snapshot = source._build_snapshot(ref)
 
     assert snapshot.mime_type == "application/pdf"
-    assert snapshot.text_content == "Extracted PDF text"

@@ -461,7 +461,8 @@ function DetectorConfigCard({
   );
 }
 
-function formatCustomDetectorMethod(method: string): string {
+function formatCustomDetectorMethod(method: string | undefined): string {
+  if (!method) return "Custom";
   return method
     .toLowerCase()
     .replace(/_/g, " ")

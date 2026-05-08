@@ -1202,9 +1202,11 @@ export class AssetService {
     assets: Record<string, any>[],
     options?: {
       finalizeRun?: boolean;
+      isFullScan?: boolean;
     },
   ) {
     const finalizeRun = options?.finalizeRun ?? true;
+    const isFullScan = options?.isFullScan ?? true;
     const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
 
     // Process in batches to avoid transaction timeout
@@ -1241,6 +1243,7 @@ export class AssetService {
         runnerId,
         source.type,
         existingAssetsMap,
+        isFullScan,
       );
 
       totalCreated += result.created;
@@ -1401,6 +1404,7 @@ export class AssetService {
     runnerId: string,
     sourceType: AssetType,
     existingAssetsMap: Map<string, Asset>,
+    isFullScan: boolean = true,
   ): Promise<{
     created: number;
     updated: number;
@@ -1558,8 +1562,8 @@ export class AssetService {
                   contextAfter: finding.context_after || null,
                   location: finding.location || null,
                   detectedAt: new Date(finding.detected_at || Date.now()),
-                  extractedData: finding.extracted_data || null,
-                  extractionMethod: finding.extraction_method || null,
+                  pipelineResult:
+                    finding.pipeline_result || finding.extracted_data || null,
                 });
               }
             }
@@ -1631,7 +1635,7 @@ export class AssetService {
             // Strip extraction-only fields that don't belong on the Finding model
             const findingData = Object.fromEntries(
               Object.entries(detection as Record<string, unknown>).filter(
-                ([k]) => k !== 'extractedData' && k !== 'extractionMethod',
+                ([k]) => k !== 'pipelineResult',
               ),
             );
             toCreate.push({
@@ -1791,7 +1795,7 @@ export class AssetService {
         // We need to look up the finding IDs after createMany since Prisma doesn't return them
         const detectionsWithExtraction = Array.from(
           incomingDetections.values(),
-        ).filter((d) => d.extractedData != null && d.customDetectorKey);
+        ).filter((d) => d.pipelineResult != null && d.customDetectorKey);
         if (detectionsWithExtraction.length > 0) {
           const identities = detectionsWithExtraction.map(
             (d) => d.detectionIdentity,
@@ -1815,57 +1819,64 @@ export class AssetService {
               sourceId: detection.sourceId,
               assetId: detection.assetId,
               runnerId: detection.runnerId ?? null,
-              extractionMethod: detection.extractionMethod ?? 'UNKNOWN',
               detectorVersion: 1,
-              extractedData: detection.extractedData,
+              pipelineResult: detection.pipelineResult,
               extractedAt: detection.detectedAt ?? new Date(),
             });
           }
         }
 
-        // Resolve findings not in current scan
-        const hasManualStatusOverride = (finding: any) => {
-          const history = Array.isArray(finding.history) ? finding.history : [];
-          const lastStatusChange = [...history]
-            .reverse()
-            .find(
-              (entry: any) =>
-                entry.eventType === HistoryEventType.STATUS_CHANGED,
-            );
-          return lastStatusChange
-            ? lastStatusChange.status !== FindingStatus.OPEN
-            : false;
-        };
+        // For full scans (strategy=ALL), resolve findings that were not re-detected
+        // on scanned assets — absence means the finding is genuinely gone.
+        // For partial scans (RANDOM/LATEST), skip this: only matched findings are
+        // updated; unmatched findings on sampled assets are left open because the
+        // sampling may not cover every detection on every run.
+        if (isFullScan) {
+          const hasManualStatusOverride = (finding: any) => {
+            const history = Array.isArray(finding.history)
+              ? finding.history
+              : [];
+            const lastStatusChange = [...history]
+              .reverse()
+              .find(
+                (entry: any) =>
+                  entry.eventType === HistoryEventType.STATUS_CHANGED,
+              );
+            return lastStatusChange
+              ? lastStatusChange.status !== FindingStatus.OPEN
+              : false;
+          };
 
-        const toResolve = Array.from(existingMap.values()).filter(
-          (f: any) =>
-            f.status === FindingStatus.OPEN && !hasManualStatusOverride(f),
-        );
+          const toResolve = Array.from(existingMap.values()).filter(
+            (f: any) =>
+              f.status === FindingStatus.OPEN && !hasManualStatusOverride(f),
+          );
 
-        for (const finding of toResolve) {
-          const currentHistory = Array.isArray(finding.history)
-            ? finding.history
-            : [];
+          for (const finding of toResolve) {
+            const currentHistory = Array.isArray(finding.history)
+              ? finding.history
+              : [];
 
-          await tx.finding.update({
-            where: { id: finding.id },
-            data: {
-              status: FindingStatus.RESOLVED,
-              runnerId,
-              resolvedAt: new Date(),
-              resolutionReason: 'Detection no longer present in scan',
-              history: [
-                ...currentHistory,
-                {
-                  timestamp: new Date(),
-                  runnerId,
-                  eventType: HistoryEventType.RESOLVED,
-                  status: FindingStatus.RESOLVED,
-                  changeReason: 'Detection no longer present in scan',
-                },
-              ],
-            },
-          });
+            await tx.finding.update({
+              where: { id: finding.id },
+              data: {
+                status: FindingStatus.RESOLVED,
+                runnerId,
+                resolvedAt: new Date(),
+                resolutionReason: 'Detection no longer present in scan',
+                history: [
+                  ...currentHistory,
+                  {
+                    timestamp: new Date(),
+                    runnerId,
+                    eventType: HistoryEventType.RESOLVED,
+                    status: FindingStatus.RESOLVED,
+                    changeReason: 'Detection no longer present in scan',
+                  },
+                ],
+              },
+            });
+          }
         }
 
         return {

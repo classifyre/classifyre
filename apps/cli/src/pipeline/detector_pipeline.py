@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any
 
@@ -49,22 +50,18 @@ class DetectorPipeline:
         self.content_size_limit = content_size_limit
 
     async def process(self, assets: list[SingleAssetScanResults]) -> list[SingleAssetScanResults]:
-        """
-        Process assets through detector pipeline.
-
-        Args:
-            assets: List of extracted assets from source
-
-        Returns:
-            List of assets with detector findings added
-        """
+        """Process assets through detector pipeline, returning all results at once."""
         results: list[SingleAssetScanResults] = []
-
-        for asset in assets:
-            asset_with_findings = await self._process_single_asset(asset)
-            results.append(asset_with_findings)
-
+        async for asset in self.process_stream(assets):
+            results.append(asset)
         return results
+
+    async def process_stream(
+        self, assets: list[SingleAssetScanResults]
+    ) -> AsyncGenerator[SingleAssetScanResults, None]:
+        """Process assets one at a time, yielding each as soon as it finishes."""
+        for asset in assets:
+            yield await self._process_single_asset(asset)
 
     async def _process_single_asset(self, asset: SingleAssetScanResults) -> SingleAssetScanResults:
         """Process a single asset through detectors."""

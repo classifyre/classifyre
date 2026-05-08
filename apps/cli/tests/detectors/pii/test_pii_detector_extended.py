@@ -6,6 +6,10 @@ from src.detectors.pii.detector import PIIDetector
 from src.models.generated_detectors import Severity
 from src.models.generated_single_asset_scan_results import DetectionResult, DetectorType, Location
 
+from .conftest import requires_presidio
+
+pytestmark = requires_presidio
+
 
 @pytest.mark.asyncio
 async def test_detection_result_has_detector_type():

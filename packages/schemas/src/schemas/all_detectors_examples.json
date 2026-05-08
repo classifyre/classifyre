@@ -1,110 +1,441 @@
 {
   "SECRETS": [
     {
-      "name": "Core Secrets",
-      "description": "Common cloud and API credentials with strong signal.",
+      "name": "All Plugins",
+      "description": "Enable every detect-secrets plugin. Maximum recall across all known credential types: cloud providers, SaaS tokens, entropy strings, private keys, and keyword heuristics. Suitable as a broad baseline; tune confidence_threshold or disable noisy plugins (high_entropy_*, keyword) for production enforcement.",
       "config": {
-        "enabled_patterns": [
-          "aws",
-          "github",
-          "slack",
-          "stripe",
-          "google",
-          "azure",
-          "private_key"
-        ],
-        "confidence_threshold": 0.75
+        "enabled_patterns": null,
+        "confidence_threshold": 0.7,
+        "max_findings": 500
       }
     },
     {
-      "name": "Broad Sweep",
-      "description": "Covers all known secret types for wide visibility.",
+      "name": "High-Confidence Cloud Credentials",
+      "description": "Structured, vendor-specific tokens with the highest detection precision: AWS keys, GitHub/GitLab tokens, Slack webhooks, Stripe keys, Azure storage keys, OpenAI keys, PyPI tokens, and private keys. All patterns use regex heuristics built into detect-secrets with near-zero false-positive rates.",
       "config": {
         "enabled_patterns": [
           "aws",
           "github",
+          "gitlab",
           "slack",
           "stripe",
-          "google",
-          "azure",
-          "private_key",
-          "generic_api_key",
-          "generic_secret"
+          "azure_storage",
+          "openai",
+          "pypi",
+          "private_key"
+        ],
+        "confidence_threshold": 0.9,
+        "max_findings": 200
+      }
+    },
+    {
+      "name": "SaaS & Developer Tokens",
+      "description": "Broad SaaS credential coverage for developer-facing content: Artifactory, Cloudant, Discord, IBM Cloud IAM/COS, JWT, Mailchimp, npm, SendGrid, Softlayer, Square OAuth, Telegram, and Twilio. Complements High-Confidence Cloud Credentials for full third-party secret coverage.",
+      "config": {
+        "enabled_patterns": [
+          "artifactory",
+          "basic_auth",
+          "cloudant",
+          "discord",
+          "ibm_cloud_iam",
+          "ibm_cos_hmac",
+          "jwt",
+          "mailchimp",
+          "npm",
+          "sendgrid",
+          "softlayer",
+          "square_oauth",
+          "telegram",
+          "twilio"
+        ],
+        "confidence_threshold": 0.8,
+        "max_findings": 200
+      }
+    },
+    {
+      "name": "Entropy Scanner",
+      "description": "High-entropy string detection for unstructured or custom secret formats: Base64 (limit 4.5) and Hex (limit 3.0) using Shannon entropy. Best used alongside structured plugin scans to catch secrets that don't match any known pattern. Expect higher false-positive rates; pair with a deny-list or manual review step.",
+      "config": {
+        "enabled_patterns": [
+          "high_entropy_base64",
+          "high_entropy_hex"
+        ],
+        "entropy_limit_base64": 4.5,
+        "entropy_limit_hex": 3.0,
+        "confidence_threshold": 0.75,
+        "max_findings": 100
+      }
+    },
+    {
+      "name": "Entropy Scanner \u2014 Strict",
+      "description": "Tightened entropy thresholds to reduce false positives at the cost of some recall. Base64 limit raised to 5.5 and Hex to 3.5. Suitable for automated enforcement pipelines where manual review is unavailable.",
+      "config": {
+        "enabled_patterns": [
+          "high_entropy_base64",
+          "high_entropy_hex"
+        ],
+        "entropy_limit_base64": 5.5,
+        "entropy_limit_hex": 3.5,
+        "confidence_threshold": 0.85,
+        "max_findings": 50
+      }
+    },
+    {
+      "name": "Keyword Heuristics",
+      "description": "detect-secrets KeywordDetector flags variable assignments whose names suggest secrets (e.g. password =, api_key =, secret =) regardless of the value. High false-positive rate by design \u2014 treat results as candidates for human review rather than confirmed secrets.",
+      "config": {
+        "enabled_patterns": [
+          "keyword"
         ],
         "confidence_threshold": 0.7,
         "max_findings": 200
       }
     },
     {
-      "name": "Lightweight",
-      "description": "Focus on generic keys to reduce noise.",
+      "name": "IP Address Exposure",
+      "description": "Detects public IP addresses embedded in configuration, code, or documents. Useful for data governance audits where internal network topology must not leak into public repositories or documents.",
       "config": {
         "enabled_patterns": [
-          "generic_api_key",
-          "generic_secret"
+          "ip_public"
         ],
-        "confidence_threshold": 0.85,
-        "max_findings": 50
+        "confidence_threshold": 0.7,
+        "max_findings": 100
+      }
+    },
+    {
+      "name": "Enterprise Full Sweep",
+      "description": "All structured credential plugins plus entropy scanning at balanced thresholds. Covers the complete detect-secrets plugin catalog. Designed for periodic scheduled scans across large document corpora where false-positive review capacity exists.",
+      "config": {
+        "enabled_patterns": [
+          "aws",
+          "github",
+          "gitlab",
+          "slack",
+          "stripe",
+          "azure_storage",
+          "openai",
+          "private_key",
+          "artifactory",
+          "basic_auth",
+          "cloudant",
+          "discord",
+          "ibm_cloud_iam",
+          "ibm_cos_hmac",
+          "jwt",
+          "mailchimp",
+          "npm",
+          "pypi",
+          "sendgrid",
+          "softlayer",
+          "square_oauth",
+          "telegram",
+          "twilio",
+          "high_entropy_base64",
+          "high_entropy_hex",
+          "keyword",
+          "ip_public"
+        ],
+        "entropy_limit_base64": 4.5,
+        "entropy_limit_hex": 3.0,
+        "confidence_threshold": 0.7,
+        "max_findings": 1000
       }
     }
   ],
   "PII": [
     {
-      "name": "High Risk PII",
-      "description": "Find critical identity and financial details first.",
+      "name": "Global Coverage",
+      "description": "Detect all globally-recognized PII patterns: emails, phones, credit cards, crypto wallets, IP addresses, IBANs, URLs, and named entities (persons, locations, dates, NRP). Suitable as a broad baseline across any data source.",
       "config": {
         "enabled_patterns": [
-          "ssn",
-          "credit_card",
-          "iban_code",
-          "us_passport",
-          "us_driver_license",
-          "austrian_svnr",
-          "swiss_ahv",
-          "german_tax_id"
+          "CREDIT_CARD",
+          "CRYPTO",
+          "DATE_TIME",
+          "EMAIL_ADDRESS",
+          "IBAN_CODE",
+          "IP_ADDRESS",
+          "NRP",
+          "LOCATION",
+          "PERSON",
+          "PHONE_NUMBER",
+          "MEDICAL_LICENSE",
+          "URL"
+        ],
+        "confidence_threshold": 0.7
+      }
+    },
+    {
+      "name": "US & North America",
+      "description": "US-specific government and financial identifiers: Social Security Numbers, driver licenses, passports, ITINs, and bank account numbers. Pair with Global Coverage for complete US compliance.",
+      "config": {
+        "enabled_patterns": [
+          "US_SSN",
+          "US_DRIVER_LICENSE",
+          "US_PASSPORT",
+          "US_ITIN",
+          "US_BANK_NUMBER",
+          "CREDIT_CARD",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER"
         ],
         "severity_threshold": "high",
         "confidence_threshold": 0.8
       }
     },
     {
-      "name": "Contact PII",
-      "description": "Focus on personal contact details and location clues.",
+      "name": "European Union / GDPR",
+      "description": "GDPR-relevant entity types covering EU national identifiers, IBAN codes, medical licenses, and contact details. Designed for Article 5 data minimization and Article 35 DPIA workflows.",
       "config": {
         "enabled_patterns": [
-          "email",
-          "phone_number",
-          "person",
-          "location",
-          "date_of_birth"
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "LOCATION",
+          "IP_ADDRESS",
+          "DATE_TIME",
+          "IBAN_CODE",
+          "MEDICAL_LICENSE",
+          "EU_NATIONAL_ID",
+          "NRP"
         ],
-        "severity_threshold": "medium",
+        "confidence_threshold": 0.7
+      }
+    },
+    {
+      "name": "DACH \u2014 Germany, Austria, Switzerland",
+      "description": "DACH-specific national identifiers for German tax IDs (DE_TAX_ID), Austrian social insurance numbers (AT_SVNR), and Swiss AHV pension numbers (CH_AHV), alongside EU-wide patterns for comprehensive DSGVO/DSG compliance.",
+      "config": {
+        "enabled_patterns": [
+          "DE_TAX_ID",
+          "AT_SVNR",
+          "CH_AHV",
+          "EU_NATIONAL_ID",
+          "IBAN_CODE",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "DATE_TIME"
+        ],
         "confidence_threshold": 0.75
       }
     },
     {
-      "name": "Full PII Coverage",
-      "description": "Run broad privacy checks across all supported personal data patterns.",
+      "name": "Spain",
+      "description": "Spanish national identifiers: NIF (N\u00famero de Identificaci\u00f3n Fiscal) for citizens and NIE (N\u00famero de Identidad de Extranjero) for foreign residents. Combined with global contact patterns for full coverage.",
       "config": {
         "enabled_patterns": [
-          "credit_card",
-          "ssn",
-          "email",
-          "phone_number",
-          "person",
-          "location",
-          "ip_address",
-          "iban_code",
-          "us_passport",
-          "us_driver_license",
-          "austrian_svnr",
-          "swiss_ahv",
-          "german_tax_id",
-          "eu_national_id",
-          "date_of_birth"
+          "ES_NIF",
+          "ES_NIE",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "IBAN_CODE"
         ],
-        "severity_threshold": "low",
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Italy",
+      "description": "Italian national identifiers: fiscal codes, passports, driver licenses, identity cards, and VAT codes. Covers compliance with Italy's Codice della Privacy and GDPR implementation.",
+      "config": {
+        "enabled_patterns": [
+          "IT_FISCAL_CODE",
+          "IT_PASSPORT",
+          "IT_DRIVER_LICENSE",
+          "IT_IDENTITY_CARD",
+          "IT_VAR_CODE",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "IBAN_CODE"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "United Kingdom",
+      "description": "UK-specific PII including NHS numbers, combined with global contact and financial patterns. Covers UK GDPR and NHS data governance requirements.",
+      "config": {
+        "enabled_patterns": [
+          "UK_NHS",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "CREDIT_CARD",
+          "IBAN_CODE",
+          "IP_ADDRESS"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Australia",
+      "description": "Australian identifiers: Tax File Numbers (TFN), Medicare cards, ABN, and ACN. Supports compliance with the Privacy Act 1988 and Australian Privacy Principles.",
+      "config": {
+        "enabled_patterns": [
+          "AU_TFN",
+          "AU_MEDICARE",
+          "AU_ABN",
+          "AU_ACN",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Singapore",
+      "description": "Singapore identifiers: NRIC/FIN national registration numbers and UEN (Unique Entity Numbers for businesses). Supports PDPA compliance.",
+      "config": {
+        "enabled_patterns": [
+          "SG_NRIC_FIN",
+          "SG_UEN",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "India",
+      "description": "Indian identifiers: PAN cards, Aadhaar biometric IDs, voter IDs, and vehicle registration numbers. Supports compliance with DPDP Act 2023 and IT Act requirements.",
+      "config": {
+        "enabled_patterns": [
+          "IN_PAN",
+          "IN_AADHAAR",
+          "IN_VOTER",
+          "IN_VEHICLE_REGISTRATION",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Nordic \u2014 Finland & Poland",
+      "description": "Finnish personal identity codes (HETU) and Polish PESEL numbers, alongside contact identifiers. Covers local privacy law requirements for Scandinavian and Polish markets.",
+      "config": {
+        "enabled_patterns": [
+          "FI_PERSONAL_IDENTITY_CODE",
+          "PL_PESEL",
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "IBAN_CODE"
+        ],
+        "confidence_threshold": 0.75
+      }
+    },
+    {
+      "name": "Medical / Clinical",
+      "description": "Health-sector PII: medical license numbers, named persons, dates (appointments, DOB), locations (clinics, addresses), and contact details. Applies to clinical notes, patient records, and health system exports.",
+      "config": {
+        "enabled_patterns": [
+          "MEDICAL_LICENSE",
+          "PERSON",
+          "DATE_TIME",
+          "LOCATION",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER",
+          "UK_NHS",
+          "AU_MEDICARE",
+          "US_SSN"
+        ],
         "confidence_threshold": 0.7
+      }
+    },
+    {
+      "name": "Finance & Banking",
+      "description": "Financial PII: credit cards, IBAN codes, crypto wallet addresses, bank account numbers, and tax identifiers. Suitable for PCI-DSS scope assessments and financial audit workflows.",
+      "config": {
+        "enabled_patterns": [
+          "CREDIT_CARD",
+          "IBAN_CODE",
+          "CRYPTO",
+          "US_BANK_NUMBER",
+          "US_SSN",
+          "US_ITIN",
+          "DE_TAX_ID",
+          "AT_SVNR",
+          "CH_AHV",
+          "AU_TFN",
+          "IN_PAN",
+          "PERSON"
+        ],
+        "severity_threshold": "high",
+        "confidence_threshold": 0.8
+      }
+    },
+    {
+      "name": "High Confidence Global",
+      "description": "Maximum-precision scan across all supported entity types with an elevated confidence threshold. Best for automated enforcement pipelines where false positives are costly.",
+      "config": {
+        "enabled_patterns": null,
+        "severity_threshold": "high",
+        "confidence_threshold": 0.85
+      }
+    },
+    {
+      "name": "Custom Recognizer \u2014 Employee ID",
+      "description": "Extends the built-in PII detector with a regex recognizer for internal employee IDs (format EMP-XXXXXX). Demonstrates how to detect proprietary identifiers alongside standard PII.",
+      "config": {
+        "enabled_patterns": [
+          "PERSON",
+          "EMAIL_ADDRESS"
+        ],
+        "confidence_threshold": 0.7,
+        "custom_recognizers": [
+          {
+            "name": "Employee ID Recognizer",
+            "supported_entity": "EMPLOYEE_ID",
+            "supported_language": "en",
+            "patterns": [
+              {
+                "name": "employee id (strong)",
+                "regex": "\\bEMP-\\d{6}\\b",
+                "score": 0.9
+              }
+            ],
+            "context": [
+              "employee",
+              "staff",
+              "id",
+              "identifier"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Custom Recognizer \u2014 Deny List",
+      "description": "Deny-list recognizer for internal code names or sensitive project terms that should be treated as PII in external communications.",
+      "config": {
+        "enabled_patterns": [
+          "PERSON",
+          "EMAIL_ADDRESS",
+          "PHONE_NUMBER"
+        ],
+        "confidence_threshold": 0.7,
+        "custom_recognizers": [
+          {
+            "name": "Internal Project Name Recognizer",
+            "supported_entity": "INTERNAL_PROJECT",
+            "supported_language": "en",
+            "deny_list": [
+              "Project Phoenix",
+              "Operation Sunrise",
+              "Codename Atlas"
+            ],
+            "context": [
+              "project",
+              "operation",
+              "codename"
+            ]
+          }
+        ]
       }
     }
   ],
@@ -139,99 +470,592 @@
       }
     }
   ],
-  "NSFW": [
+  "IMAGE_CLASSIFICATION": [
     {
-      "name": "NSFW Standard",
-      "description": "Baseline NSFW screening for visuals.",
+      "name": "NSFW Detection",
+      "description": "Detect sexually explicit or inappropriate images using Falconsai's NSFW model. Labels 'nsfw' and 'explicit' are flagged as critical; 'suggestive' as high; 'normal' as info.",
       "config": {
-        "enabled_patterns": [
-          "nsfw"
-        ],
-        "model_name": "original",
-        "confidence_threshold": 0.7
+        "model": "Falconsai/nsfw_image_detection",
+        "device": "cpu",
+        "top_k": 5,
+        "confidence_threshold": 0.7,
+        "severity_map": [
+          {
+            "pattern": "nsfw",
+            "severity": "critical"
+          },
+          {
+            "pattern": "explicit",
+            "severity": "critical"
+          },
+          {
+            "pattern": "suggestive",
+            "severity": "high"
+          },
+          {
+            "pattern": "normal",
+            "severity": "info"
+          }
+        ]
       }
     },
     {
-      "name": "NSFW Explicit",
-      "description": "Flag explicit content with higher precision.",
+      "name": "General Image Classifier (ViT)",
+      "description": "Baseline ImageNet-1k classification using google/vit-base-patch16-224. Returns the top-5 predicted labels. Useful as a starting point for label discovery before configuring a domain-specific model.",
       "config": {
-        "enabled_patterns": [
-          "nsfw_explicit",
-          "nsfw"
-        ],
-        "model_name": "original",
-        "confidence_threshold": 0.8
+        "model": "google/vit-base-patch16-224",
+        "device": "cpu",
+        "top_k": 5,
+        "confidence_threshold": 0.5
+      }
+    },
+    {
+      "name": "Custom Local Model",
+      "description": "Use a fine-tuned model stored on disk. Point 'model' at the directory that contains config.json and the model weights. Useful for air-gapped deployments or proprietary classifiers.",
+      "config": {
+        "model": "/models/my-fine-tuned-classifier",
+        "device": "cpu",
+        "top_k": 3,
+        "confidence_threshold": 0.6,
+        "severity_map": [
+          {
+            "pattern": "violation",
+            "severity": "critical"
+          },
+          {
+            "pattern": "warning",
+            "severity": "high"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GPU Inference",
+      "description": "Run inference on the first CUDA GPU. Drop-in replacement for the CPU variant \u2014 only 'device' changes. Reduces latency by 5-10\u00d7 for large image batches.",
+      "config": {
+        "model": "Falconsai/nsfw_image_detection",
+        "device": "cuda",
+        "top_k": 5,
+        "confidence_threshold": 0.7,
+        "severity_map": [
+          {
+            "pattern": "nsfw",
+            "severity": "critical"
+          },
+          {
+            "pattern": "explicit",
+            "severity": "critical"
+          },
+          {
+            "pattern": "normal",
+            "severity": "info"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Multi-Label Sigmoid",
+      "description": "Use sigmoid normalization for models trained with multi-label objectives (each label is scored independently). Results in all labels with score >= confidence_threshold being returned rather than a single winner.",
+      "config": {
+        "model": "your-org/multi-label-vision-model",
+        "device": "cpu",
+        "function_to_apply": "sigmoid",
+        "confidence_threshold": 0.5,
+        "severity_map": [
+          {
+            "pattern": "violence",
+            "severity": "critical"
+          },
+          {
+            "pattern": "gore",
+            "severity": "critical"
+          },
+          {
+            "pattern": "hate",
+            "severity": "high"
+          }
+        ]
       }
     }
   ],
   "YARA": [
     {
-      "name": "Baseline YARA",
-      "description": "Default rules with conservative timeouts.",
+      "name": "Secrets \u2014 Cloud Credentials",
+      "description": "Hardcoded cloud-provider credentials and API keys: AWS Access Key IDs, GitHub/GitLab tokens, Slack bot tokens, OpenAI API keys, Stripe live keys, PEM-encoded private keys, and JSON Web Tokens. Near-zero false-positive rate for all structured token formats.",
       "config": {
-        "timeout": 60,
-        "max_findings": 200
-      }
-    },
-    {
-      "name": "Strict YARA",
-      "description": "Higher timeout for deeper scans.",
-      "config": {
-        "timeout": 90,
-        "max_findings": 500
-      }
-    },
-    {
-      "name": "Custom Rules",
-      "description": "Use a custom YARA rules directory.",
-      "config": {
-        "rules_path": "/opt/unstructured/yara",
-        "timeout": 90
-      }
-    }
-  ],
-  "BROKEN_LINKS": [
-    {
-      "name": "Broken Links Check",
-      "description": "Flags links and images that are unreachable or return empty content.",
-      "config": {}
-    }
-  ],
-  "PROMPT_INJECTION": [
-    {
-      "name": "Prompt Injection Baseline",
-      "description": "Heuristic baseline for instruction override and prompt exfiltration attempts.",
-      "config": {
-        "confidence_threshold": 0.7,
-        "max_findings": 25
-      }
-    }
-  ],
-  "PHISHING_URL": [
-    {
-      "name": "Phishing URL Baseline",
-      "description": "Classify extracted URLs for phishing and malware intent.",
-      "config": {
-        "confidence_threshold": 0.75,
-        "max_findings": 25
-      }
-    }
-  ],
-  "SPAM": [
-    {
-      "name": "UGC Spam Filter",
-      "description": "High-throughput spam filtering for user-generated content streams.",
-      "config": {
+        "rules": [
+          {
+            "name": "AWS_Access_Key",
+            "description": "AWS Access Key ID (AKIA prefix)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/AKIA[0-9A-Z]{16}/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "GitHub_Token",
+            "description": "GitHub Personal Access Token (ghp_, gho_, ghs_, ghu_, ghr_ prefix)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/gh[pousr]_[A-Za-z0-9_]{36,}/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "GitLab_Token",
+            "description": "GitLab Personal Access or Deploy Token (glpat- prefix)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/glpat-[A-Za-z0-9_\\-]{20,}/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Slack_Token",
+            "description": "Slack API token \u2014 bot (xoxb), app (xoxa), user (xoxp), or refresh (xoxr)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/xoxb-[0-9]+-[A-Za-z0-9\\-]+/ ascii",
+              "/xoxa-[0-9]+-[A-Za-z0-9\\-]+/ ascii",
+              "/xoxp-[0-9]+-[A-Za-z0-9\\-]+/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "OpenAI_API_Key",
+            "description": "OpenAI API key (sk- prefix, 48+ chars)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/sk-[A-Za-z0-9]{48,}/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Stripe_Live_Key",
+            "description": "Stripe live secret key (sk_live_) or restricted key (rk_live_)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/sk_live_[A-Za-z0-9]{24,}/ ascii",
+              "/rk_live_[A-Za-z0-9]{24,}/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "PEM_Private_Key",
+            "description": "PEM-encoded private key block (RSA, EC, PKCS8, etc.)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "\"-----BEGIN\" ascii",
+              "\"PRIVATE KEY\" nocase ascii"
+            ],
+            "condition": "$s0 and $s1"
+          },
+          {
+            "name": "JWT_Token",
+            "description": "JSON Web Token \u2014 three base64url segments separated by dots",
+            "severity": "high",
+            "category": "secrets",
+            "strings": [
+              "/eyJ[A-Za-z0-9_\\-]+\\.eyJ[A-Za-z0-9_\\-]+\\.[A-Za-z0-9_\\-]+/ ascii"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 30,
         "confidence_threshold": 0.8,
         "max_findings": 500
       }
     },
     {
-      "name": "Spam Audit",
-      "description": "Broader retrospective spam analysis across existing content.",
+      "name": "Malware \u2014 Process Injection & Offensive Tools",
+      "description": "Detects Windows process-injection API sequences (requires 2 of 7 known APIs), known offensive tools by name (mimikatz, msfvenom, meterpreter, pypykatz, CobaltStrike), and registry run-key persistence patterns.",
       "config": {
-        "confidence_threshold": 0.65,
-        "max_findings": 1000
+        "rules": [
+          {
+            "name": "Process_Injection_APIs",
+            "description": "Two or more process-injection Win32 API names \u2014 high-confidence indicator of reflective DLL injection or process hollowing",
+            "severity": "critical",
+            "category": "malware",
+            "strings": [
+              "\"CreateRemoteThread\" nocase ascii",
+              "\"VirtualAllocEx\" nocase ascii",
+              "\"WriteProcessMemory\" nocase ascii",
+              "\"NtUnmapViewOfSection\" nocase ascii",
+              "\"RtlCreateUserThread\" nocase ascii",
+              "\"QueueUserAPC\" nocase ascii",
+              "\"SetThreadContext\" nocase ascii"
+            ],
+            "condition": "2 of ($s*)"
+          },
+          {
+            "name": "Known_Offensive_Tools",
+            "description": "References to well-known post-exploitation and credential-dump tools",
+            "severity": "critical",
+            "category": "malware",
+            "strings": [
+              "\"mimikatz\" nocase ascii",
+              "\"msfvenom\" nocase ascii",
+              "\"meterpreter\" nocase ascii",
+              "\"pypykatz\" nocase ascii",
+              "\"cobaltstrike\" nocase ascii",
+              "\"beacon.dll\" nocase ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Registry_Persistence",
+            "description": "Windows registry run-key persistence or scheduled-task creation",
+            "severity": "high",
+            "category": "malware",
+            "strings": [
+              "\"CurrentVersion\\\\Run\" nocase ascii",
+              "\"CurrentVersion\\\\RunOnce\" nocase ascii",
+              "\"CurrentControlSet\\\\Services\" nocase ascii"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 60,
+        "confidence_threshold": 0.75,
+        "max_findings": 100
+      }
+    },
+    {
+      "name": "Suspicious Scripts \u2014 PowerShell & Shell",
+      "description": "Detects PowerShell download-and-execute chains (Net.WebClient + IEX), base64-encoded commands (-EncodedCommand, FromBase64String), shell curl/wget piped to an interpreter, Python exec+encoding obfuscation, and JavaScript eval/fromCharCode patterns.",
+      "config": {
+        "rules": [
+          {
+            "name": "PowerShell_Download_Exec",
+            "description": "PowerShell: download function combined with expression executor \u2014 classic cradle pattern",
+            "severity": "high",
+            "category": "suspicious_scripts",
+            "strings": [
+              "/DownloadString|DownloadFile|Invoke-WebRequest|Net\\.WebClient/ ascii nocase",
+              "/IEX|Invoke-Expression/ ascii nocase"
+            ],
+            "condition": "$s0 and $s1"
+          },
+          {
+            "name": "PowerShell_Encoded_Command",
+            "description": "PowerShell base64 command encoding \u2014 used to evade command-line logging",
+            "severity": "high",
+            "category": "suspicious_scripts",
+            "strings": [
+              "/-EncodedCommand|-enc |FromBase64String|\\[Convert\\]::FromBase64String/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Shell_Curl_Pipe_Exec",
+            "description": "Shell: curl or wget output piped directly into an interpreter",
+            "severity": "high",
+            "category": "suspicious_scripts",
+            "strings": [
+              "/curl|wget/ ascii",
+              "/\\| bash|\\| sh|\\| python|\\| perl/ ascii"
+            ],
+            "condition": "$s0 and $s1"
+          },
+          {
+            "name": "Python_Exec_Obfuscation",
+            "description": "Python obfuscation combining exec/compile with encoding primitives",
+            "severity": "medium",
+            "category": "suspicious_scripts",
+            "strings": [
+              "\"base64.b64decode\" ascii",
+              "\"exec(\" ascii",
+              "\"marshal.loads\" ascii",
+              "\"zlib.decompress\" ascii",
+              "\"compile(\" ascii"
+            ],
+            "condition": "2 of ($s*)"
+          },
+          {
+            "name": "JavaScript_Eval_Obfuscation",
+            "description": "JavaScript obfuscation via eval and character-encoding primitives",
+            "severity": "medium",
+            "category": "suspicious_scripts",
+            "strings": [
+              "\"eval(\" ascii",
+              "\"unescape(\" ascii",
+              "\"fromCharCode\" ascii",
+              "\"atob(\" ascii"
+            ],
+            "condition": "2 of ($s*)"
+          }
+        ],
+        "timeout": 45,
+        "confidence_threshold": 0.7,
+        "max_findings": 200
+      }
+    },
+    {
+      "name": "Office Macro Threats",
+      "description": "Malicious VBA macro patterns: auto-execution entry points (AutoOpen, Workbook_Open), shell spawning via WScript.Shell or ShellExecute combined with cmd.exe/PowerShell, and network downloads via MSXML2 or WinHttp paired with an HTTP URL.",
+      "config": {
+        "rules": [
+          {
+            "name": "VBA_Auto_Execution",
+            "description": "VBA macro auto-execution entry points that run without user interaction",
+            "severity": "high",
+            "category": "office_macros",
+            "strings": [
+              "/AutoOpen|AutoClose|Auto_Exec|Workbook_Open|Document_Open|AutoExec/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "VBA_Shell_Execution",
+            "description": "VBA macro creating a shell to run cmd.exe or PowerShell",
+            "severity": "critical",
+            "category": "office_macros",
+            "strings": [
+              "/WScript\\.Shell|Shell\\(|ShellExecute/ ascii nocase",
+              "/PowerShell|cmd\\.exe|WScript/ ascii nocase"
+            ],
+            "condition": "$s0 and $s1"
+          },
+          {
+            "name": "VBA_Network_Download",
+            "description": "VBA macro downloading content from the network via MSXML or WinHttp",
+            "severity": "critical",
+            "category": "office_macros",
+            "strings": [
+              "/MSXML2\\.XMLHTTP|Msxml2\\.ServerXMLHTTP|WinHttp\\.WinHttpRequest|ADODB\\.Stream/ ascii nocase",
+              "\"http\" nocase ascii"
+            ],
+            "condition": "$s0 and $s1"
+          }
+        ],
+        "timeout": 30,
+        "confidence_threshold": 0.8,
+        "max_findings": 50
+      }
+    },
+    {
+      "name": "PDF Threat Indicators",
+      "description": "Suspicious PDF structure markers in extracted text: embedded JavaScript actions (/JavaScript, /JS, app.alert), auto-open and launch actions (/OpenAction, /Launch, /AA), and form-submit or data-import streams.",
+      "config": {
+        "rules": [
+          {
+            "name": "PDF_Embedded_JavaScript",
+            "description": "PDF with embedded JavaScript action \u2014 can execute code on open",
+            "severity": "high",
+            "category": "pdf_threats",
+            "strings": [
+              "\"/JavaScript\" ascii",
+              "\"/JS \" ascii",
+              "\"app.alert\" nocase ascii",
+              "\"this.exportDataObject\" nocase ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "PDF_Auto_Open_Action",
+            "description": "PDF /OpenAction, /Launch, or /AA stream \u2014 executes on document open",
+            "severity": "high",
+            "category": "pdf_threats",
+            "strings": [
+              "\"/OpenAction\" ascii",
+              "\"/Launch\" ascii",
+              "\"/AA\" ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "PDF_Form_Submit_Or_Import",
+            "description": "PDF form-submission or external data-import action",
+            "severity": "medium",
+            "category": "pdf_threats",
+            "strings": [
+              "\"/SubmitForm\" ascii",
+              "\"/ImportData\" ascii",
+              "\"/URI\" ascii"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 30,
+        "confidence_threshold": 0.75,
+        "max_findings": 100
+      }
+    },
+    {
+      "name": "Supply Chain \u2014 Miners, Reverse Shells & Exfil",
+      "description": "Crypto-miner strings (xmrig, stratum+tcp, mining pool patterns), reverse-shell payloads (/dev/tcp, nc -e /bin/bash), obfuscated npm/pip install hooks (eval+Buffer.from, postinstall), and attacker-controlled exfiltration infrastructure (ngrok, webhook.site, interactsh).",
+      "config": {
+        "rules": [
+          {
+            "name": "Crypto_Miner_Indicators",
+            "description": "Crypto-miner tool names or protocol strings",
+            "severity": "critical",
+            "category": "supply_chain",
+            "strings": [
+              "/xmrig|stratum\\+tcp:\\/\\/|nicehash|minerd|MoneroOcean/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Reverse_Shell_Payload",
+            "description": "Reverse shell via /dev/tcp, nc -e, socat+mkfifo",
+            "severity": "critical",
+            "category": "supply_chain",
+            "strings": [
+              "/\\/dev\\/tcp\\/[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\/[0-9]{2,5}/ ascii",
+              "/nc\\s+\\-[ec]\\s+\\/bin\\/(bash|sh)/ ascii nocase",
+              "/socat.*mkfifo|mkfifo.*socat/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Obfuscated_Install_Hook",
+            "description": "Obfuscated code evaluated inside an npm or pip install lifecycle hook",
+            "severity": "high",
+            "category": "supply_chain",
+            "strings": [
+              "/eval\\s*\\(\\s*Buffer\\.from\\s*\\(/ ascii",
+              "/exec\\s*\\(\\s*require\\s*\\(['\"]buffer['\"]\\)/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Exfil_Infrastructure",
+            "description": "Attacker-controlled infrastructure commonly used for out-of-band data exfiltration",
+            "severity": "high",
+            "category": "supply_chain",
+            "strings": [
+              "/ngrok|requestbin|webhook\\.site|burpcollaborator|interactsh/ ascii nocase"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 45,
+        "confidence_threshold": 0.7,
+        "max_findings": 100
+      }
+    },
+    {
+      "name": "Network Threat Indicators",
+      "description": "C2 framework artifacts (CobaltStrike, ReflectiveDll, Metasploit module paths), known RAT strings (QuasarRAT, AsyncRAT, NanoCore, njRAT, DcRAT, Remcos), and DNS-tunneling tools (dnscat, iodine, dns2tcp). Best applied to log exports and configuration dumps.",
+      "config": {
+        "rules": [
+          {
+            "name": "CobaltStrike_Artifacts",
+            "description": "CobaltStrike beacon, ReflectiveDll loader, or Metasploit module path strings",
+            "severity": "critical",
+            "category": "network_ioc",
+            "strings": [
+              "/CobaltStrike|ReflectiveDll|beacon\\.dll|msf\\/module\\// ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Known_RAT_Strings",
+            "description": "Well-known Remote Access Trojan artifact strings embedded in files or configs",
+            "severity": "high",
+            "category": "network_ioc",
+            "strings": [
+              "/QuasarRAT|AsyncRAT|NanoCore|njRAT|DcRAT|Remcos/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "DNS_Tunneling_Tools",
+            "description": "DNS-tunneling tool names used to exfiltrate data over DNS queries",
+            "severity": "high",
+            "category": "network_ioc",
+            "strings": [
+              "/dnscat|iodine|dns2tcp/ ascii nocase"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 30,
+        "confidence_threshold": 0.7,
+        "max_findings": 200
+      }
+    },
+    {
+      "name": "Credential Theft Patterns",
+      "description": "Keylogger and keyboard-hook API names (GetAsyncKeyState, SetWindowsHookEx, WH_KEYBOARD), phishing HTML credential-form structure (password field + PHP action + submit button), and anonymous paste or file-transfer services used for credential exfiltration.",
+      "config": {
+        "rules": [
+          {
+            "name": "Keylogger_APIs",
+            "description": "Windows keyboard-hook API references indicative of a keylogger",
+            "severity": "high",
+            "category": "credential_theft",
+            "strings": [
+              "/GetAsyncKeyState|SetWindowsHookEx|WH_KEYBOARD|keylogger|pynput|keyboard\\.on_press/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Phishing_Credential_Form",
+            "description": "HTML form structure consistent with a credential-harvesting phishing page",
+            "severity": "high",
+            "category": "credential_theft",
+            "strings": [
+              "/action\\s*=\\s*[\"'][^\"']*\\.php[\"']/ ascii nocase",
+              "/type\\s*=\\s*[\"']password[\"']/ ascii nocase",
+              "/type\\s*=\\s*[\"']submit[\"']/ ascii nocase"
+            ],
+            "condition": "$s0 and $s1 and $s2"
+          },
+          {
+            "name": "Credential_Exfil_Services",
+            "description": "Anonymous paste and file-transfer services frequently abused for credential exfiltration",
+            "severity": "high",
+            "category": "credential_theft",
+            "strings": [
+              "/hastebin|dpaste|termbin|transfer\\.sh/ ascii nocase"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 30,
+        "confidence_threshold": 0.7,
+        "max_findings": 100
+      }
+    },
+    {
+      "name": "Custom Rule \u2014 Internal Token Leak",
+      "description": "Example of a custom rule alongside cloud-credential rules. Detects proprietary internal service tokens in format SVC-XXXXXXXX (8 hex chars) that should never appear in public documents or S3 exports.",
+      "config": {
+        "rules": [
+          {
+            "name": "Internal_Service_Token",
+            "description": "Internal service token in SVC-XXXXXXXX format",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/SVC-[A-F0-9]{8}/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "GitHub_Token",
+            "description": "GitHub Personal Access Token",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/gh[pousr]_[A-Za-z0-9_]{36,}/ ascii"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 60,
+        "confidence_threshold": 0.8,
+        "max_findings": 200
       }
     }
   ],
@@ -261,844 +1085,530 @@
       }
     }
   ],
-  "PLAGIARISM": [
+  "CUSTOM": [
     {
-      "name": "Policy Similarity Check",
-      "description": "Identify reused passages that may need attribution review.",
+      "description": "GLINER2 support ticket extractor \u2014 entities + classification in one pass",
       "config": {
+        "custom_detector_key": "cust_support_ticket",
+        "name": "Support Ticket Extractor",
+        "description": "Extract order IDs, amounts, and intent from support tickets",
+        "languages": [
+          "de",
+          "en"
+        ],
+        "pipeline_schema": {
+          "type": "GLINER2",
+          "model": {
+            "name": "fastino/gliner2-base-v1",
+            "path": null
+          },
+          "entities": {
+            "order_id": {
+              "description": "Order ID like ORD-123",
+              "required": true
+            },
+            "amount": {
+              "description": "Monetary value like 50\u20ac",
+              "required": false
+            }
+          },
+          "classification": {
+            "intent": {
+              "labels": [
+                "refund",
+                "bug",
+                "question"
+              ],
+              "multi_label": false
+            }
+          },
+          "validation": {
+            "confidence_threshold": 0.8,
+            "rules": []
+          }
+        }
+      },
+      "name": "Support Ticket Extractor"
+    },
+    {
+      "description": "GLINER2 DACH regulatory entity extractor \u2014 entities only",
+      "config": {
+        "custom_detector_key": "cust_dach_entity_extractor",
+        "name": "DACH Regulatory Entity Extractor",
+        "description": "Extract regulatory entities (GDPR articles, supervisory bodies, risk terms)",
+        "languages": [
+          "de",
+          "en"
+        ],
+        "confidence_threshold": 0.72,
+        "pipeline_schema": {
+          "type": "GLINER2",
+          "entities": {
+            "regulatory_body": {
+              "description": "Supervisory authority like BaFin, FINMA, FMA",
+              "required": false
+            },
+            "gdpr_article": {
+              "description": "GDPR article reference like 'Art. 6 DSGVO'",
+              "required": false
+            },
+            "risk_term": {
+              "description": "Legal risk term like 'Haftung ausgeschlossen'",
+              "required": false
+            }
+          },
+          "classification": {},
+          "validation": {
+            "confidence_threshold": 0.72,
+            "rules": []
+          }
+        }
+      },
+      "name": "DACH Regulatory Entity Extractor"
+    },
+    {
+      "description": "GLINER2 contract risk classifier \u2014 classification only",
+      "config": {
+        "custom_detector_key": "cust_dach_contract_risk",
+        "name": "DACH Contract Risk Terms",
+        "description": "Detect legal/compliance risk language in DACH contracts",
+        "languages": [
+          "de",
+          "en"
+        ],
+        "pipeline_schema": {
+          "type": "GLINER2",
+          "entities": {},
+          "classification": {
+            "risk_category": {
+              "labels": [
+                "liability",
+                "data_protection",
+                "termination",
+                "indemnification",
+                "none"
+              ],
+              "multi_label": true
+            }
+          },
+          "validation": {
+            "confidence_threshold": 0.75,
+            "rules": []
+          }
+        }
+      },
+      "name": "DACH Contract Risk Terms"
+    },
+    {
+      "description": "REGEX internal product code detector \u2014 no ML required",
+      "config": {
+        "custom_detector_key": "internal_product_codes",
+        "name": "Internal Product Code Detector",
+        "description": "Detect internal SKU and project code leakage in public docs",
+        "languages": [
+          "en",
+          "de"
+        ],
+        "confidence_threshold": 0.9,
+        "pipeline_schema": {
+          "type": "REGEX",
+          "patterns": {
+            "sku_format": {
+              "pattern": "INT-[A-Z]{3}-\\d{5}",
+              "description": "Internal SKU format INT-OPS-12345"
+            },
+            "project_code": {
+              "pattern": "PROJ-[A-Z]{2}\\d{2}[A-Z]{2}\\d{2}",
+              "description": "Internal project code PROJ-AB12CD34"
+            }
+          },
+          "validation": {
+            "confidence_threshold": 0.7,
+            "rules": []
+          }
+        }
+      },
+      "name": "Internal Product Code Detector"
+    },
+    {
+      "description": "REGEX German invoice PII \u2014 postal codes, IBANs, dates",
+      "config": {
+        "custom_detector_key": "cust_invoice_pii_ruleset",
+        "name": "German Invoice PII Ruleset",
+        "languages": [
+          "de",
+          "en"
+        ],
+        "pipeline_schema": {
+          "type": "REGEX",
+          "patterns": {
+            "iban": {
+              "pattern": "\\bDE\\d{2}[\\s]?\\d{4}[\\s]?\\d{4}[\\s]?\\d{4}[\\s]?\\d{4}[\\s]?\\d{2}\\b",
+              "description": "German IBAN"
+            },
+            "zip_city": {
+              "pattern": "\\b\\d{5}\\s+[A-Z\u00c4\u00d6\u00dc][a-z\u00e4\u00f6\u00fc\u00df]+\\b",
+              "description": "German postal code + city"
+            },
+            "invoice_date": {
+              "pattern": "\\b\\d{2}\\.\\d{2}\\.\\d{4}\\b",
+              "description": "Date in DD.MM.YYYY format"
+            }
+          },
+          "validation": {
+            "confidence_threshold": 0.7,
+            "rules": []
+          }
+        }
+      },
+      "name": "German Invoice PII Ruleset"
+    },
+    {
+      "description": "REGEX Austrian legal citation detector",
+      "config": {
+        "custom_detector_key": "at_legal_refs",
+        "name": "Austrian Legal Citation Detector",
+        "description": "Detect references to Austrian laws and regulations",
+        "languages": [
+          "de"
+        ],
+        "confidence_threshold": 0.9,
+        "pipeline_schema": {
+          "type": "REGEX",
+          "patterns": {
+            "bgb_ref": {
+              "pattern": "\u00a7\\s*\\d+(?:\\s+Abs\\.\\s*\\d+)?\\s+(?:ABGB|UGB|ZPO|StGB|AktG|GmbHG)",
+              "description": "Austrian law paragraph reference"
+            },
+            "bgbl_ref": {
+              "pattern": "BGBl\\.\\s*(?:I|II|III)?\\s*Nr\\.\\s*\\d+/\\d{4}",
+              "description": "Austrian Federal Law Gazette reference"
+            }
+          },
+          "validation": {
+            "confidence_threshold": 0.9,
+            "rules": []
+          }
+        }
+      },
+      "name": "Austrian Legal Citation Detector"
+    },
+    {
+      "description": "GLINER2 sarcasm & irony detector \u2014 classification",
+      "config": {
+        "custom_detector_key": "sarcasm_detector",
+        "name": "Sarcasm & Irony Detector",
+        "description": "Detect sarcasm and irony in user-generated content",
+        "languages": [
+          "en",
+          "de"
+        ],
+        "confidence_threshold": 0.72,
+        "pipeline_schema": {
+          "type": "GLINER2",
+          "entities": {},
+          "classification": {
+            "tone": {
+              "labels": [
+                "sarcastic",
+                "ironic",
+                "sincere"
+              ],
+              "multi_label": false
+            }
+          },
+          "validation": {
+            "confidence_threshold": 0.72,
+            "rules": []
+          }
+        }
+      },
+      "name": "Sarcasm & Irony Detector"
+    },
+    {
+      "description": "GLINER2 vendor & supplier entity extractor",
+      "config": {
+        "custom_detector_key": "vendor_entity_extractor",
+        "name": "Vendor & Supplier Entity Extractor",
+        "description": "Extract vendor names, contract values, and delivery terms",
+        "confidence_threshold": 0.55,
+        "pipeline_schema": {
+          "type": "GLINER2",
+          "entities": {
+            "vendor_name": {
+              "description": "Company or vendor name",
+              "required": false
+            },
+            "contract_value": {
+              "description": "Contract value like 50.000 EUR",
+              "required": false
+            },
+            "delivery_term": {
+              "description": "Incoterms like FOB, CIF, DDP",
+              "required": false
+            }
+          },
+          "classification": {},
+          "validation": {
+            "confidence_threshold": 0.55,
+            "rules": []
+          }
+        }
+      },
+      "name": "Vendor & Supplier Entity Extractor"
+    }
+  ],
+  "TEXT_CLASSIFICATION": [
+    {
+      "name": "Spam Detection",
+      "description": "Detect spam and unsolicited promotional content using a lightweight BERT model. Labels matching \"spam\" are flagged as high severity.",
+      "config": {
+        "model": "mrm8488/bert-tiny-finetuned-sms-spam-detection",
+        "device": "cpu",
+        "top_k": null,
         "confidence_threshold": 0.8,
-        "max_findings": 25
-      }
-    }
-  ],
-  "IMAGE_VIOLENCE": [
-    {
-      "name": "Visual Safety Watch",
-      "description": "Flag potentially violent imagery for manual moderation.",
-      "config": {
-        "confidence_threshold": 0.75,
-        "max_findings": 25
-      }
-    }
-  ],
-  "OCR_PII": [
-    {
-      "name": "Scanned Document Privacy",
-      "description": "Extract text from images and detect personal identifiers.",
-      "config": {
-        "enabled_patterns": [
-          "email",
-          "phone_number",
-          "credit_card",
-          "date_of_birth"
-        ],
-        "confidence_threshold": 0.75
-      }
-    }
-  ],
-  "DEID_SCORE": [
-    {
-      "name": "Anonymization Confidence",
-      "description": "Score how safely content was anonymized before sharing.",
-      "config": {
-        "enabled_patterns": [
-          "person",
-          "date_of_birth",
-          "location",
-          "email",
-          "phone_number",
-          "ip_address"
-        ],
-        "confidence_threshold": 0.7
+        "severity_map": [
+          {
+            "pattern": "spam",
+            "severity": "high"
+          }
+        ]
       }
     },
     {
-      "name": "GDPR Article 17 Verification",
-      "description": "Verify right-to-erasure requests were fully executed across core EU and DACH identifiers.",
+      "name": "Sentiment Analysis",
+      "description": "Classify text as positive or negative sentiment using DistilBERT. Negative predictions above threshold are flagged as info-level findings.",
       "config": {
-        "enabled_patterns": [
-          "person",
-          "email",
-          "phone_number",
-          "location",
-          "date_of_birth",
-          "ip_address",
-          "iban_code",
-          "austrian_svnr",
-          "swiss_ahv",
-          "german_tax_id",
-          "eu_national_id"
-        ],
-        "confidence_threshold": 0.65,
-        "min_k_anonymity": 5,
-        "min_l_diversity": 2
-      }
-    },
-    {
-      "name": "High-Risk Re-identification Check",
-      "description": "Focus on quasi-identifiers that can still re-identify people after masking.",
-      "config": {
-        "enabled_patterns": [
-          "date_of_birth",
-          "location",
-          "person",
-          "ip_address"
-        ],
-        "confidence_threshold": 0.6,
-        "min_k_anonymity": 8,
-        "min_l_diversity": 3
-      }
-    }
-  ],
-  "HATE_SPEECH": [
-    {
-      "name": "DSA Article 16 Compliance",
-      "description": "High-confidence alerts for potentially illegal hate speech requiring notice-and-action workflows.",
-      "config": {
+        "model": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+        "device": "cpu",
         "confidence_threshold": 0.85,
-        "max_findings": 25,
-        "severity_threshold": "high"
+        "severity_map": [
+          {
+            "pattern": "negative",
+            "severity": "medium"
+          },
+          {
+            "pattern": "positive",
+            "severity": "info"
+          }
+        ]
       }
     },
     {
-      "name": "Community Moderation Queue",
-      "description": "Capture borderline cases so moderators can review early before escalation.",
+      "name": "Multi-label Topic Classification",
+      "description": "Classify documents into multiple topics simultaneously using sigmoid activation. Each label is scored independently.",
       "config": {
-        "confidence_threshold": 0.65,
+        "model": "your-org/topic-classifier",
+        "device": "cpu",
+        "function_to_apply": "sigmoid",
+        "confidence_threshold": 0.5,
+        "severity_map": [
+          {
+            "pattern": "legal|compliance",
+            "severity": "high"
+          },
+          {
+            "pattern": "finance",
+            "severity": "medium"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GPU Inference",
+      "description": "Run text classification on a CUDA GPU for high-throughput batch processing.",
+      "config": {
+        "model": "mrm8488/bert-tiny-finetuned-sms-spam-detection",
+        "device": "cuda",
+        "confidence_threshold": 0.8,
+        "max_findings": 1000
+      }
+    },
+    {
+      "name": "Local Fine-tuned Model",
+      "description": "Use a proprietary model stored on disk. Useful for air-gapped deployments or domain-specific classifiers.",
+      "config": {
+        "model": "/models/my-text-classifier",
+        "device": "cpu",
+        "confidence_threshold": 0.75,
+        "severity_map": [
+          {
+            "pattern": "violation",
+            "severity": "critical"
+          },
+          {
+            "pattern": "warning",
+            "severity": "high"
+          }
+        ]
+      }
+    }
+  ],
+  "BROKEN_LINKS": [
+    {
+      "name": "Default Broken Links",
+      "description": "Check all links in the asset for reachability with default settings.",
+      "config": {}
+    },
+    {
+      "name": "Capped Scan",
+      "description": "Limit findings to the first 100 broken links to keep reports concise.",
+      "config": {
         "max_findings": 100
       }
     }
   ],
-  "AI_GENERATED": [
+  "FEATURE_EXTRACTION": [
     {
-      "name": "EU AI Act Disclosure Check",
-      "description": "Identify likely AI-authored text requiring disclosure labels under EU AI Act Article 50.",
+      "name": "Semantic Embeddings (BGE \u2014 Balanced)",
+      "description": "Produce L2-normalised mean-pooled sentence embeddings with BAAI/bge-base-en-v1.5 \u2014 a strong general-purpose encoder for semantic search, RAG, and clustering.",
       "config": {
-        "confidence_threshold": 0.8,
-        "max_findings": 50
+        "model": "BAAI/bge-base-en-v1.5",
+        "device": "cpu",
+        "pooling_strategy": "mean",
+        "normalize_embeddings": true,
+        "truncation": true
       }
     },
     {
-      "name": "Editorial Quality Gate",
-      "description": "Flag likely AI-generated text for editorial review before publication.",
+      "name": "Lightweight Embeddings (MiniLM \u2014 Fast / CPU)",
+      "description": "Fast, small embeddings via sentence-transformers/all-MiniLM-L6-v2. Ideal for CPU inference, deduplication, and high-throughput pipelines.",
       "config": {
-        "confidence_threshold": 0.7,
-        "max_findings": 200
+        "model": "sentence-transformers/all-MiniLM-L6-v2",
+        "device": "cpu",
+        "pooling_strategy": "mean",
+        "normalize_embeddings": true,
+        "truncation": true,
+        "batch_size": 32
+      }
+    },
+    {
+      "name": "High-Quality Embeddings (BGE-Large)",
+      "description": "Higher-fidelity embeddings with BAAI/bge-large-en-v1.5 for tasks where embedding quality matters more than throughput.",
+      "config": {
+        "model": "BAAI/bge-large-en-v1.5",
+        "device": "cpu",
+        "pooling_strategy": "mean",
+        "normalize_embeddings": true,
+        "max_length": 512
+      }
+    },
+    {
+      "name": "Multilingual Embeddings (E5)",
+      "description": "Multilingual embeddings using intfloat/multilingual-e5-large. Suitable for enterprise content in multiple languages.",
+      "config": {
+        "model": "intfloat/multilingual-e5-large",
+        "device": "cpu",
+        "pooling_strategy": "mean",
+        "normalize_embeddings": true,
+        "truncation": true
+      }
+    },
+    {
+      "name": "Long-Context Embeddings (ModernBERT \u2014 GPU)",
+      "description": "Long-context embeddings for PDFs, contracts, and large documents using answerdotai/ModernBERT-base on GPU with CLS pooling.",
+      "config": {
+        "model": "answerdotai/ModernBERT-base",
+        "device": "cuda",
+        "pooling_strategy": "cls",
+        "normalize_embeddings": true,
+        "max_length": 8192,
+        "truncation": true,
+        "batch_size": 4
+      }
+    },
+    {
+      "name": "Local Fine-tuned Embedding Model",
+      "description": "Use a locally fine-tuned sentence encoder stored on disk. Mean pooling with normalisation applied.",
+      "config": {
+        "model": "/models/my-domain-encoder",
+        "device": "cpu",
+        "pooling_strategy": "mean",
+        "normalize_embeddings": true
       }
     }
   ],
-  "CONTENT_QUALITY": [
+  "OBJECT_DETECTION": [
     {
-      "name": "Low Quality Flag",
-      "description": "Surface pages with weak readability or thin content for editorial improvement.",
+      "name": "General Object Detection (DETR Baseline)",
+      "description": "Detect common objects in images using the classic DETR transformer model. Good balanced baseline for COCO-class objects.",
       "config": {
+        "model": "facebook/detr-resnet-50",
+        "device": "cpu",
+        "confidence_threshold": 0.5
+      }
+    },
+    {
+      "name": "Realtime Object Detection (RT-DETR)",
+      "description": "Production-grade realtime detection with RT-DETR. Faster than classic DETR, strong accuracy, ideal for high-throughput image pipelines.",
+      "config": {
+        "model": "PekingU/rtdetr_r50vd",
+        "device": "cpu",
+        "confidence_threshold": 0.5,
+        "top_k": 50
+      }
+    },
+    {
+      "name": "Lightweight Transformer Detector (YOLOS)",
+      "description": "Pure ViT-based detector via hustvl/yolos-small. Lightweight and fast \u2014 a good starting point for research or CPU-only environments.",
+      "config": {
+        "model": "hustvl/yolos-small",
+        "device": "cpu",
         "confidence_threshold": 0.4,
-        "max_findings": 100,
-        "min_score_threshold": 40
+        "top_k": 30
       }
     },
     {
-      "name": "Premium Content Gate",
-      "description": "Apply a stricter quality bar before content is promoted or monetized.",
+      "name": "Security Screening \u2014 People & Weapons",
+      "description": "Flag images containing persons, weapons, or knives with high severity. Useful for content moderation and physical security pipelines.",
       "config": {
-        "confidence_threshold": 0.7,
-        "min_score_threshold": 70
-      }
-    }
-  ],
-  "DUPLICATE": [
-    {
-      "name": "Pre-publish Deduplication",
-      "description": "Block near-duplicate content before publishing to reduce SEO and moderation noise.",
-      "config": {
-        "confidence_threshold": 0.9,
-        "max_findings": 50
-      }
-    },
-    {
-      "name": "Training Data Quality",
-      "description": "Detect near-duplicates in ML datasets to reduce memorization and bias amplification.",
-      "config": {
-        "confidence_threshold": 0.8,
-        "max_findings": 500
-      }
-    }
-  ],
-  "DOMAIN_CLASS": [
-    {
-      "name": "Business Domain Tags",
-      "description": "Auto-tag content by domain so ownership and routing are clear.",
-      "config": {
-        "enabled_patterns": [
-          "finance",
-          "health",
-          "legal",
-          "hr",
-          "technology",
-          "other"
-        ],
-        "confidence_threshold": 0.65
-      }
-    },
-    {
-      "name": "Regulated Domain Triage",
-      "description": "Prioritize high-risk regulated domains for expert review.",
-      "config": {
-        "enabled_patterns": [
-          "health",
-          "legal",
-          "finance"
-        ],
-        "confidence_threshold": 0.7
-      }
-    }
-  ],
-  "CONTENT_TYPE": [
-    {
-      "name": "Style Labeling",
-      "description": "Classify whether content is factual, opinion, promotional, or instructional.",
-      "config": {
-        "enabled_patterns": [
-          "factual",
-          "opinion",
-          "promotional",
-          "instructional"
-        ],
-        "confidence_threshold": 0.65
-      }
-    },
-    {
-      "name": "Promotional Content Triage",
-      "description": "Identify promotional content that may need disclosure or policy checks.",
-      "config": {
-        "enabled_patterns": [
-          "promotional"
-        ],
-        "confidence_threshold": 0.7
-      }
-    }
-  ],
-  "SENSITIVITY_TIER": [
-    {
-      "name": "Data Sensitivity Routing",
-      "description": "Assign handling tiers for governance and sharing controls.",
-      "config": {
-        "enabled_patterns": [
-          "PUBLIC",
-          "INTERNAL",
-          "CONFIDENTIAL",
-          "RESTRICTED"
-        ],
-        "confidence_threshold": 0.7
-      }
-    },
-    {
-      "name": "Internal Content Gate",
-      "description": "Flag confidential or restricted content before external sharing.",
-      "config": {
-        "enabled_patterns": [
-          "CONFIDENTIAL",
-          "RESTRICTED"
-        ],
-        "confidence_threshold": 0.75
-      }
-    },
-    {
-      "name": "Public-safe Check",
-      "description": "Confirm content is classified as PUBLIC before publishing broadly.",
-      "config": {
-        "enabled_patterns": [
-          "PUBLIC"
-        ],
-        "confidence_threshold": 0.8
-      }
-    }
-  ],
-  "JURISDICTION_TAG": [
-    {
-      "name": "Regulation Tagging",
-      "description": "Suggest likely regulatory obligations from language and content context.",
-      "config": {
-        "enabled_patterns": [
-          "GDPR",
-          "DSA",
-          "CCPA",
-          "HIPAA",
-          "NDSG"
-        ],
-        "confidence_threshold": 0.65
-      }
-    },
-    {
-      "name": "DACH Market Compliance",
-      "description": "Focus on regulations most relevant for German, Austrian, and Swiss markets.",
-      "config": {
-        "enabled_patterns": [
-          "GDPR",
-          "DSA",
-          "NDSG"
-        ],
-        "confidence_threshold": 0.7
-      }
-    }
-  ],
-  "BIAS": [
-    {
-      "name": "Fairness Baseline",
-      "description": "Detect common biased language signals during content review.",
-      "config": {
-        "enabled_patterns": [
-          "gender_bias",
-          "racial_bias",
-          "age_bias",
-          "religious_bias"
-        ],
-        "confidence_threshold": 0.7
-      }
-    },
-    {
-      "name": "High Sensitivity Bias Review",
-      "description": "Use stricter thresholds for public-facing content with fairness risk.",
-      "config": {
-        "enabled_patterns": [
-          "gender_bias",
-          "racial_bias",
-          "religious_bias",
-          "political_bias"
-        ],
-        "confidence_threshold": 0.82,
-        "max_findings": 50
-      }
-    }
-  ],
-  "CUSTOM": [
-    {
-      "name": "DACH Contract Risk Terms",
-      "description": "Multilingual classifier for legal/compliance contract risk wording.",
-      "config": {
-        "custom_detector_key": "cust_dach_contract_risk",
-        "name": "DACH Contract Risk Terms",
-        "description": "Detect legal/compliance risk language",
-        "method": "CLASSIFIER",
-        "languages": [
-          "de",
-          "en"
-        ],
-        "confidence_threshold": 0.7,
-        "max_findings": 100,
-        "ruleset": {
-          "regex_rules": [],
-          "keyword_rules": []
-        },
-        "classifier": {
-          "labels": [
-            {
-              "id": "risk_term",
-              "name": "Risk Term",
-              "description": "Potential legal risk wording"
-            }
-          ],
-          "zero_shot_model": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli",
-          "hypothesis_template": "This text contains {}.",
-          "training_examples": [],
-          "min_examples_per_label": 8,
-          "setfit_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-        },
-        "entity": {
-          "entity_labels": [],
-          "model": "fastino/gliner2-base-v1"
-        }
-      }
-    },
-    {
-      "name": "DACH Regulatory Entity Extractor",
-      "description": "Extract custom regulatory entities using GLiNER labels.",
-      "config": {
-        "custom_detector_key": "cust_dach_entity_extractor",
-        "name": "DACH Regulatory Entity Extractor",
-        "method": "ENTITY",
-        "languages": [
-          "de",
-          "en"
-        ],
-        "confidence_threshold": 0.72,
-        "entity": {
-          "entity_labels": [
-            "handelsregisternummer",
-            "w-idnr",
-            "steuernummer",
-            "finma_identifier"
-          ],
-          "model": "fastino/gliner2-base-v1"
-        }
-      }
-    },
-    {
-      "name": "German Compound Ruleset",
-      "description": "Regex and keyword rules tailored for German compliance phrases.",
-      "config": {
-        "custom_detector_key": "cust_de_compound_ruleset",
-        "name": "German Compound Ruleset",
-        "method": "RULESET",
-        "languages": [
-          "de"
-        ],
-        "confidence_threshold": 0.75,
-        "ruleset": {
-          "regex_rules": [
-            {
-              "id": "de_handelsregister",
-              "name": "Handelsregister Number",
-              "pattern": "\\b(?:HRB|HRA)\\s?\\d{2,8}\\b",
-              "flags": "i",
-              "severity": "medium"
-            }
-          ],
-          "keyword_rules": [
-            {
-              "id": "de_data_protection",
-              "name": "Data Protection Officer",
-              "keywords": [
-                "datenschutzbeauftragter",
-                "datenschutzfolgeabschatzung"
-              ],
-              "case_sensitive": false,
-              "severity": "low"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "name": "NetzDG Illegal Content Signals",
-      "description": "Classifier labels for policy review queues aligned to NetzDG categories.",
-      "config": {
-        "custom_detector_key": "cust_netzdg_content_signals",
-        "name": "NetzDG Illegal Content Signals",
-        "method": "CLASSIFIER",
-        "languages": [
-          "de"
-        ],
-        "classifier": {
-          "labels": [
-            {
-              "id": "hate_speech",
-              "name": "Hate Speech"
-            },
-            {
-              "id": "threat_of_violence",
-              "name": "Threat of Violence"
-            },
-            {
-              "id": "incitement",
-              "name": "Incitement"
-            }
-          ],
-          "min_examples_per_label": 8,
-          "training_examples": [
-            {
-              "text": "Wir werden euch morgen angreifen.",
-              "label": "threat_of_violence",
-              "accepted": true
-            }
-          ],
-          "hypothesis_template": "This text contains {}."
-        }
-      }
-    },
-    {
-      "name": "German Invoice PII Ruleset",
-      "description": "Ruleset for invoice and procurement text (IBAN, VAT, tax IDs).",
-      "config": {
-        "custom_detector_key": "cust_invoice_pii_ruleset",
-        "name": "German Invoice PII Ruleset",
-        "method": "RULESET",
-        "languages": [
-          "de",
-          "en"
-        ],
-        "ruleset": {
-          "regex_rules": [
-            {
-              "id": "iban_de",
-              "name": "German IBAN",
-              "pattern": "\\bDE\\d{20}\\b",
-              "flags": "i",
-              "severity": "high"
-            },
-            {
-              "id": "ust_id",
-              "name": "EU VAT ID",
-              "pattern": "\\bDE\\d{9}\\b",
-              "flags": "i",
-              "severity": "medium"
-            }
-          ],
-          "keyword_rules": [
-            {
-              "id": "invoice_words",
-              "name": "Invoice Terms",
-              "keywords": [
-                "rechnung",
-                "kundennummer",
-                "umsatzsteuer"
-              ],
-              "case_sensitive": false,
-              "severity": "low"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "name": "Swiss Financial Entity Extractor",
-      "description": "Entity extraction labels for Swiss regulatory and financial text.",
-      "config": {
-        "custom_detector_key": "cust_swiss_financial_entities",
-        "name": "Swiss Financial Entity Extractor",
-        "method": "ENTITY",
-        "languages": [
-          "de",
-          "fr",
-          "it",
-          "en"
-        ],
-        "entity": {
-          "entity_labels": [
-            "ahv_number",
-            "finma_reference",
-            "iban_ch",
-            "counterparty_name"
-          ],
-          "model": "fastino/gliner2-base-v1"
-        }
-      }
-    },
-    {
-      "name": "Sarcasm & Irony Detector",
-      "description": "Detects sarcastic or ironic language with zero-shot fallback and few-shot adaptation.",
-      "config": {
-        "custom_detector_key": "sarcasm_detector",
-        "name": "Sarcasm & Irony Detector",
-        "method": "CLASSIFIER",
-        "languages": [
-          "en",
-          "de"
-        ],
-        "confidence_threshold": 0.72,
-        "classifier": {
-          "labels": [
-            {
-              "id": "sarcastic",
-              "name": "Sarcastic or Ironic",
-              "description": "Text expressing opposite intent for humor or criticism"
-            },
-            {
-              "id": "sincere",
-              "name": "Sincere",
-              "description": "Straightforward literal language"
-            }
-          ],
-          "zero_shot_model": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli",
-          "hypothesis_template": "This text is written sarcastically or ironically {}.",
-          "training_examples": [],
-          "min_examples_per_label": 8,
-          "setfit_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-        }
-      }
-    },
-    {
-      "name": "High Anger / Aggression Signal",
-      "description": "Classifier signal for emotionally escalated user comments.",
-      "config": {
-        "custom_detector_key": "high_anger_signal",
-        "name": "High Anger / Aggression Signal",
-        "method": "CLASSIFIER",
-        "confidence_threshold": 0.78,
-        "classifier": {
-          "labels": [
-            {
-              "id": "angry",
-              "name": "Angry or Aggressive",
-              "description": "Hostile, frustrated, threatening tone"
-            },
-            {
-              "id": "neutral",
-              "name": "Neutral or Positive",
-              "description": "Calm, constructive, or neutral language"
-            }
-          ],
-          "hypothesis_template": "This text expresses anger or aggression {}.",
-          "min_examples_per_label": 8
-        }
-      }
-    },
-    {
-      "name": "Passive-Aggressive Tone",
-      "description": "Detects indirect hostility in workplace communications.",
-      "config": {
-        "custom_detector_key": "passive_aggressive",
-        "name": "Passive-Aggressive Tone",
-        "method": "CLASSIFIER",
-        "confidence_threshold": 0.7,
-        "classifier": {
-          "labels": [
-            {
-              "id": "passive_aggressive",
-              "name": "Passive-Aggressive",
-              "description": "Indirect hostility veiled as politeness"
-            },
-            {
-              "id": "direct",
-              "name": "Direct Communication",
-              "description": "Clear neutral or constructive communication"
-            }
-          ],
-          "hypothesis_template": "This text contains passive-aggressive or indirectly hostile communication {}.",
-          "min_examples_per_label": 8
-        }
-      }
-    },
-    {
-      "name": "Undisclosed Promotional Content",
-      "description": "Flags likely promotional text disguised as organic review content.",
-      "config": {
-        "custom_detector_key": "fake_review_signal",
-        "name": "Undisclosed Promotional Content",
-        "method": "CLASSIFIER",
-        "confidence_threshold": 0.73,
-        "classifier": {
-          "labels": [
-            {
-              "id": "promotional",
-              "name": "Promotional / Advertising",
-              "description": "Paid endorsement or marketing-style copy"
-            },
-            {
-              "id": "organic",
-              "name": "Organic Opinion",
-              "description": "Genuine balanced user review"
-            }
-          ],
-          "hypothesis_template": "This text is promotional or advertising content {}.",
-          "min_examples_per_label": 8
-        }
-      }
-    },
-    {
-      "name": "Unlicensed Financial Advice Signal",
-      "description": "Flags text that resembles direct investment advice.",
-      "config": {
-        "custom_detector_key": "unlicensed_financial_advice",
-        "name": "Unlicensed Financial Advice Signal",
-        "method": "CLASSIFIER",
-        "confidence_threshold": 0.75,
-        "classifier": {
-          "labels": [
-            {
-              "id": "financial_advice",
-              "name": "Specific Financial Advice",
-              "description": "Buy/sell or portfolio recommendations"
-            },
-            {
-              "id": "general_info",
-              "name": "General Financial Information",
-              "description": "Educational or informational finance content"
-            }
-          ],
-          "hypothesis_template": "This text contains specific financial or investment advice {}.",
-          "min_examples_per_label": 8
-        }
-      }
-    },
-    {
-      "name": "Medical Misinformation Signal",
-      "description": "Classifier for potentially misleading medical claims.",
-      "config": {
-        "custom_detector_key": "medical_misinfo",
-        "name": "Medical Misinformation Signal",
-        "method": "CLASSIFIER",
-        "confidence_threshold": 0.72,
-        "classifier": {
-          "labels": [
-            {
-              "id": "misinformation",
-              "name": "Potential Medical Misinformation",
-              "description": "Unproven cures or contradictory health claims"
-            },
-            {
-              "id": "accurate",
-              "name": "Medically Accurate or Neutral",
-              "description": "Consensus-aligned or neutral medical text"
-            }
-          ],
-          "hypothesis_template": "This text contains medical misinformation or unproven health claims {}.",
-          "min_examples_per_label": 10
-        }
-      }
-    },
-    {
-      "name": "User Distress Signal",
-      "description": "Detects potential crisis language for human escalation workflows.",
-      "config": {
-        "custom_detector_key": "distress_signal",
-        "name": "User Distress Signal",
-        "method": "CLASSIFIER",
-        "confidence_threshold": 0.65,
-        "max_findings": 5,
-        "classifier": {
-          "labels": [
-            {
-              "id": "distress",
-              "name": "Distress or Crisis Signal",
-              "description": "Hopelessness or self-harm indicators"
-            },
-            {
-              "id": "not_distress",
-              "name": "Not a Distress Signal",
-              "description": "Non-crisis frustration or hyperbole"
-            }
-          ],
-          "hypothesis_template": "This text expresses genuine personal distress or a mental health crisis {}.",
-          "min_examples_per_label": 15
-        }
-      }
-    },
-    {
-      "name": "Internal Product Code Detector",
-      "description": "Detects internal SKU/project identifiers in user-facing content.",
-      "config": {
-        "custom_detector_key": "internal_product_codes",
-        "name": "Internal Product Code Detector",
-        "method": "RULESET",
-        "languages": [
-          "en",
-          "de"
-        ],
-        "confidence_threshold": 0.9,
-        "ruleset": {
-          "regex_rules": [
-            {
-              "id": "sku_format",
-              "name": "Internal SKU Pattern",
-              "pattern": "\\bINT-[A-Z]{2,4}-\\d{4,6}\\b",
-              "severity": "high"
-            },
-            {
-              "id": "project_code",
-              "name": "Internal Project Code",
-              "pattern": "\\bPROJ-[A-Z0-9]{6,10}\\b",
-              "severity": "medium"
-            }
-          ],
-          "keyword_rules": []
-        }
-      }
-    },
-    {
-      "name": "Competitor Brand Mention",
-      "description": "Flags known competitor mentions for policy review.",
-      "config": {
-        "custom_detector_key": "competitor_mentions",
-        "name": "Competitor Brand Mention",
-        "method": "RULESET",
-        "confidence_threshold": 0.95,
-        "ruleset": {
-          "regex_rules": [],
-          "keyword_rules": [
-            {
-              "id": "competitors",
-              "name": "Known Competitors",
-              "keywords": [
-                "CompetitorA",
-                "CompetitorB GmbH",
-                "RivalProduct",
-                "OtherBrand AG"
-              ],
-              "case_sensitive": false,
-              "severity": "medium"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "name": "Austrian Legal Citation Detector",
-      "description": "Detects Austrian legal references in German texts.",
-      "config": {
-        "custom_detector_key": "at_legal_refs",
-        "name": "Austrian Legal Citation Detector",
-        "method": "RULESET",
-        "languages": [
-          "de"
-        ],
-        "confidence_threshold": 0.9,
-        "ruleset": {
-          "regex_rules": [
-            {
-              "id": "paragraph_ref",
-              "name": "Austrian Law Paragraph Citation",
-              "pattern": "§\\s*\\d+\\s*(Abs\\.?\\s*\\d+\\s*)?(ABGB|UGB|DSG|StGB|GmbHG|AktG|ZPO)",
-              "severity": "info"
-            },
-            {
-              "id": "bgbl_ref",
-              "name": "Federal Law Gazette Reference",
-              "pattern": "BGBl\\.?\\s+(I|II|III)?\\s*Nr\\.\\s*\\d+/\\d{4}",
-              "severity": "info"
-            }
-          ],
-          "keyword_rules": []
-        }
-      }
-    },
-    {
-      "name": "Vendor & Supplier Entity Extractor",
-      "description": "Extracts supplier and contractor entities from procurement text.",
-      "config": {
-        "custom_detector_key": "vendor_entity_extractor",
-        "name": "Vendor & Supplier Entity Extractor",
-        "method": "ENTITY",
-        "confidence_threshold": 0.55,
-        "entity": {
-          "entity_labels": [
-            "vendor name",
-            "supplier company",
-            "contractor",
-            "subcontractor",
-            "service provider",
-            "Auftragnehmer",
-            "Lieferant"
-          ],
-          "model": "fastino/gliner2-base-v1"
-        }
-      }
-    },
-    {
-      "name": "DACH Regulatory Term Extractor",
-      "description": "Extracts regulator and regulation mentions for compliance indexing.",
-      "config": {
-        "custom_detector_key": "dach_regulatory_terms",
-        "name": "DACH Regulatory Term Extractor",
-        "method": "ENTITY",
-        "languages": [
-          "de"
-        ],
+        "model": "facebook/detr-resnet-50",
+        "device": "cpu",
         "confidence_threshold": 0.6,
-        "entity": {
-          "entity_labels": [
-            "German supervisory authority",
-            "Austrian supervisory authority",
-            "Swiss supervisory authority",
-            "GDPR article reference",
-            "German law citation",
-            "regulatory fine amount",
-            "compliance deadline",
-            "Bußgeld",
-            "Aufsichtsbehörde"
-          ],
-          "model": "fastino/gliner2-base-v1"
-        }
+        "severity_map": [
+          {
+            "pattern": "knife|weapon|gun|rifle|pistol",
+            "severity": "critical"
+          },
+          {
+            "pattern": "person|human",
+            "severity": "high"
+          },
+          {
+            "pattern": "car|truck|motorcycle",
+            "severity": "medium"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Document AI \u2014 Table & Form Detection (GPU)",
+      "description": "Detect tables, forms, and document regions in scanned PDFs or screenshots using RT-DETR on GPU. Small boxes filtered out to reduce noise.",
+      "config": {
+        "model": "PekingU/rtdetr_r50vd",
+        "device": "cuda",
+        "confidence_threshold": 0.55,
+        "min_box_area": 400,
+        "top_k": 20,
+        "severity_map": [
+          {
+            "pattern": "table",
+            "severity": "info"
+          },
+          {
+            "pattern": "form|field|checkbox",
+            "severity": "info"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Custom Local Object Detector",
+      "description": "Use a locally fine-tuned or exported object detection model stored on disk.",
+      "config": {
+        "model": "/models/my-custom-detector",
+        "device": "cpu",
+        "confidence_threshold": 0.5
       }
     }
   ]
