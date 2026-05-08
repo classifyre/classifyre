@@ -302,6 +302,8 @@ export const SandboxControllerListRunsDetectorTypeEnum = {
     Yara: 'YARA',
     BrokenLinks: 'BROKEN_LINKS',
     TextClassification: 'TEXT_CLASSIFICATION',
+    FeatureExtraction: 'FEATURE_EXTRACTION',
+    ObjectDetection: 'OBJECT_DETECTION',
     Language: 'LANGUAGE',
     CodeSecurity: 'CODE_SECURITY',
     Custom: 'CUSTOM'

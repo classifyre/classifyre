@@ -1457,5 +1457,159 @@
         "max_findings": 100
       }
     }
+  ],
+  "FEATURE_EXTRACTION": [
+    {
+      "name": "Semantic Embeddings (BGE \u2014 Balanced)",
+      "description": "Produce L2-normalised mean-pooled sentence embeddings with BAAI/bge-base-en-v1.5 \u2014 a strong general-purpose encoder for semantic search, RAG, and clustering.",
+      "config": {
+        "model": "BAAI/bge-base-en-v1.5",
+        "device": "cpu",
+        "pooling_strategy": "mean",
+        "normalize_embeddings": true,
+        "truncation": true
+      }
+    },
+    {
+      "name": "Lightweight Embeddings (MiniLM \u2014 Fast / CPU)",
+      "description": "Fast, small embeddings via sentence-transformers/all-MiniLM-L6-v2. Ideal for CPU inference, deduplication, and high-throughput pipelines.",
+      "config": {
+        "model": "sentence-transformers/all-MiniLM-L6-v2",
+        "device": "cpu",
+        "pooling_strategy": "mean",
+        "normalize_embeddings": true,
+        "truncation": true,
+        "batch_size": 32
+      }
+    },
+    {
+      "name": "High-Quality Embeddings (BGE-Large)",
+      "description": "Higher-fidelity embeddings with BAAI/bge-large-en-v1.5 for tasks where embedding quality matters more than throughput.",
+      "config": {
+        "model": "BAAI/bge-large-en-v1.5",
+        "device": "cpu",
+        "pooling_strategy": "mean",
+        "normalize_embeddings": true,
+        "max_length": 512
+      }
+    },
+    {
+      "name": "Multilingual Embeddings (E5)",
+      "description": "Multilingual embeddings using intfloat/multilingual-e5-large. Suitable for enterprise content in multiple languages.",
+      "config": {
+        "model": "intfloat/multilingual-e5-large",
+        "device": "cpu",
+        "pooling_strategy": "mean",
+        "normalize_embeddings": true,
+        "truncation": true
+      }
+    },
+    {
+      "name": "Long-Context Embeddings (ModernBERT \u2014 GPU)",
+      "description": "Long-context embeddings for PDFs, contracts, and large documents using answerdotai/ModernBERT-base on GPU with CLS pooling.",
+      "config": {
+        "model": "answerdotai/ModernBERT-base",
+        "device": "cuda",
+        "pooling_strategy": "cls",
+        "normalize_embeddings": true,
+        "max_length": 8192,
+        "truncation": true,
+        "batch_size": 4
+      }
+    },
+    {
+      "name": "Local Fine-tuned Embedding Model",
+      "description": "Use a locally fine-tuned sentence encoder stored on disk. Mean pooling with normalisation applied.",
+      "config": {
+        "model": "/models/my-domain-encoder",
+        "device": "cpu",
+        "pooling_strategy": "mean",
+        "normalize_embeddings": true
+      }
+    }
+  ],
+  "OBJECT_DETECTION": [
+    {
+      "name": "General Object Detection (DETR Baseline)",
+      "description": "Detect common objects in images using the classic DETR transformer model. Good balanced baseline for COCO-class objects.",
+      "config": {
+        "model": "facebook/detr-resnet-50",
+        "device": "cpu",
+        "confidence_threshold": 0.5
+      }
+    },
+    {
+      "name": "Realtime Object Detection (RT-DETR)",
+      "description": "Production-grade realtime detection with RT-DETR. Faster than classic DETR, strong accuracy, ideal for high-throughput image pipelines.",
+      "config": {
+        "model": "PekingU/rtdetr_r50vd",
+        "device": "cpu",
+        "confidence_threshold": 0.5,
+        "top_k": 50
+      }
+    },
+    {
+      "name": "Lightweight Transformer Detector (YOLOS)",
+      "description": "Pure ViT-based detector via hustvl/yolos-small. Lightweight and fast \u2014 a good starting point for research or CPU-only environments.",
+      "config": {
+        "model": "hustvl/yolos-small",
+        "device": "cpu",
+        "confidence_threshold": 0.4,
+        "top_k": 30
+      }
+    },
+    {
+      "name": "Security Screening \u2014 People & Weapons",
+      "description": "Flag images containing persons, weapons, or knives with high severity. Useful for content moderation and physical security pipelines.",
+      "config": {
+        "model": "facebook/detr-resnet-50",
+        "device": "cpu",
+        "confidence_threshold": 0.6,
+        "severity_map": [
+          {
+            "pattern": "knife|weapon|gun|rifle|pistol",
+            "severity": "critical"
+          },
+          {
+            "pattern": "person|human",
+            "severity": "high"
+          },
+          {
+            "pattern": "car|truck|motorcycle",
+            "severity": "medium"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Document AI \u2014 Table & Form Detection (GPU)",
+      "description": "Detect tables, forms, and document regions in scanned PDFs or screenshots using RT-DETR on GPU. Small boxes filtered out to reduce noise.",
+      "config": {
+        "model": "PekingU/rtdetr_r50vd",
+        "device": "cuda",
+        "confidence_threshold": 0.55,
+        "min_box_area": 400,
+        "top_k": 20,
+        "severity_map": [
+          {
+            "pattern": "table",
+            "severity": "info"
+          },
+          {
+            "pattern": "form|field|checkbox",
+            "severity": "info"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Custom Local Object Detector",
+      "description": "Use a locally fine-tuned or exported object detection model stored on disk.",
+      "config": {
+        "model": "/models/my-custom-detector",
+        "device": "cpu",
+        "confidence_threshold": 0.5
+      }
+    }
   ]
 }

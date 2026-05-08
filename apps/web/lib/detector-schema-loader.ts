@@ -199,6 +199,8 @@ const configSchemaByDetectorType: Record<string, string> = {
   TOXIC: "ContentDetectorConfig",
   IMAGE_CLASSIFICATION: "ImageClassificationDetectorConfig",
   TEXT_CLASSIFICATION: "TextClassificationDetectorConfig",
+  FEATURE_EXTRACTION: "FeatureExtractionDetectorConfig",
+  OBJECT_DETECTION: "ObjectDetectionDetectorConfig",
   YARA: "ThreatDetectorConfig",
   BROKEN_LINKS: "BrokenLinksDetectorConfig",
   CODE_SECURITY: "CodeSecurityDetectorConfig",

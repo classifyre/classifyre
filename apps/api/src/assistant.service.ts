@@ -857,7 +857,7 @@ function buildSystemPrompt(
                 '  description       → string (plain-language description)',
                 '  category          → string (e.g. "Security", "Privacy", "Compliance", "Content", "Operations")',
                 '  filterMapping     → object with optional arrays:',
-                '    filterMapping.detectorTypes   → string[] from: SECRETS, PII, TOXIC, IMAGE_CLASSIFICATION, TEXT_CLASSIFICATION, YARA, BROKEN_LINKS, LANGUAGE, CODE_SECURITY, CUSTOM',
+                '    filterMapping.detectorTypes   → string[] from: SECRETS, PII, TOXIC, IMAGE_CLASSIFICATION, TEXT_CLASSIFICATION, FEATURE_EXTRACTION, OBJECT_DETECTION, YARA, BROKEN_LINKS, LANGUAGE, CODE_SECURITY, CUSTOM',
                 '    filterMapping.severities      → string[] from: CRITICAL, HIGH, MEDIUM, LOW, INFO',
                 '    filterMapping.statuses         → string[] from: OPEN, FALSE_POSITIVE, RESOLVED, IGNORED',
                 '    filterMapping.findingTypes     → string[] (free-form finding type strings)',

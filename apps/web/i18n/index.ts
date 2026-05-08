@@ -1,5 +1,5 @@
-import enTranslations from "./en.ts";
-import deTranslations from "./de.ts";
+import enTranslations from "./en";
+import deTranslations from "./de";
 
 type Translations = typeof enTranslations;
 

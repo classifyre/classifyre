@@ -35,7 +35,7 @@ def _stub_detector(cfg: DetectorConfig | None = None) -> module.CodeSecurityDete
 @pytest.mark.asyncio
 async def test_detect_maps_bandit_issue() -> None:
     detector = _stub_detector()
-    detector._run_bandit_json = lambda _content, skips=None, tests=None: (
+    detector._run_bandit_json = lambda _content, **_kwargs: (
         [_BANDIT_ISSUE],
         [],
     )
@@ -60,7 +60,7 @@ async def test_detect_passes_skips_and_tests_to_bandit() -> None:
 
     captured: dict[str, object] = {}
 
-    def _capture(content: str, skips: list[str] | None = None, tests: list[str] | None = None):
+    def _capture(_content: str, skips: list[str] | None = None, tests: list[str] | None = None):
         captured["skips"] = skips
         captured["tests"] = tests
         return [], []
@@ -77,7 +77,7 @@ async def test_detect_passes_skips_and_tests_to_bandit() -> None:
 async def test_detect_filters_by_severity_threshold() -> None:
     cfg = CodeSecurityDetectorConfig(severity_threshold=Severity.medium)
     detector = _stub_detector(cfg)
-    detector._run_bandit_json = lambda _content, skips=None, tests=None: (
+    detector._run_bandit_json = lambda _content, **_kwargs: (
         [
             {**_BANDIT_ISSUE, "issue_severity": "LOW", "test_id": "B101"},
             {**_BANDIT_ISSUE, "issue_severity": "MEDIUM", "test_id": "B601"},
@@ -98,7 +98,7 @@ async def test_detect_filters_by_severity_threshold() -> None:
 async def test_detect_no_severity_threshold_keeps_all_severities() -> None:
     cfg = CodeSecurityDetectorConfig(severity_threshold=None)
     detector = _stub_detector(cfg)
-    detector._run_bandit_json = lambda _content, skips=None, tests=None: (
+    detector._run_bandit_json = lambda _content, **_kwargs: (
         [
             {**_BANDIT_ISSUE, "issue_severity": "LOW", "test_id": "B101"},
             {**_BANDIT_ISSUE, "issue_severity": "MEDIUM", "test_id": "B601"},
@@ -115,7 +115,7 @@ async def test_detect_no_severity_threshold_keeps_all_severities() -> None:
 async def test_detect_uses_generic_config_fallback() -> None:
     """Detector still works when initialised with the old GenericDetectorConfig."""
     detector = _stub_detector(GenericDetectorConfig(confidence_threshold=0.7))
-    detector._run_bandit_json = lambda _content, skips=None, tests=None: (
+    detector._run_bandit_json = lambda _content, **_kwargs: (
         [_BANDIT_ISSUE],
         [],
     )
