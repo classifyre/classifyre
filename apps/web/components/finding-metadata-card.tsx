@@ -22,7 +22,6 @@ const DETECTORS_WITH_USEFUL_METADATA = new Set<string>([
   FindingResponseDtoDetectorTypeEnum.Toxic,
   FindingResponseDtoDetectorTypeEnum.Language,
   FindingResponseDtoDetectorTypeEnum.Spam,
-  FindingResponseDtoDetectorTypeEnum.PromptInjection,
   FindingResponseDtoDetectorTypeEnum.BrokenLinks,
 ]);
 

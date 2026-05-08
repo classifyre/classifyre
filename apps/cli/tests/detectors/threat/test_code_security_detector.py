@@ -5,13 +5,15 @@ import pytest
 from src.detectors.base import BaseDetector
 from src.detectors.dependencies import MissingDependencyError
 from src.detectors.threat import code_security_detector as module
-from src.models.generated_detectors import DetectorConfig, Severity
+from src.models.generated_detectors import DetectorConfig, GenericDetectorConfig, Severity
 from src.models.generated_single_asset_scan_results import DetectorType
 
 
 def _stub_detector() -> module.CodeSecurityDetector:
     detector = module.CodeSecurityDetector.__new__(module.CodeSecurityDetector)
-    BaseDetector.__init__(detector, DetectorConfig(confidence_threshold=0.7))
+    cfg = GenericDetectorConfig(confidence_threshold=0.7)
+    BaseDetector.__init__(detector, cfg)
+    detector._cfg = cfg
     return detector
 
 

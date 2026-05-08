@@ -365,7 +365,7 @@ async function example() {
   const api = new FindingsApi();
 
   const body = {
-    // 'SECRETS' | 'PII' | 'TOXIC' | 'NSFW' | 'YARA' | 'BROKEN_LINKS' | 'PROMPT_INJECTION' | 'SPAM' | 'LANGUAGE' | 'CODE_SECURITY' | 'CUSTOM' (optional)
+    // 'SECRETS' | 'PII' | 'TOXIC' | 'IMAGE_CLASSIFICATION' | 'YARA' | 'BROKEN_LINKS' | 'TEXT_CLASSIFICATION' | 'LANGUAGE' | 'CODE_SECURITY' | 'CUSTOM' (optional)
     detectorType: detectorType_example,
     // string (optional)
     sourceId: sourceId_example,
@@ -412,7 +412,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **detectorType** | `SECRETS`, `PII`, `TOXIC`, `NSFW`, `YARA`, `BROKEN_LINKS`, `PROMPT_INJECTION`, `SPAM`, `LANGUAGE`, `CODE_SECURITY`, `CUSTOM` |  | [Optional] [Defaults to `undefined`] [Enum: SECRETS, PII, TOXIC, NSFW, YARA, BROKEN_LINKS, PROMPT_INJECTION, SPAM, LANGUAGE, CODE_SECURITY, CUSTOM] |
+| **detectorType** | `SECRETS`, `PII`, `TOXIC`, `IMAGE_CLASSIFICATION`, `YARA`, `BROKEN_LINKS`, `TEXT_CLASSIFICATION`, `LANGUAGE`, `CODE_SECURITY`, `CUSTOM` |  | [Optional] [Defaults to `undefined`] [Enum: SECRETS, PII, TOXIC, IMAGE_CLASSIFICATION, YARA, BROKEN_LINKS, TEXT_CLASSIFICATION, LANGUAGE, CODE_SECURITY, CUSTOM] |
 | **sourceId** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **assetId** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **runnerId** | `string` |  | [Optional] [Defaults to `undefined`] |

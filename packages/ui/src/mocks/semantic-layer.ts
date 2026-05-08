@@ -14,7 +14,7 @@ export const mockGlossaryTerms: MockGlossaryTerm[] = [
       "Findings from detectors that identify security vulnerabilities such as exposed secrets, malicious patterns, and prompt injection attempts.",
     category: "Security",
     filterMapping: {
-      detectorTypes: ["SECRETS", "YARA", "PROMPT_INJECTION"],
+      detectorTypes: ["SECRETS", "YARA"],
     },
     color: "#ef4444",
     icon: "Shield",
@@ -68,7 +68,7 @@ export const mockGlossaryTerms: MockGlossaryTerm[] = [
       "Content flagged for toxicity, bias, NSFW material, or other safety concerns that could pose reputational or legal risk.",
     category: "Content",
     filterMapping: {
-      detectorTypes: ["TOXIC", "NSFW", "BIAS"],
+      detectorTypes: ["TOXIC", "IMAGE_CLASSIFICATION", "BIAS"],
     },
     color: "#ec4899",
     icon: "AlertTriangle",

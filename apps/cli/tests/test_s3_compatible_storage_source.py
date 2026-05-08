@@ -137,18 +137,12 @@ def test_s3_storage_snapshot_prefers_detected_mime_for_octet_stream_hint(monkeyp
         lambda _ref_obj: (b"%PDF-1.4 test", "application/octet-stream", False),
     )
     monkeypatch.setattr(
-        "src.sources.object_storage.base.parse_bytes",
-        lambda _file_bytes, **_kwargs: ParsedBytes(
-            mime_type="application/pdf",
-            raw_content="",
-            text_content="Extracted PDF text",
-            is_binary=False,
-            file_size_bytes=13,
-            parse_error=None,
-        ),
+        "src.sources.object_storage.base.iter_file_pages",
+        lambda _file_bytes, _mime, **_kwargs: [
+            "Extracted PDF text",
+        ],
     )
 
     snapshot = source._build_snapshot(ref)
 
     assert snapshot.mime_type == "application/pdf"
-    assert snapshot.text_content == "Extracted PDF text"

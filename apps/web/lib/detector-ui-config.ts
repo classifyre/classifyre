@@ -23,7 +23,7 @@ export const detectorUiGroups = [
     id: "harmful_content",
     label: "Harmful Content",
     description:
-      "Toxicity and NSFW content checks.",
+      "Toxicity, image classification, and other inappropriate-content checks.",
   },
   {
     id: "content_quality",
@@ -49,9 +49,8 @@ const groupByDetectorTypeEntries = [
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.CodeSecurity, "secrets_credentials"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Pii, "privacy_pii"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Yara, "threats_attacks"],
-  [SearchFindingsFiltersInputDtoDetectorTypeEnum.PromptInjection, "threats_attacks"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Toxic, "harmful_content"],
-  [SearchFindingsFiltersInputDtoDetectorTypeEnum.Nsfw, "harmful_content"],
+  [SearchFindingsFiltersInputDtoDetectorTypeEnum.ImageClassification, "harmful_content"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Spam, "content_quality"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Language, "content_quality"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.BrokenLinks, "content_quality"],

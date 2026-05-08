@@ -441,7 +441,7 @@
       "secrets": "Secrets",
       "pii": "PII",
       "toxic": "Toxisch",
-      "nsfw": "NSFW",
+      "imageClassification": "Bildklassifizierung",
       "yara": "YARA",
       "brokenLinks": "Defekte Links",
       "promptInjection": "Prompt-Injektion",

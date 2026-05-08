@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import DetectorConfig, SecretsDetectorConfig, Severity
 from ...models.generated_single_asset_scan_results import DetectionResult, DetectorType, Location
 from ..base import BaseDetector
 from ..dependencies import MissingDependencyError, require_module
@@ -141,6 +141,9 @@ class SecretsDetector(BaseDetector):
 
     def __init__(self, config: DetectorConfig | None = None):
         super().__init__(config)
+        self._cfg: SecretsDetectorConfig = (
+            config if isinstance(config, SecretsDetectorConfig) else SecretsDetectorConfig()
+        )
         # Fail fast at construction time if detect-secrets is not installed.
         try:
             require_module("detect_secrets", "secrets", ["security", "detectors"])
@@ -153,7 +156,7 @@ class SecretsDetector(BaseDetector):
 
     def _build_plugins_used(self) -> list[dict[str, Any]]:
         """Build the plugins_used list consumed by detect-secrets transient_settings."""
-        patterns = self.config.enabled_patterns
+        patterns = self._cfg.enabled_patterns
         active_patterns: list[str] = (
             _ALL_PATTERNS if patterns is None else [p for p in patterns if p in _PATTERN_TO_PLUGIN]
         )
@@ -164,11 +167,11 @@ class SecretsDetector(BaseDetector):
 
             # Entropy plugins accept an optional limit override.
             if pattern == "high_entropy_base64":
-                limit = getattr(self.config, "entropy_limit_base64", None)
+                limit = self._cfg.entropy_limit_base64
                 if limit is not None:
                     entry["limit"] = float(limit)
             elif pattern == "high_entropy_hex":
-                limit = getattr(self.config, "entropy_limit_hex", None)
+                limit = self._cfg.entropy_limit_hex
                 if limit is not None:
                     entry["limit"] = float(limit)
 
@@ -219,7 +222,7 @@ class SecretsDetector(BaseDetector):
 
         lines = content.splitlines()
         line_offsets = self._line_start_offsets(lines)
-        confidence_threshold: float = self.config.confidence_threshold or 0.7
+        confidence_threshold: float = self._cfg.confidence_threshold or 0.7
         results: list[DetectionResult] = []
 
         # detect-secrets operates on files; write content to a named temp file
@@ -233,30 +236,29 @@ class SecretsDetector(BaseDetector):
             with transient_settings({"plugins_used": plugins_used}):
                 collection.scan_file(tmp_path)
 
-            for _filename, secret_set in collection:
-                for secret in secret_set:
-                    confidence = self._get_confidence(secret.type)
-                    if confidence < confidence_threshold:
-                        continue
+            for _filename, secret in collection:
+                confidence = self._get_confidence(secret.type)
+                if confidence < confidence_threshold:
+                    continue
 
-                    line_idx = (secret.line_number or 1) - 1
-                    line_text = lines[line_idx] if 0 <= line_idx < len(lines) else ""
-                    line_start = line_offsets[line_idx] if line_idx < len(line_offsets) else 0
+                line_idx = (secret.line_number or 1) - 1
+                line_text = lines[line_idx] if 0 <= line_idx < len(lines) else ""
+                line_start = line_offsets[line_idx] if line_idx < len(line_offsets) else 0
 
-                    # secret_value is the raw secret; fall back to the trimmed line.
-                    raw_value: str = secret.secret_value or line_text.strip()
+                # secret_value is the raw secret; fall back to the trimmed line.
+                raw_value: str = secret.secret_value or line_text.strip()
 
-                    col_offset = line_text.find(raw_value) if raw_value in line_text else 0
-                    start = line_start + col_offset
-                    end = start + len(raw_value)
+                col_offset = line_text.find(raw_value) if raw_value in line_text else 0
+                start = line_start + col_offset
+                end = start + len(raw_value)
 
-                    results.append(
-                        DetectionResult(
-                            detector_type=DetectorType.SECRETS,
-                            finding_type=secret.type,
-                            category="SECRETS",
-                            severity=self._get_severity(secret.type),
-                            confidence=confidence,
+                results.append(
+                    DetectionResult(
+                        detector_type=DetectorType.SECRETS,
+                        finding_type=secret.type,
+                        category="SECRETS",
+                        severity=self._get_severity(secret.type),
+                        confidence=confidence,
                             matched_content=raw_value,
                             location=Location(
                                 start=start,
@@ -265,6 +267,7 @@ class SecretsDetector(BaseDetector):
                                 path=f"line {secret.line_number}",
                             ),
                             metadata={
+                                "detector": "secrets",
                                 "plugin": secret.type,
                                 "is_verified": secret.is_verified,
                             },
@@ -280,8 +283,8 @@ class SecretsDetector(BaseDetector):
             except OSError:
                 pass
 
-        if self.config.max_findings and len(results) > self.config.max_findings:
-            results = results[: self.config.max_findings]
+        if self._cfg.max_findings and len(results) > self._cfg.max_findings:
+            results = results[: self._cfg.max_findings]
 
         return results
 

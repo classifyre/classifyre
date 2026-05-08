@@ -701,8 +701,13 @@ export const CustomDetectorEditor = React.forwardRef<
     if (!customSchema) {
       return null;
     }
-    const ajv = new Ajv({ allErrors: true, strict: false });
-    return ajv.compile(customSchema as object);
+    try {
+      const ajv = new Ajv({ allErrors: true, strict: false });
+      return ajv.compile(customSchema as object);
+    } catch (err) {
+      console.error("Failed to compile schema:", err);
+      return null;
+    }
   }, [customSchema]);
 
   useEffect(() => {
@@ -772,10 +777,15 @@ export const CustomDetectorEditor = React.forwardRef<
       return true;
     }
 
-    const valid = validator(config);
-    if (!valid) {
-      setValidationErrors(formatAjvErrors(validator.errors));
-      return false;
+    try {
+      const valid = validator(config);
+      if (!valid) {
+        setValidationErrors(formatAjvErrors(validator.errors));
+        return false;
+      }
+    } catch (err) {
+      console.warn("Validation error:", err);
+      setValidationErrors([]);
     }
 
     setValidationErrors([]);
