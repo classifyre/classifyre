@@ -118,7 +118,7 @@ class FeatureExtractionDetector(BaseDetector):
             return []
 
         try:
-            raw: list[list[list[float]]] = self.pipeline(content) or []
+            raw: list[list[list[float]]] = self.pipeline(content, truncation=True) or []
 
             # pipeline returns [batch, tokens, hidden_dim]; we always pass one text
             if not raw or not raw[0]:
