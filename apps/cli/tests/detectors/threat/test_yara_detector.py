@@ -3,12 +3,16 @@
 import pytest
 
 from src.detectors.threat.yara_detector import YaraDetector
-from src.models.generated_detectors import DetectorConfig, Severity, ThreatDetectorConfig, YaraRuleConfig
-
+from src.models.generated_detectors import (
+    Severity,
+    ThreatDetectorConfig,
+    YaraRuleConfig,
+)
 
 # ---------------------------------------------------------------------------
 # Shared rule helpers
 # ---------------------------------------------------------------------------
+
 
 def _malware_rules() -> list[YaraRuleConfig]:
     return [
@@ -17,9 +21,9 @@ def _malware_rules() -> list[YaraRuleConfig]:
             severity=Severity.critical,
             category="malware",
             strings=[
-                "\"CreateRemoteThread\" nocase ascii",
-                "\"VirtualAllocEx\" nocase ascii",
-                "\"WriteProcessMemory\" nocase ascii",
+                '"CreateRemoteThread" nocase ascii',
+                '"VirtualAllocEx" nocase ascii',
+                '"WriteProcessMemory" nocase ascii',
             ],
             condition="2 of ($s*)",
         )
@@ -49,6 +53,7 @@ def _detector_with(rules: list[YaraRuleConfig], **kwargs: object) -> YaraDetecto
 # Initialization
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_initialization_defaults():
     det = YaraDetector()
@@ -73,6 +78,7 @@ async def test_no_rules_produces_no_findings():
 # ---------------------------------------------------------------------------
 # Detection — positive cases
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_detects_malware_pattern(sample_malware_pattern):
@@ -108,7 +114,7 @@ async def test_detects_any_of_them_condition():
             name="Known_Tools",
             severity=Severity.critical,
             category="malware",
-            strings=["\"mimikatz\" nocase ascii", "\"cobaltstrike\" nocase ascii"],
+            strings=['"mimikatz" nocase ascii', '"cobaltstrike" nocase ascii'],
             condition="any of them",
         )
     ]
@@ -141,14 +147,14 @@ async def test_multiple_rules_both_fire():
             name="Rule_A",
             severity=Severity.high,
             category="test",
-            strings=["\"mimikatz\" nocase ascii"],
+            strings=['"mimikatz" nocase ascii'],
             condition="any of them",
         ),
         YaraRuleConfig(
             name="Rule_B",
             severity=Severity.critical,
             category="test",
-            strings=["\"msfvenom\" nocase ascii"],
+            strings=['"msfvenom" nocase ascii'],
             condition="any of them",
         ),
     ]
@@ -160,6 +166,7 @@ async def test_multiple_rules_both_fire():
 # ---------------------------------------------------------------------------
 # Detection — negative / clean cases
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_no_false_positives_clean_text(sample_clean_text_bytes):
@@ -179,6 +186,7 @@ async def test_no_false_positives_clean_script(sample_clean_script):
 # ---------------------------------------------------------------------------
 # Result structure
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_result_structure(sample_malware_pattern):
@@ -217,6 +225,7 @@ async def test_metadata_contains_rule_name(sample_malware_pattern):
 # Config controls
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_confidence_threshold_filters(sample_malware_pattern):
     det = _detector_with(_malware_rules(), confidence_threshold=0.99)
@@ -232,7 +241,7 @@ async def test_max_findings_respected(sample_malware_pattern):
             name=f"Rule_{i}",
             severity=Severity.high,
             category="test",
-            strings=["\"CreateRemoteThread\" nocase ascii"],
+            strings=['"CreateRemoteThread" nocase ascii'],
             condition="any of them",
         )
         for i in range(5)
@@ -249,14 +258,14 @@ async def test_results_sorted_by_severity_desc():
             name="Low_Rule",
             severity=Severity.low,
             category="test",
-            strings=["\"CreateRemoteThread\" nocase ascii"],
+            strings=['"CreateRemoteThread" nocase ascii'],
             condition="any of them",
         ),
         YaraRuleConfig(
             name="Critical_Rule",
             severity=Severity.critical,
             category="test",
-            strings=["\"VirtualAllocEx\" nocase ascii"],
+            strings=['"VirtualAllocEx" nocase ascii'],
             condition="any of them",
         ),
     ]
@@ -269,6 +278,7 @@ async def test_results_sorted_by_severity_desc():
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_handles_empty_bytes():
@@ -301,6 +311,7 @@ async def test_handles_bytes_input(sample_malware_pattern):
 # ---------------------------------------------------------------------------
 # Metadata
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_supported_content_types():

@@ -4,7 +4,7 @@ import pytest
 
 from src.detectors.content.toxic_detector import ToxicDetector
 from src.detectors.dependencies import MissingDependencyError, ensure_torch, require_module
-from src.models.generated_detectors import ContentDetectorConfig, DetectorConfig, Severity
+from src.models.generated_detectors import ContentDetectorConfig, Severity
 
 try:
     ensure_torch("toxic", ["content", "detectors"])

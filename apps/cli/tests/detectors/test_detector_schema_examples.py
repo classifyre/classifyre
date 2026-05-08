@@ -15,9 +15,7 @@ from src.models.generated_detectors import (
     DetectorType,
     ImageClassificationDetectorConfig,
     PIIDetectorConfig,
-    PIIEnabledPattern,
     SecretsDetectorConfig,
-    SecretsEnabledPattern,
     TextClassificationDetectorConfig,
     ThreatDetectorConfig,
 )

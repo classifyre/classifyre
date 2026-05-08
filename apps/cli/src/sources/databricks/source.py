@@ -306,7 +306,9 @@ class DatabricksSource(BaseSource):
             return self._connect_sql(session_configuration={"spark.sql.session.timeZone": "UTC"})
         except Exception as exc:
             if "CONFIG_NOT_AVAILABLE" in str(exc) or "42K0I" in str(exc):
-                logger.debug("Warehouse does not support session timezone config, connecting without it")
+                logger.debug(
+                    "Warehouse does not support session timezone config, connecting without it"
+                )
                 return self._connect_sql()
             raise
 

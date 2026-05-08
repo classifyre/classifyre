@@ -14,7 +14,7 @@ from ...models.generated_detectors import (
 )
 from ...models.generated_single_asset_scan_results import DetectionResult, DetectorType
 from ..base import BaseDetector
-from ..dependencies import MissingDependencyError, ensure_torch, require_module
+from ..dependencies import ensure_torch, require_module
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,8 @@ class ImageClassificationDetector(BaseDetector):
         self._image_module: ModuleType | None = None
 
         self._img_cfg: ImageClassificationDetectorConfig = (
-            config if isinstance(config, ImageClassificationDetectorConfig)
+            config
+            if isinstance(config, ImageClassificationDetectorConfig)
             else ImageClassificationDetectorConfig()
         )
         self._model_id: str = self._img_cfg.model or _DEFAULT_MODEL
@@ -68,11 +69,17 @@ class ImageClassificationDetector(BaseDetector):
         self._device: str = self._img_cfg.device or "cpu"
         self._top_k: int | None = self._img_cfg.top_k
         self._function_to_apply: str | None = self._img_cfg.function_to_apply
-        self._severity_map: list[ImageClassificationSeverityRule] | None = self._img_cfg.severity_map
+        self._severity_map: list[ImageClassificationSeverityRule] | None = (
+            self._img_cfg.severity_map
+        )
 
         ensure_torch("image_classification", ["content", "detectors"])
-        transformers = require_module("transformers", "image_classification", ["content", "detectors"])
-        self._image_module = require_module("PIL.Image", "image_classification", ["content", "detectors"])
+        transformers = require_module(
+            "transformers", "image_classification", ["content", "detectors"]
+        )
+        self._image_module = require_module(
+            "PIL.Image", "image_classification", ["content", "detectors"]
+        )
 
         pipeline_kwargs: dict[str, Any] = {
             "model": self._model_id,

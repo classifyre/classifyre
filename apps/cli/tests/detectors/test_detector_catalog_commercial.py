@@ -55,6 +55,16 @@ def test_catalog_phase2_detectors_are_active_with_safe_models() -> None:
         "transformers text-classification pipeline"
     )
 
+    assert by_type["FEATURE_EXTRACTION"]["lifecycle_status"] == "active"
+    assert by_type["FEATURE_EXTRACTION"]["recommended_model"] == (
+        "transformers feature-extraction pipeline"
+    )
+
+    assert by_type["OBJECT_DETECTION"]["lifecycle_status"] == "active"
+    assert by_type["OBJECT_DETECTION"]["recommended_model"] == (
+        "transformers object-detection pipeline"
+    )
+
     assert by_type["LANGUAGE"]["lifecycle_status"] == "active"
     assert by_type["LANGUAGE"]["recommended_model"] == "fast-langdetect"
 

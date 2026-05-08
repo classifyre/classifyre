@@ -3,7 +3,12 @@
 import logging
 import re
 
-from ...models.generated_detectors import DetectorConfig, Severity, ThreatDetectorConfig, YaraRuleConfig
+from ...models.generated_detectors import (
+    DetectorConfig,
+    Severity,
+    ThreatDetectorConfig,
+    YaraRuleConfig,
+)
 from ...models.generated_single_asset_scan_results import DetectionResult, DetectorType, Location
 from ..base import BaseDetector
 from ..dependencies import require_module

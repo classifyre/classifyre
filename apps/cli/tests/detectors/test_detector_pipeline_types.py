@@ -437,6 +437,8 @@ class TestDetectorPipelineTypes:
             "YARA",
             "BROKEN_LINKS",
             "TEXT_CLASSIFICATION",
+            "FEATURE_EXTRACTION",
+            "OBJECT_DETECTION",
             "LANGUAGE",
             "CODE_SECURITY",
             "CUSTOM",
