@@ -809,9 +809,94 @@ class CustomEntityConfig(BaseModel):
     model: str | None = 'fastino/gliner2-base-v1'
 
 
+class Skip(RootModel[str]):
+    root: str = Field(..., pattern='^B[0-9]+$')
+
+
+class Skips(RootModel[list[Skip]]):
+    root: list[Skip] = Field(
+        ...,
+        description="Bandit test IDs to skip (e.g. ['B101', 'B105']). When null all tests run. Takes precedence over tests when both are set.",
+        min_length=1,
+    )
+
+
+class Test(RootModel[str]):
+    root: str = Field(..., pattern='^B[0-9]+$')
+
+
+class Tests(RootModel[list[Test]]):
+    root: list[Test] = Field(
+        ...,
+        description="Explicit list of Bandit test IDs to run (e.g. ['B102', 'B301']). When null all tests (minus skips) run.",
+        min_length=1,
+    )
+
+
+class CodeSecurityDetectorConfig(DetectorConfig):
+    """
+    Configuration for the code security detector powered by Bandit static analysis. Use skips/tests to control which Bandit checks run.
+    """
+
+    skips: Skips | None = Field(
+        None,
+        description="Bandit test IDs to skip (e.g. ['B101', 'B105']). When null all tests run. Takes precedence over tests when both are set.",
+    )
+    tests: Tests | None = Field(
+        None,
+        description="Explicit list of Bandit test IDs to run (e.g. ['B102', 'B301']). When null all tests (minus skips) run.",
+    )
+    severity_threshold: Severity | None = Field(
+        None,
+        description='Minimum Bandit issue severity to report. Findings below this threshold are suppressed.',
+    )
+    confidence_threshold: float | None = Field(
+        0.7,
+        description='Minimum confidence score to report a finding (0-1)',
+        ge=0.0,
+        le=1.0,
+    )
+    max_findings: int | None = Field(
+        None, description='Maximum number of findings to return per asset'
+    )
+
+
+class Model(StrEnum):
+    """
+    Model size: 'lite' (~50 MB, offline-only), 'full' (~190 MB, best accuracy), 'auto' (tries full, falls back to lite on MemoryError).
+    """
+
+    lite = 'lite'
+    full = 'full'
+    auto = 'auto'
+
+
+class LanguageDetectorConfig(DetectorConfig):
+    """
+    Config for the language detector (fast-langdetect).
+    """
+
+    confidence_threshold: float | None = Field(
+        0.7,
+        description='Minimum confidence score to report a finding (0-1)',
+        ge=0.0,
+        le=1.0,
+    )
+    model: Model | None = Field(
+        'auto',
+        description="Model size: 'lite' (~50 MB, offline-only), 'full' (~190 MB, best accuracy), 'auto' (tries full, falls back to lite on MemoryError).",
+    )
+    k: int | None = Field(
+        1, description='Number of top language candidates to return.', ge=1
+    )
+    max_findings: int | None = Field(
+        None, description='Maximum number of findings to return per asset'
+    )
+
+
 class GenericDetectorConfig(DetectorConfig):
     """
-    Generic config for detectors without specialised parameters (e.g. language detection, code security)
+    Generic config for detectors without specialised parameters.
     """
 
     confidence_threshold: float | None = Field(
@@ -961,6 +1046,8 @@ class DetectorsRefactored(
         | CustomDetectorConfig
         | TextClassificationDetectorConfig
         | ImageClassificationDetectorConfig
+        | CodeSecurityDetectorConfig
+        | LanguageDetectorConfig
         | GenericDetectorConfig
     ]
 ):
@@ -973,6 +1060,8 @@ class DetectorsRefactored(
         | CustomDetectorConfig
         | TextClassificationDetectorConfig
         | ImageClassificationDetectorConfig
+        | CodeSecurityDetectorConfig
+        | LanguageDetectorConfig
         | GenericDetectorConfig
     ) = Field(
         ...,

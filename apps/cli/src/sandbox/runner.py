@@ -40,7 +40,7 @@ class SandboxRunner:
                     raw_config=raw_config,
                 )
 
-                detector = get_detector(detector_name, typed_config)  # type: ignore[arg-type]
+                detector = get_detector(detector_name, typed_config)
                 detectors.append(detector)
                 logger.info(f"Initialized sandbox detector: {detector_name}")
             except Exception as e:

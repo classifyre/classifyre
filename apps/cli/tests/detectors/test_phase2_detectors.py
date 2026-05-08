@@ -5,7 +5,12 @@ import pytest
 from src.detectors.base import BaseDetector
 from src.detectors.content.language_detector import LanguageDetector
 from src.detectors.content.text_classification_detector import TextClassificationDetector
-from src.models.generated_detectors import DetectorConfig, GenericDetectorConfig, TextClassificationDetectorConfig
+from src.models.generated_detectors import (
+    DetectorConfig,
+    GenericDetectorConfig,
+    LanguageDetectorConfig,
+    TextClassificationDetectorConfig,
+)
 from src.models.generated_single_asset_scan_results import DetectorType
 
 
@@ -23,14 +28,16 @@ def _stub_text_classification_detector(predictions):
 def _stub_language_detector(raw_result):
     class _Module:
         @staticmethod
-        def detect(_content):
-            return raw_result
+        def detect(_content, **kwargs):
+            # Return as list of candidates (matching real fast_langdetect API)
+            return [raw_result] if isinstance(raw_result, dict) else raw_result
 
     detector = LanguageDetector.__new__(LanguageDetector)
-    cfg = GenericDetectorConfig()
+    cfg = LanguageDetectorConfig()
     BaseDetector.__init__(detector, cfg)
     detector._cfg = cfg
     detector._detector_module = _Module()
+    detector._initialized = True
     return detector
 
 
