@@ -6,6 +6,30 @@ import { randomUUID } from 'crypto';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma.service';
 
+const PIPELINE_SCHEMA_SUPPORT_TICKET = {
+  model: { name: 'fastino/gliner2-base-v1', path: null },
+  entities: {
+    order_id: { description: 'Order ID like ORD-123', required: true },
+    amount: { description: 'Monetary value like 50€', required: false },
+  },
+  classification: {
+    intent: { labels: ['refund', 'bug', 'question'], multi_label: false },
+  },
+  validation: { confidence_threshold: 0.8, rules: [] },
+};
+
+const PIPELINE_SCHEMA_ENTITY_ONLY = {
+  model: { name: 'fastino/gliner2-base-v1', path: null },
+  entities: {
+    contract_clause: {
+      description: 'Legal risk clause like "Haftung ausgeschlossen"',
+      required: true,
+    },
+  },
+  classification: {},
+  validation: { confidence_threshold: 0.7, rules: [] },
+};
+
 describe('Custom Detectors (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
@@ -25,34 +49,23 @@ describe('Custom Detectors (e2e)', () => {
     await app.close();
   });
 
-  it('creates, lists, trains, and returns history for a custom detector', async () => {
+  it('creates, lists, trains, and returns history for a GLiNER2 pipeline detector', async () => {
     const suffix = randomUUID().slice(0, 8);
-    const key = `cust_e2e_dach_risk_${suffix}`;
-    const name = `E2E DACH Risk Detector ${suffix}`;
+    const key = `cust_e2e_support_${suffix}`;
+    const name = `E2E Support Ticket Extractor ${suffix}`;
 
     const createResponse = await request(app.getHttpServer())
       .post('/custom-detectors')
       .send({
         name,
         key,
-        method: 'CLASSIFIER',
-        config: {
-          custom_detector_key: key,
-          name,
-          method: 'CLASSIFIER',
-          classifier: {
-            labels: [{ id: 'risk', name: 'Risk' }],
-            min_examples_per_label: 1,
-            training_examples: [
-              { text: 'Haftung ausgeschlossen', label: 'risk', accepted: true },
-            ],
-          },
-        },
+        pipelineSchema: PIPELINE_SCHEMA_SUPPORT_TICKET,
       })
       .expect(201);
 
     expect(createResponse.body).toHaveProperty('id');
     expect(createResponse.body.key).toBe(key);
+    expect(createResponse.body).toHaveProperty('pipelineSchema');
     const detectorId = createResponse.body.id as string;
 
     const listResponse = await request(app.getHttpServer())
@@ -72,6 +85,7 @@ describe('Custom Detectors (e2e)', () => {
 
     expect(trainResponse.body.customDetectorId).toBe(detectorId);
     expect(trainResponse.body.status).toBe('SUCCEEDED');
+    expect(trainResponse.body.strategy).toBe('GLINER2_PIPELINE');
 
     const historyResponse = await request(app.getHttpServer())
       .get(`/custom-detectors/${detectorId}/training-history`)
@@ -92,21 +106,7 @@ describe('Custom Detectors (e2e)', () => {
       .send({
         name,
         key,
-        method: 'RULESET',
-        config: {
-          custom_detector_key: key,
-          name,
-          method: 'RULESET',
-          ruleset: {
-            keyword_rules: [
-              {
-                id: 'kw_risk',
-                name: 'Risk keyword',
-                keywords: ['risiko'],
-              },
-            ],
-          },
-        },
+        pipelineSchema: PIPELINE_SCHEMA_ENTITY_ONLY,
       })
       .expect(201);
 
@@ -138,6 +138,21 @@ describe('Custom Detectors (e2e)', () => {
           masked: {},
           sampling: { strategy: 'RANDOM' },
           custom_detectors: ['missing-detector-id'],
+        },
+      })
+      .expect(400);
+  });
+
+  it('rejects a pipeline schema with no entities and no classification', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    await request(app.getHttpServer())
+      .post('/custom-detectors')
+      .send({
+        name: `E2E Empty Pipeline ${suffix}`,
+        pipelineSchema: {
+          model: { name: 'fastino/gliner2-base-v1' },
+          entities: {},
+          classification: {},
         },
       })
       .expect(400);

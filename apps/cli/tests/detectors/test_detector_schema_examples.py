@@ -13,10 +13,10 @@ from src.models.generated_detectors import (
     CustomDetectorConfig,
     DetectorConfig,
     DetectorType,
+    ImageClassificationDetectorConfig,
     PIIDetectorConfig,
-    PIIEnabledPattern,
     SecretsDetectorConfig,
-    SecretsEnabledPattern,
+    TextClassificationDetectorConfig,
     ThreatDetectorConfig,
 )
 
@@ -47,12 +47,6 @@ class TestDetectorSchemaExamples:
             config = SecretsDetectorConfig.model_validate(config_data)
             assert config is not None
 
-            # Verify enabled_patterns if present
-            if config.enabled_patterns:
-                valid_patterns = {pattern.value for pattern in SecretsEnabledPattern}
-                for pattern in config.enabled_patterns:
-                    assert pattern.value in valid_patterns, f"Invalid pattern: {pattern}"
-
     def test_pii_examples_are_valid(self, examples: dict):
         """Test all PII examples validate against PIIDetectorConfig."""
         pii_examples = examples.get("PII", [])
@@ -63,12 +57,6 @@ class TestDetectorSchemaExamples:
             # This should not raise validation errors
             config = PIIDetectorConfig.model_validate(config_data)
             assert config is not None
-
-            # Verify enabled_patterns if present
-            if config.enabled_patterns:
-                valid_patterns = {pattern.value for pattern in PIIEnabledPattern}
-                for pattern in config.enabled_patterns:
-                    assert pattern.value in valid_patterns, f"Invalid pattern: {pattern}"
 
     def test_toxic_examples_are_valid(self, examples: dict):
         """Test all TOXIC examples validate against ContentDetectorConfig."""
@@ -94,22 +82,15 @@ class TestDetectorSchemaExamples:
                     f"Invalid model_name: {config.model_name}"
                 )
 
-    def test_nsfw_examples_are_valid(self, examples: dict):
-        """Test all NSFW examples validate against ContentDetectorConfig."""
-        nsfw_examples = examples.get("NSFW", [])
-        assert len(nsfw_examples) > 0, "No NSFW examples found"
+    def test_image_classification_examples_are_valid(self, examples: dict):
+        """Test all IMAGE_CLASSIFICATION examples validate against ImageClassificationDetectorConfig."""
+        ic_examples = examples.get("IMAGE_CLASSIFICATION", [])
+        assert len(ic_examples) > 0, "No IMAGE_CLASSIFICATION examples found"
 
-        for example in nsfw_examples:
+        for example in ic_examples:
             config_data = example.get("config", {})
-            # This should not raise validation errors
-            config = ContentDetectorConfig.model_validate(config_data)
+            config = ImageClassificationDetectorConfig.model_validate(config_data)
             assert config is not None
-
-            # Verify enabled_patterns if present
-            if config.enabled_patterns:
-                valid_patterns = {pattern.value for pattern in ContentEnabledPattern}
-                for pattern in config.enabled_patterns:
-                    assert pattern.value in valid_patterns, f"Invalid pattern: {pattern}"
 
     def test_yara_examples_are_valid(self, examples: dict):
         """Test all YARA examples validate against ThreatDetectorConfig."""
@@ -144,35 +125,16 @@ class TestDetectorSchemaExamples:
             config = BrokenLinksDetectorConfig.model_validate(config_data)
             assert config is not None
 
-    def test_prompt_injection_examples_are_valid(self, examples: dict):
-        """Test all PROMPT_INJECTION examples validate against DetectorConfig."""
-        prompt_injection_examples = examples.get("PROMPT_INJECTION", [])
-        assert len(prompt_injection_examples) > 0, "No PROMPT_INJECTION examples found"
+    def test_text_classification_examples_are_valid(self, examples: dict):
+        """Test all TEXT_CLASSIFICATION examples validate against TextClassificationDetectorConfig."""
+        tc_examples = examples.get("TEXT_CLASSIFICATION", [])
+        assert len(tc_examples) > 0, "No TEXT_CLASSIFICATION examples found"
 
-        for example in prompt_injection_examples:
+        for example in tc_examples:
             config_data = example.get("config", {})
-            config = DetectorConfig.model_validate(config_data)
+            config = TextClassificationDetectorConfig.model_validate(config_data)
             assert config is not None
-
-    def test_phishing_url_examples_are_valid(self, examples: dict):
-        """Test all PHISHING_URL examples validate against DetectorConfig."""
-        phishing_examples = examples.get("PHISHING_URL", [])
-        assert len(phishing_examples) > 0, "No PHISHING_URL examples found"
-
-        for example in phishing_examples:
-            config_data = example.get("config", {})
-            config = DetectorConfig.model_validate(config_data)
-            assert config is not None
-
-    def test_spam_examples_are_valid(self, examples: dict):
-        """Test all SPAM examples validate against DetectorConfig."""
-        spam_examples = examples.get("SPAM", [])
-        assert len(spam_examples) > 0, "No SPAM examples found"
-
-        for example in spam_examples:
-            config_data = example.get("config", {})
-            config = DetectorConfig.model_validate(config_data)
-            assert config is not None
+            assert config.model is not None
 
     def test_language_examples_are_valid(self, examples: dict):
         """Test all LANGUAGE examples validate against DetectorConfig."""

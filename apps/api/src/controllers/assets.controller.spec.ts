@@ -54,7 +54,7 @@ describe('SourceAssetsController', () => {
       'source-1',
       'runner-1',
       [{ hash: 'h1' }],
-      { finalizeRun: false },
+      { finalizeRun: false, isFullScan: false },
     );
   });
 

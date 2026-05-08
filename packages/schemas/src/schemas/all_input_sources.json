@@ -97,27 +97,14 @@
         "SECRETS",
         "PII",
         "TOXIC",
-        "NSFW",
+        "IMAGE_CLASSIFICATION",
         "YARA",
         "BROKEN_LINKS",
-        "PROMPT_INJECTION",
-        "PHISHING_URL",
-        "SPAM",
+        "TEXT_CLASSIFICATION",
+        "FEATURE_EXTRACTION",
+        "OBJECT_DETECTION",
         "LANGUAGE",
         "CODE_SECURITY",
-        "PLAGIARISM",
-        "IMAGE_VIOLENCE",
-        "OCR_PII",
-        "DEID_SCORE",
-        "HATE_SPEECH",
-        "AI_GENERATED",
-        "CONTENT_QUALITY",
-        "BIAS",
-        "DUPLICATE",
-        "DOMAIN_CLASS",
-        "CONTENT_TYPE",
-        "SENSITIVITY_TIER",
-        "JURISDICTION_TAG",
         "CUSTOM"
       ],
       "description": "Type of detector for content analysis"
@@ -2124,7 +2111,7 @@
         "cluster_host": {
           "type": "string",
           "minLength": 1,
-          "description": "Atlas SRV cluster host or full mongodb+srv:// URI (for example, cluster.abc123.mongodb.net or mongodb+srv://cluster.abc123.mongodb.net). If a full URI is supplied, the host is extracted and credentials are discarded — set them in masked fields instead."
+          "description": "Atlas SRV cluster host or full mongodb+srv:// URI (for example, cluster.abc123.mongodb.net or mongodb+srv://cluster.abc123.mongodb.net). If a full URI is supplied, the host is extracted and credentials are discarded \u2014 set them in masked fields instead."
         }
       },
       "required": [

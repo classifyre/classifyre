@@ -1,4 +1,6 @@
 import { Configuration } from "./generated/src/runtime";
+import type { TrainingExampleDto, TrainingExampleItem } from "./types";
+export type { TrainingExampleDto, TrainingExampleItem } from "./types";
 import type {
   AiMessageDto,
   AiCompleteRequestDto,
@@ -1239,6 +1241,68 @@ class ApiClient {
     }
 
     return (await response.json()) as { deleted: true };
+  }
+
+  async listTrainingExamples(detectorId: string): Promise<TrainingExampleDto[]> {
+    const basePath = this.config.basePath.replace(/\/$/, "");
+    const response = await fetch(
+      `${basePath}/custom-detectors/${detectorId}/training-examples`,
+    );
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(`training-examples GET failed (${response.status}): ${message}`);
+    }
+    return (await response.json()) as TrainingExampleDto[];
+  }
+
+  async saveTrainingExamples(
+    detectorId: string,
+    examples: TrainingExampleItem[],
+    clearExisting = false,
+  ): Promise<{ saved: number }> {
+    const basePath = this.config.basePath.replace(/\/$/, "");
+    const response = await fetch(
+      `${basePath}/custom-detectors/${detectorId}/training-examples`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ examples, clearExisting }),
+      },
+    );
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(`training-examples POST failed (${response.status}): ${message}`);
+    }
+    return (await response.json()) as { saved: number };
+  }
+
+  async deleteTrainingExample(
+    detectorId: string,
+    exampleId: string,
+  ): Promise<{ deleted: true }> {
+    const basePath = this.config.basePath.replace(/\/$/, "");
+    const response = await fetch(
+      `${basePath}/custom-detectors/${detectorId}/training-examples/${exampleId}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(`training-example DELETE failed (${response.status}): ${message}`);
+    }
+    return (await response.json()) as { deleted: true };
+  }
+
+  async clearTrainingExamples(detectorId: string): Promise<{ deleted: number }> {
+    const basePath = this.config.basePath.replace(/\/$/, "");
+    const response = await fetch(
+      `${basePath}/custom-detectors/${detectorId}/training-examples`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(`training-examples DELETE failed (${response.status}): ${message}`);
+    }
+    return (await response.json()) as { deleted: number };
   }
 
   async updateSchedule(

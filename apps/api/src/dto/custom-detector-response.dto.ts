@@ -1,5 +1,4 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CustomDetectorMethod } from '@prisma/client';
 import { CustomDetectorTrainingRunDto } from './custom-detector-training-run.dto';
 
 export class CustomDetectorResponseDto {
@@ -15,17 +14,14 @@ export class CustomDetectorResponseDto {
   @ApiPropertyOptional()
   description?: string | null;
 
-  @ApiProperty({ enum: CustomDetectorMethod })
-  method: CustomDetectorMethod;
+  @ApiProperty({ type: 'object', additionalProperties: true })
+  pipelineSchema: Record<string, unknown>;
 
   @ApiProperty()
   isActive: boolean;
 
   @ApiProperty()
   version: number;
-
-  @ApiProperty({ type: 'object', additionalProperties: true })
-  config: Record<string, unknown>;
 
   @ApiPropertyOptional()
   lastTrainedAt?: Date | null;

@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
-import { CustomDetectorMethod } from '@prisma/client';
 import * as path from 'path';
 import {
   assistantChatRequestSchema,
@@ -858,7 +857,7 @@ function buildSystemPrompt(
                 '  description       → string (plain-language description)',
                 '  category          → string (e.g. "Security", "Privacy", "Compliance", "Content", "Operations")',
                 '  filterMapping     → object with optional arrays:',
-                '    filterMapping.detectorTypes   → string[] from: SECRETS, PII, TOXIC, NSFW, YARA, BROKEN_LINKS, PROMPT_INJECTION, PHISHING_URL, SPAM, LANGUAGE, CODE_SECURITY, PLAGIARISM, IMAGE_VIOLENCE, OCR_PII, DEID_SCORE, HATE_SPEECH, AI_GENERATED, CONTENT_QUALITY, BIAS, DUPLICATE, DOMAIN_CLASS, CONTENT_TYPE, SENSITIVITY_TIER, JURISDICTION_TAG, CUSTOM',
+                '    filterMapping.detectorTypes   → string[] from: SECRETS, PII, TOXIC, IMAGE_CLASSIFICATION, TEXT_CLASSIFICATION, FEATURE_EXTRACTION, OBJECT_DETECTION, YARA, BROKEN_LINKS, LANGUAGE, CODE_SECURITY, CUSTOM',
                 '    filterMapping.severities      → string[] from: CRITICAL, HIGH, MEDIUM, LOW, INFO',
                 '    filterMapping.statuses         → string[] from: OPEN, FALSE_POSITIVE, RESOLVED, IGNORED',
                 '    filterMapping.findingTypes     → string[] (free-form finding type strings)',
@@ -869,10 +868,9 @@ function buildSystemPrompt(
                 '## Translating business intent',
                 '  "I want to track exposed secrets and credentials" → detectorTypes: ["SECRETS"]',
                 '  "Show me personal data exposure" → detectorTypes: ["PII", "PHI"]',
-                '  "Track compliance issues" → detectorTypes: ["SENSITIVITY_TIER", "JURISDICTION_TAG"]',
                 '  "Show only critical issues" → severities: ["CRITICAL"]',
                 '  "Track unresolved problems" → statuses: ["OPEN"]',
-                '  "Content safety concerns" → detectorTypes: ["TOXIC", "NSFW", "BIAS"]',
+                '  "Content safety concerns" → detectorTypes: ["TOXIC", "IMAGE_CLASSIFICATION"]',
                 '',
                 '## Slug naming — ALWAYS derive from displayName',
                 'Rule: whenever you set displayName, IMMEDIATELY also set slug with a kebab-case version.',
@@ -1069,7 +1067,10 @@ function buildUpdateSourceArgs(context: AssistantPageContext) {
 
 function buildCreateDetectorArgs(context: AssistantPageContext) {
   const metadata = getAssistantMetadata(context);
-  const config = ensureRecord(metadata.config, 'context.metadata.config');
+  const pipelineSchema = ensureRecord(
+    metadata.pipeline_schema ?? metadata.pipelineSchema,
+    'context.metadata.pipeline_schema',
+  );
 
   return {
     name: ensureString(metadata.name, 'context.metadata.name'),
@@ -1079,9 +1080,8 @@ function buildCreateDetectorArgs(context: AssistantPageContext) {
       metadata.description.length > 0
         ? metadata.description
         : undefined,
-    method: ensureDetectorMethod(metadata.method, 'context.metadata.method'),
     isActive: typeof metadata.isActive === 'boolean' ? metadata.isActive : true,
-    config,
+    pipelineSchema,
   };
 }
 
@@ -1206,24 +1206,6 @@ function ensureString(value: unknown, label: string): string {
   }
 
   throw new BadRequestException(`${label} must be a non-empty string`);
-}
-
-function ensureDetectorMethod(
-  value: unknown,
-  label: string,
-): CustomDetectorMethod {
-  const normalized = ensureString(value, label).toUpperCase();
-  if (
-    normalized === CustomDetectorMethod.RULESET ||
-    normalized === CustomDetectorMethod.CLASSIFIER ||
-    normalized === CustomDetectorMethod.ENTITY
-  ) {
-    return normalized;
-  }
-
-  throw new BadRequestException(
-    `${label} must be one of RULESET, CLASSIFIER, ENTITY`,
-  );
 }
 
 function toDisplayString(value: unknown): string | null {

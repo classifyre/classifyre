@@ -72,33 +72,6 @@ jobs:
       - name: Generate docs artifacts
         run: bun run docs:generate
 
-      - name: Verify generated files are committed
-        run: |
-          if ! git diff --quiet -- \
-            apps/docs/src/_generated/helm-values.mdx \
-            packages/api-client/src/generated \
-            apps/cli/src/models/generated_input.py \
-            apps/cli/src/models/generated_detectors.py \
-            apps/cli/src/models/generated_single_asset_scan_results.py; then
-            echo "::error::Generated files are out of date. Run 'bun run codegen', 'bun run docs:generate', and commit changes."
-            git status --short -- \
-              apps/docs/src/_generated/helm-values.mdx \
-              packages/api-client/src/generated \
-              apps/cli/src/models/generated_input.py \
-              apps/cli/src/models/generated_detectors.py \
-              apps/cli/src/models/generated_single_asset_scan_results.py
-            git diff --stat -- \
-              apps/docs/src/_generated/helm-values.mdx \
-              packages/api-client/src/generated \
-              apps/cli/src/models/generated_input.py \
-              apps/cli/src/models/generated_detectors.py \
-              apps/cli/src/models/generated_single_asset_scan_results.py
-            exit 1
-          fi
-
-      - name: Lint
-        run: bun run lint
-
       - name: Typecheck
         run: bun run typecheck
 
@@ -106,20 +79,6 @@ jobs:
         run: bun run build
         env:
           NEXT_TELEMETRY_DISABLED: 1
-
-      - name: Install Playwright browsers
-        run: cd apps/web && bunx playwright install --with-deps chromium
-
-      - name: Unit tests
-        run: bun run test
-
-      - name: API integration tests
-        if: env.INTEGRATION_DATABASE_URL != ''
-        env:
-          DATABASE_URL: ${{ env.INTEGRATION_DATABASE_URL }}
-          INTEGRATION_TEST_RESET_DB: "1"
-          INTEGRATION_TEST_SCHEMA_KEY: ${{ github.head_ref || github.ref_name }}
-        run: cd apps/api && bun run test:integration:run
 
       - name: Stage CI artifacts
         if: github.event_name != 'workflow_call' && github.event.action != 'closed'
@@ -156,10 +115,55 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+      - name: Verify generated files are committed
+        if: success() || failure()
+        run: |
+          if ! git diff --quiet -- \
+            apps/docs/src/_generated/helm-values.mdx \
+            packages/api-client/src/generated \
+            apps/cli/src/models/generated_input.py \
+            apps/cli/src/models/generated_detectors.py \
+            apps/cli/src/models/generated_single_asset_scan_results.py; then
+            echo "::error::Generated files are out of date. Run 'bun run codegen', 'bun run docs:generate', and commit changes."
+            git status --short -- \
+              apps/docs/src/_generated/helm-values.mdx \
+              packages/api-client/src/generated \
+              apps/cli/src/models/generated_input.py \
+              apps/cli/src/models/generated_detectors.py \
+              apps/cli/src/models/generated_single_asset_scan_results.py
+            git diff --stat -- \
+              apps/docs/src/_generated/helm-values.mdx \
+              packages/api-client/src/generated \
+              apps/cli/src/models/generated_input.py \
+              apps/cli/src/models/generated_detectors.py \
+              apps/cli/src/models/generated_single_asset_scan_results.py
+            exit 1
+          fi
+
+      - name: Lint
+        if: success() || failure()
+        run: bun run lint
+
+      - name: Install Playwright browsers
+        if: success() || failure()
+        run: cd apps/web && bunx playwright install --with-deps chromium
+
+      - name: Unit tests
+        if: success() || failure()
+        run: bun run test
+
+      - name: API integration tests
+        if: (success() || failure()) && env.INTEGRATION_DATABASE_URL != ''
+        env:
+          DATABASE_URL: ${{ env.INTEGRATION_DATABASE_URL }}
+          INTEGRATION_TEST_RESET_DB: "1"
+          INTEGRATION_TEST_SCHEMA_KEY: ${{ github.head_ref || github.ref_name }}
+        run: cd apps/api && bun run test:integration:run
+
   docker:
     name: Build ${{ matrix.name }} (linux/amd64,linux/arm64)
     needs: [validate]
-    if: github.event_name != 'workflow_call' && github.event.action != 'closed'
+    if: always() && !cancelled() && needs.validate.result != 'skipped' && github.event_name != 'workflow_call' && github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 90
 

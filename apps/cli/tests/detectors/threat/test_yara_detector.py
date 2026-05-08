@@ -1,195 +1,332 @@
-"""Tests for YARA threat detector."""
+"""Tests for the YARA threat detector."""
 
 import pytest
 
 from src.detectors.threat.yara_detector import YaraDetector
-from src.models.generated_detectors import DetectorConfig, Severity
+from src.models.generated_detectors import (
+    Severity,
+    ThreatDetectorConfig,
+    YaraRuleConfig,
+)
+
+# ---------------------------------------------------------------------------
+# Shared rule helpers
+# ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_yara_detector_initialization():
-    """Test that YARA detector can be initialized."""
-    detector = YaraDetector()
-    assert detector.detector_type == "yara"
-    assert detector.detector_name == "yara"
-    assert detector.config is not None
-
-
-@pytest.mark.asyncio
-async def test_yara_detector_initialization_with_config():
-    """Test YARA detector with custom config."""
-    config = DetectorConfig(confidence_threshold=0.9)
-    detector = YaraDetector(config)
-    assert detector.config.confidence_threshold == 0.9
-
-
-@pytest.mark.asyncio
-async def test_detect_suspicious_script(sample_suspicious_script):
-    """Test detection of suspicious script patterns."""
-    detector = YaraDetector()
-    results = await detector.detect(sample_suspicious_script, content_type="application/x-sh")
-
-    # Should detect suspicious patterns
-    assert len(results) >= 1, f"Should detect suspicious patterns, got {len(results)} results"
-
-    # Check for high severity
-    for finding in results:
-        assert finding.severity in [Severity.medium, Severity.high, Severity.critical]
-
-
-@pytest.mark.asyncio
-async def test_detect_malware_patterns(sample_malware_pattern):
-    """Test detection of malware-like API calls."""
-    detector = YaraDetector()
-    results = await detector.detect(sample_malware_pattern, content_type="application/octet-stream")
-
-    # Should detect Windows API patterns
-    assert len(results) >= 1, (
-        f"Should detect malware patterns, got: {[r.finding_type for r in results]}"
-    )
-
-    # Malware patterns should be high/critical severity
-    for finding in results:
-        assert finding.severity in [Severity.high, Severity.critical]
-
-
-@pytest.mark.asyncio
-async def test_no_false_positives_clean_script(sample_clean_script):
-    """Test that clean scripts don't trigger false positives."""
-    detector = YaraDetector()
-    results = await detector.detect(sample_clean_script, content_type="application/x-sh")
-
-    # Clean scripts should have no or very few detections
-    # (may detect some generic patterns)
-    high_severity_findings = [
-        r for r in results if r.severity in [Severity.high, Severity.critical]
+def _malware_rules() -> list[YaraRuleConfig]:
+    return [
+        YaraRuleConfig(
+            name="Process_Injection_APIs",
+            severity=Severity.critical,
+            category="malware",
+            strings=[
+                '"CreateRemoteThread" nocase ascii',
+                '"VirtualAllocEx" nocase ascii',
+                '"WriteProcessMemory" nocase ascii',
+            ],
+            condition="2 of ($s*)",
+        )
     ]
-    assert len(high_severity_findings) == 0, (
-        f"Clean script should not trigger high-severity alerts: {[r.finding_type for r in results]}"
-    )
+
+
+def _script_rules() -> list[YaraRuleConfig]:
+    return [
+        YaraRuleConfig(
+            name="Shell_Curl_Pipe_Exec",
+            severity=Severity.high,
+            category="suspicious_scripts",
+            strings=[
+                "/curl|wget/ ascii",
+                "/\\| bash|\\| sh/ ascii",
+            ],
+            condition="$s0 and $s1",
+        )
+    ]
+
+
+def _detector_with(rules: list[YaraRuleConfig], **kwargs: object) -> YaraDetector:
+    return YaraDetector(ThreatDetectorConfig(rules=rules, **kwargs))
+
+
+# ---------------------------------------------------------------------------
+# Initialization
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_initialization_defaults():
+    det = YaraDetector()
+    assert det.detector_type == "yara"
+    assert det.detector_name == "yara"
+    assert det.config is not None
+
+
+@pytest.mark.asyncio
+async def test_initialization_with_rules():
+    det = _detector_with(_malware_rules())
+    assert det._rules is not None
+
+
+@pytest.mark.asyncio
+async def test_no_rules_produces_no_findings():
+    det = YaraDetector(ThreatDetectorConfig(rules=None))
+    results = await det.detect("CreateRemoteThread VirtualAllocEx WriteProcessMemory")
+    assert results == []
+
+
+# ---------------------------------------------------------------------------
+# Detection — positive cases
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_detects_malware_pattern(sample_malware_pattern):
+    det = _detector_with(_malware_rules())
+    results = await det.detect(sample_malware_pattern, content_type="application/octet-stream")
+
+    assert len(results) >= 1
+    for r in results:
+        assert r.severity in (Severity.high, Severity.critical)
+        assert r.category == "THREAT"
+
+
+@pytest.mark.asyncio
+async def test_detects_suspicious_script(sample_suspicious_script):
+    det = _detector_with(_script_rules())
+    results = await det.detect(sample_suspicious_script, content_type="application/x-sh")
+
+    assert len(results) >= 1
+
+
+@pytest.mark.asyncio
+async def test_detects_with_string_content():
+    det = _detector_with(_malware_rules())
+    results = await det.detect("CreateRemoteThread VirtualAllocEx WriteProcessMemory")
+
+    assert len(results) >= 1
+
+
+@pytest.mark.asyncio
+async def test_detects_any_of_them_condition():
+    rules = [
+        YaraRuleConfig(
+            name="Known_Tools",
+            severity=Severity.critical,
+            category="malware",
+            strings=['"mimikatz" nocase ascii', '"cobaltstrike" nocase ascii'],
+            condition="any of them",
+        )
+    ]
+    det = _detector_with(rules)
+    results = await det.detect("found mimikatz in memory dump")
+    assert len(results) >= 1
+    assert results[0].finding_type == "Known_Tools"
+
+
+@pytest.mark.asyncio
+async def test_detects_regex_pattern():
+    rules = [
+        YaraRuleConfig(
+            name="AWS_Key",
+            severity=Severity.critical,
+            category="secrets",
+            strings=["/AKIA[0-9A-Z]{16}/ ascii"],
+            condition="any of them",
+        )
+    ]
+    det = _detector_with(rules)
+    results = await det.detect("key = AKIAIOSFODNN7EXAMPLE123")
+    assert len(results) >= 1
+
+
+@pytest.mark.asyncio
+async def test_multiple_rules_both_fire():
+    rules = [
+        YaraRuleConfig(
+            name="Rule_A",
+            severity=Severity.high,
+            category="test",
+            strings=['"mimikatz" nocase ascii'],
+            condition="any of them",
+        ),
+        YaraRuleConfig(
+            name="Rule_B",
+            severity=Severity.critical,
+            category="test",
+            strings=['"msfvenom" nocase ascii'],
+            condition="any of them",
+        ),
+    ]
+    det = _detector_with(rules)
+    results = await det.detect("using mimikatz and msfvenom together")
+    assert len(results) == 2
+
+
+# ---------------------------------------------------------------------------
+# Detection — negative / clean cases
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_no_false_positives_clean_text(sample_clean_text_bytes):
-    """Test that clean text doesn't trigger false positives."""
-    detector = YaraDetector()
-    results = await detector.detect(sample_clean_text_bytes, content_type="text/plain")
-
-    # Should have no detections for clean text
-    assert len(results) == 0, (
-        f"Clean text should not trigger detections: {[r.finding_type for r in results]}"
-    )
+    det = _detector_with(_malware_rules() + _script_rules())
+    results = await det.detect(sample_clean_text_bytes)
+    assert results == []
 
 
 @pytest.mark.asyncio
-async def test_supported_content_types():
-    """Test that detector reports supported content types."""
-    detector = YaraDetector()
-    content_types = detector.get_supported_content_types()
-
-    # Should support binary and script types
-    assert "application/octet-stream" in content_types
-    assert isinstance(content_types, list)
+async def test_no_false_positives_clean_script(sample_clean_script):
+    det = _detector_with(_script_rules())
+    results = await det.detect(sample_clean_script)
+    high_and_above = [r for r in results if r.severity in (Severity.high, Severity.critical)]
+    assert len(high_and_above) == 0
 
 
-@pytest.mark.asyncio
-async def test_detector_metadata():
-    """Test detector metadata."""
-    detector = YaraDetector()
-    metadata = detector.get_metadata()
-
-    assert metadata["detector_type"] == "yara"
-    assert metadata["detector_name"] == "yara"
-    assert "content_types" in metadata
-    assert metadata["requires_gpu"] is False
+# ---------------------------------------------------------------------------
+# Result structure
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_confidence_threshold_filtering(sample_malware_pattern):
-    """Test that confidence threshold filters results."""
-    config = DetectorConfig(confidence_threshold=0.95)
-    detector = YaraDetector(config)
+async def test_result_structure(sample_malware_pattern):
+    det = _detector_with(_malware_rules())
+    results = await det.detect(sample_malware_pattern)
 
-    results = await detector.detect(sample_malware_pattern, content_type="application/octet-stream")
-
-    # All results should meet threshold
-    for result in results:
-        assert result.confidence >= 0.95
-
-
-@pytest.mark.asyncio
-async def test_max_findings_limit(sample_malware_pattern):
-    """Test that max_findings config is respected."""
-    config = DetectorConfig(max_findings=1)
-    detector = YaraDetector(config)
-
-    results = await detector.detect(sample_malware_pattern, content_type="application/octet-stream")
-
-    # Should limit to max_findings
-    assert len(results) <= 1
+    assert len(results) >= 1
+    for r in results:
+        assert hasattr(r, "finding_type")
+        assert hasattr(r, "category")
+        assert hasattr(r, "severity")
+        assert hasattr(r, "confidence")
+        assert hasattr(r, "matched_content")
+        assert r.category == "THREAT"
+        assert 0.0 <= r.confidence <= 1.0
 
 
 @pytest.mark.asyncio
-async def test_category_is_threat(sample_malware_pattern):
-    """Test that all results have category 'threat'."""
-    detector = YaraDetector()
-    results = await detector.detect(sample_malware_pattern, content_type="application/octet-stream")
-
-    for result in results:
-        assert result.category == "THREAT"
+async def test_location_populated(sample_malware_pattern):
+    det = _detector_with(_malware_rules())
+    results = await det.detect(sample_malware_pattern, content_type="application/octet-stream")
+    assert results[0].location is not None
+    assert "application/octet-stream" in results[0].location.path
 
 
 @pytest.mark.asyncio
-async def test_location_tracking(sample_malware_pattern):
-    """Test that findings include location information."""
-    detector = YaraDetector()
-    results = await detector.detect(sample_malware_pattern, content_type="application/octet-stream")
-
-    if results:
-        # Results should have location info
-        assert results[0].location is not None
+async def test_metadata_contains_rule_name(sample_malware_pattern):
+    det = _detector_with(_malware_rules())
+    results = await det.detect(sample_malware_pattern)
+    meta = results[0].metadata or {}
+    assert "rule" in meta
+    assert meta["rule"] == "Process_Injection_APIs"
 
 
-@pytest.mark.asyncio
-async def test_results_have_proper_structure(sample_malware_pattern):
-    """Test that results have proper structure."""
-    detector = YaraDetector()
-    results = await detector.detect(sample_malware_pattern, content_type="application/octet-stream")
-
-    for result in results:
-        # Should have all required fields
-        assert hasattr(result, "finding_type")
-        assert hasattr(result, "category")
-        assert hasattr(result, "severity")
-        assert hasattr(result, "confidence")
-        assert hasattr(result, "matched_content")
-
-        # Category should be threat
-        assert result.category == "THREAT"
-
-        # Confidence should be valid
-        assert 0 <= result.confidence <= 1
+# ---------------------------------------------------------------------------
+# Config controls
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_handles_empty_content():
-    """Test handling of empty content."""
-    detector = YaraDetector()
-    results = await detector.detect(b"", content_type="application/octet-stream")
+async def test_confidence_threshold_filters(sample_malware_pattern):
+    det = _detector_with(_malware_rules(), confidence_threshold=0.99)
+    results = await det.detect(sample_malware_pattern)
+    for r in results:
+        assert r.confidence >= 0.99
 
-    # Should handle gracefully
+
+@pytest.mark.asyncio
+async def test_max_findings_respected(sample_malware_pattern):
+    rules = [
+        YaraRuleConfig(
+            name=f"Rule_{i}",
+            severity=Severity.high,
+            category="test",
+            strings=['"CreateRemoteThread" nocase ascii'],
+            condition="any of them",
+        )
+        for i in range(5)
+    ]
+    det = _detector_with(rules, max_findings=2)
+    results = await det.detect(sample_malware_pattern)
+    assert len(results) <= 2
+
+
+@pytest.mark.asyncio
+async def test_results_sorted_by_severity_desc():
+    rules = [
+        YaraRuleConfig(
+            name="Low_Rule",
+            severity=Severity.low,
+            category="test",
+            strings=['"CreateRemoteThread" nocase ascii'],
+            condition="any of them",
+        ),
+        YaraRuleConfig(
+            name="Critical_Rule",
+            severity=Severity.critical,
+            category="test",
+            strings=['"VirtualAllocEx" nocase ascii'],
+            condition="any of them",
+        ),
+    ]
+    det = _detector_with(rules)
+    results = await det.detect("CreateRemoteThread VirtualAllocEx")
+    assert len(results) == 2
+    assert results[0].severity == Severity.critical
+
+
+# ---------------------------------------------------------------------------
+# Edge cases
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_handles_empty_bytes():
+    det = _detector_with(_malware_rules())
+    results = await det.detect(b"")
+    assert isinstance(results, list)
+
+
+@pytest.mark.asyncio
+async def test_handles_empty_string():
+    det = _detector_with(_malware_rules())
+    results = await det.detect("")
     assert isinstance(results, list)
 
 
 @pytest.mark.asyncio
 async def test_handles_large_content():
-    """Test handling of large content."""
-    detector = YaraDetector()
-
-    # Create large content
-    large_content = b"A" * 1000000  # 1MB of data
-
-    results = await detector.detect(large_content, content_type="application/octet-stream")
-
-    # Should handle gracefully
+    det = _detector_with(_malware_rules())
+    results = await det.detect(b"A" * 1_000_000)
     assert isinstance(results, list)
+
+
+@pytest.mark.asyncio
+async def test_handles_bytes_input(sample_malware_pattern):
+    det = _detector_with(_malware_rules())
+    results = await det.detect(sample_malware_pattern)
+    assert isinstance(results, list)
+
+
+# ---------------------------------------------------------------------------
+# Metadata
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_supported_content_types():
+    det = YaraDetector()
+    types = det.get_supported_content_types()
+    assert "application/octet-stream" in types
+    assert "text/plain" in types
+    assert isinstance(types, list)
+
+
+@pytest.mark.asyncio
+async def test_detector_metadata():
+    det = YaraDetector()
+    meta = det.get_metadata()
+    assert meta["detector_type"] == "yara"
+    assert meta["detector_name"] == "yara"
+    assert "content_types" in meta
+    assert meta["requires_gpu"] is False

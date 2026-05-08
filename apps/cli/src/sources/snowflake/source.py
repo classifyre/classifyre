@@ -177,7 +177,7 @@ class SnowflakeSource(BaseSource):
         connect_kwargs: dict[str, Any] = {
             "account": self._account_locator(),
             "user": self._username(),
-            "login_timeout": int(connection_options.connect_timeout_seconds or 15),
+            "login_timeout": int(connection_options.connect_timeout_seconds or 30),
             "session_parameters": {
                 "QUERY_TAG": "classifyre-snowflake-source",
             },
@@ -568,14 +568,18 @@ class SnowflakeSource(BaseSource):
 
             if len(batch) >= self.BATCH_SIZE:
                 if pipeline:
-                    batch = await pipeline.process(batch)
-                yield batch
+                    async for processed in pipeline.process_stream(batch):
+                        yield [processed]
+                else:
+                    yield batch
                 batch = []
 
         if batch:
             if pipeline:
-                batch = await pipeline.process(batch)
-            yield batch
+                async for processed in pipeline.process_stream(batch):
+                    yield [processed]
+            else:
+                yield batch
 
     def generate_hash_id(self, asset_id: str) -> str:
         return hash_id(self._asset_type_value(), asset_id)

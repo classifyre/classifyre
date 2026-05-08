@@ -7,14 +7,12 @@ import {
   ArrowDown,
   ArrowUp,
   ChevronsUpDown,
-  Filter,
   Loader2,
   RefreshCw,
   Search,
 } from "lucide-react";
 import {
   api,
-  type CustomDetectorMethod,
   type CustomDetectorResponseDto,
 } from "@workspace/api-client";
 import {
@@ -22,12 +20,6 @@ import {
   Button,
   EmptyState,
   Input,
-  MultiSelect,
-  MultiSelectContent,
-  MultiSelectGroup,
-  MultiSelectItem,
-  MultiSelectTrigger,
-  MultiSelectValue,
   Pagination,
   PaginationContent,
   PaginationEllipsis,
@@ -55,16 +47,10 @@ import {
 import { getRunnerStatusBadgeTone } from "@/lib/runner-status-badge";
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
-const METHOD_OPTIONS: CustomDetectorMethod[] = [
-  "RULESET",
-  "CLASSIFIER",
-  "ENTITY",
-];
 
 type SortBy =
   | "updatedAt"
   | "name"
-  | "method"
   | "status"
   | "findingsCount"
   | "sourcesUsingCount"
@@ -84,12 +70,18 @@ function getPageItems(current: number, total: number) {
   return Array.from(pages).sort((a, b) => a - b);
 }
 
-function methodTone(
-  method: CustomDetectorMethod,
-): "default" | "secondary" | "outline" {
-  if (method === "CLASSIFIER") return "default";
-  if (method === "ENTITY") return "secondary";
-  return "outline";
+function pipelineStepBadges(pipelineSchema: Record<string, unknown>): string[] {
+  const steps: string[] = [];
+  if (pipelineSchema.entities && Object.keys(pipelineSchema.entities as object).length > 0) {
+    steps.push("Entities");
+  }
+  if (pipelineSchema.classification && Object.keys(pipelineSchema.classification as object).length > 0) {
+    steps.push("Classification");
+  }
+  if (pipelineSchema.validation) {
+    steps.push("Validation");
+  }
+  return steps.length > 0 ? steps : ["Pipeline"];
 }
 
 function compareNullableDate(
@@ -110,8 +102,6 @@ function sortRows(
     switch (sortBy) {
       case "name":
         return a.name.localeCompare(b.name);
-      case "method":
-        return a.method.localeCompare(b.method);
       case "findingsCount":
         return a.findingsCount - b.findingsCount;
       case "status":
@@ -146,7 +136,6 @@ export function CustomDetectorsTable() {
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [methods, setMethods] = useState<CustomDetectorMethod[]>([]);
   const [statusFilter, setStatusFilter] = useState<
     "ALL" | "ACTIVE" | "INACTIVE"
   >("ALL");
@@ -170,7 +159,7 @@ export function CustomDetectorsTable() {
 
   useEffect(() => {
     setPage(1);
-  }, [methods, statusFilter, usageFilter, pageSize]);
+  }, [statusFilter, usageFilter, pageSize]);
 
   const load = async (refresh = false) => {
     try {
@@ -200,13 +189,7 @@ export function CustomDetectorsTable() {
   }, []);
 
   const filtered = useMemo(() => {
-    const methodSet = new Set(methods);
-
     const searched = rows.filter((row) => {
-      if (methodSet.size > 0 && !methodSet.has(row.method)) {
-        return false;
-      }
-
       if (statusFilter === "ACTIVE" && !row.isActive) {
         return false;
       }
@@ -229,7 +212,6 @@ export function CustomDetectorsTable() {
         row.name,
         row.key,
         row.description ?? "",
-        row.method,
         ...row.recentSourceNames,
       ]
         .join(" ")
@@ -241,7 +223,6 @@ export function CustomDetectorsTable() {
     return sortRows(searched, sortBy, sortOrder);
   }, [
     rows,
-    methods,
     statusFilter,
     usageFilter,
     debouncedSearch,
@@ -283,7 +264,7 @@ export function CustomDetectorsTable() {
       return;
     }
     setSortBy(field);
-    setSortOrder(field === "name" || field === "method" ? "asc" : "desc");
+    setSortOrder(field === "name" ? "asc" : "desc");
   };
 
   const renderSortIcon = (field: SortBy) => {
@@ -333,27 +314,6 @@ export function CustomDetectorsTable() {
             className="h-9 rounded-[4px] border-2 border-black pl-9"
           />
         </div>
-
-        <MultiSelect
-          values={methods}
-          onValuesChange={(values) =>
-            setMethods(values as CustomDetectorMethod[])
-          }
-        >
-          <MultiSelectTrigger className="h-9 min-w-[220px] border-2 border-black rounded-[4px]">
-            <Filter className="mr-1 h-4 w-4" />
-            <MultiSelectValue placeholder={t("detectors.allMethods")} />
-          </MultiSelectTrigger>
-          <MultiSelectContent>
-            <MultiSelectGroup>
-              {METHOD_OPTIONS.map((method) => (
-                <MultiSelectItem key={method} value={method}>
-                  {method}
-                </MultiSelectItem>
-              ))}
-            </MultiSelectGroup>
-          </MultiSelectContent>
-        </MultiSelect>
 
         <Select
           value={statusFilter}
@@ -415,9 +375,7 @@ export function CustomDetectorsTable() {
             <TableHeader>
               <TableRow>
                 <TableHead>{renderSortHead("Detector", "name")}</TableHead>
-                <TableHead>
-                  {renderSortHead(t("common.method"), "method")}
-                </TableHead>
+                <TableHead>Pipeline Steps</TableHead>
                 <TableHead>
                   {renderSortHead(t("common.status"), "status")}
                 </TableHead>
@@ -438,7 +396,7 @@ export function CustomDetectorsTable() {
             <TableBody>
               {pagedRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={6}>
                     <EmptyState
                       title={t("detectors.noDetectors")}
                       description={t("detectors.noDetectorsHint")}
@@ -466,12 +424,17 @@ export function CustomDetectorsTable() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={methodTone(row.method)}
-                        className="font-mono text-[10px] uppercase"
-                      >
-                        {row.method}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {pipelineStepBadges((row as any).pipelineSchema).map((step) => (
+                          <Badge
+                            key={step}
+                            variant="outline"
+                            className="text-[10px] font-mono"
+                          >
+                            {step}
+                          </Badge>
+                        ))}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge

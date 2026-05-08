@@ -3,17 +3,17 @@
 import pytest
 
 from src.detectors.broken_links.detector import BrokenLinksDetector
+from src.detectors.content.feature_extraction_detector import FeatureExtractionDetector
+from src.detectors.content.image_classification_detector import ImageClassificationDetector
 from src.detectors.content.language_detector import LanguageDetector
-from src.detectors.content.nsfw_detector import NSFWDetector
-from src.detectors.content.spam_detector import SpamDetector
+from src.detectors.content.object_detection_detector import ObjectDetectionDetector
+from src.detectors.content.text_classification_detector import TextClassificationDetector
 from src.detectors.content.toxic_detector import ToxicDetector
 from src.detectors.custom.detector import CustomDetector
 from src.detectors.dependencies import MissingDependencyError
 from src.detectors.pii.detector import PIIDetector
 from src.detectors.secrets.detector import SecretsDetector
 from src.detectors.threat.code_security_detector import CodeSecurityDetector
-from src.detectors.threat.phishing_url_detector import PhishingURLDetector
-from src.detectors.threat.prompt_injection_detector import PromptInjectionDetector
 from src.detectors.threat.yara_detector import YaraDetector
 from src.models.generated_detectors import (
     BrokenLinksDetectorConfig,
@@ -21,8 +21,13 @@ from src.models.generated_detectors import (
     CustomDetectorConfig,
     DetectorConfig,
     DetectorType,
+    FeatureExtractionDetectorConfig,
+    ObjectDetectionDetectorConfig,
     PIIDetectorConfig,
+    RegexPatternDefinition,
+    RegexPipelineSchema,
     SecretsDetectorConfig,
+    TextClassificationDetectorConfig,
     ThreatDetectorConfig,
 )
 from src.models.generated_single_asset_scan_results import (
@@ -74,19 +79,20 @@ class TestDetectorTypesMatchSchema:
         except MissingDependencyError:
             pytest.skip("PyTorch not installed, skipping toxic detector test")
 
-    def test_nsfw_detector_type(self):
-        """Test NSFWDetector has correct detector_type."""
+    def test_image_classification_detector_type(self):
+        """Test ImageClassificationDetector has correct detector_type."""
         try:
-            detector = NSFWDetector(ContentDetectorConfig())
-            assert detector.detector_type == "nsfw"
-            # Verify it can be converted to DetectorType enum
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.NSFW
+            from src.models.generated_detectors import ImageClassificationDetectorConfig
+
+            detector = ImageClassificationDetector(ImageClassificationDetectorConfig())
+            assert detector.detector_type == "image_classification"
+            assert DetectorType(detector.detector_type.upper()) == DetectorType.IMAGE_CLASSIFICATION
             assert (
                 ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.NSFW
+                == ScanResultDetectorType.IMAGE_CLASSIFICATION
             )
         except MissingDependencyError:
-            pytest.skip("PyTorch not installed, skipping nsfw detector test")
+            pytest.skip("PyTorch not installed, skipping image_classification detector test")
 
     def test_yara_detector_type(self):
         """Test YaraDetector has correct detector_type."""
@@ -118,7 +124,9 @@ class TestDetectorTypesMatchSchema:
             CustomDetectorConfig(
                 custom_detector_key="cust_test_rules",
                 name="Test Custom Rules",
-                method="RULESET",
+                pipeline_schema=RegexPipelineSchema(
+                    patterns={"x": RegexPatternDefinition(pattern=r"\d+")}
+                ),
             )
         )
         assert detector.detector_type == "custom"
@@ -127,44 +135,51 @@ class TestDetectorTypesMatchSchema:
             ScanResultDetectorType(detector.detector_type.upper()) == ScanResultDetectorType.CUSTOM
         )
 
-    def test_prompt_injection_detector_type(self):
-        """Test PromptInjectionDetector has correct detector_type."""
+    def test_text_classification_detector_type(self):
+        """Test TextClassificationDetector has correct detector_type."""
         try:
-            detector = PromptInjectionDetector()
-            assert detector.detector_type == "prompt_injection"
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.PROMPT_INJECTION
-            assert (
-                ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.PROMPT_INJECTION
-            )
-        except MissingDependencyError:
-            pytest.skip("transformers/torch not installed, skipping prompt injection test")
+            from src.models.generated_detectors import TextClassificationDetectorConfig
 
-    def test_phishing_url_detector_type(self):
-        """Test PhishingURLDetector has correct detector_type."""
-        try:
-            detector = PhishingURLDetector()
-            assert detector.detector_type == "phishing_url"
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.PHISHING_URL
+            config = TextClassificationDetectorConfig(
+                model="mrm8488/bert-tiny-finetuned-sms-spam-detection"
+            )
+            detector = TextClassificationDetector(config)
+            assert detector.detector_type == "text_classification"
+            assert DetectorType(detector.detector_type.upper()) == DetectorType.TEXT_CLASSIFICATION
             assert (
                 ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.PHISHING_URL
+                == ScanResultDetectorType.TEXT_CLASSIFICATION
             )
         except MissingDependencyError:
-            pytest.skip("transformers/torch not installed, skipping phishing URL test")
+            pytest.skip("transformers/torch not installed, skipping text_classification test")
 
-    def test_spam_detector_type(self):
-        """Test SpamDetector has correct detector_type."""
+    def test_feature_extraction_detector_type(self) -> None:
+        """Test FeatureExtractionDetector has correct detector_type."""
         try:
-            detector = SpamDetector()
-            assert detector.detector_type == "spam"
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.SPAM
+            config = FeatureExtractionDetectorConfig(model="BAAI/bge-base-en-v1.5")
+            detector = FeatureExtractionDetector(config)
+            assert detector.detector_type == "feature_extraction"
+            assert DetectorType(detector.detector_type.upper()) == DetectorType.FEATURE_EXTRACTION
             assert (
                 ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.SPAM
+                == ScanResultDetectorType.FEATURE_EXTRACTION
             )
         except MissingDependencyError:
-            pytest.skip("transformers/torch not installed, skipping spam test")
+            pytest.skip("transformers/torch not installed, skipping feature_extraction test")
+
+    def test_object_detection_detector_type(self) -> None:
+        """Test ObjectDetectionDetector has correct detector_type."""
+        try:
+            config = ObjectDetectionDetectorConfig(model="facebook/detr-resnet-50")
+            detector = ObjectDetectionDetector(config)
+            assert detector.detector_type == "object_detection"
+            assert DetectorType(detector.detector_type.upper()) == DetectorType.OBJECT_DETECTION
+            assert (
+                ScanResultDetectorType(detector.detector_type.upper())
+                == ScanResultDetectorType.OBJECT_DETECTION
+            )
+        except MissingDependencyError:
+            pytest.skip("transformers/torch not installed, skipping object_detection test")
 
     def test_language_detector_type(self):
         """Test LanguageDetector has correct detector_type."""
@@ -198,12 +213,23 @@ class TestDetectorTypesMatchSchema:
             (SecretsDetector, SecretsDetectorConfig()),
             (PIIDetector, PIIDetectorConfig()),
             (ToxicDetector, ContentDetectorConfig()),
-            (NSFWDetector, ContentDetectorConfig()),
+            (ImageClassificationDetector, None),
             (YaraDetector, ThreatDetectorConfig()),
             (BrokenLinksDetector, BrokenLinksDetectorConfig()),
-            (PromptInjectionDetector, None),
-            (PhishingURLDetector, None),
-            (SpamDetector, None),
+            (
+                TextClassificationDetector,
+                TextClassificationDetectorConfig(
+                    model="mrm8488/bert-tiny-finetuned-sms-spam-detection"
+                ),
+            ),
+            (
+                FeatureExtractionDetector,
+                FeatureExtractionDetectorConfig(model="BAAI/bge-base-en-v1.5"),
+            ),
+            (
+                ObjectDetectionDetector,
+                ObjectDetectionDetectorConfig(model="facebook/detr-resnet-50"),
+            ),
             (LanguageDetector, None),
             (CodeSecurityDetector, None),
         ]
@@ -236,27 +262,14 @@ class TestDetectorTypesMatchSchema:
             "SECRETS",
             "PII",
             "TOXIC",
-            "NSFW",
+            "IMAGE_CLASSIFICATION",
+            "TEXT_CLASSIFICATION",
+            "FEATURE_EXTRACTION",
+            "OBJECT_DETECTION",
             "YARA",
             "BROKEN_LINKS",
-            "PROMPT_INJECTION",
-            "PHISHING_URL",
-            "SPAM",
             "LANGUAGE",
             "CODE_SECURITY",
-            "PLAGIARISM",
-            "IMAGE_VIOLENCE",
-            "OCR_PII",
-            "DEID_SCORE",
-            "HATE_SPEECH",
-            "AI_GENERATED",
-            "CONTENT_QUALITY",
-            "BIAS",
-            "DUPLICATE",
-            "DOMAIN_CLASS",
-            "CONTENT_TYPE",
-            "SENSITIVITY_TIER",
-            "JURISDICTION_TAG",
             "CUSTOM",
         }
         actual_types = {dt.value for dt in DetectorType}
@@ -293,7 +306,7 @@ class TestDetectorConfigMapping:
         """Test PIIDetector accepts PIIDetectorConfig."""
         try:
             config = PIIDetectorConfig(
-                enabled_patterns=["email", "phone_number"], confidence_threshold=0.75
+                enabled_patterns=["EMAIL_ADDRESS", "PHONE_NUMBER"], confidence_threshold=0.75
             )
             detector = PIIDetector(config)
             assert detector.config == config
@@ -313,18 +326,20 @@ class TestDetectorConfigMapping:
         except MissingDependencyError:
             pytest.skip("PyTorch not installed, skipping toxic detector test")
 
-    def test_nsfw_uses_content_config(self):
-        """Test NSFWDetector accepts ContentDetectorConfig."""
+    def test_image_classification_uses_its_config(self):
+        """Test ImageClassificationDetector accepts ImageClassificationDetectorConfig."""
         try:
-            config = ContentDetectorConfig(
-                enabled_patterns=["nsfw", "nsfw_explicit"],
-                model_name="original",
+            from src.models.generated_detectors import ImageClassificationDetectorConfig
+
+            config = ImageClassificationDetectorConfig(
+                model="google/vit-base-patch16-224",
+                device="cpu",
                 confidence_threshold=0.8,
             )
-            detector = NSFWDetector(config)
+            detector = ImageClassificationDetector(config)
             assert detector.config == config
         except MissingDependencyError:
-            pytest.skip("PyTorch not installed, skipping nsfw detector test")
+            pytest.skip("PyTorch not installed, skipping image_classification test")
 
     def test_yara_uses_threat_config(self):
         """Test YaraDetector accepts ThreatDetectorConfig."""
@@ -346,7 +361,9 @@ class TestDetectorConfigMapping:
         config = CustomDetectorConfig(
             custom_detector_key="cust_test_classifier",
             name="Test Custom Classifier",
-            method="CLASSIFIER",
+            pipeline_schema=RegexPipelineSchema(
+                patterns={"x": RegexPatternDefinition(pattern=r"\d+")}
+            ),
         )
         detector = CustomDetector(config)
         assert detector.config == config
@@ -361,12 +378,16 @@ class TestDetectorNames:
             (SecretsDetector, SecretsDetectorConfig(), "secrets"),
             (PIIDetector, PIIDetectorConfig(), "pii"),
             (ToxicDetector, ContentDetectorConfig(), "toxic"),
-            (NSFWDetector, ContentDetectorConfig(), "nsfw"),
+            (ImageClassificationDetector, None, "image_classification"),
             (YaraDetector, ThreatDetectorConfig(), "yara"),
             (BrokenLinksDetector, BrokenLinksDetectorConfig(), "broken_links"),
-            (PromptInjectionDetector, DetectorConfig(), "prompt_injection"),
-            (PhishingURLDetector, DetectorConfig(), "phishing_url"),
-            (SpamDetector, DetectorConfig(), "spam"),
+            (
+                TextClassificationDetector,
+                TextClassificationDetectorConfig(
+                    model="mrm8488/bert-tiny-finetuned-sms-spam-detection"
+                ),
+                "text_classification",
+            ),
             (LanguageDetector, DetectorConfig(), "language"),
             (CodeSecurityDetector, DetectorConfig(), "code_security"),
             (
@@ -374,7 +395,9 @@ class TestDetectorNames:
                 CustomDetectorConfig(
                     custom_detector_key="cust_test_names",
                     name="Custom Name Test",
-                    method="RULESET",
+                    pipeline_schema=RegexPipelineSchema(
+                        patterns={"x": RegexPatternDefinition(pattern=r"\d+")}
+                    ),
                 ),
                 "custom",
             ),

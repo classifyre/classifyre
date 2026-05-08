@@ -194,59 +194,54 @@ export function SamplingCard({
           </div>
         </div>
 
-        {/* ── Tabular advanced ───────────────────────────────────────────────── */}
-        {isTabular && (
-          <Accordion type="multiple">
-            <AccordionItem
-              value="tabular-advanced"
-              className="border-border/20"
-            >
-              <AccordionTrigger className="py-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground hover:no-underline hover:text-foreground">
-                {t("sources.sampling.advanced")}
-              </AccordionTrigger>
-              <AccordionContent className="pt-2 space-y-3">
-                {showOrderByColumn && (
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                      {t("sources.sampling.orderByColumn")}
-                    </Label>
-                    <Input
-                      placeholder={t("sources.sampling.orderByPlaceholder")}
-                      value={value.order_by_column ?? ""}
-                      onChange={(e) =>
-                        handleOrderByColumnChange(e.target.value)
-                      }
-                      disabled={disabled}
-                      className="font-mono text-xs border-2 border-border/40 focus:border-border rounded-[4px] h-9"
-                    />
-                    <p className="text-[10px] text-muted-foreground font-mono pl-0.5">
-                      {t("sources.sampling.orderByDesc")}
-                    </p>
-                  </div>
-                )}
+        {/* ── Advanced ───────────────────────────────────────────────────────── */}
+        <Accordion type="multiple">
+          <AccordionItem value="advanced" className="border-border/20">
+            <AccordionTrigger className="py-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground hover:no-underline hover:text-foreground">
+              {t("sources.sampling.advanced")}
+            </AccordionTrigger>
+            <AccordionContent className="pt-2 space-y-3">
+              {/* rows_per_page — applies to all source types */}
+              <div className="space-y-1">
+                <Label className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("sources.sampling.rowsPerPage")}
+                </Label>
+                <Input
+                  type="number"
+                  min={10}
+                  max={10000}
+                  placeholder="100"
+                  value={value.rows_per_page ?? ""}
+                  onChange={(e) => handleRowsPerPageChange(e.target.value)}
+                  disabled={disabled}
+                  className="font-mono text-xs border-2 border-border/40 focus:border-border rounded-[4px] h-9"
+                />
+                <p className="text-[10px] text-muted-foreground font-mono pl-0.5">
+                  {t("sources.sampling.rowsPerPageDesc")}
+                </p>
+              </div>
 
+              {/* tabular-only fields */}
+              {isTabular && showOrderByColumn && (
                 <div className="space-y-1">
                   <Label className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                    {t("sources.sampling.rowsPerPage")}
+                    {t("sources.sampling.orderByColumn")}
                   </Label>
                   <Input
-                    type="number"
-                    min={10}
-                    max={10000}
-                    placeholder="100"
-                    value={value.rows_per_page ?? ""}
-                    onChange={(e) => handleRowsPerPageChange(e.target.value)}
+                    placeholder={t("sources.sampling.orderByPlaceholder")}
+                    value={value.order_by_column ?? ""}
+                    onChange={(e) => handleOrderByColumnChange(e.target.value)}
                     disabled={disabled}
                     className="font-mono text-xs border-2 border-border/40 focus:border-border rounded-[4px] h-9"
                   />
                   <p className="text-[10px] text-muted-foreground font-mono pl-0.5">
-                    {t("sources.sampling.rowsPerPageDesc")}
+                    {t("sources.sampling.orderByDesc")}
                   </p>
                 </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        )}
+              )}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
         {/* ── Strategy hint ──────────────────────────────────────────────────── */}
         <p className="text-[11px] text-muted-foreground font-mono text-center py-1">

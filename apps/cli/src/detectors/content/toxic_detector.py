@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import ContentDetectorConfig, DetectorConfig, Severity
 from ...models.generated_single_asset_scan_results import DetectionResult, DetectorType
 from ..base import BaseDetector
 from ..dependencies import MissingDependencyError, ensure_torch, require_module
@@ -30,6 +30,9 @@ class ToxicDetector(BaseDetector):
     def __init__(self, config: DetectorConfig | None = None):
         """Initialize toxic content detector with Detoxify."""
         super().__init__(config)
+        self._cfg: ContentDetectorConfig = (
+            config if isinstance(config, ContentDetectorConfig) else ContentDetectorConfig()
+        )
         self.model: Any | None = None
 
         try:
@@ -79,7 +82,7 @@ class ToxicDetector(BaseDetector):
                 score = predictions.get(key, 0.0)
 
                 # Only report if score meets confidence threshold
-                if score >= (self.config.confidence_threshold or 0.7):
+                if score >= (self._cfg.confidence_threshold or 0.7):
                     # Determine severity based on type and score
                     severity = self._get_severity_for_type(key, score)
 
@@ -107,9 +110,8 @@ class ToxicDetector(BaseDetector):
         # Sort by confidence (highest first)
         results.sort(key=lambda r: r.confidence, reverse=True)
 
-        # Apply max_findings limit if configured
-        if self.config.max_findings and len(results) > self.config.max_findings:
-            results = results[: self.config.max_findings]
+        if self._cfg.max_findings and len(results) > self._cfg.max_findings:
+            results = results[: self._cfg.max_findings]
 
         return results
 

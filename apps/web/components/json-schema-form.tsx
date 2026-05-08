@@ -5,6 +5,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import Editor from "@monaco-editor/react";
 import {
   useForm,
+  useFieldArray,
   type Control,
   type FieldPath,
   type FieldValues,
@@ -1073,6 +1074,91 @@ function SchemaObjectFields({
   );
 }
 
+function ComplexObjectArrayField({
+  control,
+  fieldName,
+  fieldPath,
+  itemsSchema,
+  label,
+  required,
+  hideLabel,
+  disabled,
+  forceMasked,
+  autoDetectSensitiveFields,
+}: {
+  control: Control<FieldValues>;
+  fieldName: FieldPath<FieldValues>;
+  fieldPath: string;
+  itemsSchema: JSONSchema7;
+  label: string;
+  required: boolean;
+  hideLabel: boolean;
+  disabled: boolean;
+  forceMasked: boolean;
+  autoDetectSensitiveFields: boolean;
+}) {
+  const { t } = useTranslation();
+  const { fields, append, remove } = useFieldArray({ control, name: fieldName });
+
+  return (
+    <FormItem>
+      {!hideLabel && (
+        <FormLabel className="capitalize">
+          {label}
+          {required && <span className="text-destructive"> *</span>}
+        </FormLabel>
+      )}
+      <div className="space-y-3">
+        {fields.length === 0 && (
+          <div className="text-sm text-muted-foreground">
+            {t("forms.noItemsAdded", { label: label.toLowerCase() })}
+          </div>
+        )}
+        {fields.map((fieldEntry, index) => (
+          <Card key={fieldEntry.id} className="shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                {t("forms.itemIndex", { index: index + 1 })}
+              </CardTitle>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => remove(index)}
+                disabled={disabled}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <SchemaObjectFields
+                schema={itemsSchema}
+                control={control}
+                path={`${fieldPath}.${index}`}
+                disabled={disabled}
+                forceMasked={forceMasked}
+                autoDetectSensitiveFields={autoDetectSensitiveFields}
+              />
+            </CardContent>
+          </Card>
+        ))}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => append(getInitialValue(itemsSchema))}
+          disabled={disabled}
+          data-testid={`btn-add-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          {t("forms.addItem", { label })}
+        </Button>
+      </div>
+      <FormMessage />
+    </FormItem>
+  );
+}
+
 function SchemaField({
   name,
   schema,
@@ -1169,6 +1255,23 @@ function SchemaField({
     );
     const hasEnumItems =
       Array.isArray(itemsSchema.enum) && itemsSchema.enum.length > 0;
+
+    if (!hasEnumItems && isObjectSchema(itemsSchema) && itemsSchema.properties) {
+      return (
+        <ComplexObjectArrayField
+          control={control}
+          fieldName={fieldName}
+          fieldPath={fieldPath}
+          itemsSchema={itemsSchema}
+          label={label}
+          required={required}
+          hideLabel={hideLabel}
+          disabled={disabled}
+          forceMasked={forceMasked}
+          autoDetectSensitiveFields={autoDetectSensitiveFields}
+        />
+      );
+    }
 
     return (
       <FormField
