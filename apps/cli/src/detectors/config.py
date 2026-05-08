@@ -9,7 +9,9 @@ from ..models.generated_detectors import (
     ContentDetectorConfig,
     CustomDetectorConfig,
     DetectorConfig,
+    FeatureExtractionDetectorConfig,
     ImageClassificationDetectorConfig,
+    ObjectDetectionDetectorConfig,
     PIIDetectorConfig,
     SecretsDetectorConfig,
     TextClassificationDetectorConfig,
@@ -26,6 +28,8 @@ type DetectorTypedConfig = (
     | BrokenLinksDetectorConfig
     | TextClassificationDetectorConfig
     | ImageClassificationDetectorConfig
+    | FeatureExtractionDetectorConfig
+    | ObjectDetectionDetectorConfig
 )
 
 _DETECTOR_NAME_BY_TYPE: dict[str, str] = {
@@ -36,6 +40,8 @@ _DETECTOR_NAME_BY_TYPE: dict[str, str] = {
     "YARA": "yara",
     "BROKEN_LINKS": "broken_links",
     "TEXT_CLASSIFICATION": "text_classification",
+    "FEATURE_EXTRACTION": "feature_extraction",
+    "OBJECT_DETECTION": "object_detection",
     "LANGUAGE": "language",
     "CODE_SECURITY": "code_security",
     "CUSTOM": "custom",
@@ -50,6 +56,8 @@ _DETECTOR_CONFIG_BY_TYPE: dict[str, type[DetectorConfig]] = {
     "BROKEN_LINKS": BrokenLinksDetectorConfig,
     "CUSTOM": CustomDetectorConfig,
     "TEXT_CLASSIFICATION": TextClassificationDetectorConfig,
+    "FEATURE_EXTRACTION": FeatureExtractionDetectorConfig,
+    "OBJECT_DETECTION": ObjectDetectionDetectorConfig,
 }
 
 

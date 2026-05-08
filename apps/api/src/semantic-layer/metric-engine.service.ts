@@ -536,6 +536,8 @@ export class MetricEngineService {
       'TOXIC',
       'IMAGE_CLASSIFICATION',
       'TEXT_CLASSIFICATION',
+      'FEATURE_EXTRACTION',
+      'OBJECT_DETECTION',
       'YARA',
       'BROKEN_LINKS',
       'LANGUAGE',

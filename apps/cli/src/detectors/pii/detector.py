@@ -239,6 +239,15 @@ class PIIDetector(BaseDetector):
         except MissingDependencyError as exc:
             self._init_error = exc
             logger.warning("Presidio unavailable — PII detector will raise on first use: %s", exc)
+        except (FileNotFoundError, OSError) as exc:
+            self._init_error = MissingDependencyError(
+                "pii",
+                ["privacy", "detectors"],
+                f"Presidio installation is incomplete (missing data files): {exc}",
+            )
+            logger.warning(
+                "Presidio data files missing — PII detector will raise on first use: %s", exc
+            )
 
     # ------------------------------------------------------------------
     # Initialization

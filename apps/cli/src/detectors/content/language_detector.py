@@ -43,7 +43,8 @@ class LanguageDetector(BaseDetector):
         if self._detector_module is None:
             return []
 
-        model = (self._cfg.model or Model.auto).value
+        model_val = self._cfg.model or Model.auto
+        model = model_val.value if isinstance(model_val, Model) else str(model_val)
         k = self._cfg.k or 1
         threshold = self._cfg.confidence_threshold or 0.7
 

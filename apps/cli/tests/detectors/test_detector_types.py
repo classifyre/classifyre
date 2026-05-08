@@ -3,8 +3,10 @@
 import pytest
 
 from src.detectors.broken_links.detector import BrokenLinksDetector
-from src.detectors.content.language_detector import LanguageDetector
+from src.detectors.content.feature_extraction_detector import FeatureExtractionDetector
 from src.detectors.content.image_classification_detector import ImageClassificationDetector
+from src.detectors.content.language_detector import LanguageDetector
+from src.detectors.content.object_detection_detector import ObjectDetectionDetector
 from src.detectors.content.text_classification_detector import TextClassificationDetector
 from src.detectors.content.toxic_detector import ToxicDetector
 from src.detectors.custom.detector import CustomDetector
@@ -19,6 +21,8 @@ from src.models.generated_detectors import (
     CustomDetectorConfig,
     DetectorConfig,
     DetectorType,
+    FeatureExtractionDetectorConfig,
+    ObjectDetectionDetectorConfig,
     PIIDetectorConfig,
     RegexPatternDefinition,
     RegexPipelineSchema,
@@ -149,6 +153,34 @@ class TestDetectorTypesMatchSchema:
         except MissingDependencyError:
             pytest.skip("transformers/torch not installed, skipping text_classification test")
 
+    def test_feature_extraction_detector_type(self) -> None:
+        """Test FeatureExtractionDetector has correct detector_type."""
+        try:
+            config = FeatureExtractionDetectorConfig(model="BAAI/bge-base-en-v1.5")
+            detector = FeatureExtractionDetector(config)
+            assert detector.detector_type == "feature_extraction"
+            assert DetectorType(detector.detector_type.upper()) == DetectorType.FEATURE_EXTRACTION
+            assert (
+                ScanResultDetectorType(detector.detector_type.upper())
+                == ScanResultDetectorType.FEATURE_EXTRACTION
+            )
+        except MissingDependencyError:
+            pytest.skip("transformers/torch not installed, skipping feature_extraction test")
+
+    def test_object_detection_detector_type(self) -> None:
+        """Test ObjectDetectionDetector has correct detector_type."""
+        try:
+            config = ObjectDetectionDetectorConfig(model="facebook/detr-resnet-50")
+            detector = ObjectDetectionDetector(config)
+            assert detector.detector_type == "object_detection"
+            assert DetectorType(detector.detector_type.upper()) == DetectorType.OBJECT_DETECTION
+            assert (
+                ScanResultDetectorType(detector.detector_type.upper())
+                == ScanResultDetectorType.OBJECT_DETECTION
+            )
+        except MissingDependencyError:
+            pytest.skip("transformers/torch not installed, skipping object_detection test")
+
     def test_language_detector_type(self):
         """Test LanguageDetector has correct detector_type."""
         try:
@@ -184,7 +216,20 @@ class TestDetectorTypesMatchSchema:
             (ImageClassificationDetector, None),
             (YaraDetector, ThreatDetectorConfig()),
             (BrokenLinksDetector, BrokenLinksDetectorConfig()),
-            (TextClassificationDetector, TextClassificationDetectorConfig(model="mrm8488/bert-tiny-finetuned-sms-spam-detection")),
+            (
+                TextClassificationDetector,
+                TextClassificationDetectorConfig(
+                    model="mrm8488/bert-tiny-finetuned-sms-spam-detection"
+                ),
+            ),
+            (
+                FeatureExtractionDetector,
+                FeatureExtractionDetectorConfig(model="BAAI/bge-base-en-v1.5"),
+            ),
+            (
+                ObjectDetectionDetector,
+                ObjectDetectionDetectorConfig(model="facebook/detr-resnet-50"),
+            ),
             (LanguageDetector, None),
             (CodeSecurityDetector, None),
         ]
@@ -218,9 +263,11 @@ class TestDetectorTypesMatchSchema:
             "PII",
             "TOXIC",
             "IMAGE_CLASSIFICATION",
+            "TEXT_CLASSIFICATION",
+            "FEATURE_EXTRACTION",
+            "OBJECT_DETECTION",
             "YARA",
             "BROKEN_LINKS",
-            "TEXT_CLASSIFICATION",
             "LANGUAGE",
             "CODE_SECURITY",
             "CUSTOM",
@@ -334,7 +381,13 @@ class TestDetectorNames:
             (ImageClassificationDetector, None, "image_classification"),
             (YaraDetector, ThreatDetectorConfig(), "yara"),
             (BrokenLinksDetector, BrokenLinksDetectorConfig(), "broken_links"),
-            (TextClassificationDetector, TextClassificationDetectorConfig(model="mrm8488/bert-tiny-finetuned-sms-spam-detection"), "text_classification"),
+            (
+                TextClassificationDetector,
+                TextClassificationDetectorConfig(
+                    model="mrm8488/bert-tiny-finetuned-sms-spam-detection"
+                ),
+                "text_classification",
+            ),
             (LanguageDetector, DetectorConfig(), "language"),
             (CodeSecurityDetector, DetectorConfig(), "code_security"),
             (

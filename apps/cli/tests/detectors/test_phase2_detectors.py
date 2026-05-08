@@ -6,8 +6,6 @@ from src.detectors.base import BaseDetector
 from src.detectors.content.language_detector import LanguageDetector
 from src.detectors.content.text_classification_detector import TextClassificationDetector
 from src.models.generated_detectors import (
-    DetectorConfig,
-    GenericDetectorConfig,
     LanguageDetectorConfig,
     TextClassificationDetectorConfig,
 )
@@ -21,14 +19,14 @@ def _stub_text_classification_detector(predictions):
     detector._cfg = config
     detector._model_id = "stub/classifier"
     detector._severity_map = None
-    detector.pipeline = lambda text, **kwargs: predictions
+    detector.pipeline = lambda _text, **_kwargs: predictions
     return detector
 
 
 def _stub_language_detector(raw_result):
     class _Module:
         @staticmethod
-        def detect(_content, **kwargs):
+        def detect(_content, **_kwargs):
             # Return as list of candidates (matching real fast_langdetect API)
             return [raw_result] if isinstance(raw_result, dict) else raw_result
 

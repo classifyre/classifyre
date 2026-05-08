@@ -201,7 +201,7 @@ disallow_any_generics = true
 no_implicit_optional = true
 show_error_codes = true
 plugins = ["pydantic.mypy"]
-exclude = ["scripts/"]
+exclude = ["scripts/", ".venv/"]
 
 [[tool.mypy.overrides]]
 module = ["jsonschema.*", "requests.*", "schemas.*"]
@@ -248,6 +248,10 @@ module = [
     "setfit",
     "sklearn.*",
     "sklearn",
+    "numpy",
+    "numpy.*",
+    "tldextract",
+    "tldextract.*",
 ]
 ignore_missing_imports = true
 
@@ -283,7 +287,7 @@ module = [
     "src.utils.*",
     "src.outputs.*",
 ]
-disable_error_code = ["call-arg", "assignment", "no-untyped-def", "no-untyped-call", "no-any-return", "union-attr", "attr-defined", "arg-type", "misc", "list-item", "comparison-overlap", "type-arg", "return-value", "dict-item", "unused-ignore", "index", "union-attr", "method-assign"]
+disable_error_code = ["call-arg", "assignment", "no-untyped-def", "no-untyped-call", "no-any-return", "union-attr", "attr-defined", "arg-type", "misc", "list-item", "comparison-overlap", "type-arg", "return-value", "dict-item", "unused-ignore", "index", "union-attr", "method-assign", "import-not-found", "import-untyped"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

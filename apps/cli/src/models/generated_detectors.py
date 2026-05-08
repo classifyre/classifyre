@@ -21,6 +21,8 @@ class DetectorType(StrEnum):
     YARA = 'YARA'
     BROKEN_LINKS = 'BROKEN_LINKS'
     TEXT_CLASSIFICATION = 'TEXT_CLASSIFICATION'
+    FEATURE_EXTRACTION = 'FEATURE_EXTRACTION'
+    OBJECT_DETECTION = 'OBJECT_DETECTION'
     LANGUAGE = 'LANGUAGE'
     CODE_SECURITY = 'CODE_SECURITY'
     CUSTOM = 'CUSTOM'
@@ -631,6 +633,128 @@ class ImageClassificationDetectorConfig(DetectorConfig):
     )
 
 
+class PoolingStrategy(StrEnum):
+    """
+    How to aggregate per-token hidden states into a single embedding vector. 'mean' (recommended) averages all token embeddings. 'cls' uses the first [CLS] token. 'max' takes element-wise maximum. 'none' returns all token embeddings as a list.
+    """
+
+    mean = 'mean'
+    cls = 'cls'
+    max = 'max'
+    none = 'none'
+
+
+class FeatureExtractionDetectorConfig(DetectorConfig):
+    """
+    Generates dense vector embeddings from text using the HuggingFace feature-extraction pipeline. Accepts any encoder model from the hub or a local directory. Configure pooling_strategy and normalize_embeddings to control the output representation. Embeddings are stored in finding metadata for downstream use in semantic search, clustering, RAG, and anomaly detection.
+    """
+
+    model: str | None = Field(
+        None,
+        description="HuggingFace hub ID (e.g. 'BAAI/bge-base-en-v1.5', 'sentence-transformers/all-MiniLM-L6-v2') or absolute local directory path. Required — raises an error when null.",
+    )
+    model_revision: str | None = Field(
+        None,
+        description='Git branch, tag, or commit hash when fetching a model from the HuggingFace hub. Ignored for local paths.',
+    )
+    device: str | None = Field(
+        'cpu',
+        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
+    )
+    pooling_strategy: PoolingStrategy | None = Field(
+        'mean',
+        description="How to aggregate per-token hidden states into a single embedding vector. 'mean' (recommended) averages all token embeddings. 'cls' uses the first [CLS] token. 'max' takes element-wise maximum. 'none' returns all token embeddings as a list.",
+    )
+    normalize_embeddings: bool | None = Field(
+        True,
+        description='L2-normalise the final embedding vector. Strongly recommended for cosine-similarity workloads and vector database indexing.',
+    )
+    truncation: bool | None = Field(
+        True,
+        description="Truncate input to the model's maximum sequence length. Disable only if the model and tokenizer support arbitrary length.",
+    )
+    max_length: int | None = Field(
+        None,
+        description="Override the tokenizer's default maximum sequence length. When null the model's configured max_length is used.",
+    )
+    batch_size: int | None = Field(
+        8,
+        description='Number of texts to encode in a single forward pass. Increase for throughput on GPU, decrease to reduce memory usage.',
+    )
+    max_findings: int | None = Field(
+        None,
+        description='Maximum number of embedding findings to return per asset. Typically 1 per chunk.',
+    )
+
+
+class ObjectDetectionSeverityRule(BaseModel):
+    """
+    Maps a detected object label to a severity level. Pattern is matched case-insensitively as a regex against the label.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    pattern: str = Field(
+        ...,
+        description="Case-insensitive regex matched against the detected object label (e.g. 'person', 'weapon', 'face').",
+    )
+    severity: Severity
+
+
+class NmsThreshold(RootModel[float]):
+    root: float = Field(
+        ...,
+        description="IoU threshold for non-maximum suppression applied after inference to remove duplicate overlapping boxes. When null the model's default post-processing is used.",
+        ge=0.0,
+        le=1.0,
+    )
+
+
+class ObjectDetectionDetectorConfig(DetectorConfig):
+    """
+    Detects and localises objects in images using the HuggingFace object-detection pipeline. Accepts any detection model — DETR, RT-DETR, OWL-ViT, YOLOS, and others. Each detected object produces a finding with its label, confidence score, and bounding box coordinates. Use severity_map to assign severity to specific object classes.
+    """
+
+    model: str | None = Field(
+        None,
+        description="HuggingFace hub ID (e.g. 'facebook/detr-resnet-50', 'PekingU/rtdetr_r50vd', 'hustvl/yolos-small') or absolute local directory path. Required — raises an error when null.",
+    )
+    model_revision: str | None = Field(
+        None,
+        description='Git branch, tag, or commit hash when fetching a model from the HuggingFace hub. Ignored for local paths.',
+    )
+    device: str | None = Field(
+        'cpu',
+        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
+    )
+    confidence_threshold: float | None = Field(
+        0.5,
+        description='Minimum detection confidence to report an object as a finding (0-1). Lower values increase recall but add false positives.',
+        ge=0.0,
+        le=1.0,
+    )
+    top_k: int | None = Field(
+        None,
+        description='Keep only the top-k highest-confidence detections per image. When null all detections above confidence_threshold are returned.',
+    )
+    nms_threshold: NmsThreshold | None = Field(
+        None,
+        description="IoU threshold for non-maximum suppression applied after inference to remove duplicate overlapping boxes. When null the model's default post-processing is used.",
+    )
+    min_box_area: int | None = Field(
+        None,
+        description='Minimum bounding-box area in pixels (width × height). Detections smaller than this are suppressed. Useful for filtering noise in large images.',
+    )
+    severity_map: list[ObjectDetectionSeverityRule] | None = Field(
+        None,
+        description="Ordered rules mapping detected object labels to severity levels. First matching rule wins. Labels with no matching rule receive 'info' severity.",
+    )
+    max_findings: int | None = Field(
+        None, description='Maximum number of object findings to return per image.'
+    )
+
+
 class BrokenLinksDetectorConfig(DetectorConfig):
     """
     Configuration for broken links detector
@@ -1046,6 +1170,8 @@ class DetectorsRefactored(
         | CustomDetectorConfig
         | TextClassificationDetectorConfig
         | ImageClassificationDetectorConfig
+        | FeatureExtractionDetectorConfig
+        | ObjectDetectionDetectorConfig
         | CodeSecurityDetectorConfig
         | LanguageDetectorConfig
         | GenericDetectorConfig
@@ -1060,6 +1186,8 @@ class DetectorsRefactored(
         | CustomDetectorConfig
         | TextClassificationDetectorConfig
         | ImageClassificationDetectorConfig
+        | FeatureExtractionDetectorConfig
+        | ObjectDetectionDetectorConfig
         | CodeSecurityDetectorConfig
         | LanguageDetectorConfig
         | GenericDetectorConfig
