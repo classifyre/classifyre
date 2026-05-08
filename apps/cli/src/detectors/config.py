@@ -9,11 +9,10 @@ from ..models.generated_detectors import (
     ContentDetectorConfig,
     CustomDetectorConfig,
     DetectorConfig,
-    NSFWDetectorConfig,
+    ImageClassificationDetectorConfig,
     PIIDetectorConfig,
-    PromptInjectionDetectorConfig,
     SecretsDetectorConfig,
-    SpamDetectorConfig,
+    TextClassificationDetectorConfig,
     ThreatDetectorConfig,
 )
 
@@ -25,20 +24,18 @@ type DetectorTypedConfig = (
     | PIIDetectorConfig
     | ThreatDetectorConfig
     | BrokenLinksDetectorConfig
-    | SpamDetectorConfig
-    | NSFWDetectorConfig
-    | PromptInjectionDetectorConfig
+    | TextClassificationDetectorConfig
+    | ImageClassificationDetectorConfig
 )
 
 _DETECTOR_NAME_BY_TYPE: dict[str, str] = {
     "SECRETS": "secrets",
     "PII": "pii",
     "TOXIC": "toxic",
-    "NSFW": "nsfw",
+    "IMAGE_CLASSIFICATION": "image_classification",
     "YARA": "yara",
     "BROKEN_LINKS": "broken_links",
-    "PROMPT_INJECTION": "prompt_injection",
-    "SPAM": "spam",
+    "TEXT_CLASSIFICATION": "text_classification",
     "LANGUAGE": "language",
     "CODE_SECURITY": "code_security",
     "CUSTOM": "custom",
@@ -46,14 +43,13 @@ _DETECTOR_NAME_BY_TYPE: dict[str, str] = {
 
 _DETECTOR_CONFIG_BY_TYPE: dict[str, type[DetectorConfig]] = {
     "TOXIC": ContentDetectorConfig,
-    "NSFW": NSFWDetectorConfig,
+    "IMAGE_CLASSIFICATION": ImageClassificationDetectorConfig,
     "SECRETS": SecretsDetectorConfig,
     "PII": PIIDetectorConfig,
     "YARA": ThreatDetectorConfig,
     "BROKEN_LINKS": BrokenLinksDetectorConfig,
     "CUSTOM": CustomDetectorConfig,
-    "SPAM": SpamDetectorConfig,
-    "PROMPT_INJECTION": PromptInjectionDetectorConfig,
+    "TEXT_CLASSIFICATION": TextClassificationDetectorConfig,
 }
 
 

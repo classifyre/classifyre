@@ -167,7 +167,7 @@ export default function SemanticLayerDocsPage() {
             system translates that into detector types like{" "}
             <code className="font-mono text-xs">SECRETS</code>,{" "}
             <code className="font-mono text-xs">YARA</code>, and{" "}
-            <code className="font-mono text-xs">PROMPT_INJECTION</code>.
+            <code className="font-mono text-xs">CODE_SECURITY</code>.
           </p>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

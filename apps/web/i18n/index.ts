@@ -1,5 +1,5 @@
-import enTranslations from "./en.json";
-import deTranslations from "./de.json";
+import enTranslations from "./en.ts";
+import deTranslations from "./de.ts";
 
 type Translations = typeof enTranslations;
 

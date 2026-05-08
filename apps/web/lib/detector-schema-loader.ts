@@ -80,6 +80,7 @@ function resolveRef(
     if (current && typeof current === "object" && segment) {
       current = (current as Record<string, unknown>)[segment];
     } else {
+      console.warn(`Schema reference not found: ${ref}`);
       return undefined;
     }
   }
@@ -149,6 +150,9 @@ function resolveSchemaRefs(
     if (resolved) {
       return resolveSchemaRefs(resolved, rootSchema);
     }
+    console.warn(`Failed to resolve ${schema.$ref}, stripping reference`);
+    const { $ref, ...rest } = schema;
+    return rest as JSONSchema7;
   }
 
   if (schema.properties) {
@@ -193,7 +197,8 @@ const configSchemaByDetectorType: Record<string, string> = {
   SECRETS: "SecretsDetectorConfig",
   PII: "PIIDetectorConfig",
   TOXIC: "ContentDetectorConfig",
-  NSFW: "ContentDetectorConfig",
+  IMAGE_CLASSIFICATION: "ImageClassificationDetectorConfig",
+  TEXT_CLASSIFICATION: "TextClassificationDetectorConfig",
   YARA: "ThreatDetectorConfig",
   BROKEN_LINKS: "BrokenLinksDetectorConfig",
   CUSTOM: "CustomDetectorConfig",
@@ -203,7 +208,7 @@ const upperAcronyms = new Set([
   "AI",
   "OCR",
   "PII",
-  "NSFW",
+  "IMAGE_CLASSIFICATION",
   "URL",
   "DEID",
   "YARA",

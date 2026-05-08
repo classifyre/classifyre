@@ -3,7 +3,7 @@
 import pytest
 
 from src.detectors.secrets.detector import SecretsDetector
-from src.models.generated_detectors import DetectorConfig, Severity
+from src.models.generated_detectors import DetectorConfig, SecretsDetectorConfig, Severity
 
 
 @pytest.mark.asyncio
@@ -18,9 +18,9 @@ async def test_secrets_detector_initialization():
 @pytest.mark.asyncio
 async def test_secrets_detector_initialization_with_config():
     """Test secrets detector with custom config."""
-    config = DetectorConfig(confidence_threshold=0.95)
+    config = SecretsDetectorConfig(confidence_threshold=0.95)
     detector = SecretsDetector(config)
-    assert detector.config.confidence_threshold == 0.95
+    assert detector._cfg.confidence_threshold == 0.95
 
 
 @pytest.mark.asyncio
@@ -128,7 +128,7 @@ async def test_no_false_positives_clean_content(sample_clean_content):
 @pytest.mark.asyncio
 async def test_confidence_threshold_filtering():
     """Test that confidence threshold filters low-confidence results."""
-    config = DetectorConfig(confidence_threshold=0.95)
+    config = SecretsDetectorConfig(confidence_threshold=0.95)
     detector = SecretsDetector(config)
 
     # Ambiguous content that might have low confidence
@@ -198,7 +198,7 @@ async def test_max_findings_limit():
     key3=AKIAIOSFODNN7THIRD
     """
 
-    config = DetectorConfig(max_findings=1)
+    config = SecretsDetectorConfig(max_findings=1)
     detector = SecretsDetector(config)
     results = await detector.detect(content)
 

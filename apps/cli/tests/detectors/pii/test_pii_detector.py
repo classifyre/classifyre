@@ -31,9 +31,9 @@ async def test_pii_detector_initialization():
 @requires_presidio
 @pytest.mark.asyncio
 async def test_pii_detector_initialization_with_config():
-    config = DetectorConfig(confidence_threshold=0.9)
+    config = PIIDetectorConfig(confidence_threshold=0.9)
     detector = PIIDetector(config)
-    assert detector.config.confidence_threshold == 0.9
+    assert detector._cfg.confidence_threshold == 0.9
 
 
 @requires_presidio
@@ -125,7 +125,7 @@ async def test_no_false_positives_clean_content(sample_clean_content):
 @requires_presidio
 @pytest.mark.asyncio
 async def test_confidence_threshold_filtering():
-    config = DetectorConfig(confidence_threshold=0.95)
+    config = PIIDetectorConfig(confidence_threshold=0.95)
     detector = PIIDetector(config)
 
     content = "Call me at 123-456-7890"
@@ -168,7 +168,7 @@ Phone: 555-1111
 SSN: 111-22-3333
 Card: 4111-1111-1111-1111
 """
-    config = DetectorConfig(max_findings=2)
+    config = PIIDetectorConfig(max_findings=2)
     detector = PIIDetector(config)
     results = await detector.detect(content)
     assert len(results) <= 2

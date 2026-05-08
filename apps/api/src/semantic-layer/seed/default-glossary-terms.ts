@@ -9,7 +9,7 @@ export const DEFAULT_GLOSSARY_TERMS = [
       'All findings related to security vulnerabilities including exposed secrets, malware signatures, and prompt injection attempts.',
     category: 'Security',
     filterMapping: {
-      detectorTypes: ['SECRETS', 'YARA', 'PROMPT_INJECTION', 'CODE_SECURITY'],
+      detectorTypes: ['SECRETS', 'YARA', 'CODE_SECURITY'],
     },
     color: '#ff2b2b',
     icon: 'shield-alert',
@@ -39,10 +39,10 @@ export const DEFAULT_GLOSSARY_TERMS = [
   {
     displayName: 'Content Safety Issues',
     description:
-      'Toxic, NSFW, biased, hateful, or otherwise inappropriate content detected in scanned sources.',
+      'Toxic, biased, hateful, or otherwise inappropriate content detected in scanned sources. Includes image-classification findings.',
     category: 'Content Safety',
     filterMapping: {
-      detectorTypes: ['TOXIC', 'NSFW'],
+      detectorTypes: ['TOXIC', 'IMAGE_CLASSIFICATION'],
     },
     color: '#ef4444',
     icon: 'alert-triangle',
@@ -75,7 +75,7 @@ export const DEFAULT_GLOSSARY_TERMS = [
       'Findings related to data quality including broken links, duplicates, stale content, and content quality issues.',
     category: 'Quality',
     filterMapping: {
-      detectorTypes: ['BROKEN_LINKS', 'SPAM'],
+      detectorTypes: ['BROKEN_LINKS', 'TEXT_CLASSIFICATION'],
     },
     color: '#06b6d4',
     icon: 'database',

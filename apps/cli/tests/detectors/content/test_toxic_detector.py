@@ -4,7 +4,7 @@ import pytest
 
 from src.detectors.content.toxic_detector import ToxicDetector
 from src.detectors.dependencies import MissingDependencyError, ensure_torch, require_module
-from src.models.generated_detectors import DetectorConfig, Severity
+from src.models.generated_detectors import ContentDetectorConfig, DetectorConfig, Severity
 
 try:
     ensure_torch("toxic", ["content", "detectors"])
@@ -25,9 +25,9 @@ async def test_toxic_detector_initialization():
 @pytest.mark.asyncio
 async def test_toxic_detector_initialization_with_config():
     """Test toxic detector with custom config."""
-    config = DetectorConfig(confidence_threshold=0.8)
+    config = ContentDetectorConfig(confidence_threshold=0.8)
     detector = ToxicDetector(config)
-    assert detector.config.confidence_threshold == 0.8
+    assert detector._cfg.confidence_threshold == 0.8
 
 
 @pytest.mark.asyncio
@@ -109,7 +109,7 @@ async def test_no_false_positives_clean_text(sample_clean_text):
 @pytest.mark.asyncio
 async def test_confidence_threshold_filtering():
     """Test that confidence threshold filters results."""
-    config = DetectorConfig(confidence_threshold=0.9)
+    config = ContentDetectorConfig(confidence_threshold=0.9)
     detector = ToxicDetector(config)
 
     # Mildly negative but not clearly toxic
@@ -162,7 +162,7 @@ async def test_max_findings_limit():
     # Text with multiple toxic elements
     content = "You are stupid. You are an idiot. You are worthless."
 
-    config = DetectorConfig(max_findings=1)
+    config = ContentDetectorConfig(max_findings=1)
     detector = ToxicDetector(config)
     results = await detector.detect(content)
 

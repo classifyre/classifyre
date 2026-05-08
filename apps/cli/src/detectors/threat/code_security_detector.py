@@ -9,7 +9,7 @@ from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import DetectorConfig, GenericDetectorConfig, Severity
 from ...models.generated_single_asset_scan_results import (
     DetectionResult,
     DetectorType,
@@ -28,6 +28,9 @@ class CodeSecurityDetector(BaseDetector):
 
     def __init__(self, config: DetectorConfig | None = None):
         super().__init__(config)
+        self._cfg: GenericDetectorConfig = (
+            config if isinstance(config, GenericDetectorConfig) else GenericDetectorConfig()
+        )
         # Importing `bandit` eagerly can trigger stevedore plugin discovery noise.
         # We only verify Bandit availability here; execution happens in a subprocess.
         if find_spec("bandit") is None:
@@ -102,8 +105,8 @@ class CodeSecurityDetector(BaseDetector):
         if not content.strip():
             return []
 
-        threshold = self.config.confidence_threshold or 0.7
-        max_findings = self.config.max_findings or 25
+        threshold = self._cfg.confidence_threshold or 0.7
+        max_findings = self._cfg.max_findings or 25
         findings: list[DetectionResult] = []
 
         issues, errors = self._run_bandit_json(content)

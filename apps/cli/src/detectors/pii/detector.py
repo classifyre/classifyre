@@ -10,7 +10,7 @@ import warnings
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import DetectorConfig, PIIDetectorConfig, Severity
 from ...models.generated_single_asset_scan_results import DetectionResult, DetectorType, Location
 from ..base import BaseDetector
 from ..dependencies import MissingDependencyError, require_module
@@ -228,6 +228,9 @@ class PIIDetector(BaseDetector):
 
     def __init__(self, config: DetectorConfig | None = None) -> None:
         super().__init__(config)
+        self._cfg: PIIDetectorConfig = (
+            config if isinstance(config, PIIDetectorConfig) else PIIDetectorConfig()
+        )
         self._init_error: MissingDependencyError | None = None
         self.analyzer: Any = None
         self._supported_entities_cache: frozenset[str] | None = None
@@ -431,7 +434,7 @@ class PIIDetector(BaseDetector):
 
     def _enabled_entities(self) -> set[str] | None:
         """Return the set of enabled Presidio entity types, or None for all."""
-        configured = getattr(self.config, "enabled_patterns", None)
+        configured = self._cfg.enabled_patterns
         if not configured:
             return None
         normalized = {str(p).strip().upper() for p in configured if str(p).strip()}
@@ -658,7 +661,7 @@ class PIIDetector(BaseDetector):
             )
             return None
 
-        threshold = self.config.confidence_threshold or 0.7
+        threshold = self._cfg.confidence_threshold or 0.7
         results: list[DetectionResult] = []
 
         for cell in cells:
@@ -807,15 +810,15 @@ class PIIDetector(BaseDetector):
     def _detect_sync(self, content: str) -> list[DetectionResult]:
         tabular_results = self._detect_tabular_content(content)
         if tabular_results is not None:
-            if self.config.max_findings and len(tabular_results) > self.config.max_findings:
-                return tabular_results[: self.config.max_findings]
+            if self._cfg.max_findings and len(tabular_results) > self._cfg.max_findings:
+                return tabular_results[: self._cfg.max_findings]
             return tabular_results
 
         enabled = self._enabled_entities()
         entities = sorted(enabled) if enabled else None
         analyzer_results = self._analyze_content(content, entities=entities)
 
-        threshold = self.config.confidence_threshold or 0.7
+        threshold = self._cfg.confidence_threshold or 0.7
         results: list[DetectionResult] = []
 
         for result in analyzer_results:
@@ -837,8 +840,8 @@ class PIIDetector(BaseDetector):
             if detection.confidence >= threshold:
                 results.append(detection)
 
-        if self.config.max_findings and len(results) > self.config.max_findings:
-            results = results[: self.config.max_findings]
+        if self._cfg.max_findings and len(results) > self._cfg.max_findings:
+            results = results[: self._cfg.max_findings]
 
         return results
 

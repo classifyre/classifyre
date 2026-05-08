@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import DetectorConfig, GenericDetectorConfig, Severity
 from ...models.generated_single_asset_scan_results import (
     DetectionResult,
     DetectorType,
@@ -22,6 +22,9 @@ class LanguageDetector(BaseDetector):
 
     def __init__(self, config: DetectorConfig | None = None):
         super().__init__(config)
+        self._cfg: GenericDetectorConfig = (
+            config if isinstance(config, GenericDetectorConfig) else GenericDetectorConfig()
+        )
         self._detector_module: Any | None = None
 
         try:
@@ -51,7 +54,7 @@ class LanguageDetector(BaseDetector):
 
         language = str(raw.get("lang", "unknown"))
         score = float(raw.get("score", 0.0))
-        threshold = self.config.confidence_threshold or 0.7
+        threshold = self._cfg.confidence_threshold or 0.7
         if score < threshold:
             return []
 

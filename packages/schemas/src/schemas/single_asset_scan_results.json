@@ -136,11 +136,10 @@
         "SECRETS",
         "PII",
         "TOXIC",
-        "NSFW",
+        "IMAGE_CLASSIFICATION",
         "YARA",
         "BROKEN_LINKS",
-        "PROMPT_INJECTION",
-        "SPAM",
+        "TEXT_CLASSIFICATION",
         "LANGUAGE",
         "CODE_SECURITY",
         "CUSTOM"

@@ -43,16 +43,16 @@ def test_catalog_categories_are_uppercase_enum_values() -> None:
 def test_catalog_phase0_detectors_are_active() -> None:
     catalog = _load_detector_catalog()
     by_type = {entry["detector_type"]: entry for entry in catalog}
-    assert by_type["PROMPT_INJECTION"]["lifecycle_status"] == "active"
+    assert by_type["SECRETS"]["lifecycle_status"] == "active"
 
 
 def test_catalog_phase2_detectors_are_active_with_safe_models() -> None:
     catalog = _load_detector_catalog()
     by_type = {entry["detector_type"]: entry for entry in catalog}
 
-    assert by_type["SPAM"]["lifecycle_status"] == "active"
-    assert by_type["SPAM"]["recommended_model"] == (
-        "mrm8488/bert-tiny-finetuned-sms-spam-detection"
+    assert by_type["TEXT_CLASSIFICATION"]["lifecycle_status"] == "active"
+    assert by_type["TEXT_CLASSIFICATION"]["recommended_model"] == (
+        "transformers text-classification pipeline"
     )
 
     assert by_type["LANGUAGE"]["lifecycle_status"] == "active"

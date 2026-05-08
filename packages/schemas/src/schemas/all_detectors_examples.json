@@ -67,7 +67,7 @@
       }
     },
     {
-      "name": "Entropy Scanner — Strict",
+      "name": "Entropy Scanner \u2014 Strict",
       "description": "Tightened entropy thresholds to reduce false positives at the cost of some recall. Base64 limit raised to 5.5 and Hex to 3.5. Suitable for automated enforcement pipelines where manual review is unavailable.",
       "config": {
         "enabled_patterns": [
@@ -82,7 +82,7 @@
     },
     {
       "name": "Keyword Heuristics",
-      "description": "detect-secrets KeywordDetector flags variable assignments whose names suggest secrets (e.g. password =, api_key =, secret =) regardless of the value. High false-positive rate by design — treat results as candidates for human review rather than confirmed secrets.",
+      "description": "detect-secrets KeywordDetector flags variable assignments whose names suggest secrets (e.g. password =, api_key =, secret =) regardless of the value. High false-positive rate by design \u2014 treat results as candidates for human review rather than confirmed secrets.",
       "config": {
         "enabled_patterns": [
           "keyword"
@@ -202,7 +202,7 @@
       }
     },
     {
-      "name": "DACH — Germany, Austria, Switzerland",
+      "name": "DACH \u2014 Germany, Austria, Switzerland",
       "description": "DACH-specific national identifiers for German tax IDs (DE_TAX_ID), Austrian social insurance numbers (AT_SVNR), and Swiss AHV pension numbers (CH_AHV), alongside EU-wide patterns for comprehensive DSGVO/DSG compliance.",
       "config": {
         "enabled_patterns": [
@@ -221,7 +221,7 @@
     },
     {
       "name": "Spain",
-      "description": "Spanish national identifiers: NIF (Número de Identificación Fiscal) for citizens and NIE (Número de Identidad de Extranjero) for foreign residents. Combined with global contact patterns for full coverage.",
+      "description": "Spanish national identifiers: NIF (N\u00famero de Identificaci\u00f3n Fiscal) for citizens and NIE (N\u00famero de Identidad de Extranjero) for foreign residents. Combined with global contact patterns for full coverage.",
       "config": {
         "enabled_patterns": [
           "ES_NIF",
@@ -315,7 +315,7 @@
       }
     },
     {
-      "name": "Nordic — Finland & Poland",
+      "name": "Nordic \u2014 Finland & Poland",
       "description": "Finnish personal identity codes (HETU) and Polish PESEL numbers, alongside contact identifiers. Covers local privacy law requirements for Scandinavian and Polish markets.",
       "config": {
         "enabled_patterns": [
@@ -379,7 +379,7 @@
       }
     },
     {
-      "name": "Custom Recognizer — Employee ID",
+      "name": "Custom Recognizer \u2014 Employee ID",
       "description": "Extends the built-in PII detector with a regex recognizer for internal employee IDs (format EMP-XXXXXX). Demonstrates how to detect proprietary identifiers alongside standard PII.",
       "config": {
         "enabled_patterns": [
@@ -410,7 +410,7 @@
       }
     },
     {
-      "name": "Custom Recognizer — Deny List",
+      "name": "Custom Recognizer \u2014 Deny List",
       "description": "Deny-list recognizer for internal code names or sensitive project terms that should be treated as PII in external communications.",
       "config": {
         "enabled_patterns": [
@@ -470,89 +470,592 @@
       }
     }
   ],
-  "NSFW": [
+  "IMAGE_CLASSIFICATION": [
     {
-      "name": "NSFW Standard",
-      "description": "Baseline NSFW screening for visuals.",
+      "name": "NSFW Detection",
+      "description": "Detect sexually explicit or inappropriate images using Falconsai's NSFW model. Labels 'nsfw' and 'explicit' are flagged as critical; 'suggestive' as high; 'normal' as info.",
       "config": {
-        "enabled_patterns": [
-          "nsfw"
-        ],
-        "model_name": "original",
-        "confidence_threshold": 0.7
+        "model": "Falconsai/nsfw_image_detection",
+        "device": "cpu",
+        "top_k": 5,
+        "confidence_threshold": 0.7,
+        "severity_map": [
+          {
+            "pattern": "nsfw",
+            "severity": "critical"
+          },
+          {
+            "pattern": "explicit",
+            "severity": "critical"
+          },
+          {
+            "pattern": "suggestive",
+            "severity": "high"
+          },
+          {
+            "pattern": "normal",
+            "severity": "info"
+          }
+        ]
       }
     },
     {
-      "name": "NSFW Explicit",
-      "description": "Flag explicit content with higher precision.",
+      "name": "General Image Classifier (ViT)",
+      "description": "Baseline ImageNet-1k classification using google/vit-base-patch16-224. Returns the top-5 predicted labels. Useful as a starting point for label discovery before configuring a domain-specific model.",
       "config": {
-        "enabled_patterns": [
-          "nsfw_explicit",
-          "nsfw"
-        ],
-        "model_name": "original",
-        "confidence_threshold": 0.8
+        "model": "google/vit-base-patch16-224",
+        "device": "cpu",
+        "top_k": 5,
+        "confidence_threshold": 0.5
+      }
+    },
+    {
+      "name": "Custom Local Model",
+      "description": "Use a fine-tuned model stored on disk. Point 'model' at the directory that contains config.json and the model weights. Useful for air-gapped deployments or proprietary classifiers.",
+      "config": {
+        "model": "/models/my-fine-tuned-classifier",
+        "device": "cpu",
+        "top_k": 3,
+        "confidence_threshold": 0.6,
+        "severity_map": [
+          {
+            "pattern": "violation",
+            "severity": "critical"
+          },
+          {
+            "pattern": "warning",
+            "severity": "high"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GPU Inference",
+      "description": "Run inference on the first CUDA GPU. Drop-in replacement for the CPU variant \u2014 only 'device' changes. Reduces latency by 5-10\u00d7 for large image batches.",
+      "config": {
+        "model": "Falconsai/nsfw_image_detection",
+        "device": "cuda",
+        "top_k": 5,
+        "confidence_threshold": 0.7,
+        "severity_map": [
+          {
+            "pattern": "nsfw",
+            "severity": "critical"
+          },
+          {
+            "pattern": "explicit",
+            "severity": "critical"
+          },
+          {
+            "pattern": "normal",
+            "severity": "info"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Multi-Label Sigmoid",
+      "description": "Use sigmoid normalization for models trained with multi-label objectives (each label is scored independently). Results in all labels with score >= confidence_threshold being returned rather than a single winner.",
+      "config": {
+        "model": "your-org/multi-label-vision-model",
+        "device": "cpu",
+        "function_to_apply": "sigmoid",
+        "confidence_threshold": 0.5,
+        "severity_map": [
+          {
+            "pattern": "violence",
+            "severity": "critical"
+          },
+          {
+            "pattern": "gore",
+            "severity": "critical"
+          },
+          {
+            "pattern": "hate",
+            "severity": "high"
+          }
+        ]
       }
     }
   ],
   "YARA": [
     {
-      "name": "Baseline YARA",
-      "description": "Default rules with conservative timeouts.",
+      "name": "Secrets \u2014 Cloud Credentials",
+      "description": "Hardcoded cloud-provider credentials and API keys: AWS Access Key IDs, GitHub/GitLab tokens, Slack bot tokens, OpenAI API keys, Stripe live keys, PEM-encoded private keys, and JSON Web Tokens. Near-zero false-positive rate for all structured token formats.",
       "config": {
-        "timeout": 60,
-        "max_findings": 200
-      }
-    },
-    {
-      "name": "Strict YARA",
-      "description": "Higher timeout for deeper scans.",
-      "config": {
-        "timeout": 90,
-        "max_findings": 500
-      }
-    },
-    {
-      "name": "Custom Rules",
-      "description": "Use a custom YARA rules directory.",
-      "config": {
-        "rules_path": "/opt/unstructured/yara",
-        "timeout": 90
-      }
-    }
-  ],
-  "BROKEN_LINKS": [
-    {
-      "name": "Broken Links Check",
-      "description": "Flags links and images that are unreachable or return empty content.",
-      "config": {}
-    }
-  ],
-  "PROMPT_INJECTION": [
-    {
-      "name": "Prompt Injection Baseline",
-      "description": "Heuristic baseline for instruction override and prompt exfiltration attempts.",
-      "config": {
-        "confidence_threshold": 0.7,
-        "max_findings": 25
-      }
-    }
-  ],
-  "SPAM": [
-    {
-      "name": "UGC Spam Filter",
-      "description": "High-throughput spam filtering for user-generated content streams.",
-      "config": {
+        "rules": [
+          {
+            "name": "AWS_Access_Key",
+            "description": "AWS Access Key ID (AKIA prefix)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/AKIA[0-9A-Z]{16}/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "GitHub_Token",
+            "description": "GitHub Personal Access Token (ghp_, gho_, ghs_, ghu_, ghr_ prefix)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/gh[pousr]_[A-Za-z0-9_]{36,}/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "GitLab_Token",
+            "description": "GitLab Personal Access or Deploy Token (glpat- prefix)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/glpat-[A-Za-z0-9_\\-]{20,}/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Slack_Token",
+            "description": "Slack API token \u2014 bot (xoxb), app (xoxa), user (xoxp), or refresh (xoxr)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/xoxb-[0-9]+-[A-Za-z0-9\\-]+/ ascii",
+              "/xoxa-[0-9]+-[A-Za-z0-9\\-]+/ ascii",
+              "/xoxp-[0-9]+-[A-Za-z0-9\\-]+/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "OpenAI_API_Key",
+            "description": "OpenAI API key (sk- prefix, 48+ chars)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/sk-[A-Za-z0-9]{48,}/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Stripe_Live_Key",
+            "description": "Stripe live secret key (sk_live_) or restricted key (rk_live_)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/sk_live_[A-Za-z0-9]{24,}/ ascii",
+              "/rk_live_[A-Za-z0-9]{24,}/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "PEM_Private_Key",
+            "description": "PEM-encoded private key block (RSA, EC, PKCS8, etc.)",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "\"-----BEGIN\" ascii",
+              "\"PRIVATE KEY\" nocase ascii"
+            ],
+            "condition": "$s0 and $s1"
+          },
+          {
+            "name": "JWT_Token",
+            "description": "JSON Web Token \u2014 three base64url segments separated by dots",
+            "severity": "high",
+            "category": "secrets",
+            "strings": [
+              "/eyJ[A-Za-z0-9_\\-]+\\.eyJ[A-Za-z0-9_\\-]+\\.[A-Za-z0-9_\\-]+/ ascii"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 30,
         "confidence_threshold": 0.8,
         "max_findings": 500
       }
     },
     {
-      "name": "Spam Audit",
-      "description": "Broader retrospective spam analysis across existing content.",
+      "name": "Malware \u2014 Process Injection & Offensive Tools",
+      "description": "Detects Windows process-injection API sequences (requires 2 of 7 known APIs), known offensive tools by name (mimikatz, msfvenom, meterpreter, pypykatz, CobaltStrike), and registry run-key persistence patterns.",
       "config": {
-        "confidence_threshold": 0.65,
-        "max_findings": 1000
+        "rules": [
+          {
+            "name": "Process_Injection_APIs",
+            "description": "Two or more process-injection Win32 API names \u2014 high-confidence indicator of reflective DLL injection or process hollowing",
+            "severity": "critical",
+            "category": "malware",
+            "strings": [
+              "\"CreateRemoteThread\" nocase ascii",
+              "\"VirtualAllocEx\" nocase ascii",
+              "\"WriteProcessMemory\" nocase ascii",
+              "\"NtUnmapViewOfSection\" nocase ascii",
+              "\"RtlCreateUserThread\" nocase ascii",
+              "\"QueueUserAPC\" nocase ascii",
+              "\"SetThreadContext\" nocase ascii"
+            ],
+            "condition": "2 of ($s*)"
+          },
+          {
+            "name": "Known_Offensive_Tools",
+            "description": "References to well-known post-exploitation and credential-dump tools",
+            "severity": "critical",
+            "category": "malware",
+            "strings": [
+              "\"mimikatz\" nocase ascii",
+              "\"msfvenom\" nocase ascii",
+              "\"meterpreter\" nocase ascii",
+              "\"pypykatz\" nocase ascii",
+              "\"cobaltstrike\" nocase ascii",
+              "\"beacon.dll\" nocase ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Registry_Persistence",
+            "description": "Windows registry run-key persistence or scheduled-task creation",
+            "severity": "high",
+            "category": "malware",
+            "strings": [
+              "\"CurrentVersion\\\\Run\" nocase ascii",
+              "\"CurrentVersion\\\\RunOnce\" nocase ascii",
+              "\"CurrentControlSet\\\\Services\" nocase ascii"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 60,
+        "confidence_threshold": 0.75,
+        "max_findings": 100
+      }
+    },
+    {
+      "name": "Suspicious Scripts \u2014 PowerShell & Shell",
+      "description": "Detects PowerShell download-and-execute chains (Net.WebClient + IEX), base64-encoded commands (-EncodedCommand, FromBase64String), shell curl/wget piped to an interpreter, Python exec+encoding obfuscation, and JavaScript eval/fromCharCode patterns.",
+      "config": {
+        "rules": [
+          {
+            "name": "PowerShell_Download_Exec",
+            "description": "PowerShell: download function combined with expression executor \u2014 classic cradle pattern",
+            "severity": "high",
+            "category": "suspicious_scripts",
+            "strings": [
+              "/DownloadString|DownloadFile|Invoke-WebRequest|Net\\.WebClient/ ascii nocase",
+              "/IEX|Invoke-Expression/ ascii nocase"
+            ],
+            "condition": "$s0 and $s1"
+          },
+          {
+            "name": "PowerShell_Encoded_Command",
+            "description": "PowerShell base64 command encoding \u2014 used to evade command-line logging",
+            "severity": "high",
+            "category": "suspicious_scripts",
+            "strings": [
+              "/-EncodedCommand|-enc |FromBase64String|\\[Convert\\]::FromBase64String/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Shell_Curl_Pipe_Exec",
+            "description": "Shell: curl or wget output piped directly into an interpreter",
+            "severity": "high",
+            "category": "suspicious_scripts",
+            "strings": [
+              "/curl|wget/ ascii",
+              "/\\| bash|\\| sh|\\| python|\\| perl/ ascii"
+            ],
+            "condition": "$s0 and $s1"
+          },
+          {
+            "name": "Python_Exec_Obfuscation",
+            "description": "Python obfuscation combining exec/compile with encoding primitives",
+            "severity": "medium",
+            "category": "suspicious_scripts",
+            "strings": [
+              "\"base64.b64decode\" ascii",
+              "\"exec(\" ascii",
+              "\"marshal.loads\" ascii",
+              "\"zlib.decompress\" ascii",
+              "\"compile(\" ascii"
+            ],
+            "condition": "2 of ($s*)"
+          },
+          {
+            "name": "JavaScript_Eval_Obfuscation",
+            "description": "JavaScript obfuscation via eval and character-encoding primitives",
+            "severity": "medium",
+            "category": "suspicious_scripts",
+            "strings": [
+              "\"eval(\" ascii",
+              "\"unescape(\" ascii",
+              "\"fromCharCode\" ascii",
+              "\"atob(\" ascii"
+            ],
+            "condition": "2 of ($s*)"
+          }
+        ],
+        "timeout": 45,
+        "confidence_threshold": 0.7,
+        "max_findings": 200
+      }
+    },
+    {
+      "name": "Office Macro Threats",
+      "description": "Malicious VBA macro patterns: auto-execution entry points (AutoOpen, Workbook_Open), shell spawning via WScript.Shell or ShellExecute combined with cmd.exe/PowerShell, and network downloads via MSXML2 or WinHttp paired with an HTTP URL.",
+      "config": {
+        "rules": [
+          {
+            "name": "VBA_Auto_Execution",
+            "description": "VBA macro auto-execution entry points that run without user interaction",
+            "severity": "high",
+            "category": "office_macros",
+            "strings": [
+              "/AutoOpen|AutoClose|Auto_Exec|Workbook_Open|Document_Open|AutoExec/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "VBA_Shell_Execution",
+            "description": "VBA macro creating a shell to run cmd.exe or PowerShell",
+            "severity": "critical",
+            "category": "office_macros",
+            "strings": [
+              "/WScript\\.Shell|Shell\\(|ShellExecute/ ascii nocase",
+              "/PowerShell|cmd\\.exe|WScript/ ascii nocase"
+            ],
+            "condition": "$s0 and $s1"
+          },
+          {
+            "name": "VBA_Network_Download",
+            "description": "VBA macro downloading content from the network via MSXML or WinHttp",
+            "severity": "critical",
+            "category": "office_macros",
+            "strings": [
+              "/MSXML2\\.XMLHTTP|Msxml2\\.ServerXMLHTTP|WinHttp\\.WinHttpRequest|ADODB\\.Stream/ ascii nocase",
+              "\"http\" nocase ascii"
+            ],
+            "condition": "$s0 and $s1"
+          }
+        ],
+        "timeout": 30,
+        "confidence_threshold": 0.8,
+        "max_findings": 50
+      }
+    },
+    {
+      "name": "PDF Threat Indicators",
+      "description": "Suspicious PDF structure markers in extracted text: embedded JavaScript actions (/JavaScript, /JS, app.alert), auto-open and launch actions (/OpenAction, /Launch, /AA), and form-submit or data-import streams.",
+      "config": {
+        "rules": [
+          {
+            "name": "PDF_Embedded_JavaScript",
+            "description": "PDF with embedded JavaScript action \u2014 can execute code on open",
+            "severity": "high",
+            "category": "pdf_threats",
+            "strings": [
+              "\"/JavaScript\" ascii",
+              "\"/JS \" ascii",
+              "\"app.alert\" nocase ascii",
+              "\"this.exportDataObject\" nocase ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "PDF_Auto_Open_Action",
+            "description": "PDF /OpenAction, /Launch, or /AA stream \u2014 executes on document open",
+            "severity": "high",
+            "category": "pdf_threats",
+            "strings": [
+              "\"/OpenAction\" ascii",
+              "\"/Launch\" ascii",
+              "\"/AA\" ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "PDF_Form_Submit_Or_Import",
+            "description": "PDF form-submission or external data-import action",
+            "severity": "medium",
+            "category": "pdf_threats",
+            "strings": [
+              "\"/SubmitForm\" ascii",
+              "\"/ImportData\" ascii",
+              "\"/URI\" ascii"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 30,
+        "confidence_threshold": 0.75,
+        "max_findings": 100
+      }
+    },
+    {
+      "name": "Supply Chain \u2014 Miners, Reverse Shells & Exfil",
+      "description": "Crypto-miner strings (xmrig, stratum+tcp, mining pool patterns), reverse-shell payloads (/dev/tcp, nc -e /bin/bash), obfuscated npm/pip install hooks (eval+Buffer.from, postinstall), and attacker-controlled exfiltration infrastructure (ngrok, webhook.site, interactsh).",
+      "config": {
+        "rules": [
+          {
+            "name": "Crypto_Miner_Indicators",
+            "description": "Crypto-miner tool names or protocol strings",
+            "severity": "critical",
+            "category": "supply_chain",
+            "strings": [
+              "/xmrig|stratum\\+tcp:\\/\\/|nicehash|minerd|MoneroOcean/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Reverse_Shell_Payload",
+            "description": "Reverse shell via /dev/tcp, nc -e, socat+mkfifo",
+            "severity": "critical",
+            "category": "supply_chain",
+            "strings": [
+              "/\\/dev\\/tcp\\/[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\/[0-9]{2,5}/ ascii",
+              "/nc\\s+\\-[ec]\\s+\\/bin\\/(bash|sh)/ ascii nocase",
+              "/socat.*mkfifo|mkfifo.*socat/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Obfuscated_Install_Hook",
+            "description": "Obfuscated code evaluated inside an npm or pip install lifecycle hook",
+            "severity": "high",
+            "category": "supply_chain",
+            "strings": [
+              "/eval\\s*\\(\\s*Buffer\\.from\\s*\\(/ ascii",
+              "/exec\\s*\\(\\s*require\\s*\\(['\"]buffer['\"]\\)/ ascii"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Exfil_Infrastructure",
+            "description": "Attacker-controlled infrastructure commonly used for out-of-band data exfiltration",
+            "severity": "high",
+            "category": "supply_chain",
+            "strings": [
+              "/ngrok|requestbin|webhook\\.site|burpcollaborator|interactsh/ ascii nocase"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 45,
+        "confidence_threshold": 0.7,
+        "max_findings": 100
+      }
+    },
+    {
+      "name": "Network Threat Indicators",
+      "description": "C2 framework artifacts (CobaltStrike, ReflectiveDll, Metasploit module paths), known RAT strings (QuasarRAT, AsyncRAT, NanoCore, njRAT, DcRAT, Remcos), and DNS-tunneling tools (dnscat, iodine, dns2tcp). Best applied to log exports and configuration dumps.",
+      "config": {
+        "rules": [
+          {
+            "name": "CobaltStrike_Artifacts",
+            "description": "CobaltStrike beacon, ReflectiveDll loader, or Metasploit module path strings",
+            "severity": "critical",
+            "category": "network_ioc",
+            "strings": [
+              "/CobaltStrike|ReflectiveDll|beacon\\.dll|msf\\/module\\// ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Known_RAT_Strings",
+            "description": "Well-known Remote Access Trojan artifact strings embedded in files or configs",
+            "severity": "high",
+            "category": "network_ioc",
+            "strings": [
+              "/QuasarRAT|AsyncRAT|NanoCore|njRAT|DcRAT|Remcos/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "DNS_Tunneling_Tools",
+            "description": "DNS-tunneling tool names used to exfiltrate data over DNS queries",
+            "severity": "high",
+            "category": "network_ioc",
+            "strings": [
+              "/dnscat|iodine|dns2tcp/ ascii nocase"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 30,
+        "confidence_threshold": 0.7,
+        "max_findings": 200
+      }
+    },
+    {
+      "name": "Credential Theft Patterns",
+      "description": "Keylogger and keyboard-hook API names (GetAsyncKeyState, SetWindowsHookEx, WH_KEYBOARD), phishing HTML credential-form structure (password field + PHP action + submit button), and anonymous paste or file-transfer services used for credential exfiltration.",
+      "config": {
+        "rules": [
+          {
+            "name": "Keylogger_APIs",
+            "description": "Windows keyboard-hook API references indicative of a keylogger",
+            "severity": "high",
+            "category": "credential_theft",
+            "strings": [
+              "/GetAsyncKeyState|SetWindowsHookEx|WH_KEYBOARD|keylogger|pynput|keyboard\\.on_press/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "Phishing_Credential_Form",
+            "description": "HTML form structure consistent with a credential-harvesting phishing page",
+            "severity": "high",
+            "category": "credential_theft",
+            "strings": [
+              "/action\\s*=\\s*[\"'][^\"']*\\.php[\"']/ ascii nocase",
+              "/type\\s*=\\s*[\"']password[\"']/ ascii nocase",
+              "/type\\s*=\\s*[\"']submit[\"']/ ascii nocase"
+            ],
+            "condition": "$s0 and $s1 and $s2"
+          },
+          {
+            "name": "Credential_Exfil_Services",
+            "description": "Anonymous paste and file-transfer services frequently abused for credential exfiltration",
+            "severity": "high",
+            "category": "credential_theft",
+            "strings": [
+              "/hastebin|dpaste|termbin|transfer\\.sh/ ascii nocase"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 30,
+        "confidence_threshold": 0.7,
+        "max_findings": 100
+      }
+    },
+    {
+      "name": "Custom Rule \u2014 Internal Token Leak",
+      "description": "Example of a custom rule alongside cloud-credential rules. Detects proprietary internal service tokens in format SVC-XXXXXXXX (8 hex chars) that should never appear in public documents or S3 exports.",
+      "config": {
+        "rules": [
+          {
+            "name": "Internal_Service_Token",
+            "description": "Internal service token in SVC-XXXXXXXX format",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/SVC-[A-F0-9]{8}/ ascii nocase"
+            ],
+            "condition": "any of them"
+          },
+          {
+            "name": "GitHub_Token",
+            "description": "GitHub Personal Access Token",
+            "severity": "critical",
+            "category": "secrets",
+            "strings": [
+              "/gh[pousr]_[A-Za-z0-9_]{36,}/ ascii"
+            ],
+            "condition": "any of them"
+          }
+        ],
+        "timeout": 60,
+        "confidence_threshold": 0.8,
+        "max_findings": 200
       }
     }
   ],
@@ -584,7 +1087,7 @@
   ],
   "CUSTOM": [
     {
-      "description": "GLINER2 support ticket extractor — entities + classification in one pass",
+      "description": "GLINER2 support ticket extractor \u2014 entities + classification in one pass",
       "config": {
         "custom_detector_key": "cust_support_ticket",
         "name": "Support Ticket Extractor",
@@ -605,7 +1108,7 @@
               "required": true
             },
             "amount": {
-              "description": "Monetary value like 50€",
+              "description": "Monetary value like 50\u20ac",
               "required": false
             }
           },
@@ -628,7 +1131,7 @@
       "name": "Support Ticket Extractor"
     },
     {
-      "description": "GLINER2 DACH regulatory entity extractor — entities only",
+      "description": "GLINER2 DACH regulatory entity extractor \u2014 entities only",
       "config": {
         "custom_detector_key": "cust_dach_entity_extractor",
         "name": "DACH Regulatory Entity Extractor",
@@ -664,7 +1167,7 @@
       "name": "DACH Regulatory Entity Extractor"
     },
     {
-      "description": "GLINER2 contract risk classifier — classification only",
+      "description": "GLINER2 contract risk classifier \u2014 classification only",
       "config": {
         "custom_detector_key": "cust_dach_contract_risk",
         "name": "DACH Contract Risk Terms",
@@ -697,7 +1200,7 @@
       "name": "DACH Contract Risk Terms"
     },
     {
-      "description": "REGEX internal product code detector — no ML required",
+      "description": "REGEX internal product code detector \u2014 no ML required",
       "config": {
         "custom_detector_key": "internal_product_codes",
         "name": "Internal Product Code Detector",
@@ -728,7 +1231,7 @@
       "name": "Internal Product Code Detector"
     },
     {
-      "description": "REGEX German invoice PII — postal codes, IBANs, dates",
+      "description": "REGEX German invoice PII \u2014 postal codes, IBANs, dates",
       "config": {
         "custom_detector_key": "cust_invoice_pii_ruleset",
         "name": "German Invoice PII Ruleset",
@@ -744,7 +1247,7 @@
               "description": "German IBAN"
             },
             "zip_city": {
-              "pattern": "\\b\\d{5}\\s+[A-ZÄÖÜ][a-zäöüß]+\\b",
+              "pattern": "\\b\\d{5}\\s+[A-Z\u00c4\u00d6\u00dc][a-z\u00e4\u00f6\u00fc\u00df]+\\b",
               "description": "German postal code + city"
             },
             "invoice_date": {
@@ -774,7 +1277,7 @@
           "type": "REGEX",
           "patterns": {
             "bgb_ref": {
-              "pattern": "§\\s*\\d+(?:\\s+Abs\\.\\s*\\d+)?\\s+(?:ABGB|UGB|ZPO|StGB|AktG|GmbHG)",
+              "pattern": "\u00a7\\s*\\d+(?:\\s+Abs\\.\\s*\\d+)?\\s+(?:ABGB|UGB|ZPO|StGB|AktG|GmbHG)",
               "description": "Austrian law paragraph reference"
             },
             "bgbl_ref": {
@@ -791,7 +1294,7 @@
       "name": "Austrian Legal Citation Detector"
     },
     {
-      "description": "GLINER2 sarcasm & irony detector — classification",
+      "description": "GLINER2 sarcasm & irony detector \u2014 classification",
       "config": {
         "custom_detector_key": "sarcasm_detector",
         "name": "Sarcasm & Irony Detector",
@@ -853,6 +1356,106 @@
         }
       },
       "name": "Vendor & Supplier Entity Extractor"
+    }
+  ],
+  "TEXT_CLASSIFICATION": [
+    {
+      "name": "Spam Detection",
+      "description": "Detect spam and unsolicited promotional content using a lightweight BERT model. Labels matching \"spam\" are flagged as high severity.",
+      "config": {
+        "model": "mrm8488/bert-tiny-finetuned-sms-spam-detection",
+        "device": "cpu",
+        "top_k": null,
+        "confidence_threshold": 0.8,
+        "severity_map": [
+          {
+            "pattern": "spam",
+            "severity": "high"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Sentiment Analysis",
+      "description": "Classify text as positive or negative sentiment using DistilBERT. Negative predictions above threshold are flagged as info-level findings.",
+      "config": {
+        "model": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+        "device": "cpu",
+        "confidence_threshold": 0.85,
+        "severity_map": [
+          {
+            "pattern": "negative",
+            "severity": "medium"
+          },
+          {
+            "pattern": "positive",
+            "severity": "info"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Multi-label Topic Classification",
+      "description": "Classify documents into multiple topics simultaneously using sigmoid activation. Each label is scored independently.",
+      "config": {
+        "model": "your-org/topic-classifier",
+        "device": "cpu",
+        "function_to_apply": "sigmoid",
+        "confidence_threshold": 0.5,
+        "severity_map": [
+          {
+            "pattern": "legal|compliance",
+            "severity": "high"
+          },
+          {
+            "pattern": "finance",
+            "severity": "medium"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GPU Inference",
+      "description": "Run text classification on a CUDA GPU for high-throughput batch processing.",
+      "config": {
+        "model": "mrm8488/bert-tiny-finetuned-sms-spam-detection",
+        "device": "cuda",
+        "confidence_threshold": 0.8,
+        "max_findings": 1000
+      }
+    },
+    {
+      "name": "Local Fine-tuned Model",
+      "description": "Use a proprietary model stored on disk. Useful for air-gapped deployments or domain-specific classifiers.",
+      "config": {
+        "model": "/models/my-text-classifier",
+        "device": "cpu",
+        "confidence_threshold": 0.75,
+        "severity_map": [
+          {
+            "pattern": "violation",
+            "severity": "critical"
+          },
+          {
+            "pattern": "warning",
+            "severity": "high"
+          }
+        ]
+      }
+    }
+  ],
+  "BROKEN_LINKS": [
+    {
+      "name": "Default Broken Links",
+      "description": "Check all links in the asset for reachability with default settings.",
+      "config": {}
+    },
+    {
+      "name": "Capped Scan",
+      "description": "Limit findings to the first 100 broken links to keep reports concise.",
+      "config": {
+        "max_findings": 100
+      }
     }
   ]
 }
