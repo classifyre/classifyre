@@ -180,6 +180,7 @@ export default function NewSandboxScanPage() {
         type: string;
         enabled: boolean;
         config: Record<string, unknown>;
+        custom_detector_key?: string;
       }> = [...enabledDetectors];
 
       if (selectedCustomDetectorIds.length > 0) {
@@ -189,7 +190,8 @@ export default function NewSandboxScanPage() {
             const response = await fetch(`${base}/custom-detectors/${id}`);
             if (!response.ok) return null;
             return response.json() as Promise<{
-              config: Record<string, unknown>;
+              key?: string;
+              config?: Record<string, unknown>;
             }>;
           }),
         );
@@ -199,6 +201,7 @@ export default function NewSandboxScanPage() {
           detectorPayload.push({
             type: "CUSTOM",
             enabled: true,
+            custom_detector_key: customDetector.key ?? "",
             config: customDetector.config ?? {},
           });
         }

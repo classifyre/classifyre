@@ -35,7 +35,7 @@ Options:
 Examples:
   ./scripts/deploy-develop.sh
   ./scripts/deploy-develop.sh feat-my-pr
-  ./scripts/deploy-develop.sh --demo-mode false
+  ./scripts/deploy-develop.sh -t develop --demo-mode false
   ./scripts/deploy-develop.sh -n classifyre-develop -f /tmp/override.yaml
 EOF
 }

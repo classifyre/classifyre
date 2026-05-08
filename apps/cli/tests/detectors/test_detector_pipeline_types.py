@@ -151,18 +151,19 @@ class TestDetectorPipelineTypes:
         # Should be convertible to DetectorType enum
         assert DetectorType(detector.detector_type.upper()) == DetectorType.TOXIC
 
-    def test_pipeline_from_recipe_nsfw(self, mock_source):
-        """Test pipeline creation with NSFW detector."""
+    def test_pipeline_from_recipe_image_classification(self, mock_source):
+        """Test pipeline creation with IMAGE_CLASSIFICATION detector."""
         if not self._is_torch_available():
-            pytest.skip("PyTorch not installed, skipping nsfw detector test")
+            pytest.skip("PyTorch not installed, skipping image_classification detector test")
 
         recipe = {
             "detectors": [
                 {
-                    "type": "NSFW",
+                    "type": "IMAGE_CLASSIFICATION",
                     "enabled": True,
                     "config": {
-                        "enabled_patterns": ["nsfw", "nsfw_explicit"],
+                        "model": "google/vit-base-patch16-224",
+                        "device": "cpu",
                         "confidence_threshold": 0.8,
                     },
                 }
@@ -173,9 +174,8 @@ class TestDetectorPipelineTypes:
 
         assert len(pipeline.detectors) == 1
         detector = pipeline.detectors[0]
-        assert detector.detector_type == "nsfw"
-        # Should be convertible to DetectorType enum
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.NSFW
+        assert detector.detector_type == "image_classification"
+        assert DetectorType(detector.detector_type.upper()) == DetectorType.IMAGE_CLASSIFICATION
 
     def test_pipeline_from_recipe_yara(self, mock_source):
         """Test pipeline creation with YARA detector."""
@@ -222,17 +222,20 @@ class TestDetectorPipelineTypes:
         assert detector.detector_type == "broken_links"
         assert DetectorType(detector.detector_type.upper()) == DetectorType.BROKEN_LINKS
 
-    def test_pipeline_from_recipe_prompt_injection(self, mock_source):
-        """Test pipeline creation with PROMPT_INJECTION detector."""
+    def test_pipeline_from_recipe_text_classification(self, mock_source):
+        """Test pipeline creation with TEXT_CLASSIFICATION detector."""
         if not self._is_torch_available() or not self._is_dependency_available("transformers"):
-            pytest.skip("transformers/torch not installed, skipping prompt injection test")
+            pytest.skip("transformers/torch not installed, skipping text_classification test")
 
         recipe = {
             "detectors": [
                 {
-                    "type": "PROMPT_INJECTION",
+                    "type": "TEXT_CLASSIFICATION",
                     "enabled": True,
-                    "config": {"confidence_threshold": 0.8},
+                    "config": {
+                        "model": "mrm8488/bert-tiny-finetuned-sms-spam-detection",
+                        "confidence_threshold": 0.8,
+                    },
                 }
             ]
         }
@@ -241,52 +244,8 @@ class TestDetectorPipelineTypes:
 
         assert len(pipeline.detectors) == 1
         detector = pipeline.detectors[0]
-        assert detector.detector_type == "prompt_injection"
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.PROMPT_INJECTION
-
-    def test_pipeline_from_recipe_phishing_url(self, mock_source):
-        """Test pipeline creation with PHISHING_URL detector."""
-        if not self._is_torch_available() or not self._is_dependency_available("transformers"):
-            pytest.skip("transformers/torch not installed, skipping phishing URL test")
-
-        recipe = {
-            "detectors": [
-                {
-                    "type": "PHISHING_URL",
-                    "enabled": True,
-                    "config": {"confidence_threshold": 0.8},
-                }
-            ]
-        }
-
-        pipeline = DetectorPipeline.from_recipe(recipe, source=mock_source, runner_id="test-runner")
-
-        assert len(pipeline.detectors) == 1
-        detector = pipeline.detectors[0]
-        assert detector.detector_type == "phishing_url"
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.PHISHING_URL
-
-    def test_pipeline_from_recipe_spam(self, mock_source):
-        """Test pipeline creation with SPAM detector."""
-        if not self._is_torch_available() or not self._is_dependency_available("transformers"):
-            pytest.skip("transformers/torch not installed, skipping spam test")
-
-        recipe = {
-            "detectors": [
-                {
-                    "type": "SPAM",
-                    "enabled": True,
-                    "config": {"confidence_threshold": 0.8},
-                }
-            ]
-        }
-
-        pipeline = DetectorPipeline.from_recipe(recipe, source=mock_source, runner_id="test-runner")
-
-        assert len(pipeline.detectors) == 1
-        detector = pipeline.detectors[0]
-        assert detector.detector_type == "spam"
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.SPAM
+        assert detector.detector_type == "text_classification"
+        assert DetectorType(detector.detector_type.upper()) == DetectorType.TEXT_CLASSIFICATION
 
     def test_pipeline_from_recipe_language(self, mock_source):
         """Test pipeline creation with LANGUAGE detector."""
@@ -333,25 +292,23 @@ class TestDetectorPipelineTypes:
         assert DetectorType(detector.detector_type.upper()) == DetectorType.CODE_SECURITY
 
     def test_pipeline_from_recipe_custom_ruleset(self, mock_source):
-        """Test pipeline creation with CUSTOM detector."""
+        """Test pipeline creation with CUSTOM (REGEX) detector."""
         recipe = {
             "detectors": [
                 {
                     "type": "CUSTOM",
                     "enabled": True,
                     "config": {
-                        "custom_detector_key": "cust_pipeline_ruleset",
-                        "name": "Pipeline Custom",
-                        "method": "RULESET",
-                        "ruleset": {
-                            "keyword_rules": [
-                                {
-                                    "id": "kw_1",
-                                    "name": "Primary keywords",
-                                    "keywords": ["risk", "vertrag"],
+                        "custom_detector_key": "cust_pipeline_regex",
+                        "name": "Pipeline Custom Regex",
+                        "pipeline_schema": {
+                            "type": "REGEX",
+                            "patterns": {
+                                "keyword": {
+                                    "pattern": r"(?i)\b(?:risk|vertrag)\b",
+                                    "description": "Risk or contract keyword",
                                 }
-                            ],
-                            "regex_rules": [],
+                            },
                         },
                     },
                 }
@@ -476,12 +433,12 @@ class TestDetectorPipelineTypes:
             "SECRETS",
             "PII",
             "TOXIC",
-            "NSFW",
+            "IMAGE_CLASSIFICATION",
             "YARA",
             "BROKEN_LINKS",
-            "PROMPT_INJECTION",
-            "PHISHING_URL",
-            "SPAM",
+            "TEXT_CLASSIFICATION",
+            "FEATURE_EXTRACTION",
+            "OBJECT_DETECTION",
             "LANGUAGE",
             "CODE_SECURITY",
             "CUSTOM",

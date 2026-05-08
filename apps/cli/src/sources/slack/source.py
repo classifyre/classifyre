@@ -302,14 +302,18 @@ class SlackSource(BaseSource):
 
             if len(batch) >= self.BATCH_SIZE:
                 if pipeline:
-                    batch = await pipeline.process(batch)
-                yield batch
+                    async for processed in pipeline.process_stream(batch):
+                        yield [processed]
+                else:
+                    yield batch
                 batch = []
 
         if batch:
             if pipeline:
-                batch = await pipeline.process(batch)
-            yield batch
+                async for processed in pipeline.process_stream(batch):
+                    yield [processed]
+            else:
+                yield batch
 
     def _iter_channel_messages(self, channel_id: str) -> Iterable[dict[str, Any]]:
         cursor: str | None = None

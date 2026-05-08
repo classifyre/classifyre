@@ -21,17 +21,7 @@ const DETECTORS_WITH_USEFUL_METADATA = new Set<string>([
   FindingResponseDtoDetectorTypeEnum.Yara,
   FindingResponseDtoDetectorTypeEnum.Toxic,
   FindingResponseDtoDetectorTypeEnum.Language,
-  FindingResponseDtoDetectorTypeEnum.Spam,
-  FindingResponseDtoDetectorTypeEnum.PromptInjection,
-  FindingResponseDtoDetectorTypeEnum.PhishingUrl,
   FindingResponseDtoDetectorTypeEnum.BrokenLinks,
-  FindingResponseDtoDetectorTypeEnum.OcrPii,
-  FindingResponseDtoDetectorTypeEnum.DeidScore,
-  FindingResponseDtoDetectorTypeEnum.ContentQuality,
-  FindingResponseDtoDetectorTypeEnum.DomainClass,
-  FindingResponseDtoDetectorTypeEnum.ContentType,
-  FindingResponseDtoDetectorTypeEnum.SensitivityTier,
-  FindingResponseDtoDetectorTypeEnum.JurisdictionTag,
 ]);
 
 // Keys to always omit from the display (too internal / redundant with finding fields).

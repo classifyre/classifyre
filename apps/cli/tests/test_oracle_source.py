@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import pytest
@@ -235,6 +236,11 @@ async def test_oracle_extract_runs_detector_pipeline_when_enabled(
         async def process(self, batch: list[Any]) -> list[Any]:
             processed_batches.append(len(batch))
             return batch
+
+        async def process_stream(self, batch: list[Any]) -> AsyncGenerator[Any, None]:
+            processed_batches.append(len(batch))
+            for item in batch:
+                yield item
 
     monkeypatch.setattr(
         "src.pipeline.detector_pipeline.DetectorPipeline.from_recipe",

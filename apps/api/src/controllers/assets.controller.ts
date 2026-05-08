@@ -330,9 +330,14 @@ export class SourceAssetsController {
       this.validationService.validateOutput(source.type, asset);
     }
 
+    const config = source.config as Record<string, any> | null;
+    const samplingStrategy = config?.sampling?.strategy as string | undefined;
+    const isFullScan = samplingStrategy === 'ALL';
+
     // Perform bulk ingestion
     return this.assetService.bulkIngest(sourceId, runnerId, assets, {
       finalizeRun,
+      isFullScan,
     });
   }
 

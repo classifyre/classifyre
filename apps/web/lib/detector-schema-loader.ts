@@ -80,6 +80,7 @@ function resolveRef(
     if (current && typeof current === "object" && segment) {
       current = (current as Record<string, unknown>)[segment];
     } else {
+      console.warn(`Schema reference not found: ${ref}`);
       return undefined;
     }
   }
@@ -149,6 +150,9 @@ function resolveSchemaRefs(
     if (resolved) {
       return resolveSchemaRefs(resolved, rootSchema);
     }
+    console.warn(`Failed to resolve ${schema.$ref}, stripping reference`);
+    const { $ref, ...rest } = schema;
+    return rest as JSONSchema7;
   }
 
   if (schema.properties) {
@@ -192,18 +196,15 @@ function resolveSchemaRefs(
 const configSchemaByDetectorType: Record<string, string> = {
   SECRETS: "SecretsDetectorConfig",
   PII: "PIIDetectorConfig",
-  OCR_PII: "PIIDetectorConfig",
-  DEID_SCORE: "DeidScoreDetectorConfig",
   TOXIC: "ContentDetectorConfig",
-  NSFW: "ContentDetectorConfig",
-  BIAS: "BiasDetectorConfig",
-  CONTENT_QUALITY: "ContentQualityDetectorConfig",
-  DOMAIN_CLASS: "ClassificationDetectorConfig",
-  CONTENT_TYPE: "ClassificationDetectorConfig",
-  SENSITIVITY_TIER: "ClassificationDetectorConfig",
-  JURISDICTION_TAG: "ClassificationDetectorConfig",
+  IMAGE_CLASSIFICATION: "ImageClassificationDetectorConfig",
+  TEXT_CLASSIFICATION: "TextClassificationDetectorConfig",
+  FEATURE_EXTRACTION: "FeatureExtractionDetectorConfig",
+  OBJECT_DETECTION: "ObjectDetectionDetectorConfig",
   YARA: "ThreatDetectorConfig",
   BROKEN_LINKS: "BrokenLinksDetectorConfig",
+  CODE_SECURITY: "CodeSecurityDetectorConfig",
+  LANGUAGE: "GenericDetectorConfig",
   CUSTOM: "CustomDetectorConfig",
 };
 
@@ -211,7 +212,7 @@ const upperAcronyms = new Set([
   "AI",
   "OCR",
   "PII",
-  "NSFW",
+  "IMAGE_CLASSIFICATION",
   "URL",
   "DEID",
   "YARA",

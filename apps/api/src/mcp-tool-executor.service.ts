@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { DemoModeService } from './demo-mode.service';
 import { DemoModeException } from './demo-mode.exception';
-import { CustomDetectorMethod } from '@prisma/client';
 import { CliRunnerService } from './cli-runner/cli-runner.service';
 import { CustomDetectorsService } from './custom-detectors.service';
 import { CustomDetectorTestsService } from './custom-detector-tests.service';
@@ -40,8 +39,7 @@ export type CreateCustomDetectorArgs = {
   key?: string;
   name: string;
   description?: string;
-  method: CustomDetectorMethod;
-  config?: JsonRecord;
+  pipelineSchema: JsonRecord;
   isActive?: boolean;
 };
 
@@ -140,10 +138,7 @@ export class McpToolExecutorService {
 
   async createCustomDetector(args: CreateCustomDetectorArgs) {
     this.assertNotDemoMode();
-    return this.customDetectorsService.create({
-      ...args,
-      config: args.config ?? {},
-    });
+    return this.customDetectorsService.create(args);
   }
 
   async trainCustomDetector(args: TrainCustomDetectorArgs) {

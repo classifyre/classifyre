@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import deque
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -291,12 +291,26 @@ class DatabricksSource(BaseSource):
 
         return collected
 
-    def _connect_sql(self):
-        return self._databricks_sql.connect(
-            server_hostname=self._workspace_host(),
-            http_path=f"/sql/1.0/warehouses/{self._warehouse_id()}",
-            access_token=self._access_token_value(),
-        )
+    def _connect_sql(self, *, session_configuration: dict[str, str] | None = None):
+        kwargs: dict[str, Any] = {
+            "server_hostname": self._workspace_host(),
+            "http_path": f"/sql/1.0/warehouses/{self._warehouse_id()}",
+            "access_token": self._access_token_value(),
+        }
+        if session_configuration is not None:
+            kwargs["session_configuration"] = session_configuration
+        return self._databricks_sql.connect(**kwargs)
+
+    def _connect_sql_with_tz(self):
+        try:
+            return self._connect_sql(session_configuration={"spark.sql.session.timeZone": "UTC"})
+        except Exception as exc:
+            if "CONFIG_NOT_AVAILABLE" in str(exc) or "42K0I" in str(exc):
+                logger.debug(
+                    "Warehouse does not support session timezone config, connecting without it"
+                )
+                return self._connect_sql()
+            raise
 
     def _catalog_allowlist(self) -> set[str] | None:
         configured = self._scope_options().include_catalogs
@@ -569,11 +583,10 @@ class DatabricksSource(BaseSource):
 
         return links
 
-    def _list_notebooks(self) -> list[NotebookRef]:
+    def _iter_notebooks(self) -> Generator[NotebookRef, None, None]:
         if not self._extraction_options().include_notebooks:
-            return []
+            return
 
-        notebooks: list[NotebookRef] = []
         queue: deque[str] = deque(["/"])
         visited_paths: set[str] = set()
 
@@ -617,54 +630,60 @@ class DatabricksSource(BaseSource):
                     continue
 
                 object_id = obj.get("object_id")
-                notebooks.append(
-                    NotebookRef(
-                        path=object_path,
-                        object_id=str(object_id) if object_id is not None else None,
-                        language=(
-                            str(obj.get("language")) if obj.get("language") is not None else None
-                        ),
-                        created_at_ms=(
-                            int(obj["created_at"])
-                            if isinstance(obj.get("created_at"), int)
-                            else None
-                        ),
-                        modified_at_ms=(
-                            int(obj["modified_at"])
-                            if isinstance(obj.get("modified_at"), int)
-                            else None
-                        ),
-                    )
+                yield NotebookRef(
+                    path=object_path,
+                    object_id=str(object_id) if object_id is not None else None,
+                    language=(
+                        str(obj.get("language")) if obj.get("language") is not None else None
+                    ),
+                    created_at_ms=(
+                        int(obj["created_at"]) if isinstance(obj.get("created_at"), int) else None
+                    ),
+                    modified_at_ms=(
+                        int(obj["modified_at"]) if isinstance(obj.get("modified_at"), int) else None
+                    ),
                 )
 
-        return notebooks
-
-    def _list_pipelines(self) -> list[PipelineRef]:
+    def _iter_pipelines(self) -> Generator[PipelineRef, None, None]:
         if not self._extraction_options().include_pipelines:
-            return []
+            return
 
-        values = self._paged_values(
-            "/api/2.0/pipelines",
-            value_keys=("statuses", "pipelines", "value", "items"),
-        )
+        next_page_token: str | None = None
+        while True:
+            params = {}
+            if next_page_token:
+                params["page_token"] = next_page_token
 
-        pipelines: list[PipelineRef] = []
-        for entry in values:
-            pipeline_id = entry.get("pipeline_id") or entry.get("id")
-            if not isinstance(pipeline_id, str) or not pipeline_id:
-                continue
+            try:
+                payload = self._request_json("get", "/api/2.0/pipelines", params=params)
+            except Exception as exc:
+                logger.warning("Could not list Databricks pipelines: %s", exc)
+                break
 
-            name = entry.get("name")
-            state = entry.get("state") or entry.get("health")
-            pipelines.append(
-                PipelineRef(
+            values: list[dict[str, Any]] = []
+            for key in ("statuses", "pipelines", "value", "items"):
+                candidate = payload.get(key)
+                if isinstance(candidate, list):
+                    values = candidate
+                    break
+
+            for entry in values:
+                pipeline_id = entry.get("pipeline_id") or entry.get("id")
+                if not isinstance(pipeline_id, str) or not pipeline_id:
+                    continue
+
+                name = entry.get("name")
+                state = entry.get("state") or entry.get("health")
+                yield PipelineRef(
                     pipeline_id=pipeline_id,
                     name=str(name) if isinstance(name, str) and name else pipeline_id,
                     state=str(state) if isinstance(state, str) and state else None,
                 )
-            )
 
-        return pipelines
+            token = payload.get("next_page_token")
+            if not isinstance(token, str) or not token.strip():
+                break
+            next_page_token = token
 
     def test_connection(self) -> dict[str, Any]:
         logger.info("Testing connection to Databricks Unity Catalog...")
@@ -678,7 +697,7 @@ class DatabricksSource(BaseSource):
             if not catalogs:
                 raise ValueError("No Unity Catalog catalogs available for scanning")
 
-            with closing(self._connect_sql()) as conn:
+            with closing(self._connect_sql_with_tz()) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("SELECT 1")
                     cursor.fetchone()
@@ -827,63 +846,82 @@ class DatabricksSource(BaseSource):
 
             pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
+        # 1. Discover all tables first to establish the scope for lineage links
         tables = self._iter_tables()
-
         table_hash_by_key: dict[tuple[str, str, str], str] = {
             self._table_key(table_ref): self.generate_hash_id(self._table_raw_id(table_ref))
             for table_ref in tables
         }
 
-        lineage_links = self._collect_table_lineage_links(tables)
-
+        # 2. Process tables
+        include_lineage = self._extraction_options().include_table_lineage
         batch: list[SingleAssetScanResults] = []
 
         for table_ref in tables:
             if self._aborted:
                 return
 
-            key = self._table_key(table_ref)
-            linked_hashes = [
-                table_hash_by_key[target]
-                for target in sorted(lineage_links.get(key, set()))
-                if target in table_hash_by_key
-            ]
+            linked_hashes: list[str] = []
+            if include_lineage:
+                try:
+                    upstream_refs = self._lineage_refs_for_table(table_ref)
+                    linked_hashes = [
+                        table_hash_by_key[target]
+                        for target in sorted(upstream_refs)
+                        if target in table_hash_by_key
+                    ]
+                except Exception as exc:
+                    logger.warning(
+                        "Could not resolve Databricks lineage for %s.%s.%s: %s",
+                        table_ref.catalog,
+                        table_ref.schema,
+                        table_ref.table,
+                        exc,
+                    )
 
             asset = self._table_to_asset(table_ref, links=linked_hashes)
             self._table_lookup[asset.hash] = table_ref
-            batch.append(asset)
 
-            if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    batch = await pipeline.process(batch)
-                yield batch
-                batch = []
+            if pipeline:
+                async for processed in pipeline.process_stream([asset]):
+                    yield [processed]
+            else:
+                batch.append(asset)
+                if len(batch) >= self.BATCH_SIZE:
+                    yield batch
+                    batch = []
 
-        for notebook in self._list_notebooks():
+        # 3. Process notebooks
+        for notebook in self._iter_notebooks():
             if self._aborted:
-                return
+                break
 
-            batch.append(self._notebook_to_asset(notebook))
-            if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    batch = await pipeline.process(batch)
-                yield batch
-                batch = []
+            asset = self._notebook_to_asset(notebook)
+            if pipeline:
+                async for processed in pipeline.process_stream([asset]):
+                    yield [processed]
+            else:
+                batch.append(asset)
+                if len(batch) >= self.BATCH_SIZE:
+                    yield batch
+                    batch = []
 
-        for pipeline_ref in self._list_pipelines():
+        # 4. Process pipelines
+        for pipeline_ref in self._iter_pipelines():
             if self._aborted:
-                return
+                break
 
-            batch.append(self._pipeline_to_asset(pipeline_ref))
-            if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    batch = await pipeline.process(batch)
-                yield batch
-                batch = []
+            asset = self._pipeline_to_asset(pipeline_ref)
+            if pipeline:
+                async for processed in pipeline.process_stream([asset]):
+                    yield [processed]
+            else:
+                batch.append(asset)
+                if len(batch) >= self.BATCH_SIZE:
+                    yield batch
+                    batch = []
 
         if batch:
-            if pipeline:
-                batch = await pipeline.process(batch)
             yield batch
 
     def generate_hash_id(self, asset_id: str) -> str:
@@ -932,7 +970,7 @@ class DatabricksSource(BaseSource):
             "ORDER BY ordinal_position"
         )
 
-        with closing(self._connect_sql()) as conn:
+        with closing(self._connect_sql_with_tz()) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(query)
                 columns: list[str] = []
@@ -1003,7 +1041,7 @@ class DatabricksSource(BaseSource):
 
     def _count_table_rows(self, table_ref: TableRef) -> int | None:
         try:
-            with closing(self._connect_sql()) as conn:
+            with closing(self._connect_sql_with_tz()) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(
                         f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.catalog)}.{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
@@ -1048,7 +1086,7 @@ class DatabricksSource(BaseSource):
     def _fetch_one_page(
         self, table_ref: TableRef, base_query: str, page_size: int, offset: int
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        with closing(self._connect_sql()) as conn:
+        with closing(self._connect_sql_with_tz()) as conn:
             paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
             with conn.cursor() as cursor:
                 cursor.execute(paginated_query)
@@ -1067,7 +1105,7 @@ class DatabricksSource(BaseSource):
             rows_per_page = int(sampling.rows_per_page or 100)
             rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
         else:
-            with closing(self._connect_sql()) as conn:
+            with closing(self._connect_sql_with_tz()) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(query)
                     rows = cursor.fetchall()
