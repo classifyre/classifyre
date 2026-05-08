@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from src.detectors.pii.detector import PIIDetector
-from src.models.generated_detectors import DetectorConfig, PIIDetectorConfig, Severity
+from src.models.generated_detectors import PIIDetectorConfig, Severity
 from src.sources.tabular_utils import format_tabular_sample_content
 from src.utils.file_parser import parse_bytes
 

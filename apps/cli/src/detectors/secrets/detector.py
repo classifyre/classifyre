@@ -259,20 +259,20 @@ class SecretsDetector(BaseDetector):
                         category="SECRETS",
                         severity=self._get_severity(secret.type),
                         confidence=confidence,
-                            matched_content=raw_value,
-                            location=Location(
-                                start=start,
-                                end=end,
-                                line=secret.line_number,
-                                path=f"line {secret.line_number}",
-                            ),
-                            metadata={
-                                "detector": "secrets",
-                                "plugin": secret.type,
-                                "is_verified": secret.is_verified,
-                            },
-                        )
+                        matched_content=raw_value,
+                        location=Location(
+                            start=start,
+                            end=end,
+                            line=secret.line_number,
+                            path=f"line {secret.line_number}",
+                        ),
+                        metadata={
+                            "detector": "secrets",
+                            "plugin": secret.type,
+                            "is_verified": secret.is_verified,
+                        },
                     )
+                )
 
         except Exception as exc:
             logger.error("Error scanning for secrets: %s", exc)

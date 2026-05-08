@@ -56,7 +56,8 @@ class TextClassificationDetector(BaseDetector):
         self._transformers: ModuleType | None = None
 
         self._cfg: TextClassificationDetectorConfig = (
-            config if isinstance(config, TextClassificationDetectorConfig)
+            config
+            if isinstance(config, TextClassificationDetectorConfig)
             else TextClassificationDetectorConfig()
         )
         self._model_id: str | None = self._cfg.model
@@ -96,9 +97,7 @@ class TextClassificationDetector(BaseDetector):
             self._device,
         )
 
-    async def detect(
-        self, content: str, content_type: str = "text/plain"
-    ) -> list[DetectionResult]:
+    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
         if content_type not in self.get_supported_content_types():
             return []
         if not content.strip():

@@ -3,7 +3,7 @@
 import pytest
 
 from src.detectors.secrets.detector import SecretsDetector
-from src.models.generated_detectors import DetectorConfig, SecretsDetectorConfig, Severity
+from src.models.generated_detectors import SecretsDetectorConfig, Severity
 
 
 @pytest.mark.asyncio

@@ -30,7 +30,7 @@ def _stub_detector(
     detector._cfg = config
     detector._model_id = "stub/classifier"
     detector._severity_map = severity_map
-    detector.pipeline = lambda text, **kwargs: predictions
+    detector.pipeline = lambda _text, **_kwargs: predictions
     return detector
 
 

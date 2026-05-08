@@ -7,7 +7,6 @@ import pytest
 from src.models.generated_single_asset_scan_results import AssetType as OutputAssetType
 from src.sources.object_storage.base import ContentSnapshot, ObjectRef
 from src.sources.s3_compatible_storage.source import S3CompatibleStorageSource
-from src.utils.file_parser import ParsedBytes
 
 
 def _recipe(*, strategy: str = "LATEST", rows_per_page: int | None = 10) -> dict:
