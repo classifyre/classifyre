@@ -836,15 +836,11 @@ class DatabricksSource(BaseSource):
             runner_id=self.runner_id,
         )
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    STREAM_DETECTIONS = True
+
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
-
-        pipeline = None
-        if self.config.detectors and any(detector.enabled for detector in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
         # 1. Discover all tables first to establish the scope for lineage links
         tables = self._iter_tables()
@@ -881,15 +877,11 @@ class DatabricksSource(BaseSource):
 
             asset = self._table_to_asset(table_ref, links=linked_hashes)
             self._table_lookup[asset.hash] = table_ref
+            batch.append(asset)
 
-            if pipeline:
-                async for processed in pipeline.process_stream([asset]):
-                    yield [processed]
-            else:
-                batch.append(asset)
-                if len(batch) >= self.BATCH_SIZE:
-                    yield batch
-                    batch = []
+            if len(batch) >= self.BATCH_SIZE:
+                yield batch
+                batch = []
 
         # 3. Process notebooks
         for notebook in self._iter_notebooks():
@@ -897,14 +889,11 @@ class DatabricksSource(BaseSource):
                 break
 
             asset = self._notebook_to_asset(notebook)
-            if pipeline:
-                async for processed in pipeline.process_stream([asset]):
-                    yield [processed]
-            else:
-                batch.append(asset)
-                if len(batch) >= self.BATCH_SIZE:
-                    yield batch
-                    batch = []
+            batch.append(asset)
+
+            if len(batch) >= self.BATCH_SIZE:
+                yield batch
+                batch = []
 
         # 4. Process pipelines
         for pipeline_ref in self._iter_pipelines():
@@ -912,14 +901,11 @@ class DatabricksSource(BaseSource):
                 break
 
             asset = self._pipeline_to_asset(pipeline_ref)
-            if pipeline:
-                async for processed in pipeline.process_stream([asset]):
-                    yield [processed]
-            else:
-                batch.append(asset)
-                if len(batch) >= self.BATCH_SIZE:
-                    yield batch
-                    batch = []
+            batch.append(asset)
+
+            if len(batch) >= self.BATCH_SIZE:
+                yield batch
+                batch = []
 
         if batch:
             yield batch

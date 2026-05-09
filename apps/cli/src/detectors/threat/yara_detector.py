@@ -87,7 +87,7 @@ class YaraDetector(BaseDetector):
             logger.exception("YARA compilation failed")
             return None
 
-    async def detect(  # type: ignore[override]
+    async def detect(
         self, content: str | bytes, content_type: str = "text/plain"
     ) -> list[DetectionResult]:
         if self._rules is None:

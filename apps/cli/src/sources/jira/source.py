@@ -102,17 +102,11 @@ class JiraSource(BaseSource):
             result["message"] = f"Failed to connect to Jira Cloud API: {exc}"
         return result
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
 
         self._reset_runtime_state()
-
-        pipeline = None
-        if self.config.detectors and any(detector.enabled for detector in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
         fields = [
             "summary",
@@ -147,17 +141,11 @@ class JiraSource(BaseSource):
                 while len(pending_batch) >= self.BATCH_SIZE:
                     to_emit = pending_batch[: self.BATCH_SIZE]
                     pending_batch = pending_batch[self.BATCH_SIZE :]
-                    if pipeline is not None:
-                        to_emit = await pipeline.process(to_emit)
                     if to_emit:
                         yield to_emit
 
         if pending_batch:
-            to_emit = pending_batch
-            if pipeline is not None:
-                to_emit = await pipeline.process(to_emit)
-            if to_emit:
-                yield to_emit
+            yield pending_batch
 
     def _reset_runtime_state(self) -> None:
         self._seen_asset_hashes = set()

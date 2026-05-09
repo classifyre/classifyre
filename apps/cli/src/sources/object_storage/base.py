@@ -452,7 +452,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             result["message"] = f"Failed to connect to {self.provider_label}: {exc}"
         return result
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
 
@@ -462,12 +462,6 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._object_ref_by_hash = {}
         self._bytes_cache = {}
         self._mime_cache = {}
-
-        pipeline = None
-        if self.config.detectors and any(detector.enabled for detector in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
         refs = self._list_objects()
         sampled_refs = self._apply_sampling(refs)
@@ -490,17 +484,18 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             batch.append(asset)
 
             if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    batch = await pipeline.process(batch)
-                if batch:
-                    yield batch
+                yield batch
                 batch = []
 
         if batch:
-            if pipeline:
-                batch = await pipeline.process(batch)
-            if batch:
-                yield batch
+            yield batch
+
+    async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
+        raw_bytes = self._bytes_cache.get(asset_id)
+        mime = self._mime_cache.get(asset_id, "")
+        if raw_bytes is not None and mime:
+            return raw_bytes, mime
+        return None
 
     async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
         raw_bytes = self._bytes_cache.get(asset_id)

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import type { JSONSchema7 } from "json-schema";
-import { FlaskConical, Search, SlidersHorizontal } from "lucide-react";
+import { FlaskConical, Pencil, Search } from "lucide-react";
 import { api, type CustomDetectorResponseDto } from "@workspace/api-client";
 import { useTranslation } from "@/hooks/use-translation";
 import { Badge } from "@workspace/ui/components/badge";
@@ -12,11 +12,17 @@ import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Form } from "@workspace/ui/components/form";
 import { Input } from "@workspace/ui/components/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 import { Toggle } from "@workspace/ui/components/toggle";
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
 } from "@workspace/ui/components/collapsible";
 import { cn } from "@workspace/ui/lib/utils";
 import { JsonSchemaFields, buildFormDefaults } from "./json-schema-form";
@@ -218,43 +224,36 @@ function DetectorConfigCard({
     return matchingPresetId ?? "custom";
   });
 
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(
-    () => enabled && !matchingPresetId,
-  );
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   useEffect(() => {
     if (!enabled) {
       setSelectedPreset(null);
-      setIsAdvancedOpen(false);
+      setIsEditOpen(false);
       return;
     }
     if (matchingPresetId) {
       setSelectedPreset(matchingPresetId);
-      setIsAdvancedOpen(false);
     } else {
       setSelectedPreset("custom");
-      setIsAdvancedOpen(true);
     }
   }, [enabled, matchingPresetId]);
 
   const handlePresetSelect = (presetId: string) => {
-    const preset = presetOptions.find((option) => option.id === presetId);
-    if (!preset) {
+    if (presetId === "custom") {
+      if (!enabled) {
+        onStateChange({ enabled: true });
+      }
+      setSelectedPreset("custom");
+      setIsEditOpen(true);
       return;
     }
+    const preset = presetOptions.find((option) => option.id === presetId);
+    if (!preset) return;
     const nextConfig = preset.normalizedConfig;
     setSelectedPreset(presetId);
     form.reset(nextConfig);
-    setIsAdvancedOpen(false);
     onStateChange({ enabled: true, config: nextConfig });
-  };
-
-  const handleEnableCustom = () => {
-    if (!enabled) {
-      onStateChange({ enabled: true });
-    }
-    setSelectedPreset("custom");
-    setIsAdvancedOpen(true);
   };
 
   const handleResetDefaults = () => {
@@ -269,182 +268,166 @@ function DetectorConfigCard({
       : null;
 
   return (
-    <AiAssistedCard
-      title={displayName}
-      description={detector.type.replace(/_/g, " ")}
-      active={enabled}
-      withShadow={false}
-      headerActions={
-        <div className="flex items-center gap-2">
-          <DetectorAiConfigurator
-            detector={detector}
-            presetOptions={presetOptions}
-            currentConfig={normalizedCurrentConfig}
-            enabled={enabled}
-            onApplySuggestion={(next) => {
-              form.reset(next.config);
-              setSelectedPreset(next.presetId ?? "custom");
-              setIsAdvancedOpen(next.presetId ? false : true);
-              onStateChange({ enabled: next.enabled, config: next.config });
-            }}
-          />
-          <Toggle
-            variant="outline"
-            size="sm"
-            pressed={enabled}
-            onPressedChange={(pressed) => onStateChange({ enabled: pressed })}
-            className="cursor-pointer"
-            data-testid={`detector-toggle-${detector.type}`}
-          >
-            {enabled ? t("sources.scanConfig.on") : t("sources.scanConfig.off")}
-          </Toggle>
-        </div>
-      }
+    <div
+      className={cn(
+        "border-b-2 border-border last:border-b-0",
+        !enabled && "opacity-60",
+      )}
     >
-      <div className="space-y-4">
-        {detector.description && (
-          <p className="text-sm text-muted-foreground">
-            {detector.description}
-          </p>
-        )}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <Toggle
+          variant="outline"
+          size="sm"
+          pressed={enabled}
+          onPressedChange={(pressed) => onStateChange({ enabled: pressed })}
+          className="shrink-0 cursor-pointer"
+          data-testid={`detector-toggle-${detector.type}`}
+        >
+          {enabled ? t("sources.scanConfig.on") : t("sources.scanConfig.off")}
+        </Toggle>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {detector.categories.map((category) => (
-            <Badge
-              key={`${detector.type}-${category}`}
-              variant="outline"
-              className="border-2 border-border"
-            >
-              {category}
-            </Badge>
-          ))}
-          {detector.priority && (
-            <Badge variant="outline" className="border-2 border-border">
-              {detector.priority}
-            </Badge>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold truncate">
+              {displayName}
+            </span>
+            {detector.lifecycleStatus && (
+              <Badge variant="outline" className="border-2 border-border shrink-0">
+                {detector.lifecycleStatus}
+              </Badge>
+            )}
+            {patternCount !== null && (
+              <Badge variant="outline" className="border-2 border-border shrink-0">
+                {t("sources.scanConfig.patterns", { count: patternCount })}
+              </Badge>
+            )}
+          </div>
+          {detector.description && (
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              {detector.description}
+            </p>
           )}
-          {detector.lifecycleStatus && (
-            <Badge variant="outline" className="border-2 border-border">
-              {detector.lifecycleStatus}
-            </Badge>
-          )}
-          {patternCount !== null && (
-            <Badge variant="outline" className="border-2 border-border">
-              {t("sources.scanConfig.patterns", { count: patternCount })}
-            </Badge>
-          )}
-          {enabled && (
-            <Badge variant="outline" className="border-2 border-border">
-              {selectedPresetLabel
-                ? t("sources.scanConfig.presetLabel", {
-                    label: selectedPresetLabel,
-                  })
-                : t("sources.scanConfig.customPreset")}
-            </Badge>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="rounded-[4px] border-2 border-black"
-              onClick={handleEnableCustom}
-              data-testid={`btn-customize-${detector.type}`}
-            >
-              {t("sources.scanConfig.customize")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="rounded-[4px] border-2 border-black"
-              onClick={handleResetDefaults}
-              data-testid={`btn-reset-${detector.type}`}
-            >
-              {t("sources.scanConfig.reset")}
-            </Button>          </div>
         </div>
 
         {presetOptions.length > 0 && (
-          <div className="space-y-2 rounded-[6px] border-2 border-border bg-muted/30 p-3">
-            <div>
-              <p className="text-[11px] font-mono uppercase tracking-[0.16em]">
-                {t("sources.scanConfig.presets")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {t("sources.scanConfig.presetsDesc")}
-              </p>
-            </div>
-            <div className="grid gap-2 md:grid-cols-2">
-              {presetOptions.map((preset) => {
-                const isSelected = selectedPreset === preset.id;
-                return (
-                  <Button
-                    key={preset.id}
-                    type="button"
-                    variant="outline"
-                    className={cn(
-                      "h-auto w-full items-start justify-start whitespace-normal rounded-[4px] border-2 border-border px-3 py-2 text-left",
-                      isSelected && "border-black bg-accent/30",
-                    )}
-                    onClick={() => handlePresetSelect(preset.id)}
-                  >
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold">{preset.name}</p>
+          <div className="hidden sm:flex items-center gap-2 shrink-0">
+            <span className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">
+              {t("sources.scanConfig.presets")} &middot; {presetOptions.length}
+            </span>
+            <Select
+              value={selectedPreset ?? undefined}
+              onValueChange={handlePresetSelect}
+            >
+              <SelectTrigger className="h-8 w-[200px] rounded-[4px] border-2 border-border text-xs">
+                <SelectValue
+                  placeholder={t("sources.scanConfig.presets")}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {presetOptions.map((preset) => (
+                  <SelectItem key={preset.id} value={preset.id}>
+                    <div>
+                      <span className="text-xs font-medium">{preset.name}</span>
                       {preset.description && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[10px] text-muted-foreground leading-tight mt-0.5 whitespace-normal max-w-[240px]">
                           {preset.description}
                         </p>
                       )}
                     </div>
-                  </Button>
-                );
-              })}
-            </div>
+                  </SelectItem>
+                ))}
+                <SelectItem value="custom">
+                  <span className="text-xs font-medium">
+                    {t("sources.scanConfig.customize")}
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         )}
 
-        <Collapsible
-          open={isAdvancedOpen}
-          onOpenChange={(open) => {
-            if (open) {
-              handleEnableCustom();
-              return;
-            }
-            setIsAdvancedOpen(false);
-          }}
-        >
-          <div className="flex items-center justify-between gap-2 rounded-[6px] border-2 border-border p-3">
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="h-4 w-4" />
-              <div>
-                <p className="text-sm font-semibold">
-                  {t("sources.scanConfig.advancedSettings")}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {t("sources.scanConfig.advancedSettingsDesc")}
-                </p>
-              </div>
-            </div>
-            <CollapsibleTrigger asChild>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="rounded-[4px] border-2 border-black"
-              >
-                {isAdvancedOpen
-                  ? t("sources.scanConfig.hide")
-                  : t("sources.scanConfig.show")}
-              </Button>
-            </CollapsibleTrigger>
-          </div>
+        {enabled && selectedPresetLabel && presetOptions.length === 0 && (
+          <Badge variant="outline" className="border-2 border-border shrink-0">
+            {selectedPresetLabel}
+          </Badge>
+        )}
 
-          <CollapsibleContent className="pt-3">
-            <div className="rounded-[6px] border-2 border-border p-3">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="shrink-0 rounded-[4px] border-2 border-black"
+          onClick={() => {
+            if (!enabled) {
+              onStateChange({ enabled: true });
+            }
+            setIsEditOpen((prev) => !prev);
+          }}
+          data-testid={`btn-edit-${detector.type}`}
+        >
+          <Pencil className="h-3.5 w-3.5 mr-1" />
+          {isEditOpen ? t("sources.scanConfig.hide") : "Edit"}
+        </Button>
+      </div>
+
+      <Collapsible open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <CollapsibleContent>
+          <div className="border-t-2 border-border bg-muted/20 px-4 py-4 space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {detector.categories.map((category) => (
+                <Badge
+                  key={`${detector.type}-${category}`}
+                  variant="outline"
+                  className="border-2 border-border"
+                >
+                  {category}
+                </Badge>
+              ))}
+              {detector.priority && (
+                <Badge variant="outline" className="border-2 border-border">
+                  {detector.priority}
+                </Badge>
+              )}
+            </div>
+
+            {presetOptions.length > 0 && (
+              <div className="flex sm:hidden items-center gap-2">
+                <span className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">
+                  {t("sources.scanConfig.presets")}
+                </span>
+                <Select
+                  value={selectedPreset ?? undefined}
+                  onValueChange={handlePresetSelect}
+                >
+                  <SelectTrigger className="h-8 flex-1 rounded-[4px] border-2 border-border text-xs">
+                    <SelectValue
+                      placeholder={t("sources.scanConfig.presets")}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {presetOptions.map((preset) => (
+                      <SelectItem key={preset.id} value={preset.id}>
+                        <div>
+                          <span className="text-xs font-medium">{preset.name}</span>
+                          {preset.description && (
+                            <p className="text-[10px] text-muted-foreground leading-tight mt-0.5 whitespace-normal max-w-[240px]">
+                              {preset.description}
+                            </p>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="custom">
+                      <span className="text-xs font-medium">
+                        {t("sources.scanConfig.customize")}
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="rounded-[6px] border-2 border-border bg-background p-3">
               <Form {...form}>
                 <div className="space-y-4">
                   <JsonSchemaFields
@@ -454,10 +437,23 @@ function DetectorConfigCard({
                 </div>
               </Form>
             </div>
-          </CollapsibleContent>
-        </Collapsible>
-      </div>
-    </AiAssistedCard>
+
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="rounded-[4px] border-2 border-black"
+                onClick={handleResetDefaults}
+                data-testid={`btn-reset-${detector.type}`}
+              >
+                {t("sources.scanConfig.reset")}
+              </Button>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   );
 }
 
@@ -901,7 +897,7 @@ export function SourceScanConfig({
                   count: group.visibleDetectors.length,
                 })}
               >
-                <div className="grid gap-4 md:grid-cols-2">
+                <div>
                   {group.visibleDetectors.map((detector) => {
                     const state = detectorState[detector.id];
                     const config = state?.config ?? {};

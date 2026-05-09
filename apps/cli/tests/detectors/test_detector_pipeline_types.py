@@ -22,8 +22,8 @@ class DummySource(BaseSource):
         """Test connection."""
         return {"status": "ok"}
 
-    async def extract(self):
-        """Extract assets."""
+    async def extract_raw(self):
+        """Extract raw assets."""
         yield []
 
     def generate_hash_id(self, asset_id: str) -> str:

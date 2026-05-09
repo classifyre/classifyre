@@ -41,7 +41,11 @@ class CustomDetector(BaseDetector):
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
+    async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
+        if isinstance(content, bytes):
+            return []
         text = content.strip()
         if not text:
             return []

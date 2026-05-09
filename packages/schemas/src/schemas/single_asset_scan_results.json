@@ -284,6 +284,20 @@
         "findings_count": {
           "description": "Total number of findings detected",
           "type": "integer"
+        },
+        "warnings": {
+          "description": "Non-fatal issues during scan (e.g. content truncation, empty content)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "errors": {
+          "description": "Detector errors during scan",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "required": [

@@ -111,7 +111,11 @@ class FeatureExtractionDetector(BaseDetector):
 
         return vector.tolist()  # type: ignore[no-any-return]
 
-    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
+    async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
+        if isinstance(content, bytes):
+            return []
         if content_type not in self.get_supported_content_types():
             return []
         if not content or not content.strip():
