@@ -26,7 +26,8 @@ def _stub_detector(
     detector._truncation = True
     detector._max_length = None
     # Fake pipeline — returns [batch=1, tokens=3, hidden=4]
-    detector.pipeline = lambda _text: [[[0.1, 0.2, 0.3, 0.4]] * 3]
+    # Accept **kwargs to handle truncation parameter added in recent code changes
+    detector.pipeline = lambda _text, **kwargs: [[[0.1, 0.2, 0.3, 0.4]] * 3]
     return detector
 
 
@@ -65,7 +66,7 @@ async def test_detect_cls_pooling_uses_first_token() -> None:
     detector._truncation = True
     detector._max_length = None
     # tokens have distinct values so we can distinguish cls from mean
-    detector.pipeline = lambda _: [[[1.0, 0.0], [0.0, 1.0], [0.5, 0.5]]]
+    detector.pipeline = lambda _text, **kwargs: [[[1.0, 0.0], [0.0, 1.0], [0.5, 0.5]]]
     findings = await detector.detect("test")
     embedding = findings[0].metadata["embedding"]  # type: ignore[index]
     assert embedding == pytest.approx([1.0, 0.0])
