@@ -877,9 +877,12 @@ export class AssetService {
         contextBefore: finding.contextBefore ?? undefined,
         contextAfter: finding.contextAfter ?? undefined,
         location: this.normalizeFindingLocation(finding.location),
-        metadata: finding.metadata != null && typeof finding.metadata === 'object' && !Array.isArray(finding.metadata)
-          ? (finding.metadata as Record<string, unknown>)
-          : undefined,
+        metadata:
+          finding.metadata != null &&
+          typeof finding.metadata === 'object' &&
+          !Array.isArray(finding.metadata)
+            ? (finding.metadata as Record<string, unknown>)
+            : undefined,
         resolutionReason: finding.resolutionReason ?? undefined,
         firstDetectedAt: finding.firstDetectedAt ?? undefined,
         lastDetectedAt: finding.lastDetectedAt ?? undefined,
@@ -1570,9 +1573,12 @@ export class AssetService {
                   metadata: (() => {
                     const raw = finding.metadata;
                     if (!raw || typeof raw !== 'object') return null;
-                    const { embedding, ...rest } =
-                      raw as Record<string, unknown>;
-                    return Object.keys(rest).length > 0 ? rest : null;
+                    const filtered = Object.fromEntries(
+                      Object.entries(raw as Record<string, unknown>).filter(
+                        ([k]) => k !== 'embedding',
+                      ),
+                    );
+                    return Object.keys(filtered).length > 0 ? filtered : null;
                   })(),
                   detectedAt: new Date(finding.detected_at || Date.now()),
                   pipelineResult:

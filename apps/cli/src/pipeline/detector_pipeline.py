@@ -158,11 +158,14 @@ class DetectorPipeline:
             content_size = 0
 
         if binary_detectors:
-            binary_findings, binary_detector_types_run, bin_warnings, bin_errors = (
-                await self._run_binary_detectors_for_asset(
-                    asset=asset,
-                    detectors=binary_detectors,
-                )
+            (
+                binary_findings,
+                binary_detector_types_run,
+                bin_warnings,
+                bin_errors,
+            ) = await self._run_binary_detectors_for_asset(
+                asset=asset,
+                detectors=binary_detectors,
             )
             findings.extend(binary_findings)
             scan_warnings.extend(bin_warnings)
