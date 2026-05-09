@@ -109,7 +109,9 @@ class TextClassificationDetector(BaseDetector):
 
         results: list[DetectionResult] = []
         try:
-            raw: list[dict[str, Any]] | list[list[dict[str, Any]]] = self.pipeline(content, truncation=True) or []
+            raw: list[dict[str, Any]] | list[list[dict[str, Any]]] = (
+                self.pipeline(content, truncation=True) or []
+            )
 
             # Normalise: single-label returns [{'label': ..., 'score': ...}],
             # multi-label / top_k returns [[{'label': ..., 'score': ...}, ...]]

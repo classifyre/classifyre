@@ -38,9 +38,7 @@ class ParsedContentProvider:
             return
 
         raw_bytes, mime = result
-        pages: list[str] = await asyncio.to_thread(
-            list, iter_file_pages(raw_bytes, mime)
-        )
+        pages: list[str] = await asyncio.to_thread(list, iter_file_pages(raw_bytes, mime))
         for page in pages:
             yield page
 
