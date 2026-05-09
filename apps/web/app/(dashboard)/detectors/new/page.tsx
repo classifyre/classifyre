@@ -8,11 +8,12 @@ import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
 import { PipelineDetectorEditor } from "@/components/pipeline-detector-editor";
+import { RegexDetectorEditor } from "@/components/regex-detector-editor";
 import { useTranslation } from "@/hooks/use-translation";
 
 // ── Detector type cards ────────────────────────────────────────────────────
 
-type DetectorKind = "gliner2";
+type DetectorKind = "gliner2" | "regex";
 
 const DETECTOR_TYPES = [
   {
@@ -33,7 +34,7 @@ const DETECTOR_TYPES = [
     description:
       "Define precise pattern-matching rules using regular expressions. Fast, deterministic, zero ML overhead. Perfect for codes, IDs, and structured formats like IBANs or order numbers.",
     tags: ["Pattern matching", "No ML", "Deterministic"],
-    available: false,
+    available: true,
   },
   {
     id: "llm" as const,
@@ -195,9 +196,11 @@ export default function NewCustomDetectorPage() {
           {t("detectors.addNew")}
         </h1>
         <p className="text-muted-foreground mt-2 max-w-xl">
-          {selectedKind
+          {selectedKind === "gliner2"
             ? "Build a GLiNER2 pipeline detector. Define entities to extract and classification tasks — all run in a single model pass."
-            : t("detectors.selectTypeDesc")}
+            : selectedKind === "regex"
+              ? "Build a regex pattern detector. Define precise pattern-matching rules — fast, deterministic, zero ML overhead."
+              : t("detectors.selectTypeDesc")}
         </p>
       </div>
 
@@ -209,6 +212,16 @@ export default function NewCustomDetectorPage() {
       {/* Phase 2: GLiNER2 form with stepper */}
       {selectedKind === "gliner2" && (
         <PipelineDetectorEditor
+          mode="create"
+          submitLabel={t("detectors.create")}
+          isSubmitting={isSaving}
+          onSubmit={handleCreate}
+        />
+      )}
+
+      {/* Phase 2: Regex form with stepper */}
+      {selectedKind === "regex" && (
+        <RegexDetectorEditor
           mode="create"
           submitLabel={t("detectors.create")}
           isSubmitting={isSaving}

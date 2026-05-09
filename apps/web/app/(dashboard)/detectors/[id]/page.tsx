@@ -31,6 +31,7 @@ import {
   type CustomDetectorEditorSubmit,
 } from "@/components/custom-detector-editor";
 import { PipelineDetectorEditor } from "@/components/pipeline-detector-editor";
+import { RegexDetectorEditor } from "@/components/regex-detector-editor";
 import { CustomDetectorTrainingHistoryTable } from "@/components/custom-detector-training-history-table";
 import { CustomDetectorExtractionCoverage } from "@/components/custom-detector-extraction-coverage";
 import { formatDate } from "@/lib/date";
@@ -64,9 +65,10 @@ export default function CustomDetectorDetailsPage() {
       const detectorPayload = await api.getCustomDetector(detectorId) as DetectorWithPipeline;
       setDetector(detectorPayload);
 
-      // Pipeline detectors always get training history; legacy detectors skip it for RULESET.
+      // Pipeline detectors get training history (except REGEX which has no training); legacy detectors skip it for RULESET.
       const isPipeline = Boolean(detectorPayload.pipelineSchema && Object.keys(detectorPayload.pipelineSchema).length > 0);
-      if (isPipeline || detectorPayload.method !== "RULESET") {
+      const isRegex = isPipeline && (detectorPayload.pipelineSchema as Record<string, unknown>)?.type === "REGEX";
+      if (!isRegex && (isPipeline || detectorPayload.method !== "RULESET")) {
         const historyPayload = await api.listCustomDetectorTrainingHistory(
           detectorId,
           50,
@@ -154,6 +156,7 @@ export default function CustomDetectorDetailsPage() {
   const sourcesUsing = detector.sourcesUsing ?? [];
   // Pipeline detectors (GLiNER2 / REGEX / LLM) carry pipelineSchema instead of config.
   const isPipelineDetector = Boolean(detector.pipelineSchema && Object.keys(detector.pipelineSchema).length > 0);
+  const isRegexPipeline = isPipelineDetector && (detector.pipelineSchema as Record<string, unknown>)?.type === "REGEX";
 
   return (
     <div className="space-y-6">
@@ -167,7 +170,7 @@ export default function CustomDetectorDetailsPage() {
           {t("detectors.backToCustom")}
         </Button>
         <div className="flex items-center gap-2">
-          {(isPipelineDetector || detector.method !== "RULESET") && (
+          {!isRegexPipeline && (isPipelineDetector || detector.method !== "RULESET") && (
             <Button
               variant="outline"
               size="sm"
@@ -203,7 +206,7 @@ export default function CustomDetectorDetailsPage() {
           </div>
         </CardHeader>
         <CardContent
-          className={`grid gap-3 ${(isPipelineDetector || detector.method !== "RULESET") ? "md:grid-cols-3" : "md:grid-cols-2"}`}
+          className={`grid gap-3 ${(!isRegexPipeline && (isPipelineDetector || detector.method !== "RULESET")) ? "md:grid-cols-3" : "md:grid-cols-2"}`}
         >
           <div className="rounded-[4px] border border-black/20 p-3">
             <p className="text-xs text-muted-foreground mb-1">
@@ -236,7 +239,7 @@ export default function CustomDetectorDetailsPage() {
               {detector.sourcesWithFindingsCount}
             </p>
           </div>
-          {(isPipelineDetector || detector.method !== "RULESET") && (
+          {!isRegexPipeline && (isPipelineDetector || detector.method !== "RULESET") && (
             <div className="rounded-[4px] border border-black/20 p-3">
               <p className="text-xs text-muted-foreground">
                 {t("detectors.lastTrained")}
@@ -252,34 +255,65 @@ export default function CustomDetectorDetailsPage() {
       </Card>
 
       {isPipelineDetector ? (
-        <PipelineDetectorEditor
-          mode="edit"
-          detectorId={detectorId}
-          submitLabel={t("common.save")}
-          isSubmitting={isSaving}
-          initialPipelineSchema={detector.pipelineSchema}
-          initialName={detector.name}
-          initialKey={detector.key}
-          initialDescription={detector.description ?? ""}
-          onSubmit={async (payload) => {
-            try {
-              setIsSaving(true);
-              await api.updateCustomDetector(detectorId, {
-                name: payload.name,
-                key: payload.key,
-                description: payload.description,
-                isActive: payload.isActive,
-                pipelineSchema: payload.pipelineSchema,
-              } as any);
-              toast.success(t("detectors.saved"));
-              await load();
-            } catch (error) {
-              toast.error(error instanceof Error ? error.message : t("detectors.failedToSave"));
-            } finally {
-              setIsSaving(false);
-            }
-          }}
-        />
+        isRegexPipeline ? (
+          <RegexDetectorEditor
+            mode="edit"
+            detectorId={detectorId}
+            submitLabel={t("common.save")}
+            isSubmitting={isSaving}
+            initialPipelineSchema={detector.pipelineSchema}
+            initialName={detector.name}
+            initialKey={detector.key}
+            initialDescription={detector.description ?? ""}
+            onSubmit={async (payload) => {
+              try {
+                setIsSaving(true);
+                await api.updateCustomDetector(detectorId, {
+                  name: payload.name,
+                  key: payload.key,
+                  description: payload.description,
+                  isActive: payload.isActive,
+                  pipelineSchema: payload.pipelineSchema,
+                } as any);
+                toast.success(t("detectors.saved"));
+                await load();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : t("detectors.failedToSave"));
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+          />
+        ) : (
+          <PipelineDetectorEditor
+            mode="edit"
+            detectorId={detectorId}
+            submitLabel={t("common.save")}
+            isSubmitting={isSaving}
+            initialPipelineSchema={detector.pipelineSchema}
+            initialName={detector.name}
+            initialKey={detector.key}
+            initialDescription={detector.description ?? ""}
+            onSubmit={async (payload) => {
+              try {
+                setIsSaving(true);
+                await api.updateCustomDetector(detectorId, {
+                  name: payload.name,
+                  key: payload.key,
+                  description: payload.description,
+                  isActive: payload.isActive,
+                  pipelineSchema: payload.pipelineSchema,
+                } as any);
+                toast.success(t("detectors.saved"));
+                await load();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : t("detectors.failedToSave"));
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+          />
+        )
       ) : (
         <CustomDetectorEditor
           mode="edit"
@@ -307,7 +341,7 @@ export default function CustomDetectorDetailsPage() {
         </section>
       )}
 
-      {(isPipelineDetector || detector.method !== "RULESET") && (
+      {!isRegexPipeline && (isPipelineDetector || detector.method !== "RULESET") && (
         <section data-testid="training-history-section" className="space-y-4">
           <div>
             <h2 className="font-serif text-2xl font-black uppercase tracking-[0.06em]">

@@ -157,4 +157,187 @@ describe('Custom Detectors (e2e)', () => {
       })
       .expect(400);
   });
+
+  // ── REGEX pipeline detector tests ─────────────────────────────────────
+
+  it('creates a REGEX pipeline detector with severity and RE2 options', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const key = `cust_e2e_regex_${suffix}`;
+    const name = `E2E Regex Detector ${suffix}`;
+
+    const createResponse = await request(app.getHttpServer())
+      .post('/custom-detectors')
+      .send({
+        name,
+        key,
+        pipelineSchema: {
+          type: 'REGEX',
+          patterns: {
+            api_key: {
+              pattern: '(?:api[_-]?key)\\s*[:=]\\s*["\']?([A-Za-z0-9_\\-]{20,})["\']?',
+              description: 'Generic API key assignment',
+              severity: 'critical',
+              case_sensitive: false,
+              group: 1,
+            },
+            order_id: {
+              pattern: 'ORD-\\d{4,8}',
+              description: 'Order ID format',
+              severity: 'medium',
+            },
+            version_tag: {
+              pattern: 'v(\\d+\\.\\d+\\.\\d+)',
+              description: 'Semantic version tag',
+              severity: 'info',
+              group: 1,
+              dot_nl: false,
+            },
+          },
+        },
+      })
+      .expect(201);
+
+    expect(createResponse.body).toHaveProperty('id');
+    expect(createResponse.body.key).toBe(key);
+    expect(createResponse.body).toHaveProperty('pipelineSchema');
+
+    const schema = createResponse.body.pipelineSchema;
+    expect(schema.type).toBe('REGEX');
+    expect(Object.keys(schema.patterns)).toHaveLength(3);
+    expect(schema.patterns.api_key.severity).toBe('critical');
+    expect(schema.patterns.api_key.case_sensitive).toBe(false);
+    expect(schema.patterns.api_key.group).toBe(1);
+    expect(schema.patterns.order_id.severity).toBe('medium');
+    expect(schema.patterns.version_tag.severity).toBe('info');
+
+    const detectorId = createResponse.body.id as string;
+
+    // GET by ID returns the full schema
+    const getResponse = await request(app.getHttpServer())
+      .get(`/custom-detectors/${detectorId}`)
+      .expect(200);
+
+    expect(getResponse.body.pipelineSchema.type).toBe('REGEX');
+    expect(getResponse.body.pipelineSchema.patterns.api_key.pattern).toContain(
+      'api[_-]?key',
+    );
+  });
+
+  it('updates a REGEX detector — adds and removes patterns', async () => {
+    const suffix = randomUUID().slice(0, 8);
+
+    const created = await request(app.getHttpServer())
+      .post('/custom-detectors')
+      .send({
+        name: `E2E Regex Update ${suffix}`,
+        key: `cust_e2e_regex_update_${suffix}`,
+        pipelineSchema: {
+          type: 'REGEX',
+          patterns: {
+            old_pattern: {
+              pattern: 'OLD-\\d+',
+              severity: 'low',
+            },
+          },
+        },
+      })
+      .expect(201);
+
+    const detectorId = created.body.id as string;
+
+    const updated = await request(app.getHttpServer())
+      .patch(`/custom-detectors/${detectorId}`)
+      .send({
+        name: `E2E Regex Updated ${suffix}`,
+        pipelineSchema: {
+          type: 'REGEX',
+          patterns: {
+            new_pattern: {
+              pattern: 'NEW-\\d+',
+              severity: 'high',
+              case_sensitive: false,
+            },
+          },
+        },
+      })
+      .expect(200);
+
+    expect(updated.body.pipelineSchema.patterns).toHaveProperty('new_pattern');
+    expect(updated.body.pipelineSchema.patterns).not.toHaveProperty(
+      'old_pattern',
+    );
+    expect(updated.body.pipelineSchema.patterns.new_pattern.severity).toBe(
+      'high',
+    );
+  });
+
+  it('rejects a REGEX pipeline schema with no patterns', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    await request(app.getHttpServer())
+      .post('/custom-detectors')
+      .send({
+        name: `E2E Regex Empty ${suffix}`,
+        pipelineSchema: {
+          type: 'REGEX',
+          patterns: {},
+        },
+      })
+      .expect(400);
+  });
+
+  it('lists REGEX detectors alongside GLiNER2 detectors', async () => {
+    const suffix = randomUUID().slice(0, 8);
+
+    await request(app.getHttpServer())
+      .post('/custom-detectors')
+      .send({
+        name: `E2E Regex List ${suffix}`,
+        key: `cust_e2e_regex_list_${suffix}`,
+        pipelineSchema: {
+          type: 'REGEX',
+          patterns: {
+            sku: { pattern: 'SKU-[A-Z]{3}\\d{4}', severity: 'medium' },
+          },
+        },
+      })
+      .expect(201);
+
+    const listResponse = await request(app.getHttpServer())
+      .get('/custom-detectors')
+      .expect(200);
+
+    const regexDetector = listResponse.body.find(
+      (d: { key: string }) => d.key === `cust_e2e_regex_list_${suffix}`,
+    );
+    expect(regexDetector).toBeDefined();
+    expect(regexDetector.pipelineSchema.type).toBe('REGEX');
+  });
+
+  it('deletes a REGEX detector', async () => {
+    const suffix = randomUUID().slice(0, 8);
+
+    const created = await request(app.getHttpServer())
+      .post('/custom-detectors')
+      .send({
+        name: `E2E Regex Delete ${suffix}`,
+        key: `cust_e2e_regex_delete_${suffix}`,
+        pipelineSchema: {
+          type: 'REGEX',
+          patterns: {
+            tmp: { pattern: 'TMP-\\d+' },
+          },
+        },
+      })
+      .expect(201);
+
+    const detectorId = created.body.id as string;
+
+    await request(app.getHttpServer())
+      .delete(`/custom-detectors/${detectorId}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .get(`/custom-detectors/${detectorId}`)
+      .expect(404);
+  });
 });
