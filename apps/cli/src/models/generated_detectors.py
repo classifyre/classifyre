@@ -1084,14 +1084,61 @@ class PipelineResult(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+class Severity1(StrEnum):
+    """
+    Severity level assigned to findings from this pattern. When omitted, defaults to high (confidence is always 1.0 for regex).
+    """
+
+    critical = 'critical'
+    high = 'high'
+    medium = 'medium'
+    low = 'low'
+    info = 'info'
+
+
 class RegexPatternDefinition(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    pattern: str
-    flags: Any | None = None
+    pattern: str = Field(
+        ..., description='Regular expression pattern (RE2 syntax recommended)'
+    )
+    flags: Any | None = Field(
+        None,
+        description='Legacy integer flags (e.g. re.IGNORECASE). Prefer the boolean fields below instead.',
+    )
     description: str | None = Field(
         None, description='Human-readable description of the pattern'
+    )
+    severity: Severity1 | None = Field(
+        None,
+        description='Severity level assigned to findings from this pattern. When omitted, defaults to high (confidence is always 1.0 for regex).',
+    )
+    case_sensitive: bool | None = Field(
+        True,
+        description='Whether matching is case-sensitive. Set to false for case-insensitive matching.',
+    )
+    dot_nl: bool | None = Field(
+        False,
+        description='Whether the dot (.) metacharacter matches newline characters.',
+    )
+    literal: bool | None = Field(
+        False,
+        description='Treat the pattern as a literal string instead of a regular expression.',
+    )
+    longest_match: bool | None = Field(
+        False,
+        description='Prefer the longest possible match instead of the first match (RE2 only).',
+    )
+    max_mem: int | None = Field(
+        None,
+        description='Maximum memory (bytes) for the RE2 automaton. RE2 only; ignored with stdlib fallback.',
+        ge=1,
+    )
+    group: int | None = Field(
+        0,
+        description='Capture group index to extract as matched content. 0 = entire match (default).',
+        ge=0,
     )
 
 

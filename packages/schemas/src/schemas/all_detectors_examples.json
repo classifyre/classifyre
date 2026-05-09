@@ -1215,11 +1215,13 @@
           "patterns": {
             "sku_format": {
               "pattern": "INT-[A-Z]{3}-\\d{5}",
-              "description": "Internal SKU format INT-OPS-12345"
+              "description": "Internal SKU format INT-OPS-12345",
+              "severity": "high"
             },
             "project_code": {
               "pattern": "PROJ-[A-Z]{2}\\d{2}[A-Z]{2}\\d{2}",
-              "description": "Internal project code PROJ-AB12CD34"
+              "description": "Internal project code PROJ-AB12CD34",
+              "severity": "medium"
             }
           },
           "validation": {
@@ -1244,15 +1246,18 @@
           "patterns": {
             "iban": {
               "pattern": "\\bDE\\d{2}[\\s]?\\d{4}[\\s]?\\d{4}[\\s]?\\d{4}[\\s]?\\d{4}[\\s]?\\d{2}\\b",
-              "description": "German IBAN"
+              "description": "German IBAN",
+              "severity": "critical"
             },
             "zip_city": {
               "pattern": "\\b\\d{5}\\s+[A-Z\u00c4\u00d6\u00dc][a-z\u00e4\u00f6\u00fc\u00df]+\\b",
-              "description": "German postal code + city"
+              "description": "German postal code + city",
+              "severity": "medium"
             },
             "invoice_date": {
               "pattern": "\\b\\d{2}\\.\\d{2}\\.\\d{4}\\b",
-              "description": "Date in DD.MM.YYYY format"
+              "description": "Date in DD.MM.YYYY format",
+              "severity": "low"
             }
           },
           "validation": {
@@ -1278,11 +1283,13 @@
           "patterns": {
             "bgb_ref": {
               "pattern": "\u00a7\\s*\\d+(?:\\s+Abs\\.\\s*\\d+)?\\s+(?:ABGB|UGB|ZPO|StGB|AktG|GmbHG)",
-              "description": "Austrian law paragraph reference"
+              "description": "Austrian law paragraph reference",
+              "severity": "info"
             },
             "bgbl_ref": {
               "pattern": "BGBl\\.\\s*(?:I|II|III)?\\s*Nr\\.\\s*\\d+/\\d{4}",
-              "description": "Austrian Federal Law Gazette reference"
+              "description": "Austrian Federal Law Gazette reference",
+              "severity": "info"
             }
           },
           "validation": {
@@ -1292,6 +1299,81 @@
         }
       },
       "name": "Austrian Legal Citation Detector"
+    },
+    {
+      "description": "REGEX API key and secret leakage detector with critical severity",
+      "config": {
+        "custom_detector_key": "api_key_leakage",
+        "name": "API Key Leakage Detector",
+        "description": "Detect leaked API keys, tokens, and secrets in documents and code snippets",
+        "languages": [
+          "en"
+        ],
+        "pipeline_schema": {
+          "type": "REGEX",
+          "patterns": {
+            "generic_api_key": {
+              "pattern": "(?:api[_-]?key|apikey)\\s*[:=]\\s*[\"']?([A-Za-z0-9_\\-]{20,})[\"']?",
+              "description": "Generic API key assignment (api_key=..., apiKey: ...)",
+              "severity": "critical",
+              "case_sensitive": false,
+              "group": 1
+            },
+            "bearer_token": {
+              "pattern": "Bearer\\s+[A-Za-z0-9_\\-\\.]{20,}",
+              "description": "Bearer authentication token in headers",
+              "severity": "critical",
+              "case_sensitive": false
+            },
+            "base64_secret": {
+              "pattern": "(?:secret|password|token)\\s*[:=]\\s*[\"']?[A-Za-z0-9+/]{32,}={0,2}[\"']?",
+              "description": "Base64-encoded secret value assignment",
+              "severity": "critical",
+              "case_sensitive": false
+            }
+          }
+        }
+      },
+      "name": "API Key Leakage Detector"
+    },
+    {
+      "description": "REGEX structured ID extractor with capture group and multiline support",
+      "config": {
+        "custom_detector_key": "structured_id_extractor",
+        "name": "Structured ID Extractor",
+        "description": "Extract structured identifiers from multiline documents using capture groups",
+        "languages": [
+          "en",
+          "de"
+        ],
+        "pipeline_schema": {
+          "type": "REGEX",
+          "patterns": {
+            "ticket_id": {
+              "pattern": "(?:Ticket|Issue|Bug)\\s*#?\\s*(\\d{4,8})",
+              "description": "Extract numeric ticket/issue/bug ID",
+              "severity": "info",
+              "case_sensitive": false,
+              "group": 1
+            },
+            "version_tag": {
+              "pattern": "v(\\d+\\.\\d+\\.\\d+(?:-[a-zA-Z0-9.]+)?)",
+              "description": "Semantic version tag (extracts version without v prefix)",
+              "severity": "info",
+              "group": 1
+            },
+            "multiline_sql": {
+              "pattern": "(?:SELECT|INSERT|UPDATE|DELETE).{10,200}(?:FROM|INTO|SET|WHERE)",
+              "description": "SQL statements spanning multiple lines",
+              "severity": "medium",
+              "case_sensitive": false,
+              "dot_nl": true,
+              "longest_match": true
+            }
+          }
+        }
+      },
+      "name": "Structured ID Extractor"
     },
     {
       "description": "GLINER2 sarcasm & irony detector \u2014 classification",

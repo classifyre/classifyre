@@ -113,19 +113,29 @@ class CustomDetector(BaseDetector):
 
                 finding_type = f"regex:{label}" if runner_type == "REGEX" else f"entity:{label}"
 
+                span_severity = span.get("severity")
+                if isinstance(span_severity, str) and span_severity in Severity.__members__:
+                    severity = Severity(span_severity)
+                else:
+                    severity = Severity.medium if confidence < 0.9 else Severity.high
+
+                meta: dict[str, Any] = {
+                    "runner": runner_type,
+                    "entity_label": label,
+                    "pipeline_result": result.model_dump(),
+                }
+                if "groups" in span:
+                    meta["capture_groups"] = span["groups"]
+
                 findings.append(
                     self._make_result(
                         finding_type=finding_type,
                         category="CLASSIFICATION",
-                        severity=Severity.medium if confidence < 0.9 else Severity.high,
+                        severity=severity,
                         confidence=min(0.99, confidence),
                         matched_content=value,
                         location=location,
-                        metadata={
-                            "runner": runner_type,
-                            "entity_label": label,
-                            "pipeline_result": result.model_dump(),
-                        },
+                        metadata=meta,
                     )
                 )
 
