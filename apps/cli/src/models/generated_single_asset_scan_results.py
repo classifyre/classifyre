@@ -111,6 +111,11 @@ class ScanStats(BaseModel):
     findings_count: int | None = Field(
         None, description='Total number of findings detected'
     )
+    warnings: list[str] | None = Field(
+        None,
+        description='Non-fatal issues during scan (e.g. content truncation, empty content)',
+    )
+    errors: list[str] | None = Field(None, description='Detector errors during scan')
 
 
 class DetectionResult(BaseModel):

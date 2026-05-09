@@ -75,31 +75,46 @@ class BaseSource(ABC):
         """
         pass
 
-    @abstractmethod
+    STREAM_DETECTIONS: bool = False
+
     async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         """
-        The main extraction logic. Yields batches of extracted items.
-        Each batch is a list of SingleAssetScanResults objects.
+        Orchestrates extraction + detection.  Calls ``extract_raw()`` for batches,
+        then runs the detector pipeline (if configured) before yielding results.
 
-        This streaming approach allows:
-        - Memory-efficient processing of large datasets
-        - Real-time progress updates
-        - Incremental database commits (avoiding transaction timeouts)
+        Sources should override ``extract_raw()`` instead of this method.
+        """
+        pipeline = self._build_pipeline()
+        async for batch in self.extract_raw():
+            if pipeline:
+                if self.STREAM_DETECTIONS:
+                    async for processed in pipeline.process_stream(batch):
+                        yield [processed]
+                    continue
+                batch = await pipeline.process(batch)  # noqa: PLW2901
+            if batch:
+                yield batch
+
+    @abstractmethod
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+        """
+        The main extraction logic.  Yields batches of raw assets **without**
+        running detectors.  The base ``extract()`` wraps this with pipeline
+        processing automatically.
 
         Yields:
             Batches of SingleAssetScanResults objects
         """
-        # Subclasses should implement this as an async generator
-        # Example:
-        # batch = []
-        # for item in items:
-        #     batch.append(transform(item))
-        #     if len(batch) >= self.BATCH_SIZE:
-        #         yield batch
-        #         batch = []
-        # if batch:
-        #     yield batch
-        yield []  # Make this a generator for type checking
+        yield []
+
+    def _build_pipeline(self) -> Any:
+        config = getattr(self, "config", None)
+        detectors = getattr(config, "detectors", None) if config else None
+        if not detectors or not any(getattr(d, "enabled", False) for d in detectors):
+            return None
+        from ..pipeline.detector_pipeline import DetectorPipeline
+
+        return DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
     @abstractmethod
     def generate_hash_id(self, asset_id: str) -> str:
@@ -162,6 +177,15 @@ class BaseSource(ABC):
                 return fallback_value
 
         raise ValueError("Asset external_url is required")
+
+    async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
+        """
+        Fetch raw bytes and MIME type for an asset (for binary/image detectors).
+
+        Returns (raw_bytes, mime_type) or None if binary content is not available.
+        Sources that store raw file bytes should override this method.
+        """
+        return None
 
     async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
         """

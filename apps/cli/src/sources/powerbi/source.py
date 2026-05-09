@@ -640,15 +640,11 @@ class PowerBISource(BaseSource):
 
         return result
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    STREAM_DETECTIONS = True
+
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
-
-        pipeline = None
-        if self.config.detectors and any(detector.enabled for detector in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
         refs = self._sample_refs(self._discover_assets())
         hash_by_raw = {ref.raw_id: self.generate_hash_id(ref.raw_id) for ref in refs}
@@ -670,19 +666,11 @@ class PowerBISource(BaseSource):
             batch.append(self._asset_from_ref(ref, links=linked_hashes))
 
             if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    async for processed in pipeline.process_stream(batch):
-                        yield [processed]
-                else:
-                    yield batch
+                yield batch
                 batch = []
 
         if batch:
-            if pipeline:
-                async for processed in pipeline.process_stream(batch):
-                    yield [processed]
-            else:
-                yield batch
+            yield batch
 
     def generate_hash_id(self, asset_id: str) -> str:
         return hash_id(self._asset_type_value(), asset_id)

@@ -274,7 +274,8 @@
       "patterns": "{{count}} Muster",
       "findingsCount": "{{count}} Befunde",
       "sourcesCount": "{{count}} Quellen",
-      "recentSources": "Letzte Quellen: {{names}}"
+      "recentSources": "Letzte Quellen: {{names}}",
+      "edit": "Bearbeiten"
     },
     "sampling": {
       "title": "Stichprobenauswahl",

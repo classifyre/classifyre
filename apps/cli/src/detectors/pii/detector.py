@@ -808,8 +808,12 @@ class PIIDetector(BaseDetector):
     # Public API
     # ------------------------------------------------------------------
 
-    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
+    async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
         """Detect PII in *content* and return a list of :class:`DetectionResult` objects."""
+        if isinstance(content, bytes):
+            return []
         # Presidio + spaCy NER are CPU-bound synchronous operations.  Running them
         # directly in the async coroutine blocks the event loop for the duration of
         # each page (seconds on CPU-limited pods), making the job appear frozen.

@@ -274,7 +274,8 @@
       "patterns": "{{count}} patterns",
       "findingsCount": "{{count}} findings",
       "sourcesCount": "{{count}} sources",
-      "recentSources": "Recent sources: {{names}}"
+      "recentSources": "Recent sources: {{names}}",
+      "edit": "Edit"
     },
     "sampling": {
       "title": "Sampling",

@@ -36,7 +36,11 @@ class LanguageDetector(BaseDetector):
         except MissingDependencyError:
             raise
 
-    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
+    async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
+        if isinstance(content, bytes):
+            return []
         if not content.strip():
             return []
 

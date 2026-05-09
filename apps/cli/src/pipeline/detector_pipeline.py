@@ -17,6 +17,7 @@ from ..models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ..sources.base import BaseSource
+from .content_provider import ContentProvider
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,8 @@ class DetectorPipeline:
         source: BaseSource,
         runner_id: str,
         content_size_limit: int = 1_048_576,  # 1MB default
+        max_concurrent_assets: int = 10,
+        content_provider: ContentProvider | None = None,
     ):
         """
         Initialize detector pipeline.
@@ -43,11 +46,21 @@ class DetectorPipeline:
             source: Source instance for fetching content
             runner_id: ID of the runner executing this pipeline
             content_size_limit: Maximum content size in bytes
+            max_concurrent_assets: Max assets to process in parallel within a batch
+            content_provider: Optional provider — if None, source is used directly
         """
         self.detectors = detectors
         self.source = source
         self.runner_id = runner_id
         self.content_size_limit = content_size_limit
+        self.max_concurrent_assets = max_concurrent_assets
+        if content_provider is not None:
+            self.content_provider: ContentProvider = content_provider
+        else:
+            from .parsed_content_provider import ParsedContentProvider
+
+            self.content_provider = ParsedContentProvider(source)
+        self.init_warnings: list[str] = []
 
     async def process(self, assets: list[SingleAssetScanResults]) -> list[SingleAssetScanResults]:
         """Process assets through detector pipeline, returning all results at once."""
@@ -59,9 +72,16 @@ class DetectorPipeline:
     async def process_stream(
         self, assets: list[SingleAssetScanResults]
     ) -> AsyncGenerator[SingleAssetScanResults, None]:
-        """Process assets one at a time, yielding each as soon as it finishes."""
-        for asset in assets:
-            yield await self._process_single_asset(asset)
+        """Process assets concurrently (bounded), yielding in submission order."""
+        semaphore = asyncio.Semaphore(self.max_concurrent_assets)
+
+        async def _bounded(asset: SingleAssetScanResults) -> SingleAssetScanResults:
+            async with semaphore:
+                return await self._process_single_asset(asset)
+
+        tasks = [asyncio.create_task(_bounded(a)) for a in assets]
+        for task in tasks:
+            yield await task
 
     async def _process_single_asset(self, asset: SingleAssetScanResults) -> SingleAssetScanResults:
         """Process a single asset through detectors."""
@@ -83,6 +103,15 @@ class DetectorPipeline:
                 primary_content_type,
             )
         ]
+        binary_detectors = [
+            detector
+            for detector in self.detectors
+            if self._is_binary_detector(detector)
+            and not self._supports_content_type(
+                detector.get_supported_content_types(),
+                primary_content_type,
+            )
+        ]
         link_detectors = [
             detector
             for detector in self.detectors
@@ -93,60 +122,83 @@ class DetectorPipeline:
             )
         ]
 
-        detector_names = [d.__class__.__name__ for d in text_detectors + link_detectors]
+        all_active = text_detectors + binary_detectors + link_detectors
+        detector_names = [d.__class__.__name__ for d in all_active]
         logger.info("Scanning %s [%s]", asset.name, ", ".join(detector_names))
 
         findings: list[DetectionResult] = []
         detector_types_run: list[DetectorType] = []
+        scan_warnings: list[str] = list(self.init_warnings)
+        scan_errors: list[str] = []
 
         if text_detectors:
             (
                 text_findings,
                 text_detector_types_run,
                 content_size,
+                text_warnings,
+                text_errors,
             ) = await self._run_text_detectors_for_asset(
                 asset=asset,
                 text_content_type=primary_content_type,
                 detectors=text_detectors,
             )
             findings.extend(text_findings)
+            scan_warnings.extend(text_warnings)
+            scan_errors.extend(text_errors)
             detector_types_run = self._merge_detector_types(
                 detector_types_run,
                 text_detector_types_run,
             )
             if content_size == 0:
-                logger.warning("No content available for asset %s", asset.name)
+                msg = f"No content available for asset {asset.name}"
+                logger.warning(msg)
+                scan_warnings.append(msg)
         else:
             content_size = 0
 
+        if binary_detectors:
+            binary_findings, binary_detector_types_run, bin_warnings, bin_errors = (
+                await self._run_binary_detectors_for_asset(
+                    asset=asset,
+                    detectors=binary_detectors,
+                )
+            )
+            findings.extend(binary_findings)
+            scan_warnings.extend(bin_warnings)
+            scan_errors.extend(bin_errors)
+            detector_types_run = self._merge_detector_types(
+                detector_types_run,
+                binary_detector_types_run,
+            )
+
         if link_detectors:
-            link_findings, link_detector_types_run = await self._run_detectors(
+            link_findings, link_detector_types_run, link_errors = await self._run_detectors(
                 detectors=link_detectors,
                 content=link_content,
                 content_type="application/x.asset-links",
             )
             findings.extend(link_findings)
+            scan_errors.extend(link_errors)
             detector_types_run = self._merge_detector_types(
                 detector_types_run,
                 link_detector_types_run,
             )
 
             for finding in link_findings:
-                self.source.enrich_finding_location(finding, asset, "")
+                self.content_provider.enrich_finding_location(finding, asset, "")
 
-        # 5. Calculate duration
         scan_duration = int((datetime.now(UTC) - scan_started).total_seconds() * 1000)
 
-        # 6. Add findings to asset
         asset.findings = findings
-
-        # 7. Add scan stats
         asset.scan_stats = ScanStats(
             scanned_at=scan_started,
             duration_ms=scan_duration,
             detectors_run=detector_types_run,
             content_size_bytes=content_size,
             findings_count=len(findings),
+            warnings=scan_warnings or None,
+            errors=scan_errors or None,
         )
 
         if findings:
@@ -167,9 +219,11 @@ class DetectorPipeline:
         asset: SingleAssetScanResults,
         text_content_type: str,
         detectors: list[BaseDetector],
-    ) -> tuple[list[DetectionResult], list[DetectorType], int]:
+    ) -> tuple[list[DetectionResult], list[DetectorType], int, list[str], list[str]]:
         findings: list[DetectionResult] = []
         detector_types_run: list[DetectorType] = []
+        warnings: list[str] = []
+        errors: list[str] = []
         content_size = 0
 
         async for text_content in self._iter_text_content_pages(asset):
@@ -177,30 +231,33 @@ class DetectorPipeline:
 
             detector_content = text_content
             if len(detector_content) > self.content_size_limit:
-                logger.warning(
-                    f"Content size ({len(detector_content)} bytes) exceeds limit "
-                    f"({self.content_size_limit} bytes) for {asset.name}"
+                msg = (
+                    f"Content truncated from {len(detector_content)} to "
+                    f"{self.content_size_limit} bytes for {asset.name}"
                 )
+                logger.warning(msg)
+                warnings.append(msg)
                 detector_content = detector_content[: self.content_size_limit]
 
             if not detector_content:
                 continue
 
-            page_findings, page_detector_types_run = await self._run_detectors(
+            page_findings, page_detector_types_run, page_errors = await self._run_detectors(
                 detectors=detectors,
                 content=detector_content,
                 content_type=text_content_type,
             )
             findings.extend(page_findings)
+            errors.extend(page_errors)
             detector_types_run = self._merge_detector_types(
                 detector_types_run,
                 page_detector_types_run,
             )
 
             for finding in page_findings:
-                self.source.enrich_finding_location(finding, asset, detector_content)
+                self.content_provider.enrich_finding_location(finding, asset, detector_content)
 
-        return findings, detector_types_run, content_size
+        return findings, detector_types_run, content_size, warnings, errors
 
     async def _iter_text_content_pages(self, asset: SingleAssetScanResults):
         candidate_ids: list[str] = []
@@ -213,7 +270,7 @@ class DetectorPipeline:
 
         for candidate_id in candidate_ids:
             saw_candidate_content = False
-            async for _raw_content, text_content in self.source.fetch_content_pages(candidate_id):
+            async for text_content in self.content_provider.fetch_text_pages(candidate_id):
                 if not text_content:
                     continue
                 saw_candidate_content = True
@@ -221,6 +278,66 @@ class DetectorPipeline:
 
             if saw_candidate_content:
                 return
+
+    async def _run_binary_detectors_for_asset(
+        self,
+        *,
+        asset: SingleAssetScanResults,
+        detectors: list[BaseDetector],
+    ) -> tuple[list[DetectionResult], list[DetectorType], list[str], list[str]]:
+        """Fetch raw bytes for an asset and run binary/image detectors."""
+        warnings: list[str] = []
+        candidate_ids: list[str] = []
+        for candidate in (asset.external_url, asset.hash):
+            value = str(candidate or "").strip()
+            if not value or value in candidate_ids:
+                continue
+            candidate_ids.append(value)
+
+        for candidate_id in candidate_ids:
+            result = await self.content_provider.fetch_bytes(candidate_id)
+            if result is None:
+                continue
+
+            raw_bytes, mime_type = result
+            if len(raw_bytes) > self.content_size_limit:
+                msg = (
+                    f"Binary content truncated from {len(raw_bytes)} to "
+                    f"{self.content_size_limit} bytes for {asset.name}"
+                )
+                logger.warning(msg)
+                warnings.append(msg)
+                raw_bytes = raw_bytes[: self.content_size_limit]
+
+            if not raw_bytes:
+                continue
+
+            compatible = [
+                d
+                for d in detectors
+                if self._supports_content_type(d.get_supported_content_types(), mime_type)
+            ]
+            if not compatible:
+                continue
+
+            findings, detector_types_run, errors = await self._run_detectors(
+                detectors=compatible,
+                content=raw_bytes,
+                content_type=mime_type,
+            )
+            for finding in findings:
+                self.content_provider.enrich_finding_location(finding, asset, "")
+            return findings, detector_types_run, warnings, errors
+
+        return [], [], [], []
+
+    @staticmethod
+    def _is_binary_detector(detector: BaseDetector) -> bool:
+        """Return True if the detector handles binary content types (images, etc.)."""
+        for ct in detector.get_supported_content_types():
+            if ct.startswith(("image/", "audio/", "video/")) or ct == "application/octet-stream":
+                return True
+        return False
 
     @staticmethod
     def _merge_detector_types(
@@ -249,12 +366,12 @@ class DetectorPipeline:
         self,
         *,
         detectors: list[BaseDetector],
-        content: str,
+        content: str | bytes,
         content_type: str,
-    ) -> tuple[list[DetectionResult], list[DetectorType]]:
+    ) -> tuple[list[DetectionResult], list[DetectorType], list[str]]:
         """Run all compatible detectors in parallel for a single payload."""
         if not content:
-            return [], []
+            return [], [], []
 
         tasks = []
         runnable_detectors: list[BaseDetector] = []
@@ -266,7 +383,7 @@ class DetectorPipeline:
                 runnable_detectors.append(detector)
 
         if not tasks:
-            return [], []
+            return [], [], []
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -286,14 +403,15 @@ class DetectorPipeline:
             seen_detector_types.add(detector_type_enum)
             detector_types_run.append(detector_type_enum)
 
-        # Flatten and handle errors
         all_findings: list[DetectionResult] = []
+        errors: list[str] = []
         detected_at = datetime.now(UTC)
 
         for detector, result in zip(runnable_detectors, results, strict=False):
             detector_name = detector.__class__.__name__
             if isinstance(result, Exception):
                 logger.error("Detector %s failed: %s", detector_name, result)
+                errors.append(f"{detector_name}: {result}")
                 continue
 
             detector_findings: list[DetectionResult] = []
@@ -319,7 +437,7 @@ class DetectorPipeline:
 
             all_findings.extend(detector_findings)
 
-        return all_findings, detector_types_run
+        return all_findings, detector_types_run, errors
 
     def _build_links_payload(self, links: list[str] | None) -> str:
         if not links:
@@ -332,7 +450,7 @@ class DetectorPipeline:
             if not value:
                 continue
 
-            resolved = self.source.resolve_link_for_detection(value)
+            resolved = self.content_provider.resolve_link_for_detection(value)
             if not resolved or resolved in seen_links:
                 continue
 
@@ -342,7 +460,7 @@ class DetectorPipeline:
         return "\n".join(unique_links)
 
     async def _run_single_detector(
-        self, detector: BaseDetector, content: str, content_type: str
+        self, detector: BaseDetector, content: str | bytes, content_type: str
     ) -> list[DetectionResult]:
         """Run a single detector."""
         return await detector.detect(content, content_type)
@@ -397,11 +515,10 @@ class DetectorPipeline:
             # Return empty pipeline (no detectors)
             return cls(detectors=[], source=source, runner_id=runner_id)
 
-        # Initialize detectors from array
         detectors = []
+        init_warnings: list[str] = []
 
         for detector_item in detector_configs:
-            # Check if enabled (default True)
             if not detector_item.get("enabled", True):
                 continue
 
@@ -418,14 +535,20 @@ class DetectorPipeline:
                 detectors.append(detector)
                 logger.info(f"Initialized detector: {detector_name}")
             except Exception as e:
-                logger.error(f"Failed to initialize detector {detector_type}: {e}")
+                msg = f"Failed to initialize detector {detector_type}: {e}"
+                logger.error(msg)
+                init_warnings.append(msg)
 
-        # Default content size limit
+        from .parsed_content_provider import ParsedContentProvider
+
         content_size_limit = 1_048_576  # 1MB
 
-        return cls(
+        pipeline = cls(
             detectors=detectors,
             source=source,
             runner_id=runner_id,
             content_size_limit=content_size_limit,
+            content_provider=ParsedContentProvider(source),
         )
+        pipeline.init_warnings = init_warnings
+        return pipeline
