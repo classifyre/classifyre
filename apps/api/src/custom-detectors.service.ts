@@ -726,8 +726,22 @@ export class CustomDetectorsService {
     description?: string | null;
     pipelineSchema: Record<string, unknown>;
   }): JsonRecord {
-    const defaults = this.buildDefaultPipelineSchema(input);
     const incoming = input.pipelineSchema;
+    const schemaType = (incoming.type as string | undefined) ?? 'GLINER2';
+
+    // Transformer pipeline types store config directly in pipeline_schema —
+    // don't merge GLINER2 defaults (entities/classification/validation) on top.
+    if (CustomDetectorsService.TRANSFORMER_PIPELINE_TYPES.has(schemaType)) {
+      const config: JsonRecord = {
+        custom_detector_key: input.key,
+        name: input.name,
+        pipeline_schema: incoming,
+      };
+      if (input.description) config.description = input.description;
+      return config;
+    }
+
+    const defaults = this.buildDefaultPipelineSchema(input);
 
     const config: JsonRecord = {
       ...defaults,
@@ -749,9 +763,24 @@ export class CustomDetectorsService {
     return config;
   }
 
+  private static readonly TRANSFORMER_PIPELINE_TYPES = new Set([
+    'TEXT_CLASSIFICATION',
+    'IMAGE_CLASSIFICATION',
+    'FEATURE_EXTRACTION',
+    'OBJECT_DETECTION',
+  ]);
+
   private validatePipelineSchema(schema: Record<string, unknown>): void {
     const schemaType = (schema.type as string | undefined) ?? 'GLINER2';
-    const validTypes = ['GLINER2', 'REGEX', 'LLM'];
+    const validTypes = [
+      'GLINER2',
+      'REGEX',
+      'LLM',
+      'TEXT_CLASSIFICATION',
+      'IMAGE_CLASSIFICATION',
+      'FEATURE_EXTRACTION',
+      'OBJECT_DETECTION',
+    ];
     if (!validTypes.includes(schemaType)) {
       throw new BadRequestException(
         `Unknown pipeline schema type '${schemaType}'. Must be one of: ${validTypes.join(', ')}`,
@@ -775,6 +804,19 @@ export class CustomDetectorsService {
       if (!schema.prompt || typeof schema.prompt !== 'string') {
         throw new BadRequestException(
           'LLM pipeline schema must define a prompt string',
+        );
+      }
+      return;
+    }
+
+    // Transformer pipeline types — require a model (except IMAGE_CLASSIFICATION which has a default)
+    if (CustomDetectorsService.TRANSFORMER_PIPELINE_TYPES.has(schemaType)) {
+      if (
+        schemaType !== 'IMAGE_CLASSIFICATION' &&
+        (!schema.model || typeof schema.model !== 'string')
+      ) {
+        throw new BadRequestException(
+          `${schemaType} pipeline schema must define a model`,
         );
       }
       return;

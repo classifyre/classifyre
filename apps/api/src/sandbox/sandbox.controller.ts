@@ -49,9 +49,9 @@ Each object has the shape:
 | \`SECRETS\` | API keys, tokens, private keys |
 | \`PII\` | Emails, SSNs, credit cards, phone numbers |
 | \`TOXIC\` | Toxic / hateful text (Detoxify model) |
-| \`IMAGE_CLASSIFICATION\` | Image content classification (NSFW, etc.) |
 | \`YARA\` | Custom YARA rule matches |
 | \`BROKEN_LINKS\` | Unreachable URLs in text |
+| \`CUSTOM\` | User-defined pipelines (REGEX, GLiNER2, HuggingFace transformers) |
 
 **Minimal — secrets only (all patterns):**
 \`\`\`json

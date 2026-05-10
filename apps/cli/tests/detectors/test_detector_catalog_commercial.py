@@ -50,23 +50,21 @@ def test_catalog_phase2_detectors_are_active_with_safe_models() -> None:
     catalog = _load_detector_catalog()
     by_type = {entry["detector_type"]: entry for entry in catalog}
 
-    assert by_type["TEXT_CLASSIFICATION"]["lifecycle_status"] == "active"
-    assert by_type["TEXT_CLASSIFICATION"]["recommended_model"] == (
-        "transformers text-classification pipeline"
-    )
-
-    assert by_type["FEATURE_EXTRACTION"]["lifecycle_status"] == "active"
-    assert by_type["FEATURE_EXTRACTION"]["recommended_model"] == (
-        "transformers feature-extraction pipeline"
-    )
-
-    assert by_type["OBJECT_DETECTION"]["lifecycle_status"] == "active"
-    assert by_type["OBJECT_DETECTION"]["recommended_model"] == (
-        "transformers object-detection pipeline"
-    )
-
     assert by_type["LANGUAGE"]["lifecycle_status"] == "active"
     assert by_type["LANGUAGE"]["recommended_model"] == "fast-langdetect"
+
+    # Transformer detectors (TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, FEATURE_EXTRACTION,
+    # OBJECT_DETECTION) are now custom detectors configured via pipeline_schema, not
+    # standalone catalog entries.
+    for transformer_type in (
+        "TEXT_CLASSIFICATION",
+        "IMAGE_CLASSIFICATION",
+        "FEATURE_EXTRACTION",
+        "OBJECT_DETECTION",
+    ):
+        assert transformer_type not in by_type, (
+            f"{transformer_type} should no longer be a standalone catalog entry"
+        )
 
 
 def test_catalog_phase3_detectors_are_active_with_safe_models() -> None:

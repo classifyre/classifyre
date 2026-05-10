@@ -174,7 +174,8 @@ describe('Custom Detectors (e2e)', () => {
           type: 'REGEX',
           patterns: {
             api_key: {
-              pattern: '(?:api[_-]?key)\\s*[:=]\\s*["\']?([A-Za-z0-9_\\-]{20,})["\']?',
+              pattern:
+                '(?:api[_-]?key)\\s*[:=]\\s*["\']?([A-Za-z0-9_\\-]{20,})["\']?',
               description: 'Generic API key assignment',
               severity: 'critical',
               case_sensitive: false,

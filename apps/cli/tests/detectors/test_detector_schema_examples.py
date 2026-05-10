@@ -13,10 +13,8 @@ from src.models.generated_detectors import (
     CustomDetectorConfig,
     DetectorConfig,
     DetectorType,
-    ImageClassificationDetectorConfig,
     PIIDetectorConfig,
     SecretsDetectorConfig,
-    TextClassificationDetectorConfig,
     ThreatDetectorConfig,
 )
 
@@ -82,16 +80,6 @@ class TestDetectorSchemaExamples:
                     f"Invalid model_name: {config.model_name}"
                 )
 
-    def test_image_classification_examples_are_valid(self, examples: dict):
-        """Test all IMAGE_CLASSIFICATION examples validate against ImageClassificationDetectorConfig."""
-        ic_examples = examples.get("IMAGE_CLASSIFICATION", [])
-        assert len(ic_examples) > 0, "No IMAGE_CLASSIFICATION examples found"
-
-        for example in ic_examples:
-            config_data = example.get("config", {})
-            config = ImageClassificationDetectorConfig.model_validate(config_data)
-            assert config is not None
-
     def test_yara_examples_are_valid(self, examples: dict):
         """Test all YARA examples validate against ThreatDetectorConfig."""
         yara_examples = examples.get("YARA", [])
@@ -124,17 +112,6 @@ class TestDetectorSchemaExamples:
             config_data = example.get("config", {})
             config = BrokenLinksDetectorConfig.model_validate(config_data)
             assert config is not None
-
-    def test_text_classification_examples_are_valid(self, examples: dict):
-        """Test all TEXT_CLASSIFICATION examples validate against TextClassificationDetectorConfig."""
-        tc_examples = examples.get("TEXT_CLASSIFICATION", [])
-        assert len(tc_examples) > 0, "No TEXT_CLASSIFICATION examples found"
-
-        for example in tc_examples:
-            config_data = example.get("config", {})
-            config = TextClassificationDetectorConfig.model_validate(config_data)
-            assert config is not None
-            assert config.model is not None
 
     def test_language_examples_are_valid(self, examples: dict):
         """Test all LANGUAGE examples validate against DetectorConfig."""
