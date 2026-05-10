@@ -52,8 +52,10 @@ class BrokenLinksDetector(BaseDetector):
         self._session.headers.update({"User-Agent": self._USER_AGENT})
 
     async def detect(
-        self, content: str, content_type: str = "application/x.asset-links"
+        self, content: str | bytes, content_type: str = "application/x.asset-links"
     ) -> list[DetectionResult]:
+        if isinstance(content, bytes):
+            return []
         if content_type not in self.get_supported_content_types():
             return []
 

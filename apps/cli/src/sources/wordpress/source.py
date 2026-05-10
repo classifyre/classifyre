@@ -96,7 +96,7 @@ class WordPressSource(BaseSource):
 
         return result
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         """Extract posts and pages from WordPress."""
         if self._aborted:
             return
@@ -106,13 +106,6 @@ class WordPressSource(BaseSource):
         self._url_to_wp_id = {}
         self._hash_to_url = {}
         self._seen_asset_hashes = set()
-
-        pipeline = None
-        if self.config.detectors and any(d.enabled for d in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            logger.info("Running detector pipeline per streamed WordPress batch...")
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
         pending_batch: list[SingleAssetScanResults] = []
         content_options = self._content_options()
@@ -141,8 +134,6 @@ class WordPressSource(BaseSource):
                     while len(pending_batch) >= self.BATCH_SIZE:
                         to_emit = pending_batch[: self.BATCH_SIZE]
                         pending_batch = pending_batch[self.BATCH_SIZE :]
-                        if pipeline is not None:
-                            to_emit = await pipeline.process(to_emit)
                         if to_emit:
                             yield to_emit
 
@@ -167,19 +158,13 @@ class WordPressSource(BaseSource):
                     while len(pending_batch) >= self.BATCH_SIZE:
                         to_emit = pending_batch[: self.BATCH_SIZE]
                         pending_batch = pending_batch[self.BATCH_SIZE :]
-                        if pipeline is not None:
-                            to_emit = await pipeline.process(to_emit)
                         if to_emit:
                             yield to_emit
 
             logger.info(f"Extracted {pages_count} pages into {pages_assets} assets")
 
         if pending_batch:
-            to_emit = pending_batch
-            if pipeline is not None:
-                to_emit = await pipeline.process(to_emit)
-            if to_emit:
-                yield to_emit
+            yield pending_batch
 
         logger.info("Total extracted WordPress items: %s", total_items_extracted)
 

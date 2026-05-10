@@ -32,12 +32,8 @@ class DetectorType(StrEnum):
     SECRETS = 'SECRETS'
     PII = 'PII'
     TOXIC = 'TOXIC'
-    IMAGE_CLASSIFICATION = 'IMAGE_CLASSIFICATION'
     YARA = 'YARA'
     BROKEN_LINKS = 'BROKEN_LINKS'
-    TEXT_CLASSIFICATION = 'TEXT_CLASSIFICATION'
-    FEATURE_EXTRACTION = 'FEATURE_EXTRACTION'
-    OBJECT_DETECTION = 'OBJECT_DETECTION'
     LANGUAGE = 'LANGUAGE'
     CODE_SECURITY = 'CODE_SECURITY'
     CUSTOM = 'CUSTOM'
@@ -111,6 +107,11 @@ class ScanStats(BaseModel):
     findings_count: int | None = Field(
         None, description='Total number of findings detected'
     )
+    warnings: list[str] | None = Field(
+        None,
+        description='Non-fatal issues during scan (e.g. content truncation, empty content)',
+    )
+    errors: list[str] | None = Field(None, description='Detector errors during scan')
 
 
 class DetectionResult(BaseModel):

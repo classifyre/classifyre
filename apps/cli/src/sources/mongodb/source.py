@@ -320,15 +320,11 @@ class MongoDBSource(BaseSource):
             f"{collection_ref.database}/{collection_ref.collection}"
         )
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    STREAM_DETECTIONS = True
+
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
-
-        pipeline = None
-        if self.config.detectors and any(detector.enabled for detector in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
         batch: list[SingleAssetScanResults] = []
         for collection_ref in self._iter_collections():
@@ -340,19 +336,11 @@ class MongoDBSource(BaseSource):
             batch.append(asset)
 
             if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    async for processed in pipeline.process_stream(batch):
-                        yield [processed]
-                else:
-                    yield batch
+                yield batch
                 batch = []
 
         if batch:
-            if pipeline:
-                async for processed in pipeline.process_stream(batch):
-                    yield [processed]
-            else:
-                yield batch
+            yield batch
 
     def generate_hash_id(self, asset_id: str) -> str:
         return hash_id(self._asset_type_value(), asset_id)

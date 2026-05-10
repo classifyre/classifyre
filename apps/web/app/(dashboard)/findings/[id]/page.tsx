@@ -70,7 +70,6 @@ const detectorLabels: Partial<Record<DetectorType, string>> = {
   SECRETS: "Secrets",
   PII: "PII",
   TOXIC: "Toxic Content",
-  IMAGE_CLASSIFICATION: "Image Classification",
   YARA: "YARA",
   BROKEN_LINKS: "Broken Links",
 };

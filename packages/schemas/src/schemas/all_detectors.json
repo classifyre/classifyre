@@ -22,18 +22,6 @@
       "$ref": "#/definitions/CustomDetectorConfig"
     },
     {
-      "$ref": "#/definitions/TextClassificationDetectorConfig"
-    },
-    {
-      "$ref": "#/definitions/ImageClassificationDetectorConfig"
-    },
-    {
-      "$ref": "#/definitions/FeatureExtractionDetectorConfig"
-    },
-    {
-      "$ref": "#/definitions/ObjectDetectionDetectorConfig"
-    },
-    {
       "$ref": "#/definitions/CodeSecurityDetectorConfig"
     },
     {
@@ -50,12 +38,8 @@
         "SECRETS",
         "PII",
         "TOXIC",
-        "IMAGE_CLASSIFICATION",
         "YARA",
         "BROKEN_LINKS",
-        "TEXT_CLASSIFICATION",
-        "FEATURE_EXTRACTION",
-        "OBJECT_DETECTION",
         "LANGUAGE",
         "CODE_SECURITY",
         "CUSTOM"
@@ -271,19 +255,6 @@
           "notes": "Flags harmful or abusive language that could damage user experience or brand reputation."
         },
         {
-          "detector_type": "IMAGE_CLASSIFICATION",
-          "lifecycle_status": "active",
-          "priority": "P1",
-          "categories": [
-            "CONTENT"
-          ],
-          "supported_asset_types": [
-            "IMAGE"
-          ],
-          "recommended_model": "transformers image-classification pipeline",
-          "notes": "Generic image-classification pipeline. Any HuggingFace-compatible vision model can be used \u2014 specify a hub ID or local path. NSFW, product recognition, medical imaging, and custom label sets are all supported."
-        },
-        {
           "detector_type": "YARA",
           "lifecycle_status": "active",
           "priority": "P1",
@@ -314,52 +285,6 @@
           ],
           "recommended_model": "HTTP validation engine",
           "notes": "Finds non-working or invalid links that reduce content quality and user trust."
-        },
-        {
-          "detector_type": "TEXT_CLASSIFICATION",
-          "lifecycle_status": "active",
-          "priority": "P2",
-          "categories": [
-            "QUALITY",
-            "CONTENT"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "transformers text-classification pipeline",
-          "notes": "Generic text classification pipeline powered by HuggingFace transformers. Configure any fine-tuned model for spam detection, sentiment analysis, topic classification, toxicity, intent detection, and more."
-        },
-        {
-          "detector_type": "FEATURE_EXTRACTION",
-          "lifecycle_status": "active",
-          "priority": "P1",
-          "categories": [
-            "CLASSIFICATION",
-            "QUALITY"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "transformers feature-extraction pipeline",
-          "notes": "Generates dense vector embeddings from text using any HuggingFace feature-extraction model. Supports mean/cls/max pooling and optional L2 normalisation. Use for semantic search, clustering, anomaly detection, deduplication, and RAG pipelines."
-        },
-        {
-          "detector_type": "OBJECT_DETECTION",
-          "lifecycle_status": "active",
-          "priority": "P2",
-          "categories": [
-            "CONTENT",
-            "SECURITY"
-          ],
-          "supported_asset_types": [
-            "IMAGE"
-          ],
-          "recommended_model": "transformers object-detection pipeline",
-          "notes": "Detects and localises objects in images using any HuggingFace object-detection model. Returns labels, bounding boxes, and confidence scores. Suitable for document AI, security screening, UI analysis, and visual content moderation."
         },
         {
           "detector_type": "LANGUAGE",
@@ -406,8 +331,8 @@
             "URL",
             "IMAGE"
           ],
-          "recommended_model": "mDeBERTa-v3 + SetFit + GLiNER",
-          "notes": "User-defined rules tailored to specific business needs or internal policies."
+          "recommended_model": "mDeBERTa-v3 + SetFit + GLiNER + HuggingFace transformers",
+          "notes": "User-defined rules and pipelines tailored to specific business needs. Supports regex, GLiNER2, LLM, text classification, image classification, feature extraction, and object detection pipelines."
         }
       ]
     },
@@ -855,6 +780,45 @@
               "default": null,
               "description": "Ad-hoc recognizers added to the Presidio registry at runtime. Each entry defines a regex-pattern or deny-list recognizer for a custom entity type."
             },
+            "max_length": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Override spaCy's nlp.max_length (default 1,000,000 chars). Set higher than your longest expected input to avoid the E088 error. Prefer chunk_size for very large texts."
+            },
+            "chunk_size": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Split text into chunks of this many characters before analysis. Findings from all chunks are merged with corrected offsets. When null the full text is passed as-is (subject to max_length)."
+            },
+            "chunk_overlap": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 0,
+              "description": "Character overlap between consecutive chunks. Helps detect entities that span a chunk boundary."
+            },
             "confidence_threshold": {
               "type": "number",
               "minimum": 0,
@@ -880,12 +844,12 @@
     },
     "YaraRuleConfig": {
       "title": "YaraRuleConfig",
-      "description": "A single YARA rule definition. Strings are assigned identifiers $s0, $s1, \u2026 in order and can be referenced in the condition by index or via 'any of them' / 'N of ($s*)'.",
+      "description": "A single YARA rule definition. Strings are assigned identifiers $s0, $s1, … in order and can be referenced in the condition by index or via 'any of them' / 'N of ($s*)'.",
       "type": "object",
       "properties": {
         "name": {
           "type": "string",
-          "description": "Rule identifier \u2014 letters, digits, and underscores only. Must be unique within a config.",
+          "description": "Rule identifier — letters, digits, and underscores only. Must be unique within a config.",
           "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
         },
         "description": {
@@ -921,7 +885,7 @@
           "items": {
             "type": "string"
           },
-          "description": "YARA string patterns with optional modifiers. Assigned identifiers $s0, $s1, \u2026 in declaration order. Supported formats: regex (/pattern/ [ascii|wide|nocase|fullword]), literal (\"text\" [modifiers]), hex ({ HH HH \u2026 })."
+          "description": "YARA string patterns with optional modifiers. Assigned identifiers $s0, $s1, … in declaration order. Supported formats: regex (/pattern/ [ascii|wide|nocase|fullword]), literal (\"text\" [modifiers]), hex ({ HH HH … })."
         },
         "condition": {
           "type": "string",
@@ -995,508 +959,6 @@
               ],
               "default": null,
               "description": "Minimum severity level to include in results. Findings below this threshold are suppressed."
-            }
-          }
-        }
-      ]
-    },
-    "TextClassificationSeverityRule": {
-      "type": "object",
-      "description": "Maps a predicted label to a severity level. Pattern is matched case-insensitively as a regex against the label.",
-      "properties": {
-        "pattern": {
-          "type": "string",
-          "description": "Case-insensitive regex matched against the predicted label (e.g. 'spam', 'toxic', 'negative')."
-        },
-        "severity": {
-          "$ref": "#/definitions/Severity"
-        }
-      },
-      "required": [
-        "pattern",
-        "severity"
-      ],
-      "additionalProperties": false
-    },
-    "TextClassificationDetectorConfig": {
-      "title": "TextClassificationDetectorConfig",
-      "description": "Generic text-classification pipeline powered by HuggingFace transformers. Accepts any model fine-tuned for text-classification \u2014 from the hub or a local directory. Use severity_map to assign severity to predicted labels.",
-      "allOf": [
-        {
-          "$ref": "#/definitions/DetectorConfig"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "model": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Model to use: a HuggingFace hub ID (e.g. 'mrm8488/bert-tiny-finetuned-sms-spam-detection') or an absolute local directory path. The model must be fine-tuned for the text-classification task."
-            },
-            "model_revision": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Git branch, tag, or commit hash when fetching a model from the HuggingFace hub. Ignored for local paths."
-            },
-            "device": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": "cpu",
-              "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
-            },
-            "top_k": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Maximum number of top predictions to return per text. When null the pipeline returns all labels above confidence_threshold."
-            },
-            "function_to_apply": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "enum": [
-                    "sigmoid",
-                    "softmax",
-                    "none"
-                  ]
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Score normalization applied after the model forward pass. 'softmax' for single-label models (pipeline default), 'sigmoid' for multi-label models, 'none' for raw logits."
-            },
-            "severity_map": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/definitions/TextClassificationSeverityRule"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Ordered rules mapping predicted labels to severity levels. First matching rule wins. Labels with no matching rule receive 'info' severity."
-            },
-            "confidence_threshold": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1,
-              "default": 0.7,
-              "description": "Minimum prediction confidence to report a label as a finding (0-1)."
-            },
-            "max_findings": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Maximum number of label findings to return per text asset"
-            }
-          }
-        }
-      ]
-    },
-    "ImageClassificationSeverityRule": {
-      "type": "object",
-      "description": "Maps a predicted label to a severity level. Pattern is matched case-insensitively as a substring of the label.",
-      "properties": {
-        "pattern": {
-          "type": "string",
-          "description": "Case-insensitive substring matched against the predicted label (e.g. 'nsfw', 'explicit', 'normal')."
-        },
-        "severity": {
-          "$ref": "#/definitions/Severity"
-        }
-      },
-      "required": [
-        "pattern",
-        "severity"
-      ],
-      "additionalProperties": false
-    },
-    "ImageClassificationDetectorConfig": {
-      "title": "ImageClassificationDetectorConfig",
-      "description": "Generic image-classification pipeline powered by HuggingFace transformers. Accepts any vision model \u2014 from the hub or a local directory. Use severity_map to assign severity to predicted labels.",
-      "allOf": [
-        {
-          "$ref": "#/definitions/DetectorConfig"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "model": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Model to use: a HuggingFace hub ID (e.g. 'Falconsai/nsfw_image_detection') or an absolute local directory path. Defaults to 'google/vit-base-patch16-224' when null."
-            },
-            "model_revision": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Git branch, tag, or commit hash when fetching a model from the HuggingFace hub. Ignored for local paths."
-            },
-            "device": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": "cpu",
-              "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
-            },
-            "top_k": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Maximum number of top predictions to return per image. When null the pipeline returns all classes above confidence_threshold."
-            },
-            "function_to_apply": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "enum": [
-                    "sigmoid",
-                    "softmax",
-                    "none"
-                  ]
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Score normalization applied after the model forward pass. 'softmax' for single-label models (pipeline default), 'sigmoid' for multi-label models, 'none' for raw logits."
-            },
-            "severity_map": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/definitions/ImageClassificationSeverityRule"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Ordered rules mapping predicted labels to severity levels. First matching rule wins. Labels with no matching rule receive 'info' severity."
-            },
-            "confidence_threshold": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1,
-              "default": 0.0,
-              "description": "Minimum prediction confidence to report a label as a finding (0-1). Defaults to 0 so all top_k predictions are reported."
-            },
-            "max_findings": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Maximum number of label findings to return per image"
-            }
-          }
-        }
-      ]
-    },
-    "FeatureExtractionDetectorConfig": {
-      "title": "FeatureExtractionDetectorConfig",
-      "description": "Generates dense vector embeddings from text using the HuggingFace feature-extraction pipeline. Accepts any encoder model from the hub or a local directory. Configure pooling_strategy and normalize_embeddings to control the output representation. Embeddings are stored in finding metadata for downstream use in semantic search, clustering, RAG, and anomaly detection.",
-      "allOf": [
-        {
-          "$ref": "#/definitions/DetectorConfig"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "model": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "HuggingFace hub ID (e.g. 'BAAI/bge-base-en-v1.5', 'sentence-transformers/all-MiniLM-L6-v2') or absolute local directory path. Required — raises an error when null."
-            },
-            "model_revision": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Git branch, tag, or commit hash when fetching a model from the HuggingFace hub. Ignored for local paths."
-            },
-            "device": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": "cpu",
-              "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
-            },
-            "pooling_strategy": {
-              "type": "string",
-              "enum": [
-                "mean",
-                "cls",
-                "max",
-                "none"
-              ],
-              "default": "mean",
-              "description": "How to aggregate per-token hidden states into a single embedding vector. 'mean' (recommended) averages all token embeddings. 'cls' uses the first [CLS] token. 'max' takes element-wise maximum. 'none' returns all token embeddings as a list."
-            },
-            "normalize_embeddings": {
-              "type": "boolean",
-              "default": true,
-              "description": "L2-normalise the final embedding vector. Strongly recommended for cosine-similarity workloads and vector database indexing."
-            },
-            "truncation": {
-              "type": "boolean",
-              "default": true,
-              "description": "Truncate input to the model's maximum sequence length. Disable only if the model and tokenizer support arbitrary length."
-            },
-            "max_length": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Override the tokenizer's default maximum sequence length. When null the model's configured max_length is used."
-            },
-            "batch_size": {
-              "type": "integer",
-              "default": 8,
-              "description": "Number of texts to encode in a single forward pass. Increase for throughput on GPU, decrease to reduce memory usage."
-            },
-            "max_findings": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Maximum number of embedding findings to return per asset. Typically 1 per chunk."
-            }
-          }
-        }
-      ]
-    },
-    "ObjectDetectionSeverityRule": {
-      "type": "object",
-      "description": "Maps a detected object label to a severity level. Pattern is matched case-insensitively as a regex against the label.",
-      "properties": {
-        "pattern": {
-          "type": "string",
-          "description": "Case-insensitive regex matched against the detected object label (e.g. 'person', 'weapon', 'face')."
-        },
-        "severity": {
-          "$ref": "#/definitions/Severity"
-        }
-      },
-      "required": [
-        "pattern",
-        "severity"
-      ],
-      "additionalProperties": false
-    },
-    "ObjectDetectionDetectorConfig": {
-      "title": "ObjectDetectionDetectorConfig",
-      "description": "Detects and localises objects in images using the HuggingFace object-detection pipeline. Accepts any detection model — DETR, RT-DETR, OWL-ViT, YOLOS, and others. Each detected object produces a finding with its label, confidence score, and bounding box coordinates. Use severity_map to assign severity to specific object classes.",
-      "allOf": [
-        {
-          "$ref": "#/definitions/DetectorConfig"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "model": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "HuggingFace hub ID (e.g. 'facebook/detr-resnet-50', 'PekingU/rtdetr_r50vd', 'hustvl/yolos-small') or absolute local directory path. Required — raises an error when null."
-            },
-            "model_revision": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Git branch, tag, or commit hash when fetching a model from the HuggingFace hub. Ignored for local paths."
-            },
-            "device": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": "cpu",
-              "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
-            },
-            "confidence_threshold": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1,
-              "default": 0.5,
-              "description": "Minimum detection confidence to report an object as a finding (0-1). Lower values increase recall but add false positives."
-            },
-            "top_k": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Keep only the top-k highest-confidence detections per image. When null all detections above confidence_threshold are returned."
-            },
-            "nms_threshold": {
-              "anyOf": [
-                {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "IoU threshold for non-maximum suppression applied after inference to remove duplicate overlapping boxes. When null the model's default post-processing is used."
-            },
-            "min_box_area": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Minimum bounding-box area in pixels (width × height). Detections smaller than this are suppressed. Useful for filtering noise in large images."
-            },
-            "severity_map": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/definitions/ObjectDetectionSeverityRule"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Ordered rules mapping detected object labels to severity levels. First matching rule wins. Labels with no matching rule receive 'info' severity."
-            },
-            "max_findings": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Maximum number of object findings to return per image."
             }
           }
         }
@@ -1610,7 +1072,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Output field name \u2014 becomes a key in extracted_data JSON"
+          "description": "Output field name — becomes a key in extracted_data JSON"
         },
         "description": {
           "type": "string",
@@ -1676,7 +1138,7 @@
     },
     "CustomExtractorConfig": {
       "type": "object",
-      "description": "Structured extraction \u2014 runs after detection fires on the same content",
+      "description": "Structured extraction — runs after detection fires on the same content",
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -1877,7 +1339,7 @@
             },
             "extractor": {
               "$ref": "#/definitions/CustomExtractorConfig",
-              "description": "Optional structured extraction \u2014 runs when detector fires"
+              "description": "Optional structured extraction — runs when detector fires"
             },
             "pipeline_schema": {
               "$ref": "#/definitions/AnyPipelineSchema"
@@ -2171,16 +1633,74 @@
       "type": "object",
       "properties": {
         "pattern": {
-          "type": "string"
+          "type": "string",
+          "description": "Regular expression pattern (RE2 syntax recommended)"
         },
-        "flags": {},
+        "flags": {
+          "description": "Legacy integer flags (e.g. re.IGNORECASE). Prefer the boolean fields below instead."
+        },
         "description": {
           "type": "string",
           "description": "Human-readable description of the pattern"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low", "info"],
+          "description": "Severity level assigned to findings from this pattern. When omitted, defaults to high (confidence is always 1.0 for regex)."
+        },
+        "case_sensitive": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether matching is case-sensitive. Set to false for case-insensitive matching."
+        },
+        "dot_nl": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the dot (.) metacharacter matches newline characters."
+        },
+        "literal": {
+          "type": "boolean",
+          "default": false,
+          "description": "Treat the pattern as a literal string instead of a regular expression."
+        },
+        "longest_match": {
+          "type": "boolean",
+          "default": false,
+          "description": "Prefer the longest possible match instead of the first match (RE2 only)."
+        },
+        "max_mem": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum memory (bytes) for the RE2 automaton. RE2 only; ignored with stdlib fallback."
+        },
+        "group": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Capture group index to extract as matched content. 0 = entire match (default)."
         }
       },
       "required": [
         "pattern"
+      ],
+      "additionalProperties": false
+    },
+    "PipelineSeverityRule": {
+      "title": "PipelineSeverityRule",
+      "type": "object",
+      "description": "Maps a predicted label to a severity level. Pattern is matched case-insensitively as a substring of the label.",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "Case-insensitive substring matched against the predicted label (e.g. 'spam', 'nsfw', 'person')."
+        },
+        "severity": {
+          "$ref": "#/definitions/Severity"
+        }
+      },
+      "required": [
+        "pattern",
+        "severity"
       ],
       "additionalProperties": false
     },
@@ -2253,6 +1773,272 @@
       },
       "additionalProperties": false
     },
+    "TextClassificationPipelineSchema": {
+      "title": "TextClassificationPipelineSchema",
+      "type": "object",
+      "description": "Text classification pipeline using a HuggingFace fine-tuned model. Runs a single model; create multiple custom detectors to run multiple classifiers.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["TEXT_CLASSIFICATION"],
+          "default": "TEXT_CLASSIFICATION"
+        },
+        "model": {
+          "type": "string",
+          "description": "HuggingFace hub ID (e.g. 'mrm8488/bert-tiny-finetuned-sms-spam-detection') or absolute local directory path."
+        },
+        "model_revision": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null,
+          "description": "Git branch, tag, or commit hash when fetching from the HuggingFace hub."
+        },
+        "device": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": "cpu",
+          "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
+        },
+        "top_k": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null,
+          "description": "Maximum number of top predictions to return. When null all labels above confidence_threshold are returned."
+        },
+        "function_to_apply": {
+          "anyOf": [
+            { "type": "string", "enum": ["sigmoid", "softmax", "none"] },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Score normalization: 'softmax' for single-label, 'sigmoid' for multi-label, 'none' for raw logits."
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.7,
+          "description": "Minimum prediction confidence to report a label as a finding (0-1)."
+        },
+        "severity": {
+          "anyOf": [{ "$ref": "#/definitions/Severity" }, { "type": "null" }],
+          "default": "info",
+          "description": "Default severity when no severity_map rule matches."
+        },
+        "severity_map": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": { "$ref": "#/definitions/PipelineSeverityRule" }
+            },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Ordered rules mapping predicted labels to severity levels. First matching rule wins."
+        },
+        "max_length": {
+          "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }],
+          "default": null,
+          "description": "Override the tokenizer's maximum sequence length."
+        },
+        "chunk_size": {
+          "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }],
+          "default": null,
+          "description": "Split text into chunks of this many characters before classification."
+        },
+        "chunk_overlap": {
+          "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }],
+          "default": 0,
+          "description": "Character overlap between consecutive chunks."
+        }
+      },
+      "required": ["model"],
+      "additionalProperties": false
+    },
+    "ImageClassificationPipelineSchema": {
+      "title": "ImageClassificationPipelineSchema",
+      "type": "object",
+      "description": "Image classification pipeline using a HuggingFace vision model. Runs a single model; create multiple custom detectors to run multiple classifiers.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["IMAGE_CLASSIFICATION"],
+          "default": "IMAGE_CLASSIFICATION"
+        },
+        "model": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null,
+          "description": "HuggingFace hub ID or local path. Defaults to 'google/vit-base-patch16-224' when null."
+        },
+        "model_revision": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null,
+          "description": "Git branch, tag, or commit hash when fetching from the HuggingFace hub."
+        },
+        "device": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": "cpu",
+          "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
+        },
+        "top_k": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null,
+          "description": "Maximum number of top predictions to return per image."
+        },
+        "function_to_apply": {
+          "anyOf": [
+            { "type": "string", "enum": ["sigmoid", "softmax", "none"] },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Score normalization applied after the model forward pass."
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.0,
+          "description": "Minimum prediction confidence to report a label as a finding (0-1). Defaults to 0 so all top_k predictions are reported."
+        },
+        "severity_map": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": { "$ref": "#/definitions/PipelineSeverityRule" }
+            },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Ordered rules mapping predicted labels to severity levels. Labels with no matching rule receive 'info' severity."
+        }
+      },
+      "additionalProperties": false
+    },
+    "FeatureExtractionPipelineSchema": {
+      "title": "FeatureExtractionPipelineSchema",
+      "type": "object",
+      "description": "Feature extraction (embedding) pipeline using a HuggingFace model. Runs a single encoder; create multiple custom detectors to run multiple embedding models.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["FEATURE_EXTRACTION"],
+          "default": "FEATURE_EXTRACTION"
+        },
+        "model": {
+          "type": "string",
+          "description": "HuggingFace hub ID (e.g. 'BAAI/bge-base-en-v1.5', 'sentence-transformers/all-MiniLM-L6-v2') or absolute local directory path."
+        },
+        "model_revision": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null,
+          "description": "Git branch, tag, or commit hash when fetching from the HuggingFace hub."
+        },
+        "device": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": "cpu",
+          "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
+        },
+        "pooling_strategy": {
+          "type": "string",
+          "enum": ["mean", "cls", "max", "none"],
+          "default": "mean",
+          "description": "How to aggregate per-token hidden states into a single embedding vector."
+        },
+        "normalize_embeddings": {
+          "type": "boolean",
+          "default": true,
+          "description": "L2-normalise the final embedding vector. Recommended for cosine-similarity workloads."
+        },
+        "truncation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Truncate input to the model's maximum sequence length."
+        },
+        "max_length": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null,
+          "description": "Override the tokenizer's default maximum sequence length."
+        },
+        "batch_size": {
+          "type": "integer",
+          "default": 8,
+          "description": "Number of texts to encode in a single forward pass."
+        },
+        "chunk_size": {
+          "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }],
+          "default": null,
+          "description": "Split text into chunks of this many characters before embedding. Each chunk produces its own finding."
+        },
+        "chunk_overlap": {
+          "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }],
+          "default": 0,
+          "description": "Character overlap between consecutive chunks."
+        }
+      },
+      "required": ["model"],
+      "additionalProperties": false
+    },
+    "ObjectDetectionPipelineSchema": {
+      "title": "ObjectDetectionPipelineSchema",
+      "type": "object",
+      "description": "Object detection pipeline using a HuggingFace model. Runs a single detector; create multiple custom detectors to run multiple detection models.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["OBJECT_DETECTION"],
+          "default": "OBJECT_DETECTION"
+        },
+        "model": {
+          "type": "string",
+          "description": "HuggingFace hub ID (e.g. 'facebook/detr-resnet-50', 'hustvl/yolos-small') or absolute local directory path."
+        },
+        "model_revision": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null,
+          "description": "Git branch, tag, or commit hash when fetching from the HuggingFace hub."
+        },
+        "device": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": "cpu",
+          "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5,
+          "description": "Minimum detection confidence to report an object as a finding (0-1)."
+        },
+        "top_k": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null,
+          "description": "Keep only the top-k highest-confidence detections per image."
+        },
+        "nms_threshold": {
+          "anyOf": [
+            { "type": "number", "minimum": 0, "maximum": 1 },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "IoU threshold for non-maximum suppression. When null the model's default post-processing is used."
+        },
+        "min_box_area": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null,
+          "description": "Minimum bounding-box area in pixels (width × height). Smaller detections are suppressed."
+        },
+        "severity_map": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": { "$ref": "#/definitions/PipelineSeverityRule" }
+            },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Ordered rules mapping detected object labels to severity levels. Labels with no matching rule receive 'info' severity."
+        }
+      },
+      "required": ["model"],
+      "additionalProperties": false
+    },
     "AnyPipelineSchema": {
       "title": "AnyPipelineSchema",
       "oneOf": [
@@ -2264,6 +2050,18 @@
         },
         {
           "$ref": "#/definitions/LLMPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/TextClassificationPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/ImageClassificationPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/FeatureExtractionPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/ObjectDetectionPipelineSchema"
         }
       ],
       "discriminator": {

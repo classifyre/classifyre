@@ -87,6 +87,9 @@ custom = [
     "gliner2>=1.3.0",
     "sentence-transformers>=5.2.3",
 ]
+regex = [
+    "google-re2>=1.1",
+]
 detectors = [
     { include-group = "privacy" },
     { include-group = "security" },
@@ -95,6 +98,7 @@ detectors = [
     { include-group = "quality" },
     { include-group = "classification" },
     { include-group = "custom" },
+    { include-group = "regex" },
 ]
 file-processing = [
     "filetype>=1.2.0",
@@ -252,6 +256,8 @@ module = [
     "numpy.*",
     "tldextract",
     "tldextract.*",
+    "re2",
+    "re2.*",
 ]
 ignore_missing_imports = true
 

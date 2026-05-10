@@ -11,7 +11,7 @@ class _DummySource(BaseSource):
     def test_connection(self) -> dict[str, Any]:
         return {"status": "SUCCESS"}
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if False:
             yield []
 

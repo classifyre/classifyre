@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
-import type { JSONSchema7 } from "json-schema";
-import { FlaskConical, Search, SlidersHorizontal } from "lucide-react";
+import { Check, FlaskConical, Pencil, Search } from "lucide-react";
 import { api, type CustomDetectorResponseDto } from "@workspace/api-client";
 import { useTranslation } from "@/hooks/use-translation";
 import { Badge } from "@workspace/ui/components/badge";
@@ -12,19 +11,20 @@ import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Form } from "@workspace/ui/components/form";
 import { Input } from "@workspace/ui/components/input";
+import {
+  Select,
+  SelectContent,
+  SelectPrimitive,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 import { Toggle } from "@workspace/ui/components/toggle";
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
 } from "@workspace/ui/components/collapsible";
 import { cn } from "@workspace/ui/lib/utils";
 import { JsonSchemaFields, buildFormDefaults } from "./json-schema-form";
-import { AiAssistedCard } from "@/components/ai-assisted-card";
-import {
-  detectorUiGroups,
-  getDetectorGroupId,
-} from "@/lib/detector-ui-config";
 import {
   getDetectorSchemas,
   type DetectorSchemaInfo,
@@ -72,18 +72,6 @@ function formatDetectorName(title: string) {
     .trim();
 }
 
-function getPatternCount(schema: JSONSchema7): number | null {
-  const patterns = schema.properties?.enabled_patterns as
-    | JSONSchema7
-    | undefined;
-  if (!patterns) return null;
-  const items = patterns.items as JSONSchema7 | undefined;
-  if (!items || Array.isArray(items)) return null;
-  if (Array.isArray(items.enum)) {
-    return items.enum.length;
-  }
-  return null;
-}
 
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -135,27 +123,29 @@ function matchesSearch(
   return terms.includes(searchTerm);
 }
 
-function DetectorAiConfigurator({
-  detector: _detector,
-  presetOptions: _presetOptions,
-  currentConfig: _currentConfig,
-  enabled: _enabled,
-  onApplySuggestion: _onApplySuggestion,
-}: {
-  detector: DetectorSchemaInfo;
-  presetOptions: DetectorPresetOption[];
-  currentConfig: Record<string, unknown>;
-  enabled: boolean;
-  onApplySuggestion: (next: {
-    enabled: boolean;
-    config: Record<string, unknown>;
-    presetId: string | null;
-  }) => void;
-}) {
-  return null;
+function matchesCustomDetectorSearch(
+  detector: CustomDetectorResponseDto,
+  searchTerm: string,
+): boolean {
+  if (!searchTerm) {
+    return true;
+  }
+
+  const terms = [
+    "custom detector",
+    detector.name,
+    detector.key,
+    detector.method,
+    detector.description ?? "",
+    ...detector.recentSourceNames,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return terms.includes(searchTerm);
 }
 
-function DetectorConfigCard({
+function DetectorConfigRow({
   detector,
   enabled,
   defaultConfig,
@@ -193,7 +183,6 @@ function DetectorConfigCard({
   }, [form, onStateChange]);
 
   const displayName = formatDetectorName(detector.title);
-  const patternCount = getPatternCount(detector.schema);
 
   const presetOptions = useMemo<DetectorPresetOption[]>(
     () =>
@@ -218,43 +207,32 @@ function DetectorConfigCard({
     return matchingPresetId ?? "custom";
   });
 
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(
-    () => enabled && !matchingPresetId,
-  );
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   useEffect(() => {
     if (!enabled) {
       setSelectedPreset(null);
-      setIsAdvancedOpen(false);
+      setIsEditOpen(false);
       return;
     }
     if (matchingPresetId) {
       setSelectedPreset(matchingPresetId);
-      setIsAdvancedOpen(false);
     } else {
       setSelectedPreset("custom");
-      setIsAdvancedOpen(true);
     }
   }, [enabled, matchingPresetId]);
 
   const handlePresetSelect = (presetId: string) => {
-    const preset = presetOptions.find((option) => option.id === presetId);
-    if (!preset) {
+    if (presetId === "custom") {
+      setSelectedPreset("custom");
       return;
     }
+    const preset = presetOptions.find((option) => option.id === presetId);
+    if (!preset) return;
     const nextConfig = preset.normalizedConfig;
     setSelectedPreset(presetId);
     form.reset(nextConfig);
-    setIsAdvancedOpen(false);
     onStateChange({ enabled: true, config: nextConfig });
-  };
-
-  const handleEnableCustom = () => {
-    if (!enabled) {
-      onStateChange({ enabled: true });
-    }
-    setSelectedPreset("custom");
-    setIsAdvancedOpen(true);
   };
 
   const handleResetDefaults = () => {
@@ -263,188 +241,138 @@ function DetectorConfigCard({
     onStateChange({ config: nextConfig });
   };
 
+  const handleEnable = () => {
+    onStateChange({ enabled: true });
+    setIsEditOpen(true);
+  };
+
   const selectedPresetLabel =
     selectedPreset && selectedPreset !== "custom"
       ? presetOptions.find((preset) => preset.id === selectedPreset)?.name
       : null;
 
   return (
-    <AiAssistedCard
-      title={displayName}
-      description={detector.type.replace(/_/g, " ")}
-      active={enabled}
-      withShadow={false}
-      headerActions={
-        <div className="flex items-center gap-2">
-          <DetectorAiConfigurator
-            detector={detector}
-            presetOptions={presetOptions}
-            currentConfig={normalizedCurrentConfig}
-            enabled={enabled}
-            onApplySuggestion={(next) => {
-              form.reset(next.config);
-              setSelectedPreset(next.presetId ?? "custom");
-              setIsAdvancedOpen(next.presetId ? false : true);
-              onStateChange({ enabled: next.enabled, config: next.config });
-            }}
-          />
+    <div
+      className={cn(
+        "border-b-2 border-border last:border-b-0 border-l-4 transition-colors",
+        enabled ? "border-l-[#b7ff00]" : "border-l-transparent",
+      )}
+    >
+      {!enabled ? (
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-muted/20 transition-colors cursor-pointer"
+          onClick={handleEnable}
+          data-testid={`detector-enable-${detector.type}`}
+        >
+          <div className="min-w-0 flex-1">
+            <span className="text-sm font-medium truncate">{displayName}</span>
+            {detector.description && (
+              <p className="text-xs text-muted-foreground/70 truncate mt-0.5">
+                {detector.description}
+              </p>
+            )}
+          </div>
+        </button>
+      ) : (
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold truncate">{displayName}</span>
+              {selectedPresetLabel && (
+                <Badge variant="outline" className="border-2 border-border shrink-0 text-[10px]">
+                  {selectedPresetLabel}
+                </Badge>
+              )}
+            </div>
+            {detector.description && (
+              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                {detector.description}
+              </p>
+            )}
+          </div>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="shrink-0 rounded-[4px] border-2 border-black"
+            onClick={() => setIsEditOpen((prev) => !prev)}
+            data-testid={`btn-edit-${detector.type}`}
+          >
+            <Pencil className="h-3.5 w-3.5 mr-1" />
+            {t("sources.scanConfig.edit")}
+          </Button>
+
           <Toggle
             variant="outline"
             size="sm"
             pressed={enabled}
-            onPressedChange={(pressed) => onStateChange({ enabled: pressed })}
-            className="cursor-pointer"
+            onPressedChange={() => onStateChange({ enabled: false })}
+            className="shrink-0 cursor-pointer"
             data-testid={`detector-toggle-${detector.type}`}
           >
-            {enabled ? t("sources.scanConfig.on") : t("sources.scanConfig.off")}
+            {t("sources.scanConfig.off")}
           </Toggle>
         </div>
-      }
-    >
-      <div className="space-y-4">
-        {detector.description && (
-          <p className="text-sm text-muted-foreground">
-            {detector.description}
-          </p>
-        )}
+      )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          {detector.categories.map((category) => (
-            <Badge
-              key={`${detector.type}-${category}`}
-              variant="outline"
-              className="border-2 border-border"
-            >
-              {category}
-            </Badge>
-          ))}
-          {detector.priority && (
-            <Badge variant="outline" className="border-2 border-border">
-              {detector.priority}
-            </Badge>
-          )}
-          {detector.lifecycleStatus && (
-            <Badge variant="outline" className="border-2 border-border">
-              {detector.lifecycleStatus}
-            </Badge>
-          )}
-          {patternCount !== null && (
-            <Badge variant="outline" className="border-2 border-border">
-              {t("sources.scanConfig.patterns", { count: patternCount })}
-            </Badge>
-          )}
-          {enabled && (
-            <Badge variant="outline" className="border-2 border-border">
-              {selectedPresetLabel
-                ? t("sources.scanConfig.presetLabel", {
-                    label: selectedPresetLabel,
-                  })
-                : t("sources.scanConfig.customPreset")}
-            </Badge>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="rounded-[4px] border-2 border-black"
-              onClick={handleEnableCustom}
-              data-testid={`btn-customize-${detector.type}`}
-            >
-              {t("sources.scanConfig.customize")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="rounded-[4px] border-2 border-black"
-              onClick={handleResetDefaults}
-              data-testid={`btn-reset-${detector.type}`}
-            >
-              {t("sources.scanConfig.reset")}
-            </Button>          </div>
-        </div>
-
-        {presetOptions.length > 0 && (
-          <div className="space-y-2 rounded-[6px] border-2 border-border bg-muted/30 p-3">
-            <div>
-              <p className="text-[11px] font-mono uppercase tracking-[0.16em]">
-                {t("sources.scanConfig.presets")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {t("sources.scanConfig.presetsDesc")}
-              </p>
-            </div>
-            <div className="grid gap-2 md:grid-cols-2">
-              {presetOptions.map((preset) => {
-                const isSelected = selectedPreset === preset.id;
-                return (
-                  <Button
-                    key={preset.id}
-                    type="button"
-                    variant="outline"
-                    className={cn(
-                      "h-auto w-full items-start justify-start whitespace-normal rounded-[4px] border-2 border-border px-3 py-2 text-left",
-                      isSelected && "border-black bg-accent/30",
-                    )}
-                    onClick={() => handlePresetSelect(preset.id)}
-                  >
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold">{preset.name}</p>
-                      {preset.description && (
-                        <p className="text-xs text-muted-foreground">
-                          {preset.description}
-                        </p>
-                      )}
-                    </div>
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <Collapsible
-          open={isAdvancedOpen}
-          onOpenChange={(open) => {
-            if (open) {
-              handleEnableCustom();
-              return;
-            }
-            setIsAdvancedOpen(false);
-          }}
-        >
-          <div className="flex items-center justify-between gap-2 rounded-[6px] border-2 border-border p-3">
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="h-4 w-4" />
-              <div>
-                <p className="text-sm font-semibold">
-                  {t("sources.scanConfig.advancedSettings")}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {t("sources.scanConfig.advancedSettingsDesc")}
-                </p>
+      <Collapsible open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <CollapsibleContent>
+          <div className="border-t-2 border-border bg-muted/20 px-4 py-4 space-y-4">
+            {presetOptions.length > 0 && (
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap shrink-0">
+                  {t("sources.scanConfig.presets")}
+                </span>
+                <Select
+                  value={selectedPreset ?? undefined}
+                  onValueChange={handlePresetSelect}
+                >
+                  <SelectTrigger className="h-8 w-[260px] rounded-[4px] border-2 border-border text-xs">
+                    <SelectValue placeholder={t("sources.scanConfig.presets")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {presetOptions.map((preset) => (
+                      <SelectPrimitive.Item
+                        key={preset.id}
+                        value={preset.id}
+                        className="relative flex w-full cursor-default select-none flex-col rounded-sm py-2 pr-8 pl-2 text-sm outline-none focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                      >
+                        <span className="absolute right-2 top-2 flex size-3.5 items-center justify-center">
+                          <SelectPrimitive.ItemIndicator>
+                            <Check className="size-3.5" />
+                          </SelectPrimitive.ItemIndicator>
+                        </span>
+                        <SelectPrimitive.ItemText>
+                          <span className="text-xs font-medium">{preset.name}</span>
+                        </SelectPrimitive.ItemText>
+                        {preset.description && (
+                          <span className="text-[10px] text-muted-foreground leading-tight mt-0.5 whitespace-normal max-w-[280px]">
+                            {preset.description}
+                          </span>
+                        )}
+                      </SelectPrimitive.Item>
+                    ))}
+                    <SelectPrimitive.Item
+                      value="custom"
+                      className="relative flex w-full cursor-default select-none rounded-sm py-1.5 pr-8 pl-2 text-sm outline-none focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                    >
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 flex size-3.5 items-center justify-center">
+                        <SelectPrimitive.ItemIndicator>
+                          <Check className="size-3.5" />
+                        </SelectPrimitive.ItemIndicator>
+                      </span>
+                      <SelectPrimitive.ItemText>
+                        <span className="text-xs font-medium">{t("sources.scanConfig.customize")}</span>
+                      </SelectPrimitive.ItemText>
+                    </SelectPrimitive.Item>
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-            <CollapsibleTrigger asChild>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="rounded-[4px] border-2 border-black"
-              >
-                {isAdvancedOpen
-                  ? t("sources.scanConfig.hide")
-                  : t("sources.scanConfig.show")}
-              </Button>
-            </CollapsibleTrigger>
-          </div>
+            )}
 
-          <CollapsibleContent className="pt-3">
-            <div className="rounded-[6px] border-2 border-border p-3">
+            <div className="rounded-[6px] border-2 border-border bg-background p-3">
               <Form {...form}>
                 <div className="space-y-4">
                   <JsonSchemaFields
@@ -454,10 +382,23 @@ function DetectorConfigCard({
                 </div>
               </Form>
             </div>
-          </CollapsibleContent>
-        </Collapsible>
-      </div>
-    </AiAssistedCard>
+
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="rounded-[4px] border-2 border-black"
+                onClick={handleResetDefaults}
+                data-testid={`btn-reset-${detector.type}`}
+              >
+                {t("sources.scanConfig.reset")}
+              </Button>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   );
 }
 
@@ -469,29 +410,7 @@ function formatCustomDetectorMethod(method: string | undefined): string {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function matchesCustomDetectorSearch(
-  detector: CustomDetectorResponseDto,
-  searchTerm: string,
-): boolean {
-  if (!searchTerm) {
-    return true;
-  }
-
-  const terms = [
-    "custom detector",
-    detector.name,
-    detector.key,
-    detector.method,
-    detector.description ?? "",
-    ...detector.recentSourceNames,
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  return terms.includes(searchTerm);
-}
-
-function CustomDetectorCatalogCard({
+function CustomDetectorRow({
   detector,
   enabled,
   onToggle,
@@ -501,122 +420,127 @@ function CustomDetectorCatalogCard({
   onToggle: (enabled: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  const handleEnable = () => {
+    onToggle(true);
+    setIsDetailOpen(true);
+  };
+
   return (
-    <AiAssistedCard
-      title={detector.name}
-      description={detector.key}
-      active={enabled}
-      withShadow={false}
-      headerActions={
-        <Toggle
-          variant="outline"
-          size="sm"
-          pressed={enabled}
-          onPressedChange={onToggle}
-          className="cursor-pointer"
-          data-testid={`toggle-custom-detector-${detector.key}`}
-        >
-          {enabled ? t("sources.scanConfig.on") : t("sources.scanConfig.off")}
-        </Toggle>
-      }
+    <div
+      className={cn(
+        "border-b-2 border-border last:border-b-0 border-l-4 transition-colors",
+        enabled ? "border-l-[#b7ff00]" : "border-l-transparent",
+      )}
     >
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          {detector.description?.trim() || t("sources.scanConfig.fallbackDesc")}
-        </p>
+      {!enabled ? (
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-muted/20 transition-colors cursor-pointer"
+          onClick={handleEnable}
+          data-testid={`custom-detector-enable-${detector.key}`}
+        >
+          <div className="min-w-0 flex-1">
+            <span className="text-sm font-medium truncate">{detector.name}</span>
+            <p className="text-xs text-muted-foreground/70 truncate mt-0.5">
+              {detector.description?.trim() || t("sources.scanConfig.fallbackDesc")}
+            </p>
+          </div>
+        </button>
+      ) : (
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <span className="text-sm font-semibold truncate">{detector.name}</span>
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              {detector.description?.trim() || t("sources.scanConfig.fallbackDesc")}
+            </p>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="border-2 border-border">
-            {formatCustomDetectorMethod(detector.method)}
-          </Badge>
-          <Badge variant="outline" className="border-2 border-border">
-            {detector.isActive
-              ? t("sources.scanConfig.catalogActive")
-              : t("sources.scanConfig.catalogInactive")}
-          </Badge>
-          <Badge variant="outline" className="border-2 border-border">
-            {t("sources.scanConfig.findingsCount", {
-              count: detector.findingsCount,
-            })}
-          </Badge>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="shrink-0 rounded-[4px] border-2 border-black"
+            onClick={() => setIsDetailOpen((prev) => !prev)}
+            data-testid={`btn-edit-custom-${detector.key}`}
+          >
+            <Pencil className="h-3.5 w-3.5 mr-1" />
+            {t("sources.scanConfig.edit")}
+          </Button>
+
+          <Toggle
+            variant="outline"
+            size="sm"
+            pressed={enabled}
+            onPressedChange={() => onToggle(false)}
+            className="shrink-0 cursor-pointer"
+            data-testid={`toggle-custom-detector-${detector.key}`}
+          >
+            {t("sources.scanConfig.off")}
+          </Toggle>
         </div>
+      )}
 
-        <div className="grid gap-3 rounded-[6px] border-2 border-border bg-muted/30 p-3 sm:grid-cols-3">
-          <div>
-            <p className="text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-              {t("sources.scanConfig.usedBy")}
-            </p>
-            <p className="text-sm font-semibold">
-              {t("sources.scanConfig.sourcesCount", {
-                count: detector.sourcesUsingCount,
-              })}
-            </p>
-          </div>
-          <div>
-            <p className="text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-              {t("sources.scanConfig.withFindings")}
-            </p>
-            <p className="text-sm font-semibold">
-              {t("sources.scanConfig.sourcesCount", {
-                count: detector.sourcesWithFindingsCount,
-              })}
-            </p>
-          </div>
-          <div>
-            <p className="text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-              {t("sources.scanConfig.version")}
-            </p>
-            <p className="text-sm font-semibold">v{detector.version}</p>
-          </div>
-        </div>
+      <Collapsible open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+        <CollapsibleContent>
+          <div className="border-t-2 border-border bg-muted/20 px-4 py-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="border-2 border-border">
+                {detector.isActive
+                  ? t("sources.scanConfig.catalogActive")
+                  : t("sources.scanConfig.catalogInactive")}
+              </Badge>
+              <Badge variant="outline" className="border-2 border-border">
+                {t("sources.scanConfig.findingsCount", {
+                  count: detector.findingsCount,
+                })}
+              </Badge>
+              <Badge variant="outline" className="border-2 border-border">
+                v{detector.version}
+              </Badge>
+            </div>
 
-        {detector.recentSourceNames.length > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            {t("sources.scanConfig.recentSources", {
-              names: detector.recentSourceNames.slice(0, 3).join(", "),
-            })}
-          </p>
-        ) : null}
-      </div>
-    </AiAssistedCard>
-  );
-}
+            <div className="grid gap-3 rounded-[6px] border-2 border-border bg-background p-3 sm:grid-cols-3">
+              <div>
+                <p className="text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("sources.scanConfig.usedBy")}
+                </p>
+                <p className="text-sm font-semibold">
+                  {t("sources.scanConfig.sourcesCount", {
+                    count: detector.sourcesUsingCount,
+                  })}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("sources.scanConfig.withFindings")}
+                </p>
+                <p className="text-sm font-semibold">
+                  {t("sources.scanConfig.sourcesCount", {
+                    count: detector.sourcesWithFindingsCount,
+                  })}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("sources.scanConfig.version")}
+                </p>
+                <p className="text-sm font-semibold">v{detector.version}</p>
+              </div>
+            </div>
 
-function CatalogSection({
-  title,
-  description,
-  countLabel,
-  action,
-  children,
-}: {
-  title: string;
-  description: string;
-  countLabel: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <Card className="bg-background p-0">
-      <section>
-        <div className="flex flex-col gap-2 border-b-2 border-border bg-foreground px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-xs font-mono font-bold uppercase tracking-[0.12em] text-primary-foreground">
-              {title}
-            </h3>
-            <p className="text-[10px] font-mono text-primary-foreground/60">
-              {description}
-            </p>
+            {detector.recentSourceNames.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {t("sources.scanConfig.recentSources", {
+                  names: detector.recentSourceNames.slice(0, 3).join(", "),
+                })}
+              </p>
+            )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {action}
-            <Badge className="w-fit rounded-[4px] border-2 border-black bg-[#b7ff00] text-[10px] uppercase tracking-[0.16em] text-black shadow-[3px_3px_0_#000]">
-              {countLabel}
-            </Badge>
-          </div>
-        </div>
-        <CardContent className="p-4">{children}</CardContent>
-      </section>
-    </Card>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   );
 }
 
@@ -763,33 +687,13 @@ export function SourceScanConfig({
 
   const searchTerm = searchQuery.trim().toLowerCase();
 
-  const groupSummary = useMemo(() => {
-    return detectorUiGroups
-      .map((group) => {
-        const groupDetectors = orderedDetectors.filter(
-          (detector) =>
-            getDetectorGroupId(detector.type, detector.categories) === group.id,
-        );
-        const visibleDetectors = groupDetectors.filter((detector) =>
-          matchesSearch(
-            detector,
-            presetMap.get(detector.type) ?? [],
-            searchTerm,
-          ),
-        );
-        const enabledCount = groupDetectors.filter(
-          (detector) => detectorState[detector.id]?.enabled,
-        ).length;
-
-        return {
-          ...group,
-          totalCount: groupDetectors.length,
-          enabledCount,
-          visibleDetectors,
-        };
-      })
-      .filter((group) => group.totalCount > 0);
-  }, [orderedDetectors, presetMap, searchTerm, detectorState]);
+  const visibleBuiltInDetectors = useMemo(
+    () =>
+      orderedDetectors.filter((detector) =>
+        matchesSearch(detector, presetMap.get(detector.type) ?? [], searchTerm),
+      ),
+    [orderedDetectors, presetMap, searchTerm],
+  );
 
   const selectedCustomDetectorSet = useMemo(
     () => new Set(selectedCustomDetectorIds),
@@ -811,28 +715,19 @@ export function SourceScanConfig({
       ),
     [searchTerm, selectableCustomDetectors],
   );
-  const visibleGroupSummary = useMemo(
-    () => groupSummary.filter((group) => group.visibleDetectors.length > 0),
-    [groupSummary],
-  );
-  const hasCustomDetectorCatalog = customDetectors.length > 0;
-  const hasSelectableCustomDetectors = selectableCustomDetectors.length > 0;
 
   const enabledCount =
     Object.values(detectorState).filter((detector) => detector.enabled).length +
     selectedCustomDetectorIds.length;
-  const visibleBuiltInCount = groupSummary.reduce(
-    (total, group) => total + group.visibleDetectors.length,
-    0,
-  );
-  const visibleCustomCount = visibleCustomDetectors.length;
-  const visibleCount = visibleBuiltInCount + visibleCustomCount;
+  const visibleCount =
+    visibleBuiltInDetectors.length + visibleCustomDetectors.length;
+
   useEffect(() => {
     onSummaryChange?.({ visibleCount, enabledCount });
   }, [enabledCount, onSummaryChange, visibleCount]);
 
   const hasAnyVisibleResults =
-    visibleGroupSummary.length > 0 || visibleCustomDetectors.length > 0;
+    visibleBuiltInDetectors.length > 0 || visibleCustomDetectors.length > 0;
 
   return (
     <div className="space-y-4" data-testid="scan-config-section">
@@ -890,84 +785,63 @@ export function SourceScanConfig({
           </p>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {visibleGroupSummary.length > 0 ? (
-            visibleGroupSummary.map((group) => (
-              <CatalogSection
-                key={group.id}
-                title={group.label}
-                description={group.description}
-                countLabel={t("sources.edit.visible", {
-                  count: group.visibleDetectors.length,
-                })}
-              >
-                <div className="grid gap-4 md:grid-cols-2">
-                  {group.visibleDetectors.map((detector) => {
-                    const state = detectorState[detector.id];
-                    const config = state?.config ?? {};
-                    const enabled = state?.enabled ?? false;
-
-                    return (
-                      <DetectorConfigCard
-                        key={detector.id}
-                        detector={detector}
-                        enabled={enabled}
-                        defaultConfig={config}
-                        presets={presetMap.get(detector.type) ?? []}
-                        onStateChange={(next) => {
-                          setDetectorState((prev) => {
-                            const current = prev[detector.id]!;
-                            return {
-                              ...prev,
-                              [detector.id]: {
-                                ...current,
-                                enabled: next.enabled ?? current.enabled,
-                                config: next.config ?? current.config,
-                              } satisfies DetectorConfigState,
-                            };
-                          });
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              </CatalogSection>
-            ))
-          ) : !searchTerm && groupSummary.length === 0 ? (
-            <Card className="border-dashed border-black bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_#000]">
-              <p className="text-sm font-semibold uppercase tracking-[0.08em]">
-                {t("sources.scanConfig.noSchemas")}
+        <Card className="bg-background p-0 overflow-hidden">
+          <div className="flex items-center justify-between border-b-2 border-border bg-foreground px-4 py-3">
+            <div>
+              <h3 className="text-xs font-mono font-bold uppercase tracking-[0.12em] text-primary-foreground">
+                {t("sources.stepper.detectors")}
+              </h3>
+              <p className="text-[10px] font-mono text-primary-foreground/60">
+                {t("sources.scanConfig.browseDesc")}
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t("sources.scanConfig.noSchemasHint")}
-              </p>
-            </Card>
-          ) : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {selectableCustomDetectors.length > 0 && (
+                <Button type="button" variant="outline" size="sm" asChild>
+                  <Link href="/detectors">
+                    <FlaskConical className="mr-1 h-3.5 w-3.5" />
+                    {t("sources.scanConfig.manage")}
+                  </Link>
+                </Button>
+              )}
+              <Badge className="w-fit rounded-[4px] border-2 border-black bg-[#b7ff00] text-[10px] uppercase tracking-[0.16em] text-black shadow-[3px_3px_0_#000]">
+                {t("sources.edit.enabled", { count: enabledCount })}
+              </Badge>
+            </div>
+          </div>
 
-          {(!searchTerm || visibleCustomDetectors.length > 0 || customDetectorsLoading || customDetectorsError) && (
-          <CatalogSection
-            title={t("sources.scanConfig.customDetectors")}
-            description={t("sources.scanConfig.customDetectorsDesc")}
-            countLabel={t("sources.edit.enabled", {
-              count: selectedCustomDetectorIds.length,
+          <CardContent className="p-0">
+            {visibleBuiltInDetectors.map((detector) => {
+              const state = detectorState[detector.id];
+              const config = state?.config ?? {};
+              const enabled = state?.enabled ?? false;
+
+              return (
+                <DetectorConfigRow
+                  key={detector.id}
+                  detector={detector}
+                  enabled={enabled}
+                  defaultConfig={config}
+                  presets={presetMap.get(detector.type) ?? []}
+                  onStateChange={(next) => {
+                    setDetectorState((prev) => {
+                      const current = prev[detector.id]!;
+                      return {
+                        ...prev,
+                        [detector.id]: {
+                          ...current,
+                          enabled: next.enabled ?? current.enabled,
+                          config: next.config ?? current.config,
+                        } satisfies DetectorConfigState,
+                      };
+                    });
+                  }}
+                />
+              );
             })}
-            action={
-              <Button type="button" variant="outline" size="sm" asChild>
-                <Link
-                  href={
-                    hasCustomDetectorCatalog ? "/detectors" : "/detectors/new"
-                  }
-                >
-                  <FlaskConical className="mr-1 h-3.5 w-3.5" />
-                  {hasCustomDetectorCatalog
-                    ? t("sources.scanConfig.manage")
-                    : t("detectors.newDetector")}
-                </Link>
-              </Button>
-            }
-          >
-            {customDetectorsError ? (
-              <div className="rounded-[6px] border-2 border-dashed border-border p-6 text-center">
+
+            {customDetectorsError && (
+              <div className="border-b-2 border-border p-4 text-center">
                 <p className="text-sm font-medium">
                   {t("sources.scanConfig.loadError")}
                 </p>
@@ -975,63 +849,48 @@ export function SourceScanConfig({
                   {customDetectorsError}
                 </p>
               </div>
-            ) : customDetectorsLoading ? (
-              <div className="rounded-[6px] border-2 border-dashed border-border p-6 text-center">
+            )}
+
+            {customDetectorsLoading && (
+              <div className="border-b-2 border-border p-4 text-center">
                 <p className="text-sm font-medium">
                   {t("sources.scanConfig.loading")}
                 </p>
               </div>
-            ) : !hasCustomDetectorCatalog ? (
-              <div className="rounded-[6px] border-2 border-dashed border-border p-6 text-center">
+            )}
+
+            {!customDetectorsLoading &&
+              !customDetectorsError &&
+              visibleCustomDetectors.map((detector) => (
+                <CustomDetectorRow
+                  key={detector.id}
+                  detector={detector}
+                  enabled={selectedCustomDetectorSet.has(detector.id)}
+                  onToggle={(enabled) => {
+                    const nextIds = enabled
+                      ? Array.from(
+                          new Set([...selectedCustomDetectorIds, detector.id]),
+                        )
+                      : selectedCustomDetectorIds.filter(
+                          (id) => id !== detector.id,
+                        );
+                    onCustomDetectorsChange?.(nextIds);
+                  }}
+                />
+              ))}
+
+            {visibleCount === 0 && !searchTerm && (
+              <div className="p-6 text-center">
                 <p className="text-sm font-medium">
-                  {t("sources.scanConfig.customDetectors")}
+                  {t("sources.scanConfig.noSchemas")}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {t("sources.scanConfig.noCustomHint")}
-                </p>
-              </div>
-            ) : !hasSelectableCustomDetectors ? (
-              <div className="rounded-[6px] border-2 border-dashed border-border p-6 text-center">
-                <p className="text-sm font-medium">
-                  {t("sources.scanConfig.customDetectors")}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {t("sources.scanConfig.noSelectableCustomHint")}
-                </p>
-              </div>
-            ) : visibleCustomDetectors.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {visibleCustomDetectors.map((detector) => (
-                  <CustomDetectorCatalogCard
-                    key={detector.id}
-                    detector={detector}
-                    enabled={selectedCustomDetectorSet.has(detector.id)}
-                    onToggle={(enabled) => {
-                      const nextIds = enabled
-                        ? Array.from(
-                            new Set([...selectedCustomDetectorIds, detector.id]),
-                          )
-                        : selectedCustomDetectorIds.filter(
-                            (id) => id !== detector.id,
-                          );
-                      onCustomDetectorsChange?.(nextIds);
-                    }}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-[6px] border-2 border-dashed border-border p-6 text-center">
-                <p className="text-sm font-medium">
-                  {t("sources.scanConfig.noCustom")}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {t("sources.scanConfig.noCustomHint")}
+                  {t("sources.scanConfig.noSchemasHint")}
                 </p>
               </div>
             )}
-          </CatalogSection>
-          )}
-        </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

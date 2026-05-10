@@ -341,15 +341,11 @@ class HiveSource(BaseSource):
             runner_id=self.runner_id,
         )
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    STREAM_DETECTIONS = True
+
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
-
-        pipeline = None
-        if self.config.detectors and any(detector.enabled for detector in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
         tables = self._iter_tables()
         table_hash_by_key: dict[tuple[str, str], str] = {
@@ -375,19 +371,11 @@ class HiveSource(BaseSource):
             batch.append(asset)
 
             if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    async for processed in pipeline.process_stream(batch):
-                        yield [processed]
-                else:
-                    yield batch
+                yield batch
                 batch = []
 
         if batch:
-            if pipeline:
-                async for processed in pipeline.process_stream(batch):
-                    yield [processed]
-            else:
-                yield batch
+            yield batch
 
     def generate_hash_id(self, asset_id: str) -> str:
         return hash_id(self._asset_type_value(), asset_id)

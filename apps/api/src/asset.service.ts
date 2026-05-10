@@ -46,6 +46,7 @@ const findingForAssetSelect = {
   contextBefore: true,
   contextAfter: true,
   location: true,
+  metadata: true,
   status: true,
   resolutionReason: true,
   detectedAt: true,
@@ -75,6 +76,7 @@ type FindingForAssetListItem = Omit<
   | 'contextBefore'
   | 'contextAfter'
   | 'location'
+  | 'metadata'
   | 'resolutionReason'
   | 'firstDetectedAt'
   | 'lastDetectedAt'
@@ -92,6 +94,7 @@ type FindingForAssetListItem = Omit<
   contextBefore?: string;
   contextAfter?: string;
   location?: NormalizedFindingLocation;
+  metadata?: Record<string, unknown>;
   resolutionReason?: string;
   firstDetectedAt?: Date;
   lastDetectedAt?: Date;
@@ -874,6 +877,12 @@ export class AssetService {
         contextBefore: finding.contextBefore ?? undefined,
         contextAfter: finding.contextAfter ?? undefined,
         location: this.normalizeFindingLocation(finding.location),
+        metadata:
+          finding.metadata != null &&
+          typeof finding.metadata === 'object' &&
+          !Array.isArray(finding.metadata)
+            ? (finding.metadata as Record<string, unknown>)
+            : undefined,
         resolutionReason: finding.resolutionReason ?? undefined,
         firstDetectedAt: finding.firstDetectedAt ?? undefined,
         lastDetectedAt: finding.lastDetectedAt ?? undefined,
@@ -1561,6 +1570,16 @@ export class AssetService {
                   contextBefore: finding.context_before || null,
                   contextAfter: finding.context_after || null,
                   location: finding.location || null,
+                  metadata: (() => {
+                    const raw = finding.metadata;
+                    if (!raw || typeof raw !== 'object') return null;
+                    const filtered = Object.fromEntries(
+                      Object.entries(raw as Record<string, unknown>).filter(
+                        ([k]) => k !== 'embedding',
+                      ),
+                    );
+                    return Object.keys(filtered).length > 0 ? filtered : null;
+                  })(),
                   detectedAt: new Date(finding.detected_at || Date.now()),
                   pipelineResult:
                     finding.pipeline_result || finding.extracted_data || null,
@@ -1730,6 +1749,7 @@ export class AssetService {
                   contextBefore: detection.contextBefore,
                   contextAfter: detection.contextAfter,
                   location: detection.location,
+                  metadata: detection.metadata,
                   customDetectorId: detection.customDetectorId,
                   customDetectorKey: detection.customDetectorKey,
                   customDetectorName: detection.customDetectorName,
@@ -1767,6 +1787,7 @@ export class AssetService {
                   contextBefore: detection.contextBefore,
                   contextAfter: detection.contextAfter,
                   location: detection.location,
+                  metadata: detection.metadata,
                   customDetectorId: detection.customDetectorId,
                   customDetectorKey: detection.customDetectorKey,
                   customDetectorName: detection.customDetectorName,

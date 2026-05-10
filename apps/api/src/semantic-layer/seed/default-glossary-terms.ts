@@ -42,7 +42,7 @@ export const DEFAULT_GLOSSARY_TERMS = [
       'Toxic, biased, hateful, or otherwise inappropriate content detected in scanned sources. Includes image-classification findings.',
     category: 'Content Safety',
     filterMapping: {
-      detectorTypes: ['TOXIC', 'IMAGE_CLASSIFICATION'],
+      detectorTypes: ['TOXIC'],
     },
     color: '#ef4444',
     icon: 'alert-triangle',
@@ -75,7 +75,7 @@ export const DEFAULT_GLOSSARY_TERMS = [
       'Findings related to data quality including broken links, duplicates, stale content, and content quality issues.',
     category: 'Quality',
     filterMapping: {
-      detectorTypes: ['BROKEN_LINKS', 'TEXT_CLASSIFICATION'],
+      detectorTypes: ['BROKEN_LINKS'],
     },
     color: '#06b6d4',
     icon: 'database',

@@ -136,12 +136,8 @@
         "SECRETS",
         "PII",
         "TOXIC",
-        "IMAGE_CLASSIFICATION",
         "YARA",
         "BROKEN_LINKS",
-        "TEXT_CLASSIFICATION",
-        "FEATURE_EXTRACTION",
-        "OBJECT_DETECTION",
         "LANGUAGE",
         "CODE_SECURITY",
         "CUSTOM"
@@ -284,6 +280,20 @@
         "findings_count": {
           "description": "Total number of findings detected",
           "type": "integer"
+        },
+        "warnings": {
+          "description": "Non-fatal issues during scan (e.g. content truncation, empty content)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "errors": {
+          "description": "Detector errors during scan",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "required": [

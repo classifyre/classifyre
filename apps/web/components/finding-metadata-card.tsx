@@ -22,10 +22,11 @@ const DETECTORS_WITH_USEFUL_METADATA = new Set<string>([
   FindingResponseDtoDetectorTypeEnum.Toxic,
   FindingResponseDtoDetectorTypeEnum.Language,
   FindingResponseDtoDetectorTypeEnum.BrokenLinks,
+  FindingResponseDtoDetectorTypeEnum.Custom,
 ]);
 
 // Keys to always omit from the display (too internal / redundant with finding fields).
-const OMIT_KEYS = new Set(["scores", "raw", "error"]);
+const OMIT_KEYS = new Set(["scores", "raw", "error", "embedding"]);
 
 // Maps raw metadata keys to their i18n translation keys under findings.metadata.*
 const METADATA_KEY_TO_I18N: Record<string, TranslationKey> = {

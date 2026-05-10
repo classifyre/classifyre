@@ -85,6 +85,7 @@ model Finding {
   contextBefore     String?       @map("context_before") @db.Text
   contextAfter      String?       @map("context_after") @db.Text
   location          Json?         @db.JsonB
+  metadata          Json?         @db.JsonB
   customDetectorId  String?       @map("custom_detector_id")
   customDetectorKey String?       @map("custom_detector_key")
   customDetectorName String?      @map("custom_detector_name")
@@ -470,10 +471,6 @@ enum DetectorType {
   SECRETS
   PII
   TOXIC
-  IMAGE_CLASSIFICATION
-  TEXT_CLASSIFICATION
-  FEATURE_EXTRACTION
-  OBJECT_DETECTION
   YARA
   BROKEN_LINKS
   LANGUAGE

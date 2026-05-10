@@ -9,12 +9,8 @@ from ..models.generated_detectors import (
     ContentDetectorConfig,
     CustomDetectorConfig,
     DetectorConfig,
-    FeatureExtractionDetectorConfig,
-    ImageClassificationDetectorConfig,
-    ObjectDetectionDetectorConfig,
     PIIDetectorConfig,
     SecretsDetectorConfig,
-    TextClassificationDetectorConfig,
     ThreatDetectorConfig,
 )
 
@@ -26,22 +22,14 @@ type DetectorTypedConfig = (
     | PIIDetectorConfig
     | ThreatDetectorConfig
     | BrokenLinksDetectorConfig
-    | TextClassificationDetectorConfig
-    | ImageClassificationDetectorConfig
-    | FeatureExtractionDetectorConfig
-    | ObjectDetectionDetectorConfig
 )
 
 _DETECTOR_NAME_BY_TYPE: dict[str, str] = {
     "SECRETS": "secrets",
     "PII": "pii",
     "TOXIC": "toxic",
-    "IMAGE_CLASSIFICATION": "image_classification",
     "YARA": "yara",
     "BROKEN_LINKS": "broken_links",
-    "TEXT_CLASSIFICATION": "text_classification",
-    "FEATURE_EXTRACTION": "feature_extraction",
-    "OBJECT_DETECTION": "object_detection",
     "LANGUAGE": "language",
     "CODE_SECURITY": "code_security",
     "CUSTOM": "custom",
@@ -49,15 +37,11 @@ _DETECTOR_NAME_BY_TYPE: dict[str, str] = {
 
 _DETECTOR_CONFIG_BY_TYPE: dict[str, type[DetectorConfig]] = {
     "TOXIC": ContentDetectorConfig,
-    "IMAGE_CLASSIFICATION": ImageClassificationDetectorConfig,
     "SECRETS": SecretsDetectorConfig,
     "PII": PIIDetectorConfig,
     "YARA": ThreatDetectorConfig,
     "BROKEN_LINKS": BrokenLinksDetectorConfig,
     "CUSTOM": CustomDetectorConfig,
-    "TEXT_CLASSIFICATION": TextClassificationDetectorConfig,
-    "FEATURE_EXTRACTION": FeatureExtractionDetectorConfig,
-    "OBJECT_DETECTION": ObjectDetectionDetectorConfig,
 }
 
 

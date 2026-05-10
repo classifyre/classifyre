@@ -1,16 +1,4 @@
-"""Runner factory for custom detector pipelines.
-
-Each concrete runner handles one execution strategy (GLINER2, REGEX, LLM) and
-produces a standardised PipelineResult. New strategies are added by subclassing
-BaseRunner and registering in create_runner().
-
-Artifact directory layout written by trainer.py:
-  <artifact_dir>/
-    manifest.json          -- training metadata
-    gliner2/               -- fine-tuned GLiNER2 model (HF format)
-    setfit/<task>/         -- SetFit model per classification task
-    setfit/<task>/labels.json
-"""
+"""GLiNER2 pipeline runner."""
 
 from __future__ import annotations
 
@@ -18,39 +6,20 @@ import json
 import logging
 import re
 import time
-from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from ...models.generated_detectors import (
+from ....models.generated_detectors import (
     GLiNER2PipelineSchema,
-    LLMPipelineSchema,
     PipelineEntityDefinition,
     PipelineResult,
     PipelineValidationConfig,
-    RegexPipelineSchema,
 )
-from ..dependencies import MissingDependencyError, require_module
+from ...dependencies import MissingDependencyError, require_module
+from ._base import _DEFAULT_GLINER2_MODEL, BaseRunner
 
 logger = logging.getLogger(__name__)
-
-_DEFAULT_GLINER2_MODEL = "fastino/gliner2-base-v1"
-
-
-# ── Base ──────────────────────────────────────────────────────────────────────
-
-
-class BaseRunner(ABC):
-    """Common interface for all pipeline execution strategies."""
-
-    @abstractmethod
-    def run(self, text: str) -> PipelineResult:
-        """Execute the pipeline on *text* and return a normalised PipelineResult."""
-        ...
-
-
-# ── GLiNER2 runner ────────────────────────────────────────────────────────────
 
 
 class GLiNER2Runner(BaseRunner):
@@ -62,11 +31,13 @@ class GLiNER2Runner(BaseRunner):
       - uses per-task SetFit models from <path>/setfit/<task>/ for classification
     """
 
-    def __init__(self, schema: GLiNER2PipelineSchema, detector_key: str = "") -> None:
+    def __init__(
+        self, schema: GLiNER2PipelineSchema, detector_key: str = "", detector_name: str = ""
+    ) -> None:
         self._schema = schema
         self._detector_key = detector_key
+        self._detector_name = detector_name
         self._model: Any | None = None
-        # SetFit models keyed by classification task name
         self._setfit_models: dict[str, Any] | None = None
         self._setfit_labels: dict[str, list[str]] = {}
         self._artifact_dir: Path | None = None
@@ -146,7 +117,6 @@ class GLiNER2Runner(BaseRunner):
         if self._model is not None:
             return self._model
 
-        # If we have a fine-tuned artifact, prefer the gliner2/ subdir
         if self._artifact_dir is not None:
             gliner_path = self._artifact_dir / "gliner2"
             if gliner_path.is_dir():
@@ -229,7 +199,6 @@ class GLiNER2Runner(BaseRunner):
             labels = self._setfit_labels.get(task_name, [])
             with torch.no_grad():
                 probs = model.predict_proba([text])
-            # probs shape: (1, num_labels)
             prob_row = probs[0].tolist() if hasattr(probs[0], "tolist") else list(probs[0])
             best_idx = int(max(range(len(prob_row)), key=lambda i: prob_row[i]))
             best_label = labels[best_idx] if best_idx < len(labels) else str(best_idx)
@@ -250,94 +219,7 @@ class GLiNER2Runner(BaseRunner):
         return {task: defn.labels for task, defn in (self._schema.classification or {}).items()}
 
 
-# ── REGEX runner ──────────────────────────────────────────────────────────────
-
-
-class RegexRunner(BaseRunner):
-    """Pure-regex pipeline — no ML dependency."""
-
-    def __init__(self, schema: RegexPipelineSchema, detector_key: str = "") -> None:
-        self._schema = schema
-        self._detector_key = detector_key
-        self._compiled: dict[str, re.Pattern[str]] = {}
-        self._compile_patterns()
-
-    def _compile_patterns(self) -> None:
-        for name, defn in self._schema.patterns.items():
-            try:
-                flags = defn.flags or 0
-                self._compiled[name] = re.compile(defn.pattern, flags)
-            except re.error as exc:
-                logger.warning(
-                    "Invalid regex pattern '%s' in detector '%s': %s",
-                    name,
-                    self._detector_key,
-                    exc,
-                )
-
-    def run(self, text: str) -> PipelineResult:
-        start_ms = time.monotonic()
-        entities: dict[str, list[dict[str, object]]] = {}
-
-        for name, rx in self._compiled.items():
-            spans: list[dict[str, object]] = []
-            for match in rx.finditer(text):
-                spans.append(
-                    {
-                        "value": match.group(0),
-                        "confidence": 1.0,
-                        "start": match.start(),
-                        "end": match.end(),
-                    }
-                )
-            if spans:
-                entities[name] = spans
-
-        latency_ms = round((time.monotonic() - start_ms) * 1000)
-        return PipelineResult(
-            entities=entities,
-            classification={},
-            metadata={
-                "runner": "REGEX",
-                "latency_ms": latency_ms,
-                "timestamp": datetime.now(UTC).isoformat(),
-            },
-        )
-
-
-# ── LLM runner (stub) ─────────────────────────────────────────────────────────
-
-
-class LLMRunner(BaseRunner):
-    """LLM-based detection — not yet implemented."""
-
-    def __init__(self, schema: LLMPipelineSchema, detector_key: str = "") -> None:
-        self._schema = schema
-        self._detector_key = detector_key
-
-    def run(self, text: str) -> PipelineResult:  # pragma: no cover - stub
-        raise NotImplementedError(
-            f"LLM runner is not yet implemented (detector '{self._detector_key}')"
-        )
-
-
-# ── Factory ───────────────────────────────────────────────────────────────────
-
-
-def create_runner(
-    schema: GLiNER2PipelineSchema | RegexPipelineSchema | LLMPipelineSchema,
-    detector_key: str = "",
-) -> BaseRunner:
-    """Return the appropriate runner for *schema* based on its type discriminator."""
-    if isinstance(schema, RegexPipelineSchema):
-        return RegexRunner(schema, detector_key)
-    if isinstance(schema, LLMPipelineSchema):
-        return LLMRunner(schema, detector_key)
-    # GLiNER2PipelineSchema is the default / backward-compat path
-    return GLiNER2Runner(schema, detector_key)
-
-
-# ── Shared helpers ────────────────────────────────────────────────────────────
+# ── Normalisation helpers (used only by GLiNER2Runner) ────────────────────────
 
 
 def _normalise_entity_output(raw: dict[str, Any], text: str) -> dict[str, list[dict[str, object]]]:

@@ -41,6 +41,7 @@ export class FindingsService {
     contextAfter: true,
     detectionIdentity: true,
     location: true,
+    metadata: true,
     status: true,
     resolvedAt: true,
     resolutionReason: true,
@@ -307,7 +308,13 @@ export class FindingsService {
   }
 
   async create(createDto: CreateFindingDto) {
-    const { location, ...rest } = createDto;
+    const { location, metadata: rawMeta, ...rest } = createDto;
+    const metadata =
+      rawMeta && typeof rawMeta === 'object'
+        ? Object.fromEntries(
+            Object.entries(rawMeta).filter(([k]) => k !== 'embedding'),
+          )
+        : (rawMeta ?? undefined);
     let customDetectorId = createDto.customDetectorId;
     let customDetectorName = createDto.customDetectorName;
     if (
@@ -345,6 +352,7 @@ export class FindingsService {
         customDetectorName,
         detectionIdentity,
         location: location ? (location as any) : undefined,
+        metadata: metadata ? (metadata as any) : undefined,
         firstDetectedAt: now,
         lastDetectedAt: now,
         history: [
