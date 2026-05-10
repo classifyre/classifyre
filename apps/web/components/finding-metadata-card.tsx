@@ -22,10 +22,7 @@ const DETECTORS_WITH_USEFUL_METADATA = new Set<string>([
   FindingResponseDtoDetectorTypeEnum.Toxic,
   FindingResponseDtoDetectorTypeEnum.Language,
   FindingResponseDtoDetectorTypeEnum.BrokenLinks,
-  FindingResponseDtoDetectorTypeEnum.TextClassification,
-  FindingResponseDtoDetectorTypeEnum.ImageClassification,
-  FindingResponseDtoDetectorTypeEnum.ObjectDetection,
-  FindingResponseDtoDetectorTypeEnum.FeatureExtraction,
+  FindingResponseDtoDetectorTypeEnum.Custom,
 ]);
 
 // Keys to always omit from the display (too internal / redundant with finding fields).

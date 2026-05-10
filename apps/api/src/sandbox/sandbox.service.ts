@@ -202,6 +202,7 @@ function normalizeDetectedMimeType(
 type SandboxCliResult = {
   mime_type: string;
   findings: unknown[];
+  parse_error?: string;
 };
 
 function sanitizeUnsupportedUnicodeEscapes(text: string): string {
@@ -485,6 +486,14 @@ export class SandboxService {
 
       const durationMs = Date.now() - startTime;
 
+      const parseError =
+        typeof result.parse_error === 'string' && result.parse_error
+          ? result.parse_error
+          : undefined;
+      if (parseError) {
+        this.logger.warn(`Sandbox run ${runId}: ${parseError}`);
+      }
+
       await this.prisma.sandboxRun.update({
         where: { id: runId },
         data: {
@@ -493,6 +502,7 @@ export class SandboxService {
           contentType: mimeToContentType(normalizedMimeType),
           findings: sanitizedFindings as any,
           durationMs,
+          ...(parseError ? { errorMessage: parseError } : {}),
         },
       });
     } catch (error: unknown) {

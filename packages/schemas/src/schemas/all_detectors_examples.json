@@ -67,7 +67,7 @@
       }
     },
     {
-      "name": "Entropy Scanner \u2014 Strict",
+      "name": "Entropy Scanner — Strict",
       "description": "Tightened entropy thresholds to reduce false positives at the cost of some recall. Base64 limit raised to 5.5 and Hex to 3.5. Suitable for automated enforcement pipelines where manual review is unavailable.",
       "config": {
         "enabled_patterns": [
@@ -82,7 +82,7 @@
     },
     {
       "name": "Keyword Heuristics",
-      "description": "detect-secrets KeywordDetector flags variable assignments whose names suggest secrets (e.g. password =, api_key =, secret =) regardless of the value. High false-positive rate by design \u2014 treat results as candidates for human review rather than confirmed secrets.",
+      "description": "detect-secrets KeywordDetector flags variable assignments whose names suggest secrets (e.g. password =, api_key =, secret =) regardless of the value. High false-positive rate by design — treat results as candidates for human review rather than confirmed secrets.",
       "config": {
         "enabled_patterns": [
           "keyword"
@@ -202,7 +202,7 @@
       }
     },
     {
-      "name": "DACH \u2014 Germany, Austria, Switzerland",
+      "name": "DACH — Germany, Austria, Switzerland",
       "description": "DACH-specific national identifiers for German tax IDs (DE_TAX_ID), Austrian social insurance numbers (AT_SVNR), and Swiss AHV pension numbers (CH_AHV), alongside EU-wide patterns for comprehensive DSGVO/DSG compliance.",
       "config": {
         "enabled_patterns": [
@@ -221,7 +221,7 @@
     },
     {
       "name": "Spain",
-      "description": "Spanish national identifiers: NIF (N\u00famero de Identificaci\u00f3n Fiscal) for citizens and NIE (N\u00famero de Identidad de Extranjero) for foreign residents. Combined with global contact patterns for full coverage.",
+      "description": "Spanish national identifiers: NIF (Número de Identificación Fiscal) for citizens and NIE (Número de Identidad de Extranjero) for foreign residents. Combined with global contact patterns for full coverage.",
       "config": {
         "enabled_patterns": [
           "ES_NIF",
@@ -315,7 +315,7 @@
       }
     },
     {
-      "name": "Nordic \u2014 Finland & Poland",
+      "name": "Nordic — Finland & Poland",
       "description": "Finnish personal identity codes (HETU) and Polish PESEL numbers, alongside contact identifiers. Covers local privacy law requirements for Scandinavian and Polish markets.",
       "config": {
         "enabled_patterns": [
@@ -379,7 +379,7 @@
       }
     },
     {
-      "name": "Custom Recognizer \u2014 Employee ID",
+      "name": "Custom Recognizer — Employee ID",
       "description": "Extends the built-in PII detector with a regex recognizer for internal employee IDs (format EMP-XXXXXX). Demonstrates how to detect proprietary identifiers alongside standard PII.",
       "config": {
         "enabled_patterns": [
@@ -410,7 +410,7 @@
       }
     },
     {
-      "name": "Custom Recognizer \u2014 Deny List",
+      "name": "Custom Recognizer — Deny List",
       "description": "Deny-list recognizer for internal code names or sensitive project terms that should be treated as PII in external communications.",
       "config": {
         "enabled_patterns": [
@@ -470,117 +470,9 @@
       }
     }
   ],
-  "IMAGE_CLASSIFICATION": [
-    {
-      "name": "NSFW Detection",
-      "description": "Detect sexually explicit or inappropriate images using Falconsai's NSFW model. Labels 'nsfw' and 'explicit' are flagged as critical; 'suggestive' as high; 'normal' as info.",
-      "config": {
-        "model": "Falconsai/nsfw_image_detection",
-        "device": "cpu",
-        "top_k": 5,
-        "confidence_threshold": 0.7,
-        "severity_map": [
-          {
-            "pattern": "nsfw",
-            "severity": "critical"
-          },
-          {
-            "pattern": "explicit",
-            "severity": "critical"
-          },
-          {
-            "pattern": "suggestive",
-            "severity": "high"
-          },
-          {
-            "pattern": "normal",
-            "severity": "info"
-          }
-        ]
-      }
-    },
-    {
-      "name": "General Image Classifier (ViT)",
-      "description": "Baseline ImageNet-1k classification using google/vit-base-patch16-224. Returns the top-5 predicted labels. Useful as a starting point for label discovery before configuring a domain-specific model.",
-      "config": {
-        "model": "google/vit-base-patch16-224",
-        "device": "cpu",
-        "top_k": 5,
-        "confidence_threshold": 0.5
-      }
-    },
-    {
-      "name": "Custom Local Model",
-      "description": "Use a fine-tuned model stored on disk. Point 'model' at the directory that contains config.json and the model weights. Useful for air-gapped deployments or proprietary classifiers.",
-      "config": {
-        "model": "/models/my-fine-tuned-classifier",
-        "device": "cpu",
-        "top_k": 3,
-        "confidence_threshold": 0.6,
-        "severity_map": [
-          {
-            "pattern": "violation",
-            "severity": "critical"
-          },
-          {
-            "pattern": "warning",
-            "severity": "high"
-          }
-        ]
-      }
-    },
-    {
-      "name": "GPU Inference",
-      "description": "Run inference on the first CUDA GPU. Drop-in replacement for the CPU variant \u2014 only 'device' changes. Reduces latency by 5-10\u00d7 for large image batches.",
-      "config": {
-        "model": "Falconsai/nsfw_image_detection",
-        "device": "cuda",
-        "top_k": 5,
-        "confidence_threshold": 0.7,
-        "severity_map": [
-          {
-            "pattern": "nsfw",
-            "severity": "critical"
-          },
-          {
-            "pattern": "explicit",
-            "severity": "critical"
-          },
-          {
-            "pattern": "normal",
-            "severity": "info"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Multi-Label Sigmoid",
-      "description": "Use sigmoid normalization for models trained with multi-label objectives (each label is scored independently). Results in all labels with score >= confidence_threshold being returned rather than a single winner.",
-      "config": {
-        "model": "your-org/multi-label-vision-model",
-        "device": "cpu",
-        "function_to_apply": "sigmoid",
-        "confidence_threshold": 0.5,
-        "severity_map": [
-          {
-            "pattern": "violence",
-            "severity": "critical"
-          },
-          {
-            "pattern": "gore",
-            "severity": "critical"
-          },
-          {
-            "pattern": "hate",
-            "severity": "high"
-          }
-        ]
-      }
-    }
-  ],
   "YARA": [
     {
-      "name": "Secrets \u2014 Cloud Credentials",
+      "name": "Secrets — Cloud Credentials",
       "description": "Hardcoded cloud-provider credentials and API keys: AWS Access Key IDs, GitHub/GitLab tokens, Slack bot tokens, OpenAI API keys, Stripe live keys, PEM-encoded private keys, and JSON Web Tokens. Near-zero false-positive rate for all structured token formats.",
       "config": {
         "rules": [
@@ -616,7 +508,7 @@
           },
           {
             "name": "Slack_Token",
-            "description": "Slack API token \u2014 bot (xoxb), app (xoxa), user (xoxp), or refresh (xoxr)",
+            "description": "Slack API token — bot (xoxb), app (xoxa), user (xoxp), or refresh (xoxr)",
             "severity": "critical",
             "category": "secrets",
             "strings": [
@@ -660,7 +552,7 @@
           },
           {
             "name": "JWT_Token",
-            "description": "JSON Web Token \u2014 three base64url segments separated by dots",
+            "description": "JSON Web Token — three base64url segments separated by dots",
             "severity": "high",
             "category": "secrets",
             "strings": [
@@ -675,13 +567,13 @@
       }
     },
     {
-      "name": "Malware \u2014 Process Injection & Offensive Tools",
+      "name": "Malware — Process Injection & Offensive Tools",
       "description": "Detects Windows process-injection API sequences (requires 2 of 7 known APIs), known offensive tools by name (mimikatz, msfvenom, meterpreter, pypykatz, CobaltStrike), and registry run-key persistence patterns.",
       "config": {
         "rules": [
           {
             "name": "Process_Injection_APIs",
-            "description": "Two or more process-injection Win32 API names \u2014 high-confidence indicator of reflective DLL injection or process hollowing",
+            "description": "Two or more process-injection Win32 API names — high-confidence indicator of reflective DLL injection or process hollowing",
             "severity": "critical",
             "category": "malware",
             "strings": [
@@ -729,13 +621,13 @@
       }
     },
     {
-      "name": "Suspicious Scripts \u2014 PowerShell & Shell",
+      "name": "Suspicious Scripts — PowerShell & Shell",
       "description": "Detects PowerShell download-and-execute chains (Net.WebClient + IEX), base64-encoded commands (-EncodedCommand, FromBase64String), shell curl/wget piped to an interpreter, Python exec+encoding obfuscation, and JavaScript eval/fromCharCode patterns.",
       "config": {
         "rules": [
           {
             "name": "PowerShell_Download_Exec",
-            "description": "PowerShell: download function combined with expression executor \u2014 classic cradle pattern",
+            "description": "PowerShell: download function combined with expression executor — classic cradle pattern",
             "severity": "high",
             "category": "suspicious_scripts",
             "strings": [
@@ -746,7 +638,7 @@
           },
           {
             "name": "PowerShell_Encoded_Command",
-            "description": "PowerShell base64 command encoding \u2014 used to evade command-line logging",
+            "description": "PowerShell base64 command encoding — used to evade command-line logging",
             "severity": "high",
             "category": "suspicious_scripts",
             "strings": [
@@ -848,7 +740,7 @@
         "rules": [
           {
             "name": "PDF_Embedded_JavaScript",
-            "description": "PDF with embedded JavaScript action \u2014 can execute code on open",
+            "description": "PDF with embedded JavaScript action — can execute code on open",
             "severity": "high",
             "category": "pdf_threats",
             "strings": [
@@ -861,7 +753,7 @@
           },
           {
             "name": "PDF_Auto_Open_Action",
-            "description": "PDF /OpenAction, /Launch, or /AA stream \u2014 executes on document open",
+            "description": "PDF /OpenAction, /Launch, or /AA stream — executes on document open",
             "severity": "high",
             "category": "pdf_threats",
             "strings": [
@@ -890,7 +782,7 @@
       }
     },
     {
-      "name": "Supply Chain \u2014 Miners, Reverse Shells & Exfil",
+      "name": "Supply Chain — Miners, Reverse Shells & Exfil",
       "description": "Crypto-miner strings (xmrig, stratum+tcp, mining pool patterns), reverse-shell payloads (/dev/tcp, nc -e /bin/bash), obfuscated npm/pip install hooks (eval+Buffer.from, postinstall), and attacker-controlled exfiltration infrastructure (ngrok, webhook.site, interactsh).",
       "config": {
         "rules": [
@@ -1028,7 +920,7 @@
       }
     },
     {
-      "name": "Custom Rule \u2014 Internal Token Leak",
+      "name": "Custom Rule — Internal Token Leak",
       "description": "Example of a custom rule alongside cloud-credential rules. Detects proprietary internal service tokens in format SVC-XXXXXXXX (8 hex chars) that should never appear in public documents or S3 exports.",
       "config": {
         "rules": [
@@ -1056,6 +948,20 @@
         "timeout": 60,
         "confidence_threshold": 0.8,
         "max_findings": 200
+      }
+    }
+  ],
+  "BROKEN_LINKS": [
+    {
+      "name": "Default Broken Links",
+      "description": "Check all links in the asset for reachability with default settings.",
+      "config": {}
+    },
+    {
+      "name": "Capped Scan",
+      "description": "Limit findings to the first 100 broken links to keep reports concise.",
+      "config": {
+        "max_findings": 100
       }
     }
   ],
@@ -1087,15 +993,13 @@
   ],
   "CUSTOM": [
     {
-      "description": "GLINER2 support ticket extractor \u2014 entities + classification in one pass",
+      "name": "Support Ticket Extractor",
+      "description": "GLINER2 support ticket extractor — entities + classification in one pass",
       "config": {
         "custom_detector_key": "cust_support_ticket",
         "name": "Support Ticket Extractor",
         "description": "Extract order IDs, amounts, and intent from support tickets",
-        "languages": [
-          "de",
-          "en"
-        ],
+        "languages": ["de", "en"],
         "pipeline_schema": {
           "type": "GLINER2",
           "model": {
@@ -1103,113 +1007,65 @@
             "path": null
           },
           "entities": {
-            "order_id": {
-              "description": "Order ID like ORD-123",
-              "required": true
-            },
-            "amount": {
-              "description": "Monetary value like 50\u20ac",
-              "required": false
-            }
+            "order_id": { "description": "Order ID like ORD-123", "required": true },
+            "amount": { "description": "Monetary value like 50€", "required": false }
           },
           "classification": {
-            "intent": {
-              "labels": [
-                "refund",
-                "bug",
-                "question"
-              ],
-              "multi_label": false
-            }
+            "intent": { "labels": ["refund", "bug", "question"], "multi_label": false }
           },
-          "validation": {
-            "confidence_threshold": 0.8,
-            "rules": []
-          }
+          "validation": { "confidence_threshold": 0.8, "rules": [] }
         }
-      },
-      "name": "Support Ticket Extractor"
+      }
     },
     {
-      "description": "GLINER2 DACH regulatory entity extractor \u2014 entities only",
+      "name": "DACH Regulatory Entity Extractor",
+      "description": "GLINER2 DACH regulatory entity extractor — entities only",
       "config": {
         "custom_detector_key": "cust_dach_entity_extractor",
         "name": "DACH Regulatory Entity Extractor",
         "description": "Extract regulatory entities (GDPR articles, supervisory bodies, risk terms)",
-        "languages": [
-          "de",
-          "en"
-        ],
-        "confidence_threshold": 0.72,
+        "languages": ["de", "en"],
         "pipeline_schema": {
           "type": "GLINER2",
           "entities": {
-            "regulatory_body": {
-              "description": "Supervisory authority like BaFin, FINMA, FMA",
-              "required": false
-            },
-            "gdpr_article": {
-              "description": "GDPR article reference like 'Art. 6 DSGVO'",
-              "required": false
-            },
-            "risk_term": {
-              "description": "Legal risk term like 'Haftung ausgeschlossen'",
-              "required": false
-            }
+            "regulatory_body": { "description": "Supervisory authority like BaFin, FINMA, FMA", "required": false },
+            "gdpr_article": { "description": "GDPR article reference like 'Art. 6 DSGVO'", "required": false },
+            "risk_term": { "description": "Legal risk term like 'Haftung ausgeschlossen'", "required": false }
           },
           "classification": {},
-          "validation": {
-            "confidence_threshold": 0.72,
-            "rules": []
-          }
+          "validation": { "confidence_threshold": 0.72, "rules": [] }
         }
-      },
-      "name": "DACH Regulatory Entity Extractor"
+      }
     },
     {
-      "description": "GLINER2 contract risk classifier \u2014 classification only",
+      "name": "DACH Contract Risk Terms",
+      "description": "GLINER2 contract risk classifier — classification only",
       "config": {
         "custom_detector_key": "cust_dach_contract_risk",
         "name": "DACH Contract Risk Terms",
         "description": "Detect legal/compliance risk language in DACH contracts",
-        "languages": [
-          "de",
-          "en"
-        ],
+        "languages": ["de", "en"],
         "pipeline_schema": {
           "type": "GLINER2",
           "entities": {},
           "classification": {
             "risk_category": {
-              "labels": [
-                "liability",
-                "data_protection",
-                "termination",
-                "indemnification",
-                "none"
-              ],
+              "labels": ["liability", "data_protection", "termination", "indemnification", "none"],
               "multi_label": true
             }
           },
-          "validation": {
-            "confidence_threshold": 0.75,
-            "rules": []
-          }
+          "validation": { "confidence_threshold": 0.75, "rules": [] }
         }
-      },
-      "name": "DACH Contract Risk Terms"
+      }
     },
     {
-      "description": "REGEX internal product code detector \u2014 no ML required",
+      "name": "Internal Product Code Detector",
+      "description": "REGEX internal product code detector — no ML required",
       "config": {
         "custom_detector_key": "internal_product_codes",
         "name": "Internal Product Code Detector",
         "description": "Detect internal SKU and project code leakage in public docs",
-        "languages": [
-          "en",
-          "de"
-        ],
-        "confidence_threshold": 0.9,
+        "languages": ["en", "de"],
         "pipeline_schema": {
           "type": "REGEX",
           "patterns": {
@@ -1223,24 +1079,17 @@
               "description": "Internal project code PROJ-AB12CD34",
               "severity": "medium"
             }
-          },
-          "validation": {
-            "confidence_threshold": 0.7,
-            "rules": []
           }
         }
-      },
-      "name": "Internal Product Code Detector"
+      }
     },
     {
-      "description": "REGEX German invoice PII \u2014 postal codes, IBANs, dates",
+      "name": "German Invoice PII Ruleset",
+      "description": "REGEX German invoice PII — postal codes, IBANs, dates",
       "config": {
         "custom_detector_key": "cust_invoice_pii_ruleset",
         "name": "German Invoice PII Ruleset",
-        "languages": [
-          "de",
-          "en"
-        ],
+        "languages": ["de", "en"],
         "pipeline_schema": {
           "type": "REGEX",
           "patterns": {
@@ -1250,7 +1099,7 @@
               "severity": "critical"
             },
             "zip_city": {
-              "pattern": "\\b\\d{5}\\s+[A-Z\u00c4\u00d6\u00dc][a-z\u00e4\u00f6\u00fc\u00df]+\\b",
+              "pattern": "\\b\\d{5}\\s+[A-ZÄÖÜ][a-zäöüß]+\\b",
               "description": "German postal code + city",
               "severity": "medium"
             },
@@ -1259,62 +1108,24 @@
               "description": "Date in DD.MM.YYYY format",
               "severity": "low"
             }
-          },
-          "validation": {
-            "confidence_threshold": 0.7,
-            "rules": []
           }
         }
-      },
-      "name": "German Invoice PII Ruleset"
+      }
     },
     {
-      "description": "REGEX Austrian legal citation detector",
-      "config": {
-        "custom_detector_key": "at_legal_refs",
-        "name": "Austrian Legal Citation Detector",
-        "description": "Detect references to Austrian laws and regulations",
-        "languages": [
-          "de"
-        ],
-        "confidence_threshold": 0.9,
-        "pipeline_schema": {
-          "type": "REGEX",
-          "patterns": {
-            "bgb_ref": {
-              "pattern": "\u00a7\\s*\\d+(?:\\s+Abs\\.\\s*\\d+)?\\s+(?:ABGB|UGB|ZPO|StGB|AktG|GmbHG)",
-              "description": "Austrian law paragraph reference",
-              "severity": "info"
-            },
-            "bgbl_ref": {
-              "pattern": "BGBl\\.\\s*(?:I|II|III)?\\s*Nr\\.\\s*\\d+/\\d{4}",
-              "description": "Austrian Federal Law Gazette reference",
-              "severity": "info"
-            }
-          },
-          "validation": {
-            "confidence_threshold": 0.9,
-            "rules": []
-          }
-        }
-      },
-      "name": "Austrian Legal Citation Detector"
-    },
-    {
+      "name": "API Key Leakage Detector",
       "description": "REGEX API key and secret leakage detector with critical severity",
       "config": {
         "custom_detector_key": "api_key_leakage",
         "name": "API Key Leakage Detector",
         "description": "Detect leaked API keys, tokens, and secrets in documents and code snippets",
-        "languages": [
-          "en"
-        ],
+        "languages": ["en"],
         "pipeline_schema": {
           "type": "REGEX",
           "patterns": {
             "generic_api_key": {
               "pattern": "(?:api[_-]?key|apikey)\\s*[:=]\\s*[\"']?([A-Za-z0-9_\\-]{20,})[\"']?",
-              "description": "Generic API key assignment (api_key=..., apiKey: ...)",
+              "description": "Generic API key assignment",
               "severity": "critical",
               "case_sensitive": false,
               "group": 1
@@ -1333,364 +1144,233 @@
             }
           }
         }
-      },
-      "name": "API Key Leakage Detector"
+      }
     },
     {
-      "description": "REGEX structured ID extractor with capture group and multiline support",
-      "config": {
-        "custom_detector_key": "structured_id_extractor",
-        "name": "Structured ID Extractor",
-        "description": "Extract structured identifiers from multiline documents using capture groups",
-        "languages": [
-          "en",
-          "de"
-        ],
-        "pipeline_schema": {
-          "type": "REGEX",
-          "patterns": {
-            "ticket_id": {
-              "pattern": "(?:Ticket|Issue|Bug)\\s*#?\\s*(\\d{4,8})",
-              "description": "Extract numeric ticket/issue/bug ID",
-              "severity": "info",
-              "case_sensitive": false,
-              "group": 1
-            },
-            "version_tag": {
-              "pattern": "v(\\d+\\.\\d+\\.\\d+(?:-[a-zA-Z0-9.]+)?)",
-              "description": "Semantic version tag (extracts version without v prefix)",
-              "severity": "info",
-              "group": 1
-            },
-            "multiline_sql": {
-              "pattern": "(?:SELECT|INSERT|UPDATE|DELETE).{10,200}(?:FROM|INTO|SET|WHERE)",
-              "description": "SQL statements spanning multiple lines",
-              "severity": "medium",
-              "case_sensitive": false,
-              "dot_nl": true,
-              "longest_match": true
-            }
-          }
-        }
-      },
-      "name": "Structured ID Extractor"
-    },
-    {
-      "description": "GLINER2 sarcasm & irony detector \u2014 classification",
+      "name": "Sarcasm & Irony Detector",
+      "description": "GLINER2 sarcasm & irony detector — classification",
       "config": {
         "custom_detector_key": "sarcasm_detector",
         "name": "Sarcasm & Irony Detector",
         "description": "Detect sarcasm and irony in user-generated content",
-        "languages": [
-          "en",
-          "de"
-        ],
-        "confidence_threshold": 0.72,
+        "languages": ["en", "de"],
         "pipeline_schema": {
           "type": "GLINER2",
           "entities": {},
           "classification": {
             "tone": {
-              "labels": [
-                "sarcastic",
-                "ironic",
-                "sincere"
-              ],
+              "labels": ["sarcastic", "ironic", "sincere"],
               "multi_label": false
             }
           },
-          "validation": {
-            "confidence_threshold": 0.72,
-            "rules": []
-          }
+          "validation": { "confidence_threshold": 0.72, "rules": [] }
         }
-      },
-      "name": "Sarcasm & Irony Detector"
+      }
     },
     {
+      "name": "Vendor & Supplier Entity Extractor",
       "description": "GLINER2 vendor & supplier entity extractor",
       "config": {
         "custom_detector_key": "vendor_entity_extractor",
         "name": "Vendor & Supplier Entity Extractor",
         "description": "Extract vendor names, contract values, and delivery terms",
-        "confidence_threshold": 0.55,
         "pipeline_schema": {
           "type": "GLINER2",
           "entities": {
-            "vendor_name": {
-              "description": "Company or vendor name",
-              "required": false
-            },
-            "contract_value": {
-              "description": "Contract value like 50.000 EUR",
-              "required": false
-            },
-            "delivery_term": {
-              "description": "Incoterms like FOB, CIF, DDP",
-              "required": false
-            }
+            "vendor_name": { "description": "Company or vendor name", "required": false },
+            "contract_value": { "description": "Contract value like 50.000 EUR", "required": false },
+            "delivery_term": { "description": "Incoterms like FOB, CIF, DDP", "required": false }
           },
           "classification": {},
-          "validation": {
-            "confidence_threshold": 0.55,
-            "rules": []
-          }
+          "validation": { "confidence_threshold": 0.55, "rules": [] }
         }
-      },
-      "name": "Vendor & Supplier Entity Extractor"
-    }
-  ],
-  "TEXT_CLASSIFICATION": [
-    {
-      "name": "Spam Detection",
-      "description": "Detect spam and unsolicited promotional content using a lightweight BERT model. Labels matching \"spam\" are flagged as high severity.",
-      "config": {
-        "model": "mrm8488/bert-tiny-finetuned-sms-spam-detection",
-        "device": "cpu",
-        "top_k": null,
-        "confidence_threshold": 0.8,
-        "severity_map": [
-          {
-            "pattern": "spam",
-            "severity": "high"
-          }
-        ]
       }
     },
     {
-      "name": "Sentiment Analysis",
-      "description": "Classify text as positive or negative sentiment using DistilBERT. Negative predictions above threshold are flagged as info-level findings.",
+      "name": "Spam Detector",
+      "description": "Text classification — detect spam and unsolicited promotional content using a lightweight BERT model.",
       "config": {
-        "model": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
-        "device": "cpu",
-        "confidence_threshold": 0.85,
-        "severity_map": [
-          {
-            "pattern": "negative",
-            "severity": "medium"
-          },
-          {
-            "pattern": "positive",
-            "severity": "info"
-          }
-        ]
+        "custom_detector_key": "spam_detector",
+        "name": "Spam Detector",
+        "pipeline_schema": {
+          "type": "TEXT_CLASSIFICATION",
+          "model": "mrm8488/bert-tiny-finetuned-sms-spam-detection",
+          "device": "cpu",
+          "confidence_threshold": 0.8,
+          "severity_map": [
+            { "pattern": "spam", "severity": "high" }
+          ]
+        }
       }
     },
     {
-      "name": "Multi-label Topic Classification",
-      "description": "Classify documents into multiple topics simultaneously using sigmoid activation. Each label is scored independently.",
+      "name": "Sentiment Analyzer",
+      "description": "Text classification — classify text as positive or negative sentiment using DistilBERT.",
       "config": {
-        "model": "your-org/topic-classifier",
-        "device": "cpu",
-        "function_to_apply": "sigmoid",
-        "confidence_threshold": 0.5,
-        "severity_map": [
-          {
-            "pattern": "legal|compliance",
-            "severity": "high"
-          },
-          {
-            "pattern": "finance",
-            "severity": "medium"
-          }
-        ]
+        "custom_detector_key": "sentiment_analyzer",
+        "name": "Sentiment Analyzer",
+        "pipeline_schema": {
+          "type": "TEXT_CLASSIFICATION",
+          "model": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+          "device": "cpu",
+          "confidence_threshold": 0.85,
+          "severity_map": [
+            { "pattern": "negative", "severity": "medium" },
+            { "pattern": "positive", "severity": "info" }
+          ]
+        }
       }
     },
     {
-      "name": "GPU Inference",
-      "description": "Run text classification on a CUDA GPU for high-throughput batch processing.",
+      "name": "Multi-label Topic Classifier",
+      "description": "Text classification — classify documents into multiple topics simultaneously using sigmoid activation.",
       "config": {
-        "model": "mrm8488/bert-tiny-finetuned-sms-spam-detection",
-        "device": "cuda",
-        "confidence_threshold": 0.8,
-        "max_findings": 1000
+        "custom_detector_key": "topic_classifier",
+        "name": "Multi-label Topic Classifier",
+        "pipeline_schema": {
+          "type": "TEXT_CLASSIFICATION",
+          "model": "your-org/topic-classifier",
+          "device": "cpu",
+          "function_to_apply": "sigmoid",
+          "confidence_threshold": 0.5,
+          "severity_map": [
+            { "pattern": "legal|compliance", "severity": "high" },
+            { "pattern": "finance", "severity": "medium" }
+          ]
+        }
       }
     },
     {
-      "name": "Local Fine-tuned Model",
-      "description": "Use a proprietary model stored on disk. Useful for air-gapped deployments or domain-specific classifiers.",
+      "name": "NSFW Image Detector",
+      "description": "Image classification — detect sexually explicit or inappropriate images using Falconsai's NSFW model.",
       "config": {
-        "model": "/models/my-text-classifier",
-        "device": "cpu",
-        "confidence_threshold": 0.75,
-        "severity_map": [
-          {
-            "pattern": "violation",
-            "severity": "critical"
-          },
-          {
-            "pattern": "warning",
-            "severity": "high"
-          }
-        ]
-      }
-    }
-  ],
-  "BROKEN_LINKS": [
-    {
-      "name": "Default Broken Links",
-      "description": "Check all links in the asset for reachability with default settings.",
-      "config": {}
-    },
-    {
-      "name": "Capped Scan",
-      "description": "Limit findings to the first 100 broken links to keep reports concise.",
-      "config": {
-        "max_findings": 100
-      }
-    }
-  ],
-  "FEATURE_EXTRACTION": [
-    {
-      "name": "Semantic Embeddings (BGE \u2014 Balanced)",
-      "description": "Produce L2-normalised mean-pooled sentence embeddings with BAAI/bge-base-en-v1.5 \u2014 a strong general-purpose encoder for semantic search, RAG, and clustering.",
-      "config": {
-        "model": "BAAI/bge-base-en-v1.5",
-        "device": "cpu",
-        "pooling_strategy": "mean",
-        "normalize_embeddings": true,
-        "truncation": true
+        "custom_detector_key": "nsfw_detector",
+        "name": "NSFW Image Detector",
+        "pipeline_schema": {
+          "type": "IMAGE_CLASSIFICATION",
+          "model": "Falconsai/nsfw_image_detection",
+          "device": "cpu",
+          "top_k": 5,
+          "confidence_threshold": 0.7,
+          "severity_map": [
+            { "pattern": "nsfw", "severity": "critical" },
+            { "pattern": "explicit", "severity": "critical" },
+            { "pattern": "suggestive", "severity": "high" },
+            { "pattern": "normal", "severity": "info" }
+          ]
+        }
       }
     },
     {
-      "name": "Lightweight Embeddings (MiniLM \u2014 Fast / CPU)",
-      "description": "Fast, small embeddings via sentence-transformers/all-MiniLM-L6-v2. Ideal for CPU inference, deduplication, and high-throughput pipelines.",
+      "name": "General Image Classifier (ViT)",
+      "description": "Image classification — baseline ImageNet-1k classification using google/vit-base-patch16-224. Returns top-5 predicted labels.",
       "config": {
-        "model": "sentence-transformers/all-MiniLM-L6-v2",
-        "device": "cpu",
-        "pooling_strategy": "mean",
-        "normalize_embeddings": true,
-        "truncation": true,
-        "batch_size": 32
+        "custom_detector_key": "vit_imagenet",
+        "name": "General Image Classifier (ViT)",
+        "pipeline_schema": {
+          "type": "IMAGE_CLASSIFICATION",
+          "model": "google/vit-base-patch16-224",
+          "device": "cpu",
+          "top_k": 5,
+          "confidence_threshold": 0.5
+        }
       }
     },
     {
-      "name": "High-Quality Embeddings (BGE-Large)",
-      "description": "Higher-fidelity embeddings with BAAI/bge-large-en-v1.5 for tasks where embedding quality matters more than throughput.",
+      "name": "Semantic Embeddings (BGE — Balanced)",
+      "description": "Feature extraction — produce L2-normalised mean-pooled sentence embeddings with BAAI/bge-base-en-v1.5 for semantic search and RAG.",
       "config": {
-        "model": "BAAI/bge-large-en-v1.5",
-        "device": "cpu",
-        "pooling_strategy": "mean",
-        "normalize_embeddings": true,
-        "max_length": 512
+        "custom_detector_key": "bge_base_embedder",
+        "name": "Semantic Embeddings (BGE — Balanced)",
+        "pipeline_schema": {
+          "type": "FEATURE_EXTRACTION",
+          "model": "BAAI/bge-base-en-v1.5",
+          "device": "cpu",
+          "pooling_strategy": "mean",
+          "normalize_embeddings": true,
+          "truncation": true
+        }
+      }
+    },
+    {
+      "name": "Lightweight Embeddings (MiniLM)",
+      "description": "Feature extraction — fast, small embeddings via sentence-transformers/all-MiniLM-L6-v2. Ideal for CPU inference and high-throughput pipelines.",
+      "config": {
+        "custom_detector_key": "minilm_embedder",
+        "name": "Lightweight Embeddings (MiniLM)",
+        "pipeline_schema": {
+          "type": "FEATURE_EXTRACTION",
+          "model": "sentence-transformers/all-MiniLM-L6-v2",
+          "device": "cpu",
+          "pooling_strategy": "mean",
+          "normalize_embeddings": true,
+          "truncation": true,
+          "batch_size": 32
+        }
       }
     },
     {
       "name": "Multilingual Embeddings (E5)",
-      "description": "Multilingual embeddings using intfloat/multilingual-e5-large. Suitable for enterprise content in multiple languages.",
+      "description": "Feature extraction — multilingual embeddings using intfloat/multilingual-e5-large for enterprise content in multiple languages.",
       "config": {
-        "model": "intfloat/multilingual-e5-large",
-        "device": "cpu",
-        "pooling_strategy": "mean",
-        "normalize_embeddings": true,
-        "truncation": true
+        "custom_detector_key": "e5_multilingual_embedder",
+        "name": "Multilingual Embeddings (E5)",
+        "pipeline_schema": {
+          "type": "FEATURE_EXTRACTION",
+          "model": "intfloat/multilingual-e5-large",
+          "device": "cpu",
+          "pooling_strategy": "mean",
+          "normalize_embeddings": true,
+          "truncation": true
+        }
       }
     },
     {
-      "name": "Long-Context Embeddings (ModernBERT \u2014 GPU)",
-      "description": "Long-context embeddings for PDFs, contracts, and large documents using answerdotai/ModernBERT-base on GPU with CLS pooling.",
+      "name": "General Object Detection (DETR)",
+      "description": "Object detection — detect common objects in images using the classic DETR transformer model.",
       "config": {
-        "model": "answerdotai/ModernBERT-base",
-        "device": "cuda",
-        "pooling_strategy": "cls",
-        "normalize_embeddings": true,
-        "max_length": 8192,
-        "truncation": true,
-        "batch_size": 4
+        "custom_detector_key": "detr_coco_detector",
+        "name": "General Object Detection (DETR)",
+        "pipeline_schema": {
+          "type": "OBJECT_DETECTION",
+          "model": "facebook/detr-resnet-50",
+          "device": "cpu",
+          "confidence_threshold": 0.5
+        }
       }
     },
     {
-      "name": "Local Fine-tuned Embedding Model",
-      "description": "Use a locally fine-tuned sentence encoder stored on disk. Mean pooling with normalisation applied.",
+      "name": "Security Screening — People & Weapons",
+      "description": "Object detection — flag images containing persons, weapons, or knives with high severity for content moderation and physical security.",
       "config": {
-        "model": "/models/my-domain-encoder",
-        "device": "cpu",
-        "pooling_strategy": "mean",
-        "normalize_embeddings": true
-      }
-    }
-  ],
-  "OBJECT_DETECTION": [
-    {
-      "name": "General Object Detection (DETR Baseline)",
-      "description": "Detect common objects in images using the classic DETR transformer model. Good balanced baseline for COCO-class objects.",
-      "config": {
-        "model": "facebook/detr-resnet-50",
-        "device": "cpu",
-        "confidence_threshold": 0.5
+        "custom_detector_key": "security_screening_detector",
+        "name": "Security Screening — People & Weapons",
+        "pipeline_schema": {
+          "type": "OBJECT_DETECTION",
+          "model": "facebook/detr-resnet-50",
+          "device": "cpu",
+          "confidence_threshold": 0.6,
+          "severity_map": [
+            { "pattern": "knife|weapon|gun|rifle|pistol", "severity": "critical" },
+            { "pattern": "person|human", "severity": "high" },
+            { "pattern": "car|truck|motorcycle", "severity": "medium" }
+          ]
+        }
       }
     },
     {
       "name": "Realtime Object Detection (RT-DETR)",
-      "description": "Production-grade realtime detection with RT-DETR. Faster than classic DETR, strong accuracy, ideal for high-throughput image pipelines.",
+      "description": "Object detection — production-grade realtime detection with RT-DETR for high-throughput image pipelines.",
       "config": {
-        "model": "PekingU/rtdetr_r50vd",
-        "device": "cpu",
-        "confidence_threshold": 0.5,
-        "top_k": 50
-      }
-    },
-    {
-      "name": "Lightweight Transformer Detector (YOLOS)",
-      "description": "Pure ViT-based detector via hustvl/yolos-small. Lightweight and fast \u2014 a good starting point for research or CPU-only environments.",
-      "config": {
-        "model": "hustvl/yolos-small",
-        "device": "cpu",
-        "confidence_threshold": 0.4,
-        "top_k": 30
-      }
-    },
-    {
-      "name": "Security Screening \u2014 People & Weapons",
-      "description": "Flag images containing persons, weapons, or knives with high severity. Useful for content moderation and physical security pipelines.",
-      "config": {
-        "model": "facebook/detr-resnet-50",
-        "device": "cpu",
-        "confidence_threshold": 0.6,
-        "severity_map": [
-          {
-            "pattern": "knife|weapon|gun|rifle|pistol",
-            "severity": "critical"
-          },
-          {
-            "pattern": "person|human",
-            "severity": "high"
-          },
-          {
-            "pattern": "car|truck|motorcycle",
-            "severity": "medium"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Document AI \u2014 Table & Form Detection (GPU)",
-      "description": "Detect tables, forms, and document regions in scanned PDFs or screenshots using RT-DETR on GPU. Small boxes filtered out to reduce noise.",
-      "config": {
-        "model": "PekingU/rtdetr_r50vd",
-        "device": "cuda",
-        "confidence_threshold": 0.55,
-        "min_box_area": 400,
-        "top_k": 20,
-        "severity_map": [
-          {
-            "pattern": "table",
-            "severity": "info"
-          },
-          {
-            "pattern": "form|field|checkbox",
-            "severity": "info"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Custom Local Object Detector",
-      "description": "Use a locally fine-tuned or exported object detection model stored on disk.",
-      "config": {
-        "model": "/models/my-custom-detector",
-        "device": "cpu",
-        "confidence_threshold": 0.5
+        "custom_detector_key": "rtdetr_detector",
+        "name": "Realtime Object Detection (RT-DETR)",
+        "pipeline_schema": {
+          "type": "OBJECT_DETECTION",
+          "model": "PekingU/rtdetr_r50vd",
+          "device": "cpu",
+          "confidence_threshold": 0.5,
+          "top_k": 50
+        }
       }
     }
   ]

@@ -10,7 +10,20 @@ import pytest
 
 from src.detectors.custom.detector import CustomDetector
 from src.detectors.custom.runners import GLiNER2Runner, RegexRunner
-from src.models.generated_detectors import CustomDetectorConfig
+from src.models.generated_detectors import (
+    CustomDetectorConfig,
+    FeatureExtractionPipelineSchema,
+    ImageClassificationPipelineSchema,
+    ObjectDetectionPipelineSchema,
+    TextClassificationPipelineSchema,
+)
+
+_TRANSFORMER_SCHEMA_TYPES = (
+    TextClassificationPipelineSchema,
+    ImageClassificationPipelineSchema,
+    FeatureExtractionPipelineSchema,
+    ObjectDetectionPipelineSchema,
+)
 
 
 @pytest.fixture
@@ -122,13 +135,19 @@ async def test_regex_example_invoice_pii_detects_iban(custom_examples: list[dict
 
 @pytest.mark.asyncio
 async def test_gliner2_example_all_examples_load_and_detect(custom_examples: list[dict]):
-    """All examples must parse successfully and run detect() without crashing."""
+    """All GLINER2/REGEX examples must parse and run detect() without crashing.
+
+    Transformer-based examples (TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, etc.) are
+    skipped here — they require real model downloads. Covered by test_transformer_runners.py.
+    """
     for example in custom_examples:
         config = CustomDetectorConfig.model_validate(example["config"])
+        if isinstance(config.pipeline_schema, _TRANSFORMER_SCHEMA_TYPES):
+            continue
+
         detector = CustomDetector(config)
 
         if isinstance(detector._runner, GLiNER2Runner):
-            # Skip actual model loading — inject mock
             mock_model = MagicMock()
             mock_model.extract_entities.return_value = {"entities": {}}
             mock_model.classify.return_value = {}

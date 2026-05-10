@@ -281,12 +281,12 @@ class TestRegexRunnerEngine:
         assert result.metadata["engine"] in ("RE2", "stdlib-re")
 
     def test_fallback_to_stdlib_when_re2_unavailable(self):
-        from src.detectors.custom import runners as runners_module
+        from src.detectors.custom.runners import _regex as regex_module
 
         def mock_load() -> tuple[object, bool]:
             return re, False
 
-        with patch.object(runners_module, "_load_regex_engine", mock_load):
+        with patch.object(regex_module, "_load_regex_engine", mock_load):
             schema = _make_schema(x=r"\d+")
             runner = RegexRunner(schema)
             result = runner.run("42")
