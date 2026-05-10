@@ -414,6 +414,7 @@ class MongoDBSource(BaseSource):
         self,
         collection_ref: CollectionRef,
         documents: list[dict[str, Any]],
+        doc_offset: int = 0,
     ) -> tuple[str, str]:
         sampling = self._sampling()
 
@@ -426,7 +427,7 @@ class MongoDBSource(BaseSource):
         ]
 
         serialized_documents: list[str] = []
-        for index, document in enumerate(documents, start=1):
+        for index, document in enumerate(documents, start=1 + doc_offset):
             serialized = self._serialize_document(document)
             serialized_documents.append(serialized)
             lines.append(f"doc_{index}: {serialized}")
@@ -438,6 +439,7 @@ class MongoDBSource(BaseSource):
                 "collection": collection_ref.collection,
                 "strategy": str(strategy),
                 "documents": serialized_documents,
+                "doc_offset": doc_offset,
             },
             ensure_ascii=False,
         )
@@ -460,15 +462,15 @@ class MongoDBSource(BaseSource):
 
     async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
         sampling = self._sampling()
-
-        if sampling.strategy != SamplingStrategy.ALL:
-            result = await self.fetch_content(asset_id)
-            if result:
-                yield result
-            return
-
         collection_ref = self._parse_collection_ref(asset_id)
         if not collection_ref:
+            return
+
+        if sampling.strategy != SamplingStrategy.ALL:
+            documents = self._sample_collection_documents(collection_ref)
+            for i, document in enumerate(documents):
+                content = self._format_collection_content(collection_ref, [document], doc_offset=i)
+                yield content
             return
 
         rows_per_page = int(sampling.rows_per_page or 100)
@@ -497,11 +499,14 @@ class MongoDBSource(BaseSource):
             if not documents:
                 break
 
-            content = self._format_collection_content(collection_ref, documents)
-            self._content_cache[asset_id] = content
-            yield content
+            for i, document in enumerate(documents):
+                content = self._format_collection_content(
+                    collection_ref, [document], doc_offset=offset + i
+                )
+                self._content_cache[asset_id] = content
+                yield content
 
-            offset += rows_per_page
+            offset += len(documents)
             page_num += 1
             if len(documents) < rows_per_page:
                 break

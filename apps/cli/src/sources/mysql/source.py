@@ -528,6 +528,7 @@ class MySQLSource(BaseSource):
         table_ref: TableRef,
         column_names: list[str],
         rows: list[tuple[Any, ...]],
+        row_offset: int = 0,
     ) -> tuple[str, str]:
         sampling = self._sampling()
         return format_tabular_sample_content(
@@ -542,6 +543,7 @@ class MySQLSource(BaseSource):
                 "database": table_ref.database,
                 "table": table_ref.table,
             },
+            row_offset=row_offset,
         )
 
     def _fetch_one_page(
@@ -557,7 +559,9 @@ class MySQLSource(BaseSource):
                 )
         return rows, column_names
 
-    def _sample_table_rows(self, table_ref: TableRef) -> tuple[str, str] | None:
+    def _fetch_sample_rows(
+        self, table_ref: TableRef
+    ) -> tuple[list[tuple[Any, ...]], list[str]] | None:
         columns = self._available_columns(table_ref)
         sampling = self._sampling()
         query, params = self._build_sampling_query(table_ref, columns)
@@ -574,6 +578,13 @@ class MySQLSource(BaseSource):
 
         if not column_names:
             return None
+        return rows, column_names
+
+    def _sample_table_rows(self, table_ref: TableRef) -> tuple[str, str] | None:
+        result = self._fetch_sample_rows(table_ref)
+        if result is None:
+            return None
+        rows, column_names = result
         return self._format_sample_content(table_ref, column_names, rows)
 
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
@@ -595,15 +606,21 @@ class MySQLSource(BaseSource):
 
     async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
         sampling = self._sampling()
-
-        if sampling.strategy != SamplingStrategy.ALL:
-            result = await self.fetch_content(asset_id)
-            if result:
-                yield result
-            return
-
         table_ref = self._parse_table_ref_from_asset_id(asset_id)
         if not table_ref:
+            return
+
+        if sampling.strategy != SamplingStrategy.ALL:
+            result = self._fetch_sample_rows(table_ref)
+            if result is None:
+                return
+            rows, column_names = result
+            for i, row in enumerate(rows):
+                formatted = self._format_sample_content(
+                    table_ref, column_names, [row], row_offset=i
+                )
+                if formatted:
+                    yield formatted
             return
 
         columns = self._available_columns(table_ref)
@@ -632,12 +649,15 @@ class MySQLSource(BaseSource):
             if not rows or not column_names:
                 break
 
-            result = self._format_sample_content(table_ref, column_names, rows)
-            if result:
-                self._content_cache[asset_id] = result
-                yield result
+            for i, row in enumerate(rows):
+                formatted = self._format_sample_content(
+                    table_ref, column_names, [row], row_offset=offset + i
+                )
+                if formatted:
+                    self._content_cache[asset_id] = formatted
+                    yield formatted
 
-            offset += rows_per_page
+            offset += len(rows)
             page_num += 1
             if len(rows) < rows_per_page:
                 break
