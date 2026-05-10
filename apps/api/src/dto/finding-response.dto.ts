@@ -177,6 +177,13 @@ export class FindingResponseDto {
   @ApiPropertyOptional({ type: FindingLocationDto })
   location?: FindingLocationDto;
 
+  @ApiPropertyOptional({
+    description: 'Detector-specific metadata (key-value pairs)',
+    type: 'object',
+    additionalProperties: true,
+  })
+  metadata?: Record<string, unknown>;
+
   @ApiProperty({ enum: FindingStatus })
   status: FindingStatus;
 

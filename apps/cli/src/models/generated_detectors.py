@@ -17,12 +17,8 @@ class DetectorType(StrEnum):
     SECRETS = 'SECRETS'
     PII = 'PII'
     TOXIC = 'TOXIC'
-    IMAGE_CLASSIFICATION = 'IMAGE_CLASSIFICATION'
     YARA = 'YARA'
     BROKEN_LINKS = 'BROKEN_LINKS'
-    TEXT_CLASSIFICATION = 'TEXT_CLASSIFICATION'
-    FEATURE_EXTRACTION = 'FEATURE_EXTRACTION'
-    OBJECT_DETECTION = 'OBJECT_DETECTION'
     LANGUAGE = 'LANGUAGE'
     CODE_SECURITY = 'CODE_SECURITY'
     CUSTOM = 'CUSTOM'
@@ -420,6 +416,30 @@ class SecretsDetectorConfig(DetectorConfig):
     )
 
 
+class MaxLength(RootModel[int]):
+    root: int = Field(
+        ...,
+        description="Override spaCy's nlp.max_length (default 1,000,000 chars). Set higher than your longest expected input to avoid the E088 error. Prefer chunk_size for very large texts.",
+        ge=1,
+    )
+
+
+class ChunkSize(RootModel[int]):
+    root: int = Field(
+        ...,
+        description='Split text into chunks of this many characters before analysis. Findings from all chunks are merged with corrected offsets. When null the full text is passed as-is (subject to max_length).',
+        ge=1,
+    )
+
+
+class ChunkOverlap(RootModel[int]):
+    root: int = Field(
+        ...,
+        description='Character overlap between consecutive chunks. Helps detect entities that span a chunk boundary.',
+        ge=0,
+    )
+
+
 class PIIDetectorConfig(DetectorConfig):
     """
     Configuration for PII detector powered by Microsoft Presidio
@@ -443,6 +463,18 @@ class PIIDetectorConfig(DetectorConfig):
     custom_recognizers: list[PIICustomRecognizer] | None = Field(
         None,
         description='Ad-hoc recognizers added to the Presidio registry at runtime. Each entry defines a regex-pattern or deny-list recognizer for a custom entity type.',
+    )
+    max_length: MaxLength | None = Field(
+        None,
+        description="Override spaCy's nlp.max_length (default 1,000,000 chars). Set higher than your longest expected input to avoid the E088 error. Prefer chunk_size for very large texts.",
+    )
+    chunk_size: ChunkSize | None = Field(
+        None,
+        description='Split text into chunks of this many characters before analysis. Findings from all chunks are merged with corrected offsets. When null the full text is passed as-is (subject to max_length).',
+    )
+    chunk_overlap: ChunkOverlap | None = Field(
+        0,
+        description='Character overlap between consecutive chunks. Helps detect entities that span a chunk boundary.',
     )
     confidence_threshold: float | None = Field(
         0.7,
@@ -510,248 +542,6 @@ class ThreatDetectorConfig(DetectorConfig):
     severity_threshold: Severity | None = Field(
         None,
         description='Minimum severity level to include in results. Findings below this threshold are suppressed.',
-    )
-
-
-class TextClassificationSeverityRule(BaseModel):
-    """
-    Maps a predicted label to a severity level. Pattern is matched case-insensitively as a regex against the label.
-    """
-
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    pattern: str = Field(
-        ...,
-        description="Case-insensitive regex matched against the predicted label (e.g. 'spam', 'toxic', 'negative').",
-    )
-    severity: Severity
-
-
-class FunctionToApply(StrEnum):
-    """
-    Score normalization applied after the model forward pass. 'softmax' for single-label models (pipeline default), 'sigmoid' for multi-label models, 'none' for raw logits.
-    """
-
-    sigmoid = 'sigmoid'
-    softmax = 'softmax'
-    none = 'none'
-
-
-class TextClassificationDetectorConfig(DetectorConfig):
-    """
-    Generic text-classification pipeline powered by HuggingFace transformers. Accepts any model fine-tuned for text-classification — from the hub or a local directory. Use severity_map to assign severity to predicted labels.
-    """
-
-    model: str | None = Field(
-        None,
-        description="Model to use: a HuggingFace hub ID (e.g. 'mrm8488/bert-tiny-finetuned-sms-spam-detection') or an absolute local directory path. The model must be fine-tuned for the text-classification task.",
-    )
-    model_revision: str | None = Field(
-        None,
-        description='Git branch, tag, or commit hash when fetching a model from the HuggingFace hub. Ignored for local paths.',
-    )
-    device: str | None = Field(
-        'cpu',
-        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
-    )
-    top_k: int | None = Field(
-        None,
-        description='Maximum number of top predictions to return per text. When null the pipeline returns all labels above confidence_threshold.',
-    )
-    function_to_apply: FunctionToApply | None = Field(
-        None,
-        description="Score normalization applied after the model forward pass. 'softmax' for single-label models (pipeline default), 'sigmoid' for multi-label models, 'none' for raw logits.",
-    )
-    severity_map: list[TextClassificationSeverityRule] | None = Field(
-        None,
-        description="Ordered rules mapping predicted labels to severity levels. First matching rule wins. Labels with no matching rule receive 'info' severity.",
-    )
-    confidence_threshold: float | None = Field(
-        0.7,
-        description='Minimum prediction confidence to report a label as a finding (0-1).',
-        ge=0.0,
-        le=1.0,
-    )
-    max_findings: int | None = Field(
-        None, description='Maximum number of label findings to return per text asset'
-    )
-
-
-class ImageClassificationSeverityRule(BaseModel):
-    """
-    Maps a predicted label to a severity level. Pattern is matched case-insensitively as a substring of the label.
-    """
-
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    pattern: str = Field(
-        ...,
-        description="Case-insensitive substring matched against the predicted label (e.g. 'nsfw', 'explicit', 'normal').",
-    )
-    severity: Severity
-
-
-class ImageClassificationDetectorConfig(DetectorConfig):
-    """
-    Generic image-classification pipeline powered by HuggingFace transformers. Accepts any vision model — from the hub or a local directory. Use severity_map to assign severity to predicted labels.
-    """
-
-    model: str | None = Field(
-        None,
-        description="Model to use: a HuggingFace hub ID (e.g. 'Falconsai/nsfw_image_detection') or an absolute local directory path. Defaults to 'google/vit-base-patch16-224' when null.",
-    )
-    model_revision: str | None = Field(
-        None,
-        description='Git branch, tag, or commit hash when fetching a model from the HuggingFace hub. Ignored for local paths.',
-    )
-    device: str | None = Field(
-        'cpu',
-        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
-    )
-    top_k: int | None = Field(
-        None,
-        description='Maximum number of top predictions to return per image. When null the pipeline returns all classes above confidence_threshold.',
-    )
-    function_to_apply: FunctionToApply | None = Field(
-        None,
-        description="Score normalization applied after the model forward pass. 'softmax' for single-label models (pipeline default), 'sigmoid' for multi-label models, 'none' for raw logits.",
-    )
-    severity_map: list[ImageClassificationSeverityRule] | None = Field(
-        None,
-        description="Ordered rules mapping predicted labels to severity levels. First matching rule wins. Labels with no matching rule receive 'info' severity.",
-    )
-    confidence_threshold: float | None = Field(
-        0.0,
-        description='Minimum prediction confidence to report a label as a finding (0-1). Defaults to 0 so all top_k predictions are reported.',
-        ge=0.0,
-        le=1.0,
-    )
-    max_findings: int | None = Field(
-        None, description='Maximum number of label findings to return per image'
-    )
-
-
-class PoolingStrategy(StrEnum):
-    """
-    How to aggregate per-token hidden states into a single embedding vector. 'mean' (recommended) averages all token embeddings. 'cls' uses the first [CLS] token. 'max' takes element-wise maximum. 'none' returns all token embeddings as a list.
-    """
-
-    mean = 'mean'
-    cls = 'cls'
-    max = 'max'
-    none = 'none'
-
-
-class FeatureExtractionDetectorConfig(DetectorConfig):
-    """
-    Generates dense vector embeddings from text using the HuggingFace feature-extraction pipeline. Accepts any encoder model from the hub or a local directory. Configure pooling_strategy and normalize_embeddings to control the output representation. Embeddings are stored in finding metadata for downstream use in semantic search, clustering, RAG, and anomaly detection.
-    """
-
-    model: str | None = Field(
-        None,
-        description="HuggingFace hub ID (e.g. 'BAAI/bge-base-en-v1.5', 'sentence-transformers/all-MiniLM-L6-v2') or absolute local directory path. Required — raises an error when null.",
-    )
-    model_revision: str | None = Field(
-        None,
-        description='Git branch, tag, or commit hash when fetching a model from the HuggingFace hub. Ignored for local paths.',
-    )
-    device: str | None = Field(
-        'cpu',
-        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
-    )
-    pooling_strategy: PoolingStrategy | None = Field(
-        'mean',
-        description="How to aggregate per-token hidden states into a single embedding vector. 'mean' (recommended) averages all token embeddings. 'cls' uses the first [CLS] token. 'max' takes element-wise maximum. 'none' returns all token embeddings as a list.",
-    )
-    normalize_embeddings: bool | None = Field(
-        True,
-        description='L2-normalise the final embedding vector. Strongly recommended for cosine-similarity workloads and vector database indexing.',
-    )
-    truncation: bool | None = Field(
-        True,
-        description="Truncate input to the model's maximum sequence length. Disable only if the model and tokenizer support arbitrary length.",
-    )
-    max_length: int | None = Field(
-        None,
-        description="Override the tokenizer's default maximum sequence length. When null the model's configured max_length is used.",
-    )
-    batch_size: int | None = Field(
-        8,
-        description='Number of texts to encode in a single forward pass. Increase for throughput on GPU, decrease to reduce memory usage.',
-    )
-    max_findings: int | None = Field(
-        None,
-        description='Maximum number of embedding findings to return per asset. Typically 1 per chunk.',
-    )
-
-
-class ObjectDetectionSeverityRule(BaseModel):
-    """
-    Maps a detected object label to a severity level. Pattern is matched case-insensitively as a regex against the label.
-    """
-
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    pattern: str = Field(
-        ...,
-        description="Case-insensitive regex matched against the detected object label (e.g. 'person', 'weapon', 'face').",
-    )
-    severity: Severity
-
-
-class NmsThreshold(RootModel[float]):
-    root: float = Field(
-        ...,
-        description="IoU threshold for non-maximum suppression applied after inference to remove duplicate overlapping boxes. When null the model's default post-processing is used.",
-        ge=0.0,
-        le=1.0,
-    )
-
-
-class ObjectDetectionDetectorConfig(DetectorConfig):
-    """
-    Detects and localises objects in images using the HuggingFace object-detection pipeline. Accepts any detection model — DETR, RT-DETR, OWL-ViT, YOLOS, and others. Each detected object produces a finding with its label, confidence score, and bounding box coordinates. Use severity_map to assign severity to specific object classes.
-    """
-
-    model: str | None = Field(
-        None,
-        description="HuggingFace hub ID (e.g. 'facebook/detr-resnet-50', 'PekingU/rtdetr_r50vd', 'hustvl/yolos-small') or absolute local directory path. Required — raises an error when null.",
-    )
-    model_revision: str | None = Field(
-        None,
-        description='Git branch, tag, or commit hash when fetching a model from the HuggingFace hub. Ignored for local paths.',
-    )
-    device: str | None = Field(
-        'cpu',
-        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
-    )
-    confidence_threshold: float | None = Field(
-        0.5,
-        description='Minimum detection confidence to report an object as a finding (0-1). Lower values increase recall but add false positives.',
-        ge=0.0,
-        le=1.0,
-    )
-    top_k: int | None = Field(
-        None,
-        description='Keep only the top-k highest-confidence detections per image. When null all detections above confidence_threshold are returned.',
-    )
-    nms_threshold: NmsThreshold | None = Field(
-        None,
-        description="IoU threshold for non-maximum suppression applied after inference to remove duplicate overlapping boxes. When null the model's default post-processing is used.",
-    )
-    min_box_area: int | None = Field(
-        None,
-        description='Minimum bounding-box area in pixels (width × height). Detections smaller than this are suppressed. Useful for filtering noise in large images.',
-    )
-    severity_map: list[ObjectDetectionSeverityRule] | None = Field(
-        None,
-        description="Ordered rules mapping detected object labels to severity levels. First matching rule wins. Labels with no matching rule receive 'info' severity.",
-    )
-    max_findings: int | None = Field(
-        None, description='Maximum number of object findings to return per image.'
     )
 
 
@@ -1084,15 +874,77 @@ class PipelineResult(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+class Severity1(StrEnum):
+    """
+    Severity level assigned to findings from this pattern. When omitted, defaults to high (confidence is always 1.0 for regex).
+    """
+
+    critical = 'critical'
+    high = 'high'
+    medium = 'medium'
+    low = 'low'
+    info = 'info'
+
+
 class RegexPatternDefinition(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    pattern: str
-    flags: Any | None = None
+    pattern: str = Field(
+        ..., description='Regular expression pattern (RE2 syntax recommended)'
+    )
+    flags: Any | None = Field(
+        None,
+        description='Legacy integer flags (e.g. re.IGNORECASE). Prefer the boolean fields below instead.',
+    )
     description: str | None = Field(
         None, description='Human-readable description of the pattern'
     )
+    severity: Severity1 | None = Field(
+        None,
+        description='Severity level assigned to findings from this pattern. When omitted, defaults to high (confidence is always 1.0 for regex).',
+    )
+    case_sensitive: bool | None = Field(
+        True,
+        description='Whether matching is case-sensitive. Set to false for case-insensitive matching.',
+    )
+    dot_nl: bool | None = Field(
+        False,
+        description='Whether the dot (.) metacharacter matches newline characters.',
+    )
+    literal: bool | None = Field(
+        False,
+        description='Treat the pattern as a literal string instead of a regular expression.',
+    )
+    longest_match: bool | None = Field(
+        False,
+        description='Prefer the longest possible match instead of the first match (RE2 only).',
+    )
+    max_mem: int | None = Field(
+        None,
+        description='Maximum memory (bytes) for the RE2 automaton. RE2 only; ignored with stdlib fallback.',
+        ge=1,
+    )
+    group: int | None = Field(
+        0,
+        description='Capture group index to extract as matched content. 0 = entire match (default).',
+        ge=0,
+    )
+
+
+class PipelineSeverityRule(BaseModel):
+    """
+    Maps a predicted label to a severity level. Pattern is matched case-insensitively as a substring of the label.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    pattern: str = Field(
+        ...,
+        description="Case-insensitive substring matched against the predicted label (e.g. 'spam', 'nsfw', 'person').",
+    )
+    severity: Severity
 
 
 class Type1(StrEnum):
@@ -1134,6 +986,274 @@ class LLMPipelineSchema(BaseModel):
     type: Literal['LLM'] = 'LLM'
 
 
+class Type4(StrEnum):
+    TEXT_CLASSIFICATION = 'TEXT_CLASSIFICATION'
+
+
+class FunctionToApply(StrEnum):
+    """
+    Score normalization: 'softmax' for single-label, 'sigmoid' for multi-label, 'none' for raw logits.
+    """
+
+    sigmoid = 'sigmoid'
+    softmax = 'softmax'
+    none = 'none'
+
+
+class MaxLength1(RootModel[int]):
+    root: int = Field(
+        ..., description="Override the tokenizer's maximum sequence length.", ge=1
+    )
+
+
+class ChunkSize1(RootModel[int]):
+    root: int = Field(
+        ...,
+        description='Split text into chunks of this many characters before classification.',
+        ge=1,
+    )
+
+
+class ChunkOverlap1(RootModel[int]):
+    root: int = Field(
+        ..., description='Character overlap between consecutive chunks.', ge=0
+    )
+
+
+class TextClassificationPipelineSchema(BaseModel):
+    """
+    Text classification pipeline using a HuggingFace fine-tuned model. Runs a single model; create multiple custom detectors to run multiple classifiers.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['TEXT_CLASSIFICATION']
+    model: str = Field(
+        ...,
+        description="HuggingFace hub ID (e.g. 'mrm8488/bert-tiny-finetuned-sms-spam-detection') or absolute local directory path.",
+    )
+    model_revision: str | None = Field(
+        None,
+        description='Git branch, tag, or commit hash when fetching from the HuggingFace hub.',
+    )
+    device: str | None = Field(
+        'cpu',
+        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
+    )
+    top_k: int | None = Field(
+        None,
+        description='Maximum number of top predictions to return. When null all labels above confidence_threshold are returned.',
+    )
+    function_to_apply: FunctionToApply | None = Field(
+        None,
+        description="Score normalization: 'softmax' for single-label, 'sigmoid' for multi-label, 'none' for raw logits.",
+    )
+    confidence_threshold: float | None = Field(
+        0.7,
+        description='Minimum prediction confidence to report a label as a finding (0-1).',
+        ge=0.0,
+        le=1.0,
+    )
+    severity: Severity | None = Field(
+        'info', description='Default severity when no severity_map rule matches.'
+    )
+    severity_map: list[PipelineSeverityRule] | None = Field(
+        None,
+        description='Ordered rules mapping predicted labels to severity levels. First matching rule wins.',
+    )
+    max_length: MaxLength1 | None = Field(
+        None, description="Override the tokenizer's maximum sequence length."
+    )
+    chunk_size: ChunkSize1 | None = Field(
+        None,
+        description='Split text into chunks of this many characters before classification.',
+    )
+    chunk_overlap: ChunkOverlap1 | None = Field(
+        0, description='Character overlap between consecutive chunks.'
+    )
+
+
+class Type5(StrEnum):
+    IMAGE_CLASSIFICATION = 'IMAGE_CLASSIFICATION'
+
+
+class FunctionToApply1(StrEnum):
+    """
+    Score normalization applied after the model forward pass.
+    """
+
+    sigmoid = 'sigmoid'
+    softmax = 'softmax'
+    none = 'none'
+
+
+class ImageClassificationPipelineSchema(BaseModel):
+    """
+    Image classification pipeline using a HuggingFace vision model. Runs a single model; create multiple custom detectors to run multiple classifiers.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['IMAGE_CLASSIFICATION']
+    model: str | None = Field(
+        None,
+        description="HuggingFace hub ID or local path. Defaults to 'google/vit-base-patch16-224' when null.",
+    )
+    model_revision: str | None = Field(
+        None,
+        description='Git branch, tag, or commit hash when fetching from the HuggingFace hub.',
+    )
+    device: str | None = Field(
+        'cpu',
+        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
+    )
+    top_k: int | None = Field(
+        None, description='Maximum number of top predictions to return per image.'
+    )
+    function_to_apply: FunctionToApply1 | None = Field(
+        None, description='Score normalization applied after the model forward pass.'
+    )
+    confidence_threshold: float | None = Field(
+        0.0,
+        description='Minimum prediction confidence to report a label as a finding (0-1). Defaults to 0 so all top_k predictions are reported.',
+        ge=0.0,
+        le=1.0,
+    )
+    severity_map: list[PipelineSeverityRule] | None = Field(
+        None,
+        description="Ordered rules mapping predicted labels to severity levels. Labels with no matching rule receive 'info' severity.",
+    )
+
+
+class Type6(StrEnum):
+    FEATURE_EXTRACTION = 'FEATURE_EXTRACTION'
+
+
+class PoolingStrategy(StrEnum):
+    """
+    How to aggregate per-token hidden states into a single embedding vector.
+    """
+
+    mean = 'mean'
+    cls = 'cls'
+    max = 'max'
+    none = 'none'
+
+
+class ChunkSize2(RootModel[int]):
+    root: int = Field(
+        ...,
+        description='Split text into chunks of this many characters before embedding. Each chunk produces its own finding.',
+        ge=1,
+    )
+
+
+class FeatureExtractionPipelineSchema(BaseModel):
+    """
+    Feature extraction (embedding) pipeline using a HuggingFace model. Runs a single encoder; create multiple custom detectors to run multiple embedding models.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['FEATURE_EXTRACTION']
+    model: str = Field(
+        ...,
+        description="HuggingFace hub ID (e.g. 'BAAI/bge-base-en-v1.5', 'sentence-transformers/all-MiniLM-L6-v2') or absolute local directory path.",
+    )
+    model_revision: str | None = Field(
+        None,
+        description='Git branch, tag, or commit hash when fetching from the HuggingFace hub.',
+    )
+    device: str | None = Field(
+        'cpu',
+        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
+    )
+    pooling_strategy: PoolingStrategy | None = Field(
+        'mean',
+        description='How to aggregate per-token hidden states into a single embedding vector.',
+    )
+    normalize_embeddings: bool | None = Field(
+        True,
+        description='L2-normalise the final embedding vector. Recommended for cosine-similarity workloads.',
+    )
+    truncation: bool | None = Field(
+        True, description="Truncate input to the model's maximum sequence length."
+    )
+    max_length: int | None = Field(
+        None, description="Override the tokenizer's default maximum sequence length."
+    )
+    batch_size: int | None = Field(
+        8, description='Number of texts to encode in a single forward pass.'
+    )
+    chunk_size: ChunkSize2 | None = Field(
+        None,
+        description='Split text into chunks of this many characters before embedding. Each chunk produces its own finding.',
+    )
+    chunk_overlap: ChunkOverlap1 | None = Field(
+        0, description='Character overlap between consecutive chunks.'
+    )
+
+
+class Type7(StrEnum):
+    OBJECT_DETECTION = 'OBJECT_DETECTION'
+
+
+class NmsThreshold(RootModel[float]):
+    root: float = Field(
+        ...,
+        description="IoU threshold for non-maximum suppression. When null the model's default post-processing is used.",
+        ge=0.0,
+        le=1.0,
+    )
+
+
+class ObjectDetectionPipelineSchema(BaseModel):
+    """
+    Object detection pipeline using a HuggingFace model. Runs a single detector; create multiple custom detectors to run multiple detection models.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['OBJECT_DETECTION']
+    model: str = Field(
+        ...,
+        description="HuggingFace hub ID (e.g. 'facebook/detr-resnet-50', 'hustvl/yolos-small') or absolute local directory path.",
+    )
+    model_revision: str | None = Field(
+        None,
+        description='Git branch, tag, or commit hash when fetching from the HuggingFace hub.',
+    )
+    device: str | None = Field(
+        'cpu',
+        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
+    )
+    confidence_threshold: float | None = Field(
+        0.5,
+        description='Minimum detection confidence to report an object as a finding (0-1).',
+        ge=0.0,
+        le=1.0,
+    )
+    top_k: int | None = Field(
+        None, description='Keep only the top-k highest-confidence detections per image.'
+    )
+    nms_threshold: NmsThreshold | None = Field(
+        None,
+        description="IoU threshold for non-maximum suppression. When null the model's default post-processing is used.",
+    )
+    min_box_area: int | None = Field(
+        None,
+        description='Minimum bounding-box area in pixels (width × height). Smaller detections are suppressed.',
+    )
+    severity_map: list[PipelineSeverityRule] | None = Field(
+        None,
+        description="Ordered rules mapping detected object labels to severity levels. Labels with no matching rule receive 'info' severity.",
+    )
+
+
 class CustomDetectorConfig(DetectorConfig):
     """
     Configuration for user-defined detector execution
@@ -1153,7 +1273,14 @@ class CustomDetectorConfig(DetectorConfig):
         None, description='Optional structured extraction — runs when detector fires'
     )
     pipeline_schema: (
-        GLiNER2PipelineSchema | RegexPipelineSchema | LLMPipelineSchema | None
+        GLiNER2PipelineSchema
+        | RegexPipelineSchema
+        | LLMPipelineSchema
+        | TextClassificationPipelineSchema
+        | ImageClassificationPipelineSchema
+        | FeatureExtractionPipelineSchema
+        | ObjectDetectionPipelineSchema
+        | None
     ) = Field(None, discriminator='type', title='AnyPipelineSchema')
     max_findings: int | None = Field(
         None, description='Maximum number of findings to return per asset'
@@ -1168,10 +1295,6 @@ class DetectorsRefactored(
         | ThreatDetectorConfig
         | BrokenLinksDetectorConfig
         | CustomDetectorConfig
-        | TextClassificationDetectorConfig
-        | ImageClassificationDetectorConfig
-        | FeatureExtractionDetectorConfig
-        | ObjectDetectionDetectorConfig
         | CodeSecurityDetectorConfig
         | LanguageDetectorConfig
         | GenericDetectorConfig
@@ -1184,10 +1307,6 @@ class DetectorsRefactored(
         | ThreatDetectorConfig
         | BrokenLinksDetectorConfig
         | CustomDetectorConfig
-        | TextClassificationDetectorConfig
-        | ImageClassificationDetectorConfig
-        | FeatureExtractionDetectorConfig
-        | ObjectDetectionDetectorConfig
         | CodeSecurityDetectorConfig
         | LanguageDetectorConfig
         | GenericDetectorConfig

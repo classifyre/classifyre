@@ -342,6 +342,11 @@ class PIIDetector(BaseDetector):
             logger.warning("spaCy model '%s' not found; using default NLP engine", cfg_model)
             return None
 
+        spacy_max_length: int | None = getattr(self._cfg, "max_length", None)
+        if spacy_max_length is not None:
+            nlp.max_length = spacy_max_length
+            logger.debug("Set spaCy nlp.max_length = %d", spacy_max_length)
+
         nlp_engine_module = require_module(
             "presidio_analyzer.nlp_engine",
             "pii",
@@ -808,13 +813,26 @@ class PIIDetector(BaseDetector):
     # Public API
     # ------------------------------------------------------------------
 
-    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
+    async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
         """Detect PII in *content* and return a list of :class:`DetectionResult` objects."""
+        if isinstance(content, bytes):
+            return []
         # Presidio + spaCy NER are CPU-bound synchronous operations.  Running them
         # directly in the async coroutine blocks the event loop for the duration of
         # each page (seconds on CPU-limited pods), making the job appear frozen.
         # Offloading to a thread keeps the loop alive and allows I/O to proceed.
         return await asyncio.to_thread(self._detect_sync, content)
+
+    def _chunk_text(self, text: str) -> list[tuple[str, int]]:
+        """Return (chunk, offset) pairs. When chunk_size is null returns the full text at offset 0."""
+        chunk_size: int | None = getattr(self._cfg, "chunk_size", None)
+        if not chunk_size:
+            return [(text, 0)]
+        overlap: int = getattr(self._cfg, "chunk_overlap", None) or 0
+        step = max(1, chunk_size - overlap)
+        return [(text[i : i + chunk_size], i) for i in range(0, len(text), step)]
 
     def _detect_sync(self, content: str) -> list[DetectionResult]:
         tabular_results = self._detect_tabular_content(content)
@@ -825,29 +843,36 @@ class PIIDetector(BaseDetector):
 
         enabled = self._enabled_entities()
         entities = sorted(enabled) if enabled else None
-        analyzer_results = self._analyze_content(content, entities=entities)
-
         threshold = self._cfg.confidence_threshold or 0.7
         results: list[DetectionResult] = []
+        seen: set[tuple[str, int, int]] = set()
 
-        for result in analyzer_results:
-            if not self._is_entity_enabled(result.entity_type):
-                continue
+        for chunk, offset in self._chunk_text(content):
+            for result in self._analyze_content(chunk, entities=entities):
+                if not self._is_entity_enabled(result.entity_type):
+                    continue
 
-            line_number = content[: result.start].count("\n") + 1
-            matched_content = content[result.start : result.end]
+                abs_start = result.start + offset
+                abs_end = result.end + offset
+                dedup_key = (result.entity_type, abs_start, abs_end)
+                if dedup_key in seen:
+                    continue
+                seen.add(dedup_key)
 
-            detection = self._build_detection_result(
-                matched_content=matched_content,
-                entity_type=result.entity_type,
-                confidence=result.score,
-                recognition_metadata=result.recognition_metadata,
-                line_number=line_number,
-                start=result.start,
-                end=result.end,
-            )
-            if detection.confidence >= threshold:
-                results.append(detection)
+                line_number = content[:abs_start].count("\n") + 1
+                matched_content = content[abs_start:abs_end]
+
+                detection = self._build_detection_result(
+                    matched_content=matched_content,
+                    entity_type=result.entity_type,
+                    confidence=result.score,
+                    recognition_metadata=result.recognition_metadata,
+                    line_number=line_number,
+                    start=abs_start,
+                    end=abs_end,
+                )
+                if detection.confidence >= threshold:
+                    results.append(detection)
 
         if self._cfg.max_findings and len(results) > self._cfg.max_findings:
             results = results[: self._cfg.max_findings]

@@ -50,7 +50,9 @@ class ToxicDetector(BaseDetector):
             logger.error(f"Failed to initialize Detoxify model: {e}")
             raise
 
-    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
+    async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
         """
         Detect toxic content using Detoxify.
 
@@ -61,6 +63,9 @@ class ToxicDetector(BaseDetector):
         Returns:
             List of detection results for found toxic content
         """
+        if isinstance(content, bytes):
+            return []
+
         results: list[DetectionResult] = []
 
         try:

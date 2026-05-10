@@ -224,18 +224,13 @@ class SlackSource(BaseSource):
             )
         return {"channels": results}
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    STREAM_DETECTIONS = True
+
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
 
         logger.info("Extracting Slack messages...")
-
-        pipeline = None
-        if self.config.detectors and any(d.enabled for d in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
-            logger.info("Detector pipeline initialized")
 
         channel_ids, channel_lookup = self._resolve_channels()
 
@@ -251,7 +246,6 @@ class SlackSource(BaseSource):
             async for batch in self._stream_channel_batches(
                 channel_id,
                 channel_name,
-                pipeline,
             ):
                 yield batch
 
@@ -272,10 +266,9 @@ class SlackSource(BaseSource):
         self,
         channel_id: str,
         channel_name: str,
-        pipeline: Any | None,
     ) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         assets = self._iter_channel_assets(channel_id, channel_name)
-        async for batch in self._yield_batches(assets, pipeline):
+        async for batch in self._yield_batches(assets):
             yield batch
 
     def _iter_channel_assets(
@@ -291,7 +284,6 @@ class SlackSource(BaseSource):
     async def _yield_batches(
         self,
         assets: Iterable[SingleAssetScanResults],
-        pipeline: Any | None,
     ) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         batch: list[SingleAssetScanResults] = []
 
@@ -301,19 +293,11 @@ class SlackSource(BaseSource):
             batch.append(asset)
 
             if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    async for processed in pipeline.process_stream(batch):
-                        yield [processed]
-                else:
-                    yield batch
+                yield batch
                 batch = []
 
         if batch:
-            if pipeline:
-                async for processed in pipeline.process_stream(batch):
-                    yield [processed]
-            else:
-                yield batch
+            yield batch
 
     def _iter_channel_messages(self, channel_id: str) -> Iterable[dict[str, Any]]:
         cursor: str | None = None

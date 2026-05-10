@@ -311,10 +311,14 @@ def run_sandbox_command(args: argparse.Namespace) -> None:
     try:
         runner = SandboxRunner(detectors)
         parsed, findings = runner.run(file_path)
-        output = {
+        if parsed.parse_error:
+            logger.warning("File parse warning: %s", parsed.parse_error)
+        output: dict[str, Any] = {
             "mime_type": parsed.mime_type,
             "findings": [f.model_dump(mode="json") for f in findings],
         }
+        if parsed.parse_error:
+            output["parse_error"] = parsed.parse_error
         print(json.dumps(_sanitize_for_json(output), ensure_ascii=False))
     except Exception as e:
         logger.error("Sandbox run failed: %s", e, exc_info=True)

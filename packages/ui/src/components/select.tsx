@@ -187,4 +187,5 @@ export {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
+  SelectPrimitive,
 };
