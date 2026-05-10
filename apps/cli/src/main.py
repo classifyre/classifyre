@@ -161,43 +161,55 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     await sink.start()
                     sink_started = True
 
-                    extract_result = source.extract()
-                    if not hasattr(extract_result, "__aiter__"):
-                        raise TypeError(
-                            "Source extract() must return an async generator of batches"
-                        )
+                    # Build detector pipeline directly so we can stream in two phases:
+                    # 1) stub assets appear in the API immediately, 2) detector
+                    # results are pushed as they complete.
+                    from .pipeline.detector_pipeline import DetectorPipeline
+
+                    pipeline = DetectorPipeline.from_recipe(recipe, source, runner_id)
+                    has_detectors = bool(pipeline.detectors)
 
                     output_batch_count = 0
                     total_assets = 0
-                    buffer: list[dict[str, Any]] = []
 
-                    async for source_batch in extract_result:
-                        if not source_batch:
+                    async for raw_batch in source.extract_raw():
+                        if not raw_batch:
                             continue
-                        payload_batch = [_asset_to_payload(asset) for asset in source_batch]
-                        buffer.extend(payload_batch)
 
-                        while len(buffer) >= sink.batch_size:
-                            to_emit = buffer[: sink.batch_size]
-                            buffer = buffer[sink.batch_size :]
-                            await sink.emit_batch(to_emit)
-                            output_batch_count += 1
-                            total_assets += len(to_emit)
-                            logger.info(
-                                "Emitted output batch %s with %s assets (total: %s)",
-                                output_batch_count,
-                                len(to_emit),
-                                total_assets,
-                            )
+                        batch_size = len(raw_batch)
+                        total_assets += batch_size
 
-                    if buffer:
-                        await sink.emit_batch(buffer)
+                        # Phase 1: Emit stub assets immediately so they appear in the UI
+                        stub_batch = [_asset_to_payload(asset) for asset in raw_batch]
+                        for stub in stub_batch:
+                            stub["findings"] = []
+                        await sink.emit_batch(stub_batch, skip_findings=True)
                         output_batch_count += 1
-                        total_assets += len(buffer)
+                        logger.info(
+                            "Emitted %s stub assets (total: %s)",
+                            batch_size,
+                            total_assets,
+                        )
+
+                        # Phase 2: Run detectors and emit results as they complete
+                        if has_detectors:
+                            result_count = 0
+                            async for processed in pipeline.process_stream(raw_batch):
+                                await sink.emit_batch(
+                                    [_asset_to_payload(processed)],
+                                    skip_findings=False,
+                                )
+                                result_count += 1
+
+                            logger.info(
+                                "Detector results streamed for %s/%s assets in batch",
+                                result_count,
+                                batch_size,
+                            )
 
                     await sink.finish()
                     logger.info(
-                        "Extraction completed: emitted %s assets in %s output batches",
+                        "Extraction completed: %s assets in %s batches",
                         total_assets,
                         output_batch_count,
                     )
@@ -207,9 +219,6 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             "Source timed out during extraction, partial results flushed: %s",
                             extraction_error,
                         )
-                        if buffer:
-                            await sink.emit_batch(buffer)
-                            total_assets += len(buffer)
                         await sink.finish()
                         return
                     if sink_started:

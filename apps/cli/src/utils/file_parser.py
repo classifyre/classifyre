@@ -416,7 +416,7 @@ def iter_file_pages(
     if normalized in ("application/parquet", "application/vnd.apache.parquet"):
         yield from _iter_parquet_pages(file_bytes, batch_size, include_column_names)
     elif normalized in ("text/csv", "text/tab-separated-values"):
-        yield from _iter_csv_pages(file_bytes, batch_size, include_column_names)
+        yield from _iter_csv_pages(file_bytes, include_column_names)
     else:
         text, error = extract_text(file_bytes, normalized)
         if error:
@@ -465,8 +465,8 @@ def _iter_parquet_pages(
         abs_row = 0
         for batch in pf.iter_batches(batch_size=batch_size):
             col_names = batch.schema.names
-            lines: list[str] = []
             for local_idx in range(batch.num_rows):
+                lines: list[str] = []
                 lines.append(f"row_{abs_row + 1}:")
                 for col_i, col in enumerate(col_names):
                     cell = batch.column(col_i)[local_idx].as_py()
@@ -476,15 +476,14 @@ def _iter_parquet_pages(
                     lines.extend(f"    {c}" for c in rest)
                 lines.append("")
                 abs_row += 1
-            if lines:
-                yield "\n".join(lines)
+                if lines:
+                    yield "\n".join(lines)
     except Exception as exc:
         logger.warning("Parquet page iteration failed: %s", exc)
 
 
 def _iter_csv_pages(
     file_bytes: bytes,
-    batch_size: int,
     include_column_names: bool,
 ) -> Generator[str, None, None]:
     import csv
@@ -495,22 +494,11 @@ def _iter_csv_pages(
         reader = csv.DictReader(io.StringIO(text))
         headers = list(reader.fieldnames or [])
 
-        batch: list[dict[str, str]] = []
         total_seen = 0
 
         for row in reader:
-            batch.append(dict(row))
             total_seen += 1
-            if len(batch) >= batch_size:
-                yield _format_tabular_page(
-                    batch, headers, total_seen - len(batch) + 1, include_column_names
-                )
-                batch = []
-
-        if batch:
-            yield _format_tabular_page(
-                batch, headers, total_seen - len(batch) + 1, include_column_names
-            )
+            yield _format_tabular_page([dict(row)], headers, total_seen, include_column_names)
     except Exception as exc:
         logger.warning("CSV page iteration failed: %s", exc)
 

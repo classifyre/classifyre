@@ -26,6 +26,7 @@ def format_tabular_sample_content(
     include_column_names: bool,
     object_type: str | None = None,
     raw_metadata: dict[str, Any] | None = None,
+    row_offset: int = 0,
 ) -> tuple[str, str]:
     lines = [
         f"{scope_label}={scope_value}",
@@ -41,7 +42,7 @@ def format_tabular_sample_content(
     )
 
     serialized_rows: list[dict[str, str]] = []
-    for index, row in enumerate(rows, start=1):
+    for index, row in enumerate(rows, start=1 + row_offset):
         serialized_row: dict[str, str] = {}
         lines.append(f"row_{index}:")
         for column_name, cell in zip(column_names, row, strict=False):
@@ -61,6 +62,7 @@ def format_tabular_sample_content(
     raw_payload = dict(raw_metadata or {})
     raw_payload["strategy"] = str(strategy)
     raw_payload["rows"] = serialized_rows
+    raw_payload["row_offset"] = row_offset
     if object_type:
         raw_payload["object_type"] = object_type
 
@@ -116,10 +118,11 @@ def _find_tabular_cell_match(
     if not isinstance(rows, list):
         return None
 
+    row_offset = payload.get("row_offset", 0)
     normalized_match = _normalize_for_match(matched_content)
     substring_match: TabularCellMatch | None = None
     normalized_substring_match: TabularCellMatch | None = None
-    for current_row_index, raw_row in enumerate(rows, start=1):
+    for current_row_index, raw_row in enumerate(rows, start=1 + row_offset):
         if row_index is not None and current_row_index != row_index:
             continue
         if not isinstance(raw_row, dict):

@@ -180,6 +180,7 @@ class DetectorPipeline:
                 detectors=link_detectors,
                 content=link_content,
                 content_type="application/x.asset-links",
+                asset_name=asset.name,
             )
             findings.extend(link_findings)
             scan_errors.extend(link_errors)
@@ -249,6 +250,7 @@ class DetectorPipeline:
                 detectors=detectors,
                 content=detector_content,
                 content_type=text_content_type,
+                asset_name=asset.name,
             )
             findings.extend(page_findings)
             errors.extend(page_errors)
@@ -327,6 +329,7 @@ class DetectorPipeline:
                 detectors=compatible,
                 content=raw_bytes,
                 content_type=mime_type,
+                asset_name=asset.name,
             )
             for finding in findings:
                 self.content_provider.enrich_finding_location(finding, asset, "")
@@ -371,6 +374,7 @@ class DetectorPipeline:
         detectors: list[BaseDetector],
         content: str | bytes,
         content_type: str,
+        asset_name: str = "",
     ) -> tuple[list[DetectionResult], list[DetectorType], list[str]]:
         """Run all compatible detectors in parallel for a single payload."""
         if not content:
@@ -413,7 +417,7 @@ class DetectorPipeline:
         for detector, result in zip(runnable_detectors, results, strict=False):
             detector_name = detector.__class__.__name__
             if isinstance(result, Exception):
-                logger.error("Detector %s failed: %s", detector_name, result)
+                logger.error("Detector %s failed for %s: %s", detector_name, asset_name, result)
                 errors.append(f"{detector_name}: {result}")
                 continue
 
@@ -431,12 +435,13 @@ class DetectorPipeline:
 
             if detector_findings:
                 logger.info(
-                    "  %s: %d finding(s)",
+                    "  %s on %s: %d finding(s)",
                     detector_name,
+                    asset_name,
                     len(detector_findings),
                 )
             else:
-                logger.info("  %s: no findings", detector_name)
+                logger.info("  %s on %s: no findings", detector_name, asset_name)
 
             all_findings.extend(detector_findings)
 

@@ -46,4 +46,14 @@ export class BulkIngestAssetsDto {
   @IsOptional()
   @IsBoolean()
   finalizeRun?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'When true, skip all findings processing (create, update, resolve) for this batch. ' +
+      'Useful for streaming ingestion where assets are pushed before detector results.',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  skipFindings?: boolean;
 }
