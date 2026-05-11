@@ -566,7 +566,7 @@ function AssistantWorkflowFab() {
       <Button
         type="button"
         onClick={() => context.setOpen(true)}
-        className="pointer-events-auto h-14 rounded-[6px] border-2 border-black bg-[var(--color-accent)] px-4 text-[var(--color-accent-foreground)] shadow-[6px_6px_0_var(--color-border)] transition-[transform,color] hover:-translate-y-[1px] hover:text-[var(--color-primary-foreground)]"
+        className="pointer-events-auto h-14 rounded-[6px] border-2 border-border bg-[var(--color-accent)] px-4 text-[var(--color-accent-foreground)] shadow-[6px_6px_0_var(--color-border)] transition-[transform,color] hover:-translate-y-[1px] hover:text-[var(--color-primary-foreground)]"
       >
         <Wand2 className="mr-2 h-4 w-4" />
         Assitant

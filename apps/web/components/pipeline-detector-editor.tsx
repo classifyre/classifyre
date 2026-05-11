@@ -1306,7 +1306,7 @@ export const PipelineDetectorEditor = React.forwardRef<
               data-testid="gliner2-submit-btn"
               onClick={() => void handleSubmit()}
               disabled={isSubmitting}
-              className="h-10 rounded-[4px] border-2 border-black bg-[#b7ff00] text-black shadow-[4px_4px_0_#000] hover:-translate-y-[1px] hover:shadow-[6px_6px_0_#000] transition-all font-mono font-bold uppercase tracking-[0.12em]"
+              className="h-10 rounded-[4px] border-2 border-border bg-accent text-accent-foreground shadow-[4px_4px_0_var(--color-border)] hover:-translate-y-[1px] hover:shadow-[6px_6px_0_var(--color-border)] transition-all font-mono font-bold uppercase tracking-[0.12em]"
             >
               {isSubmitting ? "Saving…" : submitLabel}
             </Button>

@@ -85,7 +85,7 @@ export function DeleteSourceAction({
             size="sm"
             disabled={isDeleting}
             className={cn(
-              "rounded-[4px] border-2 border-black bg-[#ff2b2b] text-white shadow-[3px_3px_0_#000] hover:bg-[#e62626]",
+              "rounded-[4px] border-2 border-border bg-destructive text-white shadow-[3px_3px_0_var(--color-border)] hover:bg-destructive/90",
               className,
             )}
             data-testid="btn-delete-source"
@@ -99,7 +99,7 @@ export function DeleteSourceAction({
           </Button>
         )}
       </AlertDialogTrigger>
-      <AlertDialogContent className="rounded-[6px] border-2 border-black">
+      <AlertDialogContent className="rounded-[6px] border-2 border-border">
         <AlertDialogHeader>
           <AlertDialogTitle>Delete source?</AlertDialogTitle>
           <AlertDialogDescription>
@@ -120,7 +120,7 @@ export function DeleteSourceAction({
             variant="destructive"
             disabled={isDeleting}
             onClick={handleDelete}
-            className="rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
+            className="rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
             data-testid="btn-delete-confirm"
           >
             {isDeleting ? "Deleting..." : "Delete Source"}

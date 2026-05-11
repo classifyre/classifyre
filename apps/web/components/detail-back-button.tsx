@@ -29,7 +29,7 @@ export function DetailBackButton({
       variant="outline"
       size="icon"
       className={cn(
-        "rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]",
+        "rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]",
         className,
       )}
       onClick={handleClick}

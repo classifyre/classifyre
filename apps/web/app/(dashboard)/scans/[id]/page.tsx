@@ -407,7 +407,7 @@ export default function RunnerDetailPage() {
             <p className="text-muted-foreground mb-4">{error}</p>
             <Button
               variant="outline"
-              className="rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
+              className="rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
               onClick={() => router.push("/scans")}
             >
               {t("scans.viewAllScans")}
@@ -473,7 +473,7 @@ export default function RunnerDetailPage() {
           <Button
             variant="outline"
             size="sm"
-            className="rounded-[4px] border-2 border-black"
+            className="rounded-[4px] border-2 border-border"
             onClick={() => router.push(`/sources/${sourceDetailsId}`)}
             disabled={!sourceDetailsId}
           >
@@ -483,7 +483,7 @@ export default function RunnerDetailPage() {
           <Button
             variant="outline"
             size="sm"
-            className="rounded-[4px] border-2 border-black"
+            className="rounded-[4px] border-2 border-border"
             onClick={() => router.push(`/sources/${sourceDetailsId}/edit`)}
             disabled={!sourceDetailsId}
           >
@@ -493,7 +493,7 @@ export default function RunnerDetailPage() {
           <Button
             variant="outline"
             size="sm"
-            className="rounded-[4px] border-2 border-black"
+            className="rounded-[4px] border-2 border-border"
             onClick={handleRunAgain}
             disabled={isRunningAgain || !runner.sourceId || hasActiveRun}
           >
@@ -512,7 +512,7 @@ export default function RunnerDetailPage() {
             <Button
               variant="destructive"
               size="sm"
-              className="rounded-[4px] border-2 border-black"
+              className="rounded-[4px] border-2 border-border"
               onClick={handleStop}
               disabled={isStopping}
             >
@@ -528,7 +528,7 @@ export default function RunnerDetailPage() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="h-auto rounded-[4px] border-2 border-black bg-background p-1">
+        <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">
           <TabsTrigger value="overview" className="rounded-[3px]" data-testid="tab-overview">
             {t("scans.tabOverview")}
           </TabsTrigger>
@@ -653,7 +653,7 @@ export default function RunnerDetailPage() {
           </div>
 
           {runner.status === "RUNNING" && (
-            <Card className="border-2 border-black rounded-[6px]">
+            <Card className="border-2 border-border rounded-[6px]">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Run Progress</CardTitle>
                 <CardDescription>
@@ -767,7 +767,7 @@ export default function RunnerDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-[4px] border-2 border-black"
+                  className="rounded-[4px] border-2 border-border"
                   onClick={() =>
                     router.push(
                       `/sources/${runner.sourceId || runner.source?.id}`,

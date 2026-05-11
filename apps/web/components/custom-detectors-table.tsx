@@ -293,7 +293,7 @@ export function CustomDetectorsTable() {
 
   if (isLoading && rows.length === 0) {
     return (
-      <div className="rounded-[6px] border-2 border-black bg-background p-12 shadow-[6px_6px_0_#000]">
+      <div className="rounded-[6px] border-2 border-border bg-background p-12 shadow-[6px_6px_0_var(--color-border)]">
         <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           {t("common.loading")}
@@ -311,7 +311,7 @@ export function CustomDetectorsTable() {
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder={t("detectors.search")}
-            className="h-9 rounded-[4px] border-2 border-black pl-9"
+            className="h-9 rounded-[4px] border-2 border-border pl-9"
           />
         </div>
 
@@ -321,7 +321,7 @@ export function CustomDetectorsTable() {
             setStatusFilter(value as typeof statusFilter)
           }
         >
-          <SelectTrigger className="h-9 min-w-[150px] border-2 border-black rounded-[4px]">
+          <SelectTrigger className="h-9 min-w-[150px] border-2 border-border rounded-[4px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -335,7 +335,7 @@ export function CustomDetectorsTable() {
           value={usageFilter}
           onValueChange={(value) => setUsageFilter(value as typeof usageFilter)}
         >
-          <SelectTrigger className="h-9 min-w-[170px] border-2 border-black rounded-[4px]">
+          <SelectTrigger className="h-9 min-w-[170px] border-2 border-border rounded-[4px]">
             <SelectValue placeholder="Usage" />
           </SelectTrigger>
           <SelectContent>
@@ -349,7 +349,7 @@ export function CustomDetectorsTable() {
           type="button"
           variant="outline"
           size="sm"
-          className="h-9 rounded-[4px] border-2 border-black"
+          className="h-9 rounded-[4px] border-2 border-border"
           onClick={() => void load(true)}
           disabled={isRefreshing}
         >
@@ -370,7 +370,7 @@ export function CustomDetectorsTable() {
           }}
         />
       ) : (
-        <div className="overflow-hidden rounded-[6px] border-2 border-black bg-background shadow-[6px_6px_0_#000]">
+        <div className="overflow-hidden rounded-[6px] border-2 border-border bg-background shadow-[6px_6px_0_var(--color-border)]">
           <Table>
             <TableHeader>
               <TableRow>
@@ -518,7 +518,7 @@ export function CustomDetectorsTable() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[4px] border border-black/20 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[4px] border border-border/20 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
         <span>
           Showing <strong>{pagedRows.length}</strong> of{" "}
           <strong>{total}</strong> detectors
@@ -526,7 +526,7 @@ export function CustomDetectorsTable() {
         <div className="flex items-center gap-2">
           <span>Rows</span>
           <Select value={String(safePageSize)} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[88px] rounded-[4px] border border-black/30 bg-background text-xs">
+            <SelectTrigger className="h-8 w-[88px] rounded-[4px] border border-border/30 bg-background text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

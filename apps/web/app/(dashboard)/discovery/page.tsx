@@ -91,7 +91,7 @@ function RunStatusIcon({ status }: { status: string }) {
       return (
         <Spinner
           size="sm"
-          className="gap-0 text-[#b7ff00] [&_svg]:size-3.5"
+          className="gap-0 text-accent [&_svg]:size-3.5"
           data-icon="inline-start"
         />
       );
@@ -137,7 +137,7 @@ function RunCard({ run, onClick }: { run: RecentRun; onClick: () => void }) {
       className={cn(
         "w-full text-left rounded-[4px] border-2 px-3 py-2.5 transition-all cursor-pointer hover:-translate-y-px",
         isRunning
-          ? "border-[#b7ff00]/30 bg-[#0b0f0a] hover:bg-[#111a09]"
+          ? "border-accent/30 bg-background hover:bg-accent/10"
           : hasError
             ? "border-destructive/30 bg-destructive/5 hover:bg-destructive/10"
             : "border-border bg-background hover:bg-secondary/40",
@@ -150,7 +150,7 @@ function RunCard({ run, onClick }: { run: RecentRun; onClick: () => void }) {
             className={cn(
               "text-[11px] font-mono uppercase tracking-[0.1em] truncate",
               isRunning
-                ? "text-[#b7ff00]"
+                ? "text-accent"
                 : hasError
                   ? "text-destructive"
                   : "text-foreground",
@@ -459,8 +459,8 @@ export default function DiscoveryPage() {
         </PanelCard>
 
         {/* ── ACTIVITY: Today/Week/Month ─── */}
-        <PanelCard className="flex flex-col justify-between overflow-hidden border-[#b7ff00]/30 bg-[#0b0f0a] text-[#b7ff00] shadow-[3px_3px_0_rgba(183,255,0,0.15)] sm:shadow-[6px_6px_0_rgba(183,255,0,0.15)] sm:p-6 xl:col-span-3 xl:row-span-2">
-          <span className="text-[11px] uppercase tracking-[0.25em] text-[#b7ff00]/80 font-mono font-semibold">
+        <PanelCard className="flex flex-col justify-between overflow-hidden border-accent/30 bg-background text-accent shadow-[3px_3px_0_color-mix(in_srgb,var(--color-accent)_15%,transparent)] sm:shadow-[6px_6px_0_color-mix(in_srgb,var(--color-accent)_15%,transparent)] sm:p-6 xl:col-span-3 xl:row-span-2">
+          <span className="text-[11px] uppercase tracking-[0.25em] text-accent/80 font-mono font-semibold">
             {t("discovery.incoming")}
           </span>
           <div className="space-y-5 mt-4 flex-1 flex flex-col justify-center">
@@ -471,7 +471,7 @@ export default function DiscoveryPage() {
               >
                 {newActivity.today}
               </span>
-              <span className="text-xs uppercase tracking-[0.15em] text-[#b7ff00]/70 font-mono mt-1 block">
+              <span className="text-xs uppercase tracking-[0.15em] text-accent/70 font-mono mt-1 block">
                 {t("discovery.newToday")}
               </span>
             </div>
@@ -483,7 +483,7 @@ export default function DiscoveryPage() {
                 >
                   {newActivity.week}
                 </span>
-                <span className="text-[10px] text-[#b7ff00]/60 uppercase tracking-wide font-mono">
+                <span className="text-[10px] text-accent/60 uppercase tracking-wide font-mono">
                   {t("discovery.thisWeek")}
                 </span>
               </div>
@@ -494,13 +494,13 @@ export default function DiscoveryPage() {
                 >
                   {newActivity.month}
                 </span>
-                <span className="text-[10px] text-[#b7ff00]/60 uppercase tracking-wide font-mono">
+                <span className="text-[10px] text-accent/60 uppercase tracking-wide font-mono">
                   {t("discovery.thisMonth")}
                 </span>
               </div>
             </div>
           </div>
-          <p className="text-[10px] text-[#b7ff00]/40 uppercase tracking-[0.15em] font-mono mt-2">
+          <p className="text-[10px] text-accent/40 uppercase tracking-[0.15em] font-mono mt-2">
             {t("discovery.basedOnTimestamps")}
           </p>
         </PanelCard>
@@ -612,7 +612,7 @@ export default function DiscoveryPage() {
               <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-[0.15em]">
                 {t("discovery.last10Runs")}
                 {runningCount > 0 && (
-                  <span className="ml-2 text-[#b7ff00]">
+                  <span className="ml-2 text-accent">
                     · {t("discovery.runningCount", { count: runningCount })}
                   </span>
                 )}

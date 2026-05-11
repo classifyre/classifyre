@@ -66,6 +66,7 @@
     "off": "Aus",
     "open": "Öffnen",
     "close": "Schließen",
+    "clear": "Zurücksetzen",
     "hide": "Ausblenden",
     "show": "Einblenden",
     "manage": "Verwalten",
@@ -560,6 +561,9 @@
       "patternSeverity": "Muster & Schweregrad",
       "patternSeverityDesc": "Schweregrad, Konfidenz und Sprachabdeckung anpassen.",
       "searchExamples": "Beispiele nach Anwendungsfall oder Methode suchen",
+      "catalogTitle": "Detektor-Katalog",
+      "catalogSubtitle": "Methode und Starter wählen",
+      "noTemplates": "Keine Vorlagen gefunden",
       "builder": "Builder",
       "jsonEditor": "JSON-Editor",
       "identity": "Identität",
@@ -584,7 +588,9 @@
       "extractorEnabled": "Extraktor aktiviert",
       "extractorFields": "Extraktorfelder",
       "extractorModel": "Extraktor-GLiNER-Modell",
-      "extractorContentLimit": "Extraktor-Inhaltslimit"
+      "extractorContentLimit": "Extraktor-Inhaltslimit",
+      "templates": "Vorlagen",
+      "options": "Optionen"
     },
     "tests": {
       "namePlaceholder": "z.B. Soll IBAN erkennen",
@@ -754,7 +760,57 @@
     "startBlankDesc": "Detektor ohne vorausgefüllte Werte von Grund auf konfigurieren.",
     "chooseTemplate": "Startpunkt wählen",
     "chooseTemplateDesc": "Wähle ein vorgefertigtes Beispiel oder konfiguriere von Grund auf.",
-    "templateBadge": "Vorlage"
+    "templateBadge": "Vorlage",
+    "comingSoon": "Demnächst",
+    "select": "Auswählen →",
+    "typeGroups": {
+      "general": "Allgemein",
+      "transformers": "HuggingFace Transformers"
+    },
+    "types": {
+      "gliner2": {
+        "title": "GLiNER2 Pipeline",
+        "tagline": "Neuronale Extraktion in einem Durchgang",
+        "description": "Definiere zu extrahierende Entitäten und Klassifizierungsaufgaben — alles in einem einzigen Modelldurchlauf. Ideal für strukturierte Informationsextraktion aus unstrukturiertem Text, ohne Trainingsdaten.",
+        "tags": "NER, Zero-shot, Validierungsregeln"
+      },
+      "regex": {
+        "title": "Regex-Muster",
+        "tagline": "Deterministische Mustererkennung",
+        "description": "Definiere präzise Mustererkennungsregeln mit regulären Ausdrücken. Schnell, deterministisch, ohne ML-Overhead. Perfekt für Codes, IDs und strukturierte Formate wie IBANs oder Bestellnummern.",
+        "tags": "Mustererkennung, Kein ML, Deterministisch"
+      },
+      "llm": {
+        "title": "LLM-Detektor",
+        "tagline": "Prompt-gesteuerte Erkennung",
+        "description": "Verwende ein Large Language Model mit einem natürlichsprachigen Prompt. Am besten für nuancierte, kontextabhängige Erkennung, bei der Beispiele und Regeln schwer explizit zu definieren sind.",
+        "tags": "Prompt-basiert, Kontextbewusst, Hohe Genauigkeit"
+      },
+      "text_classification": {
+        "title": "Text-Klassifizierung",
+        "tagline": "Feinabgestimmter HuggingFace-Klassifikator",
+        "description": "Führe jedes HuggingFace Text-Klassifizierungsmodell aus. Ordne vorhergesagte Labels Schweregraden zu. Ideal für Spam-Erkennung, Toxizität, Sentiment und benutzerdefinierte Themenklassifikatoren.",
+        "tags": "Klassifizierung, Konfidenzschwelle, Schweregrad-Zuordnung"
+      },
+      "image_classification": {
+        "title": "Bild-Klassifizierung",
+        "tagline": "Bilder mit Vision-Modell labeln",
+        "description": "Klassifiziere Bilder mit jedem HuggingFace Vision-Modell. Nützlich für NSFW-Erkennung, Filterung schädlicher Inhalte und benutzerdefinierte Bildkategorisierung.",
+        "tags": "Vision, NSFW, Schädliche Inhalte"
+      },
+      "feature_extraction": {
+        "title": "Feature-Extraktion",
+        "tagline": "Dichte Vektor-Einbettungen",
+        "description": "Bette Text mit jedem HuggingFace Sentence-Transformer in dichte Vektoren ein. Speichere Einbettungen als Befunde für nachgelagerte semantische Suche oder Clustering.",
+        "tags": "Einbettungen, Pooling, Vektor-DB"
+      },
+      "object_detection": {
+        "title": "Objekterkennung",
+        "tagline": "Objekte in Bildern lokalisieren und labeln",
+        "description": "Führe jedes HuggingFace Objekterkennungsmodell auf Bildern aus. Befunde enthalten Begrenzungsrahmen, Konfidenzwerte und label-basierte Schweregrad-Zuordnung.",
+        "tags": "Begrenzungsrahmen, Objekt-Labels, Schweregrad-Zuordnung"
+      }
+    }
   },
   "scans": {
     "title": "Scans",

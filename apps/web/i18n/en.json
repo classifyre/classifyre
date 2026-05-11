@@ -66,6 +66,7 @@
     "off": "Off",
     "open": "Open",
     "close": "Close",
+    "clear": "Clear",
     "hide": "Hide",
     "show": "Show",
     "manage": "Manage",
@@ -560,6 +561,9 @@
       "patternSeverity": "Pattern & severity",
       "patternSeverityDesc": "Tune severity, confidence, and language coverage.",
       "searchExamples": "Search examples by use-case or method",
+      "catalogTitle": "Detector Catalog",
+      "catalogSubtitle": "Pick method and starter",
+      "noTemplates": "No templates found",
       "builder": "Builder",
       "jsonEditor": "JSON Editor",
       "identity": "Identity",
@@ -584,7 +588,9 @@
       "extractorEnabled": "Extractor enabled",
       "extractorFields": "Extractor fields",
       "extractorModel": "Extractor GLiNER model",
-      "extractorContentLimit": "Extractor content limit"
+      "extractorContentLimit": "Extractor content limit",
+      "templates": "Templates",
+      "options": "Options"
     },
     "tests": {
       "namePlaceholder": "e.g. Should match IBAN",
@@ -754,7 +760,57 @@
     "startBlankDesc": "Configure the detector from scratch with no pre-filled values.",
     "chooseTemplate": "Choose a starting point",
     "chooseTemplateDesc": "Pick a pre-built example to start from, or configure from scratch.",
-    "templateBadge": "Template"
+    "templateBadge": "Template",
+    "comingSoon": "Coming soon",
+    "select": "Select →",
+    "typeGroups": {
+      "general": "General",
+      "transformers": "HuggingFace Transformers"
+    },
+    "types": {
+      "gliner2": {
+        "title": "GLiNER2 Pipeline",
+        "tagline": "Single-pass neural extraction",
+        "description": "Define entities to extract and classification tasks — all run in a single model pass. Ideal for structured information extraction from unstructured text, with no training data required.",
+        "tags": "NER, Zero-shot, Validation rules"
+      },
+      "regex": {
+        "title": "Regex Patterns",
+        "tagline": "Deterministic pattern matching",
+        "description": "Define precise pattern-matching rules using regular expressions. Fast, deterministic, zero ML overhead. Perfect for codes, IDs, and structured formats like IBANs or order numbers.",
+        "tags": "Pattern matching, No ML, Deterministic"
+      },
+      "llm": {
+        "title": "LLM Detector",
+        "tagline": "Prompt-driven detection",
+        "description": "Use a large language model with a natural-language prompt. Best for nuanced, context-dependent detection where examples and rules are hard to define explicitly.",
+        "tags": "Prompt-based, Context-aware, High accuracy"
+      },
+      "text_classification": {
+        "title": "Text Classification",
+        "tagline": "Fine-tuned HuggingFace classifier",
+        "description": "Run any HuggingFace text-classification model. Map predicted labels to severity levels. Ideal for spam detection, toxicity, sentiment, and custom topic classifiers.",
+        "tags": "Classification, Confidence threshold, Severity map"
+      },
+      "image_classification": {
+        "title": "Image Classification",
+        "tagline": "Label images using a vision model",
+        "description": "Classify images with any HuggingFace vision model. Useful for NSFW detection, harmful content filtering, and custom image category labelling.",
+        "tags": "Vision, NSFW, Harmful content"
+      },
+      "feature_extraction": {
+        "title": "Feature Extraction",
+        "tagline": "Dense vector embeddings",
+        "description": "Embed text into dense vectors using any HuggingFace sentence-transformer. Store embeddings as findings for downstream semantic search or clustering.",
+        "tags": "Embeddings, Pooling, Vector DB"
+      },
+      "object_detection": {
+        "title": "Object Detection",
+        "tagline": "Locate and label objects in images",
+        "description": "Run any HuggingFace object-detection model on images. Findings include bounding boxes, confidence scores, and label-based severity mapping.",
+        "tags": "Bounding boxes, Object labels, Severity map"
+      }
+    }
   },
   "scans": {
     "title": "Scans",

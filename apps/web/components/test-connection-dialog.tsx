@@ -54,7 +54,7 @@ export function TestConnectionDialog({
       }}
     >
       <DialogContent
-        className="rounded-[6px] border-2 border-black shadow-[6px_6px_0_#000] sm:max-w-md"
+        className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)] sm:max-w-md"
         showCloseButton={!isLocked}
         onEscapeKeyDown={(event) => {
           if (isLocked) {
@@ -88,7 +88,7 @@ export function TestConnectionDialog({
 
         <div
           className={cn(
-            "rounded-[4px] border-2 border-black/15 bg-muted/30 p-3 text-sm",
+            "rounded-[4px] border-2 border-border/15 bg-muted/30 p-3 text-sm",
             status === "error" && "border-destructive/30 bg-destructive/5",
           )}
           data-testid="test-connection-status"
@@ -106,7 +106,7 @@ export function TestConnectionDialog({
             <Button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+              className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
               data-testid="btn-test-connection-close"
             >
               {t("sources.testConnection.close")}

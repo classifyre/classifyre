@@ -427,7 +427,7 @@ export default function SourceViewPage() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="h-auto rounded-[4px] border-2 border-black bg-background p-1">
+        <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">
           <TabsTrigger value="overview" className="rounded-[3px]">
             Overview
           </TabsTrigger>
