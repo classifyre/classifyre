@@ -444,7 +444,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder={t("sources.searchPlaceholder")}
-            className="h-9 pl-9 border-2 border-black rounded-[4px]"
+            className="h-9 pl-9 border-2 border-border rounded-[4px]"
           />
         </div>
 
@@ -457,7 +457,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[200px] border-2 border-black rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[200px] border-2 border-border rounded-[4px]">
             <MultiSelectValue placeholder={t("sources.sourceType")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -485,7 +485,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-black rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
             <MultiSelectValue placeholder={t("sources.runnerStatus")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -802,7 +802,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                             <>
                               <Button
                                 size="sm"
-                                className="h-8 rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+                                className="h-8 rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
                                 onClick={() =>
                                   runner?.id
                                     ? router.push(`/scans/${runner.id}`)
@@ -831,7 +831,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                           ) : (
                             <Button
                               size="sm"
-                              className="h-8 rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+                              className="h-8 rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
                               disabled={isStarting}
                               onClick={() => handleScan(source.id)}
                             >
@@ -845,7 +845,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 rounded-[4px] border-2 border-black"
+                            className="h-8 rounded-[4px] border-2 border-border"
                             onClick={() =>
                               router.push(`/sources/${source.id}/edit`)
                             }
@@ -884,7 +884,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             {t("common.rowsPerPage")}
           </span>
           <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] border-2 border-black rounded-[4px]">
+            <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
               <SelectValue placeholder={t("common.rowsPerPage")} />
             </SelectTrigger>
             <SelectContent>

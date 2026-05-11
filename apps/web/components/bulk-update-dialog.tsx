@@ -362,7 +362,7 @@ export function BulkUpdateDialog({
                 value={status}
                 onValueChange={(v) => setStatus(v as StatusValue | typeof NONE)}
               >
-                <SelectTrigger className="h-9 w-full border-2 border-black rounded-[4px]">
+                <SelectTrigger className="h-9 w-full border-2 border-border rounded-[4px]">
                   <SelectValue
                     placeholder={t("findings.bulkUpdate.noChange")}
                   />
@@ -396,7 +396,7 @@ export function BulkUpdateDialog({
                   setSeverity(v as SeverityValue | typeof NONE)
                 }
               >
-                <SelectTrigger className="h-9 w-full border-2 border-black rounded-[4px]">
+                <SelectTrigger className="h-9 w-full border-2 border-border rounded-[4px]">
                   <SelectValue
                     placeholder={t("findings.bulkUpdate.noChange")}
                   />
@@ -410,7 +410,7 @@ export function BulkUpdateDialog({
                       <SelectItem key={value} value={value}>
                         <span className="inline-flex items-center gap-2">
                           <span
-                            className="h-2.5 w-2.5 rounded-[2px] border border-black/20"
+                            className="h-2.5 w-2.5 rounded-[2px] border border-border/20"
                             style={{
                               backgroundColor:
                                 FINDING_SEVERITY_COLOR_BY_ENUM[
@@ -436,7 +436,7 @@ export function BulkUpdateDialog({
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder={t("findings.bulkUpdate.commentPlaceholder")}
-              className="min-h-[80px] resize-y border-2 border-black rounded-[4px] text-sm"
+              className="min-h-[80px] resize-y border-2 border-border rounded-[4px] text-sm"
               rows={3}
             />
           </div>
@@ -463,14 +463,14 @@ export function BulkUpdateDialog({
               variant="outline"
               onClick={handleClose}
               disabled={isSaving}
-              className="border-2 border-black rounded-[4px]"
+              className="border-2 border-border rounded-[4px]"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
-              className="border-2 border-black rounded-[4px] bg-foreground text-background hover:bg-foreground/90"
+              className="border-2 border-border rounded-[4px] bg-foreground text-background hover:bg-foreground/90"
             >
               {isSaving ? (
                 <>

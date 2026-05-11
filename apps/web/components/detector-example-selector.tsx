@@ -30,17 +30,17 @@ export function TransformerExampleSelector({
         type="button"
         onClick={onStartBlank}
         data-testid="start-blank"
-        className={cn(
-          "group text-left rounded-[6px]",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2",
-        )}
-      >
-        <Card clickable className="h-full p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border-2 border-black bg-card">
-              <FileText className="h-4 w-4" />
-            </div>
-            <Badge className="rounded-[4px] border border-black bg-[#b7ff00] text-black">
+            className={cn(
+              "group text-left rounded-[6px]",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border focus-visible:ring-offset-2",
+            )}
+          >
+            <Card clickable className="h-full p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border-2 border-border bg-card">
+                  <FileText className="h-4 w-4" />
+                </div>
+            <Badge className="rounded-[4px] border border-border bg-accent text-accent-foreground">
               {t("ai.start")}
             </Badge>
           </div>
@@ -60,20 +60,20 @@ export function TransformerExampleSelector({
           onClick={() => onSelectExample(example)}
           className={cn(
             "group text-left rounded-[6px]",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border focus-visible:ring-offset-2",
           )}
         >
           <Card
             clickable
-            className="h-full border-black bg-background p-4 shadow-[4px_4px_0_#000]"
+            className="h-full border-border bg-background p-4 shadow-[4px_4px_0_var(--color-border)]"
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border-2 border-black bg-card">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border-2 border-border bg-card">
                 <Sparkles className="h-4 w-4" />
               </div>
               <Badge
                 variant="outline"
-                className="rounded-[4px] border-black text-[10px]"
+                className="rounded-[4px] border-border text-[10px]"
               >
                 {t("detectors.templateBadge")}
               </Badge>

@@ -304,7 +304,7 @@ function DetectorConfigRow({
             type="button"
             size="sm"
             variant="outline"
-            className="shrink-0 rounded-[4px] border-2 border-black"
+            className="shrink-0 rounded-[4px] border-2 border-border"
             onClick={() => setIsEditOpen((prev) => !prev)}
             data-testid={`btn-edit-${detector.type}`}
           >
@@ -396,7 +396,7 @@ function DetectorConfigRow({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="rounded-[4px] border-2 border-black"
+                className="rounded-[4px] border-2 border-border"
                 onClick={handleResetDefaults}
                 data-testid={`btn-reset-${detector.type}`}
               >
@@ -472,7 +472,7 @@ function CustomDetectorRow({
             type="button"
             size="sm"
             variant={isEditing ? "default" : "outline"}
-            className="shrink-0 rounded-[4px] border-2 border-black"
+            className="shrink-0 rounded-[4px] border-2 border-border"
             onClick={() => {
               if (isEditing) {
                 onCancelEdit();
@@ -775,7 +775,7 @@ export const SourceScanConfig = React.forwardRef<
             <Badge variant="secondary">
               {t("sources.edit.visible", { count: visibleCount })}
             </Badge>
-            <Badge className="rounded-[4px] border border-black bg-[#b7ff00] text-black">
+            <Badge className="rounded-[4px] border border-border bg-accent text-accent-foreground">
               {t("sources.edit.enabled", { count: enabledCount })}
             </Badge>
           </div>
@@ -787,7 +787,7 @@ export const SourceScanConfig = React.forwardRef<
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder={t("sources.scanConfig.searchPlaceholder")}
-            className="h-10 rounded-[4px] border-2 border-black bg-background pl-9 text-sm shadow-[3px_3px_0_#000] focus-visible:ring-0"
+              className="h-10 rounded-[4px] border-2 border-border bg-background pl-9 text-sm shadow-[3px_3px_0_var(--color-border)] focus-visible:ring-0"
           />
           {searchQuery ? (
             <Button
@@ -803,7 +803,7 @@ export const SourceScanConfig = React.forwardRef<
       </Card>
 
       {!hasAnyVisibleResults && searchTerm ? (
-        <Card className="border-dashed border-black bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_#000]">
+        <Card className="border-dashed border-border bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_var(--color-border)]">
           <p className="text-sm font-semibold uppercase tracking-[0.08em]">
             {t("sources.scanConfig.noResults")}
           </p>
@@ -831,7 +831,7 @@ export const SourceScanConfig = React.forwardRef<
                   </Link>
                 </Button>
               )}
-              <Badge className="w-fit rounded-[4px] border-2 border-black bg-[#b7ff00] text-[10px] uppercase tracking-[0.16em] text-black shadow-[3px_3px_0_#000]">
+              <Badge className="w-fit rounded-[4px] border-2 border-border bg-accent text-[10px] uppercase tracking-[0.16em] text-accent-foreground shadow-[3px_3px_0_var(--color-border)]">
                 {t("sources.edit.enabled", { count: enabledCount })}
               </Badge>
             </div>
@@ -936,14 +936,14 @@ export const SourceScanConfig = React.forwardRef<
         <Button
           type="button"
           variant="outline"
-          className="w-full rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
+          className="w-full rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
           onClick={handleOpenCreator}
         >
           <Plus className="mr-2 h-4 w-4" />
           {t("detectors.addNew")}
         </Button>
       ) : (
-        <Card className="border-2 border-black shadow-[4px_4px_0_#000]">
+        <Card className="border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-serif text-lg font-black uppercase tracking-[0.06em]">

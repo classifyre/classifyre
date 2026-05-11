@@ -46,6 +46,7 @@ import {
 import { Textarea } from "@workspace/ui/components/textarea";
 import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/use-translation";
 import { getDetectorSchemas } from "@/lib/detector-schema-loader";
 import { setValueAtPath } from "@/lib/assistant-form-utils";
 import { CustomDetectorTests } from "@/components/custom-detector-tests";
@@ -593,13 +594,13 @@ function StarterCard({
       onClick={onClick}
       data-testid={testId}
       className={cn(
-        "group cursor-pointer text-left border-2 border-black rounded-[6px] bg-background p-4 shadow-[4px_4px_0_#000] transition-all",
-        "hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[5px_5px_0_#000]",
+        "group cursor-pointer text-left border-2 border-border rounded-[6px] bg-background p-4 shadow-[4px_4px_0_var(--color-border)] transition-all",
+        "hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[5px_5px_0_var(--color-border)]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2",
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border-2 border-black bg-card">
+        <div className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border-2 border-border bg-card">
           {icon}
         </div>
         {badge}
@@ -621,6 +622,7 @@ export const CustomDetectorEditor = React.forwardRef<
   { mode, initialValue, initialMethod, submitLabel, isSubmitting = false, embedded, onSubmit },
   ref,
 ) {
+  const { t } = useTranslation();
   const [examples, setExamples] = useState<CustomDetectorExampleDto[]>([]);
   const [existingDetectors, setExistingDetectors] = useState<
     CustomDetectorResponseDto[]
@@ -1465,18 +1467,18 @@ export const CustomDetectorEditor = React.forwardRef<
 
     return (
       <div className="space-y-4">
-        <div className="border-2 border-black rounded-[6px] bg-background p-4 shadow-[4px_4px_0_#000]">
+        <div className="border-2 border-border rounded-[6px] bg-background p-4 shadow-[4px_4px_0_var(--color-border)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
-                Detector Catalog
+                {t("detectors.editor.catalogTitle")}
               </div>
               <div className="text-sm font-semibold uppercase tracking-[0.06em]">
-                Pick method and starter
+                {t("detectors.editor.catalogSubtitle")}
               </div>
             </div>
-            <Badge className="rounded-[4px] border border-black bg-[#b7ff00] text-black">
-              {examples.length} Templates
+            <Badge className="rounded-[4px] border border-border bg-accent text-accent-foreground">
+              {examples.length} {t("detectors.editor.templates")}
             </Badge>
           </div>
           <div className="relative mt-3">
@@ -1484,8 +1486,8 @@ export const CustomDetectorEditor = React.forwardRef<
             <Input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search examples by use-case or method"
-              className="h-10 rounded-[4px] border-2 border-black pl-9 text-sm shadow-[3px_3px_0_#000] focus-visible:ring-0"
+              placeholder={t("detectors.editor.searchExamples")}
+              className="h-10 rounded-[4px] border-2 border-border pl-9 text-sm shadow-[3px_3px_0_var(--color-border)] focus-visible:ring-0"
             />
             {searchQuery ? (
               <Button
@@ -1494,16 +1496,16 @@ export const CustomDetectorEditor = React.forwardRef<
                 onClick={() => setSearchQuery("")}
                 className="absolute right-1 top-1/2 h-7 -translate-y-1/2 rounded-[4px] px-2 text-xs"
               >
-                Clear
+                {t("common.clear")}
               </Button>
             ) : null}
           </div>
         </div>
 
         {groupEntries.length === 0 ? (
-          <div className="border-2 border-dashed border-black rounded-[6px] bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_#000]">
+          <div className="border-2 border-dashed border-border rounded-[6px] bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_var(--color-border)]">
             <p className="text-sm font-semibold uppercase tracking-[0.08em]">
-              No templates found
+              {t("detectors.editor.noTemplates")}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               Try a different keyword or start blank in another method.
@@ -1525,8 +1527,8 @@ export const CustomDetectorEditor = React.forwardRef<
                       {METHOD_META[methodType].description}
                     </p>
                   </div>
-                  <Badge className="w-fit rounded-[4px] border-2 border-black bg-[#b7ff00] text-[10px] uppercase tracking-[0.16em] text-black shadow-[3px_3px_0_#000]">
-                    {starters.length} Options
+                  <Badge className="w-fit rounded-[4px] border-2 border-border bg-accent text-[10px] uppercase tracking-[0.16em] text-accent-foreground shadow-[3px_3px_0_var(--color-border)]">
+                    {starters.length} {t("detectors.editor.options")}
                   </Badge>
                 </div>
 
@@ -1549,15 +1551,15 @@ export const CustomDetectorEditor = React.forwardRef<
                         }
                         badge={
                           isBlank ? (
-                            <Badge className="rounded-[4px] border border-black bg-[#b7ff00] text-black">
-                              Start
+                            <Badge className="rounded-[4px] border border-border bg-accent text-accent-foreground">
+                              {t("ai.start")}
                             </Badge>
                           ) : (
                             <Badge
                               variant="outline"
-                              className="rounded-[4px] border-black text-[10px]"
+                              className="rounded-[4px] border-border text-[10px]"
                             >
-                              Template
+                              {t("detectors.templateBadge")}
                             </Badge>
                           )
                         }
@@ -1576,14 +1578,14 @@ export const CustomDetectorEditor = React.forwardRef<
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2">
-        <Badge variant="outline" className="font-mono rounded-[4px] border-black">
+        <Badge variant="outline" className="font-mono rounded-[4px] border-border">
           {method}
         </Badge>
         <div className="flex items-center gap-2">
           <Button
             type="button"
             variant={editorMode === "builder" ? "default" : "outline"}
-            className="rounded-[4px] border-2 border-black"
+            className="rounded-[4px] border-2 border-border"
             onClick={() => switchEditorMode("builder")}
             disabled={isSubmitting}
           >
@@ -1592,7 +1594,7 @@ export const CustomDetectorEditor = React.forwardRef<
           <Button
             type="button"
             variant={editorMode === "json" ? "default" : "outline"}
-            className="rounded-[4px] border-2 border-black"
+            className="rounded-[4px] border-2 border-border"
             onClick={() => switchEditorMode("json")}
             disabled={isSubmitting}
           >
@@ -1602,7 +1604,7 @@ export const CustomDetectorEditor = React.forwardRef<
       </div>
 
       {isJsonMode ? (
-        <Card className="rounded-[6px] border-2 border-black shadow-[6px_6px_0_#000]">
+        <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
           <CardHeader>
             <CardTitle className="uppercase tracking-[0.06em]">
               JSON Editor
@@ -1635,7 +1637,7 @@ export const CustomDetectorEditor = React.forwardRef<
               <div className="flex justify-end">
                 <Button
                   type="button"
-                  className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+                  className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
                   onClick={() => void handleSubmit()}
                   disabled={isSubmitting}
                 >
@@ -1649,7 +1651,7 @@ export const CustomDetectorEditor = React.forwardRef<
         </Card>
       ) : (
         <>
-          <div className="sticky top-0 z-20 -mx-4 border-b-2 border-black bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
+          <div className="sticky top-0 z-20 -mx-4 border-b-2 border-border bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
             <HorizontalCustomDetectorStepperNav
               steps={stepperSteps}
               activeStepId={activeStepId}
@@ -1676,7 +1678,7 @@ export const CustomDetectorEditor = React.forwardRef<
               ) : null}
 
               <section ref={stepRefs.method}>
-                <Card className="rounded-[6px] border-2 border-black shadow-[6px_6px_0_#000]">
+                <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
                   <CardHeader>
                     <CardTitle className="uppercase tracking-[0.06em]">
                       Method setup
@@ -1688,7 +1690,7 @@ export const CustomDetectorEditor = React.forwardRef<
                   </CardHeader>
                   <CardContent className="space-y-4 pt-6">
             <div className="space-y-4">
-              <Card className="rounded-[4px] border-2 border-black/20">
+              <Card className="rounded-[4px] border-2 border-border/20">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Identity</CardTitle>
                   <CardDescription>
@@ -1766,7 +1768,7 @@ export const CustomDetectorEditor = React.forwardRef<
                             method: normalizeMethod(event.target.value),
                           })
                         }
-                        className="h-10 w-full rounded-[6px] border-2 border-black bg-background px-3 text-sm"
+                        className="h-10 w-full rounded-[6px] border-2 border-border bg-background px-3 text-sm"
                         data-testid="select-detector-method"
                       >
                         <option value="RULESET">Ruleset</option>
@@ -1784,7 +1786,7 @@ export const CustomDetectorEditor = React.forwardRef<
                             isActive: event.target.value === "active",
                           })
                         }
-                        className="h-10 w-full rounded-[6px] border-2 border-black bg-background px-3 text-sm"
+                        className="h-10 w-full rounded-[6px] border-2 border-border bg-background px-3 text-sm"
                         data-testid="select-detector-status"
                       >
                         <option value="active">Active</option>
@@ -1816,7 +1818,7 @@ export const CustomDetectorEditor = React.forwardRef<
 
               {method === "RULESET" ? (
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Card className="rounded-[4px] border-2 border-black/20">
+                  <Card className="rounded-[4px] border-2 border-border/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Keyword Rules</CardTitle>
                       <CardDescription>
@@ -1880,7 +1882,7 @@ export const CustomDetectorEditor = React.forwardRef<
                                   : [],
                             });
                           }}
-                          className="h-10 w-full rounded-[6px] border-2 border-black bg-background px-3 text-sm"
+                          className="h-10 w-full rounded-[6px] border-2 border-border bg-background px-3 text-sm"
                         >
                           {SEVERITY_OPTIONS.map((severity) => (
                             <option key={severity} value={severity}>
@@ -1914,7 +1916,7 @@ export const CustomDetectorEditor = React.forwardRef<
                                   : [],
                             });
                           }}
-                          className="h-10 w-full rounded-[6px] border-2 border-black bg-background px-3 text-sm"
+                          className="h-10 w-full rounded-[6px] border-2 border-border bg-background px-3 text-sm"
                         >
                           <option value="false">No</option>
                           <option value="true">Yes</option>
@@ -1923,7 +1925,7 @@ export const CustomDetectorEditor = React.forwardRef<
                     </CardContent>
                   </Card>
 
-                  <Card className="rounded-[4px] border-2 border-black/20">
+                  <Card className="rounded-[4px] border-2 border-border/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Regex Rules</CardTitle>
                       <CardDescription>
@@ -1977,7 +1979,7 @@ export const CustomDetectorEditor = React.forwardRef<
                               })),
                             });
                           }}
-                          className="h-10 w-full rounded-[6px] border-2 border-black bg-background px-3 text-sm"
+                          className="h-10 w-full rounded-[6px] border-2 border-border bg-background px-3 text-sm"
                         >
                           {SEVERITY_OPTIONS.map((severity) => (
                             <option key={severity} value={severity}>
@@ -2015,7 +2017,7 @@ export const CustomDetectorEditor = React.forwardRef<
 
               {method === "CLASSIFIER" ? (
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Card className="rounded-[4px] border-2 border-black/20">
+                  <Card className="rounded-[4px] border-2 border-border/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Label Set</CardTitle>
                       <CardDescription>
@@ -2110,7 +2112,7 @@ export const CustomDetectorEditor = React.forwardRef<
                     </CardContent>
                   </Card>
 
-                  <Card className="rounded-[4px] border-2 border-black/20">
+                  <Card className="rounded-[4px] border-2 border-border/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">
                         Training Examples
@@ -2329,7 +2331,7 @@ export const CustomDetectorEditor = React.forwardRef<
               ) : null}
 
               {method === "ENTITY" ? (
-                <Card className="rounded-[4px] border-2 border-black/20">
+                <Card className="rounded-[4px] border-2 border-border/20">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Entity Labels</CardTitle>
                     <CardDescription>
@@ -2380,7 +2382,7 @@ export const CustomDetectorEditor = React.forwardRef<
               </section>
 
               <section ref={stepRefs.policy}>
-                <Card className="rounded-[6px] border-2 border-black shadow-[6px_6px_0_#000]">
+                <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
                   <CardHeader>
                     <CardTitle className="uppercase tracking-[0.06em]">
                       Pattern & severity
@@ -2391,7 +2393,7 @@ export const CustomDetectorEditor = React.forwardRef<
                   </CardHeader>
                   <CardContent className="space-y-4 pt-6">
             <div className="space-y-4">
-              <Card className="rounded-[4px] border-2 border-black/20">
+              <Card className="rounded-[4px] border-2 border-border/20">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Detection Policy</CardTitle>
                   <CardDescription>
@@ -2471,7 +2473,7 @@ export const CustomDetectorEditor = React.forwardRef<
                           ),
                         })
                       }
-                      className="h-10 w-full rounded-[6px] border-2 border-black bg-background px-3 text-sm"
+                      className="h-10 w-full rounded-[6px] border-2 border-border bg-background px-3 text-sm"
                     >
                       <option value="">No minimum severity</option>
                       {SEVERITY_OPTIONS.map((severity) => (
@@ -2484,7 +2486,7 @@ export const CustomDetectorEditor = React.forwardRef<
                 </CardContent>
               </Card>
 
-              <Card className="rounded-[4px] border-2 border-black/20">
+              <Card className="rounded-[4px] border-2 border-border/20">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Extractor</CardTitle>
                   <CardDescription>
@@ -2526,7 +2528,7 @@ export const CustomDetectorEditor = React.forwardRef<
                               : resolveExtractorContentLimit(extractor),
                         });
                       }}
-                      className="h-10 w-full rounded-[6px] border-2 border-black bg-background px-3 text-sm"
+                      className="h-10 w-full rounded-[6px] border-2 border-border bg-background px-3 text-sm"
                     >
                       <option value="false">Disabled</option>
                       <option value="true">Enabled</option>
@@ -2666,7 +2668,7 @@ export const CustomDetectorEditor = React.forwardRef<
               </section>
 
               <section ref={stepRefs.tests}>
-                <Card className="rounded-[6px] border-2 border-black shadow-[6px_6px_0_#000]">
+                <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
                   <CardHeader>
                     <CardTitle className="uppercase tracking-[0.06em]">
                       Test scenarios
@@ -2699,7 +2701,7 @@ export const CustomDetectorEditor = React.forwardRef<
                   <div className="flex justify-end">
                     <Button
                       type="button"
-                      className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+                      className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
                       onClick={() => void handleSubmit()}
                       disabled={isSubmitting || isLoadingExistingDetectors}
                       data-testid="btn-save-detector"

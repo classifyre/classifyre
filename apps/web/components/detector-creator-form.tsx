@@ -144,7 +144,7 @@ export function DetectorCreatorForm({
           <Button
             variant="outline"
             onClick={handleBack}
-            className="mb-4 rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
+            className="mb-4 rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             {backLabel}

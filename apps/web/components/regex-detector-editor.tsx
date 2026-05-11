@@ -537,7 +537,7 @@ function TestPlayground({
                       <span className="shrink-0 text-muted-foreground font-mono">
                         [{m.start}:{m.end}]
                       </span>
-                      <code className="rounded bg-[#b7ff00]/20 px-1.5 py-0.5 font-mono text-foreground break-all">
+                      <code className="rounded bg-accent/20 px-1.5 py-0.5 font-mono text-foreground break-all">
                         {m.groupValue !== undefined ? m.groupValue : m.value}
                       </code>
                       {m.groupValue !== undefined && (
@@ -841,7 +841,7 @@ export const RegexDetectorEditor = React.forwardRef<
               data-testid="regex-submit-btn"
               onClick={() => void handleSubmit()}
               disabled={isSubmitting}
-              className="h-10 rounded-[4px] border-2 border-black bg-[#b7ff00] text-black shadow-[4px_4px_0_#000] hover:-translate-y-[1px] hover:shadow-[6px_6px_0_#000] transition-all font-mono font-bold uppercase tracking-[0.12em]"
+              className="h-10 rounded-[4px] border-2 border-border bg-accent text-accent-foreground shadow-[4px_4px_0_var(--color-border)] hover:-translate-y-[1px] hover:shadow-[6px_6px_0_var(--color-border)] transition-all font-mono font-bold uppercase tracking-[0.12em]"
             >
               {isSubmitting ? t("detectors.regex.saving") : submitLabel}
             </Button>

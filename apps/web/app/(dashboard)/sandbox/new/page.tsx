@@ -323,7 +323,7 @@ export default function NewSandboxScanPage() {
         </div>
       </div>
 
-      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-black bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
+      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-border bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
         <HorizontalSandboxStepperNav
           activeStepId={activeStepId}
           canNavigateToDetectors={canNavigateToDetectors}

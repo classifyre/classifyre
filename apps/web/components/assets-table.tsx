@@ -712,7 +712,7 @@ export function AssetsTable({
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder="Search assets"
-            className="h-9 pl-9 border-2 border-black rounded-[4px]"
+            className="h-9 pl-9 border-2 border-border rounded-[4px]"
           />
         </div>
 
@@ -726,7 +726,7 @@ export function AssetsTable({
               }))
             }
           >
-            <SelectTrigger className="h-9 w-[200px] border-2 border-black rounded-[4px]">
+            <SelectTrigger className="h-9 w-[200px] border-2 border-border rounded-[4px]">
               <SelectValue placeholder="All sources" />
             </SelectTrigger>
             <SelectContent>
@@ -749,7 +749,7 @@ export function AssetsTable({
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-black rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
             <MultiSelectValue placeholder="Severity" />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -763,7 +763,7 @@ export function AssetsTable({
                 <MultiSelectItem key={severity} value={severity}>
                   <span className="inline-flex items-center gap-2">
                     <span
-                      className="h-2.5 w-2.5 rounded-[2px] border border-black/20"
+                      className="h-2.5 w-2.5 rounded-[2px] border border-border/20"
                       style={{
                         backgroundColor:
                           FINDING_SEVERITY_COLOR_BY_ENUM[severity],
@@ -786,7 +786,7 @@ export function AssetsTable({
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[220px] border-2 border-black rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[220px] border-2 border-border rounded-[4px]">
             <MultiSelectValue placeholder="Detector types" />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -811,7 +811,7 @@ export function AssetsTable({
             onAssetStatusesChange?.(values as AssetStatusFilterValue[])
           }
         >
-          <MultiSelectTrigger className="h-9 w-[170px] border-2 border-black rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[170px] border-2 border-border rounded-[4px]">
             <MultiSelectValue placeholder="Asset status" />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -1216,7 +1216,7 @@ export function AssetsTable({
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Rows per page</span>
           <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] border-2 border-black rounded-[4px]">
+            <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
               <SelectValue placeholder="Rows" />
             </SelectTrigger>
             <SelectContent>

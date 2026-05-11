@@ -352,7 +352,7 @@ export function RunnersTable({
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder={t("runners.search")}
-            className="h-9 pl-9 border-2 border-black rounded-[4px]"
+            className="h-9 pl-9 border-2 border-border rounded-[4px]"
           />
         </div>
 
@@ -365,7 +365,7 @@ export function RunnersTable({
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[220px] border-2 border-black rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[220px] border-2 border-border rounded-[4px]">
             <MultiSelectValue placeholder="Sources" />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -398,7 +398,7 @@ export function RunnersTable({
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[190px] border-2 border-black rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[190px] border-2 border-border rounded-[4px]">
             <MultiSelectValue placeholder={t("runners.triggerType")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -591,7 +591,7 @@ export function RunnersTable({
             {t("common.rowsPerPage")}
           </span>
           <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] border-2 border-black rounded-[4px]">
+            <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
               <SelectValue placeholder={t("common.rows")} />
             </SelectTrigger>
             <SelectContent>

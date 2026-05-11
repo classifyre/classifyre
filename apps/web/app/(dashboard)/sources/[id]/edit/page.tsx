@@ -591,7 +591,7 @@ function SourceEditStepperContent({
   return (
     <div>
       {/* Mobile sticky horizontal nav */}
-      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-black bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
+      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-border bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
         <HorizontalStepperNav
           activeStepId={activeStepId}
           configSaved={true}
@@ -604,7 +604,7 @@ function SourceEditStepperContent({
         {/* Scrollable content */}
         <div className="min-w-0 flex-1 space-y-16 pb-32">
           <section ref={configRef}>
-            <Card className="rounded-[6px] border-2 border-black shadow-[6px_6px_0_#000]">
+            <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
               <CardHeader>
                 <CardTitle className="uppercase tracking-[0.06em]">
                   {t("sources.edit.configuration")}

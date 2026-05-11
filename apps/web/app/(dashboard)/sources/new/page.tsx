@@ -421,7 +421,7 @@ export default function NewSourcePage() {
         <Button
           variant="outline"
           onClick={() => router.push("/sources")}
-          className="mb-4 rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
+          className="mb-4 rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           {t("sources.new.backToSources")}
@@ -572,7 +572,7 @@ function SourceStepperContent({
   return (
     <div>
       {/* Mobile sticky horizontal nav */}
-      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-black bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
+      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-border bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
         <HorizontalStepperNav
           activeStepId={activeStepId}
           configSaved={true}
