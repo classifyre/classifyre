@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { Plus, Trash2, Info, Upload, X, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import {
@@ -66,6 +67,7 @@ export interface PipelineDetectorEditorProps {
   initialDescription?: string;
   initialIsActive?: boolean;
   initialPipelineSchema?: Record<string, unknown>;
+  embedded?: boolean;
   onSubmit: (payload: {
     name: string;
     key?: string;
@@ -73,6 +75,10 @@ export interface PipelineDetectorEditorProps {
     isActive?: boolean;
     pipelineSchema: Record<string, unknown>;
   }) => void | Promise<void>;
+}
+
+export interface PipelineDetectorEditorHandle {
+  submit: () => Promise<void>;
 }
 
 const DEFAULT_MODEL = "fastino/gliner2-base-v1";
@@ -981,7 +987,10 @@ function SectionLabel({ label }: { label: string }) {
 
 // ── Main editor ────────────────────────────────────────────────────────────
 
-export function PipelineDetectorEditor({
+export const PipelineDetectorEditor = React.forwardRef<
+  PipelineDetectorEditorHandle,
+  PipelineDetectorEditorProps
+>(function PipelineDetectorEditor({
   mode,
   submitLabel,
   isSubmitting = false,
@@ -991,8 +1000,9 @@ export function PipelineDetectorEditor({
   initialDescription = "",
   initialIsActive = true,
   initialPipelineSchema,
+  embedded,
   onSubmit,
-}: PipelineDetectorEditorProps) {
+}, ref) {
   const [name, setName] = useState(initialName);
   const [key, setKey] = useState(initialKey);
   const [description, setDescription] = useState(initialDescription);
@@ -1083,7 +1093,7 @@ export function PipelineDetectorEditor({
       } else if (errs.some((e) => e.toLowerCase().includes("classif"))) {
         scrollToSection("classification");
       }
-      return;
+      throw new Error("Validation failed");
     }
 
     await onSubmit({
@@ -1094,6 +1104,10 @@ export function PipelineDetectorEditor({
       pipelineSchema: toApiSchema(pipeline),
     });
   };
+
+  React.useImperativeHandle(ref, () => ({
+    submit: handleSubmit,
+  }));
 
   const identityErrors = errors.filter((e) => e.toLowerCase().includes("name"));
   const entityErrors = errors.filter((e) => e.toLowerCase().includes("entit"));
@@ -1277,26 +1291,28 @@ export function PipelineDetectorEditor({
       </div>
 
       {/* Sticky bottom action toolbar */}
-      <Card className="sticky bottom-0 z-30 mt-6 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            {errors.length > 0 && (
-              <p className="text-sm text-destructive">
-                {errors.length === 1 ? errors[0] : `${errors.length} errors — fix them before saving`}
-              </p>
-            )}
+      {!embedded && (
+        <Card className="sticky bottom-0 z-30 mt-6 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              {errors.length > 0 && (
+                <p className="text-sm text-destructive">
+                  {errors.length === 1 ? errors[0] : `${errors.length} errors — fix them before saving`}
+                </p>
+              )}
+            </div>
+            <Button
+              type="button"
+              data-testid="gliner2-submit-btn"
+              onClick={() => void handleSubmit()}
+              disabled={isSubmitting}
+              className="h-10 rounded-[4px] border-2 border-black bg-[#b7ff00] text-black shadow-[4px_4px_0_#000] hover:-translate-y-[1px] hover:shadow-[6px_6px_0_#000] transition-all font-mono font-bold uppercase tracking-[0.12em]"
+            >
+              {isSubmitting ? "Saving…" : submitLabel}
+            </Button>
           </div>
-          <Button
-            type="button"
-            data-testid="gliner2-submit-btn"
-            onClick={() => void handleSubmit()}
-            disabled={isSubmitting}
-            className="h-10 rounded-[4px] border-2 border-black bg-[#b7ff00] text-black shadow-[4px_4px_0_#000] hover:-translate-y-[1px] hover:shadow-[6px_6px_0_#000] transition-all font-mono font-bold uppercase tracking-[0.12em]"
-          >
-            {isSubmitting ? "Saving…" : submitLabel}
-          </Button>
-        </div>
-      </Card>
+        </Card>
+      )}
     </div>
   );
-}
+});
