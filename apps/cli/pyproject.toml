@@ -9,9 +9,9 @@ keywords = ["data", "metadata", "ingestion", "unstructured", "pii", "secrets"]
 dependencies = [
     "classifyre-schemas",
     "jsonschema>=4.26.0",
-    "pydantic>=2.12.5",
+    "pydantic>=2.13.4",
     "email-validator>=2.3.0",
-    "requests>=2.32.3",
+    "requests>=2.33.1",
     "en-core-web-sm",
     "beautifulsoup4>=4.12.0",
     "lxml>=5.0.0",
@@ -34,16 +34,16 @@ packages = ["src"]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.8.0",
+    "ruff>=0.15.12",
     "mypy>=1.13.0",
-    "datamodel-code-generator>=0.45.0",
-    "pytest>=9.0.2",
+    "datamodel-code-generator>=0.57.0",
+    "pytest>=9.0.3",
     "pytest-asyncio>=0.24.0",
 ]
 privacy = [
-    "presidio-analyzer>=2.2.361",
-    "spacy>=3.8.11",
-    "phonenumbers>=9.0.25",
+    "presidio-analyzer>=2.2.362",
+    "spacy>=3.8.14",
+    "phonenumbers>=9.0.30",
     "numpy>=1.26.0,<2.0.0",
 ]
 security = [
@@ -54,38 +54,38 @@ security = [
 threat-ml = [
     "transformers>=4.50.0,<6.0.0",
     "sentencepiece>=0.2.1",
-    "torch>=2.10.0",
+    "torch>=2.11.0",
 ]
 content = [
     "detoxify>=0.5.2",
     "nudenet>=3.4.2",
     "transformers>=4.50.0,<6.0.0",
-    "onnxruntime>=1.24.2",
-    "torch>=2.10.0",
-    "pillow>=12.1.1",
+    "onnxruntime>=1.26.0",
+    "torch>=2.11.0",
+    "pillow>=12.2.0",
     "sentencepiece>=0.2.1",
 ]
 quality = [
-    "fast-langdetect>=1.0.0",
-    "datasketch>=1.9.0",
-    "sentence-transformers>=5.2.3",
+    "fast-langdetect>=1.0.1",
+    "datasketch>=1.10.0",
+    "sentence-transformers>=5.4.1",
     "textstat>=0.7.13",
     "transformers>=4.50.0,<6.0.0",
-    "torch>=2.10.0",
+    "torch>=2.11.0",
     "sentencepiece>=0.2.1",
 ]
 classification = [
     "transformers>=4.50.0,<6.0.0",
-    "fast-langdetect>=1.0.0",
+    "fast-langdetect>=1.0.1",
 ]
 custom = [
     "transformers>=4.50.0,<6.0.0",
-    "torch>=2.10.0",
+    "torch>=2.11.0",
     "setfit>=1.1.3",
-    "datasets>=4.4.1",
+    "datasets>=4.8.5",
     "scikit-learn>=1.7.2",
-    "gliner2>=1.3.0",
-    "sentence-transformers>=5.2.3",
+    "gliner2>=1.3.1",
+    "sentence-transformers>=5.4.1",
 ]
 regex = [
     "google-re2>=1.1",
@@ -109,10 +109,10 @@ file-processing = [
     "pyarrow>=18.0.0",
 ]
 postgresql = [
-    "psycopg2-binary>=2.9.9,<3.0.0",
+    "psycopg2-binary>=2.9.12,<3.0.0",
 ]
 mysql = [
-    "pymysql>=1.1.1,<2.0.0",
+    "pymysql>=1.1.3,<2.0.0",
 ]
 mssql = [
     "pymssql>=2.3.4,<3.0.0",
@@ -122,7 +122,7 @@ oracle = [
 ]
 hive = [
     "pyhive>=0.7.0,<1.0.0",
-    "thrift>=0.16.0,<1.0.0",
+    "thrift>=0.22.0,<1.0.0",
     "thrift-sasl>=0.4.3,<1.0.0",
     "pure-sasl>=0.6.2,<1.0.0",
 ]
@@ -131,27 +131,27 @@ databricks = [
     "pyarrow>=24.0.0",
 ]
 snowflake = [
-    "snowflake-connector-python>=4.0.0,<5.0.0",
+    "snowflake-connector-python>=4.4.0,<5.0.0",
 ]
 mongodb = [
-    "pymongo>=4.15.2,<5.0.0",
+    "pymongo>=4.17.0,<5.0.0",
 ]
 tableau = [
     "tableauserverclient>=0.38,<1.0.0",
 ]
 s3-compatible-storage = [
-    "boto3>=1.40.40,<2.0.0",
+    "boto3>=1.43.6,<2.0.0",
 ]
 azure-blob-storage = [
     "azure-storage-blob>=12.26.0,<13.0.0",
-    "azure-identity>=1.25.1,<2.0.0",
+    "azure-identity>=1.25.3,<2.0.0",
 ]
 google-cloud-storage = [
-    "google-cloud-storage>=3.4.0,<4.0.0",
+    "google-cloud-storage>=3.10.1,<4.0.0",
 ]
 otel = [
-    "opentelemetry-sdk>=1.27.0",
-    "opentelemetry-exporter-otlp-proto-http>=1.27.0",
+    "opentelemetry-sdk>=1.41.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.41.1",
 ]
 
 [tool.ruff]
