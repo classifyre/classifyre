@@ -49,15 +49,6 @@ class TestDetectorPipelineTypes:
         except (ModuleNotFoundError, ValueError):
             return False
 
-    @staticmethod
-    def _is_torch_available() -> bool:
-        try:
-            import torch
-
-            return hasattr(torch, "no_grad")
-        except Exception:
-            return False
-
     @pytest.fixture
     def mock_source(self):
         """Create a mock source for testing."""
@@ -121,36 +112,6 @@ class TestDetectorPipelineTypes:
         # Should be convertible to DetectorType enum
         assert DetectorType(detector.detector_type.upper()) == DetectorType.PII
 
-    def test_pipeline_from_recipe_toxic(self, mock_source):
-        """Test pipeline creation with TOXIC detector."""
-        if not self._is_torch_available():
-            pytest.skip("PyTorch not installed, skipping toxic detector test")
-
-        recipe = {
-            "detectors": [
-                {
-                    "type": "TOXIC",
-                    "enabled": True,
-                    "config": {
-                        "enabled_patterns": ["toxicity", "threat"],
-                        "model_name": "unbiased",
-                        "confidence_threshold": 0.7,
-                    },
-                }
-            ]
-        }
-
-        pipeline = DetectorPipeline.from_recipe(recipe, source=mock_source, runner_id="test-runner")
-
-        if len(pipeline.detectors) == 0:
-            pytest.skip("YARA not installed, skipping yara pipeline test")
-
-        assert len(pipeline.detectors) == 1
-        detector = pipeline.detectors[0]
-        assert detector.detector_type == "toxic"
-        # Should be convertible to DetectorType enum
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.TOXIC
-
     def test_pipeline_from_recipe_yara(self, mock_source):
         """Test pipeline creation with YARA detector."""
         if not self._is_dependency_available("yara"):
@@ -195,28 +156,6 @@ class TestDetectorPipelineTypes:
         detector = pipeline.detectors[0]
         assert detector.detector_type == "broken_links"
         assert DetectorType(detector.detector_type.upper()) == DetectorType.BROKEN_LINKS
-
-    def test_pipeline_from_recipe_language(self, mock_source):
-        """Test pipeline creation with LANGUAGE detector."""
-        if not self._is_dependency_available("fast_langdetect"):
-            pytest.skip("fast-langdetect not installed, skipping language test")
-
-        recipe = {
-            "detectors": [
-                {
-                    "type": "LANGUAGE",
-                    "enabled": True,
-                    "config": {"confidence_threshold": 0.8},
-                }
-            ]
-        }
-
-        pipeline = DetectorPipeline.from_recipe(recipe, source=mock_source, runner_id="test-runner")
-
-        assert len(pipeline.detectors) == 1
-        detector = pipeline.detectors[0]
-        assert detector.detector_type == "language"
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.LANGUAGE
 
     def test_pipeline_from_recipe_code_security(self, mock_source):
         """Test pipeline creation with CODE_SECURITY detector."""
@@ -381,10 +320,8 @@ class TestDetectorPipelineTypes:
         valid_types = [
             "SECRETS",
             "PII",
-            "TOXIC",
             "YARA",
             "BROKEN_LINKS",
-            "LANGUAGE",
             "CODE_SECURITY",
             "CUSTOM",
         ]

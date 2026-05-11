@@ -20,7 +20,10 @@ import type {
   CustomDetectorResponseDto,
   CustomDetectorTrainingRunDto,
   ParseTrainingExamplesResponseDto,
+  SaveTrainingExamplesDto,
   TrainCustomDetectorDto,
+  TrainingExampleDto,
+  TrainingExamplesStatsDto,
   UpdateCustomDetectorDto,
 } from '../models/index';
 import {
@@ -34,11 +37,21 @@ import {
     CustomDetectorTrainingRunDtoToJSON,
     ParseTrainingExamplesResponseDtoFromJSON,
     ParseTrainingExamplesResponseDtoToJSON,
+    SaveTrainingExamplesDtoFromJSON,
+    SaveTrainingExamplesDtoToJSON,
     TrainCustomDetectorDtoFromJSON,
     TrainCustomDetectorDtoToJSON,
+    TrainingExampleDtoFromJSON,
+    TrainingExampleDtoToJSON,
+    TrainingExamplesStatsDtoFromJSON,
+    TrainingExamplesStatsDtoToJSON,
     UpdateCustomDetectorDtoFromJSON,
     UpdateCustomDetectorDtoToJSON,
 } from '../models/index';
+
+export interface CustomDetectorsControllerClearTrainingExamplesRequest {
+    id: string;
+}
 
 export interface CustomDetectorsControllerCreateRequest {
     createCustomDetectorDto: CreateCustomDetectorDto;
@@ -46,6 +59,11 @@ export interface CustomDetectorsControllerCreateRequest {
 
 export interface CustomDetectorsControllerDeleteRequest {
     id: string;
+}
+
+export interface CustomDetectorsControllerDeleteTrainingExampleRequest {
+    id: string;
+    exampleId: string;
 }
 
 export interface CustomDetectorsControllerGetByIdRequest {
@@ -56,13 +74,26 @@ export interface CustomDetectorsControllerListRequest {
     includeInactive?: boolean;
 }
 
+export interface CustomDetectorsControllerListTrainingExamplesRequest {
+    id: string;
+}
+
 export interface CustomDetectorsControllerParseTrainingExamplesRequest {
     file: Blob;
+}
+
+export interface CustomDetectorsControllerSaveTrainingExamplesRequest {
+    id: string;
+    saveTrainingExamplesDto: SaveTrainingExamplesDto;
 }
 
 export interface CustomDetectorsControllerTrainRequest {
     id: string;
     trainCustomDetectorDto?: TrainCustomDetectorDto;
+}
+
+export interface CustomDetectorsControllerTrainingExamplesStatsRequest {
+    id: string;
 }
 
 export interface CustomDetectorsControllerTrainingHistoryRequest {
@@ -79,6 +110,47 @@ export interface CustomDetectorsControllerUpdateRequest {
  * 
  */
 export class CustomDetectorsApi extends runtime.BaseAPI {
+
+    /**
+     * Delete all training examples for a detector
+     */
+    async customDetectorsControllerClearTrainingExamplesRaw(requestParameters: CustomDetectorsControllerClearTrainingExamplesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling customDetectorsControllerClearTrainingExamples().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/custom-detectors/{id}/training-examples`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        if (this.isJsonMime(response.headers.get('content-type'))) {
+            return new runtime.JSONApiResponse<any>(response);
+        } else {
+            return new runtime.TextApiResponse(response) as any;
+        }
+    }
+
+    /**
+     * Delete all training examples for a detector
+     */
+    async customDetectorsControllerClearTrainingExamples(requestParameters: CustomDetectorsControllerClearTrainingExamplesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any> {
+        const response = await this.customDetectorsControllerClearTrainingExamplesRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Create custom detector
@@ -157,6 +229,55 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
      */
     async customDetectorsControllerDelete(requestParameters: CustomDetectorsControllerDeleteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any> {
         const response = await this.customDetectorsControllerDeleteRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Delete a single training example
+     */
+    async customDetectorsControllerDeleteTrainingExampleRaw(requestParameters: CustomDetectorsControllerDeleteTrainingExampleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling customDetectorsControllerDeleteTrainingExample().'
+            );
+        }
+
+        if (requestParameters['exampleId'] == null) {
+            throw new runtime.RequiredError(
+                'exampleId',
+                'Required parameter "exampleId" was null or undefined when calling customDetectorsControllerDeleteTrainingExample().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/custom-detectors/{id}/training-examples/{exampleId}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"exampleId"}}`, encodeURIComponent(String(requestParameters['exampleId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        if (this.isJsonMime(response.headers.get('content-type'))) {
+            return new runtime.JSONApiResponse<any>(response);
+        } else {
+            return new runtime.TextApiResponse(response) as any;
+        }
+    }
+
+    /**
+     * Delete a single training example
+     */
+    async customDetectorsControllerDeleteTrainingExample(requestParameters: CustomDetectorsControllerDeleteTrainingExampleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any> {
+        const response = await this.customDetectorsControllerDeleteTrainingExampleRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -260,6 +381,43 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
     }
 
     /**
+     * List stored training examples for a detector
+     */
+    async customDetectorsControllerListTrainingExamplesRaw(requestParameters: CustomDetectorsControllerListTrainingExamplesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<TrainingExampleDto>>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling customDetectorsControllerListTrainingExamples().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/custom-detectors/{id}/training-examples`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(TrainingExampleDtoFromJSON));
+    }
+
+    /**
+     * List stored training examples for a detector
+     */
+    async customDetectorsControllerListTrainingExamples(requestParameters: CustomDetectorsControllerListTrainingExamplesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<TrainingExampleDto>> {
+        const response = await this.customDetectorsControllerListTrainingExamplesRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Accepts csv/tsv/txt/md/log/json/xlsx and returns normalized label/text training examples.
      * Parse uploaded training examples file
      */
@@ -319,6 +477,59 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
     }
 
     /**
+     * Appends (or replaces) labeled examples. Set clearExisting=true to wipe previous examples first.
+     * Save training examples for a detector
+     */
+    async customDetectorsControllerSaveTrainingExamplesRaw(requestParameters: CustomDetectorsControllerSaveTrainingExamplesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling customDetectorsControllerSaveTrainingExamples().'
+            );
+        }
+
+        if (requestParameters['saveTrainingExamplesDto'] == null) {
+            throw new runtime.RequiredError(
+                'saveTrainingExamplesDto',
+                'Required parameter "saveTrainingExamplesDto" was null or undefined when calling customDetectorsControllerSaveTrainingExamples().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/custom-detectors/{id}/training-examples`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SaveTrainingExamplesDtoToJSON(requestParameters['saveTrainingExamplesDto']),
+        }, initOverrides);
+
+        if (this.isJsonMime(response.headers.get('content-type'))) {
+            return new runtime.JSONApiResponse<any>(response);
+        } else {
+            return new runtime.TextApiResponse(response) as any;
+        }
+    }
+
+    /**
+     * Appends (or replaces) labeled examples. Set clearExisting=true to wipe previous examples first.
+     * Save training examples for a detector
+     */
+    async customDetectorsControllerSaveTrainingExamples(requestParameters: CustomDetectorsControllerSaveTrainingExamplesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any> {
+        const response = await this.customDetectorsControllerSaveTrainingExamplesRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Trigger custom detector training
      */
     async customDetectorsControllerTrainRaw(requestParameters: CustomDetectorsControllerTrainRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CustomDetectorTrainingRunDto>> {
@@ -355,6 +566,43 @@ export class CustomDetectorsApi extends runtime.BaseAPI {
      */
     async customDetectorsControllerTrain(requestParameters: CustomDetectorsControllerTrainRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CustomDetectorTrainingRunDto> {
         const response = await this.customDetectorsControllerTrainRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Get training example counts grouped by label
+     */
+    async customDetectorsControllerTrainingExamplesStatsRaw(requestParameters: CustomDetectorsControllerTrainingExamplesStatsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TrainingExamplesStatsDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling customDetectorsControllerTrainingExamplesStats().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/custom-detectors/{id}/training-examples/stats`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TrainingExamplesStatsDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Get training example counts grouped by label
+     */
+    async customDetectorsControllerTrainingExamplesStats(requestParameters: CustomDetectorsControllerTrainingExamplesStatsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TrainingExamplesStatsDto> {
+        const response = await this.customDetectorsControllerTrainingExamplesStatsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

@@ -45,9 +45,7 @@ const DETECTOR_TYPE_TO_GROUP: Record<string, DetectorUiGroupId> = {
   CODE_SECURITY: "secrets_credentials",
   PII: "privacy_pii",
   YARA: "threats_attacks",
-  TOXIC: "harmful_content",
   SPAM: "content_quality",
-  LANGUAGE: "content_quality",
   BROKEN_LINKS: "content_quality",
   CUSTOM: "classification",
 };

@@ -50,9 +50,6 @@ def test_catalog_phase2_detectors_are_active_with_safe_models() -> None:
     catalog = _load_detector_catalog()
     by_type = {entry["detector_type"]: entry for entry in catalog}
 
-    assert by_type["LANGUAGE"]["lifecycle_status"] == "active"
-    assert by_type["LANGUAGE"]["recommended_model"] == "fast-langdetect"
-
     # Transformer detectors (TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, FEATURE_EXTRACTION,
     # OBJECT_DETECTION) are now custom detectors configured via pipeline_schema, not
     # standalone catalog entries.

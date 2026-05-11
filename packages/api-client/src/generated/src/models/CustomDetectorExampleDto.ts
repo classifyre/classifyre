@@ -30,41 +30,22 @@ export interface CustomDetectorExampleDto {
      * @type {string}
      * @memberof CustomDetectorExampleDto
      */
-    method: CustomDetectorExampleDtoMethodEnum;
-    /**
-     * 
-     * @type {string}
-     * @memberof CustomDetectorExampleDto
-     */
     description: string;
     /**
      * 
      * @type {{ [key: string]: any; }}
      * @memberof CustomDetectorExampleDto
      */
-    config: { [key: string]: any; };
+    pipelineSchema: { [key: string]: any; };
 }
-
-
-/**
- * @export
- */
-export const CustomDetectorExampleDtoMethodEnum = {
-    Ruleset: 'RULESET',
-    Classifier: 'CLASSIFIER',
-    Entity: 'ENTITY'
-} as const;
-export type CustomDetectorExampleDtoMethodEnum = typeof CustomDetectorExampleDtoMethodEnum[keyof typeof CustomDetectorExampleDtoMethodEnum];
-
 
 /**
  * Check if a given object implements the CustomDetectorExampleDto interface.
  */
 export function instanceOfCustomDetectorExampleDto(value: object): value is CustomDetectorExampleDto {
     if (!('name' in value) || value['name'] === undefined) return false;
-    if (!('method' in value) || value['method'] === undefined) return false;
     if (!('description' in value) || value['description'] === undefined) return false;
-    if (!('config' in value) || value['config'] === undefined) return false;
+    if (!('pipelineSchema' in value) || value['pipelineSchema'] === undefined) return false;
     return true;
 }
 
@@ -79,9 +60,8 @@ export function CustomDetectorExampleDtoFromJSONTyped(json: any, ignoreDiscrimin
     return {
         
         'name': json['name'],
-        'method': json['method'],
         'description': json['description'],
-        'config': json['config'],
+        'pipelineSchema': json['pipelineSchema'],
     };
 }
 
@@ -97,9 +77,8 @@ export function CustomDetectorExampleDtoToJSONTyped(value?: CustomDetectorExampl
     return {
         
         'name': value['name'],
-        'method': value['method'],
         'description': value['description'],
-        'config': value['config'],
+        'pipelineSchema': value['pipelineSchema'],
     };
 }
 

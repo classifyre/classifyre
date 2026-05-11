@@ -31,10 +31,8 @@ class DetectorType(StrEnum):
 
     SECRETS = 'SECRETS'
     PII = 'PII'
-    TOXIC = 'TOXIC'
     YARA = 'YARA'
     BROKEN_LINKS = 'BROKEN_LINKS'
-    LANGUAGE = 'LANGUAGE'
     CODE_SECURITY = 'CODE_SECURITY'
     CUSTOM = 'CUSTOM'
 

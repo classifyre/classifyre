@@ -1,30 +1,36 @@
 
-# UpdateCustomDetectorDto
+# TrainingExampleDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`name` | string
-`key` | string
-`description` | string
-`isActive` | boolean
-`pipelineSchema` | object
+`id` | string
+`customDetectorId` | string
+`label` | string
+`text` | string
+`value` | string
+`accepted` | boolean
+`source` | string
+`createdAt` | Date
 
 ## Example
 
 ```typescript
-import type { UpdateCustomDetectorDto } from '@workspace/api-client'
+import type { TrainingExampleDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "name": Support Ticket Extractor,
-  "key": cust_support_ticket_extractor,
-  "description": Extracts order IDs, amounts, and intent from support tickets,
-  "isActive": null,
-  "pipelineSchema": null,
-} satisfies UpdateCustomDetectorDto
+  "id": null,
+  "customDetectorId": null,
+  "label": null,
+  "text": null,
+  "value": null,
+  "accepted": null,
+  "source": null,
+  "createdAt": null,
+} satisfies TrainingExampleDto
 
 console.log(example)
 
@@ -33,7 +39,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as UpdateCustomDetectorDto
+const exampleParsed = JSON.parse(exampleJSON) as TrainingExampleDto
 console.log(exampleParsed)
 ```
 

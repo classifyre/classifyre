@@ -6,7 +6,6 @@ from typing import Any
 
 from ..models.generated_detectors import (
     BrokenLinksDetectorConfig,
-    ContentDetectorConfig,
     CustomDetectorConfig,
     DetectorConfig,
     PIIDetectorConfig,
@@ -16,7 +15,6 @@ from ..models.generated_detectors import (
 
 type DetectorTypedConfig = (
     DetectorConfig
-    | ContentDetectorConfig
     | CustomDetectorConfig
     | SecretsDetectorConfig
     | PIIDetectorConfig
@@ -27,16 +25,13 @@ type DetectorTypedConfig = (
 _DETECTOR_NAME_BY_TYPE: dict[str, str] = {
     "SECRETS": "secrets",
     "PII": "pii",
-    "TOXIC": "toxic",
     "YARA": "yara",
     "BROKEN_LINKS": "broken_links",
-    "LANGUAGE": "language",
     "CODE_SECURITY": "code_security",
     "CUSTOM": "custom",
 }
 
 _DETECTOR_CONFIG_BY_TYPE: dict[str, type[DetectorConfig]] = {
-    "TOXIC": ContentDetectorConfig,
     "SECRETS": SecretsDetectorConfig,
     "PII": PIIDetectorConfig,
     "YARA": ThreatDetectorConfig,

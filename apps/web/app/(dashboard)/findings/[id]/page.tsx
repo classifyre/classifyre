@@ -69,7 +69,6 @@ type HistoryEventType = FindingHistoryEntry["eventType"];
 const detectorLabels: Partial<Record<DetectorType, string>> = {
   SECRETS: "Secrets",
   PII: "PII",
-  TOXIC: "Toxic Content",
   YARA: "YARA",
   BROKEN_LINKS: "Broken Links",
 };

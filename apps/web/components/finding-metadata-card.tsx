@@ -19,8 +19,6 @@ const DETECTORS_WITH_USEFUL_METADATA = new Set<string>([
   FindingResponseDtoDetectorTypeEnum.Secrets,
   FindingResponseDtoDetectorTypeEnum.CodeSecurity,
   FindingResponseDtoDetectorTypeEnum.Yara,
-  FindingResponseDtoDetectorTypeEnum.Toxic,
-  FindingResponseDtoDetectorTypeEnum.Language,
   FindingResponseDtoDetectorTypeEnum.BrokenLinks,
   FindingResponseDtoDetectorTypeEnum.Custom,
 ]);

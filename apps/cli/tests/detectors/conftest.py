@@ -104,37 +104,6 @@ Credit Card: 5555-5555-5555-4444
 """
 
 
-# Content Safety Fixtures
-@pytest.fixture
-def sample_toxic_text():
-    """Sample toxic text content."""
-    return "I hate you and you are stupid and worthless"
-
-
-@pytest.fixture
-def sample_clean_text():
-    """Sample clean, non-toxic text."""
-    return "Thank you for your help. I really appreciate your assistance."
-
-
-@pytest.fixture
-def sample_threat_text():
-    """Sample text with threatening language."""
-    return "I will hurt you if you don't do what I say"
-
-
-@pytest.fixture
-def sample_profanity_text():
-    """Sample text with profanity."""
-    return "This is complete bullshit and fucking ridiculous"
-
-
-@pytest.fixture
-def sample_identity_attack_text():
-    """Sample text with identity-based attack."""
-    return "All people from that country are criminals and terrorists"
-
-
 # Image fixtures for NSFW detector
 @pytest.fixture
 def sample_safe_image():

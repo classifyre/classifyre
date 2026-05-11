@@ -1,30 +1,24 @@
 
-# UpdateCustomDetectorDto
+# TrainingExamplesStatsDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`name` | string
-`key` | string
-`description` | string
-`isActive` | boolean
-`pipelineSchema` | object
+`total` | number
+`byLabel` | [{ [key: string]: TrainingExamplesStatsDtoByLabelValue; }](TrainingExamplesStatsDtoByLabelValue.md)
 
 ## Example
 
 ```typescript
-import type { UpdateCustomDetectorDto } from '@workspace/api-client'
+import type { TrainingExamplesStatsDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "name": Support Ticket Extractor,
-  "key": cust_support_ticket_extractor,
-  "description": Extracts order IDs, amounts, and intent from support tickets,
-  "isActive": null,
-  "pipelineSchema": null,
-} satisfies UpdateCustomDetectorDto
+  "total": null,
+  "byLabel": null,
+} satisfies TrainingExamplesStatsDto
 
 console.log(example)
 
@@ -33,7 +27,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as UpdateCustomDetectorDto
+const exampleParsed = JSON.parse(exampleJSON) as TrainingExamplesStatsDto
 console.log(exampleParsed)
 ```
 
