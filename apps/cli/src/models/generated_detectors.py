@@ -16,10 +16,8 @@ class DetectorType(StrEnum):
 
     SECRETS = 'SECRETS'
     PII = 'PII'
-    TOXIC = 'TOXIC'
     YARA = 'YARA'
     BROKEN_LINKS = 'BROKEN_LINKS'
-    LANGUAGE = 'LANGUAGE'
     CODE_SECURITY = 'CODE_SECURITY'
     CUSTOM = 'CUSTOM'
 
@@ -167,19 +165,6 @@ class Location(BaseModel):
     path: str | None = Field(None, description='File path or identifier')
 
 
-class ContentEnabledPattern(StrEnum):
-    """
-    Content detector pattern types
-    """
-
-    toxicity = 'toxicity'
-    severe_toxicity = 'severe_toxicity'
-    obscene = 'obscene'
-    threat = 'threat'
-    insult = 'insult'
-    identity_attack = 'identity_attack'
-
-
 class SecretsEnabledPattern(StrEnum):
     """
     Secrets detector pattern types. Each value maps to a detect-secrets plugin: artifactory=ArtifactoryDetector, aws=AWSKeyDetector, azure_storage=AzureStorageKeyDetector, basic_auth=BasicAuthDetector, cloudant=CloudantDetector, discord=DiscordBotTokenDetector, github=GitHubTokenDetector, gitlab=GitLabTokenDetector, high_entropy_base64=Base64HighEntropyString, high_entropy_hex=HexHighEntropyString, ibm_cloud_iam=IbmCloudIamDetector, ibm_cos_hmac=IbmCosHmacDetector, ip_public=IPPublicDetector, jwt=JwtTokenDetector, keyword=KeywordDetector, mailchimp=MailchimpDetector, npm=NpmDetector, openai=OpenAIDetector, private_key=PrivateKeyDetector, pypi=PypiTokenDetector, sendgrid=SendGridDetector, slack=SlackDetector, softlayer=SoftlayerDetector, square_oauth=SquareOAuthDetector, stripe=StripeDetector, telegram=TelegramBotTokenDetector, twilio=TwilioKeyDetector.
@@ -324,38 +309,6 @@ class DetectorConfig(BaseModel):
     """
     Base configuration for detector
     """
-
-
-class ContentModelName(StrEnum):
-    """
-    Detoxify model variant
-    """
-
-    original = 'original'
-    unbiased = 'unbiased'
-    multilingual = 'multilingual'
-
-
-class ContentDetectorConfig(DetectorConfig):
-    """
-    Configuration for content safety detectors
-    """
-
-    enabled_patterns: list[ContentEnabledPattern] | None = Field(
-        None, description='Specific content types to detect'
-    )
-    model_name: ContentModelName | None = Field(
-        'original', description='Detoxify model variant', title='ContentModelName'
-    )
-    confidence_threshold: float | None = Field(
-        0.7,
-        description='Minimum confidence score to report a finding (0-1)',
-        ge=0.0,
-        le=1.0,
-    )
-    max_findings: int | None = Field(
-        None, description='Maximum number of findings to return per asset'
-    )
 
 
 class EnabledPatterns(RootModel[list[SecretsEnabledPattern]]):
@@ -769,39 +722,6 @@ class CodeSecurityDetectorConfig(DetectorConfig):
         description='Minimum confidence score to report a finding (0-1)',
         ge=0.0,
         le=1.0,
-    )
-    max_findings: int | None = Field(
-        None, description='Maximum number of findings to return per asset'
-    )
-
-
-class Model(StrEnum):
-    """
-    Model size: 'lite' (~50 MB, offline-only), 'full' (~190 MB, best accuracy), 'auto' (tries full, falls back to lite on MemoryError).
-    """
-
-    lite = 'lite'
-    full = 'full'
-    auto = 'auto'
-
-
-class LanguageDetectorConfig(DetectorConfig):
-    """
-    Config for the language detector (fast-langdetect).
-    """
-
-    confidence_threshold: float | None = Field(
-        0.7,
-        description='Minimum confidence score to report a finding (0-1)',
-        ge=0.0,
-        le=1.0,
-    )
-    model: Model | None = Field(
-        'auto',
-        description="Model size: 'lite' (~50 MB, offline-only), 'full' (~190 MB, best accuracy), 'auto' (tries full, falls back to lite on MemoryError).",
-    )
-    k: int | None = Field(
-        1, description='Number of top language candidates to return.', ge=1
     )
     max_findings: int | None = Field(
         None, description='Maximum number of findings to return per asset'
@@ -1289,26 +1209,22 @@ class CustomDetectorConfig(DetectorConfig):
 
 class DetectorsRefactored(
     RootModel[
-        ContentDetectorConfig
-        | SecretsDetectorConfig
+        SecretsDetectorConfig
         | PIIDetectorConfig
         | ThreatDetectorConfig
         | BrokenLinksDetectorConfig
         | CustomDetectorConfig
         | CodeSecurityDetectorConfig
-        | LanguageDetectorConfig
         | GenericDetectorConfig
     ]
 ):
     root: (
-        ContentDetectorConfig
-        | SecretsDetectorConfig
+        SecretsDetectorConfig
         | PIIDetectorConfig
         | ThreatDetectorConfig
         | BrokenLinksDetectorConfig
         | CustomDetectorConfig
         | CodeSecurityDetectorConfig
-        | LanguageDetectorConfig
         | GenericDetectorConfig
     ) = Field(
         ...,

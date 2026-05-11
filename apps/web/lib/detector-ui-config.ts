@@ -49,8 +49,6 @@ const groupByDetectorTypeEntries = [
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.CodeSecurity, "secrets_credentials"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Pii, "privacy_pii"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Yara, "threats_attacks"],
-  [SearchFindingsFiltersInputDtoDetectorTypeEnum.Toxic, "harmful_content"],
-  [SearchFindingsFiltersInputDtoDetectorTypeEnum.Language, "content_quality"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.BrokenLinks, "content_quality"],
   [SearchFindingsFiltersInputDtoDetectorTypeEnum.Custom, "classification"],
 ] as const satisfies readonly (readonly [

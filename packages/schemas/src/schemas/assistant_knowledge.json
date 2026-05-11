@@ -1029,14 +1029,6 @@
         "Use severity_threshold to tune alerting."
       ]
     },
-    "TOXIC": {
-      "title": "Toxic content detection",
-      "summary": "Find abusive or harmful text.",
-      "suggestions": [
-        "Text Safety preset balances recall and precision.",
-        "Increase confidence_threshold for stricter alerts."
-      ]
-    },
     "YARA": {
       "title": "YARA detection",
       "summary": "Scan for malware and suspicious patterns.",

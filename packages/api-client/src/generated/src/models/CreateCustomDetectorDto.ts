@@ -38,44 +38,25 @@ export interface CreateCustomDetectorDto {
      */
     description?: string;
     /**
-     * Execution method for this custom detector
-     * @type {string}
-     * @memberof CreateCustomDetectorDto
-     */
-    method: CreateCustomDetectorDtoMethodEnum;
-    /**
      * Whether this detector can be selected in sources
      * @type {boolean}
      * @memberof CreateCustomDetectorDto
      */
     isActive?: boolean;
     /**
-     * Custom detector config payload
-     * @type {{ [key: string]: any; }}
+     * Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)
+     * @type {object}
      * @memberof CreateCustomDetectorDto
      */
-    config: { [key: string]: any; };
+    pipelineSchema: object;
 }
-
-
-/**
- * @export
- */
-export const CreateCustomDetectorDtoMethodEnum = {
-    Ruleset: 'RULESET',
-    Classifier: 'CLASSIFIER',
-    Entity: 'ENTITY'
-} as const;
-export type CreateCustomDetectorDtoMethodEnum = typeof CreateCustomDetectorDtoMethodEnum[keyof typeof CreateCustomDetectorDtoMethodEnum];
-
 
 /**
  * Check if a given object implements the CreateCustomDetectorDto interface.
  */
 export function instanceOfCreateCustomDetectorDto(value: object): value is CreateCustomDetectorDto {
     if (!('name' in value) || value['name'] === undefined) return false;
-    if (!('method' in value) || value['method'] === undefined) return false;
-    if (!('config' in value) || value['config'] === undefined) return false;
+    if (!('pipelineSchema' in value) || value['pipelineSchema'] === undefined) return false;
     return true;
 }
 
@@ -92,9 +73,8 @@ export function CreateCustomDetectorDtoFromJSONTyped(json: any, ignoreDiscrimina
         'name': json['name'],
         'key': json['key'] == null ? undefined : json['key'],
         'description': json['description'] == null ? undefined : json['description'],
-        'method': json['method'],
         'isActive': json['isActive'] == null ? undefined : json['isActive'],
-        'config': json['config'],
+        'pipelineSchema': json['pipelineSchema'],
     };
 }
 
@@ -112,9 +92,8 @@ export function CreateCustomDetectorDtoToJSONTyped(value?: CreateCustomDetectorD
         'name': value['name'],
         'key': value['key'],
         'description': value['description'],
-        'method': value['method'],
         'isActive': value['isActive'],
-        'config': value['config'],
+        'pipelineSchema': value['pipelineSchema'],
     };
 }
 

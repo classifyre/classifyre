@@ -27,10 +27,18 @@ api:
       repository: classifyre/cli
       tag: "develop"
       pullPolicy: Always
-    # local-path leaves these cache PVCs pending until a job consumes them, which
-    # blocks `helm upgrade --wait` during deploy even though the app is healthy.
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+        ephemeral-storage: 15Gi
+      limits:
+        cpu: "2"
+        memory: 4Gi
+        ephemeral-storage: 20Gi
     uvCache:
-      enabled: false
+      enabled: true
+      size: 30Gi
       accessModes:
         - ReadWriteOnce
 

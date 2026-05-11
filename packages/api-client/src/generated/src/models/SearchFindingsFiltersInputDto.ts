@@ -112,14 +112,8 @@ export interface SearchFindingsFiltersInputDto {
 export const SearchFindingsFiltersInputDtoDetectorTypeEnum = {
     Secrets: 'SECRETS',
     Pii: 'PII',
-    Toxic: 'TOXIC',
-    ImageClassification: 'IMAGE_CLASSIFICATION',
     Yara: 'YARA',
     BrokenLinks: 'BROKEN_LINKS',
-    TextClassification: 'TEXT_CLASSIFICATION',
-    FeatureExtraction: 'FEATURE_EXTRACTION',
-    ObjectDetection: 'OBJECT_DETECTION',
-    Language: 'LANGUAGE',
     CodeSecurity: 'CODE_SECURITY',
     Custom: 'CUSTOM'
 } as const;
