@@ -76,12 +76,13 @@ export type CustomDetectorEditorInitialValue = {
   config?: Record<string, unknown>;
 };
 
-type CustomDetectorEditorProps = {
+export type CustomDetectorEditorProps = {
   mode: "create" | "edit";
   initialValue?: CustomDetectorEditorInitialValue;
   initialMethod?: CustomDetectorMethod;
   submitLabel: string;
   isSubmitting?: boolean;
+  embedded?: boolean;
   onSubmit: (payload: CustomDetectorEditorSubmit) => Promise<void> | void;
 };
 
@@ -102,6 +103,7 @@ export type CustomDetectorEditorHandle = {
     missingFields: string[];
     errors: string[];
   };
+  submit: () => Promise<void>;
 };
 
 type StarterOption = {
@@ -616,7 +618,7 @@ export const CustomDetectorEditor = React.forwardRef<
   CustomDetectorEditorHandle,
   CustomDetectorEditorProps
 >(function CustomDetectorEditor(
-  { mode, initialValue, initialMethod, submitLabel, isSubmitting = false, onSubmit },
+  { mode, initialValue, initialMethod, submitLabel, isSubmitting = false, embedded, onSubmit },
   ref,
 ) {
   const [examples, setExamples] = useState<CustomDetectorExampleDto[]>([]);
@@ -1253,7 +1255,7 @@ export const CustomDetectorEditor = React.forwardRef<
       keyFormatError !== null ||
       keyAvailabilityError !== null
     ) {
-      return;
+      throw new Error("Validation failed");
     }
 
     if (editorMode === "json") {
@@ -1261,14 +1263,14 @@ export const CustomDetectorEditor = React.forwardRef<
         const parsed = JSON.parse(jsonDraft) as unknown;
         if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
           setJsonError("JSON root must be an object.");
-          return;
+          throw new Error("Validation failed");
         }
         syncDraftFromConfig(parsed as Record<string, unknown>, {
           syncEditorDrafts: true,
         });
       } catch {
         setJsonError("JSON is invalid. Fix syntax before saving.");
-        return;
+        throw new Error("Validation failed");
       }
     }
 
@@ -1293,7 +1295,7 @@ export const CustomDetectorEditor = React.forwardRef<
 
     if (!validateConfig(mergedConfig)) {
       toast.error("Configuration failed schema validation");
-      return;
+      throw new Error("Validation failed");
     }
 
     await onSubmit({
@@ -1391,6 +1393,7 @@ export const CustomDetectorEditor = React.forwardRef<
           errors,
         };
       },
+      submit: handleSubmit,
     }),
     [
       configDraft,
@@ -2691,21 +2694,23 @@ export const CustomDetectorEditor = React.forwardRef<
                 </Card>
               </section>
 
-              <Card className="sticky bottom-0 z-30 p-4">
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
-                    onClick={() => void handleSubmit()}
-                    disabled={isSubmitting || isLoadingExistingDetectors}
-                    data-testid="btn-save-detector"
-                  >
-                    {isSubmitting
-                      ? `${mode === "create" ? "Creating" : "Saving"}...`
-                      : submitLabel}
-                  </Button>
-                </div>
-              </Card>
+              {!embedded && (
+                <Card className="sticky bottom-0 z-30 p-4">
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+                      onClick={() => void handleSubmit()}
+                      disabled={isSubmitting || isLoadingExistingDetectors}
+                      data-testid="btn-save-detector"
+                    >
+                      {isSubmitting
+                        ? `${mode === "create" ? "Creating" : "Saving"}...`
+                        : submitLabel}
+                    </Button>
+                  </div>
+                </Card>
+              )}
             </div>
 
             <aside className="hidden self-start md:sticky md:top-6 md:block md:w-44 lg:w-52">

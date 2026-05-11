@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
@@ -77,6 +78,7 @@ export interface TransformerDetectorEditorProps {
   initialDescription?: string;
   initialIsActive?: boolean;
   initialPipelineSchema?: Record<string, unknown>;
+  embedded?: boolean;
   onSubmit: (payload: {
     name: string;
     key?: string;
@@ -84,6 +86,10 @@ export interface TransformerDetectorEditorProps {
     isActive?: boolean;
     pipelineSchema: Record<string, unknown>;
   }) => void | Promise<void>;
+}
+
+export interface TransformerDetectorEditorHandle {
+  submit: () => Promise<void>;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -197,7 +203,10 @@ function initFromSchema(schema: Record<string, unknown> | undefined): Partial<Tr
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function TransformerDetectorEditor({
+export const TransformerDetectorEditor = React.forwardRef<
+  TransformerDetectorEditorHandle,
+  TransformerDetectorEditorProps
+>(function TransformerDetectorEditor({
   pipelineType,
   mode,
   submitLabel,
@@ -207,8 +216,9 @@ export function TransformerDetectorEditor({
   initialDescription = "",
   initialIsActive = true,
   initialPipelineSchema,
+  embedded,
   onSubmit,
-}: TransformerDetectorEditorProps) {
+}, ref) {
   const { t } = useTranslation();
 
   const steps: Array<{ id: TransformerStepId; title: string; description: string }> = [
@@ -301,6 +311,12 @@ export function TransformerDetectorEditor({
   }
 
   async function handleSubmit() {
+    const isValid =
+      form.name.trim().length > 0 &&
+      (pipelineType === "IMAGE_CLASSIFICATION" || form.model.trim().length > 0);
+    if (!isValid) {
+      throw new Error("Validation failed");
+    }
     const pipelineSchema = buildPipelineSchema(pipelineType, form);
     await onSubmit({
       name: form.name,
@@ -310,6 +326,10 @@ export function TransformerDetectorEditor({
       pipelineSchema,
     });
   }
+
+  React.useImperativeHandle(ref, () => ({
+    submit: handleSubmit,
+  }));
 
   const canSubmit =
     !isSubmitting &&
@@ -766,17 +786,19 @@ export function TransformerDetectorEditor({
         )}
 
         {/* ── Sticky toolbar ── */}
-        <Card className="sticky bottom-0 z-30 p-4 border-t-2 border-black">
-          <div className="flex items-center justify-end">
-            <Button
-              onClick={() => void handleSubmit()}
-              disabled={!canSubmit}
-              className="rounded-[4px] border-2 border-black bg-[#b7ff00] text-black shadow-[3px_3px_0_#000] hover:bg-[#a3e800]"
-            >
-              {isSubmitting ? t("detectors.transformer.saving") : submitLabel}
-            </Button>
-          </div>
-        </Card>
+        {!embedded && (
+          <Card className="sticky bottom-0 z-30 p-4 border-t-2 border-black">
+            <div className="flex items-center justify-end">
+              <Button
+                onClick={() => void handleSubmit()}
+                disabled={!canSubmit}
+                className="rounded-[4px] border-2 border-black bg-[#b7ff00] text-black shadow-[3px_3px_0_#000] hover:bg-[#a3e800]"
+              >
+                {isSubmitting ? t("detectors.transformer.saving") : submitLabel}
+              </Button>
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* ── Right: stepper nav ── */}
@@ -791,4 +813,4 @@ export function TransformerDetectorEditor({
       </aside>
     </div>
   );
-}
+});

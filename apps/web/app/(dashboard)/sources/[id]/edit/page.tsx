@@ -18,6 +18,7 @@ import {
 import {
   SourceScanConfig,
   type DetectorConfigInput,
+  type SourceScanConfigHandle,
 } from "@/components/source-scan-config";
 import { SourceDetectorConfigCard } from "@/components/source-detector-config-card";
 import {
@@ -568,6 +569,8 @@ function SourceEditStepperContent({
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const scanConfigRef = useRef<SourceScanConfigHandle>(null);
+
   const withValidFormData = async (
     handler: (data: Record<string, unknown>) => void | Promise<void>,
   ) => {
@@ -580,6 +583,8 @@ function SourceEditStepperContent({
       scrollToSection("config");
       return;
     }
+    const flushed = await scanConfigRef.current?.flushDetectorChanges();
+    if (flushed === false) return;
     await handler(sourceFormRef.current?.getValues() ?? {});
   };
 
@@ -636,6 +641,7 @@ function SourceEditStepperContent({
               showActions={false}
             >
               <SourceScanConfig
+                ref={scanConfigRef}
                 defaultDetectors={defaultDetectors}
                 onDetectorsChange={onDetectorsChange}
                 onSummaryChange={setScanSummary}
