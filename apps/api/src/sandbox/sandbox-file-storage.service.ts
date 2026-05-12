@@ -55,7 +55,14 @@ export class SandboxFileStorageService implements OnModuleInit {
       prefix: 'sandbox-files/',
     };
 
-    await this.ensureBucket();
+    // Retry bucket creation with exponential backoff — SeaweedFS may not be
+    // ready yet when the API starts up, especially on first install.
+    await this.retryWithBackoff(
+      () => this.ensureBucket(),
+      10,
+      1000,
+      `S3 sandbox bucket ${bucket}`,
+    );
     this.logger.log(
       `Sandbox S3 storage: bucket=${bucket} endpoint=${endpoint || 'aws'}`,
     );
@@ -90,8 +97,17 @@ export class SandboxFileStorageService implements OnModuleInit {
         new HeadObjectCommand({ Bucket: this.s3.bucket, Key: s3Key }),
       );
       return { s3Key, contentHash };
-    } catch {
-      // Object does not exist — upload it
+    } catch (err: any) {
+      // Only proceed to upload when the object genuinely does not exist.
+      // Re-throw permission/network errors so they don't mask real problems.
+      const isNotFound =
+        err instanceof NoSuchKey ||
+        err?.name === 'NoSuchKey' ||
+        err?.$metadata?.httpStatusCode === 404 ||
+        err?.Code === 'NotFound';
+      if (!isNotFound) {
+        throw err;
+      }
     }
 
     await this.s3.client.send(
@@ -168,5 +184,30 @@ export class SandboxFileStorageService implements OnModuleInit {
         }
       }
     }
+  }
+
+  private async retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    maxRetries: number,
+    baseDelayMs: number,
+    description: string,
+  ): Promise<T> {
+    let lastError: Error | undefined;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (err: any) {
+        lastError = err;
+        if (attempt === maxRetries) break;
+        const delay = baseDelayMs * 2 ** attempt;
+        this.logger.warn(
+          `${description} not ready (attempt ${attempt + 1}/${maxRetries + 1}): ${err?.message}. Retrying in ${delay}ms...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+    throw new Error(
+      `${description} unavailable after ${maxRetries + 1} attempts: ${lastError?.message}`,
+    );
   }
 }
