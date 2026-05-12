@@ -718,10 +718,11 @@ objectStorage:
     # -- Secret access key for the SeaweedFS S3 API.
     secretAccessKey: ""
     # -- Existing secret containing SeaweedFS credentials.
-    # -- Must have keys matching seaweedfs.existingSecretAccessKeyIdKey and seaweedfs.existingSecretSecretAccessKeyKey.
+    # -- When empty, the API reads from the SeaweedFS-generated secret
+    # -- (keys: admin_access_key_id / admin_secret_access_key).
     existingSecret: ""
-    existingSecretAccessKeyIdKey: access-key-id
-    existingSecretSecretAccessKeyKey: secret-access-key
+    existingSecretAccessKeyIdKey: admin_access_key_id
+    existingSecretSecretAccessKeyKey: admin_secret_access_key
 
   external:
     # -- External S3 endpoint URL. Leave empty for AWS S3 (SDK auto-resolves region-based endpoint).
@@ -779,6 +780,8 @@ seaweedfs:
     enabled: true
     port: 8333
     httpsPort: 0
-    # Auth is handled via iam.json configured by an init container; disable built-in auth flag.
-    enableAuth: false
+    # Enable native SeaweedFS S3 IAM authentication. The chart generates an
+    # iam.json with Admin/Read/Write credentials persisted across upgrades.
+    # API creates buckets via ensureBucket() — no init job required.
+    enableAuth: true
     allowEmptyFolder: true

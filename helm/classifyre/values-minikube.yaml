@@ -101,4 +101,4 @@ seaweedfs:
   s3:
     enabled: true
     port: 8333
-    enableAuth: false
+    enableAuth: true
