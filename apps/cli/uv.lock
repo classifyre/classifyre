@@ -690,7 +690,7 @@ detectors = [
     { name = "nudenet", specifier = ">=3.4.2" },
     { name = "numpy", specifier = ">=1.26.0,<2.0.0" },
     { name = "onnxruntime", specifier = ">=1.24.2" },
-    { name = "phonenumbers", specifier = ">=9.0.25" },
+    { name = "phonenumbers", specifier = ">=8.13.0,<9.0.0" },
     { name = "pillow", specifier = ">=12.1.1" },
     { name = "presidio-analyzer", specifier = ">=2.2.361" },
     { name = "scikit-learn", specifier = ">=1.7.2" },
@@ -736,7 +736,7 @@ otel = [
 postgresql = [{ name = "psycopg2-binary", specifier = ">=2.9.9,<3.0.0" }]
 privacy = [
     { name = "numpy", specifier = ">=1.26.0,<2.0.0" },
-    { name = "phonenumbers", specifier = ">=9.0.25" },
+    { name = "phonenumbers", specifier = ">=8.13.0,<9.0.0" },
     { name = "presidio-analyzer", specifier = ">=2.2.361" },
     { name = "spacy", specifier = ">=3.8.11" },
 ]
@@ -2560,11 +2560,11 @@ wheels = [
 
 [[package]]
 name = "phonenumbers"
-version = "9.0.25"
+version = "8.13.55"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2f/13/c1310103d1a8c61486bd507aafd864252927e8ea2c3133459ddabd23ec34/phonenumbers-9.0.25.tar.gz", hash = "sha256:a5f236fa384c6a77378d7836c8e486ade5f984ad2e8e6cc0dbe5124315cdc81b", size = 2298295, upload-time = "2026-02-26T10:24:47.372Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6e/23/b4c886487ca212ca87768433a43e2b3099c1c2fa5d9e21d2fbce187cc3c2/phonenumbers-8.13.55.tar.gz", hash = "sha256:57c989dda3eabab1b5a9e3d24438a39ebd032fa0172bf68bfd90ab70b3d5e08b", size = 2296624, upload-time = "2025-02-15T08:06:03.465Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/29/03/c6e12d36b307cdf8d886f1471de2dc95d807b331465fa828ec7fb4830594/phonenumbers-9.0.25-py2.py3-none-any.whl", hash = "sha256:b1fd6c20d588f5bcd40af3899d727a9f536364211ec6eac554fcd75ca58992a3", size = 2584287, upload-time = "2026-02-26T10:24:44.58Z" },
+    { url = "https://files.pythonhosted.org/packages/50/dc/a7f0a9d5ad8b98bc5406deb00207b268d6d2edd215c21642e8f2ecc6f0ce/phonenumbers-8.13.55-py2.py3-none-any.whl", hash = "sha256:25feaf46135f0fb1e61b69513dc97c477285ba98a69204bf5a8cf241a844a718", size = 2582306, upload-time = "2025-02-15T08:05:56.746Z" },
 ]
 
 [[package]]
