@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Injectable,
   Logger,
   OnModuleDestroy,
@@ -13,7 +12,6 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
-  HeadObjectCommand,
   CreateBucketCommand,
   HeadBucketCommand,
   NoSuchKey,
