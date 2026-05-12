@@ -88,7 +88,21 @@ class SourceFormPage {
     return status;
   }
 
+  async goToDetectorsStep() {
+    // The source form now uses a stepper; detectors are on step 2.
+    // Click the stepper nav button to scroll the detectors section into view.
+    await this.page.getByRole("button", { name: /detektoren/i }).click();
+    // Wait for the scan-config section to be visible
+    await expect(this.page.locator('[data-testid="scan-config-section"]')).toBeVisible({
+      timeout: 10_000,
+    });
+  }
+
   async enableDetector(detector: string) {
+    const enableBtn = this.page.locator(`[data-testid="detector-enable-${detector}"]`);
+    if (await enableBtn.isVisible()) {
+      await enableBtn.click();
+    }
     const toggle = this.page.locator(`[data-testid="detector-toggle-${detector}"]`);
     if ((await toggle.getAttribute("data-state")) !== "on") {
       await toggle.click();
@@ -119,12 +133,15 @@ class ScanDetailPage {
 
   async waitForCompletion(timeout = 1_500_000) {
     const badge = this.page.locator('[data-testid="scan-status-badge"]');
-    await expect(badge).toHaveText(/Completed|Error/i, { timeout });
+    // Match English (Completed/Error) and German (Abgeschlossen/Fehler)
+    await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler/i, {
+      timeout,
+    });
     const text = await badge.textContent();
-    if (text?.toLowerCase().includes("error")) {
+    if (/error|fehler/i.test(text ?? "")) {
       throw new Error("Scan finished with ERROR status");
     }
-    expect(text?.toLowerCase()).toContain("completed");
+    expect(text).toMatch(/completed|abgeschlossen/i);
   }
 
   async getStatsValue(label: string) {
@@ -292,6 +309,8 @@ test.describe("MongoDB Source E2E", () => {
 
       const connStatus = await form.testConnection();
       expect(connStatus, "Connection test should pass").toBe("success");
+
+      await form.goToDetectorsStep();
 
       const detectorToggle = page.locator(`[data-testid="toggle-custom-detector-${detectorKey}"]`);
       if ((await detectorToggle.getAttribute("data-state")) !== "on") {
