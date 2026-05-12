@@ -149,6 +149,12 @@ export class KubernetesCliJobService {
         );
         return;
       }
+      if (this.isCannotParseContentError(error)) {
+        this.logger.warn(
+          `deleteNamespacedJob(${jobRef.namespace}/${jobRef.jobName}) response had no Content-Type; treating as deleted.`,
+        );
+        return;
+      }
       throw error;
     }
   }
@@ -178,6 +184,12 @@ export class KubernetesCliJobService {
     } catch (error: any) {
       if (this.isNotFound(error)) {
         return false;
+      }
+      if (this.isCannotParseContentError(error)) {
+        this.logger.warn(
+          `readNamespacedJob(${namespace}/${jobName}) response had no Content-Type; assuming job is active.`,
+        );
+        return true;
       }
       throw error;
     }
@@ -557,11 +569,23 @@ export class KubernetesCliJobService {
         latestOutput,
         onLogChunk,
       );
-      const response = await (this.batchApi as any).readNamespacedJob({
-        namespace,
-        name: jobName,
-      });
-      const job = this.unwrapBody<V1Job>(response);
+      let job: V1Job;
+      try {
+        const response = await (this.batchApi as any).readNamespacedJob({
+          namespace,
+          name: jobName,
+        });
+        job = this.unwrapBody<V1Job>(response);
+      } catch (error: any) {
+        if (this.isCannotParseContentError(error)) {
+          this.logger.warn(
+            `readNamespacedJob(${namespace}/${jobName}) response had no Content-Type; retrying poll.`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, pollMs));
+          continue;
+        }
+        throw error;
+      }
       const status = job.status;
       if ((status?.succeeded || 0) > 0) {
         latestOutput = await this.syncJobLogs(
@@ -615,20 +639,30 @@ export class KubernetesCliJobService {
     }
 
     const containerName = pod.spec?.containers?.[0]?.name;
-    const response = await (this.coreApi as any).readNamespacedPodLog({
-      namespace,
-      name: pod.metadata.name,
-      container: containerName,
-      timestamps: false,
-    });
-    const body = this.unwrapBody<string>(response);
-    if (typeof body === 'string') {
-      return body;
+    try {
+      const response = await (this.coreApi as any).readNamespacedPodLog({
+        namespace,
+        name: pod.metadata.name,
+        container: containerName,
+        timestamps: false,
+      });
+      const body = this.unwrapBody<string>(response);
+      if (typeof body === 'string') {
+        return body;
+      }
+      if (body && typeof (body as any).toString === 'function') {
+        return (body as any).toString();
+      }
+      return '';
+    } catch (error: any) {
+      if (this.isCannotParseContentError(error)) {
+        this.logger.warn(
+          `readNamespacedPodLog(${namespace}/${pod.metadata.name}) response had no Content-Type; returning empty logs.`,
+        );
+        return '';
+      }
+      throw error;
     }
-    if (body && typeof (body as any).toString === 'function') {
-      return (body as any).toString();
-    }
-    return '';
   }
 
   private async syncJobLogs(
@@ -670,22 +704,32 @@ export class KubernetesCliJobService {
       return undefined;
     }
 
-    const response = await (this.coreApi as any).listNamespacedPod({
-      namespace,
-      labelSelector: `job-name=${jobName}`,
-    });
-    const podList = this.unwrapBody<V1PodList>(response);
-    const pods = [...(podList.items || [])];
-    pods.sort((a, b) => {
-      const aTime = a.metadata?.creationTimestamp
-        ? new Date(a.metadata.creationTimestamp).getTime()
-        : 0;
-      const bTime = b.metadata?.creationTimestamp
-        ? new Date(b.metadata.creationTimestamp).getTime()
-        : 0;
-      return bTime - aTime;
-    });
-    return pods[0];
+    try {
+      const response = await (this.coreApi as any).listNamespacedPod({
+        namespace,
+        labelSelector: `job-name=${jobName}`,
+      });
+      const podList = this.unwrapBody<V1PodList>(response);
+      const pods = [...(podList.items || [])];
+      pods.sort((a, b) => {
+        const aTime = a.metadata?.creationTimestamp
+          ? new Date(a.metadata.creationTimestamp).getTime()
+          : 0;
+        const bTime = b.metadata?.creationTimestamp
+          ? new Date(b.metadata.creationTimestamp).getTime()
+          : 0;
+        return bTime - aTime;
+      });
+      return pods[0];
+    } catch (error: any) {
+      if (this.isCannotParseContentError(error)) {
+        this.logger.warn(
+          `listNamespacedPod(${namespace}, job-name=${jobName}) response had no Content-Type; returning undefined.`,
+        );
+        return undefined;
+      }
+      throw error;
+    }
   }
 
   private extractExitCodeFromPod(pod?: V1Pod): number | undefined {
@@ -826,6 +870,12 @@ export class KubernetesCliJobService {
       if (this.isNotFound(error)) {
         return;
       }
+      if (this.isCannotParseContentError(error)) {
+        this.logger.warn(
+          `deleteNamespacedJob(${namespace}/${jobName}) response had no Content-Type; treating as deleted.`,
+        );
+        return;
+      }
       this.logger.warn(
         `Failed to clean up CLI Job ${namespace}/${jobName}: ${error?.message || error}`,
       );
@@ -851,6 +901,14 @@ export class KubernetesCliJobService {
       return response.response.body as T;
     }
     return response as T;
+  }
+
+  private isCannotParseContentError(error: any): boolean {
+    const message =
+      error?.message || error?.body?.message || error?.response?.body?.message;
+    return (
+      typeof message === 'string' && message.includes('Cannot parse content')
+    );
   }
 
   private isAlreadyExists(error: any): boolean {
