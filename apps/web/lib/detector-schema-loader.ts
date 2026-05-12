@@ -184,6 +184,29 @@ function resolveSchemaRefs(
     );
   }
 
+  if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
+    schema = {
+      ...schema,
+      additionalProperties: resolveSchemaRefs(
+        schema.additionalProperties as JSONSchema7,
+        rootSchema,
+      ),
+    };
+  }
+
+  if (schema.patternProperties) {
+    const resolvedPatternProperties: Record<string, JSONSchema7> = {};
+    for (const [key, value] of Object.entries(schema.patternProperties)) {
+      if (value && typeof value === "object") {
+        resolvedPatternProperties[key] = resolveSchemaRefs(
+          value as JSONSchema7,
+          rootSchema,
+        );
+      }
+    }
+    schema = { ...schema, patternProperties: resolvedPatternProperties };
+  }
+
   if (schema.anyOf) {
     schema.anyOf = schema.anyOf.map((item) =>
       resolveSchemaRefs(item as JSONSchema7, rootSchema),

@@ -1557,7 +1557,12 @@ function SchemaField({
                 {...field}
                 value={field.value ?? ""}
                 onChange={(event) => {
-                  field.onChange(coerceNumberInput(event.target.value));
+                  const raw = event.target.value;
+                  if (raw === "" || raw === null) {
+                    field.onChange(null);
+                  } else {
+                    field.onChange(coerceNumberInput(raw));
+                  }
                 }}
                 autoComplete="off"
                 disabled={disabled}
@@ -1764,9 +1769,11 @@ export const JsonSchemaForm = React.forwardRef<
   React.useEffect(() => {
     if (!hasInitializedResetRef.current) {
       hasInitializedResetRef.current = true;
+      console.log("[RHF] Skip initial reset, mergedDefaults:", JSON.stringify(mergedDefaults));
       return;
     }
 
+    console.log("[RHF] Calling reset with:", JSON.stringify(mergedDefaults));
     form.reset(mergedDefaults as FormValues);
   }, [form, mergedDefaults]);
 
