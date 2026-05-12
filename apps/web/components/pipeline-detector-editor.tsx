@@ -19,9 +19,8 @@ import {
 } from "@workspace/ui/components";
 import { AiAssistedCard } from "@/components/ai-assisted-card";
 import {
-  VerticalCustomDetectorStepperNav,
   HorizontalCustomDetectorStepperNav,
-  type CustomDetectorStepId,
+  VerticalCustomDetectorStepperNav,
 } from "@/components/custom-detector-stepper";
 import { api } from "@workspace/api-client";
 import type { TrainingExampleItem, TrainingExampleDto } from "@workspace/api-client";
@@ -56,6 +55,14 @@ interface PipelineSchemaState {
     rules: ValidationRule[];
   };
 }
+
+type PipelineDetectorStepId =
+  | "identity"
+  | "entities"
+  | "classification"
+  | "validation"
+  | "model"
+  | "training";
 
 export interface PipelineDetectorEditorProps {
   mode: "create" | "edit";
@@ -1011,7 +1018,7 @@ export const PipelineDetectorEditor = React.forwardRef<
     parseInitialSchema(initialPipelineSchema),
   );
   const [errors, setErrors] = useState<string[]>([]);
-  const [activeStepId, setActiveStepId] = useState<CustomDetectorStepId>("identity");
+  const [activeStepId, setActiveStepId] = useState<PipelineDetectorStepId>("identity");
 
   const identityRef = useRef<HTMLDivElement>(null);
   const entitiesRef = useRef<HTMLDivElement>(null);
@@ -1020,7 +1027,7 @@ export const PipelineDetectorEditor = React.forwardRef<
   const modelRef = useRef<HTMLDivElement>(null);
   const trainingRef = useRef<HTMLDivElement>(null);
 
-  const sectionRefs: Record<CustomDetectorStepId, RefObject<HTMLDivElement | null>> = {
+  const sectionRefs: Record<PipelineDetectorStepId, RefObject<HTMLDivElement | null>> = {
     identity: identityRef,
     entities: entitiesRef,
     classification: classificationRef,
@@ -1031,7 +1038,7 @@ export const PipelineDetectorEditor = React.forwardRef<
 
   // Scroll-spy: highlight whichever section top edge crosses 40% from top of viewport
   useEffect(() => {
-    const stepIds: CustomDetectorStepId[] = [
+    const stepIds: PipelineDetectorStepId[] = [
       "identity",
       "entities",
       "classification",
@@ -1041,9 +1048,9 @@ export const PipelineDetectorEditor = React.forwardRef<
     ];
     const els = stepIds
       .map((id) => ({ id, el: sectionRefs[id].current }))
-      .filter((x): x is { id: CustomDetectorStepId; el: HTMLDivElement } => x.el !== null);
+      .filter((x): x is { id: PipelineDetectorStepId; el: HTMLDivElement } => x.el !== null);
 
-    const map = new Map<Element, CustomDetectorStepId>(els.map(({ id, el }) => [el, id]));
+    const map = new Map<Element, PipelineDetectorStepId>(els.map(({ id, el }) => [el, id]));
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -1062,9 +1069,18 @@ export const PipelineDetectorEditor = React.forwardRef<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const scrollToSection = (id: CustomDetectorStepId) => {
+  const scrollToSection = (id: PipelineDetectorStepId) => {
     sectionRefs[id].current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  const stepperSteps = [
+    { id: "identity" as PipelineDetectorStepId, title: "Identity", description: "Name and key" },
+    { id: "entities" as PipelineDetectorStepId, title: "Entities", description: "Entity definitions" },
+    { id: "classification" as PipelineDetectorStepId, title: "Classification", description: "Classification tasks" },
+    { id: "validation" as PipelineDetectorStepId, title: "Validation", description: "Validation rules" },
+    { id: "model" as PipelineDetectorStepId, title: "Model", description: "Model settings" },
+    { id: "training" as PipelineDetectorStepId, title: "Training", description: "Training configuration" },
+  ];
 
   const validate = (): string[] => {
     const errs: string[] = [];
@@ -1125,6 +1141,7 @@ export const PipelineDetectorEditor = React.forwardRef<
       {/* Mobile sticky horizontal nav */}
       <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-border bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
         <HorizontalCustomDetectorStepperNav
+          steps={stepperSteps}
           activeStepId={activeStepId}
           onNavigate={scrollToSection}
         />
@@ -1284,6 +1301,7 @@ export const PipelineDetectorEditor = React.forwardRef<
         {/* Right sticky sidebar — desktop only */}
         <aside className="hidden self-start md:sticky md:top-6 md:block md:w-44 lg:w-52">
           <VerticalCustomDetectorStepperNav
+            steps={stepperSteps}
             activeStepId={activeStepId}
             onNavigate={scrollToSection}
           />
