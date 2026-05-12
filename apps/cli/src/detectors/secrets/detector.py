@@ -218,7 +218,11 @@ class SecretsDetector(BaseDetector):
             from detect_secrets import SecretsCollection
             from detect_secrets.settings import transient_settings
         except ImportError as exc:
-            raise MissingDependencyError("detect_secrets", "secrets") from exc
+            raise MissingDependencyError(
+                detector_name="detect_secrets",
+                dependencies=["detect_secrets"],
+                uv_groups=["security", "detectors"],
+            ) from exc
 
         plugins_used = self._build_plugins_used()
         if not plugins_used:

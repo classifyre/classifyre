@@ -42,9 +42,10 @@ class ObjectDetectionRunner(BaseRunner):
             self._pipe: Any = transformers.pipeline("object-detection", **pipeline_kwargs)
         except ImportError as exc:
             raise MissingDependencyError(
-                "object_detection",
-                ["custom", "detectors"],
-                f"ObjectDetectionRunner requires additional dependencies: {exc}",
+                detector_name="object_detection",
+                dependencies=["transformers"],
+                uv_groups=["custom", "detectors"],
+                detail=f"ObjectDetectionRunner requires additional dependencies: {exc}",
             ) from exc
 
     def run(self, text: str) -> None:  # type: ignore[override]  # pragma: no cover
