@@ -6,12 +6,17 @@ import {
 } from '@nestjs/common';
 import {
   CustomDetector,
-  CustomDetectorMethod,
   CustomDetectorTrainingRun,
   CustomDetectorTrainingStatus,
   FindingStatus,
   Prisma,
 } from '@prisma/client';
+
+export enum CustomDetectorMethod {
+  RULESET = 'RULESET',
+  CLASSIFIER = 'CLASSIFIER',
+  ENTITY = 'ENTITY',
+}
 import { createHash, randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';

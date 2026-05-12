@@ -6,11 +6,10 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  CustomDetectorMethod,
   CustomDetectorTrainingStatus,
   FindingStatus,
 } from '@prisma/client';
-import { CustomDetectorsService } from './custom-detectors.service';
+import { CustomDetectorsService, CustomDetectorMethod } from './custom-detectors.service';
 
 describe('CustomDetectorsService', () => {
   function createService() {
