@@ -111,7 +111,6 @@ class MySQLSourceForm {
 
   async enableDetector(detector: string) {
     const toggle = this.page.locator(`[data-testid="detector-toggle-${detector}"]`);
-    await toggle.scrollIntoViewIfNeeded();
     if ((await toggle.getAttribute("data-state")) !== "on") {
       await toggle.click();
     }
@@ -120,7 +119,6 @@ class MySQLSourceForm {
 
   async saveAndScan() {
     const btn = this.page.locator('[data-testid="btn-save-and-scan"]');
-    await btn.scrollIntoViewIfNeeded();
     await btn.click();
     await this.page.waitForURL(/\/scans\/[a-z0-9-]+/, { timeout: 30_000 });
   }
