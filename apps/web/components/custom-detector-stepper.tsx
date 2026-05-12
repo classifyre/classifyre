@@ -5,16 +5,16 @@ import { cn } from "@workspace/ui/lib/utils";
 
 export type CustomDetectorStepId = "method" | "policy" | "tests";
 
-type StepItem = {
-  id: CustomDetectorStepId;
+type StepItem<TStepId extends string = CustomDetectorStepId> = {
+  id: TStepId;
   title: string;
   description: string;
 };
 
-type CustomDetectorStepperNavProps = {
-  steps: StepItem[];
-  activeStepId: CustomDetectorStepId;
-  onNavigate: (id: CustomDetectorStepId) => void;
+type CustomDetectorStepperNavProps<TStepId extends string = CustomDetectorStepId> = {
+  steps: StepItem<TStepId>[];
+  activeStepId: TStepId;
+  onNavigate: (id: TStepId) => void;
 };
 
 function StepIndicator({
@@ -41,11 +41,11 @@ function StepIndicator({
   );
 }
 
-export function VerticalCustomDetectorStepperNav({
+export function VerticalCustomDetectorStepperNav<TStepId extends string = CustomDetectorStepId>({
   steps,
   activeStepId,
   onNavigate,
-}: CustomDetectorStepperNavProps) {
+}: CustomDetectorStepperNavProps<TStepId>) {
   const activeIndex = steps.findIndex((step) => step.id === activeStepId);
 
   return (
@@ -112,11 +112,11 @@ export function VerticalCustomDetectorStepperNav({
   );
 }
 
-export function HorizontalCustomDetectorStepperNav({
+export function HorizontalCustomDetectorStepperNav<TStepId extends string = CustomDetectorStepId>({
   steps,
   activeStepId,
   onNavigate,
-}: CustomDetectorStepperNavProps) {
+}: CustomDetectorStepperNavProps<TStepId>) {
   const activeIndex = steps.findIndex((step) => step.id === activeStepId);
 
   return (

@@ -24,6 +24,7 @@ import {
   type SearchAssetsChartsResponseDto,
   type SearchFindingsChartsResponseDto,
   type StartRunnerDto,
+  type SearchRunnerLogsBodyDto,
 } from "@workspace/api-client";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
@@ -187,7 +188,7 @@ export default function RunnerDetailPage() {
   );
 
   const fetchLogsPage = useCallback(
-    async (scanRunnerId: string, cursor?: string, append = false) => {
+    async (params: { cursor?: string; take?: number; search?: string; levels?: string[]; sortOrder?: "asc" | "desc" }, append = false) => {
       try {
         if (append) {
           setLogsLoadingMore(true);
@@ -195,14 +196,19 @@ export default function RunnerDetailPage() {
           setLogsLoading(true);
         }
 
-        const response = await api.runners.cliRunnerControllerGetRunnerLogs({
-          runnerId: scanRunnerId,
-          cursor,
-          take: 200,
+        const response = await api.runners.cliRunnerControllerSearchRunnerLogs({
+          runnerId,
+          searchRunnerLogsBodyDto: {
+            cursor: params.cursor,
+            take: params.take ?? 200,
+            search: params.search,
+            levels: params.levels as SearchRunnerLogsBodyDto["levels"],
+            sortOrder: params.sortOrder,
+          },
         });
 
         const entries = response.entries ?? [];
-        setLogsCursor(response.cursor || cursor || "0");
+        setLogsCursor(response.cursor || params.cursor || "0");
         setLogsHasMore(Boolean(response.hasMore));
         setLogEntries((prev) => (append ? [...prev, ...entries] : entries));
       } catch (err) {
@@ -220,7 +226,7 @@ export default function RunnerDetailPage() {
         }
       }
     },
-    [],
+    [runnerId],
   );
 
   useEffect(() => {
@@ -231,7 +237,7 @@ export default function RunnerDetailPage() {
       }
       await Promise.all([
         fetchOverview(currentRunner),
-        fetchLogsPage(currentRunner.id),
+        fetchLogsPage({}, false),
       ]);
     };
 
@@ -262,7 +268,7 @@ export default function RunnerDetailPage() {
     const interval = setInterval(() => {
       void refreshRunnerState();
       if (!logsLoading && !logsLoadingMore) {
-        void fetchLogsPage(runnerId, logsCursor, true);
+        void fetchLogsPage({ cursor: logsCursor }, true);
       }
     }, 2500);
 
@@ -320,29 +326,12 @@ export default function RunnerDetailPage() {
     }
   };
 
-  const handleLoadMoreLogs = async () => {
-    if (!runnerId || !logsHasMore || logsLoadingMore) {
-      return;
-    }
-    await fetchLogsPage(runnerId, logsCursor, true);
-  };
-
-  const handleRefreshLogs = useCallback(async () => {
-    if (!runnerId) {
-      return;
-    }
-    await refreshRunnerState();
-    if (!logsLoading && !logsLoadingMore) {
-      await fetchLogsPage(runnerId, logsCursor, true);
-    }
-  }, [
-    fetchLogsPage,
-    logsCursor,
-    logsLoading,
-    logsLoadingMore,
-    refreshRunnerState,
-    runnerId,
-  ]);
+  const handleFetchLogs = useCallback(
+    async (params: { cursor?: string; take?: number; search?: string; levels?: string[]; sortOrder?: "asc" | "desc" }, append = false) => {
+      await fetchLogsPage(params, append);
+    },
+    [fetchLogsPage],
+  );
 
   const handleDownloadAllLogs = useCallback(async (): Promise<
     RunnerLogEntryDto[]
@@ -358,10 +347,12 @@ export default function RunnerDetailPage() {
     let pageCount = 0;
 
     while (hasMore && pageCount < 1000) {
-      const response = await api.runners.cliRunnerControllerGetRunnerLogs({
+      const response = await api.runners.cliRunnerControllerSearchRunnerLogs({
         runnerId,
-        cursor,
-        take: 1000,
+        searchRunnerLogsBodyDto: {
+          cursor,
+          take: 1000,
+        },
       });
 
       for (const entry of response.entries ?? []) {
@@ -778,8 +769,8 @@ export default function RunnerDetailPage() {
             }
             autoRefreshEnabled={autoRefreshEnabled}
             onAutoRefreshChange={setAutoRefreshEnabled}
-            onLoadMore={handleLoadMoreLogs}
-            onRefreshNow={handleRefreshLogs}
+            onFetch={handleFetchLogs}
+            nextCursor={logsHasMore ? logsCursor : null}
             onDownloadAll={handleDownloadAllLogs}
           />
         </TabsContent>

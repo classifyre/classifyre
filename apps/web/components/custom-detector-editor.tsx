@@ -100,6 +100,7 @@ export type CustomDetectorEditorHandle = {
     missingFields: string[];
     errors: string[];
   };
+  submit: () => Promise<void>;
 };
 
 type StarterOption = {
@@ -1379,11 +1380,13 @@ export const CustomDetectorEditor = React.forwardRef<
           errors,
         };
       },
+      submit: handleSubmit,
     }),
     [
       configDraft,
       description,
       editorMode,
+      handleSubmit,
       isActive,
       key,
       method,
