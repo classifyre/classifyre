@@ -1769,11 +1769,9 @@ export const JsonSchemaForm = React.forwardRef<
   React.useEffect(() => {
     if (!hasInitializedResetRef.current) {
       hasInitializedResetRef.current = true;
-      console.log("[RHF] Skip initial reset, mergedDefaults:", JSON.stringify(mergedDefaults));
       return;
     }
 
-    console.log("[RHF] Calling reset with:", JSON.stringify(mergedDefaults));
     form.reset(mergedDefaults as FormValues);
   }, [form, mergedDefaults]);
 
