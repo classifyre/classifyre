@@ -73,13 +73,43 @@ postgres:
 
 objectStorage:
   bucket: classifyre-logs
+  sandboxBucket: classifyre-sandbox
+  logPrefix: "runner-logs/"
+  region: us-east-1
+  forcePathStyle: true
   seaweedfs:
     enabled: true
+    s3Port: 8333
 
 seaweedfs:
+  master:
+    enabled: true
+    replicas: 1
+    data:
+      type: "emptyDir"
+    logs:
+      type: "emptyDir"
+
   volume:
+    enabled: true
+    replicas: 1
     dataDirs:
       - name: data
         type: "persistentVolumeClaim"
         size: "10Gi"
         storageClass: ""
+    idx:
+      type: "emptyDir"
+
+  filer:
+    enabled: true
+    replicas: 1
+    data:
+      type: "emptyDir"
+
+  s3:
+    enabled: true
+    port: 8333
+    httpsPort: 0
+    enableAuth: true
+    allowEmptyFolder: true
