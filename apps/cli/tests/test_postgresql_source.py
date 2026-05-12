@@ -507,6 +507,6 @@ async def test_postgresql_fetch_content_pages_batches_for_all_strategy(
 
     assert len(queries_issued) == 2
     assert all("LIMIT" in q and "OFFSET" in q for q, _ in queries_issued)
-    assert len(pages) == 2
+    assert len(pages) == 12
     assert "user1" in pages[0]
-    assert "user12" in pages[1]
+    assert "user12" in pages[11]
