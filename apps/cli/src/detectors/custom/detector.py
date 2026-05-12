@@ -77,8 +77,11 @@ class CustomDetector(BaseDetector):
             else None
         )
 
-    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
-        text = content.strip()
+    async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
+        text = content.decode("utf-8") if isinstance(content, bytes) else content
+        text = text.strip()
         if not text:
             return []
 
