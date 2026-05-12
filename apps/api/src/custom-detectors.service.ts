@@ -109,6 +109,17 @@ function asStringArray(value: unknown): string[] {
     .filter((entry): entry is string => Boolean(entry));
 }
 
+function resolveMethod(config: JsonRecord): CustomDetectorMethod {
+  const method = asString(config.method)?.toUpperCase();
+  if (method === CustomDetectorMethod.RULESET)
+    return CustomDetectorMethod.RULESET;
+  if (method === CustomDetectorMethod.CLASSIFIER)
+    return CustomDetectorMethod.CLASSIFIER;
+  if (method === CustomDetectorMethod.ENTITY)
+    return CustomDetectorMethod.ENTITY;
+  return CustomDetectorMethod.RULESET;
+}
+
 function normalizeHeaderCell(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, '_');
 }
@@ -993,10 +1004,9 @@ export class CustomDetectorsService {
       key: detector.key,
       name: detector.name,
       description: detector.description,
-      method: detector.method,
+      pipelineSchema: asRecord(detector.pipelineSchema),
       isActive: detector.isActive,
       version: detector.version,
-      config: asRecord(detector.config),
       lastTrainedAt: detector.lastTrainedAt,
       lastTrainingSummary: detector.lastTrainingSummary as Record<
         string,
@@ -1147,12 +1157,14 @@ export class CustomDetectorsService {
     dto: CreateCustomDetectorDto,
   ): Promise<CustomDetectorResponseDto> {
     const key = this.normalizeKey(dto.key ?? `cust_${dto.name}`);
+    const pipelineSchema = asRecord(dto.pipelineSchema);
+    const method = resolveMethod(pipelineSchema);
     const config = this.canonicalizeConfig({
       key,
       name: dto.name,
       description: dto.description,
-      method: dto.method,
-      config: dto.config,
+      method,
+      config: pipelineSchema,
     });
     this.validateCustomConfig(config);
 
@@ -1163,8 +1175,7 @@ export class CustomDetectorsService {
           key,
           name: dto.name,
           description: dto.description,
-          method: dto.method,
-          config: config as Prisma.InputJsonValue,
+          pipelineSchema: config as Prisma.InputJsonValue,
           isActive: dto.isActive ?? true,
         },
         include: {
@@ -1199,21 +1210,24 @@ export class CustomDetectorsService {
     const nextName = dto.name ?? existing.name;
     const nextDescription =
       dto.description !== undefined ? dto.description : existing.description;
-    const nextMethod = dto.method ?? existing.method;
+
+    const existingConfig = asRecord(existing.pipelineSchema);
+    const incomingConfig =
+      dto.pipelineSchema !== undefined
+        ? asRecord(dto.pipelineSchema)
+        : existingConfig;
+    const nextMethod = resolveMethod(incomingConfig);
     const nextConfig = this.canonicalizeConfig({
       key: nextKey,
       name: nextName,
       description: nextDescription,
       method: nextMethod,
-      config:
-        dto.config !== undefined
-          ? dto.config
-          : (asRecord(existing.config) as Record<string, unknown>),
+      config: incomingConfig,
     });
     this.validateCustomConfig(nextConfig);
 
     const nextVersion =
-      stableStringify(nextConfig) !== stableStringify(existing.config)
+      stableStringify(nextConfig) !== stableStringify(existingConfig)
         ? existing.version + 1
         : existing.version;
 
@@ -1225,9 +1239,8 @@ export class CustomDetectorsService {
           key: nextKey,
           name: nextName,
           description: nextDescription,
-          method: nextMethod,
+          pipelineSchema: nextConfig as Prisma.InputJsonValue,
           isActive: dto.isActive ?? existing.isActive,
-          config: nextConfig as Prisma.InputJsonValue,
           version: nextVersion,
         },
         include: {
@@ -1298,19 +1311,14 @@ export class CustomDetectorsService {
     return customExamples
       .map((raw) => asRecord(raw))
       .map((example) => {
-        const config = asRecord(example.config);
-        const method = asString(config.method);
+        const pipelineSchema = asRecord(
+          example.pipelineSchema ?? example.config,
+        );
         return {
           name: asString(example.name) ?? 'Custom Detector Example',
           description:
             asString(example.description) ?? 'Custom detector example',
-          method:
-            method === 'RULESET' ||
-            method === 'CLASSIFIER' ||
-            method === 'ENTITY'
-              ? (method as CustomDetectorMethod)
-              : CustomDetectorMethod.RULESET,
-          config,
+          pipelineSchema,
         };
       });
   }
@@ -1386,12 +1394,14 @@ export class CustomDetectorsService {
       .map((id) => byId.get(id))
       .filter((row): row is CustomDetector => Boolean(row))
       .map((row) => {
+        const pipelineSchema = asRecord(row.pipelineSchema);
+        const method = resolveMethod(pipelineSchema);
         const config = this.canonicalizeConfig({
           key: row.key,
           name: row.name,
           description: row.description,
-          method: row.method,
-          config: asRecord(row.config),
+          method,
+          config: pipelineSchema,
         });
         return {
           id: row.id,
@@ -1442,12 +1452,14 @@ export class CustomDetectorsService {
       .map((key) => byKey.get(key))
       .filter((row): row is CustomDetector => Boolean(row))
       .map((row) => {
+        const pipelineSchema = asRecord(row.pipelineSchema);
+        const method = resolveMethod(pipelineSchema);
         const config = this.canonicalizeConfig({
           key: row.key,
           name: row.name,
           description: row.description,
-          method: row.method,
-          config: asRecord(row.config),
+          method,
+          config: pipelineSchema,
         });
         return {
           id: row.id,
@@ -1505,7 +1517,8 @@ export class CustomDetectorsService {
     });
 
     try {
-      const config = asRecord(detector.config);
+      const config = asRecord(detector.pipelineSchema);
+      const method = resolveMethod(config);
       const classifier = asRecord(config.classifier);
       const labels = asStringArray(
         Array.isArray(classifier.labels)
@@ -1571,18 +1584,18 @@ export class CustomDetectorsService {
           : 8;
 
       const readyForSetFit =
-        detector.method === CustomDetectorMethod.CLASSIFIER &&
+        method === CustomDetectorMethod.CLASSIFIER &&
         labels.length > 0 &&
         labels.every(
           (label) => (positiveCounts.get(label) ?? 0) >= minExamples,
         );
 
       const strategy =
-        detector.method === CustomDetectorMethod.CLASSIFIER
+        method === CustomDetectorMethod.CLASSIFIER
           ? readyForSetFit
             ? 'SETFIT'
             : 'ZERO_SHOT'
-          : detector.method;
+          : method;
 
       const configHash = createHash('sha256')
         .update(stableStringify(config))

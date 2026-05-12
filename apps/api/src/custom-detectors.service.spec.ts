@@ -5,11 +5,8 @@ import {
 } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  CustomDetectorTrainingStatus,
-  FindingStatus,
-} from '@prisma/client';
-import { CustomDetectorsService, CustomDetectorMethod } from './custom-detectors.service';
+import { CustomDetectorTrainingStatus, FindingStatus } from '@prisma/client';
+import { CustomDetectorsService } from './custom-detectors.service';
 
 describe('CustomDetectorsService', () => {
   function createService() {
@@ -49,14 +46,16 @@ describe('CustomDetectorsService', () => {
       key: 'cust_legal_risk',
       name: 'Legal Risk Detector',
       description: 'Detect risk terms',
-      method: CustomDetectorMethod.CLASSIFIER,
-      isActive: true,
-      version: 1,
-      config: {
+      pipelineSchema: {
         custom_detector_key: 'cust_legal_risk',
         name: 'Legal Risk Detector',
         method: 'CLASSIFIER',
+        classifier: {
+          labels: [{ id: 'risk', name: 'Risk' }],
+        },
       },
+      isActive: true,
+      version: 1,
       lastTrainedAt: null,
       lastTrainingSummary: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -68,8 +67,8 @@ describe('CustomDetectorsService', () => {
     const result = await service.create({
       name: 'Legal Risk Detector',
       key: 'cust_legal_risk',
-      method: CustomDetectorMethod.CLASSIFIER,
-      config: {
+      pipelineSchema: {
+        method: 'CLASSIFIER',
         classifier: {
           labels: [{ id: 'risk', name: 'Risk' }],
         },
@@ -78,7 +77,7 @@ describe('CustomDetectorsService', () => {
 
     expect(prisma.customDetector.create).toHaveBeenCalled();
     expect(result.key).toBe('cust_legal_risk');
-    expect(result.method).toBe(CustomDetectorMethod.CLASSIFIER);
+    expect(result.pipelineSchema.method).toBe('CLASSIFIER');
   });
 
   it('rejects unknown IDs in assertActiveDetectorIds', async () => {
@@ -99,8 +98,7 @@ describe('CustomDetectorsService', () => {
       service.create({
         name: 'Duplicate key detector',
         key: 'cust_duplicate',
-        method: CustomDetectorMethod.RULESET,
-        config: {
+        pipelineSchema: {
           custom_detector_key: 'cust_duplicate',
           name: 'Duplicate key detector',
           method: 'RULESET',
@@ -118,14 +116,13 @@ describe('CustomDetectorsService', () => {
         key: 'cust_second',
         name: 'Second',
         description: null,
-        method: CustomDetectorMethod.RULESET,
-        isActive: true,
-        version: 1,
-        config: {
+        pipelineSchema: {
           custom_detector_key: 'cust_second',
           name: 'Second',
           method: 'RULESET',
         },
+        isActive: true,
+        version: 1,
         lastTrainedAt: null,
         lastTrainingSummary: null,
         createdAt: new Date(),
@@ -136,14 +133,13 @@ describe('CustomDetectorsService', () => {
         key: 'cust_first',
         name: 'First',
         description: null,
-        method: CustomDetectorMethod.ENTITY,
-        isActive: true,
-        version: 1,
-        config: {
+        pipelineSchema: {
           custom_detector_key: 'cust_first',
           name: 'First',
           method: 'ENTITY',
         },
+        isActive: true,
+        version: 1,
         lastTrainedAt: null,
         lastTrainingSummary: null,
         createdAt: new Date(),
@@ -170,14 +166,13 @@ describe('CustomDetectorsService', () => {
         key: 'cust_usage_1',
         name: 'Usage Detector',
         description: null,
-        method: CustomDetectorMethod.RULESET,
-        isActive: true,
-        version: 1,
-        config: {
+        pipelineSchema: {
           custom_detector_key: 'cust_usage_1',
           name: 'Usage Detector',
           method: 'RULESET',
         },
+        isActive: true,
+        version: 1,
         lastTrainedAt: null,
         lastTrainingSummary: null,
         createdAt: new Date(),
@@ -218,10 +213,7 @@ describe('CustomDetectorsService', () => {
       key: 'cust_classifier',
       name: 'Classifier',
       description: null,
-      method: CustomDetectorMethod.CLASSIFIER,
-      isActive: true,
-      version: 1,
-      config: {
+      pipelineSchema: {
         custom_detector_key: 'cust_classifier',
         name: 'Classifier',
         method: 'CLASSIFIER',
@@ -237,6 +229,8 @@ describe('CustomDetectorsService', () => {
           ],
         },
       },
+      isActive: true,
+      version: 1,
       lastTrainedAt: null,
       lastTrainingSummary: null,
       createdAt: new Date(),
@@ -321,16 +315,15 @@ describe('CustomDetectorsService', () => {
     let capturedConfig: Record<string, unknown> | null = null;
     prisma.customDetector.create.mockImplementation(
       ({ data }: { data: Record<string, unknown> }) => {
-        capturedConfig = data.config as Record<string, unknown>;
+        capturedConfig = data.pipelineSchema as Record<string, unknown>;
         return Promise.resolve({
           id: 'det-norm',
           key: 'food_detector',
           name: 'Food Detector',
           description: null,
-          method: CustomDetectorMethod.CLASSIFIER,
+          pipelineSchema: data.pipelineSchema,
           isActive: true,
           version: 1,
-          config: data.config,
           lastTrainedAt: null,
           lastTrainingSummary: null,
           createdAt: new Date(),
@@ -344,8 +337,7 @@ describe('CustomDetectorsService', () => {
     await service.create({
       name: 'Food Detector',
       key: 'food_detector',
-      method: CustomDetectorMethod.CLASSIFIER,
-      config: {
+      pipelineSchema: {
         classifier: {
           // Plain string labels — legacy format that the CLI cannot parse
           labels: ['food discussion', 'not food discussion'],
