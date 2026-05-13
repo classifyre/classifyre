@@ -119,6 +119,10 @@ class LinkRecordingDetector(BaseDetector):
         return ["application/x.asset-links"]
 
 
+class NamedDetectorConfig(DetectorConfig):
+    name: str | None = None
+
+
 def make_asset(asset_id: str = "1") -> SingleAssetScanResults:
     now = datetime.now(UTC)
     return SingleAssetScanResults(
@@ -188,6 +192,23 @@ async def test_pipeline_runs_text_detectors_only() -> None:
     assert text_detector.seen == ["hello world"]
     assert image_detector.seen == []
     assert text_detector.seen_content_types == ["text/plain"]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_logs_configured_detector_name(caplog: pytest.LogCaptureFixture) -> None:
+    source = DummySource({"type": "DUMMY"}, content="hello world")
+    detector = RecordingDetector(["text/plain"], config=NamedDetectorConfig(name="Invoice Classifier"))
+
+    pipeline = DetectorPipeline(
+        detectors=[detector],
+        source=source,
+        runner_id="runner-log-name",
+    )
+
+    with caplog.at_level("INFO", logger="src.pipeline.detector_pipeline"):
+        await pipeline.process([make_asset("log-name")])
+
+    assert "Scanning asset-log-name [Invoice Classifier]" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -439,6 +460,31 @@ async def test_pipeline_routes_binary_content_to_image_detectors() -> None:
     assert len(image_detector.seen) == 1
     assert image_detector.seen[0] == image_bytes
     assert image_detector.seen_content_types == ["image/png"]
+    assert asset.findings is not None
+    assert len(asset.findings) == 1
+
+
+@pytest.mark.asyncio
+async def test_pipeline_resolves_effective_binary_mime_from_bytes_and_filename() -> None:
+    image_bytes = b"\xff\xd8\xffjpeg-data"
+    source = BinarySource(
+        {"type": "DUMMY"},
+        content="",
+        binary_data=image_bytes,
+        binary_mime="application/octet-stream",
+    )
+    image_detector = RecordingDetector(["image/jpeg"])
+
+    pipeline = DetectorPipeline(
+        detectors=[image_detector],
+        source=source,
+        runner_id="runner-binary-mime-fallback",
+    )
+
+    [asset] = await pipeline.process([make_image_asset("photo.jpg")])
+
+    assert image_detector.seen == [image_bytes]
+    assert image_detector.seen_content_types == ["image/jpeg"]
     assert asset.findings is not None
     assert len(asset.findings) == 1
 

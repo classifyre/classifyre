@@ -102,6 +102,32 @@ async def test_s3_storage_extract_applies_latest_sampling_and_asset_types(monkey
     assert assets[1].asset_type == OutputAssetType.BINARY
 
 
+@pytest.mark.asyncio
+async def test_s3_storage_fetch_content_bytes_redownloads_binary_media(monkeypatch):
+    source = S3CompatibleStorageSource(_recipe())
+    ref = ObjectRef(
+        key="exports/image.jpg",
+        size=2048,
+        last_modified=datetime.now(UTC),
+        etag="etag-jpg",
+        content_type_hint="application/octet-stream",
+    )
+
+    external_url = source._external_url(ref.key)
+    asset_hash = source.generate_hash_id(external_url)
+    source._hash_to_uri[asset_hash] = external_url
+    source._object_ref_by_hash[asset_hash] = ref
+
+    jpeg_bytes = b"\xff\xd8\xfftest-image"
+    monkeypatch.setattr(
+        source,
+        "_download_object",
+        lambda _ref_obj: (jpeg_bytes, "application/octet-stream", False),
+    )
+
+    assert await source.fetch_content_bytes(asset_hash) == (jpeg_bytes, "image/jpeg")
+
+
 def test_s3_storage_external_url_for_custom_endpoint():
     source = S3CompatibleStorageSource(
         {
