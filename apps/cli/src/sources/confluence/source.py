@@ -23,7 +23,7 @@ from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ...utils.content_extraction import html_to_text
-from ...utils.file_parser import parse_bytes
+from ...utils.file_parser import resolve_mime_type
 from ...utils.hashing import hash_url, normalize_http_url
 from ..atlassian_common import (
     AtlassianCloudClient,
@@ -121,6 +121,7 @@ class ConfluenceSource(BaseSource):
         self._page_content_cache: dict[str, tuple[str, str]] = {}
         self._asset_content_cache: dict[str, tuple[str, str]] = {}
         self._attachment_download_url_by_hash: dict[str, str] = {}
+        self._attachment_name_by_hash: dict[str, str] = {}
 
     def _optional(self) -> ConfluenceOptional:
         if self.config.optional:
@@ -192,6 +193,7 @@ class ConfluenceSource(BaseSource):
         self._page_content_cache = {}
         self._asset_content_cache = {}
         self._attachment_download_url_by_hash = {}
+        self._attachment_name_by_hash = {}
 
     def _discover_page_refs(self) -> list[dict[str, Any]]:
         refs: list[dict[str, Any]] = []
@@ -353,6 +355,7 @@ class ConfluenceSource(BaseSource):
 
             attachment_hash = self.generate_hash_id(attachment_url)
             attachment_name = str(attachment.get("title") or f"Attachment {attachment.get('id')}")
+            self._attachment_name_by_hash[attachment_hash] = attachment_name
             mime = str(attachment.get("mediaType") or "").lower()
             asset_type = self._asset_type_from_mime_or_url(mime, attachment_url)
             metadata = {
@@ -625,6 +628,12 @@ class ConfluenceSource(BaseSource):
         assets.append(asset)
         return True
 
+    def _attachment_file_name(self, asset_id: str, download_url: str) -> str:
+        stored_name = self._attachment_name_by_hash.get(asset_id)
+        if isinstance(stored_name, str) and stored_name.strip():
+            return stored_name.strip()
+        return download_url
+
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         normalized = normalize_http_url(asset_id, base_url=self.base_url)
         if normalized:
@@ -647,7 +656,12 @@ class ConfluenceSource(BaseSource):
         if self.attachment_max_bytes > 0 and len(file_bytes) > self.attachment_max_bytes:
             file_bytes = file_bytes[: self.attachment_max_bytes]
 
-        return file_bytes, declared_mime or "application/octet-stream"
+        mime_type = resolve_mime_type(
+            file_bytes,
+            declared_mime_type=declared_mime,
+            file_name=self._attachment_file_name(asset_id, download_url),
+        )
+        return file_bytes, mime_type
 
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
         direct = self._asset_content_cache.get(asset_id)
@@ -683,10 +697,10 @@ class ConfluenceSource(BaseSource):
         if self.attachment_max_bytes > 0 and len(file_bytes) > self.attachment_max_bytes:
             file_bytes = file_bytes[: self.attachment_max_bytes]
 
-        parsed = parse_bytes(
+        parsed = self.parse_asset_bytes(
             file_bytes,
             declared_mime_type=declared_mime,
-            file_name=download_url,
+            file_name=self._attachment_file_name(asset_id, download_url),
         )
 
         if parsed.text_content:

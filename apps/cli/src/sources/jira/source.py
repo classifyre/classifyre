@@ -18,7 +18,7 @@ from ...models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
 )
-from ...utils.file_parser import parse_bytes
+from ...utils.file_parser import resolve_mime_type
 from ...utils.hashing import hash_url, normalize_http_url
 from ..atlassian_common import (
     AtlassianCloudClient,
@@ -70,6 +70,7 @@ class JiraSource(BaseSource):
         self._hash_to_url: dict[str, str] = {}
         self._asset_content_cache: dict[str, tuple[str, str]] = {}
         self._attachment_url_by_hash: dict[str, str] = {}
+        self._attachment_name_by_hash: dict[str, str] = {}
 
     def _optional(self) -> JiraOptional:
         if self.config.optional:
@@ -152,6 +153,7 @@ class JiraSource(BaseSource):
         self._hash_to_url = {}
         self._asset_content_cache = {}
         self._attachment_url_by_hash = {}
+        self._attachment_name_by_hash = {}
 
     def _effective_jql(self) -> str:
         scope = self._optional().scope
@@ -405,6 +407,7 @@ class JiraSource(BaseSource):
             self._attachment_url_by_hash[attachment_hash] = normalized_url
             mime = str(attachment.get("mimeType") or "").lower()
             filename = str(attachment.get("filename") or f"attachment-{attachment.get('id')}")
+            self._attachment_name_by_hash[attachment_hash] = filename
             metadata = {
                 "issue_hash": issue_hash,
                 "attachment_id": attachment.get("id"),
@@ -504,6 +507,40 @@ class JiraSource(BaseSource):
         assets.append(asset)
         return True
 
+    def _attachment_file_name(self, asset_id: str, attachment_url: str) -> str:
+        stored_name = self._attachment_name_by_hash.get(asset_id)
+        if isinstance(stored_name, str) and stored_name.strip():
+            return stored_name.strip()
+        return attachment_url
+
+    async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
+        normalized = normalize_http_url(asset_id, base_url=self.base_url)
+        if normalized:
+            asset_hash = self.generate_hash_id(normalized)
+            asset_id = asset_hash
+
+        attachment_url = self._attachment_url_by_hash.get(asset_id) or self._hash_to_url.get(
+            asset_id
+        )
+        if not attachment_url:
+            return None
+
+        try:
+            file_bytes, declared_mime = self.client.get_bytes(attachment_url)
+        except Exception as exc:
+            logger.warning("Failed to fetch Jira attachment bytes for %s: %s", attachment_url, exc)
+            return None
+
+        if self.attachment_max_bytes > 0 and len(file_bytes) > self.attachment_max_bytes:
+            file_bytes = file_bytes[: self.attachment_max_bytes]
+
+        mime_type = resolve_mime_type(
+            file_bytes,
+            declared_mime_type=declared_mime,
+            file_name=self._attachment_file_name(asset_id, attachment_url),
+        )
+        return file_bytes, mime_type
+
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
         cached = self._asset_content_cache.get(asset_id)
         if cached:
@@ -532,10 +569,10 @@ class JiraSource(BaseSource):
         if self.attachment_max_bytes > 0 and len(file_bytes) > self.attachment_max_bytes:
             file_bytes = file_bytes[: self.attachment_max_bytes]
 
-        parsed = parse_bytes(
+        parsed = self.parse_asset_bytes(
             file_bytes,
             declared_mime_type=declared_mime,
-            file_name=attachment_url,
+            file_name=self._attachment_file_name(asset_id, attachment_url),
         )
 
         if parsed.text_content:

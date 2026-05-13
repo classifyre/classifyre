@@ -1,6 +1,6 @@
 import os
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from typing import Any
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
@@ -177,6 +177,48 @@ class BaseSource(ABC):
                 return fallback_value
 
         raise ValueError("Asset external_url is required")
+
+    def ocr_enabled(self) -> bool:
+        """Return whether sampling-level OCR is enabled for this source."""
+        config = getattr(self, "config", None)
+        sampling = getattr(config, "sampling", None) if config is not None else None
+        return bool(getattr(sampling, "enable_ocr", False))
+
+    def parse_asset_bytes(
+        self,
+        file_bytes: bytes,
+        *,
+        declared_mime_type: str | None = None,
+        file_name: str = "",
+    ) -> Any:
+        from ..utils.file_parser import parse_bytes
+
+        return parse_bytes(
+            file_bytes,
+            declared_mime_type=declared_mime_type,
+            file_name=file_name,
+            enable_ocr=self.ocr_enabled(),
+        )
+
+    def iter_asset_pages(
+        self,
+        file_bytes: bytes,
+        mime_type: str,
+        batch_size: int = 100,
+        include_column_names: bool = True,
+        *,
+        file_name: str = "",
+    ) -> Generator[str, None, None]:
+        from ..utils.file_parser import iter_file_pages
+
+        return iter_file_pages(
+            file_bytes,
+            mime_type,
+            batch_size,
+            include_column_names,
+            file_name=file_name,
+            enable_ocr=self.ocr_enabled(),
+        )
 
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         """

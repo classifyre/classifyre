@@ -52,6 +52,23 @@ def test_slack_generate_hash_id():
     assert unhash_id(hashed_id) == expected_raw
 
 
+def test_slack_generate_hash_id_prefers_team_id_when_available():
+    recipe = {
+        "type": "SLACK",
+        "required": {"workspace": "acme"},
+        "masked": {"bot_token": "xoxb-test-token"},
+    }
+
+    source = SlackSource(recipe)
+    source.team_id = "T123"
+    asset_id = "C123456_#_1700000000.000000"
+
+    hashed_id = source.generate_hash_id(asset_id)
+
+    expected_raw = "SLACK_#_T123_#_C123456_#_1700000000.000000"
+    assert unhash_id(hashed_id) == expected_raw
+
+
 def test_normalize_http_url_resolves_relative_paths():
     normalized = normalize_http_url("/images/photo.jpg", base_url="https://blog.example.com")
     assert normalized == "https://blog.example.com/images/photo.jpg"

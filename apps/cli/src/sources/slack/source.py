@@ -164,6 +164,18 @@ class SlackSource(BaseSource):
 
         return result
 
+    def _ensure_team_id(self) -> None:
+        if self.team_id:
+            return
+        try:
+            payload = self._request("get", "auth.test")
+        except Exception:
+            logger.debug("Slack auth.test failed while resolving team_id", exc_info=True)
+            return
+        team_id = payload.get("team_id")
+        if isinstance(team_id, str) and team_id.strip():
+            self.team_id = team_id.strip()
+
     def _normalize_ts(self, value: str | None) -> str | None:
         if not value:
             return None
@@ -231,6 +243,7 @@ class SlackSource(BaseSource):
             return
 
         logger.info("Extracting Slack messages...")
+        self._ensure_team_id()
 
         channel_ids, channel_lookup = self._resolve_channels()
 
@@ -416,8 +429,8 @@ class SlackSource(BaseSource):
         return f"slack://channel?channel={channel_id}&message={ts}"
 
     def generate_hash_id(self, asset_id: str) -> str:
-        workspace = self.workspace or self.team_id or "slack"
-        raw_id = f"{workspace}_#_{asset_id}"
+        identity = self.team_id or self.workspace or "slack"
+        raw_id = f"{identity}_#_{asset_id}"
         type_value = (
             self.config.type.value if hasattr(self.config.type, "value") else str(self.config.type)
         )

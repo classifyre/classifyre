@@ -862,8 +862,6 @@
       "noRunsHint": "Adjust filters to broaden the run search.",
       "loading": "Loading runs..."
     },
-    "livePolling": "Live polling",
-    "idle": "Idle",
     "monitorDesc": "Monitor sandbox runs and inspect detector findings",
     "newScan": "New sandbox scan",
     "runResults": "Run results",

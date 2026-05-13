@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
@@ -25,6 +25,7 @@ import {
   type SearchSourcesResponseDto,
   type SearchSourcesSortBy,
   type SearchSourcesSortOrder,
+  type RunnerDto,
   type StartRunnerDto,
 } from "@workspace/api-client";
 import {
@@ -62,6 +63,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components";
 import { getSourceIcon } from "../lib/source-type-icon";
+import { mergeRunnerIntoSearchSourceItem } from "@/lib/runner-ws-merge";
 import { DeleteSourceAction } from "./delete-source-action";
 import {
   getRunnerStatusBadgeLabel,
@@ -69,6 +71,7 @@ import {
   isRunnerStatusRunning,
 } from "../lib/runner-status-badge";
 import { useUrlParams } from "../lib/url-filters";
+import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 
@@ -276,6 +279,28 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     sourceId: string;
     action: "scan" | "stop";
   } | null>(null);
+
+  const applyRunnerWsEvent = useCallback((runner: RunnerDto) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      let changed = false;
+      const items = prev.items.map((source) => {
+        const next = mergeRunnerIntoSearchSourceItem(source, runner);
+        if (next) {
+          changed = true;
+          return next;
+        }
+        return source;
+      });
+      return changed ? { ...prev, items } : prev;
+    });
+  }, []);
+
+  useRunnerWebSocket({
+    trackRunnersList: false,
+    onRunnerUpdate: applyRunnerWsEvent,
+    onRunnerCreated: applyRunnerWsEvent,
+  });
 
   const resolvedPageSize = Number(pageSize);
 
