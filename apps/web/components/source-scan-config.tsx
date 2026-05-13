@@ -461,11 +461,11 @@ function DetectorConfigCard({
   );
 }
 
-function formatCustomDetectorMethod(method: string): string {
+function formatCustomDetectorMethod(method?: string): string {
   return method
-    .toLowerCase()
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    ?.toLowerCase()
+    ?.replace(/_/g, " ")
+    ?.replace(/\b\w/g, (letter) => letter.toUpperCase()) || '';
 }
 
 function matchesCustomDetectorSearch(
