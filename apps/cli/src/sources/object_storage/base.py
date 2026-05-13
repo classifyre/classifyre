@@ -495,7 +495,43 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         mime = self._mime_cache.get(asset_id, "")
         if raw_bytes is not None and mime:
             return raw_bytes, mime
-        return None
+
+        external_url = self._hash_to_uri.get(asset_id)
+        asset_hash = asset_id
+        if external_url is None:
+            decoded = asset_id
+            if "_#_" not in decoded:
+                try:
+                    decoded = unhash_id(asset_id)
+                except Exception:
+                    decoded = asset_id
+            if "_#_" in decoded:
+                _, candidate = decoded.split("_#_", maxsplit=1)
+                external_url = candidate
+                asset_hash = self.generate_hash_id(candidate)
+            else:
+                external_url = asset_id
+                asset_hash = self.generate_hash_id(asset_id)
+
+        ref = self._object_ref_by_hash.get(asset_hash)
+        if ref is None:
+            return None
+
+        try:
+            file_bytes, content_type_hint, _truncated = self._download_object(ref)
+        except Exception as exc:
+            logger.warning("Failed to download object %s for binary fetch: %s", ref.key, exc)
+            return None
+
+        mime_type = resolve_mime_type(
+            file_bytes,
+            declared_mime_type=content_type_hint or ref.content_type_hint or "",
+            file_name=ref.key,
+        )
+        self._mime_cache[asset_hash] = mime_type
+        if external_url:
+            self._mime_cache[external_url] = mime_type
+        return file_bytes, mime_type
 
     async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
         raw_bytes = self._bytes_cache.get(asset_id)

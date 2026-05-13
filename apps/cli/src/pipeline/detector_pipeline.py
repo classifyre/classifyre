@@ -17,6 +17,7 @@ from ..models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ..sources.base import BaseSource
+from ..utils.file_parser import resolve_mime_type
 from .content_provider import ContentProvider
 
 logger = logging.getLogger(__name__)
@@ -123,7 +124,7 @@ class DetectorPipeline:
         ]
 
         all_active = text_detectors + binary_detectors + link_detectors
-        detector_names = [d.__class__.__name__ for d in all_active]
+        detector_names = [self._detector_log_label(d) for d in all_active]
         logger.info("Scanning %s [%s]", asset.name, ", ".join(detector_names))
 
         findings: list[DetectionResult] = []
@@ -317,10 +318,16 @@ class DetectorPipeline:
             if not raw_bytes:
                 continue
 
+            effective_mime_type = self._resolve_binary_mime_type(
+                raw_bytes=raw_bytes,
+                declared_mime_type=mime_type,
+                asset=asset,
+            )
+
             compatible = [
                 d
                 for d in detectors
-                if self._supports_content_type(d.get_supported_content_types(), mime_type)
+                if self._supports_content_type(d.get_supported_content_types(), effective_mime_type)
             ]
             if not compatible:
                 continue
@@ -328,7 +335,7 @@ class DetectorPipeline:
             findings, detector_types_run, errors = await self._run_detectors(
                 detectors=compatible,
                 content=raw_bytes,
-                content_type=mime_type,
+                content_type=effective_mime_type,
                 asset_name=asset.name,
             )
             for finding in findings:
@@ -338,12 +345,39 @@ class DetectorPipeline:
         return [], [], [], []
 
     @staticmethod
+    def _resolve_binary_mime_type(
+        *,
+        raw_bytes: bytes,
+        declared_mime_type: str,
+        asset: SingleAssetScanResults,
+    ) -> str:
+        file_name = str(asset.name or "").strip() or str(asset.external_url or "").strip()
+        return resolve_mime_type(
+            raw_bytes,
+            declared_mime_type=declared_mime_type,
+            file_name=file_name,
+        )
+
+    @staticmethod
     def _is_binary_detector(detector: BaseDetector) -> bool:
         """Return True if the detector handles binary content types (images, etc.)."""
         for ct in detector.get_supported_content_types():
             if ct.startswith(("image/", "audio/", "video/")) or ct == "application/octet-stream":
                 return True
         return False
+
+    @staticmethod
+    def _detector_log_label(detector: BaseDetector) -> str:
+        """Return a human-readable detector label for logs."""
+        config_name = getattr(getattr(detector, "config", None), "name", None)
+        if isinstance(config_name, str) and config_name.strip():
+            return config_name.strip()
+
+        detector_name = getattr(detector, "detector_name", "")
+        if isinstance(detector_name, str) and detector_name.strip() and detector_name != "base":
+            return detector_name.strip()
+
+        return detector.__class__.__name__
 
     @staticmethod
     def _merge_detector_types(
