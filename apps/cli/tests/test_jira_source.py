@@ -14,6 +14,7 @@ from src.utils.validation import validate_input
 def _jira_recipe(
     *,
     strategy: str = "ALL",
+    enable_ocr: bool = False,
     scope: dict[str, Any] | None = None,
     include_scope: bool = True,
     optional_extra: dict[str, Any] | None = None,
@@ -31,7 +32,7 @@ def _jira_recipe(
         },
         "masked": {"api_token": "token"},
         **({"optional": optional} if optional else {}),
-        "sampling": {"strategy": strategy},
+        "sampling": {"strategy": strategy, "enable_ocr": enable_ocr},
     }
 
 
@@ -270,7 +271,8 @@ async def test_jira_fetch_content_for_attachment(monkeypatch: pytest.MonkeyPatch
         lambda _url: (b"jira attachment text payload", "text/plain"),
     )
     monkeypatch.setattr(
-        "src.sources.jira.source.parse_bytes",
+        source,
+        "parse_asset_bytes",
         lambda _file_bytes, **_kwargs: ParsedBytes(
             mime_type="text/plain",
             raw_content="jira attachment text payload",
@@ -287,6 +289,88 @@ async def test_jira_fetch_content_for_attachment(monkeypatch: pytest.MonkeyPatch
     raw, text = content
     assert "jira attachment text payload" in raw
     assert "jira attachment text payload" in text
+
+
+@pytest.mark.asyncio
+async def test_jira_fetch_content_passes_sampling_ocr_flag(monkeypatch: pytest.MonkeyPatch):
+    source = JiraSource(_jira_recipe(enable_ocr=True))
+    attachment_url = "https://your-domain.atlassian.net/secure/attachment/att-9/scan.png"
+    attachment_hash = source.generate_hash_id(attachment_url)
+    source._attachment_url_by_hash[attachment_hash] = attachment_url
+
+    monkeypatch.setattr(source.client, "get_bytes", lambda _url: (b"png-bytes", "image/png"))
+
+    captured: dict[str, object] = {}
+
+    def _parse_asset_bytes(file_bytes: bytes, **kwargs: object) -> ParsedBytes:
+        captured["file_bytes"] = file_bytes
+        captured.update(kwargs)
+        return ParsedBytes(
+            mime_type="image/png",
+            raw_content="",
+            text_content="ocr payload",
+            is_binary=True,
+            file_size_bytes=len(file_bytes),
+            parse_error=None,
+        )
+
+    monkeypatch.setattr(source, "parse_asset_bytes", _parse_asset_bytes)
+
+    content = await source.fetch_content(attachment_hash)
+
+    assert content == ("", "ocr payload")
+    assert captured["declared_mime_type"] == "image/png"
+    assert isinstance(captured["file_name"], str)
+    assert captured["file_name"]
+
+
+def test_jira_parse_asset_bytes_enables_ocr_from_sampling(monkeypatch: pytest.MonkeyPatch):
+    source = JiraSource(_jira_recipe(enable_ocr=True))
+    captured: dict[str, object] = {}
+
+    def _parse_bytes(file_bytes: bytes, **kwargs: object) -> ParsedBytes:
+        captured["file_bytes"] = file_bytes
+        captured.update(kwargs)
+        return ParsedBytes(
+            mime_type="image/png",
+            raw_content="",
+            text_content="ocr payload",
+            is_binary=True,
+            file_size_bytes=len(file_bytes),
+            parse_error=None,
+        )
+
+    monkeypatch.setattr("src.utils.file_parser.parse_bytes", _parse_bytes)
+
+    source.parse_asset_bytes(
+        b"png-bytes",
+        declared_mime_type="image/png",
+        file_name="scan.png",
+    )
+
+    assert captured["enable_ocr"] is True
+
+
+@pytest.mark.asyncio
+async def test_jira_fetch_content_bytes_resolves_mime_from_stored_filename(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = JiraSource(_jira_recipe())
+    attachment_url = "https://your-domain.atlassian.net/secure/attachment/att-9"
+    attachment_hash = source.generate_hash_id(attachment_url)
+    source._attachment_url_by_hash[attachment_hash] = attachment_url
+    source._attachment_name_by_hash[attachment_hash] = "diagram.png"
+
+    monkeypatch.setattr(
+        source.client,
+        "get_bytes",
+        lambda _url: (b"\x89PNG\r\n\x1a\njira-image", "application/octet-stream"),
+    )
+
+    assert await source.fetch_content_bytes(attachment_hash) == (
+        b"\x89PNG\r\n\x1a\njira-image",
+        "image/png",
+    )
 
 
 def test_jira_resolve_link_for_detection_maps_hash_to_url():

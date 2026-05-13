@@ -87,7 +87,7 @@ async def test_slack_extract_messages(mock_session_cls, slack_recipe):
                 }
             )
         if url.endswith("/auth.test"):
-            return _make_response({"ok": True})
+            return _make_response({"ok": True, "team_id": "T123"})
         raise AssertionError(f"Unexpected URL: {url}")
 
     mock_session.request.side_effect = request_side_effect
@@ -101,7 +101,7 @@ async def test_slack_extract_messages(mock_session_cls, slack_recipe):
 
     assert len(results) == 1
     decoded = unhash_id(results[0].hash)
-    assert decoded.endswith("acme_#_C123_#_1700000000.000100")
+    assert decoded.endswith("T123_#_C123_#_1700000000.000100")
     assert results[0].external_url.startswith("https://acme.slack.com/archives/C123")
 
 

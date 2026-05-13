@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -423,6 +424,32 @@ class BinarySource(DummySource):
         return self._binary_data, self._binary_mime
 
 
+class OcrBinarySource(BinarySource):
+    def __init__(
+        self,
+        recipe: dict[str, Any],
+        content: str,
+        binary_data: bytes,
+        binary_mime: str,
+        ocr_pages: list[str],
+    ) -> None:
+        super().__init__(recipe, content, binary_data, binary_mime)
+        self._ocr_pages = ocr_pages
+        self.config = SimpleNamespace(sampling=SimpleNamespace(enable_ocr=True))
+
+    def iter_asset_pages(
+        self,
+        file_bytes: bytes,
+        mime_type: str,
+        batch_size: int = 100,
+        include_column_names: bool = True,
+        *,
+        file_name: str = "",
+    ):
+        _ = (file_bytes, mime_type, batch_size, include_column_names, file_name)
+        yield from self._ocr_pages
+
+
 def make_image_asset(asset_id: str = "img-1") -> SingleAssetScanResults:
     now = datetime.now(UTC)
     return SingleAssetScanResults(
@@ -462,6 +489,57 @@ async def test_pipeline_routes_binary_content_to_image_detectors() -> None:
     assert image_detector.seen_content_types == ["image/png"]
     assert asset.findings is not None
     assert len(asset.findings) == 1
+
+
+@pytest.mark.asyncio
+async def test_pipeline_routes_ocr_text_to_text_detectors_for_image_assets() -> None:
+    image_bytes = b"\x89PNG\r\n\x1a\nfake-image-data"
+    source = OcrBinarySource(
+        {"type": "DUMMY"},
+        content="",
+        binary_data=image_bytes,
+        binary_mime="image/png",
+        ocr_pages=["detected words"],
+    )
+    text_detector = RecordingDetector(["text/plain"])
+    image_detector = RecordingDetector(["image/png"])
+
+    pipeline = DetectorPipeline(
+        detectors=[text_detector, image_detector],
+        source=source,
+        runner_id="runner-ocr-image",
+    )
+
+    [_asset] = await pipeline.process([make_image_asset("ocr-image")])
+
+    assert text_detector.seen == ["detected words"]
+    assert text_detector.seen_content_types == ["text/plain"]
+    assert image_detector.seen == [image_bytes]
+    assert image_detector.seen_content_types == ["image/png"]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_runs_mixed_detector_on_ocr_text_and_binary_payloads() -> None:
+    image_bytes = b"\x89PNG\r\n\x1a\nfake-image-data"
+    source = OcrBinarySource(
+        {"type": "DUMMY"},
+        content="",
+        binary_data=image_bytes,
+        binary_mime="image/png",
+        ocr_pages=["detected words"],
+    )
+    mixed_detector = RecordingDetector(["text/plain", "image/png"])
+
+    pipeline = DetectorPipeline(
+        detectors=[mixed_detector],
+        source=source,
+        runner_id="runner-ocr-mixed",
+    )
+
+    [_asset] = await pipeline.process([make_image_asset("ocr-mixed")])
+
+    assert mixed_detector.seen == ["detected words", image_bytes]
+    assert mixed_detector.seen_content_types == ["text/plain", "image/png"]
 
 
 @pytest.mark.asyncio

@@ -862,8 +862,6 @@
       "noRunsHint": "Filter anpassen, um die Suche zu erweitern.",
       "loading": "Ausführungen werden geladen..."
     },
-    "livePolling": "Live-Polling",
-    "idle": "Inaktiv",
     "monitorDesc": "Sandbox-Läufe überwachen und Detektor-Befunde prüfen",
     "newScan": "Neuer Sandbox-Scan",
     "runResults": "Laufergebnisse",

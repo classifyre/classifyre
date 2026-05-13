@@ -8,6 +8,7 @@ from src.utils.file_parser import (
     ParsedFile,
     detect_mime_type,
     extract_text,
+    iter_file_pages,
     parse_bytes,
     parse_file,
 )
@@ -161,6 +162,44 @@ class TestExtractText:
         assert "Hello DOCX" in text
         assert err is None
 
+    def test_image_ocr_uses_docling_when_enabled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("Detected from OCR", None),
+        )
+
+        text, err = extract_text(
+            b"\x89PNG\r\n\x1a\nfake-image",
+            "image/png",
+            file_name="receipt.png",
+            enable_ocr=True,
+        )
+
+        assert text == "Detected from OCR"
+        assert err is None
+
+    def test_image_ocr_is_disabled_by_default(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def fail_if_called(*_args, **_kwargs):
+            raise AssertionError("Docling OCR should not run when OCR is disabled")
+
+        monkeypatch.setattr("src.utils.file_parser._extract_docling_markdown", fail_if_called)
+
+        text, err = extract_text(
+            b"\x89PNG\r\n\x1a\nfake-image",
+            "image/png",
+            file_name="receipt.png",
+            enable_ocr=False,
+        )
+
+        assert text == ""
+        assert err is None
+
 
 # ---------------------------------------------------------------------------
 # parse_file
@@ -220,3 +259,44 @@ class TestParseBytes:
             file_name="invoice.pdf",
         )
         assert parsed.mime_type == "application/pdf"
+
+    def test_parse_bytes_preserves_binary_flag_when_ocr_extracts_image_text(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("ocr text", None),
+        )
+
+        parsed = parse_bytes(
+            b"\x89PNG\r\n\x1a\nimage-bytes",
+            declared_mime_type="image/png",
+            file_name="photo.png",
+            enable_ocr=True,
+        )
+
+        assert parsed.mime_type == "image/png"
+        assert parsed.text_content == "ocr text"
+        assert parsed.is_binary is True
+
+    def test_iter_file_pages_uses_ocr_for_images(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("first line\nsecond line", None),
+        )
+
+        pages = list(
+            iter_file_pages(
+                b"\x89PNG\r\n\x1a\nimage-bytes",
+                "image/png",
+                batch_size=1,
+                file_name="photo.png",
+                enable_ocr=True,
+            )
+        )
+
+        assert pages == ["first line\n", "second line"]

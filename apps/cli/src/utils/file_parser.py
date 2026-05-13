@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import tempfile
 from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
@@ -64,6 +65,44 @@ _MIME_HINTS_BY_EXTENSION = {
     ".pdf": "application/pdf",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".bmp": "image/bmp",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
+    ".webp": "image/webp",
+}
+
+_DOCLING_MIME_TYPES = {
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/html",
+    "application/xhtml+xml",
+    "text/markdown",
+    "text/plain",
+}
+_DOCLING_EXTENSIONS = {
+    ".pdf",
+    ".docx",
+    ".pptx",
+    ".xlsx",
+    ".html",
+    ".htm",
+    ".md",
+    ".txt",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".webp",
 }
 
 
@@ -191,13 +230,89 @@ def detect_mime_type(file_bytes: bytes) -> str:
     return _sniff_text_mime(file_bytes)
 
 
-def extract_text(file_bytes: bytes, mime_type: str) -> tuple[str, str | None]:
+def _supports_docling_ocr(mime_type: str, file_name: str) -> bool:
+    normalized = _normalize_mime_type(mime_type)
+    if normalized.startswith("image/"):
+        return True
+    if normalized in _DOCLING_MIME_TYPES:
+        return True
+    return _file_extension(file_name) in _DOCLING_EXTENSIONS
+
+
+def _temp_file_name(file_name: str, mime_type: str) -> str:
+    extension = _file_extension(file_name)
+    if extension:
+        return f"input{extension}"
+
+    for suffix, candidate_mime in _MIME_HINTS_BY_EXTENSION.items():
+        if candidate_mime == mime_type:
+            return f"input{suffix}"
+
+    if mime_type.startswith("image/"):
+        suffix = mime_type.split("/", maxsplit=1)[1].replace("jpeg", "jpg")
+        return f"input.{suffix}"
+
+    return "input.bin"
+
+
+def _extract_docling_markdown(
+    file_bytes: bytes,
+    *,
+    mime_type: str,
+    file_name: str,
+) -> tuple[str, str | None]:
+    try:
+        from ..sources.dependencies import MissingSourceDependencyError, require_module
+
+        converter_module = require_module(
+            "docling.document_converter",
+            "file parser OCR",
+            ["file-processing", "detectors"],
+            detail="OCR extraction requires the Docling optional dependency.",
+        )
+        document_converter = converter_module.DocumentConverter()
+    except MissingSourceDependencyError as exc:
+        return "", str(exc)
+    except Exception as exc:
+        return "", f"Docling initialisation failed: {exc}"
+
+    temp_file_name = _temp_file_name(file_name, mime_type)
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="classifyre-docling-") as temp_dir:
+            temp_path = Path(temp_dir) / temp_file_name
+            temp_path.write_bytes(file_bytes)
+            result = document_converter.convert(temp_path)
+            text = result.document.export_to_markdown().strip()
+            return text, None
+    except Exception as exc:
+        return "", f"Docling extraction failed: {exc}"
+
+
+def extract_text(
+    file_bytes: bytes,
+    mime_type: str,
+    *,
+    file_name: str = "",
+    enable_ocr: bool = False,
+) -> tuple[str, str | None]:
     """
     Extract plain text from file bytes based on MIME type.
 
     Returns:
         (text_content, error_message_or_None)
     """
+    if enable_ocr and _supports_docling_ocr(mime_type, file_name):
+        text, error = _extract_docling_markdown(
+            file_bytes,
+            mime_type=mime_type,
+            file_name=file_name,
+        )
+        if text:
+            return text, None
+        if error:
+            logger.warning("OCR extraction failed for %s: %s", file_name or mime_type, error)
+
     # Binary media types — no text extraction
     if mime_type.startswith(("image/", "audio/", "video/")):
         return "", None
@@ -359,6 +474,7 @@ def parse_bytes(
     *,
     declared_mime_type: str | None = None,
     file_name: str = "",
+    enable_ocr: bool = False,
 ) -> ParsedBytes:
     """
     Parse in-memory bytes: resolve MIME type and extract raw/text content.
@@ -372,7 +488,12 @@ def parse_bytes(
         file_bytes, declared_mime_type=declared_mime_type, file_name=file_name
     )
 
-    text_content, parse_error = extract_text(file_bytes, mime_type)
+    text_content, parse_error = extract_text(
+        file_bytes,
+        mime_type,
+        file_name=file_name,
+        enable_ocr=enable_ocr,
+    )
     raw_content = _decode_bytes(file_bytes) if _is_text_like_mime_type(mime_type) else ""
 
     if mime_type in {"text/html", "application/xhtml+xml"} and raw_content and not text_content:
@@ -400,6 +521,9 @@ def iter_file_pages(
     mime_type: str,
     batch_size: int = 100,
     include_column_names: bool = True,
+    *,
+    file_name: str = "",
+    enable_ocr: bool = False,
 ) -> Generator[str, None, None]:
     """
     Iterate over file content in pages of up to batch_size rows or lines.
@@ -418,7 +542,12 @@ def iter_file_pages(
     elif normalized in ("text/csv", "text/tab-separated-values"):
         yield from _iter_csv_pages(file_bytes, include_column_names)
     else:
-        text, error = extract_text(file_bytes, normalized)
+        text, error = extract_text(
+            file_bytes,
+            normalized,
+            file_name=file_name,
+            enable_ocr=enable_ocr,
+        )
         if error:
             logger.warning("Text extraction error (%s): %s", mime_type, error)
         if text:
@@ -520,7 +649,7 @@ def _format_tabular_page(
     return "\n".join(lines)
 
 
-def parse_file(file_path: Path) -> ParsedFile:
+def parse_file(file_path: Path, *, enable_ocr: bool = False) -> ParsedFile:
     """
     Parse a local file: detect MIME type and extract text.
 
@@ -537,7 +666,7 @@ def parse_file(file_path: Path) -> ParsedFile:
         raise FileNotFoundError(f"File not found: {file_path}")
 
     file_bytes = file_path.read_bytes()
-    parsed = parse_bytes(file_bytes, file_name=file_path.name)
+    parsed = parse_bytes(file_bytes, file_name=file_path.name, enable_ocr=enable_ocr)
 
     encoding: str | None = None
     if not parsed.is_binary and parsed.text_content:
