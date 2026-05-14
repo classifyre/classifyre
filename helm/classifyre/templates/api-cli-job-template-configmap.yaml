@@ -64,10 +64,6 @@ data:
                   {
                     "name": "HF_HOME",
                     "value": "{{ if .Values.api.cliJobs.uvCache.enabled }}{{ .Values.api.cliJobs.uvCache.mountPath }}/hf{{ else }}/tmp/uv-cache/hf{{ end }}"
-                  },
-                  {
-                    "name": "DOCLING_ARTIFACTS_PATH",
-                    "value": "{{ if .Values.api.cliJobs.uvCache.enabled }}{{ .Values.api.cliJobs.uvCache.mountPath }}/docling{{ else }}/tmp/uv-cache/docling{{ end }}"
                   }
                   {{- if .Values.telemetry.enabled }},
                   {

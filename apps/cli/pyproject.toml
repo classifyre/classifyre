@@ -113,6 +113,7 @@ file-processing = [
 ocr = [
     { include-group = "file-processing" },
     "docling>=2.93.0",
+    "rapidocr-onnxruntime>=1.4.0",
 ]
 postgresql = [
     "psycopg2-binary>=2.9.9,<3.0.0",
