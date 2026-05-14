@@ -126,6 +126,10 @@ class _DoclingState:
 
 _docling_state = _DoclingState()
 _docling_lock = threading.Lock()
+# Limits concurrent converter.convert() calls to prevent OOM. Each docling
+# conversion holds ~300-500 MB of working memory; with multiple asyncio.to_thread
+# workers running in parallel this exhausts the 4 GiB K8s job limit.
+_docling_conversion_sem = threading.Semaphore(2)
 
 
 def _get_docling_converter() -> tuple[object, str | None]:
@@ -330,7 +334,8 @@ def _extract_docling_markdown(
         with tempfile.TemporaryDirectory(prefix="classifyre-docling-") as temp_dir:
             temp_path = Path(temp_dir) / temp_fname
             temp_path.write_bytes(file_bytes)
-            result = converter.convert(temp_path)  # type: ignore[union-attr]
+            with _docling_conversion_sem:
+                result = converter.convert(temp_path)  # type: ignore[union-attr]
             text = result.document.export_to_markdown().strip()
             page_count = len(result.document.pages) if hasattr(result.document, "pages") else None
             logger.info(
