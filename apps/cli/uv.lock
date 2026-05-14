@@ -622,6 +622,7 @@ ocr = [
     { name = "pdfplumber" },
     { name = "pyarrow" },
     { name = "python-docx" },
+    { name = "rapidocr-onnxruntime" },
 ]
 oracle = [
     { name = "oracledb" },
@@ -772,6 +773,7 @@ ocr = [
     { name = "pdfplumber", specifier = ">=0.11.9" },
     { name = "pyarrow", specifier = ">=18.0.0" },
     { name = "python-docx", specifier = ">=1.2.0" },
+    { name = "rapidocr-onnxruntime", specifier = ">=1.4.0" },
 ]
 oracle = [{ name = "oracledb", specifier = ">=2.5.1,<3.0.0" }]
 otel = [
@@ -3784,6 +3786,25 @@ dependencies = [
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ea/4a/fa521d947f0fc7bb304bf11bec4cb66266bd81494588b4cb48dc01001719/rapidocr-3.8.1-py3-none-any.whl", hash = "sha256:650044b1fbce9e6bae5cae462dcf8be754cde11e2f23fc51f65dcc08deae2c46", size = 15080319, upload-time = "2026-04-11T07:13:22.56Z" },
+]
+
+[[package]]
+name = "rapidocr-onnxruntime"
+version = "1.4.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "onnxruntime" },
+    { name = "opencv-python" },
+    { name = "pillow" },
+    { name = "pyclipper" },
+    { name = "pyyaml" },
+    { name = "shapely" },
+    { name = "six" },
+    { name = "tqdm" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ba/12/1e5497183bdbe782dbb91bad1d0d2297dba4d2831b2652657f7517bfc6df/rapidocr_onnxruntime-1.4.4-py3-none-any.whl", hash = "sha256:971d7d5f223a7a808662229df1ef69893809d8457d834e6373d3854bc1782cbf", size = 14915192, upload-time = "2025-01-17T01:48:25.104Z" },
 ]
 
 [[package]]
