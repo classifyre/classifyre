@@ -130,7 +130,12 @@ _docling_lock = threading.Lock()
 
 def _get_docling_converter() -> tuple[object, str | None]:
     """Return a cached DocumentConverter, initializing it on the first call."""
-    if _docling_state.attempted:
+    # Fast-path: only skip the lock once initialization is settled (converter
+    # ready or permanently failed).  Checking `attempted` alone is not enough —
+    # `attempted` is set before the install+init finishes, so threads that reach
+    # here while another thread holds the lock would return (None, None) and
+    # emit a spurious "unavailable" warning instead of waiting.
+    if _docling_state.converter is not None or _docling_state.error is not None:
         return _docling_state.converter, _docling_state.error
     with _docling_lock:
         if _docling_state.attempted:
