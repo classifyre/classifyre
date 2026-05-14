@@ -558,7 +558,6 @@ detectors = [
     { name = "datasets" },
     { name = "datasketch" },
     { name = "detect-secrets" },
-    { name = "docling" },
     { name = "filetype" },
     { name = "gliner2" },
     { name = "google-re2" },
@@ -591,7 +590,6 @@ dev = [
 ]
 file-processing = [
     { name = "chardet" },
-    { name = "docling" },
     { name = "filetype" },
     { name = "openpyxl" },
     { name = "pdfplumber" },
@@ -615,6 +613,15 @@ mssql = [
 ]
 mysql = [
     { name = "pymysql" },
+]
+ocr = [
+    { name = "chardet" },
+    { name = "docling" },
+    { name = "filetype" },
+    { name = "openpyxl" },
+    { name = "pdfplumber" },
+    { name = "pyarrow" },
+    { name = "python-docx" },
 ]
 oracle = [
     { name = "oracledb" },
@@ -709,7 +716,6 @@ detectors = [
     { name = "datasets", specifier = ">=4.4.1" },
     { name = "datasketch", specifier = ">=1.9.0" },
     { name = "detect-secrets", specifier = ">=1.5.0" },
-    { name = "docling", specifier = ">=2.93.0" },
     { name = "filetype", specifier = ">=1.2.0" },
     { name = "gliner2", specifier = ">=1.3.0" },
     { name = "google-re2", specifier = ">=1.1" },
@@ -742,7 +748,6 @@ dev = [
 ]
 file-processing = [
     { name = "chardet", specifier = ">=5.2.0" },
-    { name = "docling", specifier = ">=2.93.0" },
     { name = "filetype", specifier = ">=1.2.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pdfplumber", specifier = ">=0.11.9" },
@@ -759,6 +764,15 @@ hive = [
 mongodb = [{ name = "pymongo", specifier = ">=4.15.2,<5.0.0" }]
 mssql = [{ name = "pymssql", specifier = ">=2.3.4,<3.0.0" }]
 mysql = [{ name = "pymysql", specifier = ">=1.1.1,<2.0.0" }]
+ocr = [
+    { name = "chardet", specifier = ">=5.2.0" },
+    { name = "docling", specifier = ">=2.93.0" },
+    { name = "filetype", specifier = ">=1.2.0" },
+    { name = "openpyxl", specifier = ">=3.1.5" },
+    { name = "pdfplumber", specifier = ">=0.11.9" },
+    { name = "pyarrow", specifier = ">=18.0.0" },
+    { name = "python-docx", specifier = ">=1.2.0" },
+]
 oracle = [{ name = "oracledb", specifier = ">=2.5.1,<3.0.0" }]
 otel = [
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.27.0" },

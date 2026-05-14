@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import tempfile
+import threading
 from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
@@ -83,8 +84,6 @@ _DOCLING_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "text/html",
     "application/xhtml+xml",
-    "text/markdown",
-    "text/plain",
 }
 _DOCLING_EXTENSIONS = {
     ".pdf",
@@ -93,8 +92,6 @@ _DOCLING_EXTENSIONS = {
     ".xlsx",
     ".html",
     ".htm",
-    ".md",
-    ".txt",
     ".png",
     ".jpg",
     ".jpeg",
@@ -104,6 +101,55 @@ _DOCLING_EXTENSIONS = {
     ".tiff",
     ".webp",
 }
+
+
+class _DoclingState:
+    """Mutable singleton state for the Docling DocumentConverter.
+
+    Stored as object attributes so functions can mutate state without `global`
+    statements (which ruff PLW0603 disallows). Initializing the converter is
+    expensive (loads ML models), so it happens exactly once per process.
+    """
+
+    def __init__(self) -> None:
+        self.converter: object = None
+        self.error: str | None = None
+        self.attempted: bool = False
+
+
+_docling_state = _DoclingState()
+_docling_lock = threading.Lock()
+
+
+def _get_docling_converter() -> tuple[object, str | None]:
+    """Return a cached DocumentConverter, initializing it on the first call."""
+    if _docling_state.attempted:
+        return _docling_state.converter, _docling_state.error
+    with _docling_lock:
+        if _docling_state.attempted:
+            return _docling_state.converter, _docling_state.error
+        _docling_state.attempted = True
+        try:
+            from ..sources.dependencies import require_module
+
+            converter_module = require_module(
+                "docling.document_converter",
+                "file parser OCR",
+                ["ocr"],
+                detail="OCR extraction requires the Docling optional dependency.",
+            )
+            _docling_state.converter = converter_module.DocumentConverter()
+        except Exception as exc:
+            _docling_state.error = str(exc)
+    return _docling_state.converter, _docling_state.error
+
+
+def _reset_docling_singleton() -> None:
+    """Reset the cached Docling converter. Intended for test isolation only."""
+    with _docling_lock:
+        _docling_state.converter = None
+        _docling_state.error = None
+        _docling_state.attempted = False
 
 
 def _normalize_mime_type(mime_type: str | None) -> str:
@@ -261,28 +307,18 @@ def _extract_docling_markdown(
     mime_type: str,
     file_name: str,
 ) -> tuple[str, str | None]:
-    try:
-        from ..sources.dependencies import MissingSourceDependencyError, require_module
+    converter, error = _get_docling_converter()
+    if error:
+        return "", error
+    if converter is None:
+        return "", "Docling converter unavailable"
 
-        converter_module = require_module(
-            "docling.document_converter",
-            "file parser OCR",
-            ["file-processing", "detectors"],
-            detail="OCR extraction requires the Docling optional dependency.",
-        )
-        document_converter = converter_module.DocumentConverter()
-    except MissingSourceDependencyError as exc:
-        return "", str(exc)
-    except Exception as exc:
-        return "", f"Docling initialisation failed: {exc}"
-
-    temp_file_name = _temp_file_name(file_name, mime_type)
-
+    temp_fname = _temp_file_name(file_name, mime_type)
     try:
         with tempfile.TemporaryDirectory(prefix="classifyre-docling-") as temp_dir:
-            temp_path = Path(temp_dir) / temp_file_name
+            temp_path = Path(temp_dir) / temp_fname
             temp_path.write_bytes(file_bytes)
-            result = document_converter.convert(temp_path)
+            result = converter.convert(temp_path)  # type: ignore[union-attr]
             text = result.document.export_to_markdown().strip()
             return text, None
     except Exception as exc:
