@@ -70,7 +70,6 @@ class JiraSource(BaseSource):
         self._hash_to_url: dict[str, str] = {}
         self._asset_content_cache: dict[str, tuple[str, str]] = {}
         self._attachment_url_by_hash: dict[str, str] = {}
-        self._attachment_name_by_hash: dict[str, str] = {}
 
     def _optional(self) -> JiraOptional:
         if self.config.optional:
@@ -506,12 +505,6 @@ class JiraSource(BaseSource):
         self._seen_asset_hashes.add(asset.hash)
         assets.append(asset)
         return True
-
-    def _attachment_file_name(self, asset_id: str, attachment_url: str) -> str:
-        stored_name = self._attachment_name_by_hash.get(asset_id)
-        if isinstance(stored_name, str) and stored_name.strip():
-            return stored_name.strip()
-        return attachment_url
 
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         normalized = normalize_http_url(asset_id, base_url=self.base_url)

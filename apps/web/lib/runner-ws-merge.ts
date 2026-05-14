@@ -7,6 +7,11 @@ import type {
 import { RunnerDtoFromJSON } from "@workspace/api-client";
 
 export function parseRunnerSocketPayload(raw: unknown): RunnerDto {
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new TypeError(
+      `Expected runner payload object, got ${raw === null ? "null" : typeof raw}`,
+    );
+  }
   return RunnerDtoFromJSON(raw as object);
 }
 
