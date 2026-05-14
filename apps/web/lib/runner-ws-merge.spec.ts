@@ -127,7 +127,7 @@ describe("mergeRunnerIntoSearchSourceItem", () => {
     const runner = makeRunner({
       id: "r-new",
       sourceId: "s-1",
-      triggeredAt: "2024-06-01T00:00:00Z",
+      triggeredAt: "2024-06-01T00:00:00Z" as never,
       status: "COMPLETED" as RunnerDto["status"],
     });
     const result = mergeRunnerIntoSearchSourceItem(source, runner);
@@ -140,7 +140,7 @@ describe("mergeRunnerIntoSearchSourceItem", () => {
     const runner = makeRunner({
       id: "r-old",
       sourceId: "s-1",
-      triggeredAt: "2024-01-01T00:00:00Z",
+      triggeredAt: "2024-01-01T00:00:00Z" as never,
     });
     const result = mergeRunnerIntoSearchSourceItem(source, runner);
     expect(result).toBeNull();
