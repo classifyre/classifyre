@@ -332,6 +332,14 @@ def _extract_docling_markdown(
             temp_path.write_bytes(file_bytes)
             result = converter.convert(temp_path)  # type: ignore[union-attr]
             text = result.document.export_to_markdown().strip()
+            page_count = len(result.document.pages) if hasattr(result.document, "pages") else None
+            logger.info(
+                "OCR extracted %d chars from %s (%s%s)",
+                len(text),
+                file_name or mime_type,
+                mime_type,
+                f", {page_count} pages" if page_count else "",
+            )
             return text, None
     except Exception as exc:
         return "", f"Docling extraction failed: {exc}"
