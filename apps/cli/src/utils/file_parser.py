@@ -76,6 +76,14 @@ _MIME_HINTS_BY_EXTENSION = {
     ".webp": "image/webp",
 }
 
+_DOCLING_IMAGE_MIME_TYPES = {
+    "image/png",
+    "image/jpeg",
+    "image/tiff",
+    "image/bmp",
+    "image/webp",
+}
+
 _DOCLING_MIME_TYPES = {
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -98,7 +106,6 @@ _DOCLING_EXTENSIONS = {
     ".png",
     ".jpg",
     ".jpeg",
-    ".gif",
     ".bmp",
     ".tif",
     ".tiff",
@@ -232,7 +239,7 @@ def detect_mime_type(file_bytes: bytes) -> str:
 
 def _supports_docling_ocr(mime_type: str, file_name: str) -> bool:
     normalized = _normalize_mime_type(mime_type)
-    if normalized.startswith("image/"):
+    if normalized in _DOCLING_IMAGE_MIME_TYPES:
         return True
     if normalized in _DOCLING_MIME_TYPES:
         return True
