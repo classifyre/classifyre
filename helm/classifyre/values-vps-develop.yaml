@@ -41,7 +41,6 @@ api:
       size: 30Gi
       accessModes:
         - ReadWriteOnce
-
   runnerLogs:
     accessModes:
       - ReadWriteOnce
