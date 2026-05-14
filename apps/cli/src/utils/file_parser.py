@@ -126,10 +126,11 @@ class _DoclingState:
 
 _docling_state = _DoclingState()
 _docling_lock = threading.Lock()
-# Limits concurrent converter.convert() calls to prevent OOM. Each docling
-# conversion holds ~300-500 MB of working memory; with multiple asyncio.to_thread
-# workers running in parallel this exhausts the 4 GiB K8s job limit.
-_docling_conversion_sem = threading.Semaphore(2)
+# Limits concurrent converter.convert() calls to prevent OOM. The docling
+# StandardPdfPipeline alone holds ~1 GB of model weights; additional working
+# memory per in-flight conversion can push the process over the 4 GiB K8s
+# limit when two conversions run simultaneously.
+_docling_conversion_sem = threading.Semaphore(1)
 
 
 def _get_docling_converter() -> tuple[object, str | None]:
@@ -301,6 +302,30 @@ def _supports_docling_ocr(mime_type: str, file_name: str) -> bool:
     return _file_extension(file_name) in _DOCLING_EXTENSIONS
 
 
+# PDFs with fewer extracted chars than this are likely scanned/image-only and
+# need the full docling OCR pipeline.  Most text-layer PDFs yield hundreds of
+# chars; a threshold of 50 is conservative enough to never skip real content.
+_MIN_NATIVE_PDF_CHARS = 50
+
+
+def _extract_pdf_text(file_bytes: bytes) -> tuple[str, str | None]:
+    """Extract text from a PDF using pdfplumber (no ML models required)."""
+    try:
+        import io
+
+        import pdfplumber
+
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            pages = []
+            for page in pdf.pages:
+                text = page.extract_text() or ""
+                if text:
+                    pages.append(text)
+        return "\n\n".join(pages), None
+    except Exception as e:
+        return "", f"PDF extraction failed: {e}"
+
+
 def _temp_file_name(file_name: str, mime_type: str) -> str:
     extension = _file_extension(file_name)
     if extension:
@@ -364,6 +389,22 @@ def extract_text(
         (text_content, error_message_or_None)
     """
     if enable_ocr and _supports_docling_ocr(mime_type, file_name):
+        # PDFs: try cheap native text extraction first.  Only hand off to the
+        # heavy docling pipeline when the native path yields too little text,
+        # which indicates a scanned or image-only PDF that genuinely needs OCR.
+        # This avoids loading the ~1 GB StandardPdfPipeline for the majority of
+        # PDFs that already carry a text layer.
+        if mime_type == "application/pdf":
+            cheap_text, cheap_error = _extract_pdf_text(file_bytes)
+            if len(cheap_text.strip()) >= _MIN_NATIVE_PDF_CHARS:
+                logger.info(
+                    "OCR extracted %d chars from %s (%s, native text layer)",
+                    len(cheap_text.strip()),
+                    file_name or mime_type,
+                    mime_type,
+                )
+                return cheap_text, cheap_error
+        # Images, DOCX, PPTX, and sparse/scanned PDFs: use docling.
         text, error = _extract_docling_markdown(
             file_bytes,
             mime_type=mime_type,
@@ -380,20 +421,7 @@ def extract_text(
 
     # PDF
     if mime_type == "application/pdf":
-        try:
-            import io
-
-            import pdfplumber
-
-            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-                pages = []
-                for page in pdf.pages:
-                    text = page.extract_text() or ""
-                    if text:
-                        pages.append(text)
-            return "\n\n".join(pages), None
-        except Exception as e:
-            return "", f"PDF extraction failed: {e}"
+        return _extract_pdf_text(file_bytes)
 
     # DOCX
     if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
