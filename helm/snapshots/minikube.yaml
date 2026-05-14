@@ -148,10 +148,6 @@ data:
                     "value": "/cache/uv/hf"
                   },
                   {
-                    "name": "DOCLING_ARTIFACTS_PATH",
-                    "value": "/cache/uv/docling"
-                  },
-                  {
                     "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
                     "value": "https://otel.classifyre.com"
                   },
@@ -224,7 +220,7 @@ metadata:
     # Preserve this ConfigMap across `helm upgrade` so the instance ID stays stable.
     "helm.sh/resource-policy": keep
 data:
-  instance-id: "242206da-94c5-4ced-a76f-ae4b2df0c872"
+  instance-id: "3c6c9dc1-c331-44a0-812f-105c7d72b5f9"
 ---
 # Source: classifyre-core/templates/api-cli-cache-pvc.yaml
 apiVersion: v1
@@ -394,7 +390,7 @@ spec:
         app.kubernetes.io/instance: classifyre
         app.kubernetes.io/component: api
       annotations:
-        checksum/cli-job-template: 718c8c0bc7d1b65e237ecf5322a505646b9955814c6417331a3f75ac510a7805
+        checksum/cli-job-template: f2a056386684439dc2829f62c93af7bc22bd00d5cbc10e95b2c609fafa084e06
     spec:
       serviceAccountName: classifyre-api
       automountServiceAccountToken: true
