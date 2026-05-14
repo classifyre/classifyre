@@ -198,7 +198,9 @@ async def test_pipeline_runs_text_detectors_only() -> None:
 @pytest.mark.asyncio
 async def test_pipeline_logs_configured_detector_name(caplog: pytest.LogCaptureFixture) -> None:
     source = DummySource({"type": "DUMMY"}, content="hello world")
-    detector = RecordingDetector(["text/plain"], config=NamedDetectorConfig(name="Invoice Classifier"))
+    detector = RecordingDetector(
+        ["text/plain"], config=NamedDetectorConfig(name="Invoice Classifier")
+    )
 
     pipeline = DetectorPipeline(
         detectors=[detector],

@@ -429,7 +429,7 @@ class SlackSource(BaseSource):
         return f"slack://channel?channel={channel_id}&message={ts}"
 
     def generate_hash_id(self, asset_id: str) -> str:
-        identity = self.team_id or self.workspace or "slack"
+        identity = self.workspace or self.team_id or "slack"
         raw_id = f"{identity}_#_{asset_id}"
         type_value = (
             self.config.type.value if hasattr(self.config.type, "value") else str(self.config.type)
