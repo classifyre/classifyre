@@ -1,9 +1,12 @@
 import os
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, Generator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
+
+if TYPE_CHECKING:
+    from ..utils.file_parser import ParsedBytes
 from ..utils.hashing import calculate_checksum, normalize_http_url
 from ..utils.validation import validate_output
 from .recipe_normalizer import normalize_source_recipe
@@ -40,6 +43,7 @@ class BaseSource(ABC):
         self.source_id = source_id
         self.runner_id = runner_id
         self._aborted = False
+        self._attachment_name_by_hash: dict[str, str] = {}
 
     def _apply_initial_sampling_override(self, recipe: dict[str, Any]) -> None:
         sampling = recipe.get("sampling")
@@ -178,6 +182,13 @@ class BaseSource(ABC):
 
         raise ValueError("Asset external_url is required")
 
+    def _attachment_file_name(self, asset_id: str, fallback_url: str) -> str:
+        """Return the stored file name for an attachment, or fallback_url if not recorded."""
+        stored = self._attachment_name_by_hash.get(asset_id)
+        if isinstance(stored, str) and stored.strip():
+            return stored.strip()
+        return fallback_url
+
     def ocr_enabled(self) -> bool:
         """Return whether sampling-level OCR is enabled for this source."""
         config = getattr(self, "config", None)
@@ -190,7 +201,7 @@ class BaseSource(ABC):
         *,
         declared_mime_type: str | None = None,
         file_name: str = "",
-    ) -> Any:
+    ) -> "ParsedBytes":
         from ..utils.file_parser import parse_bytes
 
         return parse_bytes(
