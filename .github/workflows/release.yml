@@ -346,12 +346,18 @@ jobs:
           kubectl -n "${HELM_NAMESPACE}" get deploy,pods,svc
           helm status "${HELM_RELEASE_NAME}" -n "${HELM_NAMESPACE}"
 
-      - name: Bump main to next patch version
+      - name: Push release commit to main
+        run: git push origin HEAD:main
+
+      - name: Update develop to SNAPSHOT
         env:
           NEXT_VERSION: ${{ steps.versions.outputs.next_version }}
         run: |
           set -euo pipefail
-          node scripts/set-release-version.mjs "${NEXT_VERSION}"
+          git fetch origin develop
+          git checkout develop
+
+          node scripts/set-release-version.mjs "${NEXT_VERSION}-SNAPSHOT"
           (cd apps/cli && uv lock)
           (cd packages/schemas && uv lock)
 
@@ -371,5 +377,5 @@ jobs:
             packages/schemas/uv.lock \
             helm/classifyre/Chart.yaml
 
-          git commit -m "chore(release): prepare v${NEXT_VERSION}"
-          git push origin HEAD:main
+          git commit -m "chore: set develop to v${NEXT_VERSION}-SNAPSHOT"
+          git push origin develop

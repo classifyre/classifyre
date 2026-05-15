@@ -199,5 +199,40 @@ else
   helm status classifyre -n classifyre
 fi
 
+# ── Step 6: Update develop to SNAPSHOT ──────────────────────────────────────
+echo ""
+echo "==> [6/6] Updating develop to next SNAPSHOT version..."
+
+IFS='.' read -r major minor patch <<< "${VERSION}"
+NEXT_VERSION="${major}.${minor}.$((patch + 1))"
+
+git fetch origin develop
+git checkout develop
+
+node scripts/set-release-version.mjs "${NEXT_VERSION}-SNAPSHOT"
+(cd apps/cli && uv lock)
+(cd packages/schemas && uv lock)
+
+git add \
+  package.json \
+  apps/api/package.json \
+  apps/blog/package.json \
+  apps/docs/package.json \
+  apps/web/package.json \
+  apps/cli/package.json \
+  apps/cli/pyproject.toml \
+  apps/cli/uv.lock \
+  packages/api-client/package.json \
+  packages/devops/package.json \
+  packages/schemas/package.json \
+  packages/schemas/pyproject.toml \
+  packages/schemas/uv.lock \
+  helm/classifyre/Chart.yaml
+
+git commit -m "chore: set develop to v${NEXT_VERSION}-SNAPSHOT"
+git push origin develop
+
+git checkout main
+
 echo ""
 echo "✅  Release ${TAG} complete!"
