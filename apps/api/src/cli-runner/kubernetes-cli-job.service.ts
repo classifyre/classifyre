@@ -927,8 +927,27 @@ export class KubernetesCliJobService {
     if (status === 404) {
       return true;
     }
-    const reason = error?.body?.reason || error?.response?.body?.reason;
-    return reason === 'NotFound';
+    // ApiException from @kubernetes/client-node formats the message as
+    // "HTTP-Code: 404\nBody: ..." and stores body as a JSON string, not
+    // a parsed object, so we must handle both shapes.
+    if (
+      typeof error?.message === 'string' &&
+      /HTTP-Code:\s*404\b/.test(error.message)
+    ) {
+      return true;
+    }
+    const rawBody = error?.body ?? error?.response?.body;
+    let body: Record<string, unknown> | null = null;
+    if (rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)) {
+      body = rawBody as Record<string, unknown>;
+    } else if (typeof rawBody === 'string') {
+      try {
+        body = JSON.parse(rawBody) as Record<string, unknown>;
+      } catch {
+        /* ignore */
+      }
+    }
+    return body?.['reason'] === 'NotFound';
   }
 
   private isLogUnavailable(error: any): boolean {
