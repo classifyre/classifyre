@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import tempfile
+import threading
 from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
@@ -64,7 +66,107 @@ _MIME_HINTS_BY_EXTENSION = {
     ".pdf": "application/pdf",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".bmp": "image/bmp",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
+    ".webp": "image/webp",
 }
+
+_DOCLING_IMAGE_MIME_TYPES = {
+    "image/png",
+    "image/jpeg",
+    "image/tiff",
+    "image/bmp",
+    "image/webp",
+}
+
+_DOCLING_MIME_TYPES = {
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/html",
+    "application/xhtml+xml",
+}
+_DOCLING_EXTENSIONS = {
+    ".pdf",
+    ".docx",
+    ".pptx",
+    ".xlsx",
+    ".html",
+    ".htm",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".webp",
+}
+
+
+class _DoclingState:
+    """Mutable singleton state for the Docling DocumentConverter.
+
+    Stored as object attributes so functions can mutate state without `global`
+    statements (which ruff PLW0603 disallows). Initializing the converter is
+    expensive (loads ML models), so it happens exactly once per process.
+    """
+
+    def __init__(self) -> None:
+        self.converter: object = None
+        self.error: str | None = None
+        self.attempted: bool = False
+
+
+_docling_state = _DoclingState()
+_docling_lock = threading.Lock()
+# Limits concurrent converter.convert() calls to prevent OOM. The docling
+# StandardPdfPipeline alone holds ~1 GB of model weights; additional working
+# memory per in-flight conversion can push the process over the 4 GiB K8s
+# limit when two conversions run simultaneously.
+_docling_conversion_sem = threading.Semaphore(1)
+
+
+def _get_docling_converter() -> tuple[object, str | None]:
+    """Return a cached DocumentConverter, initializing it on the first call."""
+    # Fast-path: only skip the lock once initialization is settled (converter
+    # ready or permanently failed).  Checking `attempted` alone is not enough —
+    # `attempted` is set before the install+init finishes, so threads that reach
+    # here while another thread holds the lock would return (None, None) and
+    # emit a spurious "unavailable" warning instead of waiting.
+    if _docling_state.converter is not None or _docling_state.error is not None:
+        return _docling_state.converter, _docling_state.error
+    with _docling_lock:
+        if _docling_state.attempted:
+            return _docling_state.converter, _docling_state.error
+        _docling_state.attempted = True
+        try:
+            from ..sources.dependencies import require_module
+
+            converter_module = require_module(
+                "docling.document_converter",
+                "file parser OCR",
+                ["ocr"],
+                detail="OCR extraction requires the Docling optional dependency.",
+            )
+            _docling_state.converter = converter_module.DocumentConverter()
+        except Exception as exc:
+            _docling_state.error = str(exc)
+    return _docling_state.converter, _docling_state.error
+
+
+def _reset_docling_singleton() -> None:
+    """Reset the cached Docling converter. Intended for test isolation only."""
+    with _docling_lock:
+        _docling_state.converter = None
+        _docling_state.error = None
+        _docling_state.attempted = False
 
 
 def _normalize_mime_type(mime_type: str | None) -> str:
@@ -191,33 +293,135 @@ def detect_mime_type(file_bytes: bytes) -> str:
     return _sniff_text_mime(file_bytes)
 
 
-def extract_text(file_bytes: bytes, mime_type: str) -> tuple[str, str | None]:
+def _supports_docling_ocr(mime_type: str, file_name: str) -> bool:
+    normalized = _normalize_mime_type(mime_type)
+    if normalized in _DOCLING_IMAGE_MIME_TYPES:
+        return True
+    if normalized in _DOCLING_MIME_TYPES:
+        return True
+    return _file_extension(file_name) in _DOCLING_EXTENSIONS
+
+
+# PDFs with fewer extracted chars than this are likely scanned/image-only and
+# need the full docling OCR pipeline.  Most text-layer PDFs yield hundreds of
+# chars; a threshold of 50 is conservative enough to never skip real content.
+_MIN_NATIVE_PDF_CHARS = 50
+
+
+def _extract_pdf_text(file_bytes: bytes) -> tuple[str, str | None]:
+    """Extract text from a PDF using pdfplumber (no ML models required)."""
+    try:
+        import io
+
+        import pdfplumber
+
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            pages = []
+            for page in pdf.pages:
+                text = page.extract_text() or ""
+                if text:
+                    pages.append(text)
+        return "\n\n".join(pages), None
+    except Exception as e:
+        return "", f"PDF extraction failed: {e}"
+
+
+def _temp_file_name(file_name: str, mime_type: str) -> str:
+    extension = _file_extension(file_name)
+    if extension:
+        return f"input{extension}"
+
+    for suffix, candidate_mime in _MIME_HINTS_BY_EXTENSION.items():
+        if candidate_mime == mime_type:
+            return f"input{suffix}"
+
+    if mime_type.startswith("image/"):
+        suffix = mime_type.split("/", maxsplit=1)[1].replace("jpeg", "jpg")
+        return f"input.{suffix}"
+
+    return "input.bin"
+
+
+def _extract_docling_markdown(
+    file_bytes: bytes,
+    *,
+    mime_type: str,
+    file_name: str,
+) -> tuple[str, str | None]:
+    converter, error = _get_docling_converter()
+    if error:
+        return "", error
+    if converter is None:
+        return "", "Docling converter unavailable"
+
+    temp_fname = _temp_file_name(file_name, mime_type)
+    try:
+        with tempfile.TemporaryDirectory(prefix="classifyre-docling-") as temp_dir:
+            temp_path = Path(temp_dir) / temp_fname
+            temp_path.write_bytes(file_bytes)
+            with _docling_conversion_sem:
+                result = converter.convert(temp_path)  # type: ignore[union-attr]
+            text = result.document.export_to_markdown().strip()
+            page_count = len(result.document.pages) if hasattr(result.document, "pages") else None
+            logger.info(
+                "OCR extracted %d chars from %s (%s%s)",
+                len(text),
+                file_name or mime_type,
+                mime_type,
+                f", {page_count} pages" if page_count else "",
+            )
+            return text, None
+    except Exception as exc:
+        return "", f"Docling extraction failed: {exc}"
+
+
+def extract_text(
+    file_bytes: bytes,
+    mime_type: str,
+    *,
+    file_name: str = "",
+    enable_ocr: bool = False,
+) -> tuple[str, str | None]:
     """
     Extract plain text from file bytes based on MIME type.
 
     Returns:
         (text_content, error_message_or_None)
     """
+    if enable_ocr and _supports_docling_ocr(mime_type, file_name):
+        # PDFs: try cheap native text extraction first.  Only hand off to the
+        # heavy docling pipeline when the native path yields too little text,
+        # which indicates a scanned or image-only PDF that genuinely needs OCR.
+        # This avoids loading the ~1 GB StandardPdfPipeline for the majority of
+        # PDFs that already carry a text layer.
+        if mime_type == "application/pdf":
+            cheap_text, cheap_error = _extract_pdf_text(file_bytes)
+            if len(cheap_text.strip()) >= _MIN_NATIVE_PDF_CHARS:
+                logger.info(
+                    "OCR extracted %d chars from %s (%s, native text layer)",
+                    len(cheap_text.strip()),
+                    file_name or mime_type,
+                    mime_type,
+                )
+                return cheap_text, cheap_error
+        # Images, DOCX, PPTX, and sparse/scanned PDFs: use docling.
+        text, error = _extract_docling_markdown(
+            file_bytes,
+            mime_type=mime_type,
+            file_name=file_name,
+        )
+        if text:
+            return text, None
+        if error:
+            logger.warning("OCR extraction failed for %s: %s", file_name or mime_type, error)
+
     # Binary media types — no text extraction
     if mime_type.startswith(("image/", "audio/", "video/")):
         return "", None
 
     # PDF
     if mime_type == "application/pdf":
-        try:
-            import io
-
-            import pdfplumber
-
-            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-                pages = []
-                for page in pdf.pages:
-                    text = page.extract_text() or ""
-                    if text:
-                        pages.append(text)
-            return "\n\n".join(pages), None
-        except Exception as e:
-            return "", f"PDF extraction failed: {e}"
+        return _extract_pdf_text(file_bytes)
 
     # DOCX
     if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
@@ -359,6 +563,7 @@ def parse_bytes(
     *,
     declared_mime_type: str | None = None,
     file_name: str = "",
+    enable_ocr: bool = False,
 ) -> ParsedBytes:
     """
     Parse in-memory bytes: resolve MIME type and extract raw/text content.
@@ -372,7 +577,12 @@ def parse_bytes(
         file_bytes, declared_mime_type=declared_mime_type, file_name=file_name
     )
 
-    text_content, parse_error = extract_text(file_bytes, mime_type)
+    text_content, parse_error = extract_text(
+        file_bytes,
+        mime_type,
+        file_name=file_name,
+        enable_ocr=enable_ocr,
+    )
     raw_content = _decode_bytes(file_bytes) if _is_text_like_mime_type(mime_type) else ""
 
     if mime_type in {"text/html", "application/xhtml+xml"} and raw_content and not text_content:
@@ -400,6 +610,9 @@ def iter_file_pages(
     mime_type: str,
     batch_size: int = 100,
     include_column_names: bool = True,
+    *,
+    file_name: str = "",
+    enable_ocr: bool = False,
 ) -> Generator[str, None, None]:
     """
     Iterate over file content in pages of up to batch_size rows or lines.
@@ -418,7 +631,12 @@ def iter_file_pages(
     elif normalized in ("text/csv", "text/tab-separated-values"):
         yield from _iter_csv_pages(file_bytes, include_column_names)
     else:
-        text, error = extract_text(file_bytes, normalized)
+        text, error = extract_text(
+            file_bytes,
+            normalized,
+            file_name=file_name,
+            enable_ocr=enable_ocr,
+        )
         if error:
             logger.warning("Text extraction error (%s): %s", mime_type, error)
         if text:
@@ -520,7 +738,7 @@ def _format_tabular_page(
     return "\n".join(lines)
 
 
-def parse_file(file_path: Path) -> ParsedFile:
+def parse_file(file_path: Path, *, enable_ocr: bool = False) -> ParsedFile:
     """
     Parse a local file: detect MIME type and extract text.
 
@@ -537,7 +755,7 @@ def parse_file(file_path: Path) -> ParsedFile:
         raise FileNotFoundError(f"File not found: {file_path}")
 
     file_bytes = file_path.read_bytes()
-    parsed = parse_bytes(file_bytes, file_name=file_path.name)
+    parsed = parse_bytes(file_bytes, file_name=file_path.name, enable_ocr=enable_ocr)
 
     encoding: str | None = None
     if not parsed.is_binary and parsed.text_content:

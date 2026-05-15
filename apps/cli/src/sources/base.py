@@ -1,9 +1,12 @@
 import os
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator
-from typing import Any
+from collections.abc import AsyncGenerator, Generator
+from typing import TYPE_CHECKING, Any
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
+
+if TYPE_CHECKING:
+    from ..utils.file_parser import ParsedBytes
 from ..utils.hashing import calculate_checksum, normalize_http_url
 from ..utils.validation import validate_output
 from .recipe_normalizer import normalize_source_recipe
@@ -40,6 +43,7 @@ class BaseSource(ABC):
         self.source_id = source_id
         self.runner_id = runner_id
         self._aborted = False
+        self._attachment_name_by_hash: dict[str, str] = {}
 
     def _apply_initial_sampling_override(self, recipe: dict[str, Any]) -> None:
         sampling = recipe.get("sampling")
@@ -177,6 +181,55 @@ class BaseSource(ABC):
                 return fallback_value
 
         raise ValueError("Asset external_url is required")
+
+    def _attachment_file_name(self, asset_id: str, fallback_url: str) -> str:
+        """Return the stored file name for an attachment, or fallback_url if not recorded."""
+        stored = self._attachment_name_by_hash.get(asset_id)
+        if isinstance(stored, str) and stored.strip():
+            return stored.strip()
+        return fallback_url
+
+    def ocr_enabled(self) -> bool:
+        """Return whether sampling-level OCR is enabled for this source."""
+        config = getattr(self, "config", None)
+        sampling = getattr(config, "sampling", None) if config is not None else None
+        return bool(getattr(sampling, "enable_ocr", False))
+
+    def parse_asset_bytes(
+        self,
+        file_bytes: bytes,
+        *,
+        declared_mime_type: str | None = None,
+        file_name: str = "",
+    ) -> "ParsedBytes":
+        from ..utils.file_parser import parse_bytes
+
+        return parse_bytes(
+            file_bytes,
+            declared_mime_type=declared_mime_type,
+            file_name=file_name,
+            enable_ocr=self.ocr_enabled(),
+        )
+
+    def iter_asset_pages(
+        self,
+        file_bytes: bytes,
+        mime_type: str,
+        batch_size: int = 100,
+        include_column_names: bool = True,
+        *,
+        file_name: str = "",
+    ) -> Generator[str, None, None]:
+        from ..utils.file_parser import iter_file_pages
+
+        return iter_file_pages(
+            file_bytes,
+            mime_type,
+            batch_size,
+            include_column_names,
+            file_name=file_name,
+            enable_ocr=self.ocr_enabled(),
+        )
 
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         """

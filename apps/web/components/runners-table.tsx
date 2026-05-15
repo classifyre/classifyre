@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
@@ -60,6 +60,11 @@ import {
   getRunnerStatusBadgeTone,
   isRunnerStatusRunning,
 } from "../lib/runner-status-badge";
+import {
+  mergeRunnerWsIntoRow,
+  runnerMatchesRunnersListFilters,
+} from "@/lib/runner-ws-merge";
+import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import { useTranslation } from "@/hooks/use-translation";
 
 type RunnerStatusFilterValue = SearchRunnersStatus;
@@ -189,6 +194,7 @@ export function RunnersTable({
   const [isLoading, setIsLoading] = useState(false);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [wsBump, setWsBump] = useState(0);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -252,6 +258,70 @@ export function RunnersTable({
       ? resolvedPageSize
       : DEFAULT_PAGE_SIZE;
 
+  const pageRef = useRef(page);
+  const sortRef = useRef(sort);
+  const filtersRef = useRef(effectiveFilters);
+  const safePageSizeRef = useRef(safePageSize);
+  pageRef.current = page;
+  sortRef.current = sort;
+  filtersRef.current = effectiveFilters;
+  safePageSizeRef.current = safePageSize;
+
+  useRunnerWebSocket({
+    trackRunnersList: false,
+    onRunnerUpdate: (runner) => {
+      setData((prev) => {
+        if (!prev) return prev;
+        const idx = prev.items.findIndex((r) => r.id === runner.id);
+        if (idx < 0) return prev;
+        const existing = prev.items[idx];
+        if (!existing) return prev;
+        const nextItems = [...prev.items];
+        nextItems[idx] = mergeRunnerWsIntoRow(existing, runner);
+        return { ...prev, items: nextItems };
+      });
+    },
+    onRunnerCreated: (runner) => {
+      let prepended = false;
+      setData((prev) => {
+        if (!prev) return prev;
+        const existingIdx = prev.items.findIndex((r) => r.id === runner.id);
+        if (existingIdx >= 0) {
+          const existing = prev.items[existingIdx];
+          if (!existing) return prev;
+          const nextItems = [...prev.items];
+          nextItems[existingIdx] = mergeRunnerWsIntoRow(existing, runner);
+          return { ...prev, items: nextItems };
+        }
+
+        const pageOk = pageRef.current === 1;
+        const sortOk =
+          sortRef.current.by === SearchRunnersSortByEnum.TriggeredAt &&
+          sortRef.current.order === SearchRunnersSortOrderEnum.Desc;
+        const filters = filtersRef.current;
+        if (
+          pageOk &&
+          sortOk &&
+          runnerMatchesRunnersListFilters(runner, filters)
+        ) {
+          prepended = true;
+          return {
+            ...prev,
+            items: [runner, ...prev.items].slice(0, safePageSizeRef.current),
+            total: prev.total + 1,
+          };
+        }
+        return prev;
+      });
+      if (
+        !prepended &&
+        runnerMatchesRunnersListFilters(runner, filtersRef.current)
+      ) {
+        setWsBump((n) => n + 1);
+      }
+    },
+  });
+
   useEffect(() => {
     let active = true;
 
@@ -302,7 +372,7 @@ export function RunnersTable({
     return () => {
       active = false;
     };
-  }, [effectiveFilters, page, safePageSize, sort.by, sort.order]);
+  }, [effectiveFilters, page, safePageSize, sort.by, sort.order, wsBump]);
 
   const rows = data?.items ?? [];
   const total = data?.total ?? 0;

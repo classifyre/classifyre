@@ -72,6 +72,10 @@ import {
 type SandboxRunStatus = SandboxControllerListRunsStatusEnum;
 type AssetContentType = SandboxControllerListRunsContentTypeEnum;
 
+type SandboxRunsTableProps = {
+  onPollingChange?: (hasActiveRuns: boolean) => void;
+};
+
 type SandboxFinding = {
   finding_type?: string;
   category?: string;
@@ -92,10 +96,6 @@ type SortBy =
 type SortOrder = "ASC" | "DESC";
 
 type HasFindingsFilter = "ALL" | "WITH" | "WITHOUT";
-
-type SandboxRunsTableProps = {
-  onPollingChange?: (isPolling: boolean) => void;
-};
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 20;

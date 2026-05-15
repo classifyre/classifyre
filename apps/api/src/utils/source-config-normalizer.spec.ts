@@ -45,6 +45,29 @@ describe('normalizeSourceConfig sampling', () => {
     ).toBe(true);
   });
 
+  it('preserves enable_ocr from sampling and legacy optional.sampling', () => {
+    const normalized = normalizeSourceConfig('POSTGRESQL', {
+      type: 'POSTGRESQL',
+      required: { host: 'db.local', port: 5432 },
+      optional: {
+        sampling: {
+          enable_ocr: false,
+        },
+      },
+      sampling: {
+        strategy: 'ALL',
+        enable_ocr: true,
+      },
+    });
+
+    expect((normalized.sampling as Record<string, unknown>)?.strategy).toBe(
+      'ALL',
+    );
+    expect((normalized.sampling as Record<string, unknown>)?.enable_ocr).toBe(
+      true,
+    );
+  });
+
   it('strips legacy limit and max_columns from sampling', () => {
     const normalized = normalizeSourceConfig('POSTGRESQL', {
       type: 'POSTGRESQL',

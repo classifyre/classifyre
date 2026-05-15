@@ -19,7 +19,7 @@ from ...models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
 )
-from ...utils.file_parser import infer_mime_type_from_file_name, iter_file_pages, resolve_mime_type
+from ...utils.file_parser import infer_mime_type_from_file_name, resolve_mime_type
 from ...utils.hashing import hash_id, unhash_id
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -547,7 +547,13 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             # pdfplumber can't freeze the event loop during large file iteration.
             pages: list[str] = await asyncio.to_thread(
                 list,
-                iter_file_pages(raw_bytes, mime, batch_size, include_col_names),
+                self.iter_asset_pages(
+                    raw_bytes,
+                    mime,
+                    batch_size,
+                    include_col_names,
+                    file_name=self._file_name_for_asset_id(asset_id),
+                ),
             )
             for batch_text in pages:
                 yield "", batch_text
@@ -556,6 +562,27 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         result = await self.fetch_content(asset_id)
         if result:
             yield result
+
+    def _file_name_for_asset_id(self, asset_id: str) -> str:
+        external_url = self._hash_to_uri.get(asset_id)
+        if external_url is None:
+            decoded = asset_id
+            if "_#_" not in decoded:
+                try:
+                    decoded = unhash_id(asset_id)
+                except Exception:
+                    decoded = asset_id
+            if "_#_" in decoded:
+                _, candidate = decoded.split("_#_", maxsplit=1)
+                external_url = candidate
+            else:
+                external_url = asset_id
+
+        ref_hash = self.generate_hash_id(external_url)
+        ref = self._object_ref_by_hash.get(ref_hash)
+        if ref is not None:
+            return ref.key
+        return external_url
 
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
         if asset_id in self._content_cache:

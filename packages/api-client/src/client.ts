@@ -122,6 +122,8 @@ export type {
   AssetListItemDto,
 } from "./generated/src/models";
 
+export { RunnerDtoFromJSON } from "./generated/src/models/RunnerDto";
+
 // Augmented FindingResponseDto: adds metadata field not present in the generated type.
 // The API returns metadata (detector-specific structured context) but the generated
 // OpenAPI client doesn't include it. We extend the type here so consumers get it typed.
