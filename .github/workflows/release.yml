@@ -96,9 +96,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          current_version="$(node -p "require('./package.json').version")"
+          raw_version="$(node -p "require('./package.json').version")"
+          current_version="${raw_version%%-*}"
           if ! [[ "${current_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::package.json version must be major.minor.patch"
+            echo "::error::package.json version (${raw_version}) must start with major.minor.patch"
             exit 1
           fi
 
@@ -108,9 +109,9 @@ jobs:
           fi
 
           version="$(
-            node -e "
+            CURRENT="${current_version}" node -e "
               const type = process.env.RELEASE_TYPE;
-              const [major, minor, patch] = require('./package.json').version.split('.').map(Number);
+              const [major, minor, patch] = process.env.CURRENT.split('.').map(Number);
               const next =
                 type === 'major' ? [major + 1, 0, 0] :
                 type === 'minor' ? [major, minor + 1, 0] :
