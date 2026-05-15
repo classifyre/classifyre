@@ -147,9 +147,6 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                 result = source.test_connection()
                 if result.get("status") == "FAILURE":
                     msg = result.get("message", "")
-                    if _is_timeout_error(Exception(msg)):
-                        logger.warning("Source unreachable (timeout), skipping: %s", msg)
-                        return
                     logger.error("Aborting: Connection test failed: %s", msg)
                     sys.exit(1)
 
