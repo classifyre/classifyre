@@ -301,8 +301,10 @@ jobs:
           uv build
           uv publish
 
-      - name: Push release tag
-        run: git push origin "${{ steps.versions.outputs.tag }}"
+      - name: Push release commit and tag to main
+        run: |
+          git push origin HEAD:main
+          git push origin "${{ steps.versions.outputs.tag }}"
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -311,44 +313,6 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
-
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Configure kubeconfig
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.kube
-          printf '%s' "${{ secrets.KUBECONFIG }}" > ~/.kube/config
-          chmod 600 ~/.kube/config
-
-      - name: Deploy release with Helm
-        env:
-          VERSION: ${{ steps.versions.outputs.version }}
-        run: |
-          set -euo pipefail
-          helm upgrade --install "${HELM_RELEASE_NAME}" ./helm/classifyre \
-            --namespace "${HELM_NAMESPACE}" \
-            --create-namespace \
-            -f "${HELM_VALUES_FILE}" \
-            --set api.image.tag="${VERSION}" \
-            --set api.cliJobs.image.tag="${VERSION}" \
-            --set frontend.image.tag="${VERSION}" \
-            --wait \
-            --timeout 15m
-
-      - name: Verify deployment
-        env:
-          VERSION: ${{ steps.versions.outputs.version }}
-        run: |
-          set -euo pipefail
-          kubectl -n "${HELM_NAMESPACE}" rollout status deployment/${HELM_RELEASE_NAME}-api --timeout=300s
-          kubectl -n "${HELM_NAMESPACE}" rollout status deployment/${HELM_RELEASE_NAME}-web --timeout=300s
-          kubectl -n "${HELM_NAMESPACE}" get deploy,pods,svc
-          helm status "${HELM_RELEASE_NAME}" -n "${HELM_NAMESPACE}"
-
-      - name: Push release commit to main
-        run: git push origin HEAD:main
 
       - name: Update develop to SNAPSHOT
         env:
@@ -380,3 +344,64 @@ jobs:
 
           git commit -m "chore: set develop to v${NEXT_VERSION}-SNAPSHOT"
           git push origin develop
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.kube
+          printf '%s' "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Clear pending Helm operation
+        run: |
+          set -euo pipefail
+
+          history_json="$(helm history "${HELM_RELEASE_NAME}" -n "${HELM_NAMESPACE}" -o json 2>/dev/null || true)"
+          if [[ -z "${history_json}" || "${history_json}" == "[]" ]]; then
+            echo "No existing Helm release state to clear."
+            exit 0
+          fi
+
+          last_status="$(jq -r '.[-1].status // empty' <<< "${history_json}")"
+          last_revision="$(jq -r '.[-1].revision // empty' <<< "${history_json}")"
+
+          if [[ "${last_status}" != pending-* ]]; then
+            echo "Helm release is not pending (${last_status:-unknown})."
+            exit 0
+          fi
+
+          if [[ -z "${last_revision}" ]]; then
+            echo "::error::Pending Helm release detected but revision could not be resolved."
+            exit 1
+          fi
+
+          echo "Deleting stale Helm release secret for pending revision ${last_revision}."
+          kubectl -n "${HELM_NAMESPACE}" delete secret "sh.helm.release.v1.${HELM_RELEASE_NAME}.v${last_revision}" --ignore-not-found=true
+
+      - name: Deploy release with Helm
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          set -euo pipefail
+          helm upgrade --install "${HELM_RELEASE_NAME}" ./helm/classifyre \
+            --namespace "${HELM_NAMESPACE}" \
+            --create-namespace \
+            -f "${HELM_VALUES_FILE}" \
+            --set api.image.tag="${VERSION}" \
+            --set api.cliJobs.image.tag="${VERSION}" \
+            --set frontend.image.tag="${VERSION}" \
+            --wait \
+            --timeout 15m
+
+      - name: Verify deployment
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          set -euo pipefail
+          kubectl -n "${HELM_NAMESPACE}" rollout status deployment/${HELM_RELEASE_NAME}-api --timeout=300s
+          kubectl -n "${HELM_NAMESPACE}" rollout status deployment/${HELM_RELEASE_NAME}-web --timeout=300s
+          kubectl -n "${HELM_NAMESPACE}" get deploy,pods,svc
+          helm status "${HELM_RELEASE_NAME}" -n "${HELM_NAMESPACE}"
