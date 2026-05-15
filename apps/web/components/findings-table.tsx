@@ -67,11 +67,9 @@ import {
 } from "@workspace/ui/components";
 import { getSourceIcon } from "../lib/source-type-icon";
 import { useUrlParams } from "../lib/url-filters";
-import {
-  formatFindingStatusLabel,
-  toFindingStatusBadgeValue,
-} from "../lib/finding-status-badge";
+import { toFindingStatusBadgeValue } from "../lib/finding-status-badge";
 import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -246,7 +244,13 @@ function ConfidenceBar({ value }: { value: number }) {
 
 // ─── Expanded row ─────────────────────────────────────────────────────────────
 
-function FindingExpandedRow({ finding }: { finding: FindingResponseDto }) {
+function FindingExpandedRow({
+  finding,
+  t,
+}: {
+  finding: FindingResponseDto;
+  t: (key: TranslationKey) => string;
+}) {
   const severityKey = (finding.severity || "INFO").toLowerCase() as
     | "critical"
     | "high"
@@ -260,7 +264,7 @@ function FindingExpandedRow({ finding }: { finding: FindingResponseDto }) {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div>
           <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            Scanned
+            {t("findings.detail.scanned")}
           </p>
           {runnerHref ? (
             <Link
@@ -270,12 +274,12 @@ function FindingExpandedRow({ finding }: { finding: FindingResponseDto }) {
               {formatRelative(finding.lastDetectedAt || finding.detectedAt)}
             </Link>
           ) : (
-            <p className="text-xs text-muted-foreground">Manual</p>
+            <p className="text-xs text-muted-foreground">{t("findings.detail.manual")}</p>
           )}
         </div>
         <div>
           <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            Location
+            {t("findings.detail.location")}
           </p>
           <p className="font-mono text-xs">
             {finding.location?.path || "-"}
@@ -286,7 +290,7 @@ function FindingExpandedRow({ finding }: { finding: FindingResponseDto }) {
         </div>
         <div>
           <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            Source
+            {t("common.source")}
           </p>
           <p className="text-xs">{finding.source?.name || finding.sourceId}</p>
           <p className="font-mono text-[11px] text-muted-foreground">
@@ -296,7 +300,7 @@ function FindingExpandedRow({ finding }: { finding: FindingResponseDto }) {
         {finding.comment && (
           <div>
             <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-              Notes
+              {t("findings.detail.notes")}
             </p>
             <p className="text-xs">{finding.comment}</p>
           </div>
@@ -1172,7 +1176,7 @@ export function FindingsTable({
                                 | "info"
                             }
                           >
-                            {formatEnumLabel(finding.severity)}
+                            {t(`findings.severityLabels.${finding.severity.toUpperCase()}` as TranslationKey)}
                           </SeverityBadge>
                         </TableCell>
 
@@ -1180,7 +1184,7 @@ export function FindingsTable({
                           <StatusBadge
                             status={toFindingStatusBadgeValue(finding.status)}
                           >
-                            {formatFindingStatusLabel(finding.status)}
+                            {t(`findings.statusLabels.${finding.status}` as TranslationKey)}
                           </StatusBadge>
                         </TableCell>
 
@@ -1267,7 +1271,7 @@ export function FindingsTable({
                             }
                           >
                             <ArrowUpRight className="h-3.5 w-3.5" />
-                            Details
+                            {t("findings.detail.details")}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -1275,7 +1279,7 @@ export function FindingsTable({
                       {isExpanded && (
                         <TableRow>
                           <TableCell colSpan={11} className="p-0 bg-muted/15">
-                            <FindingExpandedRow finding={finding} />
+                            <FindingExpandedRow finding={finding} t={t} />
                           </TableCell>
                         </TableRow>
                       )}
