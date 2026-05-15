@@ -94,6 +94,17 @@ class DatabricksSource(BaseSource):
             detail="The Databricks SQL connector is optional.",
         )
 
+        # pyarrow→pandas conversion calls pytz.timezone() on the timezone name
+        # embedded in Arrow schema metadata. Databricks uses 'Etc/UTC' which is
+        # absent from pytz's built-in zone list. Pre-populating the cache makes
+        # pytz.timezone('Etc/UTC') return UTC without hitting the lookup failure.
+        try:
+            import pytz
+
+            pytz._tzinfo_cache.setdefault("Etc/UTC", pytz.UTC)
+        except Exception:
+            pass
+
         self._validate_auth_configuration()
 
         self.session = requests.Session()
@@ -297,10 +308,6 @@ class DatabricksSource(BaseSource):
             http_path=f"/sql/1.0/warehouses/{self._warehouse_id()}",
             access_token=self._access_token_value(),
             _socket_timeout=self._timeout_seconds(),
-            # pytz doesn't recognise 'Etc/UTC' which Databricks embeds in Arrow
-            # timestamp metadata; returning timestamps as strings bypasses the
-            # pyarrow→pandas timezone conversion entirely.
-            timestamp_as_string=True,
         )
 
     def _catalog_allowlist(self) -> set[str] | None:
