@@ -161,7 +161,10 @@
     "scheduleLabel": "Scheduled",
     "notAvailable": "Source not available",
     "couldntLoad": "We couldn't load this source.",
+    "loadingSource": "Loading source...",
     "editSource": "Edit Source",
+    "deleteSource": "Delete Source",
+    "runScan": "Run Scan",
     "assetNew": "New",
     "assetUpdated": "Updated",
     "assetUnchanged": "Unchanged",
@@ -187,7 +190,11 @@
       "notScannedMessage": "This source has not been scanned yet.",
       "assetsLabel": "assets",
       "lastScanTime": "Last scan: {{relative}}",
-      "overview": "{{type}} source overview"
+      "overview": "{{type}} source overview",
+      "tabOverview": "Overview",
+      "tabFindings": "Findings",
+      "tabAssets": "Assets",
+      "runSummaryLine": "{{findings}} findings · {{assets}} assets scanned"
     },
     "edit": {
       "loading": "Loading source configuration...",
@@ -392,6 +399,8 @@
       "manual": "Manual",
       "closeDetails": "Close details drawer",
       "openDetails": "Open details drawer",
+      "details": "Details",
+      "scanned": "Scanned",
       "notAvailable": "Finding not available",
       "couldntLoad": "We couldn't load this finding.",
       "couldntFetch": "We couldn't fetch this finding",
@@ -399,6 +408,41 @@
       "backToDiscovery": "Back to Discovery",
       "goBack": "Go back",
       "loading": "Loading finding details..."
+    },
+    "statusLabels": {
+      "OPEN": "Open",
+      "FALSE_POSITIVE": "False Positive",
+      "RESOLVED": "Resolved",
+      "IGNORED": "Ignored"
+    },
+    "severityLabels": {
+      "CRITICAL": "Critical",
+      "HIGH": "High",
+      "MEDIUM": "Medium",
+      "LOW": "Low",
+      "INFO": "Info"
+    },
+    "drawer": {
+      "title": "Details",
+      "description": "Review and adjust finding status, severity, and notes.",
+      "closeAriaLabel": "Close details",
+      "statusSectionLabel": "Status",
+      "severitySectionLabel": "Severity",
+      "commentSectionLabel": "Comment",
+      "commentPlaceholder": "Add a note to this finding…",
+      "confidenceSectionLabel": "Confidence",
+      "saveChanges": "Save changes",
+      "saving": "Saving…",
+      "firstDetected": "First detected",
+      "lastDetected": "Last detected",
+      "openFor": "Open for",
+      "resolvedAt": "Resolved",
+      "setBy": "Set by",
+      "manual": "Manual",
+      "confidenceHigh": "High",
+      "confidenceMedium": "Medium",
+      "confidenceLow": "Low",
+      "confidenceVeryLow": "Very Low"
     },
     "signals": {
       "title": "Detection Signals",
@@ -487,10 +531,36 @@
     "noAssetsHint": "Adjust the filters and run the search again.",
     "loading": "Loading assets...",
     "columns": {
+      "asset": "Asset",
+      "assetType": "Asset Type",
       "sourceType": "Source Type",
+      "lastScanned": "Last Scanned",
       "detectors": "Detectors",
       "topFindings": "Top Findings",
-      "statusMix": "Status Mix"
+      "statusMix": "Status Mix",
+      "updating": "Updating assets...",
+      "sourceTypeDesc": "The type of data source this asset belongs to",
+      "detectorsDesc": "Active detectors that fired on this asset and their finding counts",
+      "topFindingsDesc": "Most frequent finding types on this asset",
+      "severityDesc": "Highest severity finding and total findings count",
+      "statusMixDesc": "Breakdown of finding statuses on this asset"
+    },
+    "searchSeverity": "Search severities...",
+    "noSeveritiesFound": "No severities found",
+    "searchDetectorTypes": "Search detector types...",
+    "noDetectorTypesFound": "No detector types found",
+    "searchStatuses": "Search statuses...",
+    "noStatusesFound": "No statuses found",
+    "subTable": {
+      "noFindings": "No findings returned for this asset",
+      "detector": "Detector",
+      "type": "Type",
+      "detected": "Detected",
+      "matchedContent": "Matched Content"
+    },
+    "charts": {
+      "topAssets": "Top assets by findings",
+      "topSources": "Top sources by asset volume"
     },
     "graph": {
       "noData": "No relationship data",

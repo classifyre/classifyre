@@ -386,7 +386,7 @@ export default function AssetsPage() {
                 <Card className="panel-card rounded-[6px]">
                   <CardHeader>
                     <CardTitle className="text-sm uppercase tracking-[0.08em]">
-                      Top assets by findings
+                      {t("assets.charts.topAssets")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -433,7 +433,7 @@ export default function AssetsPage() {
                 <Card className="panel-card rounded-[6px]">
                   <CardHeader>
                     <CardTitle className="text-sm uppercase tracking-[0.08em]">
-                      Top sources by asset volume
+                      {t("assets.charts.topSources")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
