@@ -73,16 +73,16 @@ class DetectorPipeline:
     async def process_stream(
         self, assets: list[SingleAssetScanResults]
     ) -> AsyncGenerator[SingleAssetScanResults, None]:
-        """Process assets concurrently (bounded), yielding in submission order."""
+        """Process assets concurrently (bounded), yielding in completion order."""
         semaphore = asyncio.Semaphore(self.max_concurrent_assets)
 
         async def _bounded(asset: SingleAssetScanResults) -> SingleAssetScanResults:
             async with semaphore:
                 return await self._process_single_asset(asset)
 
-        tasks = [asyncio.create_task(_bounded(a)) for a in assets]
-        for task in tasks:
-            yield await task
+        tasks = {asyncio.create_task(_bounded(a)) for a in assets}
+        for coro in asyncio.as_completed(tasks):
+            yield await coro
 
     async def _process_single_asset(self, asset: SingleAssetScanResults) -> SingleAssetScanResults:
         """Process a single asset through detectors."""
@@ -573,7 +573,11 @@ class DetectorPipeline:
 
     @classmethod
     def from_recipe(
-        cls, recipe: dict[str, Any], source: BaseSource, runner_id: str
+        cls,
+        recipe: dict[str, Any],
+        source: BaseSource,
+        runner_id: str,
+        max_concurrent_assets: int = 10,
     ) -> "DetectorPipeline":
         """Create pipeline from recipe configuration."""
         from ..detectors import get_detector
@@ -619,6 +623,7 @@ class DetectorPipeline:
             source=source,
             runner_id=runner_id,
             content_size_limit=content_size_limit,
+            max_concurrent_assets=max_concurrent_assets,
             content_provider=ParsedContentProvider(source),
         )
         pipeline.init_warnings = init_warnings
