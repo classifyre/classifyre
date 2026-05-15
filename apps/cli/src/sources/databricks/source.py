@@ -291,27 +291,13 @@ class DatabricksSource(BaseSource):
 
         return collected
 
-    def _connect_sql(self, *, session_configuration: dict[str, str] | None = None):
-        kwargs: dict[str, Any] = {
-            "server_hostname": self._workspace_host(),
-            "http_path": f"/sql/1.0/warehouses/{self._warehouse_id()}",
-            "access_token": self._access_token_value(),
-            "_socket_timeout": self._timeout_seconds(),
-        }
-        if session_configuration is not None:
-            kwargs["session_configuration"] = session_configuration
-        return self._databricks_sql.connect(**kwargs)
-
-    def _connect_sql_with_tz(self):
-        try:
-            return self._connect_sql(session_configuration={"spark.sql.session.timeZone": "UTC"})
-        except Exception as exc:
-            if "CONFIG_NOT_AVAILABLE" in str(exc) or "42K0I" in str(exc):
-                logger.debug(
-                    "Warehouse does not support session timezone config, connecting without it"
-                )
-                return self._connect_sql()
-            raise
+    def _connect_sql(self):
+        return self._databricks_sql.connect(
+            server_hostname=self._workspace_host(),
+            http_path=f"/sql/1.0/warehouses/{self._warehouse_id()}",
+            access_token=self._access_token_value(),
+            _socket_timeout=self._timeout_seconds(),
+        )
 
     def _catalog_allowlist(self) -> set[str] | None:
         configured = self._scope_options().include_catalogs
@@ -669,7 +655,7 @@ class DatabricksSource(BaseSource):
             if not catalogs:
                 raise ValueError("No Unity Catalog catalogs available for scanning")
 
-            with closing(self._connect_sql_with_tz()) as conn:
+            with closing(self._connect_sql()) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("SELECT 1")
                     cursor.fetchone()
@@ -847,9 +833,7 @@ class DatabricksSource(BaseSource):
                         if target in table_hash_by_key
                     ]
                     if linked_hashes:
-                        logger.debug(
-                            "%s has %d upstream link(s)", table_label, len(linked_hashes)
-                        )
+                        logger.debug("%s has %d upstream link(s)", table_label, len(linked_hashes))
                 except Exception as exc:
                     logger.warning(
                         "Could not resolve Databricks lineage for %s: %s", table_label, exc
@@ -861,7 +845,11 @@ class DatabricksSource(BaseSource):
             emitted_tables += 1
 
             if len(batch) >= self.BATCH_SIZE:
-                logger.info("Emitting batch of %d table asset(s) (total so far: %d)", len(batch), emitted_tables)
+                logger.info(
+                    "Emitting batch of %d table asset(s) (total so far: %d)",
+                    len(batch),
+                    emitted_tables,
+                )
                 yield batch
                 batch = []
 
@@ -956,7 +944,7 @@ class DatabricksSource(BaseSource):
             "ORDER BY ordinal_position"
         )
 
-        with closing(self._connect_sql_with_tz()) as conn:
+        with closing(self._connect_sql()) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(query)
                 columns: list[str] = []
@@ -1027,7 +1015,7 @@ class DatabricksSource(BaseSource):
 
     def _count_table_rows(self, table_ref: TableRef) -> int | None:
         try:
-            with closing(self._connect_sql_with_tz()) as conn:
+            with closing(self._connect_sql()) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(
                         f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.catalog)}.{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
@@ -1074,7 +1062,7 @@ class DatabricksSource(BaseSource):
     def _fetch_one_page(
         self, table_ref: TableRef, base_query: str, page_size: int, offset: int
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        with closing(self._connect_sql_with_tz()) as conn:
+        with closing(self._connect_sql()) as conn:
             paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
             with conn.cursor() as cursor:
                 cursor.execute(paginated_query)
@@ -1103,7 +1091,7 @@ class DatabricksSource(BaseSource):
             rows_per_page = int(sampling.rows_per_page or 100)
             rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
         else:
-            with closing(self._connect_sql_with_tz()) as conn:
+            with closing(self._connect_sql()) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(query)
                     rows = cursor.fetchall()
@@ -1154,7 +1142,10 @@ class DatabricksSource(BaseSource):
                 return
             rows, column_names = result
             logger.info(
-                "Scanning %s: %d row(s) [strategy=%s]", table_label, len(rows), str(sampling.strategy)
+                "Scanning %s: %d row(s) [strategy=%s]",
+                table_label,
+                len(rows),
+                str(sampling.strategy),
             )
             for i, row in enumerate(rows):
                 formatted = self._format_sample_content(
