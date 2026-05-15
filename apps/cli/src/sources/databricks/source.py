@@ -297,6 +297,10 @@ class DatabricksSource(BaseSource):
             http_path=f"/sql/1.0/warehouses/{self._warehouse_id()}",
             access_token=self._access_token_value(),
             _socket_timeout=self._timeout_seconds(),
+            # pytz doesn't recognise 'Etc/UTC' which Databricks embeds in Arrow
+            # timestamp metadata; returning timestamps as strings bypasses the
+            # pyarrow→pandas timezone conversion entirely.
+            timestamp_as_string=True,
         )
 
     def _catalog_allowlist(self) -> set[str] | None:

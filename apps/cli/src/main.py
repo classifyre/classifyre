@@ -163,7 +163,12 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     # results are pushed as they complete.
                     from .pipeline.detector_pipeline import DetectorPipeline
 
-                    pipeline = DetectorPipeline.from_recipe(recipe, source, runner_id)
+                    pipeline = DetectorPipeline.from_recipe(
+                        recipe,
+                        source,
+                        runner_id,
+                        max_concurrent_assets=args.detector_max_concurrent,
+                    )
                     has_detectors = bool(pipeline.detectors)
 
                     output_batch_count = 0
@@ -191,12 +196,33 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         # Phase 2: Run detectors and emit results as they complete
                         if has_detectors:
                             result_count = 0
+                            flush_count = 0
+                            pending_results: list[dict[str, Any]] = []
                             async for processed in pipeline.process_stream(raw_batch):
-                                await sink.emit_batch(
-                                    [_asset_to_payload(processed)],
-                                    skip_findings=False,
-                                )
+                                pending_results.append(_asset_to_payload(processed))
                                 result_count += 1
+                                if len(pending_results) >= args.detector_flush_batch_size:
+                                    flush_count += 1
+                                    logger.info(
+                                        "Flushing detector batch %s: %s asset(s) (total processed: %s/%s)",
+                                        flush_count,
+                                        len(pending_results),
+                                        result_count,
+                                        batch_size,
+                                    )
+                                    await sink.emit_batch(pending_results, skip_findings=False)
+                                    pending_results = []
+
+                            if pending_results:
+                                flush_count += 1
+                                logger.info(
+                                    "Flushing detector batch %s (final): %s asset(s) (total processed: %s/%s)",
+                                    flush_count,
+                                    len(pending_results),
+                                    result_count,
+                                    batch_size,
+                                )
+                                await sink.emit_batch(pending_results, skip_findings=False)
 
                             logger.info(
                                 "Detector results streamed for %s/%s assets in batch",
@@ -406,8 +432,36 @@ def main() -> None:
         default=None,
         help="Directory to write trained model artifacts (train command only)",
     )
+    parser.add_argument(
+        "--detector-flush-batch-size",
+        type=int,
+        default=None,
+        help="How many detector-processed assets to accumulate before pushing findings to the API (default: 5, env: CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE)",
+    )
+    parser.add_argument(
+        "--detector-max-concurrent",
+        type=int,
+        default=None,
+        help="Max assets processed in parallel by the detector pipeline (default: 10, env: CLASSIFYRE_DETECTOR_MAX_CONCURRENT)",
+    )
 
     args = parser.parse_args()
+
+    if args.detector_flush_batch_size is None:
+        env_val = os.environ.get("CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE")
+        try:
+            args.detector_flush_batch_size = int(env_val) if env_val else 5
+        except ValueError:
+            args.detector_flush_batch_size = 5
+    args.detector_flush_batch_size = max(args.detector_flush_batch_size, 1)
+
+    if args.detector_max_concurrent is None:
+        env_val = os.environ.get("CLASSIFYRE_DETECTOR_MAX_CONCURRENT")
+        try:
+            args.detector_max_concurrent = int(env_val) if env_val else 10
+        except ValueError:
+            args.detector_max_concurrent = 10
+    args.detector_max_concurrent = max(args.detector_max_concurrent, 1)
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)

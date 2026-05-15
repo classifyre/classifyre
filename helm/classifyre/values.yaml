@@ -257,6 +257,10 @@ api:
     workDir: /app/apps/cli
     # -- Allow CLI to auto-install optional detector dependencies.
     autoInstallOptionalDeps: true
+    # -- Number of detector-processed assets to accumulate before pushing findings to the API.
+    detectorFlushBatchSize: 5
+    # -- Max assets processed in parallel by the detector pipeline.
+    detectorMaxConcurrent: 10
 
     resources:
       # -- CLI job resource requests.

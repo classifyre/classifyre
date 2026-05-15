@@ -54,6 +54,14 @@ data:
                     "value": "20"
                   },
                   {
+                    "name": "CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE",
+                    "value": "{{ .Values.api.cliJobs.detectorFlushBatchSize }}"
+                  },
+                  {
+                    "name": "CLASSIFYRE_DETECTOR_MAX_CONCURRENT",
+                    "value": "{{ .Values.api.cliJobs.detectorMaxConcurrent }}"
+                  },
+                  {
                     "name": "HOME",
                     "value": "/tmp"
                   },
