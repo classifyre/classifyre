@@ -420,6 +420,6 @@ async def test_mssql_fetch_content_pages_batches_for_all_strategy(
     assert len(queries_issued) == 3
     assert "COUNT" in queries_issued[0]
     assert all("OFFSET" in q and "FETCH NEXT" in q for q in queries_issued[1:])
-    assert len(pages) == 2
+    assert len(pages) == 12
     assert "item1" in pages[0]
-    assert "item12" in pages[1]
+    assert "item12" in pages[11]

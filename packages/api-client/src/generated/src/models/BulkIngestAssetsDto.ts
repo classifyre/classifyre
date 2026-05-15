@@ -37,6 +37,12 @@ export interface BulkIngestAssetsDto {
      * @memberof BulkIngestAssetsDto
      */
     finalizeRun?: boolean;
+    /**
+     * When true, skip all findings processing (create, update, resolve) for this batch. Useful for streaming ingestion where assets are pushed before detector results.
+     * @type {boolean}
+     * @memberof BulkIngestAssetsDto
+     */
+    skipFindings?: boolean;
 }
 
 /**
@@ -61,6 +67,7 @@ export function BulkIngestAssetsDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'runnerId': json['runnerId'],
         'assets': json['assets'],
         'finalizeRun': json['finalizeRun'] == null ? undefined : json['finalizeRun'],
+        'skipFindings': json['skipFindings'] == null ? undefined : json['skipFindings'],
     };
 }
 
@@ -78,6 +85,7 @@ export function BulkIngestAssetsDtoToJSONTyped(value?: BulkIngestAssetsDto | nul
         'runnerId': value['runnerId'],
         'assets': value['assets'],
         'finalizeRun': value['finalizeRun'],
+        'skipFindings': value['skipFindings'],
     };
 }
 

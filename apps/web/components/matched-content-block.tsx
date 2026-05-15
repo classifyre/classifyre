@@ -48,7 +48,7 @@ export function MatchedContentBlock({
       </div>
       <div className="space-y-3 bg-white p-6 dark:bg-card">
         {contextBefore && (
-          <pre className="overflow-x-auto rounded-[4px] border border-black/20 bg-muted/40 p-4 text-xs text-muted-foreground">
+          <pre className="overflow-x-auto rounded-[4px] border border-border/20 bg-muted/40 p-4 text-xs text-muted-foreground">
             {contextBefore}
           </pre>
         )}
@@ -59,7 +59,7 @@ export function MatchedContentBlock({
           {content}
         </pre>
         {contextAfter && (
-          <pre className="overflow-x-auto rounded-[4px] border border-black/20 bg-muted/40 p-4 text-xs text-muted-foreground">
+          <pre className="overflow-x-auto rounded-[4px] border border-border/20 bg-muted/40 p-4 text-xs text-muted-foreground">
             {contextAfter}
           </pre>
         )}

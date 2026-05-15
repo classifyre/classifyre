@@ -69,13 +69,18 @@ All URIs are relative to *http://localhost*
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerDelete**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerdelete) | **DELETE** /custom-detectors/{detectorId}/test-scenarios/{scenarioId} | 
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerList**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerlist) | **GET** /custom-detectors/{detectorId}/test-scenarios | 
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerRun**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerrun) | **POST** /custom-detectors/{detectorId}/test-scenarios/run | 
+*CustomDetectorsApi* | [**customDetectorsControllerClearTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollercleartrainingexamples) | **DELETE** /custom-detectors/{id}/training-examples | Delete all training examples for a detector
 *CustomDetectorsApi* | [**customDetectorsControllerCreate**](docs/CustomDetectorsApi.md#customdetectorscontrollercreate) | **POST** /custom-detectors | Create custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerDelete**](docs/CustomDetectorsApi.md#customdetectorscontrollerdelete) | **DELETE** /custom-detectors/{id} | Delete custom detector
+*CustomDetectorsApi* | [**customDetectorsControllerDeleteTrainingExample**](docs/CustomDetectorsApi.md#customdetectorscontrollerdeletetrainingexample) | **DELETE** /custom-detectors/{id}/training-examples/{exampleId} | Delete a single training example
 *CustomDetectorsApi* | [**customDetectorsControllerGetById**](docs/CustomDetectorsApi.md#customdetectorscontrollergetbyid) | **GET** /custom-detectors/{id} | Get custom detector by ID
 *CustomDetectorsApi* | [**customDetectorsControllerList**](docs/CustomDetectorsApi.md#customdetectorscontrollerlist) | **GET** /custom-detectors | List custom detectors
 *CustomDetectorsApi* | [**customDetectorsControllerListExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollerlistexamples) | **GET** /custom-detectors/examples | List custom detector starter examples
+*CustomDetectorsApi* | [**customDetectorsControllerListTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollerlisttrainingexamples) | **GET** /custom-detectors/{id}/training-examples | List stored training examples for a detector
 *CustomDetectorsApi* | [**customDetectorsControllerParseTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollerparsetrainingexamples) | **POST** /custom-detectors/training-examples/parse | Parse uploaded training examples file
+*CustomDetectorsApi* | [**customDetectorsControllerSaveTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollersavetrainingexamples) | **POST** /custom-detectors/{id}/training-examples | Save training examples for a detector
 *CustomDetectorsApi* | [**customDetectorsControllerTrain**](docs/CustomDetectorsApi.md#customdetectorscontrollertrain) | **POST** /custom-detectors/{id}/train | Trigger custom detector training
+*CustomDetectorsApi* | [**customDetectorsControllerTrainingExamplesStats**](docs/CustomDetectorsApi.md#customdetectorscontrollertrainingexamplesstats) | **GET** /custom-detectors/{id}/training-examples/stats | Get training example counts grouped by label
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingHistory**](docs/CustomDetectorsApi.md#customdetectorscontrollertraininghistory) | **GET** /custom-detectors/{id}/training-history | List training history for custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerUpdate**](docs/CustomDetectorsApi.md#customdetectorscontrollerupdate) | **PATCH** /custom-detectors/{id} | Update custom detector
 *FindingsApi* | [**findingsControllerBulkUpdate**](docs/FindingsApi.md#findingscontrollerbulkupdate) | **POST** /findings/bulk-update | Bulk update findings
@@ -226,6 +231,7 @@ All URIs are relative to *http://localhost*
 - [RunnersChartsTotalsDto](docs/RunnersChartsTotalsDto.md)
 - [SandboxRunDto](docs/SandboxRunDto.md)
 - [SandboxRunListResponseDto](docs/SandboxRunListResponseDto.md)
+- [SaveTrainingExamplesDto](docs/SaveTrainingExamplesDto.md)
 - [SearchAssetFindingDto](docs/SearchAssetFindingDto.md)
 - [SearchAssetItemDto](docs/SearchAssetItemDto.md)
 - [SearchAssetsChartsOptionsDto](docs/SearchAssetsChartsOptionsDto.md)
@@ -272,6 +278,10 @@ All URIs are relative to *http://localhost*
 - [StopRunnerResponseDto](docs/StopRunnerResponseDto.md)
 - [TestConnectionResponseDto](docs/TestConnectionResponseDto.md)
 - [TrainCustomDetectorDto](docs/TrainCustomDetectorDto.md)
+- [TrainingExampleDto](docs/TrainingExampleDto.md)
+- [TrainingExampleItemDto](docs/TrainingExampleItemDto.md)
+- [TrainingExamplesStatsDto](docs/TrainingExamplesStatsDto.md)
+- [TrainingExamplesStatsDtoByLabelValue](docs/TrainingExamplesStatsDtoByLabelValue.md)
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
 - [UpdateFindingDto](docs/UpdateFindingDto.md)

@@ -310,7 +310,7 @@ export class SourceAssetsController {
     @Param('sourceId') sourceId: string,
     @Body() bulkIngestDto: BulkIngestAssetsDto,
   ) {
-    const { runnerId, assets, finalizeRun } = bulkIngestDto;
+    const { runnerId, assets, finalizeRun, skipFindings } = bulkIngestDto;
 
     if (!runnerId) {
       throw new BadRequestException('runnerId is required');
@@ -338,6 +338,7 @@ export class SourceAssetsController {
     return this.assetService.bulkIngest(sourceId, runnerId, assets, {
       finalizeRun,
       isFullScan,
+      skipFindings,
     });
   }
 

@@ -157,6 +157,12 @@ export interface FindingResponseDto {
      */
     location?: FindingLocationDto;
     /**
+     * Detector-specific metadata (key-value pairs)
+     * @type {{ [key: string]: any; }}
+     * @memberof FindingResponseDto
+     */
+    metadata?: { [key: string]: any; };
+    /**
      * 
      * @type {string}
      * @memberof FindingResponseDto
@@ -237,14 +243,8 @@ export interface FindingResponseDto {
 export const FindingResponseDtoDetectorTypeEnum = {
     Secrets: 'SECRETS',
     Pii: 'PII',
-    Toxic: 'TOXIC',
-    ImageClassification: 'IMAGE_CLASSIFICATION',
     Yara: 'YARA',
     BrokenLinks: 'BROKEN_LINKS',
-    TextClassification: 'TEXT_CLASSIFICATION',
-    FeatureExtraction: 'FEATURE_EXTRACTION',
-    ObjectDetection: 'OBJECT_DETECTION',
-    Language: 'LANGUAGE',
     CodeSecurity: 'CODE_SECURITY',
     Custom: 'CUSTOM'
 } as const;
@@ -323,6 +323,7 @@ export function FindingResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'contextBefore': json['contextBefore'] == null ? undefined : json['contextBefore'],
         'contextAfter': json['contextAfter'] == null ? undefined : json['contextAfter'],
         'location': json['location'] == null ? undefined : FindingLocationDtoFromJSON(json['location']),
+        'metadata': json['metadata'] == null ? undefined : json['metadata'],
         'status': json['status'],
         'resolutionReason': json['resolutionReason'] == null ? undefined : json['resolutionReason'],
         'comment': json['comment'] == null ? undefined : json['comment'],
@@ -367,6 +368,7 @@ export function FindingResponseDtoToJSONTyped(value?: FindingResponseDto | null,
         'contextBefore': value['contextBefore'],
         'contextAfter': value['contextAfter'],
         'location': FindingLocationDtoToJSON(value['location']),
+        'metadata': value['metadata'],
         'status': value['status'],
         'resolutionReason': value['resolutionReason'],
         'comment': value['comment'],

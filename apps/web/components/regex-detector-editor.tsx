@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Plus, Trash2, Play, AlertTriangle } from "lucide-react";
 import {
@@ -58,6 +59,7 @@ export interface RegexDetectorEditorProps {
   initialDescription?: string;
   initialIsActive?: boolean;
   initialPipelineSchema?: Record<string, unknown>;
+  embedded?: boolean;
   onSubmit: (payload: {
     name: string;
     key?: string;
@@ -65,6 +67,10 @@ export interface RegexDetectorEditorProps {
     isActive?: boolean;
     pipelineSchema: Record<string, unknown>;
   }) => void | Promise<void>;
+}
+
+export interface RegexDetectorEditorHandle {
+  submit: () => Promise<void>;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -531,7 +537,7 @@ function TestPlayground({
                       <span className="shrink-0 text-muted-foreground font-mono">
                         [{m.start}:{m.end}]
                       </span>
-                      <code className="rounded bg-[#b7ff00]/20 px-1.5 py-0.5 font-mono text-foreground break-all">
+                      <code className="rounded bg-accent/20 px-1.5 py-0.5 font-mono text-foreground break-all">
                         {m.groupValue !== undefined ? m.groupValue : m.value}
                       </code>
                       {m.groupValue !== undefined && (
@@ -571,7 +577,10 @@ const DEFAULT_PATTERN: RegexPatternState = {
   group: 0,
 };
 
-export function RegexDetectorEditor({
+export const RegexDetectorEditor = React.forwardRef<
+  RegexDetectorEditorHandle,
+  RegexDetectorEditorProps
+>(function RegexDetectorEditor({
   mode,
   submitLabel,
   isSubmitting = false,
@@ -580,8 +589,9 @@ export function RegexDetectorEditor({
   initialDescription = "",
   initialIsActive = true,
   initialPipelineSchema,
+  embedded,
   onSubmit,
-}: RegexDetectorEditorProps) {
+}, ref) {
   const { t } = useTranslation();
   const [name, setName] = useState(initialName);
   const [key, setKey] = useState(initialKey);
@@ -669,7 +679,7 @@ export function RegexDetectorEditor({
       } else {
         scrollToSection("patterns");
       }
-      return;
+      throw new Error("Validation failed");
     }
 
     await onSubmit({
@@ -680,6 +690,10 @@ export function RegexDetectorEditor({
       pipelineSchema: toApiSchema(patterns),
     });
   };
+
+  React.useImperativeHandle(ref, () => ({
+    submit: handleSubmit,
+  }));
 
   const identityErrors = errors.filter((e) => e === t("detectors.regex.validationNameRequired"));
   const patternErrors = errors.filter((e) => e !== t("detectors.regex.validationNameRequired"));
@@ -812,26 +826,28 @@ export function RegexDetectorEditor({
       </div>
 
       {/* Sticky bottom action toolbar */}
-      <Card className="sticky bottom-0 z-30 mt-6 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            {errors.length > 0 && (
-              <p className="text-sm text-destructive">
-                {errors.length === 1 ? errors[0] : t("detectors.regex.errorsCount", { count: errors.length })}
-              </p>
-            )}
+      {!embedded && (
+        <Card className="sticky bottom-0 z-30 mt-6 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              {errors.length > 0 && (
+                <p className="text-sm text-destructive">
+                  {errors.length === 1 ? errors[0] : t("detectors.regex.errorsCount", { count: errors.length })}
+                </p>
+              )}
+            </div>
+            <Button
+              type="button"
+              data-testid="regex-submit-btn"
+              onClick={() => void handleSubmit()}
+              disabled={isSubmitting}
+              className="h-10 rounded-[4px] border-2 border-border bg-accent text-accent-foreground shadow-[4px_4px_0_var(--color-border)] hover:-translate-y-[1px] hover:shadow-[6px_6px_0_var(--color-border)] transition-all font-mono font-bold uppercase tracking-[0.12em]"
+            >
+              {isSubmitting ? t("detectors.regex.saving") : submitLabel}
+            </Button>
           </div>
-          <Button
-            type="button"
-            data-testid="regex-submit-btn"
-            onClick={() => void handleSubmit()}
-            disabled={isSubmitting}
-            className="h-10 rounded-[4px] border-2 border-black bg-[#b7ff00] text-black shadow-[4px_4px_0_#000] hover:-translate-y-[1px] hover:shadow-[6px_6px_0_#000] transition-all font-mono font-bold uppercase tracking-[0.12em]"
-          >
-            {isSubmitting ? t("detectors.regex.saving") : submitLabel}
-          </Button>
-        </div>
-      </Card>
+        </Card>
+      )}
     </div>
   );
-}
+});

@@ -45,9 +45,7 @@ const DETECTOR_TYPE_TO_GROUP: Record<string, DetectorUiGroupId> = {
   CODE_SECURITY: "secrets_credentials",
   PII: "privacy_pii",
   YARA: "threats_attacks",
-  TOXIC: "harmful_content",
   SPAM: "content_quality",
-  LANGUAGE: "content_quality",
   BROKEN_LINKS: "content_quality",
   CUSTOM: "classification",
 };
@@ -372,7 +370,7 @@ export default function NewGlossaryTermPage() {
         <Button
           variant="outline"
           onClick={() => router.push("/semantic")}
-          className="mb-4 rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
+          className="mb-4 rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           {t("semantic.glossary.backToSemantic")}
@@ -386,7 +384,7 @@ export default function NewGlossaryTermPage() {
       </div>
 
       {/* ── Term Details ── */}
-      <Card className="rounded-[6px] border-2 border-black shadow-[6px_6px_0_#000]">
+      <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
         <CardHeader>
           <CardTitle className="uppercase tracking-[0.06em]">
             {t("semantic.glossary.termDetails")}
@@ -465,7 +463,7 @@ export default function NewGlossaryTermPage() {
       </Card>
 
       {/* ── Filter Mapping ── */}
-      <Card className="rounded-[6px] border-2 border-black shadow-[6px_6px_0_#000]">
+      <Card className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)]">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="uppercase tracking-[0.06em]">
@@ -682,14 +680,14 @@ export default function NewGlossaryTermPage() {
         <Button
           variant="outline"
           onClick={() => router.push("/semantic")}
-          className="rounded-[4px] border-2 border-black"
+          className="rounded-[4px] border-2 border-border"
         >
           {t("common.cancel")}
         </Button>
         <Button
           onClick={handleSubmit}
           disabled={isSaving}
-          className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+          className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
         >
           {isSaving
             ? t("semantic.glossary.creating")

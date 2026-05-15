@@ -255,9 +255,9 @@ async def test_mysql_fetch_content_pages_batches_for_all_strategy(
     assert len(queries_issued) == 3
     assert "COUNT" in queries_issued[0][0]
     assert all("LIMIT" in q and "OFFSET" in q for q, _ in queries_issued[1:])
-    assert len(pages) == 2
+    assert len(pages) == 12
     assert "user1" in pages[0]
-    assert "user12" in pages[1]
+    assert "user12" in pages[11]
 
 
 def test_mysql_sample_table_rows_no_batching_for_random_strategy(

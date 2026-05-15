@@ -98,7 +98,7 @@ export function CustomDetectorExtractionCoverage({ detectorId }: Props) {
 
   if (loading) {
     return (
-      <Card className="border-2 border-black rounded-[6px] shadow-[6px_6px_0_#000]">
+      <Card className="border-2 border-border rounded-[6px] shadow-[6px_6px_0_var(--color-border)]">
         <CardHeader>
           <CardTitle>Extraction Coverage</CardTitle>
         </CardHeader>
@@ -113,7 +113,7 @@ export function CustomDetectorExtractionCoverage({ detectorId }: Props) {
   const hasFields = normalizedCoverage.fields.length > 0;
 
   return (
-    <Card className="border-2 border-black rounded-[6px] shadow-[6px_6px_0_#000]">
+    <Card className="border-2 border-border rounded-[6px] shadow-[6px_6px_0_var(--color-border)]">
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <div>

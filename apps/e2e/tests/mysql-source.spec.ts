@@ -109,9 +109,19 @@ class MySQLSourceForm {
     });
   }
 
+  async goToDetectorsStep() {
+    await this.page.getByRole("button", { name: /detektoren/i }).click();
+    await expect(this.page.locator('[data-testid="scan-config-section"]')).toBeVisible({
+      timeout: 10_000,
+    });
+  }
+
   async enableDetector(detector: string) {
+    const enableBtn = this.page.locator(`[data-testid="detector-enable-${detector}"]`);
+    if (await enableBtn.isVisible()) {
+      await enableBtn.click();
+    }
     const toggle = this.page.locator(`[data-testid="detector-toggle-${detector}"]`);
-    await toggle.scrollIntoViewIfNeeded();
     if ((await toggle.getAttribute("data-state")) !== "on") {
       await toggle.click();
     }
@@ -120,7 +130,6 @@ class MySQLSourceForm {
 
   async saveAndScan() {
     const btn = this.page.locator('[data-testid="btn-save-and-scan"]');
-    await btn.scrollIntoViewIfNeeded();
     await btn.click();
     await this.page.waitForURL(/\/scans\/[a-z0-9-]+/, { timeout: 30_000 });
   }
@@ -129,9 +138,12 @@ class MySQLSourceForm {
 async function waitForScanCompletion(page: Page, timeout = 600_000): Promise<string> {
   const badge = page.locator('[data-testid="scan-status-badge"]');
   await expect(badge).toBeVisible({ timeout: 30_000 });
-  await expect(badge).toHaveText(/Completed|Error/i, { timeout });
+  // Match English (Completed/Error) and German (Abgeschlossen/Fehler)
+  await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler/i, {
+    timeout,
+  });
   const badgeText = (await badge.textContent()) ?? "";
-  return badgeText.toLowerCase().includes("error") ? "ERROR" : "COMPLETED";
+  return /error|fehler/i.test(badgeText) ? "ERROR" : "COMPLETED";
 }
 
 function sourceIdFromUrl(page: Page): string {
@@ -191,6 +203,7 @@ test.describe("MySQL Source (SSL / Aiven)", () => {
     await form.setDatabase(MYSQL_DATABASE);
 
     await form.saveSource();
+    await form.goToDetectorsStep();
     await form.enableDetector("PII");
     await form.saveAndScan();
 

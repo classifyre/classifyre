@@ -1,12 +1,12 @@
 ---
-# Source: classifyre/templates/pdb-api.yaml
+# Source: classifyre-core/templates/pdb-api.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: api
@@ -18,14 +18,14 @@ spec:
       app.kubernetes.io/instance: classifyre
       app.kubernetes.io/component: api
 ---
-# Source: classifyre/templates/pdb-web.yaml
+# Source: classifyre-core/templates/pdb-web.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: classifyre-web
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: web
@@ -37,54 +37,54 @@ spec:
       app.kubernetes.io/instance: classifyre
       app.kubernetes.io/component: web
 ---
-# Source: classifyre/templates/serviceaccount.yaml
+# Source: classifyre-core/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
-# Source: classifyre/templates/api-secrets.yaml
+# Source: classifyre-core/templates/api-secrets.yaml
 apiVersion: v1
 kind: Secret
 metadata:
   name: classifyre-api-secrets
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 type: Opaque
 stringData:
   CLASSIFYRE_MASKED_CONFIG_KEY: "snapshot-classifyre-masked-key-0001"
 ---
-# Source: classifyre/templates/database-secrets.yaml
+# Source: classifyre-core/templates/database-secrets.yaml
 apiVersion: v1
 kind: Secret
 metadata:
   name: classifyre-db
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 type: Opaque
 stringData:
   password: "snapshot-password"
 ---
-# Source: classifyre/templates/api-cli-job-template-configmap.yaml
+# Source: classifyre-core/templates/api-cli-job-template-configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: classifyre-api-cli-job-template
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 data:
@@ -118,7 +118,7 @@ data:
             "containers": [
               {
                 "name": "cli",
-                "image": "classifyre/cli:0.2.32",
+                "image": "classifyre/cli:0.3.1",
                 "imagePullPolicy": "IfNotPresent",
                 "resources": {"limits":{"cpu":"2","memory":"4Gi"},"requests":{"cpu":"500m","memory":"1Gi"}},
                 "securityContext": {"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":false},
@@ -142,7 +142,36 @@ data:
                   {
                     "name": "UV_CACHE_DIR",
                     "value": "/cache/uv"
-                  }
+                  },
+                  {
+                    "name": "HF_HOME",
+                    "value": "/cache/uv/hf"
+                  },
+                  {
+                    "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                    "value": "https://otel.classifyre.com"
+                  },
+                  {
+                    "name": "OTEL_EXPORTER_OTLP_PROTOCOL",
+                    "value": "http/protobuf"
+                  },
+                  {
+                    "name": "OTEL_SERVICE_NAME",
+                    "value": "classifyre-cli"
+                  },
+                  {
+                    "name": "DEPLOY_ENV",
+                    "value": "production"
+                  },
+                  {
+                    "name": "CLASSIFYRE_INSTANCE_ID",
+                    "valueFrom": {
+                      "configMapKeyRef": {
+                        "name": "classifyre-instance-id",
+                        "key": "instance-id",
+                        "optional": true
+                      }
+                    }
                   }
                 ],
                 "volumeMounts": [
@@ -176,14 +205,31 @@ data:
       }
     }
 ---
-# Source: classifyre/templates/api-cli-cache-pvc.yaml
+# Source: classifyre-core/templates/telemetry-instance-id.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: classifyre-instance-id
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-core-0.3.1
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: telemetry
+  annotations:
+    # Preserve this ConfigMap across `helm upgrade` so the instance ID stays stable.
+    "helm.sh/resource-policy": keep
+data:
+  instance-id: "cdf84746-3126-429d-a27a-1e70eb9ed3fe"
+---
+# Source: classifyre-core/templates/api-cli-cache-pvc.yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: classifyre-cli-uv-cache
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 spec:
@@ -193,14 +239,14 @@ spec:
     requests:
       storage: 20Gi
 ---
-# Source: classifyre/templates/api-cli-cache-pvc.yaml
+# Source: classifyre-core/templates/api-cli-cache-pvc.yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: classifyre-runner-logs
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 spec:
@@ -210,14 +256,14 @@ spec:
     requests:
       storage: 20Gi
 ---
-# Source: classifyre/templates/rbac.yaml
+# Source: classifyre-core/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: classifyre-api-job-manager
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 rules:
@@ -231,14 +277,14 @@ rules:
     resources: ["pods/log"]
     verbs: ["get"]
 ---
-# Source: classifyre/templates/rbac.yaml
+# Source: classifyre-core/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: classifyre-api-job-manager
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 subjects:
@@ -249,14 +295,14 @@ roleRef:
   kind: Role
   name: classifyre-api-job-manager
 ---
-# Source: classifyre/templates/service-api.yaml
+# Source: classifyre-core/templates/service-api.yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: api
@@ -272,14 +318,14 @@ spec:
       targetPort: http
       protocol: TCP
 ---
-# Source: classifyre/templates/service-web.yaml
+# Source: classifyre-core/templates/service-web.yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: classifyre-web
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: web
@@ -295,14 +341,14 @@ spec:
       targetPort: http
       protocol: TCP
 ---
-# Source: classifyre/templates/deployment-api.yaml
+# Source: classifyre-core/templates/deployment-api.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: api
@@ -320,7 +366,7 @@ spec:
         app.kubernetes.io/instance: classifyre
         app.kubernetes.io/component: api
       annotations:
-        checksum/cli-job-template: 020352f9a8b2bd32d8e1a10768b494c3886abba3323b39550e01cceb0f7bc0be
+        checksum/cli-job-template: ac8ea9592fca2bf1476fba382886045cca247d34f513502c80b65c7d581d9a40
     spec:
       serviceAccountName: classifyre-api
       automountServiceAccountToken: true
@@ -333,7 +379,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: prisma-migrate
-          image: classifyre/api:0.2.32
+          image: classifyre/api:0.3.1
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -376,7 +422,7 @@ spec:
                   key: CLASSIFYRE_MASKED_CONFIG_KEY
       containers:
         - name: api
-          image: classifyre/api:0.2.32
+          image: classifyre/api:0.3.1
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
@@ -416,6 +462,8 @@ spec:
                 secretKeyRef:
                   name: classifyre-api-secrets
                   key: CLASSIFYRE_MASKED_CONFIG_KEY
+            - name: DEMO_MODE
+              value: "false"
             - name: ENVIRONMENT
               value: "kubernetes"
             - name: NODE_ENV
@@ -444,6 +492,18 @@ spec:
               value: "always"
             - name: K8S_CLI_JOB_WORKDIR
               value: "/app/apps/cli"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "https://otel.classifyre.com"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: DEPLOY_ENV
+              value: "production"
+            - name: CLASSIFYRE_INSTANCE_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: classifyre-instance-id
+                  key: instance-id
+                  optional: true
           volumeMounts:
             - name: cli-job-template
               mountPath: /etc/classifyre/cli-job-template
@@ -521,14 +581,14 @@ spec:
               app.kubernetes.io/instance: classifyre
               app.kubernetes.io/component: api
 ---
-# Source: classifyre/templates/deployment-web.yaml
+# Source: classifyre-core/templates/deployment-web.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: classifyre-web
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: web
@@ -556,7 +616,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: classifyre/web:0.2.32
+          image: classifyre/web:0.3.1
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
@@ -580,6 +640,18 @@ spec:
               value: "production"
             - name: PORT
               value: "3100"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "https://otel.classifyre.com"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: DEPLOY_ENV
+              value: "production"
+            - name: CLASSIFYRE_INSTANCE_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: classifyre-instance-id
+                  key: instance-id
+                  optional: true
           resources:
             limits:
               cpu: "1"
@@ -644,14 +716,14 @@ spec:
               app.kubernetes.io/instance: classifyre
               app.kubernetes.io/component: web
 ---
-# Source: classifyre/templates/hpa-api.yaml
+# Source: classifyre-core/templates/hpa-api.yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: api
@@ -676,14 +748,14 @@ spec:
           type: Utilization
           averageUtilization: 75
 ---
-# Source: classifyre/templates/hpa-web.yaml
+# Source: classifyre-core/templates/hpa-web.yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: classifyre-web
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-0.2.32
+    helm.sh/chart: classifyre-core-0.3.1
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: web

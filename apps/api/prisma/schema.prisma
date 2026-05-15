@@ -470,10 +470,8 @@ enum InstanceTimeFormat {
 enum DetectorType {
   SECRETS
   PII
-  TOXIC
   YARA
   BROKEN_LINKS
-  LANGUAGE
   CODE_SECURITY
   CUSTOM
 }

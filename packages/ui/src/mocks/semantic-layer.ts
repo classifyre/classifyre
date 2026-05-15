@@ -68,7 +68,7 @@ export const mockGlossaryTerms: MockGlossaryTerm[] = [
       "Content flagged for toxicity, bias, NSFW material, or other safety concerns that could pose reputational or legal risk.",
     category: "Content",
     filterMapping: {
-      detectorTypes: ["TOXIC", "IMAGE_CLASSIFICATION", "BIAS"],
+      detectorTypes: ["CUSTOM"],
     },
     color: "#ec4899",
     icon: "AlertTriangle",
@@ -327,8 +327,7 @@ export const mockMetricResults: MockMetricResult[] = [
       { dimensionValue: "PII", value: 387 },
       { dimensionValue: "COMPLIANCE", value: 298 },
       { dimensionValue: "YARA", value: 245 },
-      { dimensionValue: "TOXIC", value: 134 },
-      { dimensionValue: "CUSTOM", value: 134 },
+      { dimensionValue: "CUSTOM", value: 268 },
     ],
   },
   {

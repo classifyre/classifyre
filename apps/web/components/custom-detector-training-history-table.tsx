@@ -214,7 +214,7 @@ export function CustomDetectorTrainingHistoryTable({
               setPage(1);
             }}
             placeholder="Search status, strategy, or error"
-            className="h-9 rounded-[4px] border-2 border-black pl-9"
+            className="h-9 rounded-[4px] border-2 border-border pl-9"
           />
         </div>
 
@@ -225,7 +225,7 @@ export function CustomDetectorTrainingHistoryTable({
             setPage(1);
           }}
         >
-          <SelectTrigger className="h-9 min-w-[180px] border-2 border-black rounded-[4px]">
+          <SelectTrigger className="h-9 min-w-[180px] border-2 border-border rounded-[4px]">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -238,7 +238,7 @@ export function CustomDetectorTrainingHistoryTable({
         </Select>
       </div>
 
-      <div className="overflow-hidden rounded-[6px] border-2 border-black bg-background shadow-[6px_6px_0_#000]">
+      <div className="overflow-hidden rounded-[6px] border-2 border-border bg-background shadow-[6px_6px_0_var(--color-border)]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -289,7 +289,7 @@ export function CustomDetectorTrainingHistoryTable({
         </Table>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[4px] border border-black/20 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[4px] border border-border/20 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
         <span>
           Showing <strong>{pagedRows.length}</strong> of{" "}
           <strong>{total}</strong> training runs
@@ -303,7 +303,7 @@ export function CustomDetectorTrainingHistoryTable({
               setPage(1);
             }}
           >
-            <SelectTrigger className="h-8 w-[88px] rounded-[4px] border border-black/30 bg-background text-xs">
+            <SelectTrigger className="h-8 w-[88px] rounded-[4px] border border-border/30 bg-background text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

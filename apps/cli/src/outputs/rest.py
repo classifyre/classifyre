@@ -26,6 +26,7 @@ class BulkIngestAssetsRequest(BaseModel):
     runner_id: str = Field(serialization_alias="runnerId")
     assets: list[dict[str, Any]]
     finalize_run: bool = Field(False, serialization_alias="finalizeRun")
+    skip_findings: bool = Field(False, serialization_alias="skipFindings")
 
 
 class FinalizeIngestRunRequest(BaseModel):
@@ -86,7 +87,9 @@ class RestOutputSink:
     # Keep each bulk request well under Fastify's 50 MB bodyLimit
     _MAX_BATCH_BYTES = 20 * 1024 * 1024  # 20 MB
 
-    async def emit_batch(self, assets: list[dict[str, Any]]) -> None:
+    async def emit_batch(
+        self, assets: list[dict[str, Any]], *, skip_findings: bool = False
+    ) -> None:
         if not assets:
             return
 
@@ -104,6 +107,7 @@ class RestOutputSink:
                 runner_id=runner_id,
                 assets=cleaned_chunk,
                 finalize_run=False,
+                skip_findings=skip_findings,
             )
             self._request_json(
                 "POST",

@@ -315,7 +315,6 @@ function extractFieldRows(schema: SchemaNode): DetectorDocFieldRow[] {
 const DETECTOR_TYPE_TO_DEFINITION: Record<string, string> = {
   SECRETS: "SecretsDetectorConfig",
   PII: "PIIDetectorConfig",
-  TOXIC: "ContentDetectorConfig",
   IMAGE_CLASSIFICATION: "ImageClassificationDetectorConfig",
   YARA: "ThreatDetectorConfig",
   BROKEN_LINKS: "BrokenLinksDetectorConfig",
@@ -325,12 +324,10 @@ const DETECTOR_TYPE_TO_DEFINITION: Record<string, string> = {
 const DETECTOR_TYPE_LABELS: Record<string, string> = {
   SECRETS: "Secrets",
   PII: "PII",
-  TOXIC: "Toxicity",
   IMAGE_CLASSIFICATION: "Image Classification",
   YARA: "YARA",
   BROKEN_LINKS: "Broken Links",
   SPAM: "Spam",
-  LANGUAGE: "Language",
   CODE_SECURITY: "Code Security",
   CUSTOM: "Custom",
 };

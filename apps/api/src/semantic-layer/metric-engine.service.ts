@@ -533,10 +533,8 @@ export class MetricEngineService {
     const allowedDetectorTypes = new Set([
       'SECRETS',
       'PII',
-      'TOXIC',
       'YARA',
       'BROKEN_LINKS',
-      'LANGUAGE',
       'CODE_SECURITY',
       'CUSTOM',
     ]);

@@ -8,8 +8,8 @@ const RUNNER_STATUS_BADGE_LABELS = {
 } as const;
 
 const RUNNER_STATUS_BADGE_TONE = {
-  COMPLETED: "border-black bg-[#b7ff00] text-black",
-  RUNNING: "border-[#b7ff00]/30 bg-[#0b0f0a] text-[#b7ff00]",
+  COMPLETED: "border-border bg-accent text-accent-foreground",
+  RUNNING: "border-accent/30 bg-background text-accent",
   PENDING: "border-border bg-muted text-foreground",
   ERROR: "border-destructive/30 bg-destructive/5 text-destructive",
 } as const;

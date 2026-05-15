@@ -439,37 +439,6 @@
       }
     }
   ],
-  "TOXIC": [
-    {
-      "name": "Text Safety",
-      "description": "Balanced coverage for toxic and abusive text.",
-      "config": {
-        "enabled_patterns": [
-          "toxicity",
-          "severe_toxicity",
-          "obscene",
-          "threat",
-          "insult",
-          "identity_attack"
-        ],
-        "model_name": "unbiased",
-        "confidence_threshold": 0.7
-      }
-    },
-    {
-      "name": "Strict Toxicity",
-      "description": "High-confidence alerts on severe toxicity.",
-      "config": {
-        "enabled_patterns": [
-          "severe_toxicity",
-          "threat",
-          "identity_attack"
-        ],
-        "model_name": "original",
-        "confidence_threshold": 0.85
-      }
-    }
-  ],
   "YARA": [
     {
       "name": "Secrets — Cloud Credentials",
@@ -962,22 +931,6 @@
       "description": "Limit findings to the first 100 broken links to keep reports concise.",
       "config": {
         "max_findings": 100
-      }
-    }
-  ],
-  "LANGUAGE": [
-    {
-      "name": "Language Routing",
-      "description": "Use high-confidence language detection when jurisdiction routing depends on it.",
-      "config": {
-        "confidence_threshold": 0.9
-      }
-    },
-    {
-      "name": "Language Baseline",
-      "description": "Permissive language tagging for low-stakes analytics and indexing.",
-      "config": {
-        "confidence_threshold": 0.7
       }
     }
   ],

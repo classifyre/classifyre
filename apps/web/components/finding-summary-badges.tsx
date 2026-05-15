@@ -21,11 +21,9 @@ type TopFindingItem = {
 const DETECTOR_DOT_COLOR_BY_KEY: Record<string, string> = {
   SECRETS: "bg-rose-500",
   PII: "bg-amber-500",
-  TOXIC: "bg-fuchsia-500",
   YARA: "bg-emerald-500",
   BROKEN_LINKS: "bg-orange-500",
   SPAM: "bg-slate-400",
-  LANGUAGE: "bg-blue-400",
   CODE_SECURITY: "bg-indigo-500",
   CUSTOM: "bg-slate-600",
 };
@@ -35,11 +33,9 @@ function useDetectorLabelMap(): Record<string, string> {
   return {
     SECRETS: t("findings.categories.secrets"),
     PII: t("findings.categories.pii"),
-    TOXIC: t("findings.categories.toxic"),
     YARA: t("findings.categories.yara"),
     BROKEN_LINKS: t("findings.categories.brokenLinks"),
     SPAM: t("findings.categories.spam"),
-    LANGUAGE: t("findings.categories.language"),
     CODE_SECURITY: t("findings.categories.codeSecurity"),
     CUSTOM: t("findings.categories.custom"),
   };

@@ -1418,7 +1418,7 @@
     },
     "/custom-detectors/training-examples/parse": {
       "post": {
-        "description": "Accepts csv/tsv/txt/md/log/json and returns normalized label/text training examples.",
+        "description": "Accepts csv/tsv/txt/md/log/json/xlsx and returns normalized label/text training examples.",
         "operationId": "CustomDetectorsController_parseTrainingExamples",
         "parameters": [],
         "requestBody": {
@@ -1558,6 +1558,191 @@
           }
         },
         "summary": "Delete custom detector",
+        "tags": [
+          "Custom Detectors"
+        ]
+      }
+    },
+    "/custom-detectors/{id}/training-examples": {
+      "get": {
+        "operationId": "CustomDetectorsController_listTrainingExamples",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Custom detector UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrainingExampleDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List stored training examples for a detector",
+        "tags": [
+          "Custom Detectors"
+        ]
+      },
+      "post": {
+        "description": "Appends (or replaces) labeled examples. Set clearExisting=true to wipe previous examples first.",
+        "operationId": "CustomDetectorsController_saveTrainingExamples",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Custom detector UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveTrainingExamplesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "saved": 42
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Save training examples for a detector",
+        "tags": [
+          "Custom Detectors"
+        ]
+      },
+      "delete": {
+        "operationId": "CustomDetectorsController_clearTrainingExamples",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Custom detector UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "deleted": 42
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete all training examples for a detector",
+        "tags": [
+          "Custom Detectors"
+        ]
+      }
+    },
+    "/custom-detectors/{id}/training-examples/stats": {
+      "get": {
+        "operationId": "CustomDetectorsController_trainingExamplesStats",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Custom detector UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingExamplesStatsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get training example counts grouped by label",
+        "tags": [
+          "Custom Detectors"
+        ]
+      }
+    },
+    "/custom-detectors/{id}/training-examples/{exampleId}": {
+      "delete": {
+        "operationId": "CustomDetectorsController_deleteTrainingExample",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Custom detector UUID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exampleId",
+            "required": true,
+            "in": "path",
+            "description": "Training example UUID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "deleted": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete a single training example",
         "tags": [
           "Custom Detectors"
         ]
@@ -1926,14 +2111,8 @@
               "enum": [
                 "SECRETS",
                 "PII",
-                "TOXIC",
-                "IMAGE_CLASSIFICATION",
                 "YARA",
                 "BROKEN_LINKS",
-                                "TEXT_CLASSIFICATION",
-                                "FEATURE_EXTRACTION",
-                                "OBJECT_DETECTION",
-                "LANGUAGE",
                 "CODE_SECURITY",
                 "CUSTOM"
               ]
@@ -2728,7 +2907,7 @@
         ]
       },
       "put": {
-        "description": "Update any combination of provider, model, API key (plaintext \u2014 stored encrypted), and base URL. Pass apiKey as an empty string to clear a stored key.",
+        "description": "Update any combination of provider, model, API key (plaintext — stored encrypted), and base URL. Pass apiKey as an empty string to clear a stored key.",
         "operationId": "AiProviderConfigController_updateConfig",
         "parameters": [],
         "requestBody": {
@@ -3132,6 +3311,9 @@
                       "COMPLETED",
                       "ERROR"
                     ]
+                  },
+                  "errorMessage": {
+                    "type": "string"
                   }
                 }
               }
@@ -3150,8 +3332,8 @@
       }
     },
     "/runners/{runnerId}/logs": {
-      "get": {
-        "operationId": "CliRunnerController_getRunnerLogs",
+      "post": {
+        "operationId": "CliRunnerController_searchRunnerLogs",
         "parameters": [
           {
             "name": "runnerId",
@@ -3160,28 +3342,18 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "cursor",
-            "required": false,
-            "in": "query",
-            "description": "Byte cursor returned by previous page",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "take",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 1000,
-              "default": 200,
-              "type": "number"
-            }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRunnerLogsBodyDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -3194,7 +3366,7 @@
             }
           }
         },
-        "summary": "Get paginated runner logs from filesystem storage (ordered oldest to newest)",
+        "summary": "Search runner logs with server-side filtering, full-text search, and sort",
         "tags": [
           "Runners"
         ]
@@ -3402,7 +3574,7 @@
     },
     "/sandbox/runs": {
       "post": {
-        "description": "Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, \u2026) and run one\nor more detectors against its extracted text.\n\n**`detectors`** is a JSON string containing an array of detector config objects.\nEach object has the shape:\n```json\n{ \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } }\n```\n\n### Detector types & sample configs\n\n| Type | What it finds |\n|------|---------------|\n| `SECRETS` | API keys, tokens, private keys |\n| `PII` | Emails, SSNs, credit cards, phone numbers |\n| `TOXIC` | Toxic / hateful text (Detoxify model) |\n| `IMAGE_CLASSIFICATION` | Image content classification (NSFW, etc.) |\n| `YARA` | Custom YARA rule matches |\n| `BROKEN_LINKS` | Unreachable URLs in text |\n\n**Minimal \u2014 secrets only (all patterns):**\n```json\n[{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}]\n```\n\n**PII with specific patterns:**\n```json\n[{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}]\n```\n\n**Secrets + PII combined:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}}\n]\n```\n\n**Toxic content (multilingual model):**\n```json\n[{\"type\":\"TOXIC\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"toxicity\",\"severe_toxicity\",\"insult\"],\"model_name\":\"multilingual\"}}]\n```\n\n**Full scan \u2014 all detectors:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},\n  {\"type\":\"TOXIC\",\"enabled\":true,\"config\":{}},\n  {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}}\n]\n```",
+        "description": "Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, …) and run one\nor more detectors against its extracted text.\n\n**`detectors`** is a JSON string containing an array of detector config objects.\nEach object has the shape:\n```json\n{ \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } }\n```\n\n### Detector types & sample configs\n\n| Type | What it finds |\n|------|---------------|\n| `SECRETS` | API keys, tokens, private keys |\n| `PII` | Emails, SSNs, credit cards, phone numbers |\n| `YARA` | Custom YARA rule matches |\n| `BROKEN_LINKS` | Unreachable URLs in text |\n| `CUSTOM` | User-defined pipelines (REGEX, GLiNER2, HuggingFace transformers) |\n\n**Minimal — secrets only (all patterns):**\n```json\n[{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}]\n```\n\n**PII with specific patterns:**\n```json\n[{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}]\n```\n\n**Secrets + PII combined:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}}\n]\n```\n\n**Full scan — all detectors:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},\n  {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}}\n]\n```",
         "operationId": "SandboxController_createRun",
         "parameters": [],
         "requestBody": {
@@ -3512,14 +3684,8 @@
                 "enum": [
                   "SECRETS",
                   "PII",
-                  "TOXIC",
-                  "IMAGE_CLASSIFICATION",
                   "YARA",
                   "BROKEN_LINKS",
-                                    "TEXT_CLASSIFICATION",
-                                "FEATURE_EXTRACTION",
-                                "OBJECT_DETECTION",
-                  "LANGUAGE",
                   "CODE_SECURITY",
                   "CUSTOM"
                 ]
@@ -3974,7 +4140,7 @@
             "description": ""
           }
         },
-        "summary": "Certify a metric (DRAFT \u2192 ACTIVE)",
+        "summary": "Certify a metric (DRAFT → ACTIVE)",
         "tags": [
           "Semantic Layer - Metrics"
         ]
@@ -4431,6 +4597,26 @@
           "limit": {
             "type": "number",
             "default": 25
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "NAME",
+              "TYPE",
+              "STATUS",
+              "CREATED_AT",
+              "UPDATED_AT",
+              "LAST_RUN_AT"
+            ],
+            "default": "CREATED_AT"
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "default": "DESC"
           }
         }
       },
@@ -4809,14 +4995,8 @@
               "enum": [
                 "SECRETS",
                 "PII",
-                "TOXIC",
-                "IMAGE_CLASSIFICATION",
                 "YARA",
                 "BROKEN_LINKS",
-                                "TEXT_CLASSIFICATION",
-                                "FEATURE_EXTRACTION",
-                                "OBJECT_DETECTION",
-                "LANGUAGE",
                 "CODE_SECURITY",
                 "CUSTOM"
               ]
@@ -5015,14 +5195,8 @@
             "enum": [
               "SECRETS",
               "PII",
-              "TOXIC",
-              "IMAGE_CLASSIFICATION",
               "YARA",
               "BROKEN_LINKS",
-                            "TEXT_CLASSIFICATION",
-                                "FEATURE_EXTRACTION",
-                                "OBJECT_DETECTION",
-              "LANGUAGE",
               "CODE_SECURITY",
               "CUSTOM"
             ]
@@ -5073,6 +5247,11 @@
           },
           "location": {
             "$ref": "#/components/schemas/FindingLocationDto"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Detector-specific metadata (key-value pairs)",
+            "additionalProperties": true
           },
           "status": {
             "type": "string",
@@ -5353,14 +5532,8 @@
               "enum": [
                 "SECRETS",
                 "PII",
-                "TOXIC",
-                "IMAGE_CLASSIFICATION",
                 "YARA",
                 "BROKEN_LINKS",
-                                "TEXT_CLASSIFICATION",
-                                "FEATURE_EXTRACTION",
-                                "OBJECT_DETECTION",
-                "LANGUAGE",
                 "CODE_SECURITY",
                 "CUSTOM"
               ]
@@ -5606,14 +5779,8 @@
             "enum": [
               "SECRETS",
               "PII",
-              "TOXIC",
-              "IMAGE_CLASSIFICATION",
               "YARA",
               "BROKEN_LINKS",
-                            "TEXT_CLASSIFICATION",
-                                "FEATURE_EXTRACTION",
-                                "OBJECT_DETECTION",
-              "LANGUAGE",
               "CODE_SECURITY",
               "CUSTOM"
             ]
@@ -5664,6 +5831,11 @@
           },
           "location": {
             "$ref": "#/components/schemas/FindingLocationDto"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Detector-specific metadata (key-value pairs)",
+            "additionalProperties": true
           },
           "status": {
             "type": "string",
@@ -6010,6 +6182,11 @@
             "type": "boolean",
             "description": "Whether this request should finalize the run immediately (defaults to true)",
             "default": true
+          },
+          "skipFindings": {
+            "type": "boolean",
+            "description": "When true, skip all findings processing (create, update, resolve) for this batch. Useful for streaming ingestion where assets are pushed before detector results.",
+            "default": false
           }
         },
         "required": [
@@ -6048,27 +6225,18 @@
           "name": {
             "type": "string"
           },
-          "method": {
-            "type": "string",
-            "enum": [
-              "RULESET",
-              "CLASSIFIER",
-              "ENTITY"
-            ]
-          },
           "description": {
             "type": "string"
           },
-          "config": {
+          "pipelineSchema": {
             "type": "object",
             "additionalProperties": true
           }
         },
         "required": [
           "name",
-          "method",
           "description",
-          "config"
+          "pipelineSchema"
         ]
       },
       "CustomDetectorTrainingRunDto": {
@@ -6161,23 +6329,15 @@
           "description": {
             "type": "string"
           },
-          "method": {
-            "type": "string",
-            "enum": [
-              "RULESET",
-              "CLASSIFIER",
-              "ENTITY"
-            ]
+          "pipelineSchema": {
+            "type": "object",
+            "additionalProperties": true
           },
           "isActive": {
             "type": "boolean"
           },
           "version": {
             "type": "number"
-          },
-          "config": {
-            "type": "object",
-            "additionalProperties": true
           },
           "lastTrainedAt": {
             "format": "date-time",
@@ -6236,10 +6396,9 @@
           "id",
           "key",
           "name",
-          "method",
+          "pipelineSchema",
           "isActive",
           "version",
-          "config",
           "findingsCount",
           "sourcesUsingCount",
           "sourcesWithFindingsCount",
@@ -6255,43 +6414,31 @@
           "name": {
             "type": "string",
             "description": "Human-friendly detector name",
-            "example": "DACH Contract Risk Terms"
+            "example": "Support Ticket Extractor"
           },
           "key": {
             "type": "string",
             "description": "Stable key override. If omitted, generated from name.",
-            "example": "cust_dach_contract_risk"
+            "example": "cust_support_ticket_extractor"
           },
           "description": {
             "type": "string",
             "description": "Optional detector description",
-            "example": "Detect legal/compliance risk language in contracts"
-          },
-          "method": {
-            "type": "string",
-            "enum": [
-              "RULESET",
-              "CLASSIFIER",
-              "ENTITY"
-            ],
-            "description": "Execution method for this custom detector",
-            "example": "CLASSIFIER"
+            "example": "Extracts order IDs, amounts, and intent from support tickets"
           },
           "isActive": {
             "type": "boolean",
             "description": "Whether this detector can be selected in sources",
             "default": true
           },
-          "config": {
+          "pipelineSchema": {
             "type": "object",
-            "description": "Custom detector config payload",
-            "additionalProperties": true
+            "description": "Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)"
           }
         },
         "required": [
           "name",
-          "method",
-          "config"
+          "pipelineSchema"
         ]
       },
       "ParsedTrainingExampleDto": {
@@ -6319,6 +6466,28 @@
           "text",
           "accepted",
           "source"
+        ]
+      },
+      "ParseTrainingExamplesSkippedReasonsDto": {
+        "type": "object",
+        "properties": {
+          "missingLabel": {
+            "type": "number",
+            "description": "Rows skipped because label cell was empty"
+          },
+          "missingText": {
+            "type": "number",
+            "description": "Rows skipped because text cell was empty"
+          },
+          "duplicates": {
+            "type": "number",
+            "description": "Rows removed as exact duplicates"
+          }
+        },
+        "required": [
+          "missingLabel",
+          "missingText",
+          "duplicates"
         ]
       },
       "ParseTrainingExamplesResponseDto": {
@@ -6349,6 +6518,29 @@
             "items": {
               "$ref": "#/components/schemas/ParsedTrainingExampleDto"
             }
+          },
+          "availableColumns": {
+            "description": "All column headers found in the file (xlsx/csv only)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detectedLabelColumn": {
+            "type": "string",
+            "description": "Column header auto-detected as the label column"
+          },
+          "detectedTextColumn": {
+            "type": "string",
+            "description": "Column header auto-detected as the text column"
+          },
+          "skippedReasons": {
+            "description": "Breakdown of why rows were skipped",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ParseTrainingExamplesSkippedReasonsDto"
+              }
+            ]
           }
         },
         "required": [
@@ -6366,39 +6558,141 @@
           "name": {
             "type": "string",
             "description": "Human-friendly detector name",
-            "example": "DACH Contract Risk Terms"
+            "example": "Support Ticket Extractor"
           },
           "key": {
             "type": "string",
             "description": "Stable key override. If omitted, generated from name.",
-            "example": "cust_dach_contract_risk"
+            "example": "cust_support_ticket_extractor"
           },
           "description": {
             "type": "string",
             "description": "Optional detector description",
-            "example": "Detect legal/compliance risk language in contracts"
-          },
-          "method": {
-            "type": "string",
-            "enum": [
-              "RULESET",
-              "CLASSIFIER",
-              "ENTITY"
-            ],
-            "description": "Execution method for this custom detector",
-            "example": "CLASSIFIER"
+            "example": "Extracts order IDs, amounts, and intent from support tickets"
           },
           "isActive": {
             "type": "boolean",
             "description": "Whether this detector can be selected in sources",
             "default": true
           },
-          "config": {
+          "pipelineSchema": {
             "type": "object",
-            "description": "Custom detector config payload",
-            "additionalProperties": true
+            "description": "Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)"
           }
         }
+      },
+      "TrainingExampleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "customDetectorId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "accepted": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "customDetectorId",
+          "label",
+          "text",
+          "accepted",
+          "createdAt"
+        ]
+      },
+      "TrainingExamplesStatsDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "byLabel": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "positive": {
+                  "type": "number"
+                },
+                "negative": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "total",
+          "byLabel"
+        ]
+      },
+      "TrainingExampleItemDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Entity label or classification label"
+          },
+          "text": {
+            "type": "string",
+            "description": "Context text containing the entity or to classify"
+          },
+          "value": {
+            "type": "string",
+            "description": "Specific entity value (span text) — required for NER fine-tuning. Omit for classification."
+          },
+          "accepted": {
+            "type": "boolean",
+            "description": "true = positive example, false = negative / false-positive"
+          },
+          "source": {
+            "type": "string",
+            "description": "Source filename the example came from"
+          }
+        },
+        "required": [
+          "label",
+          "text",
+          "accepted"
+        ]
+      },
+      "SaveTrainingExamplesDto": {
+        "type": "object",
+        "properties": {
+          "examples": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrainingExampleItemDto"
+            }
+          },
+          "clearExisting": {
+            "type": "boolean",
+            "description": "When true, delete all existing examples before saving",
+            "default": false
+          }
+        },
+        "required": [
+          "examples"
+        ]
       },
       "TrainCustomDetectorDto": {
         "type": "object",
@@ -6454,14 +6748,8 @@
             "enum": [
               "SECRETS",
               "PII",
-              "TOXIC",
-              "IMAGE_CLASSIFICATION",
               "YARA",
               "BROKEN_LINKS",
-                            "TEXT_CLASSIFICATION",
-                                "FEATURE_EXTRACTION",
-                                "OBJECT_DETECTION",
-              "LANGUAGE",
               "CODE_SECURITY",
               "CUSTOM"
             ]
@@ -6593,14 +6881,8 @@
             "enum": [
               "SECRETS",
               "PII",
-              "TOXIC",
-              "IMAGE_CLASSIFICATION",
               "YARA",
               "BROKEN_LINKS",
-                            "TEXT_CLASSIFICATION",
-                                "FEATURE_EXTRACTION",
-                                "OBJECT_DETECTION",
-              "LANGUAGE",
               "CODE_SECURITY",
               "CUSTOM"
             ]
@@ -7284,6 +7566,11 @@
             ],
             "example": "TWELVE_HOUR"
           },
+          "demoMode": {
+            "type": "boolean",
+            "description": "Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.",
+            "example": false
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -7300,6 +7587,7 @@
           "language",
           "timezone",
           "timeFormat",
+          "demoMode",
           "createdAt",
           "updatedAt"
         ]
@@ -7932,12 +8220,68 @@
           "message"
         ]
       },
+      "SearchRunnerLogsBodyDto": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "Opaque pagination cursor"
+          },
+          "take": {
+            "type": "number",
+            "default": 200,
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "search": {
+            "type": "string",
+            "description": "Full-text search on message"
+          },
+          "levels": {
+            "type": "array",
+            "description": "Filter by log levels",
+            "items": {
+              "type": "string",
+              "enum": [
+                "TRACE",
+                "DEBUG",
+                "INFO",
+                "WARN",
+                "ERROR",
+                "FATAL",
+                "UNKNOWN"
+              ]
+            }
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "default": "asc",
+            "description": "asc = oldest first (cursor-based), desc = newest first (index-based)"
+          },
+          "streams": {
+            "type": "array",
+            "description": "Filter by stream type",
+            "items": {
+              "type": "string",
+              "enum": [
+                "stderr",
+                "stdout",
+                "combined"
+              ]
+            }
+          }
+        }
+      },
       "RunnerLogEntryDto": {
         "type": "object",
         "properties": {
           "cursor": {
             "type": "string",
-            "description": "Byte offset cursor for this log entry"
+            "description": "Opaque pagination cursor for this entry"
           },
           "timestamp": {
             "type": "string",
@@ -7955,12 +8299,26 @@
           },
           "message": {
             "type": "string"
+          },
+          "level": {
+            "type": "string",
+            "description": "Inferred log level",
+            "enum": [
+              "TRACE",
+              "DEBUG",
+              "INFO",
+              "WARN",
+              "ERROR",
+              "FATAL",
+              "UNKNOWN"
+            ]
           }
         },
         "required": [
           "cursor",
           "stream",
-          "message"
+          "message",
+          "level"
         ]
       },
       "RunnerLogsResponseDto": {

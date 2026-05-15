@@ -17,6 +17,7 @@ from ..models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ..sources.base import BaseSource
+from ..utils.file_parser import resolve_mime_type
 from .content_provider import ContentProvider
 
 logger = logging.getLogger(__name__)
@@ -72,16 +73,16 @@ class DetectorPipeline:
     async def process_stream(
         self, assets: list[SingleAssetScanResults]
     ) -> AsyncGenerator[SingleAssetScanResults, None]:
-        """Process assets concurrently (bounded), yielding in submission order."""
+        """Process assets concurrently (bounded), yielding in completion order."""
         semaphore = asyncio.Semaphore(self.max_concurrent_assets)
 
         async def _bounded(asset: SingleAssetScanResults) -> SingleAssetScanResults:
             async with semaphore:
                 return await self._process_single_asset(asset)
 
-        tasks = [asyncio.create_task(_bounded(a)) for a in assets]
-        for task in tasks:
-            yield await task
+        tasks = {asyncio.create_task(_bounded(a)) for a in assets}
+        for coro in asyncio.as_completed(tasks):
+            yield await coro
 
     async def _process_single_asset(self, asset: SingleAssetScanResults) -> SingleAssetScanResults:
         """Process a single asset through detectors."""
@@ -92,24 +93,32 @@ class DetectorPipeline:
 
         # Record scan start time
         scan_started = datetime.now(UTC)
-        primary_content_type = self._asset_type_to_content_type(asset.asset_type)
+        ocr_enabled = self.source.ocr_enabled()
+        text_content_type = self._text_content_type_for_asset(asset.asset_type, ocr_enabled)
         link_content = self._build_links_payload(asset.links)
 
-        text_detectors = [
-            detector
-            for detector in self.detectors
-            if self._supports_content_type(
-                detector.get_supported_content_types(),
-                primary_content_type,
-            )
-        ]
+        text_detectors = []
+        if text_content_type:
+            text_detectors = [
+                detector
+                for detector in self.detectors
+                if self._supports_content_type(
+                    detector.get_supported_content_types(),
+                    text_content_type,
+                )
+            ]
+        asset_has_binary_primary = self._asset_has_binary_primary_payload(asset.asset_type)
         binary_detectors = [
             detector
             for detector in self.detectors
             if self._is_binary_detector(detector)
-            and not self._supports_content_type(
-                detector.get_supported_content_types(),
-                primary_content_type,
+            and (
+                asset_has_binary_primary
+                or not text_content_type
+                or not self._supports_content_type(
+                    detector.get_supported_content_types(),
+                    text_content_type,
+                )
             )
         ]
         link_detectors = [
@@ -121,9 +130,14 @@ class DetectorPipeline:
                 "application/x.asset-links",
             )
         ]
+        should_warn_on_empty_text = asset.asset_type in {
+            OutputAssetType.TXT,
+            OutputAssetType.TABLE,
+            OutputAssetType.URL,
+        }
 
         all_active = text_detectors + binary_detectors + link_detectors
-        detector_names = [d.__class__.__name__ for d in all_active]
+        detector_names = [self._detector_log_label(d) for d in all_active]
         logger.info("Scanning %s [%s]", asset.name, ", ".join(detector_names))
 
         findings: list[DetectionResult] = []
@@ -140,8 +154,9 @@ class DetectorPipeline:
                 text_errors,
             ) = await self._run_text_detectors_for_asset(
                 asset=asset,
-                text_content_type=primary_content_type,
+                text_content_type=text_content_type,
                 detectors=text_detectors,
+                warn_on_empty_content=should_warn_on_empty_text,
             )
             findings.extend(text_findings)
             scan_warnings.extend(text_warnings)
@@ -150,10 +165,6 @@ class DetectorPipeline:
                 detector_types_run,
                 text_detector_types_run,
             )
-            if content_size == 0:
-                msg = f"No content available for asset {asset.name}"
-                logger.warning(msg)
-                scan_warnings.append(msg)
         else:
             content_size = 0
 
@@ -180,6 +191,7 @@ class DetectorPipeline:
                 detectors=link_detectors,
                 content=link_content,
                 content_type="application/x.asset-links",
+                asset_name=asset.name,
             )
             findings.extend(link_findings)
             scan_errors.extend(link_errors)
@@ -222,6 +234,7 @@ class DetectorPipeline:
         asset: SingleAssetScanResults,
         text_content_type: str,
         detectors: list[BaseDetector],
+        warn_on_empty_content: bool = True,
     ) -> tuple[list[DetectionResult], list[DetectorType], int, list[str], list[str]]:
         findings: list[DetectionResult] = []
         detector_types_run: list[DetectorType] = []
@@ -249,6 +262,7 @@ class DetectorPipeline:
                 detectors=detectors,
                 content=detector_content,
                 content_type=text_content_type,
+                asset_name=asset.name,
             )
             findings.extend(page_findings)
             errors.extend(page_errors)
@@ -259,6 +273,11 @@ class DetectorPipeline:
 
             for finding in page_findings:
                 self.content_provider.enrich_finding_location(finding, asset, detector_content)
+
+        if content_size == 0 and warn_on_empty_content:
+            msg = f"No content available for asset {asset.name}"
+            logger.warning(msg)
+            warnings.append(msg)
 
         return findings, detector_types_run, content_size, warnings, errors
 
@@ -315,10 +334,16 @@ class DetectorPipeline:
             if not raw_bytes:
                 continue
 
+            effective_mime_type = self._resolve_binary_mime_type(
+                raw_bytes=raw_bytes,
+                declared_mime_type=mime_type,
+                asset=asset,
+            )
+
             compatible = [
                 d
                 for d in detectors
-                if self._supports_content_type(d.get_supported_content_types(), mime_type)
+                if self._supports_content_type(d.get_supported_content_types(), effective_mime_type)
             ]
             if not compatible:
                 continue
@@ -326,7 +351,8 @@ class DetectorPipeline:
             findings, detector_types_run, errors = await self._run_detectors(
                 detectors=compatible,
                 content=raw_bytes,
-                content_type=mime_type,
+                content_type=effective_mime_type,
+                asset_name=asset.name,
             )
             for finding in findings:
                 self.content_provider.enrich_finding_location(finding, asset, "")
@@ -335,12 +361,39 @@ class DetectorPipeline:
         return [], [], [], []
 
     @staticmethod
+    def _resolve_binary_mime_type(
+        *,
+        raw_bytes: bytes,
+        declared_mime_type: str,
+        asset: SingleAssetScanResults,
+    ) -> str:
+        file_name = str(asset.name or "").strip() or str(asset.external_url or "").strip()
+        return resolve_mime_type(
+            raw_bytes,
+            declared_mime_type=declared_mime_type,
+            file_name=file_name,
+        )
+
+    @staticmethod
     def _is_binary_detector(detector: BaseDetector) -> bool:
         """Return True if the detector handles binary content types (images, etc.)."""
         for ct in detector.get_supported_content_types():
             if ct.startswith(("image/", "audio/", "video/")) or ct == "application/octet-stream":
                 return True
         return False
+
+    @staticmethod
+    def _detector_log_label(detector: BaseDetector) -> str:
+        """Return a human-readable detector label for logs."""
+        config_name = getattr(getattr(detector, "config", None), "name", None)
+        if isinstance(config_name, str) and config_name.strip():
+            return config_name.strip()
+
+        detector_name = getattr(detector, "detector_name", "")
+        if isinstance(detector_name, str) and detector_name.strip() and detector_name != "base":
+            return detector_name.strip()
+
+        return detector.__class__.__name__
 
     @staticmethod
     def _merge_detector_types(
@@ -371,6 +424,7 @@ class DetectorPipeline:
         detectors: list[BaseDetector],
         content: str | bytes,
         content_type: str,
+        asset_name: str = "",
     ) -> tuple[list[DetectionResult], list[DetectorType], list[str]]:
         """Run all compatible detectors in parallel for a single payload."""
         if not content:
@@ -413,7 +467,7 @@ class DetectorPipeline:
         for detector, result in zip(runnable_detectors, results, strict=False):
             detector_name = detector.__class__.__name__
             if isinstance(result, Exception):
-                logger.error("Detector %s failed: %s", detector_name, result)
+                logger.error("Detector %s failed for %s: %s", detector_name, asset_name, result)
                 errors.append(f"{detector_name}: {result}")
                 continue
 
@@ -431,12 +485,13 @@ class DetectorPipeline:
 
             if detector_findings:
                 logger.info(
-                    "  %s: %d finding(s)",
+                    "  %s on %s: %d finding(s)",
                     detector_name,
+                    asset_name,
                     len(detector_findings),
                 )
             else:
-                logger.info("  %s: no findings", detector_name)
+                logger.info("  %s on %s: no findings", detector_name, asset_name)
 
             all_findings.extend(detector_findings)
 
@@ -468,20 +523,33 @@ class DetectorPipeline:
         """Run a single detector."""
         return await detector.detect(content, content_type)
 
-    def _asset_type_to_content_type(self, asset_type: OutputAssetType) -> str:
-        """Map canonical asset type to best-effort MIME type for detector routing."""
+    def _text_content_type_for_asset(
+        self,
+        asset_type: OutputAssetType,
+        ocr_enabled: bool,
+    ) -> str | None:
+        """Map an asset type to the text payload MIME used for text-capable detectors."""
         mapping = {
             OutputAssetType.TXT: "text/plain",
             OutputAssetType.TABLE: "text/plain",
             # URL assets usually resolve to HTML pages and are scanned as extracted text.
             OutputAssetType.URL: "text/html",
-            OutputAssetType.IMAGE: "image/*",
-            OutputAssetType.VIDEO: "video/*",
-            OutputAssetType.AUDIO: "audio/*",
-            OutputAssetType.BINARY: "application/octet-stream",
-            OutputAssetType.OTHER: "application/octet-stream",
         }
-        return mapping.get(asset_type, "text/plain")
+        if asset_type in mapping:
+            return mapping[asset_type]
+        if ocr_enabled and asset_type in {OutputAssetType.IMAGE, OutputAssetType.BINARY}:
+            return "text/plain"
+        return None
+
+    @staticmethod
+    def _asset_has_binary_primary_payload(asset_type: OutputAssetType) -> bool:
+        return asset_type in {
+            OutputAssetType.IMAGE,
+            OutputAssetType.VIDEO,
+            OutputAssetType.AUDIO,
+            OutputAssetType.BINARY,
+            OutputAssetType.OTHER,
+        }
 
     def _supports_content_type(self, supported: list[str], content_type: str) -> bool:
         """
@@ -505,7 +573,11 @@ class DetectorPipeline:
 
     @classmethod
     def from_recipe(
-        cls, recipe: dict[str, Any], source: BaseSource, runner_id: str
+        cls,
+        recipe: dict[str, Any],
+        source: BaseSource,
+        runner_id: str,
+        max_concurrent_assets: int = 10,
     ) -> "DetectorPipeline":
         """Create pipeline from recipe configuration."""
         from ..detectors import get_detector
@@ -551,6 +623,7 @@ class DetectorPipeline:
             source=source,
             runner_id=runner_id,
             content_size_limit=content_size_limit,
+            max_concurrent_assets=max_concurrent_assets,
             content_provider=ParsedContentProvider(source),
         )
         pipeline.init_warnings = init_warnings

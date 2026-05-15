@@ -1212,10 +1212,12 @@ export class AssetService {
     options?: {
       finalizeRun?: boolean;
       isFullScan?: boolean;
+      skipFindings?: boolean;
     },
   ) {
     const finalizeRun = options?.finalizeRun ?? true;
     const isFullScan = options?.isFullScan ?? true;
+    const skipFindings = options?.skipFindings ?? false;
     const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
 
     // Process in batches to avoid transaction timeout
@@ -1253,6 +1255,7 @@ export class AssetService {
         source.type,
         existingAssetsMap,
         isFullScan,
+        skipFindings,
       );
 
       totalCreated += result.created;
@@ -1414,6 +1417,7 @@ export class AssetService {
     sourceType: AssetType,
     existingAssetsMap: Map<string, Asset>,
     isFullScan: boolean = true,
+    skipFindings: boolean = false,
   ): Promise<{
     created: number;
     updated: number;
@@ -1517,6 +1521,17 @@ export class AssetService {
               lastScannedAt: scannedAt,
             },
           });
+        }
+
+        // When streaming ingestion, stubs are sent before detector results.
+        // Skip all findings processing so existing findings are not resolved prematurely.
+        if (skipFindings) {
+          return {
+            created: assetsToCreate.length,
+            updated: assetsToUpdate.length,
+            unchanged: assetsUnchanged.length,
+            findings: 0,
+          };
         }
 
         // Collect ALL scanned asset IDs — needed to resolve findings on assets

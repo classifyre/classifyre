@@ -3,8 +3,6 @@
 import pytest
 
 from src.detectors.broken_links.detector import BrokenLinksDetector
-from src.detectors.content.language_detector import LanguageDetector
-from src.detectors.content.toxic_detector import ToxicDetector
 from src.detectors.custom.detector import CustomDetector
 from src.detectors.dependencies import MissingDependencyError
 from src.detectors.pii.detector import PIIDetector
@@ -13,7 +11,6 @@ from src.detectors.threat.code_security_detector import CodeSecurityDetector
 from src.detectors.threat.yara_detector import YaraDetector
 from src.models.generated_detectors import (
     BrokenLinksDetectorConfig,
-    ContentDetectorConfig,
     CustomDetectorConfig,
     DetectorConfig,
     DetectorType,
@@ -56,19 +53,6 @@ class TestDetectorTypesMatchSchema:
         except MissingDependencyError:
             pytest.skip("Presidio not installed, skipping PII detector test")
 
-    def test_toxic_detector_type(self):
-        """Test ToxicDetector has correct detector_type."""
-        try:
-            detector = ToxicDetector(ContentDetectorConfig())
-            assert detector.detector_type == "toxic"
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.TOXIC
-            assert (
-                ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.TOXIC
-            )
-        except MissingDependencyError:
-            pytest.skip("PyTorch not installed, skipping toxic detector test")
-
     def test_yara_detector_type(self):
         """Test YaraDetector has correct detector_type."""
         try:
@@ -109,19 +93,6 @@ class TestDetectorTypesMatchSchema:
             ScanResultDetectorType(detector.detector_type.upper()) == ScanResultDetectorType.CUSTOM
         )
 
-    def test_language_detector_type(self):
-        """Test LanguageDetector has correct detector_type."""
-        try:
-            detector = LanguageDetector()
-            assert detector.detector_type == "language"
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.LANGUAGE
-            assert (
-                ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.LANGUAGE
-            )
-        except MissingDependencyError:
-            pytest.skip("fast-langdetect not installed, skipping language test")
-
     def test_code_security_detector_type(self):
         """Test CodeSecurityDetector has correct detector_type."""
         try:
@@ -140,10 +111,8 @@ class TestDetectorTypesMatchSchema:
         detectors = [
             (SecretsDetector, SecretsDetectorConfig()),
             (PIIDetector, PIIDetectorConfig()),
-            (ToxicDetector, ContentDetectorConfig()),
             (YaraDetector, ThreatDetectorConfig()),
             (BrokenLinksDetector, BrokenLinksDetectorConfig()),
-            (LanguageDetector, None),
             (CodeSecurityDetector, None),
         ]
 
@@ -172,10 +141,8 @@ class TestDetectorTypesMatchSchema:
         expected_types = {
             "SECRETS",
             "PII",
-            "TOXIC",
             "YARA",
             "BROKEN_LINKS",
-            "LANGUAGE",
             "CODE_SECURITY",
             "CUSTOM",
         }
@@ -220,19 +187,6 @@ class TestDetectorConfigMapping:
         except MissingDependencyError:
             pytest.skip("Presidio not installed, skipping PII config test")
 
-    def test_toxic_uses_content_config(self):
-        """Test ToxicDetector accepts ContentDetectorConfig."""
-        try:
-            config = ContentDetectorConfig(
-                enabled_patterns=["toxicity", "threat"],
-                model_name="unbiased",
-                confidence_threshold=0.7,
-            )
-            detector = ToxicDetector(config)
-            assert detector.config == config
-        except MissingDependencyError:
-            pytest.skip("PyTorch not installed, skipping toxic detector test")
-
     def test_yara_uses_threat_config(self):
         """Test YaraDetector accepts ThreatDetectorConfig."""
         try:
@@ -269,10 +223,8 @@ class TestDetectorNames:
         detectors = [
             (SecretsDetector, SecretsDetectorConfig(), "secrets"),
             (PIIDetector, PIIDetectorConfig(), "pii"),
-            (ToxicDetector, ContentDetectorConfig(), "toxic"),
             (YaraDetector, ThreatDetectorConfig(), "yara"),
             (BrokenLinksDetector, BrokenLinksDetectorConfig(), "broken_links"),
-            (LanguageDetector, DetectorConfig(), "language"),
             (CodeSecurityDetector, DetectorConfig(), "code_security"),
             (
                 CustomDetector,

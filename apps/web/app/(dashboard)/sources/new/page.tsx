@@ -21,6 +21,7 @@ import { SourceExampleSelector } from "@/components/source-example-selector";
 import {
   SourceScanConfig,
   type DetectorConfigInput,
+  type SourceScanConfigHandle,
 } from "@/components/source-scan-config";
 import { SourceDetectorConfigCard } from "@/components/source-detector-config-card";
 import {
@@ -420,7 +421,7 @@ export default function NewSourcePage() {
         <Button
           variant="outline"
           onClick={() => router.push("/sources")}
-          className="mb-4 rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
+          className="mb-4 rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           {t("sources.new.backToSources")}
@@ -552,6 +553,8 @@ function SourceStepperContent({
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const scanConfigRef = useRef<SourceScanConfigHandle>(null);
+
   const withValidFormData = async (
     handler: (data: Record<string, unknown>) => void | Promise<void>,
   ) => {
@@ -561,13 +564,15 @@ function SourceStepperContent({
       scrollToSection("config");
       return;
     }
+    const flushed = await scanConfigRef.current?.flushDetectorChanges();
+    if (flushed === false) return;
     await handler(sourceFormRef.current?.getValues() ?? {});
   };
 
   return (
     <div>
       {/* Mobile sticky horizontal nav */}
-      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-black bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
+      <div className="sticky top-0 z-20 -mx-4 mb-6 border-b-2 border-border bg-background/95 px-4 py-2 backdrop-blur-sm md:hidden">
         <HorizontalStepperNav
           activeStepId={activeStepId}
           configSaved={true}
@@ -605,6 +610,7 @@ function SourceStepperContent({
               showActions={false}
             >
               <SourceScanConfig
+                ref={scanConfigRef}
                 defaultDetectors={detectorDefaults}
                 onDetectorsChange={onDetectorsChange}
                 onSummaryChange={setScanSummary}

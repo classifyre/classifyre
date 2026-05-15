@@ -2199,7 +2199,7 @@ export const JsonSchemaForm = React.forwardRef<
           >
             <AccordionItem
               value="optional-parameters"
-              className="border-black/70 shadow-[6px_6px_0_#000]"
+              className="border-border/70 shadow-[6px_6px_0_var(--color-border)]"
             >
               <AccordionTrigger
                 className="hover:no-underline"
@@ -2459,7 +2459,7 @@ export const JsonSchemaForm = React.forwardRef<
                 variant="outline"
                 onClick={onCancel}
                 disabled={disabled}
-                className="rounded-[4px] border-2 border-black"
+                className="rounded-[4px] border-2 border-border"
               >
                 {finalCancelLabel}
               </Button>
@@ -2470,7 +2470,7 @@ export const JsonSchemaForm = React.forwardRef<
                 variant="outline"
                 onClick={handleSecondarySubmit}
                 disabled={disabled}
-                className="rounded-[4px] border-2 border-black"
+                className="rounded-[4px] border-2 border-border"
                 data-testid="btn-test-source"
               >
                 {secondarySubmitLabel}
@@ -2479,7 +2479,7 @@ export const JsonSchemaForm = React.forwardRef<
             <Button
               type="submit"
               disabled={disabled}
-              className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+              className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
               data-testid="btn-save-source"
             >
               {finalSubmitLabel}

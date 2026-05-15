@@ -147,9 +147,6 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                 result = source.test_connection()
                 if result.get("status") == "FAILURE":
                     msg = result.get("message", "")
-                    if _is_timeout_error(Exception(msg)):
-                        logger.warning("Source unreachable (timeout), skipping: %s", msg)
-                        return
                     logger.error("Aborting: Connection test failed: %s", msg)
                     sys.exit(1)
 
@@ -161,43 +158,81 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     await sink.start()
                     sink_started = True
 
-                    extract_result = source.extract()
-                    if not hasattr(extract_result, "__aiter__"):
-                        raise TypeError(
-                            "Source extract() must return an async generator of batches"
-                        )
+                    # Build detector pipeline directly so we can stream in two phases:
+                    # 1) stub assets appear in the API immediately, 2) detector
+                    # results are pushed as they complete.
+                    from .pipeline.detector_pipeline import DetectorPipeline
+
+                    pipeline = DetectorPipeline.from_recipe(
+                        recipe,
+                        source,
+                        runner_id,
+                        max_concurrent_assets=args.detector_max_concurrent,
+                    )
+                    has_detectors = bool(pipeline.detectors)
 
                     output_batch_count = 0
                     total_assets = 0
-                    buffer: list[dict[str, Any]] = []
 
-                    async for source_batch in extract_result:
-                        if not source_batch:
+                    async for raw_batch in source.extract_raw():
+                        if not raw_batch:
                             continue
-                        payload_batch = [_asset_to_payload(asset) for asset in source_batch]
-                        buffer.extend(payload_batch)
 
-                        while len(buffer) >= sink.batch_size:
-                            to_emit = buffer[: sink.batch_size]
-                            buffer = buffer[sink.batch_size :]
-                            await sink.emit_batch(to_emit)
-                            output_batch_count += 1
-                            total_assets += len(to_emit)
-                            logger.info(
-                                "Emitted output batch %s with %s assets (total: %s)",
-                                output_batch_count,
-                                len(to_emit),
-                                total_assets,
-                            )
+                        batch_size = len(raw_batch)
+                        total_assets += batch_size
 
-                    if buffer:
-                        await sink.emit_batch(buffer)
+                        # Phase 1: Emit stub assets immediately so they appear in the UI
+                        stub_batch = [_asset_to_payload(asset) for asset in raw_batch]
+                        for stub in stub_batch:
+                            stub["findings"] = []
+                        await sink.emit_batch(stub_batch, skip_findings=True)
                         output_batch_count += 1
-                        total_assets += len(buffer)
+                        logger.info(
+                            "Emitted %s stub assets (total: %s)",
+                            batch_size,
+                            total_assets,
+                        )
+
+                        # Phase 2: Run detectors and emit results as they complete
+                        if has_detectors:
+                            result_count = 0
+                            flush_count = 0
+                            pending_results: list[dict[str, Any]] = []
+                            async for processed in pipeline.process_stream(raw_batch):
+                                pending_results.append(_asset_to_payload(processed))
+                                result_count += 1
+                                if len(pending_results) >= args.detector_flush_batch_size:
+                                    flush_count += 1
+                                    logger.info(
+                                        "Flushing detector batch %s: %s asset(s) (total processed: %s/%s)",
+                                        flush_count,
+                                        len(pending_results),
+                                        result_count,
+                                        batch_size,
+                                    )
+                                    await sink.emit_batch(pending_results, skip_findings=False)
+                                    pending_results = []
+
+                            if pending_results:
+                                flush_count += 1
+                                logger.info(
+                                    "Flushing detector batch %s (final): %s asset(s) (total processed: %s/%s)",
+                                    flush_count,
+                                    len(pending_results),
+                                    result_count,
+                                    batch_size,
+                                )
+                                await sink.emit_batch(pending_results, skip_findings=False)
+
+                            logger.info(
+                                "Detector results streamed for %s/%s assets in batch",
+                                result_count,
+                                batch_size,
+                            )
 
                     await sink.finish()
                     logger.info(
-                        "Extraction completed: emitted %s assets in %s output batches",
+                        "Extraction completed: %s assets in %s batches",
                         total_assets,
                         output_batch_count,
                     )
@@ -207,9 +242,6 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             "Source timed out during extraction, partial results flushed: %s",
                             extraction_error,
                         )
-                        if buffer:
-                            await sink.emit_batch(buffer)
-                            total_assets += len(buffer)
                         await sink.finish()
                         return
                     if sink_started:
@@ -400,8 +432,36 @@ def main() -> None:
         default=None,
         help="Directory to write trained model artifacts (train command only)",
     )
+    parser.add_argument(
+        "--detector-flush-batch-size",
+        type=int,
+        default=None,
+        help="How many detector-processed assets to accumulate before pushing findings to the API (default: 5, env: CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE)",
+    )
+    parser.add_argument(
+        "--detector-max-concurrent",
+        type=int,
+        default=None,
+        help="Max assets processed in parallel by the detector pipeline (default: 10, env: CLASSIFYRE_DETECTOR_MAX_CONCURRENT)",
+    )
 
     args = parser.parse_args()
+
+    if args.detector_flush_batch_size is None:
+        env_val = os.environ.get("CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE")
+        try:
+            args.detector_flush_batch_size = int(env_val) if env_val else 5
+        except ValueError:
+            args.detector_flush_batch_size = 5
+    args.detector_flush_batch_size = max(args.detector_flush_batch_size, 1)
+
+    if args.detector_max_concurrent is None:
+        env_val = os.environ.get("CLASSIFYRE_DETECTOR_MAX_CONCURRENT")
+        try:
+            args.detector_max_concurrent = int(env_val) if env_val else 10
+        except ValueError:
+            args.detector_max_concurrent = 10
+    args.detector_max_concurrent = max(args.detector_max_concurrent, 1)
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)

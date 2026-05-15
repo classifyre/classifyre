@@ -90,6 +90,7 @@ docs/RunnersChartsTotalsDto.md
 docs/SandboxApi.md
 docs/SandboxRunDto.md
 docs/SandboxRunListResponseDto.md
+docs/SaveTrainingExamplesDto.md
 docs/SearchAssetFindingDto.md
 docs/SearchAssetItemDto.md
 docs/SearchAssetsChartsOptionsDto.md
@@ -140,6 +141,10 @@ docs/StartRunnerDto.md
 docs/StopRunnerResponseDto.md
 docs/TestConnectionResponseDto.md
 docs/TrainCustomDetectorDto.md
+docs/TrainingExampleDto.md
+docs/TrainingExampleItemDto.md
+docs/TrainingExamplesStatsDto.md
+docs/TrainingExamplesStatsDtoByLabelValue.md
 docs/UpdateAiProviderConfigDto.md
 docs/UpdateCustomDetectorDto.md
 docs/UpdateFindingDto.md
@@ -245,6 +250,7 @@ src/models/RunnersChartsTopSourceDto.ts
 src/models/RunnersChartsTotalsDto.ts
 src/models/SandboxRunDto.ts
 src/models/SandboxRunListResponseDto.ts
+src/models/SaveTrainingExamplesDto.ts
 src/models/SearchAssetFindingDto.ts
 src/models/SearchAssetItemDto.ts
 src/models/SearchAssetsChartsOptionsDto.ts
@@ -291,6 +297,10 @@ src/models/StartRunnerDto.ts
 src/models/StopRunnerResponseDto.ts
 src/models/TestConnectionResponseDto.ts
 src/models/TrainCustomDetectorDto.ts
+src/models/TrainingExampleDto.ts
+src/models/TrainingExampleItemDto.ts
+src/models/TrainingExamplesStatsDto.ts
+src/models/TrainingExamplesStatsDtoByLabelValue.ts
 src/models/UpdateAiProviderConfigDto.ts
 src/models/UpdateCustomDetectorDto.ts
 src/models/UpdateFindingDto.ts

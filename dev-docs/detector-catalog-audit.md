@@ -66,30 +66,6 @@ None of these drive detection. All could be replaced with `str` operations if ne
 
 ---
 
-### TOXIC
-
-| | |
-|---|---|
-| File | `content/toxic_detector.py` |
-| Library | `detoxify`, `torch` |
-| Config type | `ContentDetectorConfig` |
-| Model | `Detoxify("original")` — hardcoded |
-| Regex in our code | **None** |
-
-**Initialization:** Full. Loads Detoxify `original` at construction, all 6 toxicity types covered (`toxicity`, `severe_toxicity`, `obscene`, `threat`, `insult`, `identity_attack`).
-
-**Library utilization:** Partial gap. Detoxify ships three model variants:
-
-| Variant | Coverage |
-|---|---|
-| `original` | English only, 6 labels, smallest |
-| `unbiased` | English, reduced identity-group bias |
-| `multilingual` | 7 languages (en, fr, es, it, pt, tr, ru), 6 labels |
-
-The model is hardcoded to `"original"` with no config override. `ContentDetectorConfig` doesn't expose a `model` field. If multilingual content or bias-sensitive use cases matter, this is the main gap to close — add a `model` field (`original` | `unbiased` | `multilingual`) to `ContentDetectorConfig` and pass it to `Detoxify(...)`.
-
----
-
 ### IMAGE_CLASSIFICATION
 
 | | |
@@ -164,21 +140,6 @@ Replaces the old `SPAM` detector. The spam heuristic (keyword matching + URL reg
 
 ---
 
-### LANGUAGE
-
-| | |
-|---|---|
-| File | `content/language_detector.py` |
-| Library | `fast_langdetect` |
-| Config type | `LanguageDetectorConfig` |
-| Regex in our code | **None** |
-
-**Initialization:** Full. Calls `fast_langdetect.detect(content, model=model, k=k)` with both the `model` and `k` (top-k candidates) parameters wired from config. Default model is `Model.auto`; `k=1` returns the single best prediction, `k>1` returns multiple language candidates as separate findings.
-
-**Library utilization:** Good. `fast_langdetect` also has a `detect_multilingual()` function for content that mixes several languages — the current approach handles this adequately via `k > 1`.
-
----
-
 ### CODE_SECURITY
 
 | | |
@@ -221,12 +182,10 @@ Replaces the old `SPAM` detector. The spam heuristic (keyword matching + URL reg
 |---|---|---|---|
 | `SECRETS` | No | — | — |
 | `PII` | Yes | Input parsing + token counting; not detection | Low priority; removable |
-| `TOXIC` | No | — | — |
 | `IMAGE_CLASSIFICATION` | Yes | Config-driven label → severity mapping | Keep |
 | `YARA` | Yes | Rule name sanitization (`[^A-Za-z0-9_]`) | Keep |
 | `BROKEN_LINKS` | No | — | — |
 | `TEXT_CLASSIFICATION` | Yes | Config-driven label → severity mapping | Keep |
-| `LANGUAGE` | No | — | — |
 | `CODE_SECURITY` | No | — | — |
 | `CUSTOM` | Yes | `RegexRunner` — intentional feature | Keep |
 
@@ -238,7 +197,6 @@ No detector uses regex as a detection fallback.
 
 | Detector | Gap | Priority |
 |---|---|---|
-| `TOXIC` | Model hardcoded to `"original"`. Detoxify ships `"unbiased"` (reduced identity bias) and `"multilingual"` (7 languages). No `model` field in `ContentDetectorConfig`. | Medium — add `model` field |
 | `PII` | `AnalyzerEngine.batch_analyze()` could replace the per-cell loop (up to 200 Presidio calls per tabular page) for lower latency. | Low — only relevant at scale |
 | `CODE_SECURITY` | Severity filtering done in Python after bandit runs. Passing `--level` to bandit would skip emitting low-severity results entirely, reducing subprocess output. | Low |
 | `IMAGE_CLASSIFICATION` | `batch_size` not exposed in config — minor for bulk image workloads. | Low |

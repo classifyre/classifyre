@@ -39,10 +39,10 @@ export const DEFAULT_GLOSSARY_TERMS = [
   {
     displayName: 'Content Safety Issues',
     description:
-      'Toxic, biased, hateful, or otherwise inappropriate content detected in scanned sources. Includes image-classification findings.',
+      'Inappropriate or harmful content detected in scanned sources via custom detectors. Includes image-classification findings.',
     category: 'Content Safety',
     filterMapping: {
-      detectorTypes: ['TOXIC'],
+      detectorTypes: ['CUSTOM'],
     },
     color: '#ef4444',
     icon: 'alert-triangle',

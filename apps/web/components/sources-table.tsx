@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
@@ -25,6 +25,7 @@ import {
   type SearchSourcesResponseDto,
   type SearchSourcesSortBy,
   type SearchSourcesSortOrder,
+  type RunnerDto,
   type StartRunnerDto,
 } from "@workspace/api-client";
 import {
@@ -62,6 +63,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components";
 import { getSourceIcon } from "../lib/source-type-icon";
+import { mergeRunnerIntoSearchSourceItem } from "@/lib/runner-ws-merge";
 import { DeleteSourceAction } from "./delete-source-action";
 import {
   getRunnerStatusBadgeLabel,
@@ -69,6 +71,7 @@ import {
   isRunnerStatusRunning,
 } from "../lib/runner-status-badge";
 import { useUrlParams } from "../lib/url-filters";
+import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 
@@ -277,6 +280,28 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     action: "scan" | "stop";
   } | null>(null);
 
+  const applyRunnerWsEvent = useCallback((runner: RunnerDto) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      let changed = false;
+      const items = prev.items.map((source) => {
+        const next = mergeRunnerIntoSearchSourceItem(source, runner);
+        if (next) {
+          changed = true;
+          return next;
+        }
+        return source;
+      });
+      return changed ? { ...prev, items } : prev;
+    });
+  }, []);
+
+  useRunnerWebSocket({
+    trackRunnersList: false,
+    onRunnerUpdate: applyRunnerWsEvent,
+    onRunnerCreated: applyRunnerWsEvent,
+  });
+
   const resolvedPageSize = Number(pageSize);
 
   // ── Debounce search input ────────────────────────────────────────────────
@@ -444,7 +469,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder={t("sources.searchPlaceholder")}
-            className="h-9 pl-9 border-2 border-black rounded-[4px]"
+            className="h-9 pl-9 border-2 border-border rounded-[4px]"
           />
         </div>
 
@@ -457,7 +482,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[200px] border-2 border-black rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[200px] border-2 border-border rounded-[4px]">
             <MultiSelectValue placeholder={t("sources.sourceType")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -485,7 +510,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-black rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
             <MultiSelectValue placeholder={t("sources.runnerStatus")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -802,7 +827,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                             <>
                               <Button
                                 size="sm"
-                                className="h-8 rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+                                className="h-8 rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
                                 onClick={() =>
                                   runner?.id
                                     ? router.push(`/scans/${runner.id}`)
@@ -831,7 +856,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                           ) : (
                             <Button
                               size="sm"
-                              className="h-8 rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+                              className="h-8 rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
                               disabled={isStarting}
                               onClick={() => handleScan(source.id)}
                             >
@@ -845,7 +870,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 rounded-[4px] border-2 border-black"
+                            className="h-8 rounded-[4px] border-2 border-border"
                             onClick={() =>
                               router.push(`/sources/${source.id}/edit`)
                             }
@@ -884,7 +909,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             {t("common.rowsPerPage")}
           </span>
           <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] border-2 border-black rounded-[4px]">
+            <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
               <SelectValue placeholder={t("common.rowsPerPage")} />
             </SelectTrigger>
             <SelectContent>

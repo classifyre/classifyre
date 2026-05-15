@@ -4,9 +4,6 @@
   "description": "Merged detector schemas with all detector types and common definitions",
   "oneOf": [
     {
-      "$ref": "#/definitions/ContentDetectorConfig"
-    },
-    {
       "$ref": "#/definitions/SecretsDetectorConfig"
     },
     {
@@ -25,9 +22,6 @@
       "$ref": "#/definitions/CodeSecurityDetectorConfig"
     },
     {
-      "$ref": "#/definitions/LanguageDetectorConfig"
-    },
-    {
       "$ref": "#/definitions/GenericDetectorConfig"
     }
   ],
@@ -37,10 +31,8 @@
       "enum": [
         "SECRETS",
         "PII",
-        "TOXIC",
         "YARA",
         "BROKEN_LINKS",
-        "LANGUAGE",
         "CODE_SECURITY",
         "CUSTOM"
       ],
@@ -240,21 +232,6 @@
           "notes": "Identifies personal data (e.g., names, emails, IDs) that must be protected for privacy and compliance."
         },
         {
-          "detector_type": "TOXIC",
-          "lifecycle_status": "active",
-          "priority": "P1",
-          "categories": [
-            "CONTENT"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "detoxify",
-          "notes": "Flags harmful or abusive language that could damage user experience or brand reputation."
-        },
-        {
           "detector_type": "YARA",
           "lifecycle_status": "active",
           "priority": "P1",
@@ -285,21 +262,6 @@
           ],
           "recommended_model": "HTTP validation engine",
           "notes": "Finds non-working or invalid links that reduce content quality and user trust."
-        },
-        {
-          "detector_type": "LANGUAGE",
-          "lifecycle_status": "active",
-          "priority": "P2",
-          "categories": [
-            "QUALITY"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "fast-langdetect",
-          "notes": "Detects the language of the content to support localization and processing rules."
         },
         {
           "detector_type": "CODE_SECURITY",
@@ -376,18 +338,6 @@
         "start",
         "end"
       ]
-    },
-    "ContentEnabledPattern": {
-      "type": "string",
-      "enum": [
-        "toxicity",
-        "severe_toxicity",
-        "obscene",
-        "threat",
-        "insult",
-        "identity_attack"
-      ],
-      "description": "Content detector pattern types"
     },
     "SecretsEnabledPattern": {
       "type": "string",
@@ -570,57 +520,6 @@
       "type": "object",
       "description": "Base configuration for detector",
       "properties": {}
-    },
-    "ContentDetectorConfig": {
-      "title": "ContentDetectorConfig",
-      "description": "Configuration for content safety detectors",
-      "allOf": [
-        {
-          "$ref": "#/definitions/DetectorConfig"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "enabled_patterns": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/ContentEnabledPattern"
-              },
-              "description": "Specific content types to detect"
-            },
-            "model_name": {
-              "type": "string",
-              "enum": [
-                "original",
-                "unbiased",
-                "multilingual"
-              ],
-              "default": "original",
-              "title": "ContentModelName",
-              "description": "Detoxify model variant"
-            },
-            "confidence_threshold": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1,
-              "default": 0.7,
-              "description": "Minimum confidence score to report a finding (0-1)"
-            },
-            "max_findings": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Maximum number of findings to return per asset"
-            }
-          }
-        }
-      ]
     },
     "SecretsDetectorConfig": {
       "title": "SecretsDetectorConfig",
@@ -1427,51 +1326,6 @@
               "maximum": 1,
               "default": 0.7,
               "description": "Minimum confidence score to report a finding (0-1)"
-            },
-            "max_findings": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Maximum number of findings to return per asset"
-            }
-          }
-        }
-      ]
-    },
-    "LanguageDetectorConfig": {
-      "title": "LanguageDetectorConfig",
-      "description": "Config for the language detector (fast-langdetect).",
-      "allOf": [
-        {
-          "$ref": "#/definitions/DetectorConfig"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "confidence_threshold": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1,
-              "default": 0.7,
-              "description": "Minimum confidence score to report a finding (0-1)"
-            },
-            "model": {
-              "type": "string",
-              "enum": ["lite", "full", "auto"],
-              "default": "auto",
-              "description": "Model size: 'lite' (~50 MB, offline-only), 'full' (~190 MB, best accuracy), 'auto' (tries full, falls back to lite on MemoryError)."
-            },
-            "k": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1,
-              "description": "Number of top language candidates to return."
             },
             "max_findings": {
               "anyOf": [

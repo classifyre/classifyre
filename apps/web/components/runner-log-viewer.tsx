@@ -338,7 +338,7 @@ export function RunnerLogViewer({
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder={t("runners.logs.search")}
-              className="h-9 pl-9 border-2 border-black rounded-[4px]"
+              className="h-9 pl-9 border-2 border-border rounded-[4px]"
             />
           </div>
 
@@ -346,7 +346,7 @@ export function RunnerLogViewer({
             values={levelFilter}
             onValuesChange={(values) => setLevelFilter(values as string[])}
           >
-            <MultiSelectTrigger className="h-9 w-[180px] border-2 border-black rounded-[4px]">
+            <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
               <MultiSelectValue placeholder={t("runners.logs.allLevels")} />
             </MultiSelectTrigger>
             <MultiSelectContent
@@ -375,7 +375,7 @@ export function RunnerLogViewer({
           <Button
             variant="outline"
             size="sm"
-            className="h-9 gap-1.5 border-2 border-black rounded-[4px]"
+            className="h-9 gap-1.5 border-2 border-border rounded-[4px]"
             onClick={() =>
               setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))
             }
