@@ -296,7 +296,7 @@ class DatabricksSource(BaseSource):
             "server_hostname": self._workspace_host(),
             "http_path": f"/sql/1.0/warehouses/{self._warehouse_id()}",
             "access_token": self._access_token_value(),
-            "_timeout": self._timeout_seconds(),
+            "_socket_timeout": self._timeout_seconds(),
         }
         if session_configuration is not None:
             kwargs["session_configuration"] = session_configuration
@@ -671,7 +671,7 @@ class DatabricksSource(BaseSource):
 
             with closing(self._connect_sql_with_tz()) as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("SELECT 1")
+                    cursor.execute("SELECT 1", operation_timeout=self._statement_timeout_seconds())
                     cursor.fetchone()
 
             auth_mode = (
@@ -958,7 +958,7 @@ class DatabricksSource(BaseSource):
 
         with closing(self._connect_sql_with_tz()) as conn:
             with conn.cursor() as cursor:
-                cursor.execute(query)
+                cursor.execute(query, operation_timeout=self._statement_timeout_seconds())
                 columns: list[str] = []
                 for row in cursor.fetchall():
                     candidate: Any | None = None
@@ -1030,7 +1030,8 @@ class DatabricksSource(BaseSource):
             with closing(self._connect_sql_with_tz()) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(
-                        f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.catalog)}.{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
+                        f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.catalog)}.{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}",
+                        operation_timeout=self._statement_timeout_seconds(),
                     )
                     row = cursor.fetchone()
                     return int(row[0]) if row else None
@@ -1077,7 +1078,7 @@ class DatabricksSource(BaseSource):
         with closing(self._connect_sql_with_tz()) as conn:
             paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
             with conn.cursor() as cursor:
-                cursor.execute(paginated_query)
+                cursor.execute(paginated_query, operation_timeout=self._statement_timeout_seconds())
                 rows = list(cursor.fetchall())
                 column_names = (
                     [desc[0] for desc in cursor.description] if cursor.description else []
@@ -1105,7 +1106,7 @@ class DatabricksSource(BaseSource):
         else:
             with closing(self._connect_sql_with_tz()) as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute(query)
+                    cursor.execute(query, operation_timeout=self._statement_timeout_seconds())
                     rows = cursor.fetchall()
                     column_names = [desc[0] for desc in cursor.description or []]
 
