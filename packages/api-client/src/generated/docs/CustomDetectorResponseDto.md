@@ -10,10 +10,9 @@ Name | Type
 `key` | string
 `name` | string
 `description` | string
-`method` | string
+`pipelineSchema` | { [key: string]: any; }
 `isActive` | boolean
 `version` | number
-`config` | { [key: string]: any; }
 `lastTrainedAt` | Date
 `lastTrainingSummary` | { [key: string]: any; }
 `latestTrainingRun` | [CustomDetectorTrainingRunDto](CustomDetectorTrainingRunDto.md)
@@ -36,10 +35,9 @@ const example = {
   "key": null,
   "name": null,
   "description": null,
-  "method": null,
+  "pipelineSchema": null,
   "isActive": null,
   "version": null,
-  "config": null,
   "lastTrainedAt": null,
   "lastTrainingSummary": null,
   "latestTrainingRun": null,

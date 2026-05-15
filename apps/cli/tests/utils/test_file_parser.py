@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import sys
+from types import ModuleType
+from typing import Any
+
 import pytest
 
 from src.utils.file_parser import (
     ParsedFile,
+    _get_docling_converter,
+    _reset_docling_singleton,
+    _supports_docling_ocr,
     detect_mime_type,
     extract_text,
+    iter_file_pages,
     parse_bytes,
     parse_file,
 )
@@ -161,6 +169,209 @@ class TestExtractText:
         assert "Hello DOCX" in text
         assert err is None
 
+    def test_image_ocr_uses_docling_when_enabled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("Detected from OCR", None),
+        )
+
+        text, err = extract_text(
+            b"\x89PNG\r\n\x1a\nfake-image",
+            "image/png",
+            file_name="receipt.png",
+            enable_ocr=True,
+        )
+
+        assert text == "Detected from OCR"
+        assert err is None
+
+    def test_image_ocr_is_disabled_by_default(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def fail_if_called(*_args, **_kwargs):
+            raise AssertionError("Docling OCR should not run when OCR is disabled")
+
+        monkeypatch.setattr("src.utils.file_parser._extract_docling_markdown", fail_if_called)
+
+        text, err = extract_text(
+            b"\x89PNG\r\n\x1a\nfake-image",
+            "image/png",
+            file_name="receipt.png",
+            enable_ocr=False,
+        )
+
+        assert text == ""
+        assert err is None
+
+    def test_plain_text_does_not_use_ocr_even_when_enabled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """text/plain has a fast extraction path; Docling must not be called for it."""
+
+        def fail_if_called(*_args: Any, **_kwargs: Any) -> None:
+            raise AssertionError("Docling OCR must not run for plain-text content")
+
+        monkeypatch.setattr("src.utils.file_parser._extract_docling_markdown", fail_if_called)
+
+        text, err = extract_text(
+            b"hello plain text",
+            "text/plain",
+            file_name="notes.txt",
+            enable_ocr=True,
+        )
+
+        assert "hello plain text" in text
+        assert err is None
+
+    def test_markdown_does_not_use_ocr_even_when_enabled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """text/markdown has a fast extraction path; Docling must not be called for it."""
+
+        def fail_if_called(*_args: Any, **_kwargs: Any) -> None:
+            raise AssertionError("Docling OCR must not run for markdown content")
+
+        monkeypatch.setattr("src.utils.file_parser._extract_docling_markdown", fail_if_called)
+
+        text, err = extract_text(
+            b"# Heading\nsome content",
+            "text/markdown",
+            file_name="readme.md",
+            enable_ocr=True,
+        )
+
+        assert "Heading" in text
+        assert err is None
+
+
+# ---------------------------------------------------------------------------
+# _supports_docling_ocr
+# ---------------------------------------------------------------------------
+
+
+class TestSupportsDoclingOcr:
+    def test_image_mime_is_supported(self) -> None:
+        assert _supports_docling_ocr("image/png", "") is True
+        assert _supports_docling_ocr("image/jpeg", "") is True
+        assert _supports_docling_ocr("image/tiff", "") is True
+
+    def test_pdf_mime_is_supported(self) -> None:
+        assert _supports_docling_ocr("application/pdf", "") is True
+
+    def test_docx_mime_is_supported(self) -> None:
+        assert (
+            _supports_docling_ocr(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ""
+            )
+            is True
+        )
+
+    def test_plain_text_is_not_supported(self) -> None:
+        assert _supports_docling_ocr("text/plain", "file.txt") is False
+
+    def test_markdown_is_not_supported(self) -> None:
+        assert _supports_docling_ocr("text/markdown", "readme.md") is False
+
+    def test_txt_extension_is_not_supported(self) -> None:
+        assert _supports_docling_ocr("application/octet-stream", "notes.txt") is False
+
+    def test_md_extension_is_not_supported(self) -> None:
+        assert _supports_docling_ocr("application/octet-stream", "doc.md") is False
+
+    def test_png_extension_is_supported(self) -> None:
+        assert _supports_docling_ocr("application/octet-stream", "photo.png") is True
+
+
+# ---------------------------------------------------------------------------
+# _get_docling_converter singleton
+# ---------------------------------------------------------------------------
+
+
+class TestDoclingConverterSingleton:
+    @pytest.fixture(autouse=True)
+    def reset_singleton(self) -> None:
+        _reset_docling_singleton()
+        yield
+        _reset_docling_singleton()
+
+    def _install_fake_docling(self, monkeypatch: pytest.MonkeyPatch, init_count: list[int]) -> None:
+        """Inject a fake docling.document_converter into sys.modules."""
+
+        class FakeDocument:
+            @staticmethod
+            def export_to_markdown() -> str:
+                return "ocr output"
+
+        class FakeResult:
+            document = FakeDocument()
+
+        class FakeConverter:
+            def convert(self, _path: Any) -> FakeResult:
+                return FakeResult()
+
+        def make_converter() -> FakeConverter:
+            init_count.append(1)
+            return FakeConverter()
+
+        fake_module = ModuleType("docling.document_converter")
+        fake_module.DocumentConverter = make_converter  # type: ignore[attr-defined]
+
+        parent_module = ModuleType("docling")
+        monkeypatch.setitem(sys.modules, "docling", parent_module)
+        monkeypatch.setitem(sys.modules, "docling.document_converter", fake_module)
+
+    def test_converter_is_initialized_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        init_count: list[int] = []
+        self._install_fake_docling(monkeypatch, init_count)
+
+        c1, e1 = _get_docling_converter()
+        c2, _ = _get_docling_converter()
+        c3, _ = _get_docling_converter()
+
+        assert len(init_count) == 1, "DocumentConverter() must be called exactly once"
+        assert c1 is c2 is c3
+        assert e1 is None
+
+    def test_error_is_cached_on_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A failed init must not retry require_module on subsequent calls."""
+        attempt_count: list[int] = []
+
+        def failing_require(module_name: str, *_args: Any, **_kwargs: Any) -> ModuleType:
+            attempt_count.append(1)
+            raise ImportError(f"no module named {module_name!r}")
+
+        import src.sources.dependencies as deps
+
+        monkeypatch.setattr(deps, "require_module", failing_require)
+
+        c1, e1 = _get_docling_converter()
+        _c2, e2 = _get_docling_converter()
+
+        assert c1 is None
+        assert e1 is not None
+        assert e2 == e1
+        assert len(attempt_count) == 1, "require_module must not be retried after a cached failure"
+
+    def test_extract_uses_cached_converter(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        init_count: list[int] = []
+        self._install_fake_docling(monkeypatch, init_count)
+
+        text1, _ = extract_text(
+            b"\x89PNG\r\n\x1a\nfake", "image/png", file_name="a.png", enable_ocr=True
+        )
+        text2, _ = extract_text(
+            b"\x89PNG\r\n\x1a\nfake", "image/png", file_name="b.png", enable_ocr=True
+        )
+
+        assert text1 == text2 == "ocr output"
+        assert len(init_count) == 1, "DocumentConverter() must not be re-instantiated per file"
+
 
 # ---------------------------------------------------------------------------
 # parse_file
@@ -220,3 +431,44 @@ class TestParseBytes:
             file_name="invoice.pdf",
         )
         assert parsed.mime_type == "application/pdf"
+
+    def test_parse_bytes_preserves_binary_flag_when_ocr_extracts_image_text(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("ocr text", None),
+        )
+
+        parsed = parse_bytes(
+            b"\x89PNG\r\n\x1a\nimage-bytes",
+            declared_mime_type="image/png",
+            file_name="photo.png",
+            enable_ocr=True,
+        )
+
+        assert parsed.mime_type == "image/png"
+        assert parsed.text_content == "ocr text"
+        assert parsed.is_binary is True
+
+    def test_iter_file_pages_uses_ocr_for_images(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("first line\nsecond line", None),
+        )
+
+        pages = list(
+            iter_file_pages(
+                b"\x89PNG\r\n\x1a\nimage-bytes",
+                "image/png",
+                batch_size=1,
+                file_name="photo.png",
+                enable_ocr=True,
+            )
+        )
+
+        assert pages == ["first line\n", "second line"]

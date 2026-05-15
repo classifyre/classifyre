@@ -143,7 +143,6 @@ def test_databricks_test_connection_success(monkeypatch: pytest.MonkeyPatch) -> 
     source = DatabricksSource(_pat_recipe())
     monkeypatch.setattr(source, "_list_catalogs", lambda: ["main"])
     monkeypatch.setattr(source, "_connect_sql", _DummyConnection)
-    monkeypatch.setattr(source, "_connect_sql_with_tz", lambda: _DummyConnection())
 
     result = source.test_connection()
 
@@ -403,13 +402,12 @@ async def test_databricks_fetch_content_pages_batches_for_all_strategy(
 
     monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
     monkeypatch.setattr(source, "_connect_sql", lambda: _BatchConnection())
-    monkeypatch.setattr(source, "_connect_sql_with_tz", lambda: _BatchConnection())
 
     pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
 
     assert len(queries_issued) == 3
     assert "COUNT" in queries_issued[0]
     assert all("LIMIT" in q and "OFFSET" in q for q in queries_issued[1:])
-    assert len(pages) == 2
+    assert len(pages) == 12
     assert "item1" in pages[0]
-    assert "item12" in pages[1]
+    assert "item12" in pages[11]

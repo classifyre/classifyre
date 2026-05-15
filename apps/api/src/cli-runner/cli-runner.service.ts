@@ -515,6 +515,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
       hasSuccessfulRuns,
     );
 
+    // Prune old terminated runs beyond the configured limit (fire-and-forget)
+    void this.pruneOldRunners(sourceId);
+
     // Emit WebSocket event for runner created
     const runnerDto = await this.getRunnerStatus(runner.id);
     if (runnerDto && this.runnerEventsGateway) {
@@ -1436,6 +1439,25 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
   }
 
+  private async stopKubernetesJobSafely(
+    runnerId: string,
+    runner: { jobName: string | null; jobNamespace: string | null },
+  ): Promise<void> {
+    try {
+      await this.kubernetesCliJobService?.stopRunnerJob(runnerId, {
+        jobName: runner.jobName || undefined,
+        namespace: runner.jobNamespace || undefined,
+      });
+    } catch (error) {
+      // Job may have already finished, been evicted, or never started (e.g.
+      // ImagePullBackOff). Log and continue — the DB record still needs to be
+      // marked stopped so the source is unblocked.
+      this.logger.warn(
+        `Could not stop Kubernetes job for runner ${runnerId} (proceeding with DB stop): ${String(error)}`,
+      );
+    }
+  }
+
   private stopLocalRunnerProcess(runnerId: string): void {
     const child = this.runningProcessesByRunnerId.get(runnerId);
     if (!child) {
@@ -1899,6 +1921,45 @@ export class CliRunnerService implements OnApplicationBootstrap {
     return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
   }
 
+  private resolveMaxRunnersPerSource(): number {
+    const raw = process.env.MAX_RUNNERS_PER_SOURCE;
+    if (!raw) return 5;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 5;
+  }
+
+  private async pruneOldRunners(sourceId: string): Promise<void> {
+    const limit = this.resolveMaxRunnersPerSource();
+    if (limit === 0) return;
+
+    const terminated = await this.prisma.runner.findMany({
+      where: {
+        sourceId,
+        status: { in: [RunnerStatus.COMPLETED, RunnerStatus.ERROR] },
+      },
+      orderBy: { triggeredAt: 'desc' },
+      select: { id: true },
+    });
+
+    const toDelete = terminated.slice(limit);
+    if (toDelete.length === 0) return;
+
+    for (const { id } of toDelete) {
+      try {
+        await this.runnerLogStorage.deleteRunnerLogs(id);
+        await this.prisma.runner.delete({ where: { id } });
+      } catch (error) {
+        this.logger.warn(
+          `Failed to prune old runner ${id} for source ${sourceId}: ${String(error)}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Pruned ${toDelete.length} old runner(s) for source ${sourceId} (limit: ${limit})`,
+    );
+  }
+
   private async getBaselineFindings(
     sourceId: string,
     excludeRunnerId: string,
@@ -2041,10 +2102,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
     switch (runner.executionMode) {
       case RunnerExecutionMode.KUBERNETES:
-        await this.kubernetesCliJobService?.stopRunnerJob(runnerId, {
-          jobName: runner.jobName || undefined,
-          namespace: runner.jobNamespace || undefined,
-        });
+        await this.stopKubernetesJobSafely(runnerId, runner);
         break;
       case RunnerExecutionMode.EXTERNAL:
         throw new BadRequestException(
@@ -2054,10 +2112,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       default: {
         const environment = process.env.ENVIRONMENT || 'development';
         if (this.isKubernetesExecutionEnabled(environment)) {
-          await this.kubernetesCliJobService?.stopRunnerJob(runnerId, {
-            jobName: runner.jobName || undefined,
-            namespace: runner.jobNamespace || undefined,
-          });
+          await this.stopKubernetesJobSafely(runnerId, runner);
           break;
         }
 

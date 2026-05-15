@@ -284,7 +284,7 @@ export default function NewMetricPage() {
         <Button
           variant="outline"
           onClick={() => router.push("/semantic")}
-          className="mb-4 rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
+          className="mb-4 rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           {t("semantic.metrics.backToSemantic")}
@@ -297,7 +297,7 @@ export default function NewMetricPage() {
         </p>
       </div>
 
-      <Card className="border-2 border-black rounded-[6px] shadow-[6px_6px_0_#000]">
+      <Card className="border-2 border-border rounded-[6px] shadow-[6px_6px_0_var(--color-border)]">
         <CardHeader>
           <CardTitle className="uppercase tracking-[0.06em]">
             {t("semantic.metrics.metricDetails")}
@@ -445,7 +445,7 @@ export default function NewMetricPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-2 border-black rounded-[6px] shadow-[6px_6px_0_#000]">
+      <Card className="border-2 border-border rounded-[6px] shadow-[6px_6px_0_var(--color-border)]">
         <CardHeader>
           <CardTitle className="uppercase tracking-[0.06em]">
             {t("semantic.metrics.definition")}
@@ -485,7 +485,7 @@ export default function NewMetricPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-2 border-black rounded-[6px] shadow-[6px_6px_0_#000]">
+      <Card className="border-2 border-border rounded-[6px] shadow-[6px_6px_0_var(--color-border)]">
         <CardHeader>
           <CardTitle className="uppercase tracking-[0.06em]">
             {t("semantic.metrics.allowedDimensions")}
@@ -516,14 +516,14 @@ export default function NewMetricPage() {
         <Button
           variant="outline"
           onClick={() => router.push("/semantic")}
-          className="rounded-[4px] border-2 border-black"
+          className="rounded-[4px] border-2 border-border"
         >
           {t("common.cancel")}
         </Button>
         <Button
           onClick={handleSubmit}
           disabled={isSaving}
-          className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+          className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
         >
           {isSaving
             ? t("semantic.metrics.creating")

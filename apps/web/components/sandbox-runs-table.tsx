@@ -72,6 +72,10 @@ import {
 type SandboxRunStatus = SandboxControllerListRunsStatusEnum;
 type AssetContentType = SandboxControllerListRunsContentTypeEnum;
 
+type SandboxRunsTableProps = {
+  onPollingChange?: (hasActiveRuns: boolean) => void;
+};
+
 type SandboxFinding = {
   finding_type?: string;
   category?: string;
@@ -92,10 +96,6 @@ type SortBy =
 type SortOrder = "ASC" | "DESC";
 
 type HasFindingsFilter = "ALL" | "WITH" | "WITHOUT";
-
-type SandboxRunsTableProps = {
-  onPollingChange?: (isPolling: boolean) => void;
-};
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 20;
@@ -662,7 +662,7 @@ export function SandboxRunsTable({
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder={t("sandbox.runs.search")}
-            className="h-9 rounded-[4px] border-2 border-black pl-9"
+            className="h-9 rounded-[4px] border-2 border-border pl-9"
           />
         </div>
 
@@ -672,7 +672,7 @@ export function SandboxRunsTable({
             setStatusFilters(values as SandboxRunStatus[])
           }
         >
-          <MultiSelectTrigger className="h-9 w-[170px] rounded-[4px] border-2 border-black">
+          <MultiSelectTrigger className="h-9 w-[170px] rounded-[4px] border-2 border-border">
             <MultiSelectValue placeholder={t("common.status")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -697,7 +697,7 @@ export function SandboxRunsTable({
             setContentTypeFilters(values as AssetContentType[])
           }
         >
-          <MultiSelectTrigger className="h-9 w-[180px] rounded-[4px] border-2 border-black">
+          <MultiSelectTrigger className="h-9 w-[180px] rounded-[4px] border-2 border-border">
             <MultiSelectValue placeholder={t("sandbox.runs.contentType")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -724,7 +724,7 @@ export function SandboxRunsTable({
             )
           }
         >
-          <MultiSelectTrigger className="h-9 w-[200px] rounded-[4px] border-2 border-black">
+          <MultiSelectTrigger className="h-9 w-[200px] rounded-[4px] border-2 border-border">
             <MultiSelectValue placeholder={t("sandbox.runs.detectors")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -749,7 +749,7 @@ export function SandboxRunsTable({
             setHasFindingsFilter(value as HasFindingsFilter)
           }
         >
-          <SelectTrigger className="h-9 w-[150px] rounded-[4px] border-2 border-black">
+          <SelectTrigger className="h-9 w-[150px] rounded-[4px] border-2 border-border">
             <SelectValue placeholder={t("sandbox.runs.findings")} />
           </SelectTrigger>
           <SelectContent>
@@ -767,7 +767,7 @@ export function SandboxRunsTable({
             setSortOrder(nextOrder);
           }}
         >
-          <SelectTrigger className="h-9 w-[190px] rounded-[4px] border-2 border-black">
+          <SelectTrigger className="h-9 w-[190px] rounded-[4px] border-2 border-border">
             <SelectValue placeholder="Sort" />
           </SelectTrigger>
           <SelectContent>
@@ -889,7 +889,7 @@ export function SandboxRunsTable({
             {t("common.rowsPerPage")}
           </span>
           <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] rounded-[4px] border-2 border-black">
+            <SelectTrigger className="h-8 w-[130px] rounded-[4px] border-2 border-border">
               <SelectValue placeholder="Rows" />
             </SelectTrigger>
             <SelectContent>

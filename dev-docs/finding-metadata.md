@@ -55,17 +55,6 @@ CLI Detector → DetectionResult.metadata
 
 ---
 
-### TOXIC
-
-| Key | Type | Description |
-|---|---|---|
-| `toxicity_type` | `string` | One of: `toxicity`, `severe_toxicity`, `obscene`, `threat`, `insult`, `identity_attack` |
-| `model` | `string` | Always `"detoxify-original"` |
-
-**Source file:** `apps/cli/src/detectors/content/toxic_detector.py`
-
----
-
 ### IMAGE_CLASSIFICATION
 
 | Key | Type | Description |
@@ -116,18 +105,6 @@ CLI Detector → DetectionResult.metadata
 > **Note:** The `embedding` key is stripped during ingestion. Only `dimension`, `pooling_strategy`, `normalized`, and `model` are persisted to the database.
 
 **Source file:** `apps/cli/src/detectors/content/feature_extraction_detector.py`
-
----
-
-### LANGUAGE
-
-| Key | Type | Description |
-|---|---|---|
-| `model` | `string` | `fast_langdetect` model name |
-| `language` | `string` | ISO 639-1 language code (e.g. `en`, `fr`, `de`) |
-| `raw` | `object` | Raw candidate dict from the detector (stripped by frontend OMIT_KEYS) |
-
-**Source file:** `apps/cli/src/detectors/content/language_detector.py`
 
 ---
 
@@ -246,7 +223,7 @@ The `FindingMetadataCard` component (`apps/web/components/finding-metadata-card.
 
 **Behavior:**
 
-- Only renders for detectors listed in `DETECTORS_WITH_USEFUL_METADATA` (PII, SECRETS, CODE_SECURITY, YARA, TOXIC, LANGUAGE, BROKEN_LINKS, TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION)
+- Only renders for detectors listed in `DETECTORS_WITH_USEFUL_METADATA` (PII, SECRETS, CODE_SECURITY, YARA, BROKEN_LINKS, TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION)
 - Omits internal keys via `OMIT_KEYS`: `scores`, `raw`, `error`, `embedding`
 - Maps snake_case metadata keys to i18n translation keys for display labels
 - Unknown keys are displayed as-is with title-cased labels

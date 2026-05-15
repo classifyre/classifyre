@@ -160,7 +160,7 @@ async def test_oracle_fetch_content_uses_cache(
         call_count += 1
         return ('{"rows":[]}', "sample rows payload")
 
-    monkeypatch.setattr(source, "_sample_object_rows", _sample)
+    monkeypatch.setattr(source, "_sample_table_rows", _sample)
 
     first = await source.fetch_content(asset.hash)
     second = await source.fetch_content(asset.hash)
@@ -325,6 +325,6 @@ async def test_oracle_fetch_content_pages_batches_for_all_strategy(
     assert len(queries_issued) == 3
     assert "COUNT" in queries_issued[0]
     assert all("OFFSET" in q and "FETCH NEXT" in q for q in queries_issued[1:])
-    assert len(pages) == 2
+    assert len(pages) == 12
     assert "item1" in pages[0]
-    assert "item12" in pages[1]
+    assert "item12" in pages[11]

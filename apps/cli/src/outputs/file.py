@@ -28,7 +28,9 @@ class FileOutputSink:
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self._handle = self.file_path.open("a", encoding="utf-8")
 
-    async def emit_batch(self, assets: list[dict[str, Any]]) -> None:
+    async def emit_batch(
+        self, assets: list[dict[str, Any]], *, skip_findings: bool = False
+    ) -> None:
         if not assets:
             return
         handle = self._require_handle()

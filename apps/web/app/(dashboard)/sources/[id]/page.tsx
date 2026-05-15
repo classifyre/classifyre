@@ -67,7 +67,6 @@ type DetectorType = FindingResponseDto["detectorType"];
 const detectorDotClass: Partial<Record<DetectorType, string>> = {
   SECRETS: "bg-rose-500",
   PII: "bg-amber-500",
-  TOXIC: "bg-fuchsia-500",
   YARA: "bg-emerald-500",
   BROKEN_LINKS: "bg-orange-500",
   CUSTOM: "bg-indigo-600",
@@ -76,7 +75,6 @@ const detectorDotClass: Partial<Record<DetectorType, string>> = {
 const detectorLabels: Partial<Record<DetectorType, string>> = {
   SECRETS: "Secrets",
   PII: "PII",
-  TOXIC: "Toxic",
   YARA: "YARA",
   BROKEN_LINKS: "Broken Links",
   CUSTOM: "Custom Detector",
@@ -429,7 +427,7 @@ export default function SourceViewPage() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="h-auto rounded-[4px] border-2 border-black bg-background p-1">
+        <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">
           <TabsTrigger value="overview" className="rounded-[3px]">
             Overview
           </TabsTrigger>

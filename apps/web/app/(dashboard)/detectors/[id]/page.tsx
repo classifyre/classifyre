@@ -199,7 +199,7 @@ export default function CustomDetectorDetailsPage() {
           )}
           <Button
             size="sm"
-            className="rounded-[4px] border-2 border-black bg-[#ff2b2b] text-white shadow-[3px_3px_0_#000] hover:bg-[#e62626]"
+            className="rounded-[4px] border-2 border-border bg-destructive text-white shadow-[3px_3px_0_var(--color-border)] hover:bg-destructive/90"
             onClick={() => setShowDeleteDialog(true)}
             data-testid="btn-delete-detector"
           >
@@ -209,7 +209,7 @@ export default function CustomDetectorDetailsPage() {
         </div>
       </div>
 
-      <Card className="border-2 border-black rounded-[6px] shadow-[6px_6px_0_#000]">
+      <Card className="border-2 border-border rounded-[6px] shadow-[6px_6px_0_var(--color-border)]">
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -223,7 +223,7 @@ export default function CustomDetectorDetailsPage() {
         <CardContent
           className={`grid gap-3 ${(!isRegexPipeline && !isTransformerPipeline && (isPipelineDetector || detector.method !== "RULESET")) ? "md:grid-cols-3" : "md:grid-cols-2"}`}
         >
-          <div className="rounded-[4px] border border-black/20 p-3">
+          <div className="rounded-[4px] border border-border/20 p-3">
             <p className="text-xs text-muted-foreground mb-1">
               {t("detectors.sourcesUsing")}
             </p>
@@ -246,7 +246,7 @@ export default function CustomDetectorDetailsPage() {
               </ul>
             )}
           </div>
-          <div className="rounded-[4px] border border-black/20 p-3">
+          <div className="rounded-[4px] border border-border/20 p-3">
             <p className="text-xs text-muted-foreground">
               {t("detectors.sourcesWithFindings")}
             </p>
@@ -255,7 +255,7 @@ export default function CustomDetectorDetailsPage() {
             </p>
           </div>
           {!isRegexPipeline && !isTransformerPipeline && (isPipelineDetector || detector.method !== "RULESET") && (
-            <div className="rounded-[4px] border border-black/20 p-3">
+            <div className="rounded-[4px] border border-border/20 p-3">
               <p className="text-xs text-muted-foreground">
                 {t("detectors.lastTrained")}
               </p>

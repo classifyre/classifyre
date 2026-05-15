@@ -40,7 +40,7 @@ export function StepperHeader<TStepId extends string>({
               disabled={!canNavigate}
               onClick={() => onNavigate(step.id)}
               className={cn(
-                "h-auto w-full items-start justify-start gap-4 rounded-[4px] border-2 border-black px-4 py-3 text-left shadow-[4px_4px_0_#000]",
+                "h-auto w-full items-start justify-start gap-4 rounded-[4px] border-2 border-border px-4 py-3 text-left shadow-[4px_4px_0_var(--color-border)]",
                 status === "active" && cn(aiAccentBase, aiAccentHoverYellow),
                 status === "done" && "bg-black text-white",
                 status === "locked" && "bg-muted/20",

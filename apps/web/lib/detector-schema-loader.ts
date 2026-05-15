@@ -196,11 +196,9 @@ function resolveSchemaRefs(
 const configSchemaByDetectorType: Record<string, string> = {
   SECRETS: "SecretsDetectorConfig",
   PII: "PIIDetectorConfig",
-  TOXIC: "ContentDetectorConfig",
   YARA: "ThreatDetectorConfig",
   BROKEN_LINKS: "BrokenLinksDetectorConfig",
   CODE_SECURITY: "CodeSecurityDetectorConfig",
-  LANGUAGE: "GenericDetectorConfig",
   CUSTOM: "CustomDetectorConfig",
 };
 

@@ -21,10 +21,8 @@ const DETECTOR_TYPE_GROUP_MAP: Record<string, string> = {
   CODE_SECURITY: "secrets_credentials",
   PII: "privacy_pii",
   YARA: "threats_attacks",
-  TOXIC: "harmful_content",
   NSFW: "harmful_content",
   SPAM: "content_quality",
-  LANGUAGE: "content_quality",
   BROKEN_LINKS: "content_quality",
 };
 

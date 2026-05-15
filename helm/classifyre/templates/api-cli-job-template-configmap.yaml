@@ -54,13 +54,24 @@ data:
                     "value": "20"
                   },
                   {
+                    "name": "CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE",
+                    "value": "{{ .Values.api.cliJobs.detectorFlushBatchSize }}"
+                  },
+                  {
+                    "name": "CLASSIFYRE_DETECTOR_MAX_CONCURRENT",
+                    "value": "{{ .Values.api.cliJobs.detectorMaxConcurrent }}"
+                  },
+                  {
                     "name": "HOME",
                     "value": "/tmp"
-                  }
-                  ,
+                  },
                   {
                     "name": "UV_CACHE_DIR",
                     "value": "{{ if .Values.api.cliJobs.uvCache.enabled }}{{ .Values.api.cliJobs.uvCache.mountPath }}{{ else }}/tmp/uv-cache{{ end }}"
+                  },
+                  {
+                    "name": "HF_HOME",
+                    "value": "{{ if .Values.api.cliJobs.uvCache.enabled }}{{ .Values.api.cliJobs.uvCache.mountPath }}/hf{{ else }}/tmp/uv-cache/hf{{ end }}"
                   }
                   {{- if .Values.telemetry.enabled }},
                   {

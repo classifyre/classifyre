@@ -7,9 +7,6 @@ import pytest
 
 from src.models.generated_detectors import (
     BrokenLinksDetectorConfig,
-    ContentDetectorConfig,
-    ContentEnabledPattern,
-    ContentModelName,
     CustomDetectorConfig,
     DetectorConfig,
     DetectorType,
@@ -56,30 +53,6 @@ class TestDetectorSchemaExamples:
             config = PIIDetectorConfig.model_validate(config_data)
             assert config is not None
 
-    def test_toxic_examples_are_valid(self, examples: dict):
-        """Test all TOXIC examples validate against ContentDetectorConfig."""
-        toxic_examples = examples.get("TOXIC", [])
-        assert len(toxic_examples) > 0, "No TOXIC examples found"
-
-        for example in toxic_examples:
-            config_data = example.get("config", {})
-            # This should not raise validation errors
-            config = ContentDetectorConfig.model_validate(config_data)
-            assert config is not None
-
-            # Verify enabled_patterns if present
-            if config.enabled_patterns:
-                valid_patterns = {pattern.value for pattern in ContentEnabledPattern}
-                for pattern in config.enabled_patterns:
-                    assert pattern.value in valid_patterns, f"Invalid pattern: {pattern}"
-
-            # Verify model_name if present
-            if config.model_name:
-                valid_models = {model.value for model in ContentModelName}
-                assert config.model_name.value in valid_models, (
-                    f"Invalid model_name: {config.model_name}"
-                )
-
     def test_yara_examples_are_valid(self, examples: dict):
         """Test all YARA examples validate against ThreatDetectorConfig."""
         yara_examples = examples.get("YARA", [])
@@ -111,16 +84,6 @@ class TestDetectorSchemaExamples:
         for example in broken_links_examples:
             config_data = example.get("config", {})
             config = BrokenLinksDetectorConfig.model_validate(config_data)
-            assert config is not None
-
-    def test_language_examples_are_valid(self, examples: dict):
-        """Test all LANGUAGE examples validate against DetectorConfig."""
-        language_examples = examples.get("LANGUAGE", [])
-        assert len(language_examples) > 0, "No LANGUAGE examples found"
-
-        for example in language_examples:
-            config_data = example.get("config", {})
-            config = DetectorConfig.model_validate(config_data)
             assert config is not None
 
     def test_code_security_examples_are_valid(self, examples: dict):

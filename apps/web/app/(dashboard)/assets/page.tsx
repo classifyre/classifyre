@@ -353,7 +353,7 @@ export default function AssetsPage() {
                   <Card
                     className={
                       isActive
-                        ? "overflow-hidden border-2 border-[#b7ff00]/30 bg-[#0b0f0a] text-[#b7ff00] rounded-[6px]"
+                        ? "overflow-hidden border-2 border-accent/30 bg-background text-accent rounded-[6px]"
                         : "border-2 border-border rounded-[6px] transition-all group-hover:bg-secondary/40"
                     }
                   >
@@ -361,7 +361,7 @@ export default function AssetsPage() {
                       <p
                         className={
                           isActive
-                            ? "text-[11px] font-mono uppercase tracking-[0.16em] text-[#b7ff00]/80"
+                            ? "text-[11px] font-mono uppercase tracking-[0.16em] text-accent/80"
                             : "text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground"
                         }
                       >

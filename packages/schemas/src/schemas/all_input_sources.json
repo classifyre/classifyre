@@ -96,10 +96,8 @@
       "enum": [
         "SECRETS",
         "PII",
-        "TOXIC",
         "YARA",
         "BROKEN_LINKS",
-        "LANGUAGE",
         "CODE_SECURITY",
         "CUSTOM"
       ],
@@ -148,6 +146,11 @@
           "default": false,
           "description": "When true, force strategy ALL until this source gets its first successful run. After the first successful run, use the configured strategy."
         },
+        "enable_ocr": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, enable OCR/text extraction for supported binary documents and images before routing text-capable detectors."
+        },
         "order_by_column": {
           "type": "string",
           "description": "Column to use for LATEST sampling mode in tabular sources (usually created_at/updated_at). Auto-detected when not set."
@@ -176,6 +179,7 @@
       "default": {
         "strategy": "RANDOM",
         "fetch_all_until_first_success": false,
+        "enable_ocr": false,
         "fallback_to_random": true,
         "include_column_names": true,
         "rows_per_page": 100

@@ -19,7 +19,7 @@ from ...models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
 )
-from ...utils.file_parser import infer_mime_type_from_file_name, iter_file_pages, resolve_mime_type
+from ...utils.file_parser import infer_mime_type_from_file_name, resolve_mime_type
 from ...utils.hashing import hash_id, unhash_id
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -495,7 +495,43 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         mime = self._mime_cache.get(asset_id, "")
         if raw_bytes is not None and mime:
             return raw_bytes, mime
-        return None
+
+        external_url = self._hash_to_uri.get(asset_id)
+        asset_hash = asset_id
+        if external_url is None:
+            decoded = asset_id
+            if "_#_" not in decoded:
+                try:
+                    decoded = unhash_id(asset_id)
+                except Exception:
+                    decoded = asset_id
+            if "_#_" in decoded:
+                _, candidate = decoded.split("_#_", maxsplit=1)
+                external_url = candidate
+                asset_hash = self.generate_hash_id(candidate)
+            else:
+                external_url = asset_id
+                asset_hash = self.generate_hash_id(asset_id)
+
+        ref = self._object_ref_by_hash.get(asset_hash)
+        if ref is None:
+            return None
+
+        try:
+            file_bytes, content_type_hint, _truncated = self._download_object(ref)
+        except Exception as exc:
+            logger.warning("Failed to download object %s for binary fetch: %s", ref.key, exc)
+            return None
+
+        mime_type = resolve_mime_type(
+            file_bytes,
+            declared_mime_type=content_type_hint or ref.content_type_hint or "",
+            file_name=ref.key,
+        )
+        self._mime_cache[asset_hash] = mime_type
+        if external_url:
+            self._mime_cache[external_url] = mime_type
+        return file_bytes, mime_type
 
     async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
         raw_bytes = self._bytes_cache.get(asset_id)
@@ -511,7 +547,13 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             # pdfplumber can't freeze the event loop during large file iteration.
             pages: list[str] = await asyncio.to_thread(
                 list,
-                iter_file_pages(raw_bytes, mime, batch_size, include_col_names),
+                self.iter_asset_pages(
+                    raw_bytes,
+                    mime,
+                    batch_size,
+                    include_col_names,
+                    file_name=self._file_name_for_asset_id(asset_id),
+                ),
             )
             for batch_text in pages:
                 yield "", batch_text
@@ -520,6 +562,27 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         result = await self.fetch_content(asset_id)
         if result:
             yield result
+
+    def _file_name_for_asset_id(self, asset_id: str) -> str:
+        external_url = self._hash_to_uri.get(asset_id)
+        if external_url is None:
+            decoded = asset_id
+            if "_#_" not in decoded:
+                try:
+                    decoded = unhash_id(asset_id)
+                except Exception:
+                    decoded = asset_id
+            if "_#_" in decoded:
+                _, candidate = decoded.split("_#_", maxsplit=1)
+                external_url = candidate
+            else:
+                external_url = asset_id
+
+        ref_hash = self.generate_hash_id(external_url)
+        ref = self._object_ref_by_hash.get(ref_hash)
+        if ref is not None:
+            return ref.key
+        return external_url
 
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
         if asset_id in self._content_cache:

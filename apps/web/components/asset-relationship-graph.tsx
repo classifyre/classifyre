@@ -763,7 +763,7 @@ export function AssetRelationshipGraph({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[8px] border-2 border-black bg-card p-3">
+      <div className="rounded-[8px] border-2 border-border bg-card p-3">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -799,7 +799,7 @@ export function AssetRelationshipGraph({
               value={density}
               onValueChange={(value) => setDensity(value as DensityMode)}
             >
-              <SelectTrigger className="border-2 border-black rounded-[4px]">
+              <SelectTrigger className="border-2 border-border rounded-[4px]">
                 <SelectValue placeholder="Density" />
               </SelectTrigger>
               <SelectContent>
@@ -809,7 +809,7 @@ export function AssetRelationshipGraph({
               </SelectContent>
             </Select>
             <Select value={focusSource} onValueChange={setFocusSource}>
-              <SelectTrigger className="border-2 border-black rounded-[4px]">
+              <SelectTrigger className="border-2 border-border rounded-[4px]">
                 <SelectValue placeholder="Focus source" />
               </SelectTrigger>
               <SelectContent>

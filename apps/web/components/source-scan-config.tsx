@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import * as React from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
-import { Check, FlaskConical, Pencil, Search } from "lucide-react";
+import { Check, FlaskConical, Pencil, Plus, Search, X } from "lucide-react";
 import { api, type CustomDetectorResponseDto } from "@workspace/api-client";
 import { useTranslation } from "@/hooks/use-translation";
 import { Badge } from "@workspace/ui/components/badge";
@@ -33,6 +34,9 @@ import {
   getDetectorExamples,
   type DetectorExample,
 } from "@/lib/detector-examples-loader";
+import { DetectorCreatorForm } from "@/components/detector-creator-form";
+import { DetectorEditorForm } from "@/components/detector-editor-form";
+import type { DetectorEditorFormHandle } from "@/components/detector-editor-form";
 
 export interface DetectorConfigInput {
   type: string;
@@ -45,6 +49,10 @@ interface DetectorConfigState {
   type: string;
   enabled: boolean;
   config: Record<string, unknown>;
+}
+
+export interface SourceScanConfigHandle {
+  flushDetectorChanges: () => Promise<boolean>;
 }
 
 interface SourceScanConfigProps {
@@ -296,7 +304,7 @@ function DetectorConfigRow({
             type="button"
             size="sm"
             variant="outline"
-            className="shrink-0 rounded-[4px] border-2 border-black"
+            className="shrink-0 rounded-[4px] border-2 border-border"
             onClick={() => setIsEditOpen((prev) => !prev)}
             data-testid={`btn-edit-${detector.type}`}
           >
@@ -388,7 +396,7 @@ function DetectorConfigRow({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="rounded-[4px] border-2 border-black"
+                className="rounded-[4px] border-2 border-border"
                 onClick={handleResetDefaults}
                 data-testid={`btn-reset-${detector.type}`}
               >
@@ -413,19 +421,29 @@ function formatCustomDetectorMethod(method: string | undefined): string {
 function CustomDetectorRow({
   detector,
   enabled,
+  isEditing,
   onToggle,
+  onStartEdit,
+  onCancelEdit,
+  onEditorRef,
 }: {
   detector: CustomDetectorResponseDto;
   enabled: boolean;
+  isEditing: boolean;
   onToggle: (enabled: boolean) => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onEditorRef?: (ref: DetectorEditorFormHandle | null) => void;
 }) {
   const { t } = useTranslation();
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  const handleEnable = () => {
-    onToggle(true);
-    setIsDetailOpen(true);
-  };
+  const editorCallbackRef = useCallback(
+    (node: DetectorEditorFormHandle | null) => {
+      onEditorRef?.(node);
+    },
+    [onEditorRef],
+  );
 
   return (
     <div
@@ -434,109 +452,77 @@ function CustomDetectorRow({
         enabled ? "border-l-[#b7ff00]" : "border-l-transparent",
       )}
     >
-      {!enabled ? (
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-muted/20 transition-colors cursor-pointer"
-          onClick={handleEnable}
-          data-testid={`custom-detector-enable-${detector.key}`}
-        >
-          <div className="min-w-0 flex-1">
-            <span className="text-sm font-medium truncate">{detector.name}</span>
-            <p className="text-xs text-muted-foreground/70 truncate mt-0.5">
-              {detector.description?.trim() || t("sources.scanConfig.fallbackDesc")}
-            </p>
-          </div>
-        </button>
-      ) : (
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <span className="text-sm font-semibold truncate">{detector.name}</span>
-            <p className="text-xs text-muted-foreground truncate mt-0.5">
-              {detector.description?.trim() || t("sources.scanConfig.fallbackDesc")}
-            </p>
-          </div>
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <span
+            className={cn(
+              "text-sm truncate",
+              enabled ? "font-semibold" : "font-medium text-muted-foreground",
+            )}
+          >
+            {detector.name}
+          </span>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
+            {detector.description?.trim() || t("sources.scanConfig.fallbackDesc")}
+          </p>
+        </div>
 
+        {enabled && (
           <Button
             type="button"
             size="sm"
-            variant="outline"
-            className="shrink-0 rounded-[4px] border-2 border-black"
-            onClick={() => setIsDetailOpen((prev) => !prev)}
+            variant={isEditing ? "default" : "outline"}
+            className="shrink-0 rounded-[4px] border-2 border-border"
+            onClick={() => {
+              if (isEditing) {
+                onCancelEdit();
+              } else {
+                onStartEdit();
+              }
+              setIsDetailOpen((prev) => !prev);
+            }}
             data-testid={`btn-edit-custom-${detector.key}`}
           >
-            <Pencil className="h-3.5 w-3.5 mr-1" />
-            {t("sources.scanConfig.edit")}
-          </Button>
-
-          <Toggle
-            variant="outline"
-            size="sm"
-            pressed={enabled}
-            onPressedChange={() => onToggle(false)}
-            className="shrink-0 cursor-pointer"
-            data-testid={`toggle-custom-detector-${detector.key}`}
-          >
-            {t("sources.scanConfig.off")}
-          </Toggle>
-        </div>
-      )}
-
-      <Collapsible open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <CollapsibleContent>
-          <div className="border-t-2 border-border bg-muted/20 px-4 py-4 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="border-2 border-border">
-                {detector.isActive
-                  ? t("sources.scanConfig.catalogActive")
-                  : t("sources.scanConfig.catalogInactive")}
-              </Badge>
-              <Badge variant="outline" className="border-2 border-border">
-                {t("sources.scanConfig.findingsCount", {
-                  count: detector.findingsCount,
-                })}
-              </Badge>
-              <Badge variant="outline" className="border-2 border-border">
-                v{detector.version}
-              </Badge>
-            </div>
-
-            <div className="grid gap-3 rounded-[6px] border-2 border-border bg-background p-3 sm:grid-cols-3">
-              <div>
-                <p className="text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                  {t("sources.scanConfig.usedBy")}
-                </p>
-                <p className="text-sm font-semibold">
-                  {t("sources.scanConfig.sourcesCount", {
-                    count: detector.sourcesUsingCount,
-                  })}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                  {t("sources.scanConfig.withFindings")}
-                </p>
-                <p className="text-sm font-semibold">
-                  {t("sources.scanConfig.sourcesCount", {
-                    count: detector.sourcesWithFindingsCount,
-                  })}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                  {t("sources.scanConfig.version")}
-                </p>
-                <p className="text-sm font-semibold">v{detector.version}</p>
-              </div>
-            </div>
-
-            {detector.recentSourceNames.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {t("sources.scanConfig.recentSources", {
-                  names: detector.recentSourceNames.slice(0, 3).join(", "),
-                })}
-              </p>
+            {isEditing ? (
+              <>
+                <X className="h-3.5 w-3.5 mr-1" />
+                {t("common.close")}
+              </>
+            ) : (
+              <>
+                <Pencil className="h-3.5 w-3.5 mr-1" />
+                {t("sources.scanConfig.edit")}
+              </>
             )}
+          </Button>
+        )}
+
+        <Toggle
+          variant="outline"
+          size="sm"
+          pressed={enabled}
+          onPressedChange={(pressed) => {
+            if (!pressed) {
+              onCancelEdit();
+              setIsDetailOpen(false);
+            }
+            onToggle(pressed);
+          }}
+          className="shrink-0 cursor-pointer"
+          data-testid={`toggle-custom-detector-${detector.key}`}
+        >
+          {enabled ? t("common.on") : t("common.off")}
+        </Toggle>
+      </div>
+
+      <Collapsible open={isDetailOpen && isEditing} onOpenChange={setIsDetailOpen}>
+        <CollapsibleContent>
+          <div className="border-t-2 border-border bg-muted/20 px-4 py-4">
+            <DetectorEditorForm
+              ref={editorCallbackRef}
+              detector={detector}
+              embedded
+            />
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -544,14 +530,17 @@ function CustomDetectorRow({
   );
 }
 
-export function SourceScanConfig({
+export const SourceScanConfig = React.forwardRef<
+  SourceScanConfigHandle,
+  SourceScanConfigProps
+>(function SourceScanConfig({
   defaultDetectors,
   onDetectorsChange,
   onSummaryChange,
   selectedCustomDetectorIds = [],
   onCustomDetectorsChange,
   mode = "create",
-}: SourceScanConfigProps) {
+}, ref) {
   const { t } = useTranslation();
   const detectors = useMemo(
     () => getDetectorSchemas({ includeCustom: false }),
@@ -594,6 +583,11 @@ export function SourceScanConfig({
   >(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [displayOrder, setDisplayOrder] = useState<string[]>([]);
+  const [isCreatingDetector, setIsCreatingDetector] = useState(false);
+  const [editingDetectorId, setEditingDetectorId] = useState<string | null>(null);
+  const [createFormKey, setCreateFormKey] = useState(0);
+  const activeEditorRef = useRef<DetectorEditorFormHandle | null>(null);
+  const loadTicketRef = useRef<object | null>(null);
 
   const presetMap = useMemo(
     () =>
@@ -610,41 +604,37 @@ export function SourceScanConfig({
     setDetectorState(initialState);
   }, [initialState]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadCustomDetectors() {
-      try {
-        setCustomDetectorsLoading(true);
-        setCustomDetectorsError(null);
-        const payload = await api.listCustomDetectors({
-          includeInactive: true,
-        });
-        if (!cancelled) {
-          setCustomDetectors(payload ?? []);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setCustomDetectors([]);
-          setCustomDetectorsError(
-            error instanceof Error
-              ? error.message
-              : "Failed to load custom detectors.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setCustomDetectorsLoading(false);
-        }
+  const loadCustomDetectors = useCallback(async () => {
+    const ticket = {};
+    loadTicketRef.current = ticket;
+    try {
+      setCustomDetectorsLoading(true);
+      setCustomDetectorsError(null);
+      const payload = await api.listCustomDetectors({
+        includeInactive: true,
+      });
+      if (loadTicketRef.current === ticket) {
+        setCustomDetectors(payload ?? []);
+      }
+    } catch (error) {
+      if (loadTicketRef.current === ticket) {
+        setCustomDetectors([]);
+        setCustomDetectorsError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load custom detectors.",
+        );
+      }
+    } finally {
+      if (loadTicketRef.current === ticket) {
+        setCustomDetectorsLoading(false);
       }
     }
-
-    void loadCustomDetectors();
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    void loadCustomDetectors();
+  }, [loadCustomDetectors]);
 
   useEffect(() => {
     const ranked = detectors
@@ -729,6 +719,43 @@ export function SourceScanConfig({
   const hasAnyVisibleResults =
     visibleBuiltInDetectors.length > 0 || visibleCustomDetectors.length > 0;
 
+  const handleOpenCreator = () => {
+    setCreateFormKey((k) => k + 1);
+    setIsCreatingDetector(true);
+  };
+
+  const handleCloseCreator = () => {
+    setIsCreatingDetector(false);
+  };
+
+  const handleDetectorCreated = useCallback(
+    (detector: { id: string; name: string }) => {
+      setIsCreatingDetector(false);
+      void loadCustomDetectors();
+      const nextIds = Array.from(
+        new Set([...selectedCustomDetectorIds, detector.id]),
+      );
+      onCustomDetectorsChange?.(nextIds);
+    },
+    [loadCustomDetectors, onCustomDetectorsChange, selectedCustomDetectorIds],
+  );
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      flushDetectorChanges: async () => {
+        if (!editingDetectorId || !activeEditorRef.current) return true;
+        try {
+          await activeEditorRef.current.submit();
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    }),
+    [editingDetectorId],
+  );
+
   return (
     <div className="space-y-4" data-testid="scan-config-section">
       <Card className="p-4">
@@ -748,7 +775,7 @@ export function SourceScanConfig({
             <Badge variant="secondary">
               {t("sources.edit.visible", { count: visibleCount })}
             </Badge>
-            <Badge className="rounded-[4px] border border-black bg-[#b7ff00] text-black">
+            <Badge className="rounded-[4px] border border-border bg-accent text-accent-foreground">
               {t("sources.edit.enabled", { count: enabledCount })}
             </Badge>
           </div>
@@ -760,7 +787,7 @@ export function SourceScanConfig({
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder={t("sources.scanConfig.searchPlaceholder")}
-            className="h-10 rounded-[4px] border-2 border-black bg-background pl-9 text-sm shadow-[3px_3px_0_#000] focus-visible:ring-0"
+              className="h-10 rounded-[4px] border-2 border-border bg-background pl-9 text-sm shadow-[3px_3px_0_var(--color-border)] focus-visible:ring-0"
           />
           {searchQuery ? (
             <Button
@@ -776,7 +803,7 @@ export function SourceScanConfig({
       </Card>
 
       {!hasAnyVisibleResults && searchTerm ? (
-        <Card className="border-dashed border-black bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_#000]">
+        <Card className="border-dashed border-border bg-muted/30 px-6 py-8 text-center shadow-[4px_4px_0_var(--color-border)]">
           <p className="text-sm font-semibold uppercase tracking-[0.08em]">
             {t("sources.scanConfig.noResults")}
           </p>
@@ -804,7 +831,7 @@ export function SourceScanConfig({
                   </Link>
                 </Button>
               )}
-              <Badge className="w-fit rounded-[4px] border-2 border-black bg-[#b7ff00] text-[10px] uppercase tracking-[0.16em] text-black shadow-[3px_3px_0_#000]">
+              <Badge className="w-fit rounded-[4px] border-2 border-border bg-accent text-[10px] uppercase tracking-[0.16em] text-accent-foreground shadow-[3px_3px_0_var(--color-border)]">
                 {t("sources.edit.enabled", { count: enabledCount })}
               </Badge>
             </div>
@@ -866,6 +893,7 @@ export function SourceScanConfig({
                   key={detector.id}
                   detector={detector}
                   enabled={selectedCustomDetectorSet.has(detector.id)}
+                  isEditing={editingDetectorId === detector.id}
                   onToggle={(enabled) => {
                     const nextIds = enabled
                       ? Array.from(
@@ -875,6 +903,16 @@ export function SourceScanConfig({
                           (id) => id !== detector.id,
                         );
                     onCustomDetectorsChange?.(nextIds);
+                  }}
+                  onStartEdit={() => {
+                    setEditingDetectorId(detector.id);
+                    activeEditorRef.current = null;
+                  }}
+                  onCancelEdit={() => setEditingDetectorId(null)}
+                  onEditorRef={(ref) => {
+                    if (editingDetectorId === detector.id) {
+                      activeEditorRef.current = ref;
+                    }
                   }}
                 />
               ))}
@@ -892,6 +930,43 @@ export function SourceScanConfig({
           </CardContent>
         </Card>
       )}
+
+      {/* Add new detector */}
+      {!isCreatingDetector ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
+          onClick={handleOpenCreator}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          {t("detectors.addNew")}
+        </Button>
+      ) : (
+        <Card className="border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-serif text-lg font-black uppercase tracking-[0.06em]">
+                {t("detectors.addNew")}
+              </h3>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleCloseCreator}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <DetectorCreatorForm
+              key={createFormKey}
+              embedded
+              onCreated={handleDetectorCreated}
+              onCancel={handleCloseCreator}
+            />
+          </div>
+        </Card>
+      )}
     </div>
   );
-}
+});
