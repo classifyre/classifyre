@@ -14,7 +14,7 @@ api:
   startCommand: node dist/src/main.js
 
   env:
-    DEMO_MODE: "true"
+    DEMO_MODE: "false"
 
   autoscaling:
     enabled: false
