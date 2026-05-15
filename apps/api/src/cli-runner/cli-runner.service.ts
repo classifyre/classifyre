@@ -1439,6 +1439,25 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
   }
 
+  private async stopKubernetesJobSafely(
+    runnerId: string,
+    runner: { jobName: string | null; jobNamespace: string | null },
+  ): Promise<void> {
+    try {
+      await this.kubernetesCliJobService?.stopRunnerJob(runnerId, {
+        jobName: runner.jobName || undefined,
+        namespace: runner.jobNamespace || undefined,
+      });
+    } catch (error) {
+      // Job may have already finished, been evicted, or never started (e.g.
+      // ImagePullBackOff). Log and continue — the DB record still needs to be
+      // marked stopped so the source is unblocked.
+      this.logger.warn(
+        `Could not stop Kubernetes job for runner ${runnerId} (proceeding with DB stop): ${String(error)}`,
+      );
+    }
+  }
+
   private stopLocalRunnerProcess(runnerId: string): void {
     const child = this.runningProcessesByRunnerId.get(runnerId);
     if (!child) {
@@ -2083,10 +2102,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
     switch (runner.executionMode) {
       case RunnerExecutionMode.KUBERNETES:
-        await this.kubernetesCliJobService?.stopRunnerJob(runnerId, {
-          jobName: runner.jobName || undefined,
-          namespace: runner.jobNamespace || undefined,
-        });
+        await this.stopKubernetesJobSafely(runnerId, runner);
         break;
       case RunnerExecutionMode.EXTERNAL:
         throw new BadRequestException(
@@ -2096,10 +2112,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       default: {
         const environment = process.env.ENVIRONMENT || 'development';
         if (this.isKubernetesExecutionEnabled(environment)) {
-          await this.kubernetesCliJobService?.stopRunnerJob(runnerId, {
-            jobName: runner.jobName || undefined,
-            namespace: runner.jobNamespace || undefined,
-          });
+          await this.stopKubernetesJobSafely(runnerId, runner);
           break;
         }
 
