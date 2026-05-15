@@ -515,9 +515,11 @@ class DatabricksSource(BaseSource):
         response = self._request_json(
             "get",
             "/api/2.0/lineage-tracking/table-lineage",
-            json_payload={
+            params={
                 "table_name": f"{table_ref.catalog}.{table_ref.schema}.{table_ref.table}",
-                "include_entity_lineage": bool(self._extraction_options().include_notebooks),
+                "include_entity_lineage": str(
+                    bool(self._extraction_options().include_notebooks)
+                ).lower(),
             },
         )
 
