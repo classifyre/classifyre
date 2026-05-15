@@ -515,6 +515,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
       hasSuccessfulRuns,
     );
 
+    // Prune old terminated runs beyond the configured limit (fire-and-forget)
+    void this.pruneOldRunners(sourceId);
+
     // Emit WebSocket event for runner created
     const runnerDto = await this.getRunnerStatus(runner.id);
     if (runnerDto && this.runnerEventsGateway) {
@@ -1897,6 +1900,45 @@ export class CliRunnerService implements OnApplicationBootstrap {
     const s = ['th', 'st', 'nd', 'rd'];
     const v = n % 100;
     return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
+  }
+
+  private resolveMaxRunnersPerSource(): number {
+    const raw = process.env.MAX_RUNNERS_PER_SOURCE;
+    if (!raw) return 5;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 5;
+  }
+
+  private async pruneOldRunners(sourceId: string): Promise<void> {
+    const limit = this.resolveMaxRunnersPerSource();
+    if (limit === 0) return;
+
+    const terminated = await this.prisma.runner.findMany({
+      where: {
+        sourceId,
+        status: { in: [RunnerStatus.COMPLETED, RunnerStatus.ERROR] },
+      },
+      orderBy: { triggeredAt: 'desc' },
+      select: { id: true },
+    });
+
+    const toDelete = terminated.slice(limit);
+    if (toDelete.length === 0) return;
+
+    for (const { id } of toDelete) {
+      try {
+        await this.runnerLogStorage.deleteRunnerLogs(id);
+        await this.prisma.runner.delete({ where: { id } });
+      } catch (error) {
+        this.logger.warn(
+          `Failed to prune old runner ${id} for source ${sourceId}: ${String(error)}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Pruned ${toDelete.length} old runner(s) for source ${sourceId} (limit: ${limit})`,
+    );
   }
 
   private async getBaselineFindings(
