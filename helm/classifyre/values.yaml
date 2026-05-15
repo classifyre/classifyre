@@ -72,6 +72,10 @@ api:
     TEMP_DIR: /tmp
     # -- Filesystem directory for runner execution logs.
     RUNNER_LOGS_DIR: /var/lib/classifyre/runner-logs
+    # -- Maximum number of completed/failed runs to keep per source. Older runs are
+    # -- deleted (including their logs) when a new run is triggered and the count
+    # -- exceeds this value. Set to "0" to disable cleanup.
+    MAX_RUNNERS_PER_SOURCE: "5"
     # -- Enable read-only demo mode. When "true" all mutating API operations return 403.
     DEMO_MODE: "false"
 
@@ -253,6 +257,10 @@ api:
     workDir: /app/apps/cli
     # -- Allow CLI to auto-install optional detector dependencies.
     autoInstallOptionalDeps: true
+    # -- Number of detector-processed assets to accumulate before pushing findings to the API.
+    detectorFlushBatchSize: 5
+    # -- Max assets processed in parallel by the detector pipeline.
+    detectorMaxConcurrent: 10
 
     resources:
       # -- CLI job resource requests.

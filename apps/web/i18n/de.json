@@ -289,6 +289,8 @@
       "strategy": "Strategie",
       "fetchAll": "Alle bis zum ersten Erfolg abrufen",
       "fetchAllDesc": "Beim ersten erfolgreichen Lauf alle Elemente scannen, danach reguläre Stichproben.",
+      "enableOcr": "OCR aktivieren",
+      "enableOcrDesc": "Text aus Bildern und gescannten PDFs per optischer Zeichenerkennung extrahieren (langsamer, erfordert OCR-Abhängigkeiten).",
       "advanced": "Erweitert",
       "orderByColumn": "Sortieren nach Spalte",
       "orderByPlaceholder": "z.B. updated_at",
@@ -862,8 +864,6 @@
       "noRunsHint": "Filter anpassen, um die Suche zu erweitern.",
       "loading": "Ausführungen werden geladen..."
     },
-    "livePolling": "Live-Polling",
-    "idle": "Inaktiv",
     "monitorDesc": "Sandbox-Läufe überwachen und Detektor-Befunde prüfen",
     "newScan": "Neuer Sandbox-Scan",
     "runResults": "Laufergebnisse",

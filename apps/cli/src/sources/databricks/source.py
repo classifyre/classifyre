@@ -94,6 +94,17 @@ class DatabricksSource(BaseSource):
             detail="The Databricks SQL connector is optional.",
         )
 
+        # pyarrow→pandas conversion calls pytz.timezone() on the timezone name
+        # embedded in Arrow schema metadata. Databricks uses 'Etc/UTC' which is
+        # absent from pytz's built-in zone list. Pre-populating the cache makes
+        # pytz.timezone('Etc/UTC') return UTC without hitting the lookup failure.
+        try:
+            import pytz
+
+            pytz._tzinfo_cache.setdefault("Etc/UTC", pytz.UTC)
+        except Exception:
+            pass
+
         self._validate_auth_configuration()
 
         self.session = requests.Session()
@@ -291,26 +302,13 @@ class DatabricksSource(BaseSource):
 
         return collected
 
-    def _connect_sql(self, *, session_configuration: dict[str, str] | None = None):
-        kwargs: dict[str, Any] = {
-            "server_hostname": self._workspace_host(),
-            "http_path": f"/sql/1.0/warehouses/{self._warehouse_id()}",
-            "access_token": self._access_token_value(),
-        }
-        if session_configuration is not None:
-            kwargs["session_configuration"] = session_configuration
-        return self._databricks_sql.connect(**kwargs)
-
-    def _connect_sql_with_tz(self):
-        try:
-            return self._connect_sql(session_configuration={"spark.sql.session.timeZone": "UTC"})
-        except Exception as exc:
-            if "CONFIG_NOT_AVAILABLE" in str(exc) or "42K0I" in str(exc):
-                logger.debug(
-                    "Warehouse does not support session timezone config, connecting without it"
-                )
-                return self._connect_sql()
-            raise
+    def _connect_sql(self):
+        return self._databricks_sql.connect(
+            server_hostname=self._workspace_host(),
+            http_path=f"/sql/1.0/warehouses/{self._warehouse_id()}",
+            access_token=self._access_token_value(),
+            _socket_timeout=self._timeout_seconds(),
+        )
 
     def _catalog_allowlist(self) -> set[str] | None:
         configured = self._scope_options().include_catalogs
@@ -395,6 +393,7 @@ class DatabricksSource(BaseSource):
                 catalogs.append(name)
 
         catalogs.sort()
+        logger.info("Found %d catalog(s): %s", len(catalogs), ", ".join(catalogs) or "(none)")
         return catalogs
 
     def _list_schemas_for_catalog(self, catalog: str) -> list[str]:
@@ -413,6 +412,7 @@ class DatabricksSource(BaseSource):
                 schemas.append(name)
 
         schemas.sort()
+        logger.info("Catalog %s: found %d schema(s)", catalog, len(schemas))
         return schemas
 
     def _coerce_object_type(self, table_type: Any) -> str:
@@ -451,6 +451,7 @@ class DatabricksSource(BaseSource):
             if limit is not None and len(tables) >= limit:
                 break
 
+        logger.info("Schema %s.%s: found %d table(s)", catalog, schema, len(tables))
         return tables
 
     def _iter_tables(self) -> list[TableRef]:
@@ -480,6 +481,7 @@ class DatabricksSource(BaseSource):
                         exc,
                     )
 
+        logger.info("Discovery complete: %d table(s) in scope", len(tables))
         return tables
 
     def _table_key(self, table_ref: TableRef) -> tuple[str, str, str]:
@@ -524,9 +526,11 @@ class DatabricksSource(BaseSource):
         response = self._request_json(
             "get",
             "/api/2.0/lineage-tracking/table-lineage",
-            json_payload={
+            params={
                 "table_name": f"{table_ref.catalog}.{table_ref.schema}.{table_ref.table}",
-                "include_entity_lineage": bool(self._extraction_options().include_notebooks),
+                "include_entity_lineage": str(
+                    bool(self._extraction_options().include_notebooks)
+                ).lower(),
             },
         )
 
@@ -549,39 +553,6 @@ class DatabricksSource(BaseSource):
                         refs.add(parsed)
 
         return refs
-
-    def _collect_table_lineage_links(
-        self,
-        tables: list[TableRef],
-    ) -> dict[tuple[str, str, str], set[tuple[str, str, str]]]:
-        if not self._extraction_options().include_table_lineage:
-            return {}
-
-        known_keys = {self._table_key(table_ref) for table_ref in tables}
-        links: dict[tuple[str, str, str], set[tuple[str, str, str]]] = {}
-
-        for table_ref in tables:
-            if self._aborted:
-                break
-
-            source_key = self._table_key(table_ref)
-            try:
-                upstream_refs = self._lineage_refs_for_table(table_ref)
-            except Exception as exc:
-                logger.warning(
-                    "Could not resolve Databricks lineage for %s.%s.%s: %s",
-                    table_ref.catalog,
-                    table_ref.schema,
-                    table_ref.table,
-                    exc,
-                )
-                continue
-
-            for target in upstream_refs:
-                if target in known_keys:
-                    links.setdefault(source_key, set()).add(target)
-
-        return links
 
     def _iter_notebooks(self) -> Generator[NotebookRef, None, None]:
         if not self._extraction_options().include_notebooks:
@@ -697,7 +668,7 @@ class DatabricksSource(BaseSource):
             if not catalogs:
                 raise ValueError("No Unity Catalog catalogs available for scanning")
 
-            with closing(self._connect_sql_with_tz()) as conn:
+            with closing(self._connect_sql()) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("SELECT 1")
                     cursor.fetchone()
@@ -843,6 +814,7 @@ class DatabricksSource(BaseSource):
             return
 
         # 1. Discover all tables first to establish the scope for lineage links
+        logger.info("Starting Databricks extraction: discovering tables...")
         tables = self._iter_tables()
         table_hash_by_key: dict[tuple[str, str, str], str] = {
             self._table_key(table_ref): self.generate_hash_id(self._table_raw_id(table_ref))
@@ -851,11 +823,18 @@ class DatabricksSource(BaseSource):
 
         # 2. Process tables
         include_lineage = self._extraction_options().include_table_lineage
-        batch: list[SingleAssetScanResults] = []
+        if include_lineage and tables:
+            logger.info("Fetching table lineage for %d table(s)...", len(tables))
 
-        for table_ref in tables:
+        batch: list[SingleAssetScanResults] = []
+        emitted_tables = 0
+
+        for i, table_ref in enumerate(tables, 1):
             if self._aborted:
                 return
+
+            table_label = f"{table_ref.catalog}.{table_ref.schema}.{table_ref.table}"
+            logger.info("Processing table %d/%d: %s", i, len(tables), table_label)
 
             linked_hashes: list[str] = []
             if include_lineage:
@@ -866,49 +845,71 @@ class DatabricksSource(BaseSource):
                         for target in sorted(upstream_refs)
                         if target in table_hash_by_key
                     ]
+                    if linked_hashes:
+                        logger.debug("%s has %d upstream link(s)", table_label, len(linked_hashes))
                 except Exception as exc:
                     logger.warning(
-                        "Could not resolve Databricks lineage for %s.%s.%s: %s",
-                        table_ref.catalog,
-                        table_ref.schema,
-                        table_ref.table,
-                        exc,
+                        "Could not resolve Databricks lineage for %s: %s", table_label, exc
                     )
 
             asset = self._table_to_asset(table_ref, links=linked_hashes)
             self._table_lookup[asset.hash] = table_ref
             batch.append(asset)
+            emitted_tables += 1
 
             if len(batch) >= self.BATCH_SIZE:
+                logger.info(
+                    "Emitting batch of %d table asset(s) (total so far: %d)",
+                    len(batch),
+                    emitted_tables,
+                )
                 yield batch
                 batch = []
 
         # 3. Process notebooks
+        notebook_count = 0
         for notebook in self._iter_notebooks():
             if self._aborted:
                 break
 
             asset = self._notebook_to_asset(notebook)
             batch.append(asset)
+            notebook_count += 1
 
             if len(batch) >= self.BATCH_SIZE:
                 yield batch
                 batch = []
 
+        if notebook_count:
+            logger.info("Discovered %d notebook(s)", notebook_count)
+
         # 4. Process pipelines
+        pipeline_count = 0
         for pipeline_ref in self._iter_pipelines():
             if self._aborted:
                 break
 
             asset = self._pipeline_to_asset(pipeline_ref)
             batch.append(asset)
+            pipeline_count += 1
 
             if len(batch) >= self.BATCH_SIZE:
                 yield batch
                 batch = []
 
+        if pipeline_count:
+            logger.info("Discovered %d pipeline(s)", pipeline_count)
+
         if batch:
+            logger.info("Emitting final batch of %d asset(s)", len(batch))
             yield batch
+
+        logger.info(
+            "Extraction complete: %d table(s), %d notebook(s), %d pipeline(s)",
+            emitted_tables,
+            notebook_count,
+            pipeline_count,
+        )
 
     def generate_hash_id(self, asset_id: str) -> str:
         return hash_id(self._asset_type_value(), asset_id)
@@ -956,7 +957,7 @@ class DatabricksSource(BaseSource):
             "ORDER BY ordinal_position"
         )
 
-        with closing(self._connect_sql_with_tz()) as conn:
+        with closing(self._connect_sql()) as conn:
             with conn.cursor() as cursor:
                 cursor.execute(query)
                 columns: list[str] = []
@@ -1027,7 +1028,7 @@ class DatabricksSource(BaseSource):
 
     def _count_table_rows(self, table_ref: TableRef) -> int | None:
         try:
-            with closing(self._connect_sql_with_tz()) as conn:
+            with closing(self._connect_sql()) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(
                         f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.catalog)}.{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
@@ -1074,7 +1075,7 @@ class DatabricksSource(BaseSource):
     def _fetch_one_page(
         self, table_ref: TableRef, base_query: str, page_size: int, offset: int
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        with closing(self._connect_sql_with_tz()) as conn:
+        with closing(self._connect_sql()) as conn:
             paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
             with conn.cursor() as cursor:
                 cursor.execute(paginated_query)
@@ -1087,22 +1088,33 @@ class DatabricksSource(BaseSource):
     def _fetch_sample_rows(
         self, table_ref: TableRef
     ) -> tuple[list[tuple[Any, ...]], list[str]] | None:
+        table_label = f"{table_ref.catalog}.{table_ref.schema}.{table_ref.table}"
         columns = self._available_columns(table_ref)
         sampling = self._sampling()
         query, _params = self._build_sampling_query(table_ref, columns)
+
+        logger.info(
+            "Sampling %s (%d column(s), strategy=%s)",
+            table_label,
+            len(columns),
+            str(sampling.strategy),
+        )
 
         if sampling.strategy == SamplingStrategy.ALL:
             rows_per_page = int(sampling.rows_per_page or 100)
             rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
         else:
-            with closing(self._connect_sql_with_tz()) as conn:
+            with closing(self._connect_sql()) as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(query)
                     rows = cursor.fetchall()
                     column_names = [desc[0] for desc in cursor.description or []]
 
         if not column_names:
+            logger.warning("No columns returned for %s; skipping", table_label)
             return None
+
+        logger.info("Fetched %d row(s) from %s", len(rows), table_label)
         return rows, column_names
 
     def _sample_table_rows(self, table_ref: TableRef) -> tuple[str, str] | None:
@@ -1135,11 +1147,19 @@ class DatabricksSource(BaseSource):
         if not table_ref:
             return
 
+        table_label = f"{table_ref.catalog}.{table_ref.schema}.{table_ref.table}"
+
         if sampling.strategy != SamplingStrategy.ALL:
             result = self._fetch_sample_rows(table_ref)
             if result is None:
                 return
             rows, column_names = result
+            logger.info(
+                "Scanning %s: %d row(s) [strategy=%s]",
+                table_label,
+                len(rows),
+                str(sampling.strategy),
+            )
             for i, row in enumerate(rows):
                 formatted = self._format_sample_content(
                     table_ref, column_names, [row], row_offset=i

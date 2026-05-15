@@ -253,6 +253,14 @@ function normalizeSampling(config: JsonRecord) {
     delete sampling.fetch_all_until_first_success;
   }
 
+  const enableOcr =
+    asBoolean(sampling.enable_ocr) ?? asBoolean(optionalSampling?.enable_ocr);
+  if (typeof enableOcr === 'boolean') {
+    sampling.enable_ocr = enableOcr;
+  } else {
+    delete sampling.enable_ocr;
+  }
+
   removeUndefinedKeys(sampling);
   config.sampling = sampling;
 
