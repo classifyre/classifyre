@@ -244,13 +244,13 @@ api:
     # -- Retry attempts for failed CLI jobs.
     backoffLimit: 2
     # -- Max runtime per CLI job (seconds).
-    activeDeadlineSeconds: 3600
+    activeDeadlineSeconds: 14400
     # -- TTL for completed CLI jobs (seconds). Ignored when cleanup policy deletes jobs immediately.
     ttlSecondsAfterFinished: 1800
     # -- Cleanup policy for CLI jobs: none, failed, or always.
     cleanupPolicy: always
     # -- Max time API waits for job completion (seconds).
-    waitTimeoutSeconds: 3900
+    waitTimeoutSeconds: 15300
     # -- Poll interval while waiting for job completion (milliseconds).
     pollIntervalMs: 2000
     # -- Working directory inside CLI job container.
