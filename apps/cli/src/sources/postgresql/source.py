@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
@@ -536,6 +537,22 @@ class PostgreSQLSource(BaseSource):
                 )
         return rows, column_names
 
+    def _fetch_one_page_on_conn(
+        self,
+        conn: Any,
+        base_query: str,
+        page_size: int,
+        offset: int,
+    ) -> tuple[list[tuple[Any, ...]], list[str]]:
+        paginated_query = f"{base_query} LIMIT %s OFFSET %s"
+        with conn.cursor() as cursor:
+            cursor.execute(paginated_query, [page_size, offset])
+            rows = list(cursor.fetchall())
+            column_names = (
+                [desc[0] for desc in cursor.description] if cursor.description else []
+            )
+        return rows, column_names
+
     def _fetch_sample_rows(
         self, table_ref: TableRef
     ) -> tuple[list[tuple[Any, ...]], list[str]] | None:
@@ -619,25 +636,31 @@ class PostgreSQLSource(BaseSource):
         offset = 0
         page_num = 1
 
-        while not self._aborted:
-            if total_batches is not None:
-                logger.info("%s batch %d/%d", table_label, page_num, total_batches)
-            rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, offset)
-            if not rows or not column_names:
-                break
+        conn = self._connect(table_ref.database)
+        try:
+            while not self._aborted:
+                if total_batches is not None:
+                    logger.info("%s batch %d/%d", table_label, page_num, total_batches)
+                rows, column_names = await asyncio.to_thread(
+                    self._fetch_one_page_on_conn,
+                    conn, query, rows_per_page, offset,
+                )
+                if not rows or not column_names:
+                    break
 
-            for i, row in enumerate(rows):
                 formatted = self._format_sample_content(
-                    table_ref, column_names, [row], row_offset=offset + i
+                    table_ref, column_names, rows, row_offset=offset
                 )
                 if formatted:
                     self._content_cache[asset_id] = formatted
                     yield formatted
 
-            offset += len(rows)
-            page_num += 1
-            if len(rows) < rows_per_page:
-                break
+                offset += len(rows)
+                page_num += 1
+                if len(rows) < rows_per_page:
+                    break
+        finally:
+            conn.close()
 
     def enrich_finding_location(
         self,
