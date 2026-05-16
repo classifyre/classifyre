@@ -16,6 +16,7 @@ model Source {
   consecutiveFailures Int            @default(0) @map("consecutive_failures")
   lastRunStatus       RunnerStatus?  @map("last_run_status")
   lastRunAt           DateTime?      @map("last_run_at")
+  lastErrorMessage    String?        @map("last_error_message")
   createdAt           DateTime       @default(now()) @map("created_at")
   updatedAt           DateTime       @updatedAt @map("updated_at")
   currentRunnerId     String?        @map("current_runner_id")
@@ -425,6 +426,7 @@ enum AssetType {
   DATABRICKS
   SNOWFLAKE
   MONGODB
+  NEO4J
   POWERBI
   TABLEAU
   CUSTOM

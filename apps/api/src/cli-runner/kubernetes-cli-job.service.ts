@@ -584,6 +584,21 @@ export class KubernetesCliJobService {
           await new Promise((resolve) => setTimeout(resolve, pollMs));
           continue;
         }
+        const statusCode = error?.code ?? error?.statusCode ?? error?.body?.code;
+        if (statusCode === 404) {
+          latestOutput = await this.syncJobLogs(
+            namespace,
+            jobName,
+            latestOutput,
+            onLogChunk,
+          );
+          return {
+            succeeded: false,
+            exitCode: undefined,
+            output: latestOutput,
+            failureContext: `Kubernetes Job ${namespace}/${jobName} was not found. It may have been deleted by TTL, evicted, or cleaned up before the status could be read.`,
+          };
+        }
         throw error;
       }
       const status = job.status;
