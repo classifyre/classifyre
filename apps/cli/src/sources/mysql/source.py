@@ -576,6 +576,39 @@ class MySQLSource(BaseSource):
             )
         return rows, column_names
 
+    def _fetch_page_keyset(
+        self,
+        conn: Any,
+        base_query: str,
+        page_size: int,
+        pk_columns: list[str],
+        pk_order: str,
+        last_pk_values: list[Any] | None,
+    ) -> tuple[list[tuple[Any, ...]], list[str]]:
+        """Fetch one page using keyset pagination — O(1) cost at any offset."""
+        params: list[Any]
+        if last_pk_values is None:
+            paginated_query = f"{base_query} ORDER BY {pk_order} LIMIT %s"
+            params = [page_size]
+        elif len(pk_columns) == 1:
+            where = f"WHERE {_quote_identifier(pk_columns[0])} > %s"
+            paginated_query = f"{base_query} {where} ORDER BY {pk_order} LIMIT %s"
+            params = [last_pk_values[0], page_size]
+        else:
+            pk_cols_quoted = ", ".join(_quote_identifier(col) for col in pk_columns)
+            placeholders = ", ".join("%s" for _ in pk_columns)
+            where = f"WHERE ({pk_cols_quoted}) > ({placeholders})"
+            paginated_query = f"{base_query} {where} ORDER BY {pk_order} LIMIT %s"
+            params = [*last_pk_values, page_size]
+
+        with conn.cursor() as cursor:
+            cursor.execute(paginated_query, params)
+            rows = list(cursor.fetchall())
+            column_names = (
+                [desc[0] for desc in cursor.description] if cursor.description else []
+            )
+        return rows, column_names
+
     def _fetch_sample_rows(
         self, table_ref: TableRef
     ) -> tuple[list[tuple[Any, ...]], list[str]] | None:
@@ -656,29 +689,58 @@ class MySQLSource(BaseSource):
                 rows_per_page,
             )
 
-        offset = 0
+        # Prefer keyset pagination (O(1) per page) over LIMIT/OFFSET (O(N²)).
+        # Fall back to LIMIT/OFFSET only when the table has no primary key.
+        pk_columns = self._get_primary_key_columns(table_ref)
+        pk_indices: list[int] = []
+        use_keyset = False
+        if pk_columns:
+            column_list = self._available_columns(table_ref)
+            indices = [column_list.index(col) for col in pk_columns if col in column_list]
+            if len(indices) == len(pk_columns):
+                pk_indices = indices
+                pk_order = ", ".join(_quote_identifier(col) for col in pk_columns)
+                use_keyset = True
+
+        row_offset = 0
         page_num = 1
+        last_pk_values: list[Any] | None = None
 
         conn = self._connect(table_ref.database)
         try:
             while not self._aborted:
                 if total_batches is not None:
                     logger.info("%s batch %d/%d", table_label, page_num, total_batches)
-                rows, column_names = await asyncio.to_thread(
-                    self._fetch_one_page_on_conn,
-                    conn, query, rows_per_page, offset,
-                )
+
+                if use_keyset:
+                    rows, column_names = await asyncio.to_thread(
+                        self._fetch_page_keyset,
+                        conn, query, rows_per_page, pk_columns, pk_order, last_pk_values,
+                    )
+                else:
+                    rows, column_names = await asyncio.to_thread(
+                        self._fetch_one_page_on_conn,
+                        conn, query, rows_per_page, row_offset,
+                    )
+
                 if not rows or not column_names:
                     break
 
-                formatted = self._format_sample_content(
-                    table_ref, column_names, rows, row_offset=offset
-                )
-                if formatted:
-                    self._content_cache[asset_id] = formatted
-                    yield formatted
+                # Yield each row individually so the detection pipeline can start
+                # processing rows while the next page is being fetched in a thread.
+                for i, row in enumerate(rows):
+                    formatted = self._format_sample_content(
+                        table_ref, column_names, [row], row_offset=row_offset + i
+                    )
+                    if formatted:
+                        self._content_cache[asset_id] = formatted
+                        yield formatted
 
-                offset += len(rows)
+                if use_keyset:
+                    last_row = rows[-1]
+                    last_pk_values = [last_row[pk_indices[j]] for j in range(len(pk_columns))]
+
+                row_offset += len(rows)
                 page_num += 1
                 if len(rows) < rows_per_page:
                     break
