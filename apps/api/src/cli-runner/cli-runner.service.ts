@@ -1014,8 +1014,13 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
 
     const baseMessage = this.kubernetesExitMessage(result.exitCode);
-    const errorMessage = result.failureContext
-      ? `${baseMessage}\n\n${result.failureContext}`
+    const cliError = this.extractLastCliError(output);
+    const contextParts = [
+      result.failureContext,
+      cliError,
+    ].filter(Boolean);
+    const errorMessage = contextParts.length > 0
+      ? `${baseMessage}\n\n${contextParts.join('\n\n')}`
       : baseMessage;
 
     await this.failRunner(runnerId, errorMessage, {
@@ -1053,9 +1058,48 @@ export class CliRunnerService implements OnApplicationBootstrap {
       return 'Job was terminated (SIGTERM: deadline or manual stop exceeded).';
     }
     if (exitCode === 1) {
-      return 'Job exited with an error. See the details panel for the full output.';
+      return 'Job exited with an error.';
     }
-    return `Job failed with exit code ${exitCode}. See the details panel for the full output.`;
+    return `Job failed with exit code ${exitCode}.`;
+  }
+
+  private extractLastCliError(output: string): string | undefined {
+    if (!output) return undefined;
+
+    const lines = output.split('\n');
+
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const errorMatch = line.match(
+        /^(?:ERROR|CRITICAL|FATAL):[^\s]*\s+(.+)$/i,
+      );
+      if (errorMatch) {
+        return errorMatch[1].slice(0, 1000);
+      }
+
+      if (/^Traceback \(most recent call last\)/i.test(line)) {
+        const traceLines = lines.slice(i).join('\n').slice(0, 1500);
+        return traceLines;
+      }
+    }
+
+    const lastNonEmpty = lines
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .slice(-3)
+      .join('\n');
+
+    if (
+      lastNonEmpty &&
+      !/^INFO:/i.test(lastNonEmpty) &&
+      lastNonEmpty.length > 5
+    ) {
+      return lastNonEmpty.slice(0, 1000);
+    }
+
+    return undefined;
   }
 
   private async persistKubernetesExecutionIdentity(
@@ -1621,6 +1665,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         consecutiveFailures: 0,
         lastRunStatus: RunnerStatus.COMPLETED,
         lastRunAt: completedAt,
+        lastErrorMessage: null,
       },
     });
 
@@ -1841,6 +1886,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           consecutiveFailures: { increment: 1 },
           lastRunStatus: RunnerStatus.ERROR,
           lastRunAt: now,
+          lastErrorMessage: normalizedMessage.slice(0, 2000),
         },
         select: { consecutiveFailures: true },
       });

@@ -242,6 +242,37 @@ class DetectorPipeline:
         errors: list[str] = []
         content_size = 0
 
+        semaphore = asyncio.Semaphore(self.max_concurrent_assets)
+        pending_tasks: set[asyncio.Task[tuple[list[DetectionResult], list[DetectorType], list[str], str]]] = set()
+
+        async def _detect_page(page_content: str) -> tuple[
+            list[DetectionResult], list[DetectorType], list[str], str
+        ]:
+            async with semaphore:
+                page_findings, page_types, page_errors = await self._run_detectors(
+                    detectors=detectors,
+                    content=page_content,
+                    content_type=text_content_type,
+                    asset_name=asset.name,
+                )
+                return page_findings, page_types, page_errors, page_content
+
+        def _collect_done() -> None:
+            done = {t for t in pending_tasks if t.done()}
+            for task in done:
+                pending_tasks.discard(task)
+                page_findings, page_types, page_errors, page_content = task.result()
+                findings.extend(page_findings)
+                errors.extend(page_errors)
+                nonlocal detector_types_run
+                detector_types_run = self._merge_detector_types(
+                    detector_types_run, page_types,
+                )
+                for finding in page_findings:
+                    self.content_provider.enrich_finding_location(
+                        finding, asset, page_content,
+                    )
+
         async for text_content in self._iter_text_content_pages(asset):
             content_size += len(text_content)
 
@@ -258,21 +289,13 @@ class DetectorPipeline:
             if not detector_content:
                 continue
 
-            page_findings, page_detector_types_run, page_errors = await self._run_detectors(
-                detectors=detectors,
-                content=detector_content,
-                content_type=text_content_type,
-                asset_name=asset.name,
-            )
-            findings.extend(page_findings)
-            errors.extend(page_errors)
-            detector_types_run = self._merge_detector_types(
-                detector_types_run,
-                page_detector_types_run,
-            )
+            task = asyncio.create_task(_detect_page(detector_content))
+            pending_tasks.add(task)
+            _collect_done()
 
-            for finding in page_findings:
-                self.content_provider.enrich_finding_location(finding, asset, detector_content)
+        if pending_tasks:
+            await asyncio.gather(*pending_tasks)
+            _collect_done()
 
         if content_size == 0 and warn_on_empty_content:
             msg = f"No content available for asset {asset.name}"
