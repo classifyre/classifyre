@@ -55,6 +55,7 @@ class DetectorPipeline:
         self.runner_id = runner_id
         self.content_size_limit = content_size_limit
         self.max_concurrent_assets = max_concurrent_assets
+        self._detector_semaphore = asyncio.Semaphore(max_concurrent_assets)
         if content_provider is not None:
             self.content_provider: ContentProvider = content_provider
         else:
@@ -73,14 +74,12 @@ class DetectorPipeline:
     async def process_stream(
         self, assets: list[SingleAssetScanResults]
     ) -> AsyncGenerator[SingleAssetScanResults, None]:
-        """Process assets concurrently (bounded), yielding in completion order."""
-        semaphore = asyncio.Semaphore(self.max_concurrent_assets)
+        """Process assets concurrently, yielding in completion order.
 
-        async def _bounded(asset: SingleAssetScanResults) -> SingleAssetScanResults:
-            async with semaphore:
-                return await self._process_single_asset(asset)
-
-        tasks = {asyncio.create_task(_bounded(a)) for a in assets}
+        Total concurrent detector invocations across all assets and pages
+        are bounded by ``self._detector_semaphore``.
+        """
+        tasks = {asyncio.create_task(self._process_single_asset(a)) for a in assets}
         for coro in asyncio.as_completed(tasks):
             yield await coro
 
@@ -242,13 +241,12 @@ class DetectorPipeline:
         errors: list[str] = []
         content_size = 0
 
-        semaphore = asyncio.Semaphore(self.max_concurrent_assets)
         pending_tasks: set[asyncio.Task[tuple[list[DetectionResult], list[DetectorType], list[str], str]]] = set()
 
         async def _detect_page(page_content: str) -> tuple[
             list[DetectionResult], list[DetectorType], list[str], str
         ]:
-            async with semaphore:
+            async with self._detector_semaphore:
                 page_findings, page_types, page_errors = await self._run_detectors(
                     detectors=detectors,
                     content=page_content,
