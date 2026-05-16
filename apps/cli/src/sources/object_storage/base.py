@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import logging
 import random
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
@@ -261,22 +262,24 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
         return datetime.now(UTC)
 
-    def _apply_sampling(self, refs: list[ObjectRef]) -> list[ObjectRef]:
+    def _apply_sampling(self, refs: Iterator[ObjectRef]) -> list[ObjectRef]:
         strategy = self.config.sampling.strategy
-        if strategy == SamplingStrategy.ALL:
-            return refs
-
         limit = int(self.config.sampling.rows_per_page or 100)
 
-        if strategy == SamplingStrategy.RANDOM:
-            if limit >= len(refs):
-                return refs
-            generator = random.Random(0)
-            indexes = sorted(generator.sample(range(len(refs)), k=limit))
-            return [refs[index] for index in indexes]
+        if strategy == SamplingStrategy.ALL:
+            return list(refs)
 
-        refs_sorted = sorted(refs, key=lambda ref: ref.last_modified, reverse=True)
-        return refs_sorted[:limit]
+        materialized = list(refs)
+
+        if strategy == SamplingStrategy.RANDOM:
+            if limit >= len(materialized):
+                return materialized
+            generator = random.Random(0)
+            indexes = sorted(generator.sample(range(len(materialized)), k=limit))
+            return [materialized[index] for index in indexes]
+
+        materialized.sort(key=lambda ref: ref.last_modified, reverse=True)
+        return materialized[:limit]
 
     def _file_extension(self, key: str) -> str:
         return PurePosixPath(key).suffix.lower()
@@ -330,7 +333,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 )
 
     def _build_snapshot(self, ref: ObjectRef) -> ContentSnapshot:
-        if not self._include_content_preview():
+        if self._discovery_only or not self._include_content_preview():
             mime = (ref.content_type_hint or "").split(";", maxsplit=1)[0].strip().lower()
             if not mime:
                 mime = infer_mime_type_from_file_name(ref.key)
@@ -441,11 +444,11 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             "source_type": self.recipe.get("type"),
         }
         try:
-            object_refs = self._list_objects()
+            count = sum(1 for _ in itertools.islice(self._list_objects(), 100))
             result["status"] = "SUCCESS"
             result["message"] = (
                 f"Connected to {self.provider_label}. "
-                f"Listed {len(object_refs)} object(s) in current scope."
+                f"Found {'100+' if count >= 100 else count} object(s) in current scope."
             )
         except Exception as exc:
             result["status"] = "FAILURE"
@@ -637,6 +640,17 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         _ = text_content
         finding.location = Location(path=asset.external_url)
 
+    def evict_asset_cache(self, asset_hash: str) -> None:
+        external_url = self._hash_to_uri.get(asset_hash)
+        self._content_cache.pop(asset_hash, None)
+        self._bytes_cache.pop(asset_hash, None)
+        self._mime_cache.pop(asset_hash, None)
+        self._object_ref_by_hash.pop(asset_hash, None)
+        if external_url:
+            self._content_cache.pop(external_url, None)
+            self._bytes_cache.pop(external_url, None)
+            self._mime_cache.pop(external_url, None)
+
     def abort(self) -> None:
         logger.info("Aborting object storage extraction...")
         super().abort()
@@ -653,7 +667,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 logger.debug("Failed to close object storage client cleanly")
 
     @abstractmethod
-    def _list_objects(self) -> list[ObjectRef]:
+    def _list_objects(self) -> Iterator[ObjectRef]:
         raise NotImplementedError
 
     @abstractmethod

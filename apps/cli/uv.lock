@@ -614,6 +614,9 @@ mssql = [
 mysql = [
     { name = "pymysql" },
 ]
+neo4j = [
+    { name = "neo4j" },
+]
 ocr = [
     { name = "chardet" },
     { name = "docling" },
@@ -765,6 +768,7 @@ hive = [
 mongodb = [{ name = "pymongo", specifier = ">=4.15.2,<5.0.0" }]
 mssql = [{ name = "pymssql", specifier = ">=2.3.4,<3.0.0" }]
 mysql = [{ name = "pymysql", specifier = ">=1.1.1,<2.0.0" }]
+neo4j = [{ name = "neo4j", specifier = ">=5.0.0,<6.0.0" }]
 ocr = [
     { name = "chardet", specifier = ">=5.2.0" },
     { name = "docling", specifier = ">=2.93.0" },
@@ -2390,6 +2394,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a2/6e/371856a3fb9d31ca8dac321cda606860fa4548858c0cc45d9d1d4ca2628b/mypy_extensions-1.1.0.tar.gz", hash = "sha256:52e68efc3284861e772bbcd66823fde5ae21fd2fdb51c62a211403730b916558", size = 6343, upload-time = "2025-04-22T14:54:24.164Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/79/7b/2c79738432f5c924bef5071f933bcc9efd0473bac3b4aa584a6f7c1c8df8/mypy_extensions-1.1.0-py3-none-any.whl", hash = "sha256:1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505", size = 4963, upload-time = "2025-04-22T14:54:22.983Z" },
+]
+
+[[package]]
+name = "neo4j"
+version = "5.28.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytz" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/62/aa/83baca8f9e5e5ba1a00722067a4bf3c088c5c02019a7b485e94c8cf05d39/neo4j-5.28.4.tar.gz", hash = "sha256:4a2d8d6eb8c2da0bc87a30e96e2c179fbc0045665626482901ca3dcc9c2b1811", size = 232608, upload-time = "2026-05-04T08:00:55.426Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d9/fd/d46f29f4089a00a7d4894f5e1739288c2a42622b72ea7161a226b73ff4fa/neo4j-5.28.4-py3-none-any.whl", hash = "sha256:ba87c423fd2a1fbe6a116c47ac96cfbe7d8c419d24d2f5611e5674283dddf7b9", size = 313927, upload-time = "2026-05-04T08:00:52.005Z" },
 ]
 
 [[package]]

@@ -177,6 +177,29 @@ class RestOutputSink:
                 update_error,
             )
 
+    async def register_discovered_assets(self, hashes: list[str]) -> None:
+        runner_id = self._require_runner_id()
+        for i in range(0, len(hashes), 500):
+            chunk = hashes[i : i + 500]
+            self._request_json(
+                "POST",
+                f"/runners/{runner_id}/assets/discover",
+                {"assetHashes": chunk},
+            )
+
+    async def update_asset_status(
+        self, asset_hash: str, status: str, error_message: str | None = None
+    ) -> None:
+        runner_id = self._require_runner_id()
+        item: dict[str, Any] = {"assetHash": asset_hash, "status": status}
+        if error_message:
+            item["errorMessage"] = error_message[:2000]
+        self._request_json(
+            "PATCH",
+            f"/runners/{runner_id}/assets/status",
+            {"assets": [item]},
+        )
+
     def _require_source_id(self) -> str:
         source_id = self.context.source_id
         if not source_id:

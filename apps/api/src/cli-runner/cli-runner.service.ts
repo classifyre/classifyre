@@ -15,6 +15,7 @@ import {
   AssetType,
   Prisma,
   RunnerExecutionMode,
+  RunnerAssetStatus,
   RunnerStatus,
   Source,
   TriggerType,
@@ -2121,6 +2122,129 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
 
     return runnerDto;
+  }
+
+  async registerDiscoveredAssets(
+    runnerId: string,
+    assetHashes: string[],
+  ): Promise<{ registered: number }> {
+    if (!assetHashes.length) return { registered: 0 };
+
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { id: true },
+    });
+    if (!runner) {
+      throw new NotFoundException(`Runner ${runnerId} not found`);
+    }
+
+    const result = await this.prisma.runnerAsset.createMany({
+      data: assetHashes.map((hash) => ({
+        runnerId,
+        assetHash: hash,
+        status: RunnerAssetStatus.PENDING,
+      })),
+      skipDuplicates: true,
+    });
+
+    return { registered: result.count };
+  }
+
+  async updateRunnerAssetStatuses(
+    runnerId: string,
+    updates: Array<{
+      assetHash: string;
+      status: 'PROCESSED' | 'ERROR';
+      errorMessage?: string;
+    }>,
+  ): Promise<void> {
+    if (!updates.length) return;
+
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { id: true },
+    });
+    if (!runner) {
+      throw new NotFoundException(`Runner ${runnerId} not found`);
+    }
+
+    const now = new Date();
+    await this.prisma.$transaction(
+      updates.map((update) =>
+        this.prisma.runnerAsset.update({
+          where: {
+            runnerId_assetHash: { runnerId, assetHash: update.assetHash },
+          },
+          data: {
+            status:
+              update.status === 'PROCESSED'
+                ? RunnerAssetStatus.PROCESSED
+                : RunnerAssetStatus.ERROR,
+            completedAt: now,
+            errorMessage: update.errorMessage?.slice(0, 4000),
+          },
+        }),
+      ),
+    );
+  }
+
+  async markRunnerAssetProcessing(
+    runnerId: string,
+    assetHash: string,
+  ): Promise<void> {
+    await this.prisma.runnerAsset.update({
+      where: {
+        runnerId_assetHash: { runnerId, assetHash },
+      },
+      data: {
+        status: RunnerAssetStatus.PROCESSING,
+        startedAt: new Date(),
+      },
+    });
+  }
+
+  async getRunnerAssetProgress(runnerId: string): Promise<{
+    pending: number;
+    processing: number;
+    processed: number;
+    error: number;
+    total: number;
+  }> {
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { id: true },
+    });
+    if (!runner) {
+      throw new NotFoundException(`Runner ${runnerId} not found`);
+    }
+
+    const counts = await this.prisma.runnerAsset.groupBy({
+      by: ['status'],
+      where: { runnerId },
+      _count: true,
+    });
+
+    const result = { pending: 0, processing: 0, processed: 0, error: 0, total: 0 };
+    for (const row of counts) {
+      const count = row._count;
+      switch (row.status) {
+        case RunnerAssetStatus.PENDING:
+          result.pending = count;
+          break;
+        case RunnerAssetStatus.PROCESSING:
+          result.processing = count;
+          break;
+        case RunnerAssetStatus.PROCESSED:
+          result.processed = count;
+          break;
+        case RunnerAssetStatus.ERROR:
+          result.error = count;
+          break;
+      }
+      result.total += count;
+    }
+
+    return result;
   }
 
   async stopRunner(runnerId: string) {
