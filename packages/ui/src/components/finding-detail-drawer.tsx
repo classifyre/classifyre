@@ -446,7 +446,7 @@ export function FindingDetailDrawer({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.keys(statusLabels).map((status) => (
+                    {Object.keys(s.statusLabels).map((status) => (
                       <SelectItem key={status} value={status}>
                         {s.statusLabels[status as FindingDrawerStatus]}
                       </SelectItem>
@@ -459,11 +459,11 @@ export function FindingDetailDrawer({
             {/* ── Severity ── */}
             <div className="space-y-2">
               <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
-                {strings?.severitySectionLabel ?? "Severity"}
+                {s.severitySectionLabel}
               </p>
               <div className="flex items-center gap-2">
                 <SeverityBadge severity={toSeverityBadgeValue(draftSeverity)}>
-                  {strings?.severityLabels?.[draftSeverity] ?? severityLabels[draftSeverity]}
+                  {s.severityLabels[draftSeverity]}
                 </SeverityBadge>
                 <Select
                   value={draftSeverity}
@@ -476,9 +476,9 @@ export function FindingDetailDrawer({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.keys(severityLabels).map((severity) => (
+                    {Object.keys(s.severityLabels).map((severity) => (
                       <SelectItem key={severity} value={severity}>
-                        {strings?.severityLabels?.[severity as FindingDrawerSeverity] ?? severityLabels[severity as FindingDrawerSeverity]}
+                        {s.severityLabels[severity as FindingDrawerSeverity]}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -489,14 +489,14 @@ export function FindingDetailDrawer({
             {/* ── Comment ── */}
             <div className="space-y-2">
               <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
-                {strings?.commentSectionLabel ?? "Comment"}
+                {s.commentSectionLabel}
               </p>
               <Textarea
                 value={draftComment}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                   setDraftComment(e.target.value)
                 }
-                placeholder={strings?.commentPlaceholder ?? "Add a note to this finding…"}
+                placeholder={s.commentPlaceholder}
                 disabled={!onSave || isSaving}
                 className="min-h-[80px] resize-none border-2 border-border rounded-[4px] text-sm"
                 rows={3}
@@ -510,7 +510,7 @@ export function FindingDetailDrawer({
                 disabled={isSaving}
                 className="w-full border-2 border-[#b7ff00]/30 bg-[#0b0f0a] text-[#b7ff00] hover:bg-[#0b0f0a]/80 rounded-[4px] font-mono text-xs uppercase tracking-[0.1em]"
               >
-                {isSaving ? (strings?.saving ?? "Saving…") : (strings?.saveChanges ?? "Save changes")}
+                {isSaving ? s.saving : s.saveChanges}
               </Button>
             )}
 
@@ -521,9 +521,9 @@ export function FindingDetailDrawer({
               <>
                 <div className="space-y-2">
                   <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
-                    {strings?.confidenceSectionLabel ?? "Confidence"}
+                    {s.confidenceSectionLabel}
                   </p>
-                  <ConfidenceMeter value={finding.confidence} strings={strings} />
+                  <ConfidenceMeter value={finding.confidence} s={s} />
                 </div>
                 <Separator />
               </>
@@ -531,20 +531,20 @@ export function FindingDetailDrawer({
 
             {/* ── Dates ── */}
             <div className="space-y-3">
-              <DateDetailRow label={strings?.firstDetected ?? "First detected"} value={occurredAt} />
-              <DateDetailRow label={strings?.lastDetected ?? "Last detected"} value={detectedAt} />
-              <DetailRow label={strings?.openFor ?? "Open for"}>
+              <DateDetailRow label={s.firstDetected} value={occurredAt} />
+              <DateDetailRow label={s.lastDetected} value={detectedAt} />
+              <DetailRow label={s.openFor}>
                 <span className="font-mono text-xs">{openedFor}</span>
               </DetailRow>
               {finding.resolvedAt && (
-                <DateDetailRow label={strings?.resolvedAt ?? "Resolved"} value={finding.resolvedAt} />
+                <DateDetailRow label={s.resolvedAt} value={finding.resolvedAt} />
               )}
             </div>
 
             <Separator />
 
             {/* ── Set by (runner link) ── */}
-            <DetailRow label={strings?.setBy ?? "Set by"}>
+            <DetailRow label={s.setBy}>
               {finding.runnerHref ? (
                 <a
                   href={finding.runnerHref}
@@ -554,7 +554,7 @@ export function FindingDetailDrawer({
                 </a>
               ) : (
                 <span className="font-mono text-xs text-muted-foreground">
-                  {strings?.manual ?? "Manual"}
+                  {s.manual}
                 </span>
               )}
             </DetailRow>
