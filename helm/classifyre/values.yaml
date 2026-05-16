@@ -261,6 +261,8 @@ api:
     detectorFlushBatchSize: 5
     # -- Max assets processed in parallel by the detector pipeline.
     detectorMaxConcurrent: 10
+    # -- Number of parallel asset-processing workers in Phase 2.
+    processingWorkers: 2
 
     resources:
       # -- CLI job resource requests.

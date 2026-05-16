@@ -79,11 +79,11 @@ class DetectorPipeline:
         Total concurrent detector invocations across all assets and pages
         are bounded by ``self._detector_semaphore``.
         """
-        tasks = {asyncio.create_task(self._process_single_asset(a)) for a in assets}
+        tasks = {asyncio.create_task(self.process_single_asset(a)) for a in assets}
         for coro in asyncio.as_completed(tasks):
             yield await coro
 
-    async def _process_single_asset(self, asset: SingleAssetScanResults) -> SingleAssetScanResults:
+    async def process_single_asset(self, asset: SingleAssetScanResults) -> SingleAssetScanResults:
         """Process a single asset through detectors."""
         # 1. If no detectors, return asset as-is with empty findings
         if not self.detectors:

@@ -35,6 +35,7 @@ class AssetType(StrEnum):
     DATABRICKS = 'DATABRICKS'
     SNOWFLAKE = 'SNOWFLAKE'
     MONGODB = 'MONGODB'
+    NEO4J = 'NEO4J'
     POWERBI = 'POWERBI'
     TABLEAU = 'TABLEAU'
     CONFLUENCE = 'CONFLUENCE'
@@ -1792,6 +1793,7 @@ class Type(StrEnum):
     DATABRICKS = 'DATABRICKS'
     SNOWFLAKE = 'SNOWFLAKE'
     MONGODB = 'MONGODB'
+    NEO4J = 'NEO4J'
     POWERBI = 'POWERBI'
     TABLEAU = 'TABLEAU'
     CONFLUENCE = 'CONFLUENCE'
@@ -2014,6 +2016,129 @@ class MongoDBInput(CoreInput):
     sampling: SamplingConfig
 
 
+class Neo4jRequired(BaseModel):
+    """
+    Neo4j connection endpoint. Accepts bolt://, neo4j://, or neo4j+s:// URIs.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    uri: str = Field(
+        ...,
+        description='Bolt or Neo4j URI (e.g. bolt://localhost:7687 or neo4j+s://abc123.databases.neo4j.io)',
+    )
+    database: str | None = Field(
+        None,
+        description='Target database name (defaults to "neo4j"). Multi-database requires Neo4j 4.0+.',
+    )
+
+
+class Neo4jMaskedUsernamePassword(BaseModel):
+    """
+    Neo4j basic auth credentials.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    username: str = Field(..., description='Neo4j username (typically "neo4j")')
+    password: str = Field(..., description='Neo4j password')
+
+
+class Neo4jMaskedNone(BaseModel):
+    """
+    No authentication (local dev / anonymous access).
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class TrustStrategy(StrEnum):
+    """
+    Certificate trust strategy. TRUST_ALL_CERTIFICATES is useful for self-signed certs in dev.
+    """
+
+    TRUST_ALL_CERTIFICATES = 'TRUST_ALL_CERTIFICATES'
+    TRUST_SYSTEM_CA_SIGNED_CERTIFICATES = 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES'
+
+
+class Neo4jOptionalConnection(BaseModel):
+    """
+    Neo4j driver connection tuning options.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection_timeout_ms: int | None = Field(
+        30000, description='Driver connection timeout in milliseconds.', ge=1000
+    )
+    max_connection_pool_size: int | None = Field(
+        10, description='Maximum number of connections in the driver pool.', ge=1
+    )
+    encrypted: bool | None = Field(
+        None, description='Force encrypted connection (overrides URI scheme detection).'
+    )
+    trust_strategy: TrustStrategy | None = Field(
+        None,
+        description='Certificate trust strategy. TRUST_ALL_CERTIFICATES is useful for self-signed certs in dev.',
+    )
+
+
+class Neo4jOptionalScope(BaseModel):
+    """
+    Controls which node labels and relationships are included.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_labels: list[str] | None = Field(
+        None,
+        description='Allowlist of node labels to scan. If empty, all labels are included.',
+    )
+    exclude_labels: list[str] | None = Field(
+        None, description='Denylist of node labels to skip (case-sensitive).'
+    )
+    node_limit_per_label: int | None = Field(
+        None,
+        description='Maximum number of assets (node labels) to emit per extraction run.',
+        ge=1,
+    )
+    include_relationships: bool | None = Field(
+        True,
+        description='When true, relationship edges between labels are resolved and stored as asset links.',
+    )
+
+
+class Neo4jOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: Neo4jOptionalConnection | None = None
+    scope: Neo4jOptionalScope | None = None
+
+
+class Neo4jInput(CoreInput):
+    type: Literal['NEO4J'] = 'NEO4J'
+    required: Neo4jRequired
+    masked: Neo4jMaskedUsernamePassword | Neo4jMaskedNone = Field(
+        ..., title='Neo4jMasked'
+    )
+    optional: Neo4jOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+
+
 class PowerBIInput(CoreInput):
     type: Literal['POWERBI'] = 'POWERBI'
     required: PowerBIRequiredServicePrincipal | PowerBIRequiredAccessToken = Field(
@@ -2097,7 +2222,7 @@ class ConfluenceOptionalConnection(BaseModel):
     )
 
 
-class Type15(StrEnum):
+class Type16(StrEnum):
     """
     Filter spaces by space type
     """
@@ -2134,7 +2259,7 @@ class ConfluenceOptionalScopeSpaces(BaseModel):
     keys: list[str] | None = Field(
         None, description='Filter spaces by keys (up to 250)', max_length=250
     )
-    type: Type15 | None = Field(None, description='Filter spaces by space type')
+    type: Type16 | None = Field(None, description='Filter spaces by space type')
     status: Status | None = Field(None, description='Filter spaces by status')
     labels: list[str] | None = Field(
         None,
@@ -2400,7 +2525,7 @@ class ServiceDeskOptional(BaseModel):
     content: ServiceDeskOptionalContent | None = None
 
 
-class Type16(StrEnum):
+class Type17(StrEnum):
     """
     Type of the asset or source
     """
@@ -2418,6 +2543,7 @@ class Type16(StrEnum):
     DATABRICKS = 'DATABRICKS'
     SNOWFLAKE = 'SNOWFLAKE'
     MONGODB = 'MONGODB'
+    NEO4J = 'NEO4J'
     POWERBI = 'POWERBI'
     TABLEAU = 'TABLEAU'
     CONFLUENCE = 'CONFLUENCE'

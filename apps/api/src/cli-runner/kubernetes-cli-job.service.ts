@@ -503,6 +503,30 @@ export class KubernetesCliJobService {
     container.command = ['/bin/sh', '-lc'];
     container.args = [this.buildJobCommand(params.mode, workDir)];
 
+    // Apply per-source resource overrides from recipe
+    const recipeResources = (params.recipe as any)?.resources;
+    if (recipeResources && typeof recipeResources === 'object') {
+      container.resources = container.resources || {};
+      if (recipeResources.requests) {
+        container.resources.requests = {
+          ...(container.resources.requests || {}),
+          ...recipeResources.requests,
+        };
+      }
+      if (recipeResources.limits) {
+        container.resources.limits = {
+          ...(container.resources.limits || {}),
+          ...recipeResources.limits,
+        };
+      }
+      if (
+        typeof recipeResources.timeout_seconds === 'number' &&
+        recipeResources.timeout_seconds > 0
+      ) {
+        jobAny.spec.activeDeadlineSeconds = recipeResources.timeout_seconds;
+      }
+    }
+
     return job;
   }
 

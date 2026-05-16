@@ -1965,6 +1965,7 @@ export const JsonSchemaForm = React.forwardRef<
   const maskedBlock = getBlockEntry(["masked", "masked_fields"]);
   const optionalBlock = getBlockEntry(["optional", "optional_fields"]);
   const samplingBlock = getBlockEntry(["sampling"]);
+  const resourcesBlock = getBlockEntry(["resources"]);
 
   const TABULAR_SOURCE_TYPE_MAP: Record<IngestionSourceType, boolean> = {
     WORDPRESS: false,
@@ -1980,6 +1981,7 @@ export const JsonSchemaForm = React.forwardRef<
     DATABRICKS: true,
     SNOWFLAKE: true,
     MONGODB: false,
+    NEO4J: false,
     POWERBI: false,
     TABLEAU: false,
     CONFLUENCE: false,
@@ -1997,6 +1999,7 @@ export const JsonSchemaForm = React.forwardRef<
       maskedBlock?.key,
       optionalBlock?.key,
       samplingBlock?.key,
+      resourcesBlock?.key,
     ].filter(Boolean) as string[],
   );
 
@@ -2434,6 +2437,110 @@ export const JsonSchemaForm = React.forwardRef<
                 disabled={disabled}
               />
             )}
+          />
+        )}
+
+        {resourcesBlock && (
+          <FormField
+            control={form.control}
+            name={resourcesBlock.key}
+            render={({ field }) => {
+              const val = (field.value ?? {}) as Record<string, unknown>;
+              const update = (patch: Record<string, unknown>) => {
+                const merged = { ...val, ...patch };
+                const cleaned = Object.fromEntries(
+                  Object.entries(merged).filter(
+                    ([, v]) =>
+                      v !== undefined &&
+                      v !== "" &&
+                      !(typeof v === "object" && v !== null && Object.values(v as Record<string, unknown>).every((x) => !x)),
+                  ),
+                );
+                field.onChange(Object.keys(cleaned).length ? cleaned : undefined);
+              };
+              const requests = (val.requests ?? {}) as Record<string, string>;
+              const limits = (val.limits ?? {}) as Record<string, string>;
+              return (
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="resources" className="border-none">
+                    <AccordionTrigger className="py-2 text-sm font-medium">
+                      Resources
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormItem>
+                          <FormLabel className="text-xs">CPU Request</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Default: 500m"
+                              value={requests.cpu ?? ""}
+                              onChange={(e) =>
+                                update({ requests: { ...requests, cpu: e.target.value || undefined } })
+                              }
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                        <FormItem>
+                          <FormLabel className="text-xs">Memory Request</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Default: 1Gi"
+                              value={requests.memory ?? ""}
+                              onChange={(e) =>
+                                update({ requests: { ...requests, memory: e.target.value || undefined } })
+                              }
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                        <FormItem>
+                          <FormLabel className="text-xs">CPU Limit</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Default: 2"
+                              value={limits.cpu ?? ""}
+                              onChange={(e) =>
+                                update({ limits: { ...limits, cpu: e.target.value || undefined } })
+                              }
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                        <FormItem>
+                          <FormLabel className="text-xs">Memory Limit</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Default: 4Gi"
+                              value={limits.memory ?? ""}
+                              onChange={(e) =>
+                                update({ limits: { ...limits, memory: e.target.value || undefined } })
+                              }
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                        <FormItem className="col-span-2">
+                          <FormLabel className="text-xs">Timeout (seconds)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="Default: 14400"
+                              value={(val.timeout_seconds as number) ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                                update({ timeout_seconds: v && !isNaN(v) ? v : undefined });
+                              }}
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              );
+            }}
           />
         )}
 

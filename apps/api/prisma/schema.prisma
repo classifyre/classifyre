@@ -306,6 +306,7 @@ model Runner {
   assetsUnchanged Int          @default(0) @map("assets_unchanged")
   assetsDeleted   Int          @default(0) @map("assets_deleted")
   assets          Asset[]
+  runnerAssets    RunnerAsset[]
   source          Source       @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   notifications   Notification[]
 
@@ -314,6 +315,22 @@ model Runner {
   @@index([status])
   @@index([triggeredAt])
   @@map("runners")
+}
+
+model RunnerAsset {
+  runnerId     String            @map("runner_id")
+  assetHash    String            @map("asset_hash")
+  status       RunnerAssetStatus @default(PENDING)
+  startedAt    DateTime?         @map("started_at")
+  completedAt  DateTime?         @map("completed_at")
+  errorMessage String?           @map("error_message") @db.Text
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@id([runnerId, assetHash])
+  @@index([runnerId, status])
+  @@map("runner_assets")
 }
 
 model Notification {
@@ -517,6 +534,13 @@ enum AssetStatus {
   UPDATED
   UNCHANGED
   DELETED
+}
+
+enum RunnerAssetStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  ERROR
 }
 
 enum AssetContentType {

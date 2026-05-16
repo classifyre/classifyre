@@ -1102,6 +1102,15 @@ class DatabricksSource(BaseSource):
             )
         return rows, column_names
 
+    @staticmethod
+    def _cursor_execute(cursor: Any, query: str) -> list[str]:
+        cursor.execute(query)
+        return [desc[0] for desc in cursor.description] if cursor.description else []
+
+    @staticmethod
+    def _cursor_fetchmany(cursor: Any, size: int) -> list[tuple[Any, ...]]:
+        return list(cursor.fetchmany(size))
+
     def _fetch_sample_rows(
         self, table_ref: TableRef
     ) -> tuple[list[tuple[Any, ...]], list[str]] | None:
@@ -1201,33 +1210,44 @@ class DatabricksSource(BaseSource):
                 rows_per_page,
             )
 
-        offset = 0
+        # Stream rows via fetchmany — O(1) per page at any offset, no PK needed.
+        # Each fetchmany() advances the server-side result pointer without re-scanning.
+        row_offset = 0
         page_num = 1
 
         conn = self._connect_sql()
+        cursor = conn.cursor()
         try:
+            column_names = await asyncio.to_thread(self._cursor_execute, cursor, query)
+            if not column_names:
+                return
+
             while not self._aborted:
                 if total_batches is not None:
                     logger.info("%s batch %d/%d", table_label, page_num, total_batches)
-                rows, column_names = await asyncio.to_thread(
-                    self._fetch_one_page_on_conn,
-                    conn, query, rows_per_page, offset,
-                )
-                if not rows or not column_names:
+
+                rows = await asyncio.to_thread(self._cursor_fetchmany, cursor, rows_per_page)
+                if not rows:
                     break
 
-                formatted = self._format_sample_content(
-                    table_ref, column_names, rows, row_offset=offset
-                )
-                if formatted:
-                    self._content_cache[asset_id] = formatted
-                    yield formatted
+                # Yield each row individually so detection runs in parallel with fetching.
+                for i, row in enumerate(rows):
+                    formatted = self._format_sample_content(
+                        table_ref, column_names, [row], row_offset=row_offset + i
+                    )
+                    if formatted:
+                        self._content_cache[asset_id] = formatted
+                        yield formatted
 
-                offset += len(rows)
+                row_offset += len(rows)
                 page_num += 1
                 if len(rows) < rows_per_page:
                     break
         finally:
+            try:
+                cursor.close()
+            except Exception:
+                pass
             conn.close()
 
     def enrich_finding_location(

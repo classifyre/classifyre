@@ -30,6 +30,10 @@ import {
   DeleteRunnerResponseDto,
   SearchRunnerLogsBodyDto,
   RunnerLogsResponseDto,
+  RegisterDiscoveredAssetsDto,
+  RegisterDiscoveredAssetsResponseDto,
+  UpdateRunnerAssetStatusDto,
+  RunnerAssetProgressDto,
 } from './dto';
 import { SearchRunnersRequestDto } from '../dto/search-runners-request.dto';
 import { SearchRunnersResponseDto } from '../dto/search-runners-response.dto';
@@ -117,6 +121,43 @@ export class CliRunnerController {
       body.status,
       body.errorMessage,
     );
+  }
+
+  @Post('runners/:runnerId/assets/discover')
+  @ApiOperation({ summary: 'Register discovered asset hashes for a runner' })
+  @ApiBody({ type: RegisterDiscoveredAssetsDto })
+  @ApiResponse({ status: 201, type: RegisterDiscoveredAssetsResponseDto })
+  async registerDiscoveredAssets(
+    @Param('runnerId') runnerId: string,
+    @Body() dto: RegisterDiscoveredAssetsDto,
+  ) {
+    return this.cliRunnerService.registerDiscoveredAssets(
+      runnerId,
+      dto.assetHashes,
+    );
+  }
+
+  @Patch('runners/:runnerId/assets/status')
+  @ApiOperation({ summary: 'Update processing status of runner assets' })
+  @ApiBody({ type: UpdateRunnerAssetStatusDto })
+  @ApiResponse({ status: 200 })
+  async updateRunnerAssetStatuses(
+    @Param('runnerId') runnerId: string,
+    @Body() dto: UpdateRunnerAssetStatusDto,
+  ) {
+    await this.cliRunnerService.updateRunnerAssetStatuses(
+      runnerId,
+      dto.assets,
+    );
+    return { updated: dto.assets.length };
+  }
+
+  @AllowInDemoMode()
+  @Get('runners/:runnerId/assets/progress')
+  @ApiOperation({ summary: 'Get runner asset processing progress' })
+  @ApiResponse({ status: 200, type: RunnerAssetProgressDto })
+  async getRunnerAssetProgress(@Param('runnerId') runnerId: string) {
+    return this.cliRunnerService.getRunnerAssetProgress(runnerId);
   }
 
   @Get('runners/:runnerId')

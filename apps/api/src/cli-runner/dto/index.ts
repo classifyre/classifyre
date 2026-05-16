@@ -1,5 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { TriggerType, RunnerExecutionMode, RunnerStatus } from '@prisma/client';
+import {
+  TriggerType,
+  RunnerExecutionMode,
+  RunnerStatus,
+  RunnerAssetStatus,
+} from '@prisma/client';
 import {
   IsOptional,
   IsEnum,
@@ -7,6 +12,8 @@ import {
   IsInt,
   Min,
   IsArray,
+  ValidateNested,
+  ArrayMinSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -276,4 +283,58 @@ export class RunnerLogsResponseDto {
 
   @ApiProperty({ minimum: 1, maximum: 1000 })
   take: number;
+}
+
+export class RegisterDiscoveredAssetsDto {
+  @ApiProperty({ type: [String], description: 'Asset hashes to register as PENDING' })
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMinSize(1)
+  assetHashes: string[];
+}
+
+export class RunnerAssetStatusUpdateItem {
+  @ApiProperty({ description: 'Asset hash' })
+  @IsString()
+  assetHash: string;
+
+  @ApiProperty({ enum: ['PROCESSED', 'ERROR'] })
+  @IsEnum(RunnerAssetStatus)
+  status: 'PROCESSED' | 'ERROR';
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  errorMessage?: string;
+}
+
+export class UpdateRunnerAssetStatusDto {
+  @ApiProperty({ type: [RunnerAssetStatusUpdateItem] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RunnerAssetStatusUpdateItem)
+  @ArrayMinSize(1)
+  assets: RunnerAssetStatusUpdateItem[];
+}
+
+export class RegisterDiscoveredAssetsResponseDto {
+  @ApiProperty()
+  registered: number;
+}
+
+export class RunnerAssetProgressDto {
+  @ApiProperty()
+  pending: number;
+
+  @ApiProperty()
+  processing: number;
+
+  @ApiProperty()
+  processed: number;
+
+  @ApiProperty()
+  error: number;
+
+  @ApiProperty()
+  total: number;
 }
