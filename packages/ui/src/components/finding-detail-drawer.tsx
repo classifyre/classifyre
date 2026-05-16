@@ -42,29 +42,7 @@ export interface FindingDrawerSaveData {
 
 export type FindingDetailDrawerLocale = "en" | "de";
 
-export interface FindingDetailDrawerProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  finding: {
-    id: string;
-    status: FindingDrawerStatus;
-    severity: FindingDrawerSeverity;
-    confidence?: number | null;
-    comment?: string | null;
-    detectedAt?: Date | string | null;
-    firstDetectedAt?: Date | string | null;
-    lastDetectedAt?: Date | string | null;
-    resolvedAt?: Date | string | null;
-    runnerId?: string | null;
-    /** href to the runner/scan detail page — constructed by the host app */
-    runnerHref?: string | null;
-  };
-  onSave?: (data: FindingDrawerSaveData) => void;
-  isSaving?: boolean;
-  locale?: FindingDetailDrawerLocale;
-}
-
-type DrawerStrings = {
+export type DrawerStrings = {
   title: string;
   description: string;
   closeAriaLabel: string;
@@ -88,6 +66,29 @@ type DrawerStrings = {
   statusLabels: Record<FindingDrawerStatus, string>;
   severityLabels: Record<FindingDrawerSeverity, string>;
 };
+
+export interface FindingDetailDrawerProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  finding: {
+    id: string;
+    status: FindingDrawerStatus;
+    severity: FindingDrawerSeverity;
+    confidence?: number | null;
+    comment?: string | null;
+    detectedAt?: Date | string | null;
+    firstDetectedAt?: Date | string | null;
+    lastDetectedAt?: Date | string | null;
+    resolvedAt?: Date | string | null;
+    runnerId?: string | null;
+    /** href to the runner/scan detail page — constructed by the host app */
+    runnerHref?: string | null;
+  };
+  onSave?: (data: FindingDrawerSaveData) => void;
+  isSaving?: boolean;
+  locale?: FindingDetailDrawerLocale;
+  strings?: Partial<DrawerStrings>;
+}
 
 const i18n: Record<FindingDetailDrawerLocale, DrawerStrings> = {
   en: {
@@ -367,8 +368,17 @@ export function FindingDetailDrawer({
   onSave,
   isSaving,
   locale,
+  strings,
 }: FindingDetailDrawerProps) {
-  const s = i18n[locale ?? "en"];
+  const base = i18n[locale ?? "en"];
+  const s: DrawerStrings = strings
+    ? {
+        ...base,
+        ...strings,
+        statusLabels: { ...base.statusLabels, ...strings.statusLabels },
+        severityLabels: { ...base.severityLabels, ...strings.severityLabels },
+      }
+    : base;
   const [draftStatus, setDraftStatus] = React.useState<FindingDrawerStatus>(
     finding.status,
   );
