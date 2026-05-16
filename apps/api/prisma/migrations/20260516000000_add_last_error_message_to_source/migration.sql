@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "Source" ADD COLUMN "last_error_message" TEXT;
+ALTER TABLE "sources" ADD COLUMN "last_error_message" TEXT;
