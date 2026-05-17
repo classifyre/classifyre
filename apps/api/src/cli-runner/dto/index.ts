@@ -15,6 +15,7 @@ import {
   IsObject,
   ValidateNested,
   ArrayMinSize,
+  IsPositive,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -294,6 +295,38 @@ export class RegisterDiscoveredAssetsDto {
   assetHashes: string[];
 }
 
+export class FindingsBySeverityDto {
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  critical?: number;
+
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  high?: number;
+
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  medium?: number;
+
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  low?: number;
+
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  info?: number;
+}
+
 export class RunnerAssetStatusUpdateItem {
   @ApiProperty({ description: 'Asset hash' })
   @IsString()
@@ -308,13 +341,25 @@ export class RunnerAssetStatusUpdateItem {
   @IsString()
   errorMessage?: string;
 
+  @ApiProperty({ required: false, minimum: 0, description: 'Total findings count' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  findingsTotal?: number;
+
+  @ApiProperty({ required: false, type: FindingsBySeverityDto, description: 'Finding counts per severity level' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => FindingsBySeverityDto)
+  findingsBySeverity?: FindingsBySeverityDto;
+
   @ApiProperty({
     required: false,
-    description: 'Findings summary: total, by_severity, by_detector counts',
+    description: 'Finding counts per detector: { [detectorType]: { total, critical?, high?, … } }',
   })
   @IsOptional()
   @IsObject()
-  findingsSummary?: Record<string, unknown>;
+  findingsByDetector?: Record<string, { total: number } & Partial<FindingsBySeverityDto>>;
 }
 
 export class UpdateRunnerAssetStatusDto {

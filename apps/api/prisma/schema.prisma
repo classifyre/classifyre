@@ -324,7 +324,9 @@ model RunnerAsset {
   startedAt        DateTime?         @map("started_at")
   completedAt      DateTime?         @map("completed_at")
   errorMessage     String?           @map("error_message") @db.Text
-  findingsSummary  Json?             @map("findings_summary")
+  findingsTotal      Int?  @map("findings_total")
+  findingsBySeverity Json? @map("findings_by_severity")
+  findingsByDetector Json? @map("findings_by_detector")
   createdAt        DateTime          @default(now()) @map("created_at")
 
   runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
