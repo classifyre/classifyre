@@ -59,9 +59,16 @@ describe('CliRunnerService', () => {
       finding: {
         count: jest.fn(),
       },
+      runnerAsset: {
+        count: jest.fn().mockResolvedValue(0),
+        findFirst: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       $transaction: jest.fn(),
     };
-    prisma.$transaction.mockImplementation((callback: any) => callback(prisma));
+    prisma.$transaction.mockImplementation((arg: any) =>
+      Array.isArray(arg) ? Promise.all(arg) : arg(prisma),
+    );
     const notificationsService = {
       create: jest.fn(),
     };
@@ -574,9 +581,16 @@ describe('CliRunnerService', () => {
       finding: {
         count: jest.fn(),
       },
+      runnerAsset: {
+        count: jest.fn().mockResolvedValue(0),
+        findFirst: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       $transaction: jest.fn(),
     };
-    prisma.$transaction.mockImplementation((callback: any) => callback(tx));
+    prisma.$transaction.mockImplementation((arg: any) =>
+      Array.isArray(arg) ? Promise.all(arg) : arg(tx),
+    );
     const service = new CliRunnerService(
       prisma as any,
       { create: jest.fn() } as any,

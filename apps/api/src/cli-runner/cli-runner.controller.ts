@@ -39,8 +39,8 @@ import { SearchRunnersRequestDto } from '../dto/search-runners-request.dto';
 import { SearchRunnersResponseDto } from '../dto/search-runners-response.dto';
 import { SearchRunnersChartsRequestDto } from '../dto/search-runners-charts-request.dto';
 import { SearchRunnersChartsResponseDto } from '../dto/search-runners-charts-response.dto';
-import { SearchRunnerAssetsRequestDto } from '../dto/search-runner-assets-request.dto';
-import { SearchRunnerAssetsResponseDto } from '../dto/search-runner-assets-response.dto';
+import { SearchRunnersAssetsRequestDto } from '../dto/search-runners-assets-request.dto';
+import { SearchRunnersAssetsResponseDto } from '../dto/search-runners-assets-response.dto';
 
 @ApiTags('Runners')
 @Controller()
@@ -147,10 +147,7 @@ export class CliRunnerController {
     @Param('runnerId') runnerId: string,
     @Body() dto: UpdateRunnerAssetStatusDto,
   ) {
-    await this.cliRunnerService.updateRunnerAssetStatuses(
-      runnerId,
-      dto.assets,
-    );
+    await this.cliRunnerService.updateRunnerAssetStatuses(runnerId, dto.assets);
     return { updated: dto.assets.length };
   }
 
@@ -270,15 +267,15 @@ export class SearchRunnersController {
     description:
       'Returns paginated runner_assets rows for a specific runner, joined with the resolved asset record and its findings.',
   })
-  @ApiBody({ type: SearchRunnerAssetsRequestDto })
+  @ApiBody({ type: SearchRunnersAssetsRequestDto })
   @ApiResponse({
     status: 200,
     description: 'Paginated runner assets with joined asset and findings data',
-    type: SearchRunnerAssetsResponseDto,
+    type: SearchRunnersAssetsResponseDto,
   })
   async searchRunnerAssets(
-    @Body() request: SearchRunnerAssetsRequestDto,
-  ): Promise<SearchRunnerAssetsResponseDto> {
+    @Body() request: SearchRunnersAssetsRequestDto,
+  ): Promise<SearchRunnersAssetsResponseDto> {
     return this.cliRunnerService.searchRunnerAssets(request);
   }
 }

@@ -999,6 +999,7 @@
     "loading": "Ausführungen werden geladen...",
     "status": {
       "completed": "Abgeschlossen",
+      "warning": "Warnung",
       "running": "Läuft...",
       "pending": "Ausstehend",
       "error": "Fehler"

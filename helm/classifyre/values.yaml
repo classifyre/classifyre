@@ -76,6 +76,10 @@ api:
     # -- deleted (including their logs) when a new run is triggered and the count
     # -- exceeds this value. Set to "0" to disable cleanup.
     MAX_RUNNERS_PER_SOURCE: "5"
+    # -- Maximum number of runners that can execute concurrently across all sources.
+    # -- New runs are queued in PENDING state when this limit is reached.
+    # -- Set to "0" to disable the limit (unlimited concurrency).
+    MAX_CONCURRENT_RUNNERS: "3"
     # -- Enable read-only demo mode. When "true" all mutating API operations return 403.
     DEMO_MODE: "false"
 

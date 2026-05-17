@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RunnerAssetStatus } from '@prisma/client';
-import { SearchAssetFindingDto } from './search-assets-response.dto';
 import { AssetListItemDto } from './asset-list-item.dto';
 
 export class RunnerAssetItemDto {
@@ -36,12 +35,9 @@ export class RunnerAssetItemDto {
 
   @ApiPropertyOptional({ type: AssetListItemDto, nullable: true })
   asset: AssetListItemDto | null;
-
-  @ApiProperty({ type: [SearchAssetFindingDto] })
-  findings: SearchAssetFindingDto[];
 }
 
-export class SearchRunnerAssetsResponseDto {
+export class SearchRunnersAssetsResponseDto {
   @ApiProperty({ type: [RunnerAssetItemDto] })
   items: RunnerAssetItemDto[];
 
