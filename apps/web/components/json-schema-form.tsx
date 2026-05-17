@@ -2535,6 +2535,36 @@ export const JsonSchemaForm = React.forwardRef<
                             />
                           </FormControl>
                         </FormItem>
+                        <FormItem>
+                          <FormLabel className="text-xs">Processing Workers</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="Default: 2"
+                              value={(val.processing_workers as number) ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                                update({ processing_workers: v && !isNaN(v) ? v : undefined });
+                              }}
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                        <FormItem>
+                          <FormLabel className="text-xs">Detector Max Concurrent</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="Default: 5"
+                              value={(val.detector_max_concurrent as number) ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                                update({ detector_max_concurrent: v && !isNaN(v) ? v : undefined });
+                              }}
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
                       </div>
                     </AccordionContent>
                   </AccordionItem>

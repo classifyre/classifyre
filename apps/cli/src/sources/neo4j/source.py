@@ -130,9 +130,7 @@ class Neo4jSource(BaseSource):
                 kwargs["trust"] = self._neo4j.TRUST_SYSTEM_CA_SIGNED_CERTIFICATES
 
         auth = self._auth()
-        self._driver_instance = self._neo4j.GraphDatabase.driver(
-            self._uri(), auth=auth, **kwargs
-        )
+        self._driver_instance = self._neo4j.GraphDatabase.driver(self._uri(), auth=auth, **kwargs)
         return self._driver_instance
 
     def _session(self, **kwargs: Any) -> Any:
@@ -295,9 +293,7 @@ class Neo4jSource(BaseSource):
             batch.append(asset)
 
             if len(batch) >= self.BATCH_SIZE:
-                logger.info(
-                    "Emitting batch of %d label asset(s) (total so far: %d)", len(batch), i
-                )
+                logger.info("Emitting batch of %d label asset(s) (total so far: %d)", len(batch), i)
                 yield batch
                 batch = []
 
@@ -327,10 +323,7 @@ class Neo4jSource(BaseSource):
         return None
 
     def _fetch_nodes_page(self, ref: LabelRef, skip: int, limit: int) -> list[dict[str, Any]]:
-        cypher = (
-            f"MATCH (n:{_escape_label(ref.label)}) "
-            f"RETURN n SKIP {skip} LIMIT {limit}"
-        )
+        cypher = f"MATCH (n:{_escape_label(ref.label)}) RETURN n SKIP {skip} LIMIT {limit}"
         nodes: list[dict[str, Any]] = []
         with self._session() as session:
             result = session.run(cypher)
@@ -365,9 +358,7 @@ class Neo4jSource(BaseSource):
             if len(nodes) < batch_size:
                 break
 
-        logger.info(
-            "Fetched nodes from %s in %d content batch(es)", label_name, batch_num
-        )
+        logger.info("Fetched nodes from %s in %d content batch(es)", label_name, batch_num)
 
     def _fetch_sample_nodes(self, ref: LabelRef) -> list[dict[str, Any]]:
         sampling = self._sampling()
@@ -458,9 +449,7 @@ class Neo4jSource(BaseSource):
         self._content_cache[asset_id] = content
         return content
 
-    async def fetch_content_pages(
-        self, asset_id: str
-    ) -> AsyncGenerator[tuple[str, str], None]:
+    async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
         sampling = self._sampling()
         ref = self._parse_label_ref(asset_id)
         if not ref:

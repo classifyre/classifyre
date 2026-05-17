@@ -192,7 +192,7 @@ class RestOutputSink:
     ) -> None:
         runner_id = self._require_runner_id()
         item: dict[str, Any] = {"assetHash": asset_hash, "status": status}
-        if error_message:
+        if error_message is not None:
             item["errorMessage"] = error_message[:2000]
         self._request_json(
             "PATCH",

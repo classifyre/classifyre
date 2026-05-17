@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -83,8 +83,20 @@ class DetectorPipeline:
         for coro in asyncio.as_completed(tasks):
             yield await coro
 
-    async def process_single_asset(self, asset: SingleAssetScanResults) -> SingleAssetScanResults:
-        """Process a single asset through detectors."""
+    async def process_single_asset(
+        self,
+        asset: SingleAssetScanResults,
+        *,
+        on_findings_flushed: Callable[[list[DetectionResult]], Awaitable[None]] | None = None,
+        findings_flush_size: int = 50,
+    ) -> SingleAssetScanResults:
+        """Process a single asset through detectors.
+
+        When *on_findings_flushed* is provided the text-detector phase switches to
+        sequential page processing and calls the callback every *findings_flush_size*
+        new findings so callers can push partial results without waiting for the full
+        asset (important for ALL-strategy tabular sources with thousands of pages).
+        """
         # 1. If no detectors, return asset as-is with empty findings
         if not self.detectors:
             asset.findings = []
@@ -156,6 +168,8 @@ class DetectorPipeline:
                 text_content_type=text_content_type,
                 detectors=text_detectors,
                 warn_on_empty_content=should_warn_on_empty_text,
+                on_findings_flushed=on_findings_flushed,
+                findings_flush_size=findings_flush_size,
             )
             findings.extend(text_findings)
             scan_warnings.extend(text_warnings)
@@ -234,18 +248,31 @@ class DetectorPipeline:
         text_content_type: str,
         detectors: list[BaseDetector],
         warn_on_empty_content: bool = True,
+        on_findings_flushed: Callable[[list[DetectionResult]], Awaitable[None]] | None = None,
+        findings_flush_size: int = 50,
     ) -> tuple[list[DetectionResult], list[DetectorType], int, list[str], list[str]]:
+        if on_findings_flushed is not None:
+            return await self._run_text_detectors_streaming(
+                asset=asset,
+                text_content_type=text_content_type,
+                detectors=detectors,
+                warn_on_empty_content=warn_on_empty_content,
+                on_findings_flushed=on_findings_flushed,
+                findings_flush_size=findings_flush_size,
+            )
         findings: list[DetectionResult] = []
         detector_types_run: list[DetectorType] = []
         warnings: list[str] = []
         errors: list[str] = []
         content_size = 0
 
-        pending_tasks: set[asyncio.Task[tuple[list[DetectionResult], list[DetectorType], list[str], str]]] = set()
+        pending_tasks: set[
+            asyncio.Task[tuple[list[DetectionResult], list[DetectorType], list[str], str]]
+        ] = set()
 
-        async def _detect_page(page_content: str) -> tuple[
-            list[DetectionResult], list[DetectorType], list[str], str
-        ]:
+        async def _detect_page(
+            page_content: str,
+        ) -> tuple[list[DetectionResult], list[DetectorType], list[str], str]:
             async with self._detector_semaphore:
                 page_findings, page_types, page_errors = await self._run_detectors(
                     detectors=detectors,
@@ -264,11 +291,14 @@ class DetectorPipeline:
                 errors.extend(page_errors)
                 nonlocal detector_types_run
                 detector_types_run = self._merge_detector_types(
-                    detector_types_run, page_types,
+                    detector_types_run,
+                    page_types,
                 )
                 for finding in page_findings:
                     self.content_provider.enrich_finding_location(
-                        finding, asset, page_content,
+                        finding,
+                        asset,
+                        page_content,
                     )
 
         async for text_content in self._iter_text_content_pages(asset):
@@ -294,6 +324,67 @@ class DetectorPipeline:
         if pending_tasks:
             await asyncio.gather(*pending_tasks)
             _collect_done()
+
+        if content_size == 0 and warn_on_empty_content:
+            msg = f"No content available for asset {asset.name}"
+            logger.warning(msg)
+            warnings.append(msg)
+
+        return findings, detector_types_run, content_size, warnings, errors
+
+    async def _run_text_detectors_streaming(
+        self,
+        *,
+        asset: SingleAssetScanResults,
+        text_content_type: str,
+        detectors: list[BaseDetector],
+        warn_on_empty_content: bool = True,
+        on_findings_flushed: Callable[[list[DetectionResult]], Awaitable[None]],
+        findings_flush_size: int = 50,
+    ) -> tuple[list[DetectionResult], list[DetectorType], int, list[str], list[str]]:
+        """Sequential variant: processes one page at a time and calls back every N findings."""
+        findings: list[DetectionResult] = []
+        detector_types_run: list[DetectorType] = []
+        warnings: list[str] = []
+        errors: list[str] = []
+        content_size = 0
+        unflushed_count = 0
+
+        async for text_content in self._iter_text_content_pages(asset):
+            content_size += len(text_content)
+
+            detector_content = text_content
+            if len(detector_content) > self.content_size_limit:
+                msg = (
+                    f"Content truncated from {len(detector_content)} to "
+                    f"{self.content_size_limit} bytes for {asset.name}"
+                )
+                logger.warning(msg)
+                warnings.append(msg)
+                detector_content = detector_content[: self.content_size_limit]
+
+            if not detector_content:
+                continue
+
+            async with self._detector_semaphore:
+                page_findings, page_types, page_errors = await self._run_detectors(
+                    detectors=detectors,
+                    content=detector_content,
+                    content_type=text_content_type,
+                    asset_name=asset.name,
+                )
+
+            for finding in page_findings:
+                self.content_provider.enrich_finding_location(finding, asset, detector_content)
+
+            findings.extend(page_findings)
+            errors.extend(page_errors)
+            detector_types_run = self._merge_detector_types(detector_types_run, page_types)
+            unflushed_count += len(page_findings)
+
+            if unflushed_count >= findings_flush_size and page_findings:
+                await on_findings_flushed(list(findings))
+                unflushed_count = 0
 
         if content_size == 0 and warn_on_empty_content:
             msg = f"No content available for asset {asset.name}"

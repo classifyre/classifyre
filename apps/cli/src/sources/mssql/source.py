@@ -785,9 +785,7 @@ class MSSQLSource(BaseSource):
         with conn.cursor() as cursor:
             cursor.execute(paginated_query)
             rows = list(cursor.fetchall())
-            column_names = (
-                [desc[0] for desc in cursor.description] if cursor.description else []
-            )
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
         return rows, column_names
 
     @staticmethod
@@ -811,8 +809,7 @@ class MSSQLSource(BaseSource):
         """Fetch one page using keyset pagination — O(1) cost at any offset."""
         if last_pk_values is None:
             paginated_query = (
-                f"{base_query} ORDER BY {pk_order} "
-                f"OFFSET 0 ROWS FETCH NEXT {page_size} ROWS ONLY"
+                f"{base_query} ORDER BY {pk_order} OFFSET 0 ROWS FETCH NEXT {page_size} ROWS ONLY"
             )
             params: list[Any] = []
         elif len(pk_columns) == 1:
@@ -827,9 +824,7 @@ class MSSQLSource(BaseSource):
             conditions = []
             params = []
             for i in range(len(pk_columns)):
-                eq_parts = " AND ".join(
-                    f"{_quote_identifier(pk_columns[j])} = ?" for j in range(i)
-                )
+                eq_parts = " AND ".join(f"{_quote_identifier(pk_columns[j])} = ?" for j in range(i))
                 gt_part = f"{_quote_identifier(pk_columns[i])} > ?"
                 if eq_parts:
                     conditions.append(f"({eq_parts} AND {gt_part})")
@@ -847,9 +842,7 @@ class MSSQLSource(BaseSource):
         with conn.cursor() as cursor:
             cursor.execute(paginated_query, params if params else None)
             rows = list(cursor.fetchall())
-            column_names = (
-                [desc[0] for desc in cursor.description] if cursor.description else []
-            )
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
         return rows, column_names
 
     def _fetch_sample_rows(
@@ -936,9 +929,7 @@ class MSSQLSource(BaseSource):
         # Prefer keyset pagination (O(1) per page) with a PK-ordered cursor.
         # Fall back to streaming fetchmany (also O(1)) for tables without a primary key.
         pk_columns = (
-            self._get_primary_key_columns(table_ref)
-            if table_ref.object_type == "TABLE"
-            else []
+            self._get_primary_key_columns(table_ref) if table_ref.object_type == "TABLE" else []
         )
         pk_indices: list[int] = []
         use_keyset = False
@@ -971,7 +962,12 @@ class MSSQLSource(BaseSource):
                 if use_keyset:
                     rows, column_names = await asyncio.to_thread(
                         self._fetch_page_keyset,
-                        conn, query, rows_per_page, pk_columns, pk_order, last_pk_values,
+                        conn,
+                        query,
+                        rows_per_page,
+                        pk_columns,
+                        pk_order,
+                        last_pk_values,
                     )
                 else:
                     rows = await asyncio.to_thread(self._cursor_fetchmany, cursor, rows_per_page)

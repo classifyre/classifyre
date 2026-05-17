@@ -225,6 +225,18 @@
           "minimum": 60,
           "maximum": 86400,
           "description": "Max runtime in seconds (overrides activeDeadlineSeconds)"
+        },
+        "processing_workers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Number of parallel asset-processing workers in Phase 2 (default: 2)"
+        },
+        "detector_max_concurrent": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Max concurrent detector invocations across all pages (default: 5)"
         }
       },
       "additionalProperties": false

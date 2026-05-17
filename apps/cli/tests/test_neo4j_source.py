@@ -46,7 +46,7 @@ class _FakeNeo4j:
         _driver: Any = None
 
         @classmethod
-        def driver(cls, uri: str, auth: Any = None, **kwargs: Any) -> Any:
+        def driver(cls, _uri: str, _auth: Any = None, **_kwargs: Any) -> Any:
             if cls._driver is None:
                 raise AssertionError("GraphDatabase.driver must be set by test")
             return cls._driver
@@ -60,7 +60,9 @@ def _patch_optional_dep(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def _make_driver(labels: list[str], nodes_by_label: dict[str, list[dict[str, Any]]] | None = None) -> MagicMock:
+def _make_driver(
+    labels: list[str], nodes_by_label: dict[str, list[dict[str, Any]]] | None = None
+) -> MagicMock:
     """Build a mock neo4j driver that returns specified labels and nodes."""
 
     def _make_session_cm(label_results: list[str], nodes: dict[str, list[dict[str, Any]]]) -> Any:
@@ -95,7 +97,7 @@ def _make_driver(labels: list[str], nodes_by_label: dict[str, list[dict[str, Any
                         if "LIMIT" in parts:
                             idx = parts.index("LIMIT")
                             limit = int(parts[idx + 1])
-                        sliced = node_list[skip: skip + limit]
+                        sliced = node_list[skip : skip + limit]
                         return _FakeResult([{"n": p} for p in sliced])
                 return _FakeResult([])
 
@@ -134,6 +136,7 @@ def _inject_driver(source: Neo4jSource, driver: Any) -> None:
 # Connection tests
 # ---------------------------------------------------------------------------
 
+
 def test_neo4j_connection_success() -> None:
     source = Neo4jSource(_recipe())
     driver = _make_driver(["Person", "Organization"])
@@ -163,11 +166,14 @@ def test_neo4j_connection_failure() -> None:
 # Label discovery / extraction tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_neo4j_label_discovery() -> None:
-    source = Neo4jSource(_recipe(
-        optional={"scope": {"include_relationships": False}},
-    ))
+    source = Neo4jSource(
+        _recipe(
+            optional={"scope": {"include_relationships": False}},
+        )
+    )
     driver = _make_driver(["Person", "Transaction"])
     _inject_driver(source, driver)
 
@@ -183,14 +189,16 @@ async def test_neo4j_label_discovery() -> None:
 
 @pytest.mark.asyncio
 async def test_neo4j_exclude_labels() -> None:
-    source = Neo4jSource(_recipe(
-        optional={
-            "scope": {
-                "exclude_labels": ["Transaction"],
-                "include_relationships": False,
-            }
-        },
-    ))
+    source = Neo4jSource(
+        _recipe(
+            optional={
+                "scope": {
+                    "exclude_labels": ["Transaction"],
+                    "include_relationships": False,
+                }
+            },
+        )
+    )
     driver = _make_driver(["Person", "Transaction", "Organization"])
     _inject_driver(source, driver)
 
@@ -207,6 +215,7 @@ async def test_neo4j_exclude_labels() -> None:
 # ---------------------------------------------------------------------------
 # Relationship link tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_neo4j_relationship_links() -> None:
@@ -236,6 +245,7 @@ async def test_neo4j_relationship_links() -> None:
                 class _R:
                     def __init__(self, rows: list[dict[str, Any]]) -> None:
                         self._rows = rows
+
                     def __iter__(self):
                         return iter(self._rows)
 
@@ -277,6 +287,7 @@ async def test_neo4j_relationship_links() -> None:
 # Content fetch tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_neo4j_fetch_content() -> None:
     source = Neo4jSource(_recipe())
@@ -299,16 +310,19 @@ async def test_neo4j_fetch_content() -> None:
 # Batching test (SKILL mandatory: _fetch_all_nodes_batched)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_neo4j_fetch_content_pages_batches_for_all_strategy() -> None:
     """
     With content_batch_size=10 and 12 nodes, exactly 2 Cypher queries should
-    be issued each containing SKIP and LIMIT (pages: 0–9, then 10–11).
+    be issued each containing SKIP and LIMIT (pages: 0-9, then 10-11).
     """
-    source = Neo4jSource(_recipe(
-        sampling={"strategy": "ALL", "rows_per_page": 10},
-        optional={"scope": {"include_relationships": False}},
-    ))
+    source = Neo4jSource(
+        _recipe(
+            sampling={"strategy": "ALL", "rows_per_page": 10},
+            optional={"scope": {"include_relationships": False}},
+        )
+    )
 
     nodes = [{"id": i, "val": f"v{i}"} for i in range(12)]
     driver = _make_driver(["Person"], nodes_by_label={"Person": nodes})
@@ -333,8 +347,10 @@ async def test_neo4j_fetch_content_pages_batches_for_all_strategy() -> None:
         if "MATCH" in q and "SKIP" in q.upper() and "LIMIT" in q.upper()
     ]
 
-    # Exactly 2 paginated fetch calls (0–9, then 10–11)
-    assert len(node_queries) == 2, f"Expected 2 paginated queries, got {len(node_queries)}: {node_queries}"
+    # Exactly 2 paginated fetch calls (0-9, then 10-11)
+    assert len(node_queries) == 2, (
+        f"Expected 2 paginated queries, got {len(node_queries)}: {node_queries}"
+    )
 
     skips = []
     for q in node_queries:
@@ -349,6 +365,7 @@ async def test_neo4j_fetch_content_pages_batches_for_all_strategy() -> None:
 # ---------------------------------------------------------------------------
 # Cleanup / abort tests
 # ---------------------------------------------------------------------------
+
 
 def test_neo4j_cleanup_closes_driver() -> None:
     source = Neo4jSource(_recipe())
