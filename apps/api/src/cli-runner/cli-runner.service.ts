@@ -3091,6 +3091,19 @@ export class CliRunnerService implements OnApplicationBootstrap {
         completedAt: ra.completedAt,
         errorMessage: ra.errorMessage,
         createdAt: ra.createdAt,
+        findingsTotal: ra.findingsTotal ?? null,
+        findingsBySeverity:
+          ra.findingsBySeverity != null &&
+          typeof ra.findingsBySeverity === 'object' &&
+          !Array.isArray(ra.findingsBySeverity)
+            ? (ra.findingsBySeverity as Record<string, number>)
+            : null,
+        findingsByDetector:
+          ra.findingsByDetector != null &&
+          typeof ra.findingsByDetector === 'object' &&
+          !Array.isArray(ra.findingsByDetector)
+            ? (ra.findingsByDetector as Record<string, Record<string, number>>)
+            : null,
         asset: asset
           ? {
               id: asset.id,
