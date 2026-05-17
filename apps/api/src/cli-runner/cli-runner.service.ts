@@ -2162,7 +2162,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
       assetHash: string;
       status: 'PROCESSED' | 'ERROR';
       errorMessage?: string;
-      findingsSummary?: Record<string, unknown>;
+      findingsTotal?: number;
+      findingsBySeverity?: object;
+      findingsByDetector?: object;
     }>,
   ): Promise<void> {
     if (!updates.length) return;
@@ -2189,8 +2191,14 @@ export class CliRunnerService implements OnApplicationBootstrap {
                 : RunnerAssetStatus.ERROR,
             completedAt: now,
             errorMessage: update.errorMessage?.slice(0, 4000),
-            ...(update.findingsSummary !== undefined && {
-              findingsSummary: update.findingsSummary,
+            ...(update.findingsTotal !== undefined && {
+              findingsTotal: update.findingsTotal,
+            }),
+            ...(update.findingsBySeverity !== undefined && {
+              findingsBySeverity: update.findingsBySeverity,
+            }),
+            ...(update.findingsByDetector !== undefined && {
+              findingsByDetector: update.findingsByDetector,
             }),
           },
         }),
@@ -2975,6 +2983,11 @@ export class CliRunnerService implements OnApplicationBootstrap {
             ? { completedAt: orderDir }
             : { createdAt: orderDir };
 
+    const hasFindingFilters =
+      !!filters.findingSeverity?.length ||
+      !!filters.findingStatus?.length ||
+      !!filters.findingDetectorType?.length;
+
     const where: Prisma.RunnerAssetWhereInput = {
       runnerId: filters.runnerId,
       ...(filters.status?.length ? { status: { in: filters.status } } : {}),
@@ -2983,13 +2996,25 @@ export class CliRunnerService implements OnApplicationBootstrap {
         : {}),
     };
 
-    const [runnerAssets, total] = await this.prisma.$transaction([
-      this.prisma.runnerAsset.findMany({ where, orderBy, skip, take: limit }),
-      this.prisma.runnerAsset.count({ where }),
-    ]);
+    // When finding filters are active we must resolve assets first, then filter
+    // runner_assets by whether they have matching findings — fetch all matching
+    // runner_assets (no pagination yet) and paginate in memory after filtering.
+    let runnerAssets: Awaited<ReturnType<typeof this.prisma.runnerAsset.findMany>>;
+    let total = 0;
+
+    if (hasFindingFilters) {
+      runnerAssets = await this.prisma.runnerAsset.findMany({ where, orderBy });
+    } else {
+      const [rows, count] = await this.prisma.$transaction([
+        this.prisma.runnerAsset.findMany({ where, orderBy, skip, take: limit }),
+        this.prisma.runnerAsset.count({ where }),
+      ]);
+      runnerAssets = rows;
+      total = count;
+    }
 
     if (runnerAssets.length === 0) {
-      return { items: [], total, skip, limit };
+      return { items: [], total: total ?? 0, skip, limit };
     }
 
     const hashes = [...new Set(runnerAssets.map((ra) => ra.assetHash))];
@@ -3016,12 +3041,21 @@ export class CliRunnerService implements OnApplicationBootstrap {
     const assetByHash = new Map(assets.map((a) => [a.hash, a]));
     const assetIds = assets.map((a) => a.id);
 
+    const findingWhere: Prisma.FindingWhereInput = {
+      runnerId: filters.runnerId,
+      ...(assetIds.length ? { assetId: { in: assetIds } } : {}),
+      ...(filters.findingSeverity?.length ? { severity: { in: filters.findingSeverity } } : {}),
+      ...(filters.findingStatus?.length ? { status: { in: filters.findingStatus } } : {}),
+      ...(filters.findingDetectorType?.length
+        ? { detectorType: { in: filters.findingDetectorType } }
+        : {}),
+    };
+
     const findings =
       assetIds.length > 0
         ? await this.prisma.finding.findMany({
-            where: { assetId: { in: assetIds } },
+            where: findingWhere,
             orderBy: { detectedAt: 'desc' },
-            take: assetIds.length * 20,
           })
         : [];
 
@@ -3032,7 +3066,20 @@ export class CliRunnerService implements OnApplicationBootstrap {
       findingsByAssetId.set(finding.assetId, list);
     }
 
-    const items = runnerAssets.map((ra) => {
+    // When finding filters are active, exclude runner_assets with no matching findings
+    let filteredRunnerAssets = hasFindingFilters
+      ? runnerAssets.filter((ra) => {
+          const asset = assetByHash.get(ra.assetHash);
+          return asset ? (findingsByAssetId.get(asset.id)?.length ?? 0) > 0 : false;
+        })
+      : runnerAssets;
+
+    if (hasFindingFilters) {
+      total = filteredRunnerAssets.length;
+      filteredRunnerAssets = filteredRunnerAssets.slice(skip, skip + limit);
+    }
+
+    const items = filteredRunnerAssets.map((ra) => {
       const asset = assetByHash.get(ra.assetHash) ?? null;
       const assetFindings = asset ? (findingsByAssetId.get(asset.id) ?? []) : [];
 

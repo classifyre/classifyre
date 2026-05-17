@@ -94,8 +94,10 @@ def load_recipe(recipe_path: str) -> dict[str, Any]:
             sys.exit(1)
 
 
-def _build_findings_summary(findings: list[Any]) -> dict[str, Any]:
-    """Compute a compact summary of findings for storage in runner_assets."""
+def _compute_findings_counts(
+    findings: list[Any],
+) -> tuple[int, dict[str, int], dict[str, dict[str, int]]]:
+    """Return (total, by_severity, by_detector) counts from a findings list."""
     by_severity: dict[str, int] = {}
     by_detector: dict[str, dict[str, int]] = {}
 
@@ -105,16 +107,11 @@ def _build_findings_summary(findings: list[Any]) -> dict[str, Any]:
 
         by_severity[severity] = by_severity.get(severity, 0) + 1
 
-        if detector not in by_detector:
-            by_detector[detector] = {"total": 0}
-        by_detector[detector]["total"] += 1
-        by_detector[detector][severity] = by_detector[detector].get(severity, 0) + 1
+        entry = by_detector.setdefault(detector, {"total": 0})
+        entry["total"] += 1
+        entry[severity] = entry.get(severity, 0) + 1
 
-    return {
-        "total": len(findings),
-        "by_severity": by_severity,
-        "by_detector": by_detector,
-    }
+    return len(findings), by_severity, by_detector
 
 
 def _asset_to_payload(asset: Any) -> dict[str, Any]:
@@ -264,9 +261,15 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     await sink.emit_batch([payload], skip_findings=False)
 
                                     if hasattr(sink, "update_asset_status"):
-                                        summary = _build_findings_summary(result.findings or [])
+                                        f_total, f_by_sev, f_by_det = _compute_findings_counts(
+                                            result.findings or []
+                                        )
                                         await sink.update_asset_status(
-                                            asset_hash, "PROCESSED", findings_summary=summary
+                                            asset_hash,
+                                            "PROCESSED",
+                                            findings_total=f_total,
+                                            findings_by_severity=f_by_sev,
+                                            findings_by_detector=f_by_det,
                                         )
 
                                     source.evict_asset_cache(asset_hash)
