@@ -188,12 +188,18 @@ class RestOutputSink:
             )
 
     async def update_asset_status(
-        self, asset_hash: str, status: str, error_message: str | None = None
+        self,
+        asset_hash: str,
+        status: str,
+        error_message: str | None = None,
+        findings_summary: dict[str, Any] | None = None,
     ) -> None:
         runner_id = self._require_runner_id()
         item: dict[str, Any] = {"assetHash": asset_hash, "status": status}
         if error_message is not None:
             item["errorMessage"] = error_message[:2000]
+        if findings_summary is not None:
+            item["findingsSummary"] = findings_summary
         self._request_json(
             "PATCH",
             f"/runners/{runner_id}/assets/status",

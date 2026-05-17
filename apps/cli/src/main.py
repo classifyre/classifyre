@@ -94,6 +94,29 @@ def load_recipe(recipe_path: str) -> dict[str, Any]:
             sys.exit(1)
 
 
+def _build_findings_summary(findings: list[Any]) -> dict[str, Any]:
+    """Compute a compact summary of findings for storage in runner_assets."""
+    by_severity: dict[str, int] = {}
+    by_detector: dict[str, dict[str, int]] = {}
+
+    for f in findings:
+        severity = str(getattr(f, "severity", None) or "UNKNOWN")
+        detector = str(getattr(f, "detector_type", None) or "UNKNOWN")
+
+        by_severity[severity] = by_severity.get(severity, 0) + 1
+
+        if detector not in by_detector:
+            by_detector[detector] = {"total": 0}
+        by_detector[detector]["total"] += 1
+        by_detector[detector][severity] = by_detector[detector].get(severity, 0) + 1
+
+    return {
+        "total": len(findings),
+        "by_severity": by_severity,
+        "by_detector": by_detector,
+    }
+
+
 def _asset_to_payload(asset: Any) -> dict[str, Any]:
     if hasattr(asset, "model_dump"):
         payload = asset.model_dump(mode="json", exclude_none=True)
@@ -241,7 +264,10 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     await sink.emit_batch([payload], skip_findings=False)
 
                                     if hasattr(sink, "update_asset_status"):
-                                        await sink.update_asset_status(asset_hash, "PROCESSED")
+                                        summary = _build_findings_summary(result.findings or [])
+                                        await sink.update_asset_status(
+                                            asset_hash, "PROCESSED", findings_summary=summary
+                                        )
 
                                     source.evict_asset_cache(asset_hash)
                                     processed_count += 1

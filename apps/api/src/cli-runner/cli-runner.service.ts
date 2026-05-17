@@ -41,6 +41,12 @@ import {
 } from '../dto/search-runners-request.dto';
 import { SearchRunnersChartsRequestDto } from '../dto/search-runners-charts-request.dto';
 import { SearchRunnersChartsResponseDto } from '../dto/search-runners-charts-response.dto';
+import {
+  SearchRunnerAssetsRequestDto,
+  SearchRunnerAssetsSortBy,
+  SearchRunnerAssetsSortOrder,
+} from '../dto/search-runner-assets-request.dto';
+import { SearchRunnerAssetsResponseDto } from '../dto/search-runner-assets-response.dto';
 
 type SourceRunSnapshot = {
   runnerStatus: RunnerStatus | null;
@@ -2156,6 +2162,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       assetHash: string;
       status: 'PROCESSED' | 'ERROR';
       errorMessage?: string;
+      findingsSummary?: Record<string, unknown>;
     }>,
   ): Promise<void> {
     if (!updates.length) return;
@@ -2182,6 +2189,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
                 : RunnerAssetStatus.ERROR,
             completedAt: now,
             errorMessage: update.errorMessage?.slice(0, 4000),
+            ...(update.findingsSummary !== undefined && {
+              findingsSummary: update.findingsSummary,
+            }),
           },
         }),
       ),
@@ -2944,5 +2954,147 @@ export class CliRunnerService implements OnApplicationBootstrap {
     ]);
 
     return { runners, total, skip, take };
+  }
+
+  async searchRunnerAssets(
+    request: SearchRunnerAssetsRequestDto,
+  ): Promise<SearchRunnerAssetsResponseDto> {
+    const { filters, page } = request;
+    const skip = Math.max(0, Number(page?.skip ?? 0));
+    const limit = Math.min(200, Math.max(1, Number(page?.limit ?? 50)));
+    const sortBy = page?.sortBy ?? SearchRunnerAssetsSortBy.CREATED_AT;
+    const sortOrder = page?.sortOrder ?? SearchRunnerAssetsSortOrder.ASC;
+
+    const orderDir = sortOrder === SearchRunnerAssetsSortOrder.DESC ? 'desc' : 'asc';
+    const orderBy: Prisma.RunnerAssetOrderByWithRelationInput =
+      sortBy === SearchRunnerAssetsSortBy.STATUS
+        ? { status: orderDir }
+        : sortBy === SearchRunnerAssetsSortBy.ASSET_HASH
+          ? { assetHash: orderDir }
+          : sortBy === SearchRunnerAssetsSortBy.COMPLETED_AT
+            ? { completedAt: orderDir }
+            : { createdAt: orderDir };
+
+    const where: Prisma.RunnerAssetWhereInput = {
+      runnerId: filters.runnerId,
+      ...(filters.status?.length ? { status: { in: filters.status } } : {}),
+      ...(filters.search?.trim()
+        ? { assetHash: { contains: filters.search.trim(), mode: 'insensitive' } }
+        : {}),
+    };
+
+    const [runnerAssets, total] = await this.prisma.$transaction([
+      this.prisma.runnerAsset.findMany({ where, orderBy, skip, take: limit }),
+      this.prisma.runnerAsset.count({ where }),
+    ]);
+
+    if (runnerAssets.length === 0) {
+      return { items: [], total, skip, limit };
+    }
+
+    const hashes = [...new Set(runnerAssets.map((ra) => ra.assetHash))];
+    const assets = await this.prisma.asset.findMany({
+      where: { hash: { in: hashes } },
+      select: {
+        id: true,
+        hash: true,
+        name: true,
+        externalUrl: true,
+        links: true,
+        checksum: true,
+        assetType: true,
+        sourceType: true,
+        sourceId: true,
+        runnerId: true,
+        lastScannedAt: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const assetByHash = new Map(assets.map((a) => [a.hash, a]));
+    const assetIds = assets.map((a) => a.id);
+
+    const findings =
+      assetIds.length > 0
+        ? await this.prisma.finding.findMany({
+            where: { assetId: { in: assetIds } },
+            orderBy: { detectedAt: 'desc' },
+            take: assetIds.length * 20,
+          })
+        : [];
+
+    const findingsByAssetId = new Map<string, typeof findings>();
+    for (const finding of findings) {
+      const list = findingsByAssetId.get(finding.assetId) ?? [];
+      list.push(finding);
+      findingsByAssetId.set(finding.assetId, list);
+    }
+
+    const items = runnerAssets.map((ra) => {
+      const asset = assetByHash.get(ra.assetHash) ?? null;
+      const assetFindings = asset ? (findingsByAssetId.get(asset.id) ?? []) : [];
+
+      return {
+        runnerId: ra.runnerId,
+        assetHash: ra.assetHash,
+        status: ra.status,
+        startedAt: ra.startedAt,
+        completedAt: ra.completedAt,
+        errorMessage: ra.errorMessage,
+        createdAt: ra.createdAt,
+        asset: asset
+          ? {
+              id: asset.id,
+              hash: asset.hash,
+              checksum: asset.checksum,
+              name: asset.name ?? '',
+              externalUrl: asset.externalUrl ?? '',
+              links: asset.links as string[],
+              assetType: asset.assetType,
+              sourceType: asset.sourceType,
+              sourceId: asset.sourceId,
+              runnerId: asset.runnerId ?? null,
+              lastScannedAt: asset.lastScannedAt ?? null,
+              status: asset.status,
+              createdAt: asset.createdAt,
+              updatedAt: asset.updatedAt,
+            }
+          : null,
+        findings: assetFindings.map((f) => ({
+          id: f.id,
+          detectionIdentity: f.detectionIdentity,
+          assetId: f.assetId,
+          sourceId: f.sourceId,
+          runnerId: f.runnerId ?? undefined,
+          detectorType: f.detectorType,
+          customDetectorId: f.customDetectorId ?? undefined,
+          customDetectorKey: f.customDetectorKey ?? undefined,
+          customDetectorName: f.customDetectorName ?? undefined,
+          findingType: f.findingType,
+          category: f.category,
+          severity: f.severity,
+          confidence: Number(f.confidence),
+          matchedContent: f.matchedContent,
+          redactedContent: f.redactedContent ?? undefined,
+          contextBefore: f.contextBefore ?? undefined,
+          contextAfter: f.contextAfter ?? undefined,
+          location: f.location as any,
+          metadata: f.metadata as Record<string, unknown> | undefined,
+          status: f.status,
+          resolutionReason: f.resolutionReason ?? undefined,
+          comment: f.comment ?? undefined,
+          detectedAt: f.detectedAt,
+          firstDetectedAt: f.firstDetectedAt ?? undefined,
+          lastDetectedAt: f.lastDetectedAt ?? undefined,
+          resolvedAt: f.resolvedAt ?? undefined,
+          createdAt: f.createdAt,
+          updatedAt: f.updatedAt,
+        })),
+      };
+    });
+
+    return { items, total, skip, limit };
   }
 }

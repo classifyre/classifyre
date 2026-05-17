@@ -12,6 +12,7 @@ import {
   IsInt,
   Min,
   IsArray,
+  IsObject,
   ValidateNested,
   ArrayMinSize,
 } from 'class-validator';
@@ -306,6 +307,14 @@ export class RunnerAssetStatusUpdateItem {
   @IsOptional()
   @IsString()
   errorMessage?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Findings summary: total, by_severity, by_detector counts',
+  })
+  @IsOptional()
+  @IsObject()
+  findingsSummary?: Record<string, unknown>;
 }
 
 export class UpdateRunnerAssetStatusDto {
