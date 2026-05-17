@@ -135,6 +135,52 @@ class SamplingConfig(BaseModel):
     )
 
 
+class Requests(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    cpu: str | None = Field(None, description='CPU request (e.g. 500m)')
+    memory: str | None = Field(None, description='Memory request (e.g. 1Gi)')
+
+
+class Limits(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    cpu: str | None = Field(None, description='CPU limit (e.g. 2)')
+    memory: str | None = Field(None, description='Memory limit (e.g. 4Gi)')
+
+
+class ResourceOverrides(BaseModel):
+    """
+    Override K8s job resources and timeout for this source.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    requests: Requests | None = None
+    limits: Limits | None = None
+    timeout_seconds: int | None = Field(
+        None,
+        description='Max runtime in seconds (overrides activeDeadlineSeconds)',
+        ge=60,
+        le=86400,
+    )
+    processing_workers: int | None = Field(
+        None,
+        description='Number of parallel asset-processing workers in Phase 2 (default: 2)',
+        ge=1,
+        le=20,
+    )
+    detector_max_concurrent: int | None = Field(
+        None,
+        description='Max concurrent detector invocations across all pages (default: 5)',
+        ge=1,
+        le=50,
+    )
+
+
 class Detector(BaseModel):
     model_config = ConfigDict(
         extra='allow',
@@ -1773,6 +1819,7 @@ class CoreInput(BaseModel):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class Type(StrEnum):
@@ -1816,6 +1863,7 @@ class SlackInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class S3CompatibleStorageInput(CoreInput):
@@ -1831,6 +1879,7 @@ class S3CompatibleStorageInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class AzureBlobStorageInput(CoreInput):
@@ -1846,6 +1895,7 @@ class AzureBlobStorageInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class GoogleCloudStorageInput(CoreInput):
@@ -1861,6 +1911,7 @@ class GoogleCloudStorageInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class WordPressInput(CoreInput):
@@ -1876,6 +1927,7 @@ class WordPressInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class PostgreSQLInput(CoreInput):
@@ -1891,6 +1943,7 @@ class PostgreSQLInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class MySQLInput(CoreInput):
@@ -1906,6 +1959,7 @@ class MySQLInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class MSSQLInput(CoreInput):
@@ -1921,6 +1975,7 @@ class MSSQLInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class OracleInput(CoreInput):
@@ -1936,6 +1991,7 @@ class OracleInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class HiveInput(CoreInput):
@@ -1951,6 +2007,7 @@ class HiveInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class DatabricksInput(CoreInput):
@@ -1970,6 +2027,7 @@ class DatabricksInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class SnowflakeInput(CoreInput):
@@ -1995,6 +2053,7 @@ class SnowflakeInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class MongoDBInput(CoreInput):
@@ -2014,6 +2073,7 @@ class MongoDBInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class Neo4jRequired(BaseModel):
@@ -2137,6 +2197,7 @@ class Neo4jInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class PowerBIInput(CoreInput):
@@ -2156,6 +2217,7 @@ class PowerBIInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class TableauInput(CoreInput):
@@ -2175,6 +2237,7 @@ class TableauInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class ConfluenceRequired(BaseModel):
@@ -2564,6 +2627,7 @@ class ConfluenceInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class JiraInput(CoreInput):
@@ -2579,6 +2643,7 @@ class JiraInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class ServiceDeskInput(CoreInput):
@@ -2594,6 +2659,7 @@ class ServiceDeskInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class SourceInput(

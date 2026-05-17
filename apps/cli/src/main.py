@@ -218,7 +218,25 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     if hasattr(sink, "update_asset_status"):
                                         await sink.update_asset_status(asset_hash, "PROCESSING")
 
-                                    result = await pipeline.process_single_asset(asset)
+                                    flushed_findings: list[Any] = []
+
+                                    async def _on_findings_flushed(partial: list[Any]) -> None:
+                                        flushed_findings.clear()
+                                        flushed_findings.extend(partial)
+                                        stub_payload = _asset_to_payload(asset)
+                                        stub_payload["findings"] = [
+                                            f.model_dump(mode="json", exclude_none=True)
+                                            if hasattr(f, "model_dump")
+                                            else f
+                                            for f in partial
+                                        ]
+                                        await sink.emit_batch([stub_payload], skip_findings=False)
+
+                                    result = await pipeline.process_single_asset(
+                                        asset,
+                                        on_findings_flushed=_on_findings_flushed,
+                                        findings_flush_size=args.detector_flush_batch_size,
+                                    )
                                     payload = _asset_to_payload(result)
                                     await sink.emit_batch([payload], skip_findings=False)
 
@@ -232,8 +250,9 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     logger.error("Asset %s failed: %s", asset_hash, exc)
                                     if hasattr(sink, "update_asset_status"):
                                         try:
+                                            error_msg = str(exc) or type(exc).__name__
                                             await sink.update_asset_status(
-                                                asset_hash, "ERROR", str(exc)
+                                                asset_hash, "ERROR", error_msg
                                             )
                                         except Exception:
                                             pass

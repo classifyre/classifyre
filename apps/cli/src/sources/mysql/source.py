@@ -571,9 +571,7 @@ class MySQLSource(BaseSource):
         with conn.cursor() as cursor:
             cursor.execute(paginated_query, [page_size, offset])
             rows = list(cursor.fetchall())
-            column_names = (
-                [desc[0] for desc in cursor.description] if cursor.description else []
-            )
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
         return rows, column_names
 
     @staticmethod
@@ -613,9 +611,7 @@ class MySQLSource(BaseSource):
         with conn.cursor() as cursor:
             cursor.execute(paginated_query, params)
             rows = list(cursor.fetchall())
-            column_names = (
-                [desc[0] for desc in cursor.description] if cursor.description else []
-            )
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
         return rows, column_names
 
     def _fetch_sample_rows(
@@ -731,7 +727,12 @@ class MySQLSource(BaseSource):
                 if use_keyset:
                     rows, column_names = await asyncio.to_thread(
                         self._fetch_page_keyset,
-                        conn, query, rows_per_page, pk_columns, pk_order, last_pk_values,
+                        conn,
+                        query,
+                        rows_per_page,
+                        pk_columns,
+                        pk_order,
+                        last_pk_values,
                     )
                 else:
                     rows = await asyncio.to_thread(self._cursor_fetchmany, cursor, rows_per_page)

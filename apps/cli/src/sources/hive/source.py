@@ -549,9 +549,7 @@ class HiveSource(BaseSource):
         with conn.cursor() as cursor:
             cursor.execute(paginated_query)
             rows = list(cursor.fetchall())
-            column_names = (
-                [desc[0] for desc in cursor.description] if cursor.description else []
-            )
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
         return rows, column_names
 
     @staticmethod
