@@ -530,9 +530,15 @@ export class KubernetesCliJobService {
         recipeResources.processing_workers > 0
       ) {
         const existing = container.env || [];
-        const idx = existing.findIndex((e: any) => e.name === 'CLASSIFYRE_PROCESSING_WORKERS');
-        const entry = { name: 'CLASSIFYRE_PROCESSING_WORKERS', value: String(recipeResources.processing_workers) };
-        if (idx >= 0) existing[idx] = entry; else existing.push(entry);
+        const idx = existing.findIndex(
+          (e: any) => e.name === 'CLASSIFYRE_PROCESSING_WORKERS',
+        );
+        const entry = {
+          name: 'CLASSIFYRE_PROCESSING_WORKERS',
+          value: String(recipeResources.processing_workers),
+        };
+        if (idx >= 0) existing[idx] = entry;
+        else existing.push(entry);
         container.env = existing;
       }
       if (
@@ -540,9 +546,15 @@ export class KubernetesCliJobService {
         recipeResources.detector_max_concurrent > 0
       ) {
         const existing = container.env || [];
-        const idx = existing.findIndex((e: any) => e.name === 'CLASSIFYRE_DETECTOR_MAX_CONCURRENT');
-        const entry = { name: 'CLASSIFYRE_DETECTOR_MAX_CONCURRENT', value: String(recipeResources.detector_max_concurrent) };
-        if (idx >= 0) existing[idx] = entry; else existing.push(entry);
+        const idx = existing.findIndex(
+          (e: any) => e.name === 'CLASSIFYRE_DETECTOR_MAX_CONCURRENT',
+        );
+        const entry = {
+          name: 'CLASSIFYRE_DETECTOR_MAX_CONCURRENT',
+          value: String(recipeResources.detector_max_concurrent),
+        };
+        if (idx >= 0) existing[idx] = entry;
+        else existing.push(entry);
         container.env = existing;
       }
     }
@@ -628,7 +640,8 @@ export class KubernetesCliJobService {
           await new Promise((resolve) => setTimeout(resolve, pollMs));
           continue;
         }
-        const statusCode = error?.code ?? error?.statusCode ?? error?.body?.code;
+        const statusCode =
+          error?.code ?? error?.statusCode ?? error?.body?.code;
         if (statusCode === 404) {
           latestOutput = await this.syncJobLogs(
             namespace,

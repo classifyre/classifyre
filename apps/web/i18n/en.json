@@ -999,6 +999,7 @@
     "loading": "Loading runs...",
     "status": {
       "completed": "Completed",
+      "warning": "Warning",
       "running": "Running",
       "pending": "Pending",
       "error": "Error"

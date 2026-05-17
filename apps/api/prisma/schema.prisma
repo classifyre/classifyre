@@ -456,6 +456,7 @@ enum RunnerStatus {
   PENDING
   RUNNING
   COMPLETED
+  WARNING
   ERROR
 }
 

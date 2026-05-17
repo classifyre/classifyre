@@ -225,7 +225,7 @@ export type SearchAssetsChartsRequestInputDto =
 export type SearchFindingsChartsRequestInputDto =
   GeneratedSearchFindingsChartsRequestDto;
 
-export type SearchRunnersStatus = "PENDING" | "RUNNING" | "COMPLETED" | "ERROR";
+export type SearchRunnersStatus = "PENDING" | "RUNNING" | "COMPLETED" | "WARNING" | "ERROR";
 export type SearchRunnersTriggerType =
   | "MANUAL"
   | "SCHEDULED"
@@ -305,8 +305,10 @@ export const RunnerAssetStatusEnum = {
 export const SearchRunnerAssetsSortByEnum = {
   CreatedAt: "CREATED_AT",
   Status: "STATUS",
+  StatusPriority: "STATUS_PRIORITY",
   AssetHash: "ASSET_HASH",
   CompletedAt: "COMPLETED_AT",
+  FindingsTotal: "FINDINGS_TOTAL",
 } as const;
 export type SearchRunnerAssetsSortBy =
   (typeof SearchRunnerAssetsSortByEnum)[keyof typeof SearchRunnerAssetsSortByEnum];
@@ -322,9 +324,6 @@ export type SearchRunnerAssetsFiltersInputDto = {
   runnerId: string;
   status?: RunnerAssetStatus[];
   search?: string;
-  findingSeverity?: SearchFindingsFiltersInputDtoSeverityEnum[];
-  findingStatus?: SearchFindingsFiltersInputDtoStatusEnum[];
-  findingDetectorType?: SearchFindingsFiltersInputDtoDetectorTypeEnum[];
 };
 
 export type SearchRunnerAssetsPageInputDto = {
@@ -351,7 +350,6 @@ export type RunnerAssetItemDto = {
   findingsBySeverity: Record<string, number> | null;
   findingsByDetector: Record<string, Record<string, number>> | null;
   asset: import("./generated/src/models").AssetListItemDto | null;
-  findings: import("./generated/src/models").SearchAssetFindingDto[];
 };
 
 export type SearchRunnerAssetsResponseDto = {
@@ -496,6 +494,7 @@ export type RunnersChartsTotalsDto = {
   running: number;
   queued: number;
   completed: number;
+  warning: number;
   failed: number;
 };
 

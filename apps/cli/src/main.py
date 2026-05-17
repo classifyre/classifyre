@@ -238,11 +238,10 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     if hasattr(sink, "update_asset_status"):
                                         await sink.update_asset_status(asset_hash, "PROCESSING")
 
-                                    flushed_findings: list[Any] = []
+                                    cumulative_findings: list[Any] = []
 
                                     async def _on_findings_flushed(partial: list[Any]) -> None:
-                                        flushed_findings.clear()
-                                        flushed_findings.extend(partial)
+                                        cumulative_findings.extend(partial)
                                         stub_payload = _asset_to_payload(asset)
                                         stub_payload["findings"] = [
                                             f.model_dump(mode="json", exclude_none=True)
@@ -251,6 +250,17 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                             for f in partial
                                         ]
                                         await sink.emit_batch([stub_payload], skip_findings=False)
+                                        if hasattr(sink, "update_asset_status"):
+                                            f_total, f_by_sev, f_by_det = _compute_findings_counts(
+                                                cumulative_findings
+                                            )
+                                            await sink.update_asset_status(
+                                                asset_hash,
+                                                "PROCESSING",
+                                                findings_total=f_total,
+                                                findings_by_severity=f_by_sev,
+                                                findings_by_detector=f_by_det,
+                                            )
 
                                     result = await pipeline.process_single_asset(
                                         asset,

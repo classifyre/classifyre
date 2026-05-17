@@ -2,27 +2,17 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
-import {
-  ChevronDown,
-  ChevronRight,
-  Filter,
-  Loader2,
-  Search,
-} from "lucide-react";
+import { formatDate, formatRelative } from "@/lib/date";
+import { Filter, Loader2, Search } from "lucide-react";
 import {
   api,
   RunnerAssetStatusEnum,
-  SearchFindingsFiltersInputDtoSeverityEnum,
-  SearchFindingsFiltersInputDtoStatusEnum,
-  SearchFindingsFiltersInputDtoDetectorTypeEnum,
   type RunnerAssetItemDto,
   type SearchRunnerAssetsResponseDto,
   type SearchRunnerAssetsSortBy,
   type SearchRunnerAssetsSortOrder,
   SearchRunnerAssetsSortByEnum,
   SearchRunnerAssetsSortOrderEnum,
-  SearchAssetFindingDtoStatusEnum,
 } from "@workspace/api-client";
 import { FINDING_SEVERITY_COLOR_BY_ENUM } from "@workspace/ui/lib/finding-severity";
 import {
@@ -42,7 +32,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  StatusBadge,
   Table,
   TableBody,
   TableCell,
@@ -63,7 +52,6 @@ import {
 import { getAssetTypeIcon } from "../lib/asset-type-icon";
 import { useTranslation } from "../hooks/use-translation";
 import type { TranslationKey } from "../i18n";
-import type { SearchAssetFindingDto } from "@workspace/api-client";
 
 type RunnerAssetStatusValue =
   (typeof RunnerAssetStatusEnum)[keyof typeof RunnerAssetStatusEnum];
@@ -71,9 +59,6 @@ type RunnerAssetStatusValue =
 type FilterDraft = {
   search: string;
   statuses: RunnerAssetStatusValue[];
-  findingSeverities: SearchFindingsFiltersInputDtoSeverityEnum[];
-  findingStatuses: SearchFindingsFiltersInputDtoStatusEnum[];
-  findingDetectorTypes: SearchFindingsFiltersInputDtoDetectorTypeEnum[];
 };
 
 type SortDraft = {
@@ -84,16 +69,13 @@ type SortDraft = {
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 const DEFAULT_SORT: SortDraft = {
-  by: SearchRunnerAssetsSortByEnum.CreatedAt,
+  by: SearchRunnerAssetsSortByEnum.StatusPriority,
   order: SearchRunnerAssetsSortOrderEnum.Asc,
 };
 
 const DEFAULT_DRAFT: FilterDraft = {
   search: "",
   statuses: [],
-  findingSeverities: [],
-  findingStatuses: [],
-  findingDetectorTypes: [],
 };
 
 const STATUS_COLORS: Record<RunnerAssetStatusValue, string> = {
@@ -103,21 +85,13 @@ const STATUS_COLORS: Record<RunnerAssetStatusValue, string> = {
   ERROR: "var(--destructive)",
 };
 
-const FINDING_STATUS_LABELS: Record<SearchAssetFindingDtoStatusEnum, string> =
-  {
-    [SearchAssetFindingDtoStatusEnum.Open]: "Open",
-    [SearchAssetFindingDtoStatusEnum.FalsePositive]: "False Positive",
-    [SearchAssetFindingDtoStatusEnum.Resolved]: "Resolved",
-    [SearchAssetFindingDtoStatusEnum.Ignored]: "Ignored",
-  };
-
-const SEVERITY_ORDER: Record<string, number> = {
-  CRITICAL: 5,
-  HIGH: 4,
-  MEDIUM: 3,
-  LOW: 2,
-  INFO: 1,
-};
+const SEVERITY_DISPLAY_ORDER = [
+  "CRITICAL",
+  "HIGH",
+  "MEDIUM",
+  "LOW",
+  "INFO",
+] as const;
 
 function formatEnumLabel(value: string) {
   return value
@@ -134,21 +108,6 @@ function severityColor(severity: string) {
     FINDING_SEVERITY_COLOR_BY_ENUM[key] ?? FINDING_SEVERITY_COLOR_BY_ENUM.INFO
   );
 }
-
-function toStatusBadgeValue(status: string) {
-  switch (status.toUpperCase()) {
-    case "FALSE_POSITIVE":
-      return "false_positive" as const;
-    case "RESOLVED":
-      return "resolved" as const;
-    case "IGNORED":
-      return "ignored" as const;
-    default:
-      return "open" as const;
-  }
-}
-
-const SEVERITY_DISPLAY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
 
 function getHighestSeverityFromMap(
   bySeverity: Record<string, number> | null | undefined,
@@ -170,10 +129,8 @@ function SeverityBreakdown({
     return <span className="text-xs text-muted-foreground">—</span>;
   }
 
-  // Normalise keys to uppercase and filter zero/non-number counts
   const entries = SEVERITY_DISPLAY_ORDER.flatMap((sev) => {
-    const count =
-      (bySeverity[sev] ?? bySeverity[sev.toLowerCase()]);
+    const count = bySeverity[sev] ?? bySeverity[sev.toLowerCase()];
     if (typeof count !== "number" || count <= 0) return [];
     return [{ sev, count }];
   });
@@ -220,7 +177,7 @@ function DetectorBreakdown({
   if (detectors.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-4 py-2 bg-muted/10">
+    <div className="flex flex-wrap items-center gap-2 mt-1.5">
       <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground shrink-0">
         {t("scans.runnerAssets.columns.byDetector")}
       </span>
@@ -271,127 +228,6 @@ function getPageItems(current: number, total: number) {
   return Array.from(pages).sort((a, b) => a - b);
 }
 
-function FindingsSubTable({
-  findings,
-  onFindingClick,
-  t,
-}: {
-  findings: SearchAssetFindingDto[];
-  onFindingClick: (findingId: string) => void;
-  t: (key: TranslationKey) => string;
-}) {
-  if (findings.length === 0) {
-    return (
-      <div className="py-4 text-center text-xs uppercase tracking-[0.14em] text-muted-foreground">
-        {t("assets.subTable.noFindings")}
-      </div>
-    );
-  }
-
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow className="bg-muted/30">
-          <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            {t("assets.subTable.detector")}
-          </TableHead>
-          <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            {t("assets.subTable.type")}
-          </TableHead>
-          <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            {t("common.category")}
-          </TableHead>
-          <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            {t("common.severity")}
-          </TableHead>
-          <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            {t("common.status")}
-          </TableHead>
-          <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            {t("assets.subTable.detected")}
-          </TableHead>
-          <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            {t("assets.subTable.matchedContent")}
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {findings.map((finding) => (
-          <TableRow
-            key={finding.id}
-            tabIndex={0}
-            className="group cursor-pointer"
-            onClick={() => onFindingClick(finding.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onFindingClick(finding.id);
-              }
-            }}
-          >
-            <TableCell className="font-mono text-[11px]">
-              <span className="group-hover:underline group-focus-visible:underline">
-                {formatEnumLabel(finding.detectorType)}
-              </span>
-            </TableCell>
-            <TableCell className="font-mono text-[11px]">
-              <span className="group-hover:underline group-focus-visible:underline">
-                {finding.findingType}
-              </span>
-            </TableCell>
-            <TableCell className="font-mono text-[11px]">
-              <span className="group-hover:underline group-focus-visible:underline">
-                {finding.category}
-              </span>
-            </TableCell>
-            <TableCell>
-              <Badge
-                variant="outline"
-                className="gap-1.5 border px-2 py-0.5 text-[11px] uppercase tracking-[0.04em]"
-                style={{
-                  color: severityColor(finding.severity),
-                  borderColor: `${severityColor(finding.severity)}55`,
-                  backgroundColor: `${severityColor(finding.severity)}14`,
-                }}
-              >
-                <span
-                  className="h-2 w-2 rounded-[2px]"
-                  style={{ backgroundColor: severityColor(finding.severity) }}
-                />
-                {formatEnumLabel(finding.severity)}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              <StatusBadge status={toStatusBadgeValue(finding.status)}>
-                {FINDING_STATUS_LABELS[
-                  finding.status as SearchAssetFindingDtoStatusEnum
-                ] ?? finding.status}
-              </StatusBadge>
-            </TableCell>
-            <TableCell>
-              <div className="text-xs">{formatDate(finding.detectedAt)}</div>
-              <div className="text-[11px] text-muted-foreground">
-                {formatRelative(finding.detectedAt)}
-                {formatShortUTC(finding.detectedAt) && (
-                  <span className="text-muted-foreground/50">
-                    {" "}
-                    · {formatShortUTC(finding.detectedAt)}
-                  </span>
-                )}
-              </div>
-            </TableCell>
-            <TableCell className="max-w-[380px]">
-              <code className="line-clamp-2 break-all text-[11px] text-muted-foreground group-hover:underline group-focus-visible:underline">
-                {finding.matchedContent || "-"}
-              </code>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
-
 export function RunnerAssetsTable({ runnerId }: { runnerId: string }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -401,7 +237,6 @@ export function RunnerAssetsTable({ runnerId }: { runnerId: string }) {
   const [sort, setSort] = useState<SortDraft>(DEFAULT_SORT);
   const [pageSize, setPageSize] = useState("20");
   const [page, setPage] = useState(1);
-  const [expandedHash, setExpandedHash] = useState<string | null>(null);
 
   const [data, setData] = useState<SearchRunnerAssetsResponseDto | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -445,18 +280,6 @@ export function RunnerAssetsTable({ runnerId }: { runnerId: string }) {
             runnerId,
             status: draft.statuses.length > 0 ? draft.statuses : undefined,
             search: draft.search.trim() || undefined,
-            findingSeverity:
-              draft.findingSeverities.length > 0
-                ? draft.findingSeverities
-                : undefined,
-            findingStatus:
-              draft.findingStatuses.length > 0
-                ? draft.findingStatuses
-                : undefined,
-            findingDetectorType:
-              draft.findingDetectorTypes.length > 0
-                ? draft.findingDetectorTypes
-                : undefined,
           },
           page: {
             skip: (page - 1) * resolvedPageSize,
@@ -504,15 +327,6 @@ export function RunnerAssetsTable({ runnerId }: { runnerId: string }) {
   const statusOptions = Object.values(
     RunnerAssetStatusEnum,
   ) as RunnerAssetStatusValue[];
-  const severityOptions = Object.values(
-    SearchFindingsFiltersInputDtoSeverityEnum,
-  );
-  const findingStatusOptions = Object.values(
-    SearchFindingsFiltersInputDtoStatusEnum,
-  );
-  const detectorTypeOptions = Object.values(
-    SearchFindingsFiltersInputDtoDetectorTypeEnum,
-  );
 
   return (
     <TooltipProvider>
@@ -564,104 +378,6 @@ export function RunnerAssetsTable({ runnerId }: { runnerId: string }) {
               </MultiSelectGroup>
             </MultiSelectContent>
           </MultiSelect>
-
-          <MultiSelect
-            values={draft.findingSeverities}
-            onValuesChange={(values) =>
-              setDraft((prev) => ({
-                ...prev,
-                findingSeverities:
-                  values as SearchFindingsFiltersInputDtoSeverityEnum[],
-              }))
-            }
-          >
-            <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
-              <MultiSelectValue
-                placeholder={t("scans.runnerAssets.findingSeverity")}
-              />
-            </MultiSelectTrigger>
-            <MultiSelectContent
-              search={{
-                placeholder: t("scans.runnerAssets.searchSeverity"),
-                emptyMessage: t("scans.runnerAssets.noSeveritiesFound"),
-              }}
-            >
-              <MultiSelectGroup>
-                {severityOptions.map((sev) => (
-                  <MultiSelectItem key={sev} value={sev}>
-                    <span
-                      className="inline-flex items-center gap-2"
-                      style={{ color: severityColor(sev) }}
-                    >
-                      {formatEnumLabel(sev)}
-                    </span>
-                  </MultiSelectItem>
-                ))}
-              </MultiSelectGroup>
-            </MultiSelectContent>
-          </MultiSelect>
-
-          <MultiSelect
-            values={draft.findingStatuses}
-            onValuesChange={(values) =>
-              setDraft((prev) => ({
-                ...prev,
-                findingStatuses:
-                  values as SearchFindingsFiltersInputDtoStatusEnum[],
-              }))
-            }
-          >
-            <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
-              <MultiSelectValue
-                placeholder={t("scans.runnerAssets.findingStatus")}
-              />
-            </MultiSelectTrigger>
-            <MultiSelectContent
-              search={{
-                placeholder: t("scans.runnerAssets.searchFindingStatus"),
-                emptyMessage: t("scans.runnerAssets.noFindingStatusesFound"),
-              }}
-            >
-              <MultiSelectGroup>
-                {findingStatusOptions.map((status) => (
-                  <MultiSelectItem key={status} value={status}>
-                    {formatEnumLabel(status)}
-                  </MultiSelectItem>
-                ))}
-              </MultiSelectGroup>
-            </MultiSelectContent>
-          </MultiSelect>
-
-          <MultiSelect
-            values={draft.findingDetectorTypes}
-            onValuesChange={(values) =>
-              setDraft((prev) => ({
-                ...prev,
-                findingDetectorTypes:
-                  values as SearchFindingsFiltersInputDtoDetectorTypeEnum[],
-              }))
-            }
-          >
-            <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
-              <MultiSelectValue
-                placeholder={t("scans.runnerAssets.findingDetectorType")}
-              />
-            </MultiSelectTrigger>
-            <MultiSelectContent
-              search={{
-                placeholder: t("scans.runnerAssets.searchDetectorType"),
-                emptyMessage: t("scans.runnerAssets.noDetectorTypesFound"),
-              }}
-            >
-              <MultiSelectGroup>
-                {detectorTypeOptions.map((dt) => (
-                  <MultiSelectItem key={dt} value={dt}>
-                    {formatEnumLabel(dt)}
-                  </MultiSelectItem>
-                ))}
-              </MultiSelectGroup>
-            </MultiSelectContent>
-          </MultiSelect>
         </div>
 
         {error && (
@@ -689,7 +405,6 @@ export function RunnerAssetsTable({ runnerId }: { runnerId: string }) {
               <Table>
                 <TableHeader className="sticky top-0 z-20 bg-white/95 dark:bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
                   <TableRow>
-                    <TableHead className="w-8 bg-white/95 dark:bg-card/95" />
                     <TableHead className="bg-white/95 dark:bg-card/95 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                       {t("scans.runnerAssets.columns.asset")}
                     </TableHead>
@@ -715,14 +430,7 @@ export function RunnerAssetsTable({ runnerId }: { runnerId: string }) {
                     <RunnerAssetRow
                       key={`${item.runnerId}-${item.assetHash}`}
                       item={item}
-                      isExpanded={expandedHash === item.assetHash}
-                      onToggle={() =>
-                        setExpandedHash((prev) =>
-                          prev === item.assetHash ? null : item.assetHash,
-                        )
-                      }
                       onAssetClick={(id) => router.push(`/assets/${id}`)}
-                      onFindingClick={(id) => router.push(`/findings/${id}`)}
                       t={t}
                     />
                   ))}
@@ -825,168 +533,133 @@ export function RunnerAssetsTable({ runnerId }: { runnerId: string }) {
 
 function RunnerAssetRow({
   item,
-  isExpanded,
-  onToggle,
   onAssetClick,
-  onFindingClick,
   t,
 }: {
   item: RunnerAssetItemDto;
-  isExpanded: boolean;
-  onToggle: () => void;
   onAssetClick: (assetId: string) => void;
-  onFindingClick: (findingId: string) => void;
   t: (key: TranslationKey) => string;
 }) {
   const highestSeverity = getHighestSeverityFromMap(item.findingsBySeverity);
-  const totalFindings = typeof item.findingsTotal === "number" ? item.findingsTotal : null;
+  const totalFindings =
+    typeof item.findingsTotal === "number" ? item.findingsTotal : null;
   const AssetIcon = item.asset ? getAssetTypeIcon(item.asset.assetType) : null;
 
   return (
-    <Fragment>
-      <TableRow>
-        <TableCell className="py-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={onToggle}
-          >
-            {isExpanded ? (
-              <ChevronDown className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5" />
-            )}
-          </Button>
-        </TableCell>
-
-        <TableCell className="max-w-[280px]">
-          {item.asset ? (
-            <div className="min-w-0">
-              <Button
-                variant="link"
-                size="sm"
-                className="h-auto max-w-[260px] justify-start p-0 text-left"
-                onClick={() => onAssetClick(item.asset!.id)}
-              >
-                <span className="truncate text-sm font-medium inline-block max-w-[260px]">
-                  {item.asset.name || item.asset.externalUrl || item.assetHash}
-                </span>
-              </Button>
-              {item.asset.externalUrl && (
-                <p className="truncate text-xs text-muted-foreground max-w-[260px]">
-                  {item.asset.externalUrl}
-                </p>
-              )}
-            </div>
-          ) : (
-            <span className="text-xs text-muted-foreground italic">
-              {t("scans.runnerAssets.assetPending")}
-            </span>
-          )}
-        </TableCell>
-
-        <TableCell>
-          {item.asset && AssetIcon ? (
-            <Badge variant="outline" className="gap-1.5">
-              <AssetIcon className="h-3 w-3 text-muted-foreground" />
-              {formatEnumLabel(item.asset.assetType)}
-            </Badge>
-          ) : (
-            <span className="text-xs text-muted-foreground">—</span>
-          )}
-        </TableCell>
-
-        <TableCell>
-          <span
-            className="inline-flex items-center gap-1.5 rounded-[4px] border px-2 py-0.5 text-[11px] font-mono uppercase tracking-[0.08em]"
-            style={{
-              color: STATUS_COLORS[item.status as keyof typeof STATUS_COLORS],
-              borderColor: `${STATUS_COLORS[item.status as keyof typeof STATUS_COLORS]}55`,
-              backgroundColor: `${STATUS_COLORS[item.status as keyof typeof STATUS_COLORS]}14`,
-            }}
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{
-                backgroundColor:
-                  STATUS_COLORS[item.status as keyof typeof STATUS_COLORS],
-              }}
-            />
-            {formatEnumLabel(item.status)}
-          </span>
-          {item.errorMessage && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <p className="mt-1 cursor-help text-[10px] text-destructive truncate max-w-[200px]">
-                  {item.errorMessage}
-                </p>
-              </TooltipTrigger>
-              <TooltipContent
-                side="bottom"
-                className="max-w-[360px] break-words text-xs"
-              >
-                <p className="font-medium mb-1">
-                  {t("scans.runnerAssets.errorDetails")}
-                </p>
-                {item.errorMessage}
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </TableCell>
-
-        {/* Total findings count */}
-        <TableCell className="text-right">
-          {totalFindings !== null ? (
-            <span
-              className="text-sm font-medium tabular-nums"
-              style={
-                totalFindings > 0
-                  ? { color: highestSeverity ? severityColor(highestSeverity) : undefined }
-                  : { color: "var(--muted-foreground)" }
-              }
+    <TableRow>
+      <TableCell className="max-w-[280px]">
+        {item.asset ? (
+          <div className="min-w-0">
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto max-w-[260px] justify-start p-0 text-left"
+              onClick={() => onAssetClick(item.asset!.id)}
             >
-              {totalFindings}
-            </span>
-          ) : (
-            <span className="text-xs text-muted-foreground">—</span>
-          )}
-        </TableCell>
+              <span className="truncate text-sm font-medium inline-block max-w-[260px]">
+                {item.asset.name || item.asset.externalUrl || item.assetHash}
+              </span>
+            </Button>
+            {item.asset.externalUrl && (
+              <p className="truncate text-xs text-muted-foreground max-w-[260px]">
+                {item.asset.externalUrl}
+              </p>
+            )}
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground italic">
+            {t("scans.runnerAssets.assetPending")}
+          </span>
+        )}
+      </TableCell>
 
-        {/* Severity breakdown from findingsBySeverity JSONB */}
-        <TableCell className="min-w-[160px]">
-          <SeverityBreakdown bySeverity={item.findingsBySeverity} />
-        </TableCell>
+      <TableCell>
+        {item.asset && AssetIcon ? (
+          <Badge variant="outline" className="gap-1.5">
+            <AssetIcon className="h-3 w-3 text-muted-foreground" />
+            {formatEnumLabel(item.asset.assetType)}
+          </Badge>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </TableCell>
 
-        <TableCell>
-          {item.completedAt ? (
-            <>
-              <div className="text-xs">{formatDate(item.completedAt)}</div>
-              <div className="text-[11px] text-muted-foreground">
-                {formatRelative(item.completedAt)}
-              </div>
-            </>
-          ) : (
-            <span className="text-xs text-muted-foreground">—</span>
-          )}
-        </TableCell>
-      </TableRow>
+      <TableCell>
+        <span
+          className="inline-flex items-center gap-1.5 rounded-[4px] border px-2 py-0.5 text-[11px] font-mono uppercase tracking-[0.08em]"
+          style={{
+            color: STATUS_COLORS[item.status as keyof typeof STATUS_COLORS],
+            borderColor: `${STATUS_COLORS[item.status as keyof typeof STATUS_COLORS]}55`,
+            backgroundColor: `${STATUS_COLORS[item.status as keyof typeof STATUS_COLORS]}14`,
+          }}
+        >
+          <span
+            className="h-1.5 w-1.5 rounded-full"
+            style={{
+              backgroundColor:
+                STATUS_COLORS[item.status as keyof typeof STATUS_COLORS],
+            }}
+          />
+          {formatEnumLabel(item.status)}
+        </span>
+        {item.errorMessage && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <p className="mt-1 cursor-help text-[10px] text-destructive truncate max-w-[200px]">
+                {item.errorMessage}
+              </p>
+            </TooltipTrigger>
+            <TooltipContent
+              side="bottom"
+              className="max-w-[360px] break-words text-xs"
+            >
+              <p className="font-medium mb-1">
+                {t("scans.runnerAssets.errorDetails")}
+              </p>
+              {item.errorMessage}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </TableCell>
 
-      {isExpanded && (
-        <TableRow>
-          <TableCell colSpan={8} className="p-0 bg-muted/15">
-            <DetectorBreakdown
-              byDetector={item.findingsByDetector}
-              t={t}
-            />
-            <FindingsSubTable
-              findings={item.findings}
-              onFindingClick={onFindingClick}
-              t={t}
-            />
-          </TableCell>
-        </TableRow>
-      )}
-    </Fragment>
+      <TableCell className="text-right">
+        {totalFindings !== null ? (
+          <span
+            className="text-sm font-medium tabular-nums"
+            style={
+              totalFindings > 0
+                ? {
+                    color: highestSeverity
+                      ? severityColor(highestSeverity)
+                      : undefined,
+                  }
+                : { color: "var(--muted-foreground)" }
+            }
+          >
+            {totalFindings}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </TableCell>
+
+      <TableCell className="min-w-[160px]">
+        <SeverityBreakdown bySeverity={item.findingsBySeverity} />
+        <DetectorBreakdown byDetector={item.findingsByDetector} t={t} />
+      </TableCell>
+
+      <TableCell>
+        {item.completedAt ? (
+          <>
+            <div className="text-xs">{formatDate(item.completedAt)}</div>
+            <div className="text-[11px] text-muted-foreground">
+              {formatRelative(item.completedAt)}
+            </div>
+          </>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </TableCell>
+    </TableRow>
   );
 }

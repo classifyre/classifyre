@@ -15,7 +15,6 @@ import {
   IsObject,
   ValidateNested,
   ArrayMinSize,
-  IsPositive,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -288,7 +287,10 @@ export class RunnerLogsResponseDto {
 }
 
 export class RegisterDiscoveredAssetsDto {
-  @ApiProperty({ type: [String], description: 'Asset hashes to register as PENDING' })
+  @ApiProperty({
+    type: [String],
+    description: 'Asset hashes to register as PENDING',
+  })
   @IsArray()
   @IsString({ each: true })
   @ArrayMinSize(1)
@@ -332,22 +334,30 @@ export class RunnerAssetStatusUpdateItem {
   @IsString()
   assetHash: string;
 
-  @ApiProperty({ enum: ['PROCESSED', 'ERROR'] })
+  @ApiProperty({ enum: ['PROCESSING', 'PROCESSED', 'ERROR'] })
   @IsEnum(RunnerAssetStatus)
-  status: 'PROCESSED' | 'ERROR';
+  status: 'PROCESSING' | 'PROCESSED' | 'ERROR';
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
   errorMessage?: string;
 
-  @ApiProperty({ required: false, minimum: 0, description: 'Total findings count' })
+  @ApiProperty({
+    required: false,
+    minimum: 0,
+    description: 'Total findings count',
+  })
   @IsOptional()
   @IsInt()
   @Min(0)
   findingsTotal?: number;
 
-  @ApiProperty({ required: false, type: FindingsBySeverityDto, description: 'Finding counts per severity level' })
+  @ApiProperty({
+    required: false,
+    type: FindingsBySeverityDto,
+    description: 'Finding counts per severity level',
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => FindingsBySeverityDto)
@@ -355,11 +365,15 @@ export class RunnerAssetStatusUpdateItem {
 
   @ApiProperty({
     required: false,
-    description: 'Finding counts per detector: { [detectorType]: { total, critical?, high?, … } }',
+    description:
+      'Finding counts per detector: { [detectorType]: { total, critical?, high?, … } }',
   })
   @IsOptional()
   @IsObject()
-  findingsByDetector?: Record<string, { total: number } & Partial<FindingsBySeverityDto>>;
+  findingsByDetector?: Record<
+    string,
+    { total: number } & Partial<FindingsBySeverityDto>
+  >;
 }
 
 export class UpdateRunnerAssetStatusDto {
