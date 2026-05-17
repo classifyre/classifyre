@@ -1,4 +1,9 @@
 import { Configuration } from "./generated/src/runtime";
+import {
+  SearchFindingsFiltersInputDtoSeverityEnum,
+  SearchFindingsFiltersInputDtoStatusEnum,
+  SearchFindingsFiltersInputDtoDetectorTypeEnum,
+} from "./generated/src/models";
 import type { TrainingExampleDto, TrainingExampleItem } from "./types";
 export type { TrainingExampleDto, TrainingExampleItem } from "./types";
 import type {
@@ -281,6 +286,82 @@ export type SearchRunnersChartsRequestInputDto = {
     topSourcesLimit?: number;
   };
 };
+
+// ── Runner Assets search ──────────────────────────────────────────────────────
+
+export type RunnerAssetStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "PROCESSED"
+  | "ERROR";
+
+export const RunnerAssetStatusEnum = {
+  Pending: "PENDING",
+  Processing: "PROCESSING",
+  Processed: "PROCESSED",
+  Error: "ERROR",
+} as const;
+
+export const SearchRunnerAssetsSortByEnum = {
+  CreatedAt: "CREATED_AT",
+  Status: "STATUS",
+  AssetHash: "ASSET_HASH",
+  CompletedAt: "COMPLETED_AT",
+} as const;
+export type SearchRunnerAssetsSortBy =
+  (typeof SearchRunnerAssetsSortByEnum)[keyof typeof SearchRunnerAssetsSortByEnum];
+
+export const SearchRunnerAssetsSortOrderEnum = {
+  Asc: "ASC",
+  Desc: "DESC",
+} as const;
+export type SearchRunnerAssetsSortOrder =
+  (typeof SearchRunnerAssetsSortOrderEnum)[keyof typeof SearchRunnerAssetsSortOrderEnum];
+
+export type SearchRunnerAssetsFiltersInputDto = {
+  runnerId: string;
+  status?: RunnerAssetStatus[];
+  search?: string;
+  findingSeverity?: SearchFindingsFiltersInputDtoSeverityEnum[];
+  findingStatus?: SearchFindingsFiltersInputDtoStatusEnum[];
+  findingDetectorType?: SearchFindingsFiltersInputDtoDetectorTypeEnum[];
+};
+
+export type SearchRunnerAssetsPageInputDto = {
+  skip?: number;
+  limit?: number;
+  sortBy?: SearchRunnerAssetsSortBy;
+  sortOrder?: SearchRunnerAssetsSortOrder;
+};
+
+export type SearchRunnerAssetsRequestInputDto = {
+  filters: SearchRunnerAssetsFiltersInputDto;
+  page?: SearchRunnerAssetsPageInputDto;
+};
+
+export type RunnerAssetItemDto = {
+  runnerId: string;
+  assetHash: string;
+  status: RunnerAssetStatus;
+  startedAt: string | null;
+  completedAt: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  findingsTotal: number | null;
+  findingsBySeverity: Record<string, number> | null;
+  findingsByDetector: Record<string, Record<string, number>> | null;
+  asset: import("./generated/src/models").AssetListItemDto | null;
+  findings: import("./generated/src/models").SearchAssetFindingDto[];
+};
+
+export type SearchRunnerAssetsResponseDto = {
+  items: RunnerAssetItemDto[];
+  total: number;
+  skip: number;
+  limit: number;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export type AssistantContextKey =
   | "source.create"
@@ -851,6 +932,26 @@ class ApiClient {
     }
 
     return (await response.json()) as SearchRunnersChartsResponseDto;
+  }
+
+  async searchRunnerAssets(
+    request: SearchRunnerAssetsRequestInputDto,
+  ): Promise<SearchRunnerAssetsResponseDto> {
+    const basePath = this.config.basePath.replace(/\/$/, "");
+    const response = await fetch(`${basePath}/search/runner-assets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(
+        `search/runner-assets failed (${response.status}): ${message || "Unknown error"}`,
+      );
+    }
+
+    return (await response.json()) as SearchRunnerAssetsResponseDto;
   }
 
   async listCustomDetectors(params?: {

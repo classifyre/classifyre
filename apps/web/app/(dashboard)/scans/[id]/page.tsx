@@ -1,11 +1,10 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   formatDate,
   formatRelative,
-  formatDateUTC,
   formatShortUTC,
 } from "@/lib/date";
 import {
@@ -28,10 +27,10 @@ import {
 import type { LogFetchParams } from "@/components/runner-log-viewer";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
-import { AssetsTable } from "@/components/assets-table";
+import { RunnerAssetsTable } from "@/components/runner-assets-table";
 import { DetailBackButton } from "@/components/detail-back-button";
-import { FindingsTable } from "@/components/findings-table";
 import { RunnerLogViewer } from "@/components/runner-log-viewer";
+import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import {
   getRunnerStatusBadgeLabel,
   getRunnerStatusBadgeTone,
@@ -122,7 +121,7 @@ export default function RunnerDetailPage() {
   const [logsHasMore, setLogsHasMore] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsLoadingMore, setLogsLoadingMore] = useState(false);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [logsAutoRefresh, setLogsAutoRefresh] = useState(true);
 
   const fetchOverview = useCallback(async (currentRunner: RunnerDto) => {
     try {
@@ -262,19 +261,36 @@ export default function RunnerDetailPage() {
     await fetchOverview(nextRunner);
   }, [fetchOverview, fetchRunner]);
 
+  const hasActiveRun =
+    runner?.status === "RUNNING" || runner?.status === "PENDING";
+
+  // Use the stable fetchOverview ref so the WS callback doesn't close over stale state
+  const fetchOverviewRef = useRef(fetchOverview);
+  fetchOverviewRef.current = fetchOverview;
+
+  const { subscribeToRunner, unsubscribeFromRunner, isConnected } =
+    useRunnerWebSocket({
+      enabled: true,
+      trackRunnersList: false,
+      onRunnerUpdate: (updatedRunner) => {
+        if (updatedRunner.id !== runnerId) return;
+        setRunner(updatedRunner);
+        void fetchOverviewRef.current(updatedRunner);
+      },
+    });
+
+  // Subscribe to the specific runner room once connected
   useEffect(() => {
-    if (!autoRefreshEnabled || !runnerId) {
-      return;
-    }
-    if (
-      !runner ||
-      (runner.status !== "RUNNING" && runner.status !== "PENDING")
-    ) {
-      return;
-    }
+    if (!isConnected || !runnerId) return;
+    subscribeToRunner(runnerId);
+    return () => unsubscribeFromRunner(runnerId);
+  }, [isConnected, runnerId, subscribeToRunner, unsubscribeFromRunner]);
+
+  // Keep log tailing while the run is active and auto-refresh is on
+  useEffect(() => {
+    if (!logsAutoRefresh || !runnerId || !hasActiveRun) return;
 
     const interval = setInterval(() => {
-      void refreshRunnerState();
       if (!logsLoading && !logsLoadingMore) {
         void fetchLogsPage(runnerId, { cursor: logsCursor }, true);
       }
@@ -282,13 +298,12 @@ export default function RunnerDetailPage() {
 
     return () => clearInterval(interval);
   }, [
-    autoRefreshEnabled,
+    logsAutoRefresh,
+    hasActiveRun,
     fetchLogsPage,
     logsCursor,
     logsLoading,
     logsLoadingMore,
-    refreshRunnerState,
-    runner,
     runnerId,
   ]);
 
@@ -333,21 +348,6 @@ export default function RunnerDetailPage() {
       setIsRunningAgain(false);
     }
   };
-
-  const handleRefreshLogs = useCallback(async () => {
-    if (!runnerId) return;
-    await refreshRunnerState();
-    if (!logsLoading && !logsLoadingMore) {
-      await fetchLogsPage(runnerId, { cursor: logsCursor }, true);
-    }
-  }, [
-    fetchLogsPage,
-    logsCursor,
-    logsLoading,
-    logsLoadingMore,
-    refreshRunnerState,
-    runnerId,
-  ]);
 
   const handleDownloadAllLogs = useCallback(async (): Promise<
     RunnerLogEntryDto[]
@@ -426,10 +426,7 @@ export default function RunnerDetailPage() {
   const sourceType = runner.source?.type || "CUSTOM";
   const SourceTypeIcon = getSourceIcon(sourceType);
   const sourceDetailsId = runner.sourceId || runner.source?.id;
-  const hasActiveRun =
-    runner.status === "RUNNING" || runner.status === "PENDING";
 
-  const findingsTotal = findingsCharts.totals.total;
   const assetsTotal = assetsCharts.totals.totalAssets;
   const progress = calculateProgress(runner);
 
@@ -531,14 +528,6 @@ export default function RunnerDetailPage() {
         <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">
           <TabsTrigger value="overview" className="rounded-[3px]" data-testid="tab-overview">
             {t("scans.tabOverview")}
-          </TabsTrigger>
-          <TabsTrigger value="findings" className="rounded-[3px]" data-testid="tab-findings">
-            {t("scans.tabFindings")}
-            {findingsTotal > 0 && (
-              <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold">
-                {findingsTotal}
-              </span>
-            )}
           </TabsTrigger>
           <TabsTrigger value="assets" className="rounded-[3px]" data-testid="tab-assets">
             {t("scans.tabAssets")}
@@ -789,23 +778,8 @@ export default function RunnerDetailPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="findings" className="space-y-4">
-          <Suspense>
-            <FindingsTable
-              lockedFilters={{
-                runnerId: [runner.id],
-                includeResolved: true,
-              }}
-            />
-          </Suspense>
-        </TabsContent>
-
         <TabsContent value="assets" className="space-y-4">
-          <Suspense>
-            <AssetsTable
-              scope={{ sourceId: runner.sourceId, runnerId: runner.id }}
-            />
-          </Suspense>
+          <RunnerAssetsTable runnerId={runner.id} />
         </TabsContent>
 
         <TabsContent value="logs" className="space-y-4">
@@ -816,11 +790,9 @@ export default function RunnerDetailPage() {
             nextCursor={logsNextCursor}
             loading={logsLoading}
             loadingMore={logsLoadingMore}
-            isRunning={
-              runner.status === "RUNNING" || runner.status === "PENDING"
-            }
-            autoRefreshEnabled={autoRefreshEnabled}
-            onAutoRefreshChange={setAutoRefreshEnabled}
+            isRunning={hasActiveRun}
+            autoRefreshEnabled={logsAutoRefresh}
+            onAutoRefreshChange={setLogsAutoRefresh}
             onFetch={(params, append) =>
               fetchLogsPage(runnerId, params, append)
             }
