@@ -318,13 +318,14 @@ model Runner {
 }
 
 model RunnerAsset {
-  runnerId     String            @map("runner_id")
-  assetHash    String            @map("asset_hash")
-  status       RunnerAssetStatus @default(PENDING)
-  startedAt    DateTime?         @map("started_at")
-  completedAt  DateTime?         @map("completed_at")
-  errorMessage String?           @map("error_message") @db.Text
-  createdAt    DateTime          @default(now()) @map("created_at")
+  runnerId         String            @map("runner_id")
+  assetHash        String            @map("asset_hash")
+  status           RunnerAssetStatus @default(PENDING)
+  startedAt        DateTime?         @map("started_at")
+  completedAt      DateTime?         @map("completed_at")
+  errorMessage     String?           @map("error_message") @db.Text
+  findingsSummary  Json?             @map("findings_summary")
+  createdAt        DateTime          @default(now()) @map("created_at")
 
   runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
 
