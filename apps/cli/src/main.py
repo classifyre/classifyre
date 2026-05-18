@@ -303,6 +303,22 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             processed_count,
                             error_count,
                         )
+                    elif all_stubs and hasattr(sink, "update_asset_status"):
+                        # No detectors configured: mark discovered assets as PROCESSED
+                        import asyncio as _asyncio
+
+                        async def _mark_processed(asset: Any) -> None:
+                            asset_hash = getattr(asset, "hash", None) or ""
+                            await sink.update_asset_status(
+                                asset_hash, "PROCESSED", findings_total=0
+                            )
+
+                        tasks = [_asyncio.create_task(_mark_processed(a)) for a in all_stubs]
+                        await _asyncio.gather(*tasks, return_exceptions=True)
+                        logger.info(
+                            "Phase 2 skipped (no detectors): %d assets marked processed",
+                            len(all_stubs),
+                        )
 
                     await sink.finish()
                     logger.info(
