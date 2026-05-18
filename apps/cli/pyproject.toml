@@ -9,9 +9,9 @@ keywords = ["data", "metadata", "ingestion", "unstructured", "pii", "secrets"]
 dependencies = [
     "classifyre-schemas",
     "jsonschema>=4.26.0",
-    "pydantic>=2.12.5",
+    "pydantic>=2.13.4",
     "email-validator>=2.3.0",
-    "requests>=2.32.3",
+    "requests>=2.34.2",
     "en-core-web-sm",
     "beautifulsoup4>=4.12.0",
     "lxml>=5.0.0",
@@ -34,15 +34,15 @@ packages = ["src"]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.8.0",
+    "ruff>=0.15.13",
     "mypy>=1.13.0",
-    "datamodel-code-generator>=0.45.0",
-    "pytest>=9.0.2",
+    "datamodel-code-generator>=0.57.0",
+    "pytest>=9.0.3",
     "pytest-asyncio>=0.24.0",
 ]
 privacy = [
-    "presidio-analyzer>=2.2.361",
-    "spacy>=3.8.11",
+    "presidio-analyzer>=2.2.362",
+    "spacy>=3.8.14",
     # phonenumbers 9.x introduced lazy region loading via __import__ which fails
     # mid-run in frozen/venv contexts. 8.x eagerly loads all data at import time,
     # avoiding ModuleNotFoundError during Presidio phone number analysis.
@@ -57,22 +57,22 @@ security = [
 threat-ml = [
     "transformers>=4.50.0,<6.0.0",
     "sentencepiece>=0.2.1",
-    "torch>=2.10.0",
+    "torch>=2.12.0",
 ]
 content = [
     "nudenet>=3.4.2",
     "transformers>=4.50.0,<6.0.0",
-    "onnxruntime>=1.24.2",
-    "torch>=2.10.0",
-    "pillow>=12.1.1",
+    "onnxruntime>=1.26.0",
+    "torch>=2.12.0",
+    "pillow>=12.2.0",
     "sentencepiece>=0.2.1",
 ]
 quality = [
-    "datasketch>=1.9.0",
-    "sentence-transformers>=5.2.3",
+    "datasketch>=1.10.0",
+    "sentence-transformers>=5.5.0",
     "textstat>=0.7.13",
     "transformers>=4.50.0,<6.0.0",
-    "torch>=2.10.0",
+    "torch>=2.12.0",
     "sentencepiece>=0.2.1",
 ]
 classification = [
@@ -80,13 +80,13 @@ classification = [
 ]
 custom = [
     "transformers>=4.50.0,<6.0.0",
-    "torch>=2.10.0",
-    "pillow>=12.1.1",
+    "torch>=2.12.0",
+    "pillow>=12.2.0",
     "setfit>=1.1.3",
-    "datasets>=4.4.1",
+    "datasets>=4.8.5",
     "scikit-learn>=1.7.2",
-    "gliner2>=1.3.0",
-    "sentence-transformers>=5.2.3",
+    "gliner2>=1.3.1",
+    "sentence-transformers>=5.5.0",
 ]
 regex = [
     "google-re2>=1.1",
@@ -112,14 +112,14 @@ file-processing = [
 ]
 ocr = [
     { include-group = "file-processing" },
-    "docling>=2.93.0",
+    "docling>=2.94.0",
     "rapidocr-onnxruntime>=1.4.0",
 ]
 postgresql = [
-    "psycopg2-binary>=2.9.9,<3.0.0",
+    "psycopg2-binary>=2.9.12,<3.0.0",
 ]
 mysql = [
-    "pymysql>=1.1.1,<2.0.0",
+    "pymysql>=1.1.3,<2.0.0",
 ]
 mssql = [
     "pymssql>=2.3.4,<3.0.0",
@@ -134,31 +134,31 @@ hive = [
     "pure-sasl>=0.6.2,<1.0.0",
 ]
 databricks = [
-    "databricks-sql-connector>=4.0.0,<5.0.0",
+    "databricks-sql-connector>=4.2.6,<5.0.0",
     "pyarrow>=24.0.0",
 ]
 snowflake = [
-    "snowflake-connector-python>=4.0.0,<5.0.0",
+    "snowflake-connector-python>=4.5.0,<5.0.0",
 ]
 mongodb = [
-    "pymongo>=4.15.2,<5.0.0",
+    "pymongo>=4.17.0,<5.0.0",
 ]
 tableau = [
     "tableauserverclient>=0.38,<1.0.0",
 ]
 s3-compatible-storage = [
-    "boto3>=1.40.40,<2.0.0",
+    "boto3>=1.43.9,<2.0.0",
 ]
 azure-blob-storage = [
-    "azure-storage-blob>=12.26.0,<13.0.0",
-    "azure-identity>=1.25.1,<2.0.0",
+    "azure-storage-blob>=12.29.0,<13.0.0",
+    "azure-identity>=1.25.3,<2.0.0",
 ]
 google-cloud-storage = [
-    "google-cloud-storage>=3.4.0,<4.0.0",
+    "google-cloud-storage>=3.10.1,<4.0.0",
 ]
 otel = [
-    "opentelemetry-sdk>=1.27.0",
-    "opentelemetry-exporter-otlp-proto-http>=1.27.0",
+    "opentelemetry-sdk>=1.41.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.41.1",
 ]
 
 [tool.ruff]
