@@ -47,18 +47,7 @@ class BaseSource(ABC):
         self._attachment_name_by_hash: dict[str, str] = {}
 
     def _apply_initial_sampling_override(self, recipe: dict[str, Any]) -> None:
-        sampling = recipe.get("sampling")
-        if not isinstance(sampling, dict):
-            return
-
-        if sampling.get("fetch_all_until_first_success") is not True:
-            return
-
-        has_successful_run = self._read_bool_env(self.HAS_SUCCESSFUL_RUN_ENV)
-        if has_successful_run is not False:
-            return
-
-        sampling["strategy"] = "ALL"
+        pass
 
     @staticmethod
     def _read_bool_env(name: str) -> bool | None:

@@ -142,11 +142,6 @@
         "strategy": {
           "$ref": "#/definitions/SamplingStrategy"
         },
-        "fetch_all_until_first_success": {
-          "type": "boolean",
-          "default": false,
-          "description": "When true, force strategy ALL until this source gets its first successful run. After the first successful run, use the configured strategy."
-        },
         "enable_ocr": {
           "type": "boolean",
           "default": false,
@@ -179,7 +174,6 @@
       ],
       "default": {
         "strategy": "RANDOM",
-        "fetch_all_until_first_success": false,
         "enable_ocr": false,
         "fallback_to_random": true,
         "include_column_names": true,

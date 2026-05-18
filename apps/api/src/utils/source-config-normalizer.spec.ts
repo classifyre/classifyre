@@ -1,7 +1,7 @@
 import { normalizeSourceConfig } from './source-config-normalizer';
 
 describe('normalizeSourceConfig sampling', () => {
-  it('preserves fetch_all_until_first_success when provided in sampling', () => {
+  it('strips fetch_all_until_first_success from sampling', () => {
     const normalized = normalizeSourceConfig('POSTGRESQL', {
       type: 'POSTGRESQL',
       required: { host: 'db.local', port: 5432 },
@@ -15,12 +15,12 @@ describe('normalizeSourceConfig sampling', () => {
       'RANDOM',
     );
     expect(
-      (normalized.sampling as Record<string, unknown>)
-        ?.fetch_all_until_first_success,
-    ).toBe(true);
+      'fetch_all_until_first_success' in
+        ((normalized.sampling as Record<string, unknown>) ?? {}),
+    ).toBe(false);
   });
 
-  it('hydrates fetch_all_until_first_success from optional.sampling legacy shape', () => {
+  it('strips fetch_all_until_first_success from legacy optional.sampling', () => {
     const normalized = normalizeSourceConfig('POSTGRESQL', {
       type: 'POSTGRESQL',
       required: { host: 'db.local', port: 5432 },
@@ -40,9 +40,9 @@ describe('normalizeSourceConfig sampling', () => {
       (normalized.sampling as Record<string, unknown>)?.rows_per_page,
     ).toBe(11);
     expect(
-      (normalized.sampling as Record<string, unknown>)
-        ?.fetch_all_until_first_success,
-    ).toBe(true);
+      'fetch_all_until_first_success' in
+        ((normalized.sampling as Record<string, unknown>) ?? {}),
+    ).toBe(false);
   });
 
   it('preserves enable_ocr from sampling and legacy optional.sampling', () => {
@@ -84,22 +84,6 @@ describe('normalizeSourceConfig sampling', () => {
     ).toBe(false);
     expect(
       'max_columns' in ((normalized.sampling as Record<string, unknown>) ?? {}),
-    ).toBe(false);
-  });
-
-  it('ignores non-boolean fetch_all_until_first_success values', () => {
-    const normalized = normalizeSourceConfig('POSTGRESQL', {
-      type: 'POSTGRESQL',
-      required: { host: 'db.local', port: 5432 },
-      sampling: {
-        strategy: 'RANDOM',
-        fetch_all_until_first_success: 'true',
-      },
-    });
-
-    expect(
-      'fetch_all_until_first_success' in
-        ((normalized.sampling as Record<string, unknown>) ?? {}),
     ).toBe(false);
   });
 

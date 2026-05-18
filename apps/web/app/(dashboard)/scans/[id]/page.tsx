@@ -779,7 +779,7 @@ export default function RunnerDetailPage() {
         </TabsContent>
 
         <TabsContent value="assets" className="space-y-4">
-          <RunnerAssetsTable runnerId={runner.id} />
+          <RunnerAssetsTable runnerId={runner.id} runnerStatus={runner.status} />
         </TabsContent>
 
         <TabsContent value="logs" className="space-y-4">

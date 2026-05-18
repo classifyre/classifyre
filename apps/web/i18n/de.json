@@ -294,8 +294,6 @@
       "strategyAll": "Alle",
       "hintAll": "kein Limit",
       "strategy": "Strategie",
-      "fetchAll": "Alle bis zum ersten Erfolg abrufen",
-      "fetchAllDesc": "Beim ersten erfolgreichen Lauf alle Elemente scannen, danach reguläre Stichproben.",
       "enableOcr": "OCR aktivieren",
       "enableOcrDesc": "Text aus Bildern und gescannten PDFs per optischer Zeichenerkennung extrahieren (langsamer, erfordert OCR-Abhängigkeiten).",
       "advanced": "Erweitert",
@@ -912,6 +910,12 @@
       "updating": "Wird aktualisiert…",
       "assetPending": "Asset ausstehend",
       "errorDetails": "Fehlerdetails",
+      "status": {
+        "pending": "Ausstehend",
+        "processing": "Verarbeitung",
+        "processed": "Verarbeitet",
+        "error": "Fehler"
+      },
       "columns": {
         "asset": "Asset",
         "type": "Typ",

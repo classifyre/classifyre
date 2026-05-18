@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
@@ -64,7 +64,6 @@ export class SearchRunnersAssetsFiltersInputDto {
   @IsArray()
   @IsEnum(RunnerAssetStatus, { each: true })
   status?: RunnerAssetStatus[];
-
 }
 
 export class SearchRunnersAssetsPageDto {
@@ -89,7 +88,8 @@ export class SearchRunnersAssetsPageDto {
   })
   @IsOptional()
   @IsEnum(SearchRunnersAssetsSortBy)
-  sortBy?: SearchRunnersAssetsSortBy = SearchRunnersAssetsSortBy.STATUS_PRIORITY;
+  sortBy?: SearchRunnersAssetsSortBy =
+    SearchRunnersAssetsSortBy.STATUS_PRIORITY;
 
   @ApiPropertyOptional({
     enum: SearchRunnersAssetsSortOrder,

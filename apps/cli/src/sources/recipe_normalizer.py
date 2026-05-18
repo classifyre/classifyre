@@ -147,14 +147,7 @@ def normalize_source_recipe(
         if key not in sampling and key in optional_sampling:
             sampling[key] = optional_sampling[key]
 
-    fetch_all_until_first_success = _pick(
-        _as_bool(sampling.get("fetch_all_until_first_success")),
-        _as_bool(optional_sampling.get("fetch_all_until_first_success")),
-    )
-    if fetch_all_until_first_success is not None:
-        sampling["fetch_all_until_first_success"] = fetch_all_until_first_success
-    else:
-        sampling.pop("fetch_all_until_first_success", None)
+    sampling.pop("fetch_all_until_first_success", None)
 
     normalized["sampling"] = sampling
 
