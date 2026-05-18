@@ -18,7 +18,6 @@ import {
   SelectValue,
   SeverityBadge,
   StatusBadge,
-  statusBadgeVariants,
   Table,
   TableBody,
   TableCell,
@@ -35,13 +34,11 @@ import {
   DrawerTitle,
 } from "@workspace/ui/components/drawer";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import {
-  formatFindingStatusLabel,
-  toFindingStatusBadgeValue,
-} from "../lib/finding-status-badge";
+import { toFindingStatusBadgeValue } from "../lib/finding-status-badge";
 import { getSourceIcon } from "../lib/source-type-icon";
 import type { FindingSelection } from "./findings-table";
 import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +75,7 @@ const STATUS_OPTIONS = Object.values(
 ) as StatusValue[];
 
 function FindingsPreviewTable({ selection }: { selection: FindingSelection }) {
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const [findings, setFindings] = useState<FindingResponseDto[]>([]);
   const [total, setTotal] = useState(selection.total);
@@ -140,17 +138,19 @@ function FindingsPreviewTable({ selection }: { selection: FindingSelection }) {
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow>
-              {[
-                "Category",
-                "Finding",
-                "Asset",
-                "Source",
-                "Severity",
-                "Status",
-              ].map((h) => (
-                <TableHead key={h}>
+              {(
+                [
+                  "findings.columns.category",
+                  "findings.columns.finding",
+                  "findings.columns.asset",
+                  "findings.columns.source",
+                  "findings.columns.severity",
+                  "findings.columns.status",
+                ] as const
+              ).map((key) => (
+                <TableHead key={key}>
                   <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                    {h}
+                    {t(key)}
                   </span>
                 </TableHead>
               ))}
@@ -213,14 +213,14 @@ function FindingsPreviewTable({ selection }: { selection: FindingSelection }) {
                           | "info"
                       }
                     >
-                      {formatEnumLabel(finding.severity)}
+                      {t(`findings.severityLabels.${finding.severity.toUpperCase()}` as TranslationKey)}
                     </SeverityBadge>
                   </TableCell>
                   <TableCell>
                     <StatusBadge
                       status={toFindingStatusBadgeValue(finding.status)}
                     >
-                      {formatFindingStatusLabel(finding.status)}
+                      {t(`findings.statusLabels.${finding.status}` as TranslationKey)}
                     </StatusBadge>
                   </TableCell>
                 </TableRow>
@@ -339,15 +339,16 @@ export function BulkUpdateDialog({
       <DrawerContent className="flex h-full w-full max-w-none flex-col gap-0 overflow-hidden bg-background p-0 sm:max-w-6xl">
         <DrawerHeader className="border-b px-6 py-5 shrink-0">
           <DrawerTitle className="font-serif text-xl font-black uppercase tracking-[0.06em]">
-            Bulk Update Findings
+            {t("findings.bulkUpdate.title")}
           </DrawerTitle>
           <DrawerDescription className="text-sm text-muted-foreground">
-            Apply changes to{" "}
             <span className="font-semibold text-foreground">
-              {total.toLocaleString()} finding{total !== 1 ? "s" : ""}
+              {total !== 1
+                ? t("findings.bulkUpdate.applyChangesPlural", { count: total.toLocaleString() })
+                : t("findings.bulkUpdate.applyChanges", { count: total.toLocaleString() })}
             </span>
-            {selection?.type === "all" && " matching current filters"}. Only
-            filled fields will be updated.
+            {selection?.type === "all" && ` ${t("findings.bulkUpdate.matchingFilters")}`}
+            {t("findings.bulkUpdate.onlyFilledFields")}
           </DrawerDescription>
         </DrawerHeader>
 
@@ -373,13 +374,9 @@ export function BulkUpdateDialog({
                   </SelectItem>
                   {STATUS_OPTIONS.map((value) => (
                     <SelectItem key={value} value={value}>
-                      <span
-                        className={statusBadgeVariants({
-                          status: toFindingStatusBadgeValue(value),
-                        })}
-                      >
-                        {formatFindingStatusLabel(value)}
-                      </span>
+                      <StatusBadge status={toFindingStatusBadgeValue(value)}>
+                        {t(`findings.statusLabels.${value}` as TranslationKey)}
+                      </StatusBadge>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -405,24 +402,15 @@ export function BulkUpdateDialog({
                   <SelectItem value={NONE}>
                     {t("findings.bulkUpdate.noChange")}
                   </SelectItem>
-                  {Object.entries(BulkUpdateFindingsDtoSeverityEnum).map(
-                    ([label, value]) => (
-                      <SelectItem key={value} value={value}>
-                        <span className="inline-flex items-center gap-2">
-                          <span
-                            className="h-2.5 w-2.5 rounded-[2px] border border-border/20"
-                            style={{
-                              backgroundColor:
-                                FINDING_SEVERITY_COLOR_BY_ENUM[
-                                  value as keyof typeof FINDING_SEVERITY_COLOR_BY_ENUM
-                                ],
-                            }}
-                          />
-                          {formatEnumLabel(label)}
-                        </span>
-                      </SelectItem>
-                    ),
-                  )}
+                  {Object.values(BulkUpdateFindingsDtoSeverityEnum).map((value) => (
+                    <SelectItem key={value} value={value}>
+                      <SeverityBadge
+                        severity={value.toLowerCase() as "critical" | "high" | "medium" | "low" | "info"}
+                      >
+                        {t(`findings.severityLabels.${value}` as TranslationKey)}
+                      </SeverityBadge>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -448,14 +436,14 @@ export function BulkUpdateDialog({
         </div>
 
         {/* ── Footer ── */}
-        <div className="border-t px-6 py-4 flex items-center justify-between gap-4 shrink-0">
+        <div className="border-t px-6 py-4 flex items-center justify-between gap-4 shrink-0 flex-col">
           {error ? (
             <p className="text-xs text-destructive">{error}</p>
           ) : (
             <p className="text-xs text-muted-foreground">
               {hasChanges
-                ? `Changes will be applied to all ${total.toLocaleString()} findings.`
-                : "Select at least one field to update."}
+                ? t("findings.bulkUpdate.willApply", { count: total.toLocaleString() })
+                : t("findings.bulkUpdate.selectAtLeastOne")}
             </p>
           )}
           <div className="flex items-center gap-2 shrink-0">
@@ -465,7 +453,7 @@ export function BulkUpdateDialog({
               disabled={isSaving}
               className="border-2 border-border rounded-[4px]"
             >
-              Cancel
+              {t("findings.bulkUpdate.cancel")}
             </Button>
             <Button
               onClick={handleSave}
@@ -475,11 +463,11 @@ export function BulkUpdateDialog({
               {isSaving ? (
                 <>
                   <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                  Saving…
+                  {t("findings.bulkUpdate.saving")}
                 </>
-              ) : (
-                `Update ${total.toLocaleString()} finding${total !== 1 ? "s" : ""}`
-              )}
+              ) : total !== 1
+                ? t("findings.bulkUpdate.updateFindings", { count: total.toLocaleString() })
+                : t("findings.bulkUpdate.updateFinding", { count: total.toLocaleString() })}
             </Button>
           </div>
         </div>

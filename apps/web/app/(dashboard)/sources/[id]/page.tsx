@@ -42,6 +42,8 @@ import { AssetsTable } from "@/components/assets-table";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { DeleteSourceAction } from "@/components/delete-source-action";
 import { FindingsTable } from "@/components/findings-table";
+import type { FindingSelection } from "@/components/findings-table";
+import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
 import { getSourceSchema } from "@/lib/schema-loader";
 import { getSourceIcon } from "@/lib/source-type-icon";
 import {
@@ -104,6 +106,16 @@ export default function SourceViewPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isStartingScan, setIsStartingScan] = useState(false);
+
+  // Findings tab bulk update
+  const [findingsSelection, setFindingsSelection] = useState<FindingSelection | null>(null);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [findingsTableKey, setFindingsTableKey] = useState(0);
+
+  const handleFindingsBulkSuccess = useCallback(() => {
+    setFindingsSelection(null);
+    setFindingsTableKey((k) => k + 1);
+  }, []);
 
   const fetchSourceData = useCallback(
     async (showLoading = true) => {
@@ -795,10 +807,13 @@ export default function SourceViewPage() {
         <TabsContent value="findings" className="space-y-4">
           <Suspense>
             <FindingsTable
+              key={findingsTableKey}
               lockedFilters={{
                 sourceId: [sourceId],
                 includeResolved: true,
               }}
+              onSelectionChange={setFindingsSelection}
+              onBulkUpdate={() => setBulkDialogOpen(true)}
             />
           </Suspense>
         </TabsContent>
@@ -809,6 +824,13 @@ export default function SourceViewPage() {
           </Suspense>
         </TabsContent>
       </Tabs>
+
+      <BulkUpdateDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        selection={findingsSelection}
+        onSuccess={handleFindingsBulkSuccess}
+      />
     </div>
   );
 }
