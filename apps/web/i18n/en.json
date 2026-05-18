@@ -344,12 +344,31 @@
       "finding": "Finding",
       "asset": "Asset",
       "source": "Source",
+      "matchedContent": "Matched Content",
       "severity": "Severity",
       "status": "Status",
       "confidence": "Confidence",
-      "detected": "Detected"
+      "detected": "Detected",
+      "action": "Action"
+    },
+    "selection": {
+      "allSelected": "All {{count}} findings selected",
+      "selected": "{{count}} finding selected",
+      "selectedPlural": "{{count}} findings selected",
+      "updating": "Updating findings…"
     },
     "bulkUpdate": {
+      "title": "Bulk Update Findings",
+      "applyChanges": "Apply changes to {{count}} finding",
+      "applyChangesPlural": "Apply changes to {{count}} findings",
+      "matchingFilters": "matching current filters",
+      "onlyFilledFields": ". Only filled fields will be updated.",
+      "willApply": "Changes will be applied to all {{count}} findings.",
+      "selectAtLeastOne": "Select at least one field to update.",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "updateFinding": "Update {{count}} finding",
+      "updateFindings": "Update {{count}} findings",
       "status": "Status",
       "severity": "Severity",
       "comment": "Comment",
