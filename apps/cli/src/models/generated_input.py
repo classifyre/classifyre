@@ -2672,6 +2672,7 @@ class SourceInput(
         | DatabricksInput
         | SnowflakeInput
         | MongoDBInput
+        | Neo4jInput
         | PowerBIInput
         | TableauInput
         | WordPressInput
@@ -2693,6 +2694,7 @@ class SourceInput(
         | DatabricksInput
         | SnowflakeInput
         | MongoDBInput
+        | Neo4jInput
         | PowerBIInput
         | TableauInput
         | WordPressInput
