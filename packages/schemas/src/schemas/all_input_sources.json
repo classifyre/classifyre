@@ -40,6 +40,9 @@
       "$ref": "#/definitions/MongoDBInput"
     },
     {
+      "$ref": "#/definitions/Neo4jInput"
+    },
+    {
       "$ref": "#/definitions/PowerBIInput"
     },
     {
