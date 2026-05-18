@@ -230,7 +230,6 @@ describe('CliRunnerService', () => {
       sampling: {
         strategy: 'RANDOM',
         limit: 10,
-        fetch_all_until_first_success: true,
       },
     };
     const encryptedConfig =
@@ -276,8 +275,7 @@ describe('CliRunnerService', () => {
           sampling: {
             strategy: 'RANDOM',
             limit: 10,
-            fetch_all_until_first_success: true,
-          },
+              },
         }),
       }),
       false,
@@ -554,6 +552,10 @@ describe('CliRunnerService', () => {
           sourceId: 'source-1',
           status: RunnerStatus.PENDING,
         }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      runnerAsset: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     };
     const prisma = {
@@ -687,6 +689,9 @@ describe('CliRunnerService', () => {
       source: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      runnerAsset: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
     };
     prisma.$transaction.mockImplementation((callback: any) => callback(tx));
 
@@ -776,6 +781,9 @@ describe('CliRunnerService', () => {
         source: {
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
+        runnerAsset: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
       };
       prisma.$transaction.mockImplementation((callback: any) => callback(tx));
 
@@ -830,6 +838,9 @@ describe('CliRunnerService', () => {
       },
       source: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      runnerAsset: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     };
     prisma.$transaction.mockImplementation((callback: any) => callback(tx));

@@ -107,10 +107,6 @@ class SamplingConfig(BaseModel):
         extra='forbid',
     )
     strategy: SamplingStrategy
-    fetch_all_until_first_success: bool | None = Field(
-        False,
-        description='When true, force strategy ALL until this source gets its first successful run. After the first successful run, use the configured strategy.',
-    )
     enable_ocr: bool | None = Field(
         False,
         description='When true, enable OCR/text extraction for supported binary documents and images before routing text-capable detectors.',

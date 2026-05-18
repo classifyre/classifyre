@@ -93,6 +93,13 @@ const SEVERITY_DISPLAY_ORDER = [
   "INFO",
 ] as const;
 
+const RUNNER_ASSET_STATUS_LABELS: Record<string, TranslationKey> = {
+  PENDING: "scans.runnerAssets.status.pending",
+  PROCESSING: "scans.runnerAssets.status.processing",
+  PROCESSED: "scans.runnerAssets.status.processed",
+  ERROR: "scans.runnerAssets.status.error",
+};
+
 function formatEnumLabel(value: string) {
   return value
     .toLowerCase()
@@ -228,7 +235,15 @@ function getPageItems(current: number, total: number) {
   return Array.from(pages).sort((a, b) => a - b);
 }
 
-export function RunnerAssetsTable({ runnerId }: { runnerId: string }) {
+const POLL_INTERVAL_MS = 4000;
+
+export function RunnerAssetsTable({
+  runnerId,
+  runnerStatus,
+}: {
+  runnerId: string;
+  runnerStatus?: string;
+}) {
   const { t } = useTranslation();
   const router = useRouter();
 
@@ -303,10 +318,18 @@ export function RunnerAssetsTable({ runnerId }: { runnerId: string }) {
     };
 
     void run();
+
+    const isActive =
+      runnerStatus === "RUNNING" || runnerStatus === "PENDING";
+    const interval = isActive
+      ? setInterval(() => void run(), POLL_INTERVAL_MS)
+      : undefined;
+
     return () => {
       active = false;
+      clearInterval(interval);
     };
-  }, [runnerId, draft, sort, page, resolvedPageSize]);
+  }, [runnerId, runnerStatus, draft, sort, page, resolvedPageSize]);
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -371,7 +394,9 @@ export function RunnerAssetsTable({ runnerId }: { runnerId: string }) {
                         className="h-2 w-2 rounded-full"
                         style={{ backgroundColor: STATUS_COLORS[status] }}
                       />
-                      {formatEnumLabel(status)}
+                      {RUNNER_ASSET_STATUS_LABELS[status]
+                        ? t(RUNNER_ASSET_STATUS_LABELS[status]!)
+                        : formatEnumLabel(status)}
                     </span>
                   </MultiSelectItem>
                 ))}
@@ -600,7 +625,9 @@ function RunnerAssetRow({
                 STATUS_COLORS[item.status as keyof typeof STATUS_COLORS],
             }}
           />
-          {formatEnumLabel(item.status)}
+          {RUNNER_ASSET_STATUS_LABELS[item.status]
+            ? t(RUNNER_ASSET_STATUS_LABELS[item.status]!)
+            : formatEnumLabel(item.status)}
         </span>
         {item.errorMessage && (
           <Tooltip>

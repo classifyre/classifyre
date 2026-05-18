@@ -1624,6 +1624,20 @@ export class CliRunnerService implements OnApplicationBootstrap {
     sourceStatus: RunnerStatus;
   }): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      await tx.runnerAsset.updateMany({
+        where: {
+          runnerId: params.runnerId,
+          status: {
+            in: [RunnerAssetStatus.PENDING, RunnerAssetStatus.PROCESSING],
+          },
+        },
+        data: {
+          status: RunnerAssetStatus.ERROR,
+          completedAt: new Date(),
+          errorMessage: 'Runner terminated before asset processing completed',
+        },
+      });
+
       await tx.runner.update({
         where: { id: params.runnerId },
         data: params.runnerData,
@@ -1660,36 +1674,62 @@ export class CliRunnerService implements OnApplicationBootstrap {
     const { assetsCreated, assetsUpdated, assetsUnchanged, totalFindings } =
       await this.computeRunnerStats(runnerId);
 
-    const [errorAssetCount, totalAssetCount] = await this.prisma.$transaction([
-      this.prisma.runnerAsset.count({
-        where: { runnerId, status: RunnerAssetStatus.ERROR },
-      }),
-      this.prisma.runnerAsset.count({ where: { runnerId } }),
-    ]);
+    const { finalStatus, warningMessage } = await this.prisma.$transaction(
+      async (tx) => {
+        await tx.runnerAsset.updateMany({
+          where: {
+            runnerId,
+            status: {
+              in: [RunnerAssetStatus.PENDING, RunnerAssetStatus.PROCESSING],
+            },
+          },
+          data: {
+            status: RunnerAssetStatus.ERROR,
+            completedAt,
+            errorMessage:
+              'Runner completed before asset processing finished',
+          },
+        });
 
-    const hasAssetErrors = errorAssetCount > 0;
-    const finalStatus = hasAssetErrors
-      ? RunnerStatus.WARNING
-      : RunnerStatus.COMPLETED;
-    const warningMessage = hasAssetErrors
-      ? `${errorAssetCount} of ${totalAssetCount} assets failed processing`
-      : undefined;
+        const [errorCount, totalCount] = await Promise.all([
+          tx.runnerAsset.count({
+            where: { runnerId, status: RunnerAssetStatus.ERROR },
+          }),
+          tx.runnerAsset.count({ where: { runnerId } }),
+        ]);
 
-    await this.transitionRunnerToTerminalState({
-      runnerId,
-      sourceId: runner.sourceId,
-      sourceStatus: finalStatus,
-      runnerData: {
-        status: finalStatus,
-        completedAt,
-        durationMs,
-        assetsCreated,
-        assetsUpdated,
-        assetsUnchanged,
-        totalFindings,
-        ...(warningMessage && { errorMessage: warningMessage }),
+        const hasErrors = errorCount > 0;
+        const status = hasErrors
+          ? RunnerStatus.WARNING
+          : RunnerStatus.COMPLETED;
+        const message = hasErrors
+          ? `${errorCount} of ${totalCount} assets failed processing`
+          : undefined;
+
+        await tx.runner.update({
+          where: { id: runnerId },
+          data: {
+            status,
+            completedAt,
+            durationMs,
+            assetsCreated,
+            assetsUpdated,
+            assetsUnchanged,
+            totalFindings,
+            ...(message && { errorMessage: message }),
+          },
+        });
+
+        await this.transitionSourceToTerminalState(
+          tx,
+          runner.sourceId,
+          runnerId,
+          status,
+        );
+
+        return { finalStatus: status, warningMessage: message };
       },
-    });
+    );
 
     await this.prisma.source.update({
       where: { id: runner.sourceId },
@@ -3053,7 +3093,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
         source.id,
         decryptedConfig,
       );
-      const sourceWithDecryptedConfig = { ...source, config: recipeWithFeedback };
+      const sourceWithDecryptedConfig = {
+        ...source,
+        config: recipeWithFeedback,
+      };
       await this.runnerLogStorage.initializeRunner(pending.id);
 
       const hasSuccessfulRuns = !!(await this.prisma.runner.findFirst({
@@ -3084,8 +3127,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
     const { filters, page } = request;
     const skip = Math.max(0, Number(page?.skip ?? 0));
     const limit = Math.min(200, Math.max(1, Number(page?.limit ?? 50)));
-    const sortBy =
-      page?.sortBy ?? SearchRunnersAssetsSortBy.STATUS_PRIORITY;
+    const sortBy = page?.sortBy ?? SearchRunnersAssetsSortBy.STATUS_PRIORITY;
     const sortOrder = page?.sortOrder ?? SearchRunnersAssetsSortOrder.ASC;
 
     const where: Prisma.RunnerAssetWhereInput = {
@@ -3122,16 +3164,14 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
       if (filters.status?.length) {
         const placeholders = filters.status.map(
-          (_, i) => `$${params.length + i + 1}::\"RunnerAssetStatus\"`,
+          (_, i) => `$${params.length + i + 1}::"RunnerAssetStatus"`,
         );
         conditions.push(`status IN (${placeholders.join(', ')})`);
         params.push(...filters.status);
       }
 
       if (filters.search?.trim()) {
-        conditions.push(
-          `asset_hash ILIKE $${params.length + 1}`,
-        );
+        conditions.push(`asset_hash ILIKE $${params.length + 1}`);
         params.push(`%${filters.search.trim()}%`);
       }
 
@@ -3139,7 +3179,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
       const countResult = await this.prisma.$queryRawUnsafe<
         [{ count: bigint }]
-      >(`SELECT COUNT(*) AS count FROM runner_assets WHERE ${whereClause}`, ...params);
+      >(
+        `SELECT COUNT(*) AS count FROM runner_assets WHERE ${whereClause}`,
+        ...params,
+      );
       total = Number(countResult[0]?.count ?? 0);
 
       params.push(limit, skip);
