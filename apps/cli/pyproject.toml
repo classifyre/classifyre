@@ -14,7 +14,7 @@ dependencies = [
     "requests>=2.32.3",
     "en-core-web-sm",
     "beautifulsoup4>=4.12.0",
-    "lxml>=5.0.0",
+    "lxml>=6.0.4",
 ]
 
 [tool.uv.sources]
