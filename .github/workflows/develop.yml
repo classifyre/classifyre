@@ -145,7 +145,7 @@ jobs:
           HELM_RELEASE_NAME: ${{ steps.env.outputs.release_name }}
         run: |
           set -euo pipefail
-          for deployment in api web cli; do
+          for deployment in api web; do
             echo "Forcing rollout for ${HELM_RELEASE_NAME}-${deployment}"
             kubectl -n "${HELM_NAMESPACE}" rollout restart deployment/"${HELM_RELEASE_NAME}-${deployment}"
             kubectl -n "${HELM_NAMESPACE}" rollout status deployment/"${HELM_RELEASE_NAME}-${deployment}" --timeout=10m
