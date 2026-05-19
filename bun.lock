@@ -17,7 +17,7 @@
     },
     "apps/api": {
       "name": "@classifyre/api",
-      "version": "0.2.36",
+      "version": "0.4.1-SNAPSHOT",
       "dependencies": {
         "@anthropic-ai/sdk": "^0.88.0",
         "@fastify/multipart": "^10.0.0",
@@ -56,7 +56,7 @@
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.2",
         "socket.io": "^4.8.3",
-        "uuid": "^13.0.0",
+        "uuid": "^14.0.0",
         "xlsx": "^0.18.5",
         "zod": "^4.3.6",
       },
@@ -94,7 +94,7 @@
     },
     "apps/blog": {
       "name": "@classifyre/blog",
-      "version": "0.2.36",
+      "version": "0.4.1-SNAPSHOT",
       "dependencies": {
         "@workspace/schemas": "workspace:*",
         "@workspace/ui": "workspace:*",
@@ -122,11 +122,11 @@
     },
     "apps/cli": {
       "name": "@classifyre/cli",
-      "version": "0.2.36",
+      "version": "0.4.1-SNAPSHOT",
     },
     "apps/docs": {
       "name": "@classifyre/docs",
-      "version": "0.2.36",
+      "version": "0.4.1-SNAPSHOT",
       "dependencies": {
         "@theguild/remark-mermaid": "^0.3.0",
         "@workspace/schemas": "workspace:*",
@@ -163,7 +163,7 @@
     },
     "apps/web": {
       "name": "@classifyre/web",
-      "version": "0.2.36",
+      "version": "0.4.1-SNAPSHOT",
       "dependencies": {
         "@hookform/resolvers": "^5.2.2",
         "@monaco-editor/react": "^4.7.0",
@@ -211,7 +211,7 @@
     },
     "packages/api-client": {
       "name": "@workspace/api-client",
-      "version": "0.2.36",
+      "version": "0.4.1-SNAPSHOT",
       "devDependencies": {
         "@openapitools/openapi-generator-cli": "2.31.1",
         "@types/node": "^25.5.2",
@@ -220,7 +220,7 @@
     },
     "packages/devops": {
       "name": "@workspace/devops",
-      "version": "0.2.36",
+      "version": "0.4.1-SNAPSHOT",
     },
     "packages/eslint-config": {
       "name": "@workspace/eslint-config",
@@ -244,7 +244,7 @@
     },
     "packages/schemas": {
       "name": "@workspace/schemas",
-      "version": "0.2.36",
+      "version": "0.4.1-SNAPSHOT",
       "dependencies": {
         "zod": "^4.3.6",
       },
@@ -3741,7 +3741,7 @@
 
     "util-deprecate": ["util-deprecate@1.0.2", "", {}, "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw=="],
 
-    "uuid": ["uuid@13.0.0", "", { "bin": { "uuid": "dist-node/bin/uuid" } }, "sha512-XQegIaBTVUjSHliKqcnFqYypAd4S+WCYt5NIeRs6w/UAry7z8Y9j5ZwRRL4kzq9U3sD6v+85er9FvkEaBpji2w=="],
+    "uuid": ["uuid@14.0.0", "", { "bin": { "uuid": "dist-node/bin/uuid" } }, "sha512-Qo+uWgilfSmAhXCMav1uYFynlQO7fMFiMVZsQqZRMIXp0O7rR7qjkj+cPvBHLgBqi960QCoo/PH2/6ZtVqKvrg=="],
 
     "v8-compile-cache-lib": ["v8-compile-cache-lib@3.0.1", "", {}, "sha512-wa7YjyUGfNZngI/vtK0UHAN+lgDCxBPCylVXGp0zu59Fz5aiGtNXaq3DhIov063MorB+VfufLh3JlF2KdTK3xg=="],
 
@@ -4108,6 +4108,8 @@
     "@types/stream-buffers/@types/node": ["@types/node@24.10.13", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-oH72nZRfDv9lADUBSo104Aq7gPHpQZc4BTx38r9xf9pg5LfP6EzSyH2n7qFmmxRQXh7YlUXODcYsg6PuTDSxGg=="],
 
     "@types/superagent/@types/node": ["@types/node@22.19.2", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-LPM2G3Syo1GLzXLGJAKdqoU35XvrWzGJ21/7sgZTUpbkBaOasTj8tjwn6w+hCkqaa1TfJ/w67rJSwYItlJ2mYw=="],
+
+    "@types/uuid/uuid": ["uuid@13.0.0", "", { "bin": { "uuid": "dist-node/bin/uuid" } }, "sha512-XQegIaBTVUjSHliKqcnFqYypAd4S+WCYt5NIeRs6w/UAry7z8Y9j5ZwRRL4kzq9U3sD6v+85er9FvkEaBpji2w=="],
 
     "@typescript-eslint/eslint-plugin/ignore": ["ignore@7.0.5", "", {}, "sha512-Hs59xBNfUIunMFgWAbGX5cq6893IbWg4KnrjbYwX3tx0ztorVgTDA6B2sxf8ejHJ4wz8BqGUMYlnzNBer5NvGg=="],
 
