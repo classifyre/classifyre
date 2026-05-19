@@ -405,7 +405,7 @@ async def test_databricks_fetch_content_pages_batches_for_all_strategy(
             return None
 
     monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
-    monkeypatch.setattr(source, "_connect_sql", lambda: _BatchConnection())
+    monkeypatch.setattr(source, "_connect_sql", _BatchConnection)
 
     pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
 
