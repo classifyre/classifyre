@@ -102,6 +102,7 @@ def _get_plugin_specs() -> dict[str, tuple[str, str]]:
         _plugin_cache["_loaded"] = True
     return _plugin_cache["specs"]
 
+
 # Severity classification by keywords in detect-secrets finding type (lowercased).
 _SEVERITY_RULES: list[tuple[Severity, list[str]]] = [
     (
@@ -249,24 +250,18 @@ class SecretsDetector(BaseDetector):
                 mod = importlib.import_module(mod_path)
                 cls = getattr(mod, cls_name)
             except Exception as exc:
-                logger.warning(
-                    "Failed to import plugin '%s' from %s: %s", cls_name, mod_path, exc
-                )
+                logger.warning("Failed to import plugin '%s' from %s: %s", cls_name, mod_path, exc)
                 continue
 
             kwargs: dict[str, Any] = {}
             if name == "high_entropy_base64":
                 limit = self._cfg.entropy_limit_base64
                 if limit is not None:
-                    kwargs["limit"] = float(
-                        limit.root if hasattr(limit, "root") else limit
-                    )
+                    kwargs["limit"] = float(limit.root if hasattr(limit, "root") else limit)
             elif name == "high_entropy_hex":
                 limit = self._cfg.entropy_limit_hex
                 if limit is not None:
-                    kwargs["limit"] = float(
-                        limit.root if hasattr(limit, "root") else limit
-                    )
+                    kwargs["limit"] = float(limit.root if hasattr(limit, "root") else limit)
 
             try:
                 plugin = cls(**kwargs)
@@ -341,9 +336,7 @@ class SecretsDetector(BaseDetector):
                     try:
                         secret_type = str(secret.type) if secret.type else ""
                         secret_value = (
-                            str(secret.secret_value)
-                            if secret.secret_value is not None
-                            else ""
+                            str(secret.secret_value) if secret.secret_value is not None else ""
                         )
                         is_verified = bool(secret.is_verified)
                     except Exception:
