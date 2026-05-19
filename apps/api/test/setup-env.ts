@@ -1,10 +1,7 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
 
-console.log(
-  '[setup-env] DATABASE_URL before load:',
-  process.env.DATABASE_URL,
-);
+console.log('[setup-env] DATABASE_URL before load:', process.env.DATABASE_URL);
 const preservedEnv = new Map(
   Object.entries(process.env).filter(
     (entry): entry is [string, string] => typeof entry[1] === 'string',

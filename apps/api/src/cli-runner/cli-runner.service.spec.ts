@@ -275,7 +275,7 @@ describe('CliRunnerService', () => {
           sampling: {
             strategy: 'RANDOM',
             limit: 10,
-              },
+          },
         }),
       }),
       false,

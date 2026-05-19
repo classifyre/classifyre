@@ -322,7 +322,7 @@ async def test_oracle_fetch_content_pages_batches_for_all_strategy(
             return None
 
     monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
-    monkeypatch.setattr(source, "_connect", lambda: _BatchConnection())
+    monkeypatch.setattr(source, "_connect", _BatchConnection)
 
     pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
 
