@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 from importlib.util import find_spec
+
+import pytest
 
 _gliner2_available = find_spec("gliner2") is not None
 
