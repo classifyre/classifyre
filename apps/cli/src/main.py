@@ -238,10 +238,8 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     if hasattr(sink, "update_asset_status"):
                                         await sink.update_asset_status(asset_hash, "PROCESSING")
 
-                                    cumulative_findings: list[Any] = []
-
                                     async def _on_findings_flushed(partial: list[Any]) -> None:
-                                        cumulative_findings.extend(partial)
+                                        # partial is the full accumulated findings list from the pipeline
                                         stub_payload = _asset_to_payload(asset)
                                         stub_payload["findings"] = [
                                             f.model_dump(mode="json", exclude_none=True)
@@ -252,7 +250,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                         await sink.emit_batch([stub_payload], skip_findings=False)
                                         if hasattr(sink, "update_asset_status"):
                                             f_total, f_by_sev, f_by_det = _compute_findings_counts(
-                                                cumulative_findings
+                                                partial
                                             )
                                             await sink.update_asset_status(
                                                 asset_hash,
