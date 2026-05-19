@@ -34,11 +34,6 @@ jobs:
       - name: Remove local Python virtualenvs
         run: rm -rf apps/cli/.venv packages/schemas/.venv
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
