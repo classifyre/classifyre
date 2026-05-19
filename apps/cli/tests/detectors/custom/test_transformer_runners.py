@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -197,7 +197,12 @@ def _make_feature_runner(
 async def test_feature_extraction_runner_emits_embedding_finding() -> None:
     hidden = [[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]]  # (1, 2tokens, 3dim)
     runner = _make_feature_runner(hidden)
-    findings = runner.detect("hello world", "text/plain")
+    stub_embedding = [0.25, 0.35, 0.45]
+    with patch(
+        "src.detectors.custom.runners._feature_extraction._pool_hidden",
+        return_value=stub_embedding,
+    ):
+        findings = runner.detect("hello world", "text/plain")
     assert len(findings) == 1
     f = findings[0]
     assert f.finding_type == "embedding"
