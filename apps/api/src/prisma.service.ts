@@ -17,7 +17,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       connectionString: rawUrl.toString(),
       ...(schema ? { options: `-c search_path=${schema}` } : {}),
     });
-    const adapter = new PrismaPg(pool);
+    const adapter = new PrismaPg(pool, { schema: schema ?? undefined });
     super({ adapter });
   }
 
