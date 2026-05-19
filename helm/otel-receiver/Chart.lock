@@ -1,7 +1,7 @@
 dependencies:
 - name: opentelemetry-collector
   repository: https://open-telemetry.github.io/opentelemetry-helm-charts
-  version: 0.150.0
+  version: 0.156.0
 - name: grafana
   repository: https://grafana.github.io/helm-charts
   version: 10.5.15
@@ -13,9 +13,9 @@ dependencies:
   version: 6.55.0
 - name: promtail
   repository: https://grafana.github.io/helm-charts
-  version: 6.16.6
+  version: 6.17.1
 - name: mimir-distributed
   repository: https://grafana.github.io/helm-charts
   version: 6.0.6
-digest: sha256:46d74636d56763c43af9e8e39761381d201a8b4d8a6d7843bb334b7adfd8d702
-generated: "2026-04-13T17:52:03.457699+02:00"
+digest: sha256:2b0e1e48576061f53a88f49b9f4c3bde7b9ff1eec82dcbf2e93140cc376d01ef
+generated: "2026-05-19T10:30:09.48713172Z"
