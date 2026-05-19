@@ -16,6 +16,7 @@ model Source {
   consecutiveFailures Int            @default(0) @map("consecutive_failures")
   lastRunStatus       RunnerStatus?  @map("last_run_status")
   lastRunAt           DateTime?      @map("last_run_at")
+  lastErrorMessage    String?        @map("last_error_message")
   createdAt           DateTime       @default(now()) @map("created_at")
   updatedAt           DateTime       @updatedAt @map("updated_at")
   currentRunnerId     String?        @map("current_runner_id")
@@ -305,6 +306,7 @@ model Runner {
   assetsUnchanged Int          @default(0) @map("assets_unchanged")
   assetsDeleted   Int          @default(0) @map("assets_deleted")
   assets          Asset[]
+  runnerAssets    RunnerAsset[]
   source          Source       @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   notifications   Notification[]
 
@@ -313,6 +315,25 @@ model Runner {
   @@index([status])
   @@index([triggeredAt])
   @@map("runners")
+}
+
+model RunnerAsset {
+  runnerId         String            @map("runner_id")
+  assetHash        String            @map("asset_hash")
+  status           RunnerAssetStatus @default(PENDING)
+  startedAt        DateTime?         @map("started_at")
+  completedAt      DateTime?         @map("completed_at")
+  errorMessage     String?           @map("error_message") @db.Text
+  findingsTotal      Int?  @map("findings_total")
+  findingsBySeverity Json? @map("findings_by_severity")
+  findingsByDetector Json? @map("findings_by_detector")
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@id([runnerId, assetHash])
+  @@index([runnerId, status])
+  @@map("runner_assets")
 }
 
 model Notification {
@@ -425,6 +446,7 @@ enum AssetType {
   DATABRICKS
   SNOWFLAKE
   MONGODB
+  NEO4J
   POWERBI
   TABLEAU
   CUSTOM
@@ -434,6 +456,7 @@ enum RunnerStatus {
   PENDING
   RUNNING
   COMPLETED
+  WARNING
   ERROR
 }
 
@@ -515,6 +538,13 @@ enum AssetStatus {
   UPDATED
   UNCHANGED
   DELETED
+}
+
+enum RunnerAssetStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  ERROR
 }
 
 enum AssetContentType {

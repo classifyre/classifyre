@@ -2,28 +2,17 @@
 
 from __future__ import annotations
 
-import importlib
-
 import pytest
+from importlib.util import find_spec
 
-_gliner2_available = False
-try:
-    importlib.import_module("gliner2")
-    _gliner2_available = True
-except Exception:
-    pass
+_gliner2_available = find_spec("gliner2") is not None
 
 requires_gliner2 = pytest.mark.skipif(
     not _gliner2_available,
     reason="gliner2 not installed (install custom/detectors group)",
 )
 
-_pdfplumber_available = False
-try:
-    importlib.import_module("pdfplumber")
-    _pdfplumber_available = True
-except Exception:
-    pass
+_pdfplumber_available = find_spec("pdfplumber") is not None
 
 requires_pdfplumber = pytest.mark.skipif(
     not _pdfplumber_available,

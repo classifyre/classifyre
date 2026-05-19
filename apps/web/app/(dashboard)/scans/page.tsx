@@ -36,6 +36,7 @@ const EMPTY_CHARTS: SearchRunnersChartsResponseDto = {
     running: 0,
     queued: 0,
     completed: 0,
+    warning: 0,
     failed: 0,
   },
   timeline: [],

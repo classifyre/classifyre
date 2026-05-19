@@ -48,6 +48,10 @@ export async function createTestApp(
     };
   }
 
+  console.log(
+    '[createTestApp] DATABASE_URL:',
+    process.env.DATABASE_URL?.substring(0, 120),
+  );
   let builder = Test.createTestingModule({ imports: [AppModule] });
   if (configure) {
     builder = configure(builder);

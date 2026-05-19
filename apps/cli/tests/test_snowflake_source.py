@@ -252,6 +252,7 @@ def test_snowflake_key_pair_connect_uses_private_key_bytes(
     assert captured_kwargs["user"] == "SOME_USER"
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_snowflake_fetch_content_pages_batches_for_all_strategy(
     monkeypatch: pytest.MonkeyPatch,
@@ -292,6 +293,9 @@ async def test_snowflake_fetch_content_pages_batches_for_all_strategy(
 
         def fetchall(self) -> list[tuple[Any, ...]]:
             return list(self._rows)
+
+        def fetchmany(self, size: int) -> list[tuple[Any, ...]]:
+            return list(self._rows[:size])
 
         def __enter__(self) -> _BatchCursor:
             return self

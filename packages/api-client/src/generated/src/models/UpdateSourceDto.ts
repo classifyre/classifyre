@@ -75,6 +75,7 @@ export const UpdateSourceDtoTypeEnum = {
     Databricks: 'DATABRICKS',
     Snowflake: 'SNOWFLAKE',
     Mongodb: 'MONGODB',
+    Neo4J: 'NEO4J',
     Powerbi: 'POWERBI',
     Tableau: 'TABLEAU',
     Confluence: 'CONFLUENCE',

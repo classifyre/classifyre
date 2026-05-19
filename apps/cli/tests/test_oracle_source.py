@@ -255,6 +255,7 @@ async def test_oracle_extract_runs_detector_pipeline_when_enabled(
     assert processed_batches == [1]
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_oracle_fetch_content_pages_batches_for_all_strategy(
     monkeypatch: pytest.MonkeyPatch,
@@ -297,6 +298,9 @@ async def test_oracle_fetch_content_pages_batches_for_all_strategy(
 
         def fetchall(self) -> list[tuple[Any, ...]]:
             return list(self._rows)
+
+        def fetchmany(self, size: int) -> list[tuple[Any, ...]]:
+            return list(self._rows[:size])
 
         def __enter__(self) -> _BatchCursor:
             return self

@@ -169,6 +169,7 @@ export class FindingsService {
       { customDetectorName: { contains: search, mode: 'insensitive' } },
       { category: { contains: search, mode: 'insensitive' } },
       { detectionIdentity: { contains: search, mode: 'insensitive' } },
+      { matchedContent: { contains: search, mode: 'insensitive' } },
       {
         asset: {
           is: {

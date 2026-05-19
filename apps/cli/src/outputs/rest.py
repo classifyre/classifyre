@@ -177,6 +177,41 @@ class RestOutputSink:
                 update_error,
             )
 
+    async def register_discovered_assets(self, hashes: list[str]) -> None:
+        runner_id = self._require_runner_id()
+        for i in range(0, len(hashes), 500):
+            chunk = hashes[i : i + 500]
+            self._request_json(
+                "POST",
+                f"/runners/{runner_id}/assets/discover",
+                {"assetHashes": chunk},
+            )
+
+    async def update_asset_status(
+        self,
+        asset_hash: str,
+        status: str,
+        error_message: str | None = None,
+        findings_total: int | None = None,
+        findings_by_severity: dict[str, int] | None = None,
+        findings_by_detector: dict[str, dict[str, int]] | None = None,
+    ) -> None:
+        runner_id = self._require_runner_id()
+        item: dict[str, Any] = {"assetHash": asset_hash, "status": status}
+        if error_message is not None:
+            item["errorMessage"] = error_message[:2000]
+        if findings_total is not None:
+            item["findingsTotal"] = findings_total
+        if findings_by_severity is not None:
+            item["findingsBySeverity"] = findings_by_severity
+        if findings_by_detector is not None:
+            item["findingsByDetector"] = findings_by_detector
+        self._request_json(
+            "PATCH",
+            f"/runners/{runner_id}/assets/status",
+            {"assets": [item]},
+        )
+
     def _require_source_id(self) -> str:
         source_id = self.context.source_id
         if not source_id:

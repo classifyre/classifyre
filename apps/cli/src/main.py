@@ -94,6 +94,26 @@ def load_recipe(recipe_path: str) -> dict[str, Any]:
             sys.exit(1)
 
 
+def _compute_findings_counts(
+    findings: list[Any],
+) -> tuple[int, dict[str, int], dict[str, dict[str, int]]]:
+    """Return (total, by_severity, by_detector) counts from a findings list."""
+    by_severity: dict[str, int] = {}
+    by_detector: dict[str, dict[str, int]] = {}
+
+    for f in findings:
+        severity = str(getattr(f, "severity", None) or "UNKNOWN")
+        detector = str(getattr(f, "detector_type", None) or "UNKNOWN")
+
+        by_severity[severity] = by_severity.get(severity, 0) + 1
+
+        entry = by_detector.setdefault(detector, {"total": 0})
+        entry["total"] += 1
+        entry[severity] = entry.get(severity, 0) + 1
+
+    return len(findings), by_severity, by_detector
+
+
 def _asset_to_payload(asset: Any) -> dict[str, Any]:
     if hasattr(asset, "model_dump"):
         payload = asset.model_dump(mode="json", exclude_none=True)
@@ -158,9 +178,6 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     await sink.start()
                     sink_started = True
 
-                    # Build detector pipeline directly so we can stream in two phases:
-                    # 1) stub assets appear in the API immediately, 2) detector
-                    # results are pushed as they complete.
                     from .pipeline.detector_pipeline import DetectorPipeline
 
                     pipeline = DetectorPipeline.from_recipe(
@@ -171,8 +188,11 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     )
                     has_detectors = bool(pipeline.detectors)
 
-                    output_batch_count = 0
+                    # --- Phase 1: Discovery ---
+                    source.set_discovery_only(True)
+                    all_stubs: list[Any] = []
                     total_assets = 0
+                    output_batch_count = 0
 
                     async for raw_batch in source.extract_raw():
                         if not raw_batch:
@@ -181,54 +201,122 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         batch_size = len(raw_batch)
                         total_assets += batch_size
 
-                        # Phase 1: Emit stub assets immediately so they appear in the UI
                         stub_batch = [_asset_to_payload(asset) for asset in raw_batch]
                         for stub in stub_batch:
                             stub["findings"] = []
                         await sink.emit_batch(stub_batch, skip_findings=True)
                         output_batch_count += 1
+
+                        hashes = [s["hash"] for s in stub_batch if s.get("hash")]
+                        if hasattr(sink, "register_discovered_assets") and hashes:
+                            await sink.register_discovered_assets(hashes)
+
+                        all_stubs.extend(raw_batch)
                         logger.info(
-                            "Emitted %s stub assets (total: %s)",
+                            "Discovered %s assets (total: %s)",
                             batch_size,
                             total_assets,
                         )
 
-                        # Phase 2: Run detectors and emit results as they complete
-                        if has_detectors:
-                            result_count = 0
-                            flush_count = 0
-                            pending_results: list[dict[str, Any]] = []
-                            async for processed in pipeline.process_stream(raw_batch):
-                                pending_results.append(_asset_to_payload(processed))
-                                result_count += 1
-                                if len(pending_results) >= args.detector_flush_batch_size:
-                                    flush_count += 1
-                                    logger.info(
-                                        "Flushing detector batch %s: %s asset(s) (total processed: %s/%s)",
-                                        flush_count,
-                                        len(pending_results),
-                                        result_count,
-                                        batch_size,
+                    source.set_discovery_only(False)
+                    logger.info("Phase 1 complete: %d assets discovered", total_assets)
+
+                    # --- Phase 2: Processing ---
+                    if has_detectors and all_stubs:
+                        import asyncio as _asyncio
+
+                        workers = args.processing_workers
+                        semaphore = _asyncio.Semaphore(workers)
+                        processed_count = 0
+                        error_count = 0
+
+                        async def _process_one(asset: Any) -> None:
+                            nonlocal processed_count, error_count
+                            async with semaphore:
+                                asset_hash = getattr(asset, "hash", None) or ""
+                                try:
+                                    if hasattr(sink, "update_asset_status"):
+                                        await sink.update_asset_status(asset_hash, "PROCESSING")
+
+                                    async def _on_findings_flushed(partial: list[Any]) -> None:
+                                        # partial is the full accumulated findings list from the pipeline
+                                        stub_payload = _asset_to_payload(asset)
+                                        stub_payload["findings"] = [
+                                            f.model_dump(mode="json", exclude_none=True)
+                                            if hasattr(f, "model_dump")
+                                            else f
+                                            for f in partial
+                                        ]
+                                        await sink.emit_batch([stub_payload], skip_findings=False)
+                                        if hasattr(sink, "update_asset_status"):
+                                            f_total, f_by_sev, f_by_det = _compute_findings_counts(
+                                                partial
+                                            )
+                                            await sink.update_asset_status(
+                                                asset_hash,
+                                                "PROCESSING",
+                                                findings_total=f_total,
+                                                findings_by_severity=f_by_sev,
+                                                findings_by_detector=f_by_det,
+                                            )
+
+                                    result = await pipeline.process_single_asset(
+                                        asset,
+                                        on_findings_flushed=_on_findings_flushed,
+                                        findings_flush_size=args.detector_flush_batch_size,
                                     )
-                                    await sink.emit_batch(pending_results, skip_findings=False)
-                                    pending_results = []
+                                    payload = _asset_to_payload(result)
+                                    await sink.emit_batch([payload], skip_findings=False)
 
-                            if pending_results:
-                                flush_count += 1
-                                logger.info(
-                                    "Flushing detector batch %s (final): %s asset(s) (total processed: %s/%s)",
-                                    flush_count,
-                                    len(pending_results),
-                                    result_count,
-                                    batch_size,
-                                )
-                                await sink.emit_batch(pending_results, skip_findings=False)
+                                    if hasattr(sink, "update_asset_status"):
+                                        f_total, f_by_sev, f_by_det = _compute_findings_counts(
+                                            result.findings or []
+                                        )
+                                        await sink.update_asset_status(
+                                            asset_hash,
+                                            "PROCESSED",
+                                            findings_total=f_total,
+                                            findings_by_severity=f_by_sev,
+                                            findings_by_detector=f_by_det,
+                                        )
 
-                            logger.info(
-                                "Detector results streamed for %s/%s assets in batch",
-                                result_count,
-                                batch_size,
+                                    source.evict_asset_cache(asset_hash)
+                                    processed_count += 1
+                                except Exception as exc:
+                                    error_count += 1
+                                    logger.error("Asset %s failed: %s", asset_hash, exc)
+                                    if hasattr(sink, "update_asset_status"):
+                                        try:
+                                            error_msg = str(exc) or type(exc).__name__
+                                            await sink.update_asset_status(
+                                                asset_hash, "ERROR", error_msg
+                                            )
+                                        except Exception:
+                                            pass
+
+                        tasks = [_asyncio.create_task(_process_one(a)) for a in all_stubs]
+                        await _asyncio.gather(*tasks, return_exceptions=True)
+                        logger.info(
+                            "Phase 2 complete: %d processed, %d errors",
+                            processed_count,
+                            error_count,
+                        )
+                    elif all_stubs and hasattr(sink, "update_asset_status"):
+                        # No detectors configured: mark discovered assets as PROCESSED
+                        import asyncio as _asyncio
+
+                        async def _mark_processed(asset: Any) -> None:
+                            asset_hash = getattr(asset, "hash", None) or ""
+                            await sink.update_asset_status(
+                                asset_hash, "PROCESSED", findings_total=0
                             )
+
+                        tasks = [_asyncio.create_task(_mark_processed(a)) for a in all_stubs]
+                        await _asyncio.gather(*tasks, return_exceptions=True)
+                        logger.info(
+                            "Phase 2 skipped (no detectors): %d assets marked processed",
+                            len(all_stubs),
+                        )
 
                     await sink.finish()
                     logger.info(
@@ -444,6 +532,12 @@ def main() -> None:
         default=None,
         help="Max assets processed in parallel by the detector pipeline (default: 10, env: CLASSIFYRE_DETECTOR_MAX_CONCURRENT)",
     )
+    parser.add_argument(
+        "--processing-workers",
+        type=int,
+        default=None,
+        help="Number of parallel asset-processing workers in Phase 2 (default: 2, env: CLASSIFYRE_PROCESSING_WORKERS)",
+    )
 
     args = parser.parse_args()
 
@@ -462,6 +556,14 @@ def main() -> None:
         except ValueError:
             args.detector_max_concurrent = 10
     args.detector_max_concurrent = max(args.detector_max_concurrent, 1)
+
+    if args.processing_workers is None:
+        env_val = os.environ.get("CLASSIFYRE_PROCESSING_WORKERS")
+        try:
+            args.processing_workers = int(env_val) if env_val else 2
+        except ValueError:
+            args.processing_workers = 2
+    args.processing_workers = max(args.processing_workers, 1)
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)

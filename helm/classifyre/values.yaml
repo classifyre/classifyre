@@ -76,6 +76,10 @@ api:
     # -- deleted (including their logs) when a new run is triggered and the count
     # -- exceeds this value. Set to "0" to disable cleanup.
     MAX_RUNNERS_PER_SOURCE: "5"
+    # -- Maximum number of runners that can execute concurrently across all sources.
+    # -- New runs are queued in PENDING state when this limit is reached.
+    # -- Set to "0" to disable the limit (unlimited concurrency).
+    MAX_CONCURRENT_RUNNERS: "3"
     # -- Enable read-only demo mode. When "true" all mutating API operations return 403.
     DEMO_MODE: "false"
 
@@ -243,13 +247,13 @@ api:
     serviceAccountName: ""
     # -- Retry attempts for failed CLI jobs.
     backoffLimit: 2
-    # -- Max runtime per CLI job (seconds).
+    # -- Max runtime per CLI job (seconds). Increase for large data sources.
     activeDeadlineSeconds: 14400
     # -- TTL for completed CLI jobs (seconds). Ignored when cleanup policy deletes jobs immediately.
     ttlSecondsAfterFinished: 1800
     # -- Cleanup policy for CLI jobs: none, failed, or always.
     cleanupPolicy: always
-    # -- Max time API waits for job completion (seconds).
+    # -- Max time API waits for job completion (seconds). Should exceed activeDeadlineSeconds.
     waitTimeoutSeconds: 15300
     # -- Poll interval while waiting for job completion (milliseconds).
     pollIntervalMs: 2000
@@ -261,6 +265,8 @@ api:
     detectorFlushBatchSize: 5
     # -- Max assets processed in parallel by the detector pipeline.
     detectorMaxConcurrent: 10
+    # -- Number of parallel asset-processing workers in Phase 2.
+    processingWorkers: 2
 
     resources:
       # -- CLI job resource requests.

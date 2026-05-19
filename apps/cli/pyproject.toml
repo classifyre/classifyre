@@ -143,6 +143,9 @@ snowflake = [
 mongodb = [
     "pymongo>=4.15.2,<5.0.0",
 ]
+neo4j = [
+    "neo4j>=5.0.0,<6.0.0",
+]
 tableau = [
     "tableauserverclient>=0.38,<1.0.0",
 ]
@@ -220,6 +223,12 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["bs4.*", "lxml.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "neo4j.*",
+]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
