@@ -84,9 +84,9 @@ export class FindingsService {
     return [];
   }
 
-  private buildSearchFindingsWhere(
+  private async buildSearchFindingsWhere(
     filters?: SearchFindingsRequestDto['filters'],
-  ): Prisma.FindingWhereInput {
+  ): Promise<Prisma.FindingWhereInput> {
     const where: Prisma.FindingWhereInput = {};
     const includeResolved = filters?.includeResolved ?? false;
 
@@ -169,7 +169,6 @@ export class FindingsService {
       { customDetectorName: { contains: search, mode: 'insensitive' } },
       { category: { contains: search, mode: 'insensitive' } },
       { detectionIdentity: { contains: search, mode: 'insensitive' } },
-      { matchedContent: { contains: search, mode: 'insensitive' } },
       {
         asset: {
           is: {
@@ -207,6 +206,20 @@ export class FindingsService {
       !where.status
     ) {
       textOr.push({ status: upperSearch as FindingStatus });
+    }
+
+    // Full-text search on matched_content using standard PostgreSQL GIN index.
+    // Matches whole words only (no substring/partial matches).
+    try {
+      const ftsRows = await this.prisma.$queryRaw<{ id: string }[]>`
+        SELECT id FROM findings
+        WHERE to_tsvector('simple', matched_content) @@ plainto_tsquery('simple', ${search})
+      `;
+      if (ftsRows.length > 0) {
+        textOr.push({ id: { in: ftsRows.map((r) => r.id) } });
+      }
+    } catch {
+      // plainto_tsquery may reject certain inputs; skip FTS and rely on other OR conditions.
     }
 
     return {
@@ -381,7 +394,7 @@ export class FindingsService {
       typeof page.limit === 'number' ? page.limit : Number(page.limit ?? 50);
     const skip = Number.isFinite(rawSkip) ? Math.max(0, rawSkip) : 0;
     const limit = Number.isFinite(rawLimit) ? Math.max(1, rawLimit) : 50;
-    const where = this.buildSearchFindingsWhere(filters);
+    const where = await this.buildSearchFindingsWhere(filters);
 
     const [findings, total] = await this.prisma.$transaction([
       this.prisma.finding.findMany({
@@ -418,7 +431,7 @@ export class FindingsService {
 
   async searchCustomDetectorOptions(params: SearchFindingsRequestDto) {
     const filters = params?.filters ?? {};
-    const where = this.buildSearchFindingsWhere({
+    const where = await this.buildSearchFindingsWhere({
       ...filters,
       customDetectorKey: undefined,
       detectorType: [DetectorType.CUSTOM],
@@ -796,7 +809,7 @@ export class FindingsService {
 
     // ── Filter-based mode (select-all): use updateMany for efficiency ──────────
     if (filters && !ids?.length) {
-      const where = this.buildSearchFindingsWhere(filters);
+      const where = await this.buildSearchFindingsWhere(filters);
       const data: Prisma.FindingUpdateManyMutationInput = {};
       if (status) data.status = status;
       if (severity) data.severity = severity;
@@ -1248,7 +1261,7 @@ export class FindingsService {
     windowStart.setHours(0, 0, 0, 0);
 
     // Build where clause from filters, then apply window on top
-    const baseWhere = this.buildSearchFindingsWhere(request.filters);
+    const baseWhere = await this.buildSearchFindingsWhere(request.filters);
     const where: Prisma.FindingWhereInput = {
       ...baseWhere,
       firstDetectedAt: { gte: windowStart },

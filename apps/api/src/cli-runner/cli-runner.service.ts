@@ -1686,8 +1686,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           data: {
             status: RunnerAssetStatus.ERROR,
             completedAt,
-            errorMessage:
-              'Runner completed before asset processing finished',
+            errorMessage: 'Runner completed before asset processing finished',
           },
         });
 
