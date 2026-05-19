@@ -239,6 +239,7 @@ async def test_hive_extract_runs_detector_pipeline_when_enabled(
     assert processed_batches == [1]
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_hive_fetch_content_pages_batches_for_all_strategy(
     monkeypatch: pytest.MonkeyPatch,
