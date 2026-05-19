@@ -136,8 +136,64 @@ class DetectorCatalog(RootModel[list[DetectorCatalogEntry]]):
     """
 
     root: list[DetectorCatalogEntry] = Field(
-        ...,
+        [
+            {
+                'detector_type': 'SECRETS',
+                'lifecycle_status': 'active',
+                'priority': 'P0',
+                'categories': ['SECURITY', 'COMPLIANCE'],
+                'supported_asset_types': ['TXT', 'TABLE', 'URL'],
+                'recommended_model': 'detect-secrets',
+                'notes': 'Detects confidential credentials like API keys, tokens, or passwords that could lead to security breaches.',
+            },
+            {
+                'detector_type': 'PII',
+                'lifecycle_status': 'active',
+                'priority': 'P0',
+                'categories': ['PRIVACY', 'COMPLIANCE'],
+                'supported_asset_types': ['TXT', 'TABLE', 'URL'],
+                'recommended_model': 'presidio-analyzer',
+                'notes': 'Identifies personal data (e.g., names, emails, IDs) that must be protected for privacy and compliance.',
+            },
+            {
+                'detector_type': 'YARA',
+                'lifecycle_status': 'active',
+                'priority': 'P1',
+                'categories': ['THREAT', 'SECURITY'],
+                'supported_asset_types': ['TXT', 'TABLE', 'URL', 'BINARY'],
+                'recommended_model': 'yara-python',
+                'notes': 'Uses security rules to identify known malware patterns or suspicious file content.',
+            },
+            {
+                'detector_type': 'BROKEN_LINKS',
+                'lifecycle_status': 'active',
+                'priority': 'P2',
+                'categories': ['QUALITY'],
+                'supported_asset_types': ['TXT', 'TABLE', 'URL'],
+                'recommended_model': 'HTTP validation engine',
+                'notes': 'Finds non-working or invalid links that reduce content quality and user trust.',
+            },
+            {
+                'detector_type': 'CODE_SECURITY',
+                'lifecycle_status': 'active',
+                'priority': 'P3',
+                'categories': ['SECURITY', 'THREAT'],
+                'supported_asset_types': ['TXT', 'TABLE', 'OTHER'],
+                'recommended_model': 'bandit',
+                'notes': 'Identifies vulnerabilities or insecure patterns in source code (e.g., hardcoded secrets).',
+            },
+            {
+                'detector_type': 'CUSTOM',
+                'lifecycle_status': 'active',
+                'priority': 'P0',
+                'categories': ['CLASSIFICATION', 'COMPLIANCE'],
+                'supported_asset_types': ['TXT', 'TABLE', 'URL', 'IMAGE'],
+                'recommended_model': 'mDeBERTa-v3 + SetFit + GLiNER + HuggingFace transformers',
+                'notes': 'User-defined rules and pipelines tailored to specific business needs. Supports regex, GLiNER2, LLM, text classification, image classification, feature extraction, and object detection pipelines.',
+            },
+        ],
         description='Detector capability catalog used for planning and runtime routing',
+        validate_default=True,
     )
 
 
@@ -267,13 +323,15 @@ class PIIRecognizerPattern(BaseModel):
 
 class Patterns(RootModel[list[PIIRecognizerPattern]]):
     root: list[PIIRecognizerPattern] = Field(
-        ..., description='Regex patterns for this recognizer', min_length=1
+        None, description='Regex patterns for this recognizer', min_length=1
     )
 
 
 class DenyList(RootModel[list[str]]):
     root: list[str] = Field(
-        ..., description='Exact-match deny-list terms for this recognizer', min_length=1
+        None,
+        description='Exact-match deny-list terms for this recognizer',
+        min_length=1,
     )
 
 
@@ -313,7 +371,7 @@ class DetectorConfig(BaseModel):
 
 class EnabledPatterns(RootModel[list[SecretsEnabledPattern]]):
     root: list[SecretsEnabledPattern] = Field(
-        ...,
+        None,
         description='Subset of detect-secrets plugins to enable. When null all supported plugins are active.',
         min_length=1,
     )
@@ -321,7 +379,7 @@ class EnabledPatterns(RootModel[list[SecretsEnabledPattern]]):
 
 class EntropyLimitBase64(RootModel[float]):
     root: float = Field(
-        ...,
+        None,
         description='Entropy threshold for Base64HighEntropyString (0-8). Defaults to detect-secrets built-in of 4.5 when null. Lower values catch more secrets but increase false positives.',
         ge=0.0,
         le=8.0,
@@ -330,7 +388,7 @@ class EntropyLimitBase64(RootModel[float]):
 
 class EntropyLimitHex(RootModel[float]):
     root: float = Field(
-        ...,
+        None,
         description='Entropy threshold for HexHighEntropyString (0-8). Defaults to detect-secrets built-in of 3.0 when null. Lower values catch more secrets but increase false positives.',
         ge=0.0,
         le=8.0,
@@ -371,7 +429,7 @@ class SecretsDetectorConfig(DetectorConfig):
 
 class MaxLength(RootModel[int]):
     root: int = Field(
-        ...,
+        None,
         description="Override spaCy's nlp.max_length (default 1,000,000 chars). Set higher than your longest expected input to avoid the E088 error. Prefer chunk_size for very large texts.",
         ge=1,
     )
@@ -379,7 +437,7 @@ class MaxLength(RootModel[int]):
 
 class ChunkSize(RootModel[int]):
     root: int = Field(
-        ...,
+        None,
         description='Split text into chunks of this many characters before analysis. Findings from all chunks are merged with corrected offsets. When null the full text is passed as-is (subject to max_length).',
         ge=1,
     )
@@ -387,7 +445,7 @@ class ChunkSize(RootModel[int]):
 
 class ChunkOverlap(RootModel[int]):
     root: int = Field(
-        ...,
+        0,
         description='Character overlap between consecutive chunks. Helps detect entities that span a chunk boundary.',
         ge=0,
     )
@@ -428,6 +486,7 @@ class PIIDetectorConfig(DetectorConfig):
     chunk_overlap: ChunkOverlap | None = Field(
         0,
         description='Character overlap between consecutive chunks. Helps detect entities that span a chunk boundary.',
+        validate_default=True,
     )
     confidence_threshold: float | None = Field(
         0.7,
@@ -559,8 +618,8 @@ class Aggregate(StrEnum):
     first = 'first'
     last = 'last'
     list = 'list'
-    join_ = 'join'
-    count_ = 'count'
+    join = 'join'
+    count = 'count'
 
 
 class CustomExtractorField(BaseModel):
@@ -624,8 +683,8 @@ class CustomRulesetConfig(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    regex_rules: list[CustomRegexRule] | None = Field(default_factory=list)
-    keyword_rules: list[CustomKeywordRule] | None = Field(default_factory=list)
+    regex_rules: list[CustomRegexRule] | None = Field([], validate_default=True)
+    keyword_rules: list[CustomKeywordRule] | None = Field([], validate_default=True)
 
 
 class CustomClassifierLabel(BaseModel):
@@ -653,11 +712,11 @@ class CustomClassifierConfig(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    labels: list[CustomClassifierLabel] | None = Field(default_factory=list)
+    labels: list[CustomClassifierLabel] | None = Field([], validate_default=True)
     zero_shot_model: str | None = 'MoritzLaurer/mDeBERTa-v3-base-mnli-xnli'
     hypothesis_template: str | None = 'This text contains {}.'
     training_examples: list[CustomClassifierTrainingExample] | None = Field(
-        default_factory=list
+        [], validate_default=True
     )
     min_examples_per_label: int | None = Field(8, ge=1)
     setfit_model: str | None = (
@@ -682,7 +741,7 @@ class Skip(RootModel[str]):
 
 class Skips(RootModel[list[Skip]]):
     root: list[Skip] = Field(
-        ...,
+        None,
         description="Bandit test IDs to skip (e.g. ['B101', 'B105']). When null all tests run. Takes precedence over tests when both are set.",
         min_length=1,
     )
@@ -694,7 +753,7 @@ class Test(RootModel[str]):
 
 class Tests(RootModel[list[Test]]):
     root: list[Test] = Field(
-        ...,
+        None,
         description="Explicit list of Bandit test IDs to run (e.g. ['B102', 'B301']). When null all tests (minus skips) run.",
         min_length=1,
     )
@@ -922,13 +981,13 @@ class FunctionToApply(StrEnum):
 
 class MaxLength1(RootModel[int]):
     root: int = Field(
-        ..., description="Override the tokenizer's maximum sequence length.", ge=1
+        None, description="Override the tokenizer's maximum sequence length.", ge=1
     )
 
 
 class ChunkSize1(RootModel[int]):
     root: int = Field(
-        ...,
+        None,
         description='Split text into chunks of this many characters before classification.',
         ge=1,
     )
@@ -936,7 +995,7 @@ class ChunkSize1(RootModel[int]):
 
 class ChunkOverlap1(RootModel[int]):
     root: int = Field(
-        ..., description='Character overlap between consecutive chunks.', ge=0
+        0, description='Character overlap between consecutive chunks.', ge=0
     )
 
 
@@ -990,7 +1049,9 @@ class TextClassificationPipelineSchema(BaseModel):
         description='Split text into chunks of this many characters before classification.',
     )
     chunk_overlap: ChunkOverlap1 | None = Field(
-        0, description='Character overlap between consecutive chunks.'
+        0,
+        description='Character overlap between consecutive chunks.',
+        validate_default=True,
     )
 
 
@@ -1064,7 +1125,7 @@ class PoolingStrategy(StrEnum):
 
 class ChunkSize2(RootModel[int]):
     root: int = Field(
-        ...,
+        None,
         description='Split text into chunks of this many characters before embedding. Each chunk produces its own finding.',
         ge=1,
     )
@@ -1113,7 +1174,9 @@ class FeatureExtractionPipelineSchema(BaseModel):
         description='Split text into chunks of this many characters before embedding. Each chunk produces its own finding.',
     )
     chunk_overlap: ChunkOverlap1 | None = Field(
-        0, description='Character overlap between consecutive chunks.'
+        0,
+        description='Character overlap between consecutive chunks.',
+        validate_default=True,
     )
 
 
@@ -1123,7 +1186,7 @@ class Type7(StrEnum):
 
 class NmsThreshold(RootModel[float]):
     root: float = Field(
-        ...,
+        None,
         description="IoU threshold for non-maximum suppression. When null the model's default post-processing is used.",
         ge=0.0,
         le=1.0,
