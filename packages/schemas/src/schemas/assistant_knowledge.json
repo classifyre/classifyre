@@ -995,7 +995,6 @@
       "LATEST fetches the most recently modified items first \u2014 best for catching new or changed content.",
       "RANDOM picks a random subset each run \u2014 useful for broad coverage without recency bias.",
       "ALL scans every item with no limit \u2014 use only on small or static sources to avoid long runs.",
-      "Enable fetch_all_until_first_success to do one-time full coverage until the first successful run, then automatically fall back to your configured sampling strategy.",
       "The limit field controls how many items are fetched for LATEST and RANDOM strategies.",
       "For tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake), set order_by_column to a date column (e.g. updated_at) to improve LATEST accuracy.",
       "For S3-compatible storage, Azure Blob Storage, and Google Cloud Storage, LATEST uses provider last-modified timestamps while RANDOM selects a deterministic random subset from listed objects.",

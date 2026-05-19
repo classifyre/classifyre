@@ -62,6 +62,10 @@ data:
                     "value": "{{ .Values.api.cliJobs.detectorMaxConcurrent }}"
                   },
                   {
+                    "name": "CLASSIFYRE_PROCESSING_WORKERS",
+                    "value": "{{ .Values.api.cliJobs.processingWorkers }}"
+                  },
+                  {
                     "name": "HOME",
                     "value": "/tmp"
                   },

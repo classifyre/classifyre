@@ -43,21 +43,11 @@ class BaseSource(ABC):
         self.source_id = source_id
         self.runner_id = runner_id
         self._aborted = False
+        self._discovery_only = False
         self._attachment_name_by_hash: dict[str, str] = {}
 
     def _apply_initial_sampling_override(self, recipe: dict[str, Any]) -> None:
-        sampling = recipe.get("sampling")
-        if not isinstance(sampling, dict):
-            return
-
-        if sampling.get("fetch_all_until_first_success") is not True:
-            return
-
-        has_successful_run = self._read_bool_env(self.HAS_SUCCESSFUL_RUN_ENV)
-        if has_successful_run is not False:
-            return
-
-        sampling["strategy"] = "ALL"
+        pass
 
     @staticmethod
     def _read_bool_env(name: str) -> bool | None:
@@ -70,6 +60,13 @@ class BaseSource(ABC):
         if normalized in {"0", "false", "no", "n", "off"}:
             return False
         return None
+
+    def set_discovery_only(self, value: bool) -> None:
+        self._discovery_only = value
+
+    def evict_asset_cache(self, asset_hash: str) -> None:
+        """Free cached content for a processed asset. Override in subclasses."""
+        pass
 
     @abstractmethod
     def test_connection(self) -> dict[str, Any]:

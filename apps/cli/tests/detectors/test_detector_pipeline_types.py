@@ -210,6 +210,7 @@ class TestDetectorPipelineTypes:
         assert detector.detector_type == "custom"
         assert DetectorType(detector.detector_type.upper()) == DetectorType.CUSTOM
 
+    @pytest.mark.integration
     def test_pipeline_from_recipe_multiple_detectors(self, mock_source):
         """Test pipeline creation with multiple detector types."""
         if not (

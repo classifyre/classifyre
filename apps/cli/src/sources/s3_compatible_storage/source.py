@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from typing import Any
 from urllib.parse import quote
 
@@ -71,13 +72,12 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
             self._cached_client = self._build_client()
         return self._cached_client
 
-    def _list_objects(self) -> list[ObjectRef]:
+    def _list_objects(self) -> Iterator[ObjectRef]:
         client = self._client()
         bucket = self._required_bucket()
         prefix = self._prefix()
         max_keys = self._max_keys_per_page()
 
-        object_refs: list[ObjectRef] = []
         continuation_token: str | None = None
 
         while True:
@@ -102,13 +102,11 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
                 if not self._object_matches_extension_filters(key):
                     continue
 
-                object_refs.append(
-                    ObjectRef(
-                        key=key,
-                        size=size,
-                        last_modified=self._parse_datetime(item.get("LastModified")),
-                        etag=str(item.get("ETag")).strip('"') if item.get("ETag") else None,
-                    )
+                yield ObjectRef(
+                    key=key,
+                    size=size,
+                    last_modified=self._parse_datetime(item.get("LastModified")),
+                    etag=str(item.get("ETag")).strip('"') if item.get("ETag") else None,
                 )
 
             if not response.get("IsTruncated"):
@@ -116,8 +114,6 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
             continuation_token = response.get("NextContinuationToken")
             if not continuation_token:
                 break
-
-        return object_refs
 
     def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None, bool]:
         client = self._client()

@@ -503,6 +503,62 @@ export class KubernetesCliJobService {
     container.command = ['/bin/sh', '-lc'];
     container.args = [this.buildJobCommand(params.mode, workDir)];
 
+    // Apply per-source resource overrides from recipe
+    const recipeResources = (params.recipe as any)?.resources;
+    if (recipeResources && typeof recipeResources === 'object') {
+      container.resources = container.resources || {};
+      if (recipeResources.requests) {
+        container.resources.requests = {
+          ...(container.resources.requests || {}),
+          ...recipeResources.requests,
+        };
+      }
+      if (recipeResources.limits) {
+        container.resources.limits = {
+          ...(container.resources.limits || {}),
+          ...recipeResources.limits,
+        };
+      }
+      if (
+        typeof recipeResources.timeout_seconds === 'number' &&
+        recipeResources.timeout_seconds > 0
+      ) {
+        jobAny.spec.activeDeadlineSeconds = recipeResources.timeout_seconds;
+      }
+      if (
+        typeof recipeResources.processing_workers === 'number' &&
+        recipeResources.processing_workers > 0
+      ) {
+        const existing = container.env || [];
+        const idx = existing.findIndex(
+          (e: any) => e.name === 'CLASSIFYRE_PROCESSING_WORKERS',
+        );
+        const entry = {
+          name: 'CLASSIFYRE_PROCESSING_WORKERS',
+          value: String(recipeResources.processing_workers),
+        };
+        if (idx >= 0) existing[idx] = entry;
+        else existing.push(entry);
+        container.env = existing;
+      }
+      if (
+        typeof recipeResources.detector_max_concurrent === 'number' &&
+        recipeResources.detector_max_concurrent > 0
+      ) {
+        const existing = container.env || [];
+        const idx = existing.findIndex(
+          (e: any) => e.name === 'CLASSIFYRE_DETECTOR_MAX_CONCURRENT',
+        );
+        const entry = {
+          name: 'CLASSIFYRE_DETECTOR_MAX_CONCURRENT',
+          value: String(recipeResources.detector_max_concurrent),
+        };
+        if (idx >= 0) existing[idx] = entry;
+        else existing.push(entry);
+        container.env = existing;
+      }
+    }
+
     return job;
   }
 
@@ -583,6 +639,22 @@ export class KubernetesCliJobService {
           );
           await new Promise((resolve) => setTimeout(resolve, pollMs));
           continue;
+        }
+        const statusCode =
+          error?.code ?? error?.statusCode ?? error?.body?.code;
+        if (statusCode === 404) {
+          latestOutput = await this.syncJobLogs(
+            namespace,
+            jobName,
+            latestOutput,
+            onLogChunk,
+          );
+          return {
+            succeeded: false,
+            exitCode: undefined,
+            output: latestOutput,
+            failureContext: `Kubernetes Job ${namespace}/${jobName} was not found. It may have been deleted by TTL, evicted, or cleaned up before the status could be read.`,
+          };
         }
         throw error;
       }

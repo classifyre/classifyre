@@ -204,3 +204,64 @@ async def test_max_findings_limit():
 
     # Should limit to max_findings
     assert len(results) <= 1
+
+
+@pytest.mark.asyncio
+async def test_plugin_discovery_populates_specs():
+    """Test that _discover_plugins finds all expected detect-secrets plugins."""
+    from src.detectors.secrets.detector import _get_plugin_specs
+
+    specs = _get_plugin_specs()
+
+    # Core plugins should always be discoverable
+    assert "aws" in specs
+    assert "private_key" in specs
+    assert "slack" in specs
+    assert "github" in specs
+
+    # Each entry should be a (module_path, class_name) tuple
+    for _key, (mod, cls) in specs.items():
+        assert mod.startswith("detect_secrets.plugins.")
+        assert cls.endswith("Detector") or "HighEntropyString" in cls
+
+
+@pytest.mark.asyncio
+async def test_build_plugins_instantiates_without_errors():
+    """Test that _build_plugins creates plugin instances without temp files."""
+    detector = SecretsDetector()
+    plugins = detector._build_plugins()
+
+    # Should have at least the core plugins
+    assert len(plugins) > 0
+
+    # Each plugin should have an analyze_line method
+    for plugin in plugins:
+        assert hasattr(plugin, "analyze_line")
+
+
+@pytest.mark.asyncio
+async def test_detect_runs_entirely_in_memory():
+    """Test that detect() never touches the filesystem."""
+    import tempfile
+
+    detector = SecretsDetector()
+    content = "AWS_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE\n"
+
+    # Track whether any temp files were created during detection
+    original_mkstemp = tempfile.mkstemp
+    temp_created = []
+
+    def tracking_mkstemp(*args, **kwargs):
+        temp_created.append(True)
+        return original_mkstemp(*args, **kwargs)
+
+    tempfile.mkstemp = tracking_mkstemp
+    try:
+        results = await detector.detect(content)
+    finally:
+        tempfile.mkstemp = original_mkstemp
+
+    # No temp files should have been created
+    assert len(temp_created) == 0
+    # But we should still get findings
+    assert len(results) >= 1

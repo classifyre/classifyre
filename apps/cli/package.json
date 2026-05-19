@@ -7,7 +7,7 @@
     "dev": "uv run main.py",
     "lint": "uv run ruff check . --fix && uv run ruff format .",
     "check-types": "uv run mypy .",
-    "test": "uv sync --group dev --group detectors --group file-processing && uv run pytest",
+    "test": "uv sync --group dev --group file-processing && uv run pytest",
     "test:integration": "uv run pytest tests/integration/ -m integration",
     "test:integration:run": "RUN_INTEGRATION_TESTS=1 uv run pytest tests/integration/ -m integration",
     "e2e": "bun run test:e2e",

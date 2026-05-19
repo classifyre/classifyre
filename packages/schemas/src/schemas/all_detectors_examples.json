@@ -2,7 +2,7 @@
   "SECRETS": [
     {
       "name": "All Plugins",
-      "description": "Enable every detect-secrets plugin. Maximum recall across all known credential types: cloud providers, SaaS tokens, entropy strings, private keys, and keyword heuristics. Suitable as a broad baseline; tune confidence_threshold or disable noisy plugins (high_entropy_*, keyword) for production enforcement.",
+      "description": "Enable every detect-secrets plugin — maximum recall across cloud providers, SaaS tokens, entropy strings, private keys, and keyword heuristics. Good starting point; tune confidence_threshold or disable noisy plugins for production.",
       "config": {
         "enabled_patterns": null,
         "confidence_threshold": 0.7,
@@ -10,8 +10,8 @@
       }
     },
     {
-      "name": "High-Confidence Cloud Credentials",
-      "description": "Structured, vendor-specific tokens with the highest detection precision: AWS keys, GitHub/GitLab tokens, Slack webhooks, Stripe keys, Azure storage keys, OpenAI keys, PyPI tokens, and private keys. All patterns use regex heuristics built into detect-secrets with near-zero false-positive rates.",
+      "name": "Cloud Provider Keys",
+      "description": "High-precision detection of structured cloud credentials: AWS keys, GitHub/GitLab tokens, Slack bot tokens, OpenAI keys, Stripe live keys, Azure storage keys, PyPI tokens, and PEM private keys. Near-zero false positives.",
       "config": {
         "enabled_patterns": [
           "aws",
@@ -30,7 +30,7 @@
     },
     {
       "name": "SaaS & Developer Tokens",
-      "description": "Broad SaaS credential coverage for developer-facing content: Artifactory, Cloudant, Discord, IBM Cloud IAM/COS, JWT, Mailchimp, npm, SendGrid, Softlayer, Square OAuth, Telegram, and Twilio. Complements High-Confidence Cloud Credentials for full third-party secret coverage.",
+      "description": "Broad SaaS credential coverage: Artifactory, Discord, IBM Cloud, JWT, Mailchimp, npm, SendGrid, Square, Telegram, and Twilio tokens. Complements Cloud Provider Keys for full third-party secret coverage.",
       "config": {
         "enabled_patterns": [
           "artifactory",
@@ -54,7 +54,7 @@
     },
     {
       "name": "Entropy Scanner",
-      "description": "High-entropy string detection for unstructured or custom secret formats: Base64 (limit 4.5) and Hex (limit 3.0) using Shannon entropy. Best used alongside structured plugin scans to catch secrets that don't match any known pattern. Expect higher false-positive rates; pair with a deny-list or manual review step.",
+      "description": "Detect high-entropy strings that don't match known token patterns — catches custom secrets and randomly generated passwords. Higher false-positive rate; best paired with structured plugin scans.",
       "config": {
         "enabled_patterns": [
           "high_entropy_base64",
@@ -68,7 +68,7 @@
     },
     {
       "name": "Entropy Scanner — Strict",
-      "description": "Tightened entropy thresholds to reduce false positives at the cost of some recall. Base64 limit raised to 5.5 and Hex to 3.5. Suitable for automated enforcement pipelines where manual review is unavailable.",
+      "description": "Tightened entropy thresholds to reduce false positives at the cost of recall. Suitable for CI/CD enforcement pipelines where manual review is unavailable.",
       "config": {
         "enabled_patterns": [
           "high_entropy_base64",
@@ -82,7 +82,7 @@
     },
     {
       "name": "Keyword Heuristics",
-      "description": "detect-secrets KeywordDetector flags variable assignments whose names suggest secrets (e.g. password =, api_key =, secret =) regardless of the value. High false-positive rate by design — treat results as candidates for human review rather than confirmed secrets.",
+      "description": "Flag variable assignments whose names suggest secrets (password=, api_key=, secret=). High false-positive rate by design — treat as candidates for human review, not confirmed findings.",
       "config": {
         "enabled_patterns": [
           "keyword"
@@ -93,7 +93,7 @@
     },
     {
       "name": "IP Address Exposure",
-      "description": "Detects public IP addresses embedded in configuration, code, or documents. Useful for data governance audits where internal network topology must not leak into public repositories or documents.",
+      "description": "Detect public IP addresses in configs, code, or documents. Useful for data governance audits where internal network topology must not leak externally.",
       "config": {
         "enabled_patterns": [
           "ip_public"
@@ -104,7 +104,7 @@
     },
     {
       "name": "Enterprise Full Sweep",
-      "description": "All structured credential plugins plus entropy scanning at balanced thresholds. Covers the complete detect-secrets plugin catalog. Designed for periodic scheduled scans across large document corpora where false-positive review capacity exists.",
+      "description": "All structured credential plugins plus entropy scanning at balanced thresholds. Designed for scheduled scans across large document corpora where review capacity exists.",
       "config": {
         "enabled_patterns": [
           "aws",
@@ -145,7 +145,7 @@
   "PII": [
     {
       "name": "Global Coverage",
-      "description": "Detect all globally-recognized PII patterns: emails, phones, credit cards, crypto wallets, IP addresses, IBANs, URLs, and named entities (persons, locations, dates, NRP). Suitable as a broad baseline across any data source.",
+      "description": "All globally-recognized PII patterns: emails, phones, credit cards, crypto wallets, IPs, IBANs, URLs, and named entities (persons, locations, dates). Good baseline for any data source.",
       "config": {
         "enabled_patterns": [
           "CREDIT_CARD",
@@ -165,8 +165,8 @@
       }
     },
     {
-      "name": "US & North America",
-      "description": "US-specific government and financial identifiers: Social Security Numbers, driver licenses, passports, ITINs, and bank account numbers. Pair with Global Coverage for complete US compliance.",
+      "name": "US Compliance (SOC 2 / HIPAA)",
+      "description": "US government and financial identifiers: SSN, driver licenses, passports, ITIN, and bank accounts. Pair with Global Coverage for complete US compliance.",
       "config": {
         "enabled_patterns": [
           "US_SSN",
@@ -183,8 +183,8 @@
       }
     },
     {
-      "name": "European Union / GDPR",
-      "description": "GDPR-relevant entity types covering EU national identifiers, IBAN codes, medical licenses, and contact details. Designed for Article 5 data minimization and Article 35 DPIA workflows.",
+      "name": "GDPR (European Union)",
+      "description": "GDPR-relevant entity types: EU national identifiers, IBAN codes, medical licenses, and contact details. Designed for Article 5 data minimization and DPIA workflows.",
       "config": {
         "enabled_patterns": [
           "PERSON",
@@ -202,8 +202,8 @@
       }
     },
     {
-      "name": "DACH — Germany, Austria, Switzerland",
-      "description": "DACH-specific national identifiers for German tax IDs (DE_TAX_ID), Austrian social insurance numbers (AT_SVNR), and Swiss AHV pension numbers (CH_AHV), alongside EU-wide patterns for comprehensive DSGVO/DSG compliance.",
+      "name": "DACH (Germany, Austria, Switzerland)",
+      "description": "DACH-specific identifiers: German tax IDs, Austrian social insurance, Swiss AHV numbers, plus EU-wide patterns for DSGVO/DSG compliance.",
       "config": {
         "enabled_patterns": [
           "DE_TAX_ID",
@@ -221,7 +221,7 @@
     },
     {
       "name": "Spain",
-      "description": "Spanish national identifiers: NIF (Número de Identificación Fiscal) for citizens and NIE (Número de Identidad de Extranjero) for foreign residents. Combined with global contact patterns for full coverage.",
+      "description": "Spanish national identifiers: NIF for citizens and NIE for foreign residents, combined with contact patterns.",
       "config": {
         "enabled_patterns": [
           "ES_NIF",
@@ -236,7 +236,7 @@
     },
     {
       "name": "Italy",
-      "description": "Italian national identifiers: fiscal codes, passports, driver licenses, identity cards, and VAT codes. Covers compliance with Italy's Codice della Privacy and GDPR implementation.",
+      "description": "Italian identifiers: fiscal codes, passports, driver licenses, identity cards, and VAT codes for Codice della Privacy compliance.",
       "config": {
         "enabled_patterns": [
           "IT_FISCAL_CODE",
@@ -254,7 +254,7 @@
     },
     {
       "name": "United Kingdom",
-      "description": "UK-specific PII including NHS numbers, combined with global contact and financial patterns. Covers UK GDPR and NHS data governance requirements.",
+      "description": "UK-specific PII including NHS numbers for UK GDPR and NHS data governance compliance.",
       "config": {
         "enabled_patterns": [
           "UK_NHS",
@@ -270,7 +270,7 @@
     },
     {
       "name": "Australia",
-      "description": "Australian identifiers: Tax File Numbers (TFN), Medicare cards, ABN, and ACN. Supports compliance with the Privacy Act 1988 and Australian Privacy Principles.",
+      "description": "Australian identifiers: Tax File Numbers, Medicare cards, ABN, and ACN for Privacy Act 1988 compliance.",
       "config": {
         "enabled_patterns": [
           "AU_TFN",
@@ -286,7 +286,7 @@
     },
     {
       "name": "Singapore",
-      "description": "Singapore identifiers: NRIC/FIN national registration numbers and UEN (Unique Entity Numbers for businesses). Supports PDPA compliance.",
+      "description": "Singapore identifiers: NRIC/FIN and UEN for PDPA compliance.",
       "config": {
         "enabled_patterns": [
           "SG_NRIC_FIN",
@@ -300,7 +300,7 @@
     },
     {
       "name": "India",
-      "description": "Indian identifiers: PAN cards, Aadhaar biometric IDs, voter IDs, and vehicle registration numbers. Supports compliance with DPDP Act 2023 and IT Act requirements.",
+      "description": "Indian identifiers: PAN, Aadhaar, voter IDs, and vehicle registration for DPDP Act 2023 compliance.",
       "config": {
         "enabled_patterns": [
           "IN_PAN",
@@ -315,8 +315,8 @@
       }
     },
     {
-      "name": "Nordic — Finland & Poland",
-      "description": "Finnish personal identity codes (HETU) and Polish PESEL numbers, alongside contact identifiers. Covers local privacy law requirements for Scandinavian and Polish markets.",
+      "name": "Nordic (Finland & Poland)",
+      "description": "Finnish personal identity codes (HETU) and Polish PESEL numbers for local privacy law compliance.",
       "config": {
         "enabled_patterns": [
           "FI_PERSONAL_IDENTITY_CODE",
@@ -330,8 +330,8 @@
       }
     },
     {
-      "name": "Medical / Clinical",
-      "description": "Health-sector PII: medical license numbers, named persons, dates (appointments, DOB), locations (clinics, addresses), and contact details. Applies to clinical notes, patient records, and health system exports.",
+      "name": "Healthcare / Clinical",
+      "description": "Health-sector PII: medical licenses, patient names, dates, clinic locations, and contact details. For clinical notes, patient records, and health system exports.",
       "config": {
         "enabled_patterns": [
           "MEDICAL_LICENSE",
@@ -348,8 +348,8 @@
       }
     },
     {
-      "name": "Finance & Banking",
-      "description": "Financial PII: credit cards, IBAN codes, crypto wallet addresses, bank account numbers, and tax identifiers. Suitable for PCI-DSS scope assessments and financial audit workflows.",
+      "name": "Finance & Banking (PCI-DSS)",
+      "description": "Financial PII: credit cards, IBANs, crypto wallets, bank accounts, and tax identifiers. For PCI-DSS scope assessments and financial audits.",
       "config": {
         "enabled_patterns": [
           "CREDIT_CARD",
@@ -370,8 +370,8 @@
       }
     },
     {
-      "name": "High Confidence Global",
-      "description": "Maximum-precision scan across all supported entity types with an elevated confidence threshold. Best for automated enforcement pipelines where false positives are costly.",
+      "name": "High Confidence Only",
+      "description": "Maximum-precision scan across all entity types with elevated confidence threshold. For automated enforcement pipelines where false positives are costly.",
       "config": {
         "enabled_patterns": null,
         "severity_threshold": "high",
@@ -379,8 +379,8 @@
       }
     },
     {
-      "name": "Custom Recognizer — Employee ID",
-      "description": "Extends the built-in PII detector with a regex recognizer for internal employee IDs (format EMP-XXXXXX). Demonstrates how to detect proprietary identifiers alongside standard PII.",
+      "name": "Custom — Employee ID Recognizer",
+      "description": "Extend PII detection with a regex recognizer for internal employee IDs (EMP-XXXXXX format). Shows how to detect proprietary identifiers alongside standard PII.",
       "config": {
         "enabled_patterns": [
           "PERSON",
@@ -410,8 +410,8 @@
       }
     },
     {
-      "name": "Custom Recognizer — Deny List",
-      "description": "Deny-list recognizer for internal code names or sensitive project terms that should be treated as PII in external communications.",
+      "name": "Custom — Project Code Deny List",
+      "description": "Deny-list recognizer for internal code names that should be treated as sensitive in external communications.",
       "config": {
         "enabled_patterns": [
           "PERSON",
@@ -441,8 +441,8 @@
   ],
   "YARA": [
     {
-      "name": "Secrets — Cloud Credentials",
-      "description": "Hardcoded cloud-provider credentials and API keys: AWS Access Key IDs, GitHub/GitLab tokens, Slack bot tokens, OpenAI API keys, Stripe live keys, PEM-encoded private keys, and JSON Web Tokens. Near-zero false-positive rate for all structured token formats.",
+      "name": "Cloud Credentials",
+      "description": "Hardcoded cloud credentials and API keys: AWS Access Keys, GitHub/GitLab tokens, Slack bot tokens, OpenAI keys, Stripe live keys, PEM private keys, and JWTs.",
       "config": {
         "rules": [
           {
@@ -477,7 +477,7 @@
           },
           {
             "name": "Slack_Token",
-            "description": "Slack API token — bot (xoxb), app (xoxa), user (xoxp), or refresh (xoxr)",
+            "description": "Slack API token — bot (xoxb), app (xoxa), or user (xoxp)",
             "severity": "critical",
             "category": "secrets",
             "strings": [
@@ -536,13 +536,13 @@
       }
     },
     {
-      "name": "Malware — Process Injection & Offensive Tools",
-      "description": "Detects Windows process-injection API sequences (requires 2 of 7 known APIs), known offensive tools by name (mimikatz, msfvenom, meterpreter, pypykatz, CobaltStrike), and registry run-key persistence patterns.",
+      "name": "Malware Indicators",
+      "description": "Windows process-injection APIs, known offensive tool names (mimikatz, msfvenom, CobaltStrike), and registry persistence patterns.",
       "config": {
         "rules": [
           {
             "name": "Process_Injection_APIs",
-            "description": "Two or more process-injection Win32 API names — high-confidence indicator of reflective DLL injection or process hollowing",
+            "description": "Two or more Win32 process-injection APIs — indicates reflective DLL injection or process hollowing",
             "severity": "critical",
             "category": "malware",
             "strings": [
@@ -590,13 +590,13 @@
       }
     },
     {
-      "name": "Suspicious Scripts — PowerShell & Shell",
-      "description": "Detects PowerShell download-and-execute chains (Net.WebClient + IEX), base64-encoded commands (-EncodedCommand, FromBase64String), shell curl/wget piped to an interpreter, Python exec+encoding obfuscation, and JavaScript eval/fromCharCode patterns.",
+      "name": "Suspicious Scripts",
+      "description": "PowerShell download-and-execute chains, base64-encoded commands, shell curl/wget pipe-to-exec, Python exec obfuscation, and JavaScript eval patterns.",
       "config": {
         "rules": [
           {
             "name": "PowerShell_Download_Exec",
-            "description": "PowerShell: download function combined with expression executor — classic cradle pattern",
+            "description": "PowerShell download + execute cradle pattern",
             "severity": "high",
             "category": "suspicious_scripts",
             "strings": [
@@ -607,7 +607,7 @@
           },
           {
             "name": "PowerShell_Encoded_Command",
-            "description": "PowerShell base64 command encoding — used to evade command-line logging",
+            "description": "PowerShell base64 command encoding for evasion",
             "severity": "high",
             "category": "suspicious_scripts",
             "strings": [
@@ -617,7 +617,7 @@
           },
           {
             "name": "Shell_Curl_Pipe_Exec",
-            "description": "Shell: curl or wget output piped directly into an interpreter",
+            "description": "Shell: curl or wget piped into an interpreter",
             "severity": "high",
             "category": "suspicious_scripts",
             "strings": [
@@ -628,7 +628,7 @@
           },
           {
             "name": "Python_Exec_Obfuscation",
-            "description": "Python obfuscation combining exec/compile with encoding primitives",
+            "description": "Python obfuscation combining exec/compile with encoding",
             "severity": "medium",
             "category": "suspicious_scripts",
             "strings": [
@@ -642,7 +642,7 @@
           },
           {
             "name": "JavaScript_Eval_Obfuscation",
-            "description": "JavaScript obfuscation via eval and character-encoding primitives",
+            "description": "JavaScript obfuscation via eval and character encoding",
             "severity": "medium",
             "category": "suspicious_scripts",
             "strings": [
@@ -661,12 +661,12 @@
     },
     {
       "name": "Office Macro Threats",
-      "description": "Malicious VBA macro patterns: auto-execution entry points (AutoOpen, Workbook_Open), shell spawning via WScript.Shell or ShellExecute combined with cmd.exe/PowerShell, and network downloads via MSXML2 or WinHttp paired with an HTTP URL.",
+      "description": "Malicious VBA macro patterns: auto-execution entry points, shell spawning via WScript.Shell, and network downloads via MSXML2.",
       "config": {
         "rules": [
           {
             "name": "VBA_Auto_Execution",
-            "description": "VBA macro auto-execution entry points that run without user interaction",
+            "description": "VBA macro auto-execution entry points",
             "severity": "high",
             "category": "office_macros",
             "strings": [
@@ -676,7 +676,7 @@
           },
           {
             "name": "VBA_Shell_Execution",
-            "description": "VBA macro creating a shell to run cmd.exe or PowerShell",
+            "description": "VBA macro spawning cmd.exe or PowerShell",
             "severity": "critical",
             "category": "office_macros",
             "strings": [
@@ -687,7 +687,7 @@
           },
           {
             "name": "VBA_Network_Download",
-            "description": "VBA macro downloading content from the network via MSXML or WinHttp",
+            "description": "VBA macro downloading content via MSXML or WinHttp",
             "severity": "critical",
             "category": "office_macros",
             "strings": [
@@ -704,12 +704,12 @@
     },
     {
       "name": "PDF Threat Indicators",
-      "description": "Suspicious PDF structure markers in extracted text: embedded JavaScript actions (/JavaScript, /JS, app.alert), auto-open and launch actions (/OpenAction, /Launch, /AA), and form-submit or data-import streams.",
+      "description": "Suspicious PDF structure: embedded JavaScript, auto-open/launch actions, and form-submit/data-import streams.",
       "config": {
         "rules": [
           {
             "name": "PDF_Embedded_JavaScript",
-            "description": "PDF with embedded JavaScript action — can execute code on open",
+            "description": "PDF with embedded JavaScript action",
             "severity": "high",
             "category": "pdf_threats",
             "strings": [
@@ -722,7 +722,7 @@
           },
           {
             "name": "PDF_Auto_Open_Action",
-            "description": "PDF /OpenAction, /Launch, or /AA stream — executes on document open",
+            "description": "PDF auto-open, launch, or additional-action stream",
             "severity": "high",
             "category": "pdf_threats",
             "strings": [
@@ -734,7 +734,7 @@
           },
           {
             "name": "PDF_Form_Submit_Or_Import",
-            "description": "PDF form-submission or external data-import action",
+            "description": "PDF form submission or external data import",
             "severity": "medium",
             "category": "pdf_threats",
             "strings": [
@@ -751,13 +751,13 @@
       }
     },
     {
-      "name": "Supply Chain — Miners, Reverse Shells & Exfil",
-      "description": "Crypto-miner strings (xmrig, stratum+tcp, mining pool patterns), reverse-shell payloads (/dev/tcp, nc -e /bin/bash), obfuscated npm/pip install hooks (eval+Buffer.from, postinstall), and attacker-controlled exfiltration infrastructure (ngrok, webhook.site, interactsh).",
+      "name": "Supply Chain Threats",
+      "description": "Crypto miners, reverse shells, obfuscated npm/pip install hooks, and exfiltration infrastructure (ngrok, webhook.site, interactsh).",
       "config": {
         "rules": [
           {
             "name": "Crypto_Miner_Indicators",
-            "description": "Crypto-miner tool names or protocol strings",
+            "description": "Crypto-miner tool names or mining pool protocol strings",
             "severity": "critical",
             "category": "supply_chain",
             "strings": [
@@ -767,7 +767,7 @@
           },
           {
             "name": "Reverse_Shell_Payload",
-            "description": "Reverse shell via /dev/tcp, nc -e, socat+mkfifo",
+            "description": "Reverse shell via /dev/tcp, nc -e, or socat+mkfifo",
             "severity": "critical",
             "category": "supply_chain",
             "strings": [
@@ -779,7 +779,7 @@
           },
           {
             "name": "Obfuscated_Install_Hook",
-            "description": "Obfuscated code evaluated inside an npm or pip install lifecycle hook",
+            "description": "Obfuscated code in npm or pip install lifecycle hook",
             "severity": "high",
             "category": "supply_chain",
             "strings": [
@@ -790,7 +790,7 @@
           },
           {
             "name": "Exfil_Infrastructure",
-            "description": "Attacker-controlled infrastructure commonly used for out-of-band data exfiltration",
+            "description": "Known exfiltration services: ngrok, requestbin, webhook.site, burpcollaborator, interactsh",
             "severity": "high",
             "category": "supply_chain",
             "strings": [
@@ -806,12 +806,12 @@
     },
     {
       "name": "Network Threat Indicators",
-      "description": "C2 framework artifacts (CobaltStrike, ReflectiveDll, Metasploit module paths), known RAT strings (QuasarRAT, AsyncRAT, NanoCore, njRAT, DcRAT, Remcos), and DNS-tunneling tools (dnscat, iodine, dns2tcp). Best applied to log exports and configuration dumps.",
+      "description": "C2 framework artifacts (CobaltStrike, Metasploit), known RAT strings (QuasarRAT, AsyncRAT, NanoCore), and DNS-tunneling tools.",
       "config": {
         "rules": [
           {
             "name": "CobaltStrike_Artifacts",
-            "description": "CobaltStrike beacon, ReflectiveDll loader, or Metasploit module path strings",
+            "description": "CobaltStrike beacon, ReflectiveDll, or Metasploit module path strings",
             "severity": "critical",
             "category": "network_ioc",
             "strings": [
@@ -821,7 +821,7 @@
           },
           {
             "name": "Known_RAT_Strings",
-            "description": "Well-known Remote Access Trojan artifact strings embedded in files or configs",
+            "description": "Well-known Remote Access Trojan artifact strings",
             "severity": "high",
             "category": "network_ioc",
             "strings": [
@@ -831,7 +831,7 @@
           },
           {
             "name": "DNS_Tunneling_Tools",
-            "description": "DNS-tunneling tool names used to exfiltrate data over DNS queries",
+            "description": "DNS-tunneling tools used for data exfiltration over DNS",
             "severity": "high",
             "category": "network_ioc",
             "strings": [
@@ -847,7 +847,7 @@
     },
     {
       "name": "Credential Theft Patterns",
-      "description": "Keylogger and keyboard-hook API names (GetAsyncKeyState, SetWindowsHookEx, WH_KEYBOARD), phishing HTML credential-form structure (password field + PHP action + submit button), and anonymous paste or file-transfer services used for credential exfiltration.",
+      "description": "Keylogger APIs, phishing credential-form HTML structure, and paste/file-transfer services used for credential exfiltration.",
       "config": {
         "rules": [
           {
@@ -862,7 +862,7 @@
           },
           {
             "name": "Phishing_Credential_Form",
-            "description": "HTML form structure consistent with a credential-harvesting phishing page",
+            "description": "HTML form consistent with credential-harvesting phishing page",
             "severity": "high",
             "category": "credential_theft",
             "strings": [
@@ -874,7 +874,7 @@
           },
           {
             "name": "Credential_Exfil_Services",
-            "description": "Anonymous paste and file-transfer services frequently abused for credential exfiltration",
+            "description": "Anonymous paste/file-transfer services abused for credential exfiltration",
             "severity": "high",
             "category": "credential_theft",
             "strings": [
@@ -889,8 +889,8 @@
       }
     },
     {
-      "name": "Custom Rule — Internal Token Leak",
-      "description": "Example of a custom rule alongside cloud-credential rules. Detects proprietary internal service tokens in format SVC-XXXXXXXX (8 hex chars) that should never appear in public documents or S3 exports.",
+      "name": "Custom — Internal Token Format",
+      "description": "Example custom YARA rule for detecting proprietary internal service tokens (SVC-XXXXXXXX). Combine with cloud credential rules for full coverage.",
       "config": {
         "rules": [
           {
@@ -937,7 +937,7 @@
   "CODE_SECURITY": [
     {
       "name": "Code Security Baseline",
-      "description": "Scan code snippets for insecure patterns using Bandit.",
+      "description": "Scan code snippets for insecure patterns using Bandit — catches common Python security issues like SQL injection, hardcoded passwords, and unsafe deserialization.",
       "config": {
         "confidence_threshold": 0.7,
         "max_findings": 50
@@ -947,7 +947,7 @@
   "CUSTOM": [
     {
       "name": "Support Ticket Extractor",
-      "description": "GLINER2 support ticket extractor — entities + classification in one pass",
+      "description": "Extract order IDs, monetary amounts, and customer intent from support tickets using GLINER2 NER + classification.",
       "config": {
         "custom_detector_key": "cust_support_ticket",
         "name": "Support Ticket Extractor",
@@ -971,8 +971,8 @@
       }
     },
     {
-      "name": "DACH Regulatory Entity Extractor",
-      "description": "GLINER2 DACH regulatory entity extractor — entities only",
+      "name": "Regulatory Entity Extractor (DACH)",
+      "description": "Extract regulatory bodies, GDPR article references, and legal risk terms from German/English documents using GLINER2.",
       "config": {
         "custom_detector_key": "cust_dach_entity_extractor",
         "name": "DACH Regulatory Entity Extractor",
@@ -991,8 +991,8 @@
       }
     },
     {
-      "name": "DACH Contract Risk Terms",
-      "description": "GLINER2 contract risk classifier — classification only",
+      "name": "Contract Risk Classifier (DACH)",
+      "description": "Classify contract clauses by legal risk category — liability, data protection, termination, indemnification. Multi-label classification with GLINER2.",
       "config": {
         "custom_detector_key": "cust_dach_contract_risk",
         "name": "DACH Contract Risk Terms",
@@ -1013,7 +1013,7 @@
     },
     {
       "name": "Internal Product Code Detector",
-      "description": "REGEX internal product code detector — no ML required",
+      "description": "Detect internal SKU codes (INT-OPS-12345) and project codes (PROJ-AB12CD34) leaking into public documents using regex patterns.",
       "config": {
         "custom_detector_key": "internal_product_codes",
         "name": "Internal Product Code Detector",
@@ -1037,8 +1037,8 @@
       }
     },
     {
-      "name": "German Invoice PII Ruleset",
-      "description": "REGEX German invoice PII — postal codes, IBANs, dates",
+      "name": "German Invoice PII (Regex)",
+      "description": "Detect German IBANs, postal codes with city names, and DD.MM.YYYY dates in invoices and financial documents.",
       "config": {
         "custom_detector_key": "cust_invoice_pii_ruleset",
         "name": "German Invoice PII Ruleset",
@@ -1066,8 +1066,8 @@
       }
     },
     {
-      "name": "API Key Leakage Detector",
-      "description": "REGEX API key and secret leakage detector with critical severity",
+      "name": "API Key Leakage Detector (Regex)",
+      "description": "Detect generic API key assignments, Bearer tokens, and base64-encoded secrets in documents and code snippets.",
       "config": {
         "custom_detector_key": "api_key_leakage",
         "name": "API Key Leakage Detector",
@@ -1101,7 +1101,7 @@
     },
     {
       "name": "Sarcasm & Irony Detector",
-      "description": "GLINER2 sarcasm & irony detector — classification",
+      "description": "Classify text as sarcastic, ironic, or sincere — useful for filtering user-generated content before sentiment analysis.",
       "config": {
         "custom_detector_key": "sarcasm_detector",
         "name": "Sarcasm & Irony Detector",
@@ -1121,8 +1121,8 @@
       }
     },
     {
-      "name": "Vendor & Supplier Entity Extractor",
-      "description": "GLINER2 vendor & supplier entity extractor",
+      "name": "Vendor & Supplier Extractor",
+      "description": "Extract vendor names, contract values, and Incoterms delivery terms from procurement documents.",
       "config": {
         "custom_detector_key": "vendor_entity_extractor",
         "name": "Vendor & Supplier Entity Extractor",
@@ -1141,7 +1141,7 @@
     },
     {
       "name": "Spam Detector",
-      "description": "Text classification — detect spam and unsolicited promotional content using a lightweight BERT model.",
+      "description": "Classify text as spam or legitimate using a lightweight BERT model — ideal for filtering user-generated content and form submissions.",
       "config": {
         "custom_detector_key": "spam_detector",
         "name": "Spam Detector",
@@ -1158,7 +1158,7 @@
     },
     {
       "name": "Sentiment Analyzer",
-      "description": "Text classification — classify text as positive or negative sentiment using DistilBERT.",
+      "description": "Classify text as positive or negative sentiment using DistilBERT — useful for customer feedback analysis.",
       "config": {
         "custom_detector_key": "sentiment_analyzer",
         "name": "Sentiment Analyzer",
@@ -1176,7 +1176,7 @@
     },
     {
       "name": "Multi-label Topic Classifier",
-      "description": "Text classification — classify documents into multiple topics simultaneously using sigmoid activation.",
+      "description": "Classify documents into multiple topics simultaneously — flag legal/compliance and finance content with elevated severity.",
       "config": {
         "custom_detector_key": "topic_classifier",
         "name": "Multi-label Topic Classifier",
@@ -1195,7 +1195,7 @@
     },
     {
       "name": "NSFW Image Detector",
-      "description": "Image classification — detect sexually explicit or inappropriate images using Falconsai's NSFW model.",
+      "description": "Detect sexually explicit or inappropriate images for content moderation in document pipelines.",
       "config": {
         "custom_detector_key": "nsfw_detector",
         "name": "NSFW Image Detector",
@@ -1216,7 +1216,7 @@
     },
     {
       "name": "General Image Classifier (ViT)",
-      "description": "Image classification — baseline ImageNet-1k classification using google/vit-base-patch16-224. Returns top-5 predicted labels.",
+      "description": "Baseline ImageNet-1k classification using ViT — returns top-5 predicted labels for document image categorization.",
       "config": {
         "custom_detector_key": "vit_imagenet",
         "name": "General Image Classifier (ViT)",
@@ -1230,8 +1230,8 @@
       }
     },
     {
-      "name": "Semantic Embeddings (BGE — Balanced)",
-      "description": "Feature extraction — produce L2-normalised mean-pooled sentence embeddings with BAAI/bge-base-en-v1.5 for semantic search and RAG.",
+      "name": "Semantic Embeddings (BGE)",
+      "description": "Produce normalized sentence embeddings with BAAI/bge-base for semantic search and RAG pipelines.",
       "config": {
         "custom_detector_key": "bge_base_embedder",
         "name": "Semantic Embeddings (BGE — Balanced)",
@@ -1247,7 +1247,7 @@
     },
     {
       "name": "Lightweight Embeddings (MiniLM)",
-      "description": "Feature extraction — fast, small embeddings via sentence-transformers/all-MiniLM-L6-v2. Ideal for CPU inference and high-throughput pipelines.",
+      "description": "Fast, small embeddings via MiniLM — ideal for CPU inference and high-throughput pipelines.",
       "config": {
         "custom_detector_key": "minilm_embedder",
         "name": "Lightweight Embeddings (MiniLM)",
@@ -1264,7 +1264,7 @@
     },
     {
       "name": "Multilingual Embeddings (E5)",
-      "description": "Feature extraction — multilingual embeddings using intfloat/multilingual-e5-large for enterprise content in multiple languages.",
+      "description": "Multilingual embeddings using E5 — for enterprise content in multiple languages.",
       "config": {
         "custom_detector_key": "e5_multilingual_embedder",
         "name": "Multilingual Embeddings (E5)",
@@ -1280,7 +1280,7 @@
     },
     {
       "name": "General Object Detection (DETR)",
-      "description": "Object detection — detect common objects in images using the classic DETR transformer model.",
+      "description": "Detect common objects in images using DETR — useful for automated document image categorization.",
       "config": {
         "custom_detector_key": "detr_coco_detector",
         "name": "General Object Detection (DETR)",
@@ -1293,8 +1293,8 @@
       }
     },
     {
-      "name": "Security Screening — People & Weapons",
-      "description": "Object detection — flag images containing persons, weapons, or knives with high severity for content moderation and physical security.",
+      "name": "Security Screening (People & Weapons)",
+      "description": "Flag images containing persons, weapons, or vehicles for content moderation and physical security screening.",
       "config": {
         "custom_detector_key": "security_screening_detector",
         "name": "Security Screening — People & Weapons",
@@ -1313,7 +1313,7 @@
     },
     {
       "name": "Realtime Object Detection (RT-DETR)",
-      "description": "Object detection — production-grade realtime detection with RT-DETR for high-throughput image pipelines.",
+      "description": "Production-grade realtime detection with RT-DETR — for high-throughput image processing pipelines.",
       "config": {
         "custom_detector_key": "rtdetr_detector",
         "name": "Realtime Object Detection (RT-DETR)",

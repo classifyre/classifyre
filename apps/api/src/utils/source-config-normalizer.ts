@@ -244,14 +244,7 @@ function normalizeSampling(config: JsonRecord) {
     sampling.include_column_names = includeColumnNames;
   }
 
-  const fetchAllUntilFirstSuccess =
-    asBoolean(sampling.fetch_all_until_first_success) ??
-    asBoolean(optionalSampling?.fetch_all_until_first_success);
-  if (typeof fetchAllUntilFirstSuccess === 'boolean') {
-    sampling.fetch_all_until_first_success = fetchAllUntilFirstSuccess;
-  } else {
-    delete sampling.fetch_all_until_first_success;
-  }
+  delete sampling.fetch_all_until_first_success;
 
   const enableOcr =
     asBoolean(sampling.enable_ocr) ?? asBoolean(optionalSampling?.enable_ocr);

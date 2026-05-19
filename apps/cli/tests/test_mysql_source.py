@@ -188,6 +188,7 @@ def test_mysql_latest_sampling_falls_back_to_random() -> None:
     assert params == [10]
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_mysql_fetch_content_pages_batches_for_all_strategy(
     monkeypatch: pytest.MonkeyPatch,
@@ -224,6 +225,9 @@ async def test_mysql_fetch_content_pages_batches_for_all_strategy(
 
         def fetchall(self) -> list[tuple[Any, ...]]:
             return list(self._rows)
+
+        def fetchmany(self, size: int) -> list[tuple[Any, ...]]:
+            return list(self._rows[:size])
 
         def __enter__(self) -> _BatchCursor:
             return self
