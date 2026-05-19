@@ -1,7 +1,8 @@
 """PII detector test configuration and shared fixtures."""
 
-import pytest
 from importlib.util import find_spec
+
+import pytest
 
 _presidio_available = find_spec("presidio_analyzer") is not None
 
