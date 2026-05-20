@@ -1415,7 +1415,7 @@ describe('AssetService', () => {
 
         return {
           findingUpdate,
-          mockImpl: (callback: any, _opts?: any) => {
+          mockImpl: (callback: any) => {
             const tx = {
               asset: {
                 updateMany: jest.fn().mockResolvedValue({}),
@@ -1424,9 +1424,7 @@ describe('AssetService', () => {
                 findMany: jest.fn().mockImplementation(() => {
                   findManyCallCount++;
                   if (findManyCallCount === 1) {
-                    return Promise.resolve(
-                      opts.deletedAssetFindings ?? [],
-                    );
+                    return Promise.resolve(opts.deletedAssetFindings ?? []);
                   }
                   return Promise.resolve(opts.staleFindings ?? []);
                 }),
@@ -1488,12 +1486,7 @@ describe('AssetService', () => {
         });
         mockPrismaService.$transaction.mockImplementation(mockImpl);
 
-        await service.finalizeIngestRun(
-          sourceId,
-          runnerId,
-          [],
-          true,
-        );
+        await service.finalizeIngestRun(sourceId, runnerId, [], true);
 
         const resolveCall = findingUpdate.mock.calls.find(
           ([args]: any) => args?.data?.status === FindingStatus.RESOLVED,
