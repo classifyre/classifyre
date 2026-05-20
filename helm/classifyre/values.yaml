@@ -590,8 +590,8 @@ postgres:
         memory: 256Mi
       # -- Embedded Postgres resource limits.
       limits:
-        cpu: "1"
-        memory: 1Gi
+        cpu: "2"
+        memory: 4Gi
 
   external:
     # -- External Postgres host.
