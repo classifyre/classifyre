@@ -64,7 +64,6 @@ class ServiceDeskSource(BaseSource):
         content_options = self._content_options()
         self.include_comments = content_options.include_comments is not False
         self.include_attachments = content_options.include_attachments is not False
-        self.attachment_max_bytes = int(content_options.attachment_max_bytes or 5_242_880)
 
         self._seen_asset_hashes: set[str] = set()
         self._hash_to_url: dict[str, str] = {}
@@ -539,9 +538,6 @@ class ServiceDeskSource(BaseSource):
             )
             return None
 
-        if self.attachment_max_bytes > 0 and len(file_bytes) > self.attachment_max_bytes:
-            file_bytes = file_bytes[: self.attachment_max_bytes]
-
         mime_type = resolve_mime_type(
             file_bytes,
             declared_mime_type=declared_mime,
@@ -573,9 +569,6 @@ class ServiceDeskSource(BaseSource):
         except Exception as exc:
             logger.warning("Failed to fetch Service Desk attachment %s: %s", attachment_url, exc)
             return None
-
-        if self.attachment_max_bytes > 0 and len(file_bytes) > self.attachment_max_bytes:
-            file_bytes = file_bytes[: self.attachment_max_bytes]
 
         parsed = self.parse_asset_bytes(
             file_bytes,
