@@ -1216,7 +1216,6 @@ export class AssetService {
     },
   ) {
     const finalizeRun = options?.finalizeRun ?? true;
-    const isFullScan = options?.isFullScan ?? true;
     const skipFindings = options?.skipFindings ?? false;
     const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
 
