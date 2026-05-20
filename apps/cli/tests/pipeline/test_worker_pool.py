@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any
@@ -22,10 +21,12 @@ from src.models.generated_single_asset_scan_results import (
 from src.pipeline.detector_pipeline import DetectorPipeline, _DetectorInfo
 from src.pipeline.worker_pool import (
     DetectorWorkerPool,
+    compute_pool_workers,
+    get_effective_cpu_count,
+    get_effective_memory_mb,
     is_io_bound_detector,
 )
 from src.sources.base import BaseSource
-
 
 # ---------------------------------------------------------------------------
 # Helpers — sources extend BaseSource so ParsedContentProvider works
@@ -194,7 +195,7 @@ async def test_pool_run_detector_no_findings_for_clean_content() -> None:
     """Clean content should return zero findings."""
     pool = DetectorWorkerPool(max_workers=1, mp_start_method="forkserver")
     try:
-        findings, worker_pid, elapsed_ms = await pool.run_detector(
+        findings, worker_pid, _elapsed_ms = await pool.run_detector(
             detector_name="secrets",
             detector_type="SECRETS",
             config_json="{}",
@@ -225,7 +226,7 @@ async def test_pool_concurrent_detections() -> None:
         ]
         results = await asyncio.gather(*tasks)
         assert len(results) == 8
-        for findings, worker_pid, elapsed_ms in results:
+        for findings, worker_pid, _elapsed_ms in results:
             assert len(findings) >= 1
             assert worker_pid > 0
     finally:
@@ -425,3 +426,50 @@ async def test_pool_pipeline_multiple_assets() -> None:
             assert len(r.findings) >= 1
     finally:
         pool.shutdown()
+
+
+# ---------------------------------------------------------------------------
+# Pool sizing — compute_pool_workers (no forkserver needed)
+# ---------------------------------------------------------------------------
+
+
+def test_compute_pool_workers_override() -> None:
+    assert compute_pool_workers(2, 10, override=3) == 3
+
+
+def test_compute_pool_workers_override_capped_at_16() -> None:
+    assert compute_pool_workers(2, 10, override=20) == 16
+
+
+def test_compute_pool_workers_override_min_1() -> None:
+    assert compute_pool_workers(2, 10, override=0) == 1
+
+
+def test_get_effective_cpu_count_returns_positive() -> None:
+    cpus = get_effective_cpu_count()
+    assert isinstance(cpus, int)
+    assert cpus >= 1
+
+
+def test_get_effective_memory_mb_returns_positive() -> None:
+    mem = get_effective_memory_mb()
+    assert isinstance(mem, int)
+    assert mem >= 256
+
+
+def test_compute_pool_workers_respects_resources(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With 2 CPUs and 3GB memory, pool should be small despite high desired count."""
+    monkeypatch.setattr("src.pipeline.worker_pool.get_effective_cpu_count", lambda: 2)
+    monkeypatch.setattr("src.pipeline.worker_pool.get_effective_memory_mb", lambda: 3072)
+    result = compute_pool_workers(2, 10, override=None)
+    # cpu_budget=1, mem_budget=2, desired=20 → min(20, 1, 2, 16) = 1
+    assert result == 1
+
+
+def test_compute_pool_workers_larger_machine(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With 8 CPUs and 16GB memory, more workers are allowed."""
+    monkeypatch.setattr("src.pipeline.worker_pool.get_effective_cpu_count", lambda: 8)
+    monkeypatch.setattr("src.pipeline.worker_pool.get_effective_memory_mb", lambda: 16384)
+    result = compute_pool_workers(2, 5, override=None)
+    # cpu_budget=7, mem_budget=15, desired=10 → min(10, 7, 15, 16) = 7
+    assert result == 7

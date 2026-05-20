@@ -179,12 +179,15 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     sink_started = True
 
                     from .pipeline.detector_pipeline import DetectorPipeline
-                    from .pipeline.worker_pool import DetectorWorkerPool
+                    from .pipeline.worker_pool import (
+                        DetectorWorkerPool,
+                        compute_pool_workers,
+                    )
 
-                    pool_workers = args.max_pool_workers or min(
-                        args.processing_workers * args.detector_max_concurrent,
-                        os.cpu_count() or 4,
-                        16,
+                    pool_workers = compute_pool_workers(
+                        processing_workers=args.processing_workers,
+                        detector_max_concurrent=args.detector_max_concurrent,
+                        override=args.max_pool_workers,
                     )
                     worker_pool: DetectorWorkerPool | None = None
 
