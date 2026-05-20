@@ -129,6 +129,96 @@ def is_io_bound_detector(detector_name: str) -> bool:
     return detector_name in _IO_BOUND_DETECTORS
 
 
+def get_effective_cpu_count() -> int:
+    """Return the number of usable CPUs, respecting cgroup limits (K8s/Docker).
+
+    ``os.cpu_count()`` returns the *host* CPU count, which can be much larger
+    than what the container is allowed to use.  This function reads the cgroup
+    v2 ``cpu.max`` (or v1 ``cpu.cfs_quota_us``/``cpu.cfs_period_us``) to
+    determine the actual allocation.
+    """
+    try:
+        data = open("/sys/fs/cgroup/cpu.max").read().strip()
+        quota_str, period_str = data.split()
+        if quota_str != "max":
+            cpus = int(quota_str) / int(period_str)
+            if cpus >= 0.5:
+                return max(1, int(cpus))
+    except (FileNotFoundError, OSError, ValueError):
+        pass
+
+    try:
+        quota = int(open("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read().strip())
+        period = int(open("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read().strip())
+        if quota > 0 and period > 0:
+            cpus = quota / period
+            if cpus >= 0.5:
+                return max(1, int(cpus))
+    except (FileNotFoundError, OSError, ValueError):
+        pass
+
+    return os.cpu_count() or 4
+
+
+def get_effective_memory_mb() -> int:
+    """Return usable memory in MB, respecting cgroup limits."""
+    try:
+        mem_bytes = int(open("/sys/fs/cgroup/memory.max").read().strip())
+        if mem_bytes < 2**50:
+            return max(256, mem_bytes // (1024 * 1024))
+    except (FileNotFoundError, OSError, ValueError):
+        pass
+
+    try:
+        mem_bytes = int(open("/sys/fs/cgroup/memory/memory.limit_in_bytes").read().strip())
+        if mem_bytes < 2**50:
+            return max(256, mem_bytes // (1024 * 1024))
+    except (FileNotFoundError, OSError, ValueError):
+        pass
+
+    try:
+        for line in open("/proc/meminfo"):
+            if line.startswith("MemTotal:"):
+                return max(256, int(line.split()[1]) // 1024)
+    except (FileNotFoundError, OSError, ValueError):
+        pass
+
+    return 4096
+
+
+def compute_pool_workers(
+    processing_workers: int,
+    detector_max_concurrent: int,
+    override: int | None = None,
+) -> int:
+    """Compute optimal pool size from config and actual resource limits.
+
+    The pool must fit within:
+    - CPU cores (cgroup-aware) minus 1 for the main process
+    - Memory / ~1GB per worker (each worker loads ML models)
+    - Hard cap of 16
+    """
+    if override is not None:
+        return max(1, min(override, 16))
+
+    cpus = get_effective_cpu_count()
+    mem_mb = get_effective_memory_mb()
+
+    cpu_budget = max(1, cpus - 1)
+    mem_budget = max(1, (mem_mb - 512) // 1024)
+
+    desired = processing_workers * detector_max_concurrent
+    effective = max(1, min(desired, cpu_budget, mem_budget, 16))
+
+    logger.info(
+        "Pool sizing: desired=%d (pw=%d x dmc=%d), cpu_budget=%d (cpus=%d), "
+        "mem_budget=%d (%dMB), effective=%d",
+        desired, processing_workers, detector_max_concurrent,
+        cpu_budget, cpus, mem_budget, mem_mb, effective,
+    )
+    return effective
+
+
 class DetectorWorkerPool:
     """Manages a ``ProcessPoolExecutor`` for parallel detector execution."""
 
