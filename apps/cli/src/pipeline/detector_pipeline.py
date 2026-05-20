@@ -50,14 +50,12 @@ class DetectorPipeline:
         detectors: list[BaseDetector],
         source: BaseSource,
         runner_id: str,
-        content_size_limit: int = 1_048_576,  # 1MB default
         content_provider: ContentProvider | None = None,
         worker_pool: DetectorWorkerPool | None = None,
     ):
         self.detectors = detectors
         self.source = source
         self.runner_id = runner_id
-        self.content_size_limit = content_size_limit
         self._worker_pool = worker_pool
         self._detector_info: dict[int, _DetectorInfo] = {}
         if content_provider is not None:
@@ -332,17 +330,7 @@ class DetectorPipeline:
             page_index += 1
             content_size += len(text_content)
 
-            detector_content = text_content
-            if len(detector_content) > self.content_size_limit:
-                msg = (
-                    f"Content truncated from {len(detector_content)} to "
-                    f"{self.content_size_limit} bytes for {asset.name}"
-                )
-                logger.warning(msg)
-                warnings.append(msg)
-                detector_content = detector_content[: self.content_size_limit]
-
-            if not detector_content:
+            if not text_content:
                 continue
 
             while len(pending_tasks) >= max_pending:
@@ -361,7 +349,7 @@ class DetectorPipeline:
                             finding, asset, page_content,
                         )
 
-            task = asyncio.create_task(_detect_page(detector_content, page_index))
+            task = asyncio.create_task(_detect_page(text_content, page_index))
             pending_tasks.add(task)
 
         if pending_tasks:
@@ -450,17 +438,7 @@ class DetectorPipeline:
             page_index += 1
             content_size += len(text_content)
 
-            detector_content = text_content
-            if len(detector_content) > self.content_size_limit:
-                msg = (
-                    f"Content truncated from {len(detector_content)} to "
-                    f"{self.content_size_limit} bytes for {asset.name}"
-                )
-                logger.warning(msg)
-                warnings.append(msg)
-                detector_content = detector_content[: self.content_size_limit]
-
-            if not detector_content:
+            if not text_content:
                 continue
 
             while len(pending_tasks) >= max_pending:
@@ -488,7 +466,7 @@ class DetectorPipeline:
                     await on_findings_flushed(list(findings))
                     unflushed_count = 0
 
-            task = asyncio.create_task(_detect_page(detector_content, page_index))
+            task = asyncio.create_task(_detect_page(text_content, page_index))
             pending_tasks.add(task)
 
         if pending_tasks:
@@ -547,15 +525,6 @@ class DetectorPipeline:
                 continue
 
             raw_bytes, mime_type = result
-            if len(raw_bytes) > self.content_size_limit:
-                msg = (
-                    f"Binary content truncated from {len(raw_bytes)} to "
-                    f"{self.content_size_limit} bytes for {asset.name}"
-                )
-                logger.warning(msg)
-                warnings.append(msg)
-                raw_bytes = raw_bytes[: self.content_size_limit]
-
             if not raw_bytes:
                 continue
 
@@ -906,13 +875,10 @@ class DetectorPipeline:
 
         from .parsed_content_provider import ParsedContentProvider
 
-        content_size_limit = 1_048_576  # 1MB
-
         pipeline = cls(
             detectors=detectors,
             source=source,
             runner_id=runner_id,
-            content_size_limit=content_size_limit,
             content_provider=ParsedContentProvider(source),
             worker_pool=worker_pool,
         )
