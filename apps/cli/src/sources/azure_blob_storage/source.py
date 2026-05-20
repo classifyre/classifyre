@@ -109,18 +109,15 @@ class AzureBlobStorageSource(ObjectStorageSourceBase):
                     content_type_hint=str(content_type_hint) if content_type_hint else None,
                 )
 
-    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None, bool]:
+    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         blob_service_client = self._client()
         container_client = blob_service_client.get_container_client(self._required_container())
         blob_client = container_client.get_blob_client(ref.key)
 
-        max_bytes = self._max_object_bytes()
         timeout = self._request_timeout_seconds()
-        length = max_bytes if ref.size > max_bytes else None
-
-        downloader = blob_client.download_blob(offset=0, length=length, timeout=timeout)
+        downloader = blob_client.download_blob(offset=0, length=None, timeout=timeout)
         file_bytes = downloader.readall()
-        return file_bytes, ref.content_type_hint, ref.size > max_bytes
+        return file_bytes, ref.content_type_hint
 
     def _external_url(self, key: str) -> str:
         account_url = self._required_account_url().rstrip("/")

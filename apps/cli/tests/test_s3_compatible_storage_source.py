@@ -78,7 +78,6 @@ async def test_s3_storage_extract_applies_latest_sampling_and_asset_types(monkey
             text_content="a,b\n1,10\n",
             parse_error=None,
             downloaded_bytes=110,
-            truncated=False,
         ),
         "exports/new.csv": ContentSnapshot(
             mime_type="text/csv",
@@ -86,7 +85,6 @@ async def test_s3_storage_extract_applies_latest_sampling_and_asset_types(monkey
             text_content="a,b\n10,3\n",
             parse_error=None,
             downloaded_bytes=110,
-            truncated=False,
         ),
         "exports/mid.pdf": ContentSnapshot(
             mime_type="application/pdf",
@@ -94,7 +92,6 @@ async def test_s3_storage_extract_applies_latest_sampling_and_asset_types(monkey
             text_content="Extracted PDF text",
             parse_error=None,
             downloaded_bytes=10104,
-            truncated=False,
         ),
     }
     monkeypatch.setattr(source, "_build_snapshot", lambda ref: snapshots[ref.key])
@@ -128,7 +125,7 @@ async def test_s3_storage_fetch_content_bytes_redownloads_binary_media(monkeypat
     monkeypatch.setattr(
         source,
         "_download_object",
-        lambda _ref_obj: (jpeg_bytes, "application/octet-stream", False),
+        lambda _ref_obj: (jpeg_bytes, "application/octet-stream"),
     )
 
     assert await source.fetch_content_bytes(asset_hash) == (jpeg_bytes, "image/jpeg")
@@ -205,7 +202,7 @@ def test_s3_storage_snapshot_prefers_detected_mime_for_octet_stream_hint(monkeyp
     monkeypatch.setattr(
         source,
         "_download_object",
-        lambda _ref_obj: (b"%PDF-1.4 test", "application/octet-stream", False),
+        lambda _ref_obj: (b"%PDF-1.4 test", "application/octet-stream"),
     )
 
     snapshot = source._build_snapshot(ref)

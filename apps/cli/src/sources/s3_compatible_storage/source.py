@@ -115,18 +115,11 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
             if not continuation_token:
                 break
 
-    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None, bool]:
+    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         client = self._client()
         bucket = self._required_bucket()
-        max_bytes = self._max_object_bytes()
 
-        params: dict[str, Any] = {"Bucket": bucket, "Key": ref.key}
-        truncated = False
-        if ref.size > max_bytes:
-            params["Range"] = f"bytes=0-{max_bytes - 1}"
-            truncated = True
-
-        response = client.get_object(**params)
+        response = client.get_object(Bucket=bucket, Key=ref.key)
         body = response["Body"]
         try:
             file_bytes = body.read()
@@ -137,7 +130,7 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
                 logger.debug("Failed to close S3 response body")
 
         content_type = response.get("ContentType")
-        return file_bytes, str(content_type) if content_type else None, truncated
+        return file_bytes, str(content_type) if content_type else None
 
     def _external_url(self, key: str) -> str:
         bucket = self._required_bucket()

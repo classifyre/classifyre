@@ -1,5 +1,6 @@
 """Code security detector using Bandit static analysis."""
 
+import asyncio
 import json
 import logging
 import subprocess
@@ -137,7 +138,9 @@ class CodeSecurityDetector(BaseDetector):
             return []
         if not content.strip():
             return []
+        return await asyncio.to_thread(self._detect_sync, content)
 
+    def _detect_sync(self, content: str) -> list[DetectionResult]:
         threshold = self._cfg.confidence_threshold or 0.7
         max_findings = self._cfg.max_findings or 25
         findings: list[DetectionResult] = []

@@ -95,20 +95,14 @@ class GoogleCloudStorageSource(ObjectStorageSourceBase):
                 content_type_hint=str(getattr(blob, "content_type", "") or "") or None,
             )
 
-    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None, bool]:
+    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         client = self._client()
         bucket = client.bucket(self._required_bucket())
         blob = bucket.blob(ref.key)
 
-        max_bytes = self._max_object_bytes()
         timeout = self._request_timeout_seconds()
-
-        if ref.size > max_bytes:
-            file_bytes = blob.download_as_bytes(start=0, end=max_bytes - 1, timeout=timeout)
-            return file_bytes, ref.content_type_hint, True
-
         file_bytes = blob.download_as_bytes(timeout=timeout)
-        return file_bytes, ref.content_type_hint, False
+        return file_bytes, ref.content_type_hint
 
     def _external_url(self, key: str) -> str:
         return f"gs://{self._required_bucket()}/{key}"
