@@ -5,6 +5,7 @@ plugin's ``analyze_line`` directly.  No temp files, no global Settings state,
 and no ``SecretsCollection`` needed.
 """
 
+import asyncio
 import importlib
 import logging
 import pkgutil
@@ -304,7 +305,9 @@ class SecretsDetector(BaseDetector):
                     len(content),
                 )
                 return []
+        return await asyncio.to_thread(self._detect_sync, content)
 
+    def _detect_sync(self, content: str) -> list[DetectionResult]:
         plugins = self._build_plugins()
         if not plugins:
             return []

@@ -263,10 +263,9 @@ api:
     autoInstallOptionalDeps: true
     # -- Number of detector-processed assets to accumulate before pushing findings to the API.
     detectorFlushBatchSize: 5
-    # -- Max assets processed in parallel by the detector pipeline.
-    detectorMaxConcurrent: 10
-    # -- Number of parallel asset-processing workers in Phase 2.
-    processingWorkers: 2
+    # -- Optional override for the auto-scaled process pool size (1-16).
+    # When unset, the pool auto-sizes from cgroup CPU/memory limits.
+    # maxPoolWorkers:
 
     resources:
       # -- CLI job resource requests.

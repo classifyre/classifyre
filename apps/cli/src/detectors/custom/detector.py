@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from ...models.generated_detectors import (
@@ -33,6 +34,11 @@ class CustomDetector(BaseDetector):
         )
 
     async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
+        return await asyncio.to_thread(self._detect_sync, content, content_type)
+
+    def _detect_sync(
         self, content: str | bytes, content_type: str = "text/plain"
     ) -> list[DetectionResult]:
         findings = self._runner.detect(content, content_type)

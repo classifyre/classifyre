@@ -103,7 +103,6 @@ class ContentSnapshot:
     text_content: str
     parse_error: str | None
     downloaded_bytes: int
-    truncated: bool
     # Raw bytes retained for batchable tabular files so fetch_content_pages() can
     # iterate rows in configurable-sized pages instead of one monolithic text blob.
     raw_bytes: bytes | None = None
@@ -193,14 +192,6 @@ class ObjectStorageSourceBase(BaseSource, ABC):
     def _verify_ssl(self) -> bool:
         value = self._connection_option("verify_ssl", True)
         return bool(value) if isinstance(value, bool) else True
-
-    def _max_object_bytes(self) -> int:
-        value = self._connection_option("max_object_bytes", 5_242_880)
-        try:
-            parsed = int(value)
-        except (TypeError, ValueError):
-            return 5_242_880
-        return min(max(parsed, 1_024), 52_428_800)
 
     def _include_empty_objects(self) -> bool:
         return bool(self._scope_option("include_empty_objects", False))
@@ -343,11 +334,10 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 text_content="",
                 parse_error=None,
                 downloaded_bytes=0,
-                truncated=False,
             )
 
         try:
-            file_bytes, content_type_hint, truncated = self._download_object(ref)
+            file_bytes, content_type_hint = self._download_object(ref)
         except Exception as exc:
             logger.warning("Failed to download object %s: %s", ref.key, exc)
             return ContentSnapshot(
@@ -356,7 +346,6 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 text_content="",
                 parse_error=str(exc),
                 downloaded_bytes=0,
-                truncated=False,
             )
 
         self._ensure_file_processing_dependencies()
@@ -383,7 +372,6 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             text_content="",
             parse_error=None,
             downloaded_bytes=len(file_bytes),
-            truncated=truncated,
             raw_bytes=None if is_non_extractable else file_bytes,
         )
 
@@ -417,7 +405,6 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                     "last_modified": ref.last_modified.isoformat(),
                     "mime_type": snapshot.mime_type,
                     "downloaded_bytes": snapshot.downloaded_bytes,
-                    "truncated_download": snapshot.truncated,
                     "parse_error": snapshot.parse_error,
                 }
             )
@@ -521,7 +508,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             return None
 
         try:
-            file_bytes, content_type_hint, _truncated = self._download_object(ref)
+            file_bytes, content_type_hint = self._download_object(ref)
         except Exception as exc:
             logger.warning("Failed to download object %s for binary fetch: %s", ref.key, exc)
             return None
@@ -671,7 +658,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None, bool]:
+    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         raise NotImplementedError
 
     @abstractmethod

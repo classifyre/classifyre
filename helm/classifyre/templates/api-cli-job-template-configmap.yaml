@@ -57,14 +57,12 @@ data:
                     "name": "CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE",
                     "value": "{{ .Values.api.cliJobs.detectorFlushBatchSize }}"
                   },
+                  {{- if .Values.api.cliJobs.maxPoolWorkers }}
                   {
-                    "name": "CLASSIFYRE_DETECTOR_MAX_CONCURRENT",
-                    "value": "{{ .Values.api.cliJobs.detectorMaxConcurrent }}"
+                    "name": "CLASSIFYRE_MAX_POOL_WORKERS",
+                    "value": "{{ .Values.api.cliJobs.maxPoolWorkers }}"
                   },
-                  {
-                    "name": "CLASSIFYRE_PROCESSING_WORKERS",
-                    "value": "{{ .Values.api.cliJobs.processingWorkers }}"
-                  },
+                  {{- end }}
                   {
                     "name": "HOME",
                     "value": "/tmp"
