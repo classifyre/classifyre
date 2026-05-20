@@ -51,7 +51,6 @@ class DetectorPipeline:
         source: BaseSource,
         runner_id: str,
         content_size_limit: int = 1_048_576,  # 1MB default
-        max_concurrent_assets: int = 10,
         content_provider: ContentProvider | None = None,
         worker_pool: DetectorWorkerPool | None = None,
     ):
@@ -59,8 +58,6 @@ class DetectorPipeline:
         self.source = source
         self.runner_id = runner_id
         self.content_size_limit = content_size_limit
-        self.max_concurrent_assets = max_concurrent_assets
-        self._detector_semaphore = asyncio.Semaphore(max_concurrent_assets)
         self._worker_pool = worker_pool
         self._detector_info: dict[int, _DetectorInfo] = {}
         if content_provider is not None:
@@ -293,21 +290,20 @@ class DetectorPipeline:
             page_content: str,
             page_num: int,
         ) -> tuple[list[DetectionResult], list[DetectorType], list[str], str, int]:
-            async with self._detector_semaphore:
-                t0 = time.monotonic()
-                page_findings, page_types, page_errors = await self._run_detectors(
-                    detectors=detectors,
-                    content=page_content,
-                    content_type=text_content_type,
-                    asset_name=asset.name,
-                    page_num=page_num,
-                )
-                elapsed = int((time.monotonic() - t0) * 1000)
-                logger.info(
-                    "  %s page %d done: %d findings (%dms)",
-                    asset.name, page_num, len(page_findings), elapsed,
-                )
-                return page_findings, page_types, page_errors, page_content, page_num
+            t0 = time.monotonic()
+            page_findings, page_types, page_errors = await self._run_detectors(
+                detectors=detectors,
+                content=page_content,
+                content_type=text_content_type,
+                asset_name=asset.name,
+                page_num=page_num,
+            )
+            elapsed = int((time.monotonic() - t0) * 1000)
+            logger.info(
+                "  %s page %d done: %d findings (%dms)",
+                asset.name, page_num, len(page_findings), elapsed,
+            )
+            return page_findings, page_types, page_errors, page_content, page_num
 
         def _collect_done() -> None:
             done = {t for t in pending_tasks if t.done()}
@@ -328,6 +324,10 @@ class DetectorPipeline:
                         page_content,
                     )
 
+        max_pending = max(
+            2, self._worker_pool.max_workers * 2 if self._worker_pool else 4
+        )
+
         async for text_content in self._iter_text_content_pages(asset):
             page_index += 1
             content_size += len(text_content)
@@ -345,9 +345,24 @@ class DetectorPipeline:
             if not detector_content:
                 continue
 
+            while len(pending_tasks) >= max_pending:
+                done, pending_tasks = await asyncio.wait(
+                    pending_tasks, return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in done:
+                    page_findings, page_types, page_errors, page_content, _pn = task.result()
+                    findings.extend(page_findings)
+                    errors.extend(page_errors)
+                    detector_types_run = self._merge_detector_types(
+                        detector_types_run, page_types,
+                    )
+                    for finding in page_findings:
+                        self.content_provider.enrich_finding_location(
+                            finding, asset, page_content,
+                        )
+
             task = asyncio.create_task(_detect_page(detector_content, page_index))
             pending_tasks.add(task)
-            _collect_done()
 
         if pending_tasks:
             await asyncio.gather(*pending_tasks)
@@ -387,21 +402,20 @@ class DetectorPipeline:
             page_content: str,
             page_num: int,
         ) -> tuple[list[DetectionResult], list[DetectorType], list[str], str, int]:
-            async with self._detector_semaphore:
-                t0 = time.monotonic()
-                page_findings, page_types, page_errors = await self._run_detectors(
-                    detectors=detectors,
-                    content=page_content,
-                    content_type=text_content_type,
-                    asset_name=asset.name,
-                    page_num=page_num,
-                )
-                elapsed = int((time.monotonic() - t0) * 1000)
-                logger.info(
-                    "  %s page %d done: %d findings (%dms)",
-                    asset.name, page_num, len(page_findings), elapsed,
-                )
-                return page_findings, page_types, page_errors, page_content, page_num
+            t0 = time.monotonic()
+            page_findings, page_types, page_errors = await self._run_detectors(
+                detectors=detectors,
+                content=page_content,
+                content_type=text_content_type,
+                asset_name=asset.name,
+                page_num=page_num,
+            )
+            elapsed = int((time.monotonic() - t0) * 1000)
+            logger.info(
+                "  %s page %d done: %d findings (%dms)",
+                asset.name, page_num, len(page_findings), elapsed,
+            )
+            return page_findings, page_types, page_errors, page_content, page_num
 
         async def _collect_done_and_flush() -> None:
             nonlocal detector_types_run, unflushed_count
@@ -428,6 +442,10 @@ class DetectorPipeline:
                 await on_findings_flushed(list(findings))
                 unflushed_count = 0
 
+        max_pending = max(
+            2, self._worker_pool.max_workers * 2 if self._worker_pool else 4
+        )
+
         async for text_content in self._iter_text_content_pages(asset):
             page_index += 1
             content_size += len(text_content)
@@ -445,9 +463,33 @@ class DetectorPipeline:
             if not detector_content:
                 continue
 
+            while len(pending_tasks) >= max_pending:
+                done, pending_tasks_set = await asyncio.wait(
+                    pending_tasks, return_when=asyncio.FIRST_COMPLETED,
+                )
+                pending_tasks = pending_tasks_set
+                for task in done:
+                    page_findings, page_types, page_errors, page_content, _pn = task.result()
+                    for finding in page_findings:
+                        self.content_provider.enrich_finding_location(
+                            finding, asset, page_content,
+                        )
+                    findings.extend(page_findings)
+                    errors.extend(page_errors)
+                    detector_types_run = self._merge_detector_types(
+                        detector_types_run, page_types,
+                    )
+                    unflushed_count += len(page_findings)
+                if unflushed_count >= findings_flush_size and unflushed_count > 0:
+                    logger.info(
+                        "  %s flushing %d findings (%d total)",
+                        asset.name, unflushed_count, len(findings),
+                    )
+                    await on_findings_flushed(list(findings))
+                    unflushed_count = 0
+
             task = asyncio.create_task(_detect_page(detector_content, page_index))
             pending_tasks.add(task)
-            await _collect_done_and_flush()
 
         if pending_tasks:
             await asyncio.gather(*pending_tasks)
@@ -814,7 +856,6 @@ class DetectorPipeline:
         recipe: dict[str, Any],
         source: BaseSource,
         runner_id: str,
-        max_concurrent_assets: int = 10,
         worker_pool: DetectorWorkerPool | None = None,
     ) -> DetectorPipeline:
         """Create pipeline from recipe configuration."""
@@ -872,7 +913,6 @@ class DetectorPipeline:
             source=source,
             runner_id=runner_id,
             content_size_limit=content_size_limit,
-            max_concurrent_assets=max_concurrent_assets,
             content_provider=ParsedContentProvider(source),
             worker_pool=worker_pool,
         )

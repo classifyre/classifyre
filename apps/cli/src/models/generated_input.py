@@ -163,17 +163,11 @@ class ResourceOverrides(BaseModel):
         ge=60,
         le=86400,
     )
-    processing_workers: int | None = Field(
+    max_pool_workers: int | None = Field(
         None,
-        description='Number of parallel asset-processing workers in Phase 2 (default: 2)',
+        description='Max OS processes in the detector pool. Auto-sized from CPU/memory limits when omitted.',
         ge=1,
-        le=20,
-    )
-    detector_max_concurrent: int | None = Field(
-        None,
-        description='Max concurrent detector invocations across all pages (default: 5)',
-        ge=1,
-        le=50,
+        le=16,
     )
 
 

@@ -2536,30 +2536,17 @@ export const JsonSchemaForm = React.forwardRef<
                           </FormControl>
                         </FormItem>
                         <FormItem>
-                          <FormLabel className="text-xs">Processing Workers</FormLabel>
+                          <FormLabel className="text-xs">Max Pool Workers</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
-                              placeholder="Default: 2"
-                              value={(val.processing_workers as number) ?? ""}
+                              placeholder="Auto (from CPU/memory)"
+                              min={1}
+                              max={16}
+                              value={(val.max_pool_workers as number) ?? ""}
                               onChange={(e) => {
                                 const v = e.target.value ? parseInt(e.target.value, 10) : undefined;
-                                update({ processing_workers: v && !isNaN(v) ? v : undefined });
-                              }}
-                              disabled={disabled}
-                            />
-                          </FormControl>
-                        </FormItem>
-                        <FormItem>
-                          <FormLabel className="text-xs">Detector Max Concurrent</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              placeholder="Default: 5"
-                              value={(val.detector_max_concurrent as number) ?? ""}
-                              onChange={(e) => {
-                                const v = e.target.value ? parseInt(e.target.value, 10) : undefined;
-                                update({ detector_max_concurrent: v && !isNaN(v) ? v : undefined });
+                                update({ max_pool_workers: v && !isNaN(v) ? v : undefined });
                               }}
                               disabled={disabled}
                             />

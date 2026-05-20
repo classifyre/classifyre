@@ -186,17 +186,15 @@ def get_effective_memory_mb() -> int:
     return 4096
 
 
-def compute_pool_workers(
-    processing_workers: int,
-    detector_max_concurrent: int,
-    override: int | None = None,
-) -> int:
-    """Compute optimal pool size from config and actual resource limits.
+def compute_pool_workers(override: int | None = None) -> int:
+    """Compute optimal pool size from actual resource limits.
 
-    The pool must fit within:
+    Auto-sizes from cgroup CPU/memory so the pool fits within:
     - CPU cores (cgroup-aware) minus 1 for the main process
     - Memory / ~1GB per worker (each worker loads ML models)
     - Hard cap of 16
+
+    When *override* is set, it is used directly (clamped to [1, 16]).
     """
     if override is not None:
         return max(1, min(override, 16))
@@ -207,13 +205,10 @@ def compute_pool_workers(
     cpu_budget = max(1, cpus - 1)
     mem_budget = max(1, (mem_mb - 512) // 1024)
 
-    desired = processing_workers * detector_max_concurrent
-    effective = max(1, min(desired, cpu_budget, mem_budget, 16))
+    effective = max(1, min(cpu_budget, mem_budget, 16))
 
     logger.info(
-        "Pool sizing: desired=%d (pw=%d x dmc=%d), cpu_budget=%d (cpus=%d), "
-        "mem_budget=%d (%dMB), effective=%d",
-        desired, processing_workers, detector_max_concurrent,
+        "Pool sizing: cpu_budget=%d (cpus=%d), mem_budget=%d (%dMB), effective=%d",
         cpu_budget, cpus, mem_budget, mem_mb, effective,
     )
     return effective

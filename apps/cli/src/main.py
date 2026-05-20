@@ -185,8 +185,6 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     )
 
                     pool_workers = compute_pool_workers(
-                        processing_workers=args.processing_workers,
-                        detector_max_concurrent=args.detector_max_concurrent,
                         override=args.max_pool_workers,
                     )
                     worker_pool: DetectorWorkerPool | None = None
@@ -195,7 +193,6 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         recipe,
                         source,
                         runner_id,
-                        max_concurrent_assets=args.detector_max_concurrent,
                     )
                     has_detectors = bool(pipeline.detectors)
 
@@ -205,7 +202,6 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             recipe,
                             source,
                             runner_id,
-                            max_concurrent_assets=args.detector_max_concurrent,
                             worker_pool=worker_pool,
                         )
 
@@ -246,81 +242,75 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     if has_detectors and all_stubs:
                         import asyncio as _asyncio
 
-                        workers = args.processing_workers
-                        semaphore = _asyncio.Semaphore(workers)
                         processed_count = 0
                         logger.info(
-                            "Phase 2 starting: %d assets, processing_workers=%d, "
-                            "detector_max_concurrent=%d, pool_workers=%s",
-                            len(all_stubs), workers,
-                            args.detector_max_concurrent,
+                            "Phase 2 starting: %d assets, pool_workers=%s",
+                            len(all_stubs),
                             worker_pool.max_workers if worker_pool else "none",
                         )
                         error_count = 0
 
                         async def _process_one(asset: Any) -> None:
                             nonlocal processed_count, error_count
-                            async with semaphore:
-                                asset_hash = getattr(asset, "hash", None) or ""
-                                try:
-                                    if hasattr(sink, "update_asset_status"):
-                                        await sink.update_asset_status(asset_hash, "PROCESSING")
+                            asset_hash = getattr(asset, "hash", None) or ""
+                            try:
+                                if hasattr(sink, "update_asset_status"):
+                                    await sink.update_asset_status(asset_hash, "PROCESSING")
 
-                                    async def _on_findings_flushed(partial: list[Any]) -> None:
-                                        # partial is the full accumulated findings list from the pipeline
-                                        stub_payload = _asset_to_payload(asset)
-                                        stub_payload["findings"] = [
-                                            f.model_dump(mode="json", exclude_none=True)
-                                            if hasattr(f, "model_dump")
-                                            else f
-                                            for f in partial
-                                        ]
-                                        await sink.emit_batch([stub_payload], skip_findings=False)
-                                        if hasattr(sink, "update_asset_status"):
-                                            f_total, f_by_sev, f_by_det = _compute_findings_counts(
-                                                partial
-                                            )
-                                            await sink.update_asset_status(
-                                                asset_hash,
-                                                "PROCESSING",
-                                                findings_total=f_total,
-                                                findings_by_severity=f_by_sev,
-                                                findings_by_detector=f_by_det,
-                                            )
-
-                                    result = await pipeline.process_single_asset(
-                                        asset,
-                                        on_findings_flushed=_on_findings_flushed,
-                                        findings_flush_size=args.detector_flush_batch_size,
-                                    )
-                                    payload = _asset_to_payload(result)
-                                    await sink.emit_batch([payload], skip_findings=False)
-
+                                async def _on_findings_flushed(partial: list[Any]) -> None:
+                                    stub_payload = _asset_to_payload(asset)
+                                    stub_payload["findings"] = [
+                                        f.model_dump(mode="json", exclude_none=True)
+                                        if hasattr(f, "model_dump")
+                                        else f
+                                        for f in partial
+                                    ]
+                                    await sink.emit_batch([stub_payload], skip_findings=False)
                                     if hasattr(sink, "update_asset_status"):
                                         f_total, f_by_sev, f_by_det = _compute_findings_counts(
-                                            result.findings or []
+                                            partial
                                         )
                                         await sink.update_asset_status(
                                             asset_hash,
-                                            "PROCESSED",
+                                            "PROCESSING",
                                             findings_total=f_total,
                                             findings_by_severity=f_by_sev,
                                             findings_by_detector=f_by_det,
                                         )
 
-                                    source.evict_asset_cache(asset_hash)
-                                    processed_count += 1
-                                except Exception as exc:
-                                    error_count += 1
-                                    logger.error("Asset %s failed: %s", asset_hash, exc)
-                                    if hasattr(sink, "update_asset_status"):
-                                        try:
-                                            error_msg = str(exc) or type(exc).__name__
-                                            await sink.update_asset_status(
-                                                asset_hash, "ERROR", error_msg
-                                            )
-                                        except Exception:
-                                            pass
+                                result = await pipeline.process_single_asset(
+                                    asset,
+                                    on_findings_flushed=_on_findings_flushed,
+                                    findings_flush_size=args.detector_flush_batch_size,
+                                )
+                                payload = _asset_to_payload(result)
+                                await sink.emit_batch([payload], skip_findings=False)
+
+                                if hasattr(sink, "update_asset_status"):
+                                    f_total, f_by_sev, f_by_det = _compute_findings_counts(
+                                        result.findings or []
+                                    )
+                                    await sink.update_asset_status(
+                                        asset_hash,
+                                        "PROCESSED",
+                                        findings_total=f_total,
+                                        findings_by_severity=f_by_sev,
+                                        findings_by_detector=f_by_det,
+                                    )
+
+                                source.evict_asset_cache(asset_hash)
+                                processed_count += 1
+                            except Exception as exc:
+                                error_count += 1
+                                logger.error("Asset %s failed: %s", asset_hash, exc)
+                                if hasattr(sink, "update_asset_status"):
+                                    try:
+                                        error_msg = str(exc) or type(exc).__name__
+                                        await sink.update_asset_status(
+                                            asset_hash, "ERROR", error_msg
+                                        )
+                                    except Exception:
+                                        pass
 
                         tasks = [_asyncio.create_task(_process_one(a)) for a in all_stubs]
                         await _asyncio.gather(*tasks, return_exceptions=True)
@@ -558,22 +548,10 @@ def main() -> None:
         help="How many detector-processed assets to accumulate before pushing findings to the API (default: 5, env: CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE)",
     )
     parser.add_argument(
-        "--detector-max-concurrent",
-        type=int,
-        default=None,
-        help="Max assets processed in parallel by the detector pipeline (default: 10, env: CLASSIFYRE_DETECTOR_MAX_CONCURRENT)",
-    )
-    parser.add_argument(
-        "--processing-workers",
-        type=int,
-        default=None,
-        help="Number of parallel asset-processing workers in Phase 2 (default: 2, env: CLASSIFYRE_PROCESSING_WORKERS)",
-    )
-    parser.add_argument(
         "--max-pool-workers",
         type=int,
         default=None,
-        help="Max OS processes in the detector pool (default: processing_workers * detector_max_concurrent, env: CLASSIFYRE_MAX_POOL_WORKERS)",
+        help="Max OS processes in the detector pool. Auto-sized from CPU/memory when omitted (env: CLASSIFYRE_MAX_POOL_WORKERS)",
     )
 
     args = parser.parse_args()
@@ -585,22 +563,6 @@ def main() -> None:
         except ValueError:
             args.detector_flush_batch_size = 5
     args.detector_flush_batch_size = max(args.detector_flush_batch_size, 1)
-
-    if args.detector_max_concurrent is None:
-        env_val = os.environ.get("CLASSIFYRE_DETECTOR_MAX_CONCURRENT")
-        try:
-            args.detector_max_concurrent = int(env_val) if env_val else 10
-        except ValueError:
-            args.detector_max_concurrent = 10
-    args.detector_max_concurrent = max(args.detector_max_concurrent, 1)
-
-    if args.processing_workers is None:
-        env_val = os.environ.get("CLASSIFYRE_PROCESSING_WORKERS")
-        try:
-            args.processing_workers = int(env_val) if env_val else 2
-        except ValueError:
-            args.processing_workers = 2
-    args.processing_workers = max(args.processing_workers, 1)
 
     if args.max_pool_workers is None:
         env_val = os.environ.get("CLASSIFYRE_MAX_POOL_WORKERS")

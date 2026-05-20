@@ -324,7 +324,6 @@ async def test_streaming_mode_processes_pages_concurrently() -> None:
         detectors=[detector],
         source=source,
         runner_id="test-streaming",
-        max_concurrent_assets=3,
         worker_pool=None,
     )
 
@@ -358,7 +357,6 @@ async def test_streaming_flush_fires_at_threshold() -> None:
         detectors=[detector],
         source=source,
         runner_id="test-flush",
-        max_concurrent_assets=2,
         worker_pool=None,
     )
 
@@ -434,15 +432,15 @@ async def test_pool_pipeline_multiple_assets() -> None:
 
 
 def test_compute_pool_workers_override() -> None:
-    assert compute_pool_workers(2, 10, override=3) == 3
+    assert compute_pool_workers(override=3) == 3
 
 
 def test_compute_pool_workers_override_capped_at_16() -> None:
-    assert compute_pool_workers(2, 10, override=20) == 16
+    assert compute_pool_workers(override=20) == 16
 
 
 def test_compute_pool_workers_override_min_1() -> None:
-    assert compute_pool_workers(2, 10, override=0) == 1
+    assert compute_pool_workers(override=0) == 1
 
 
 def test_get_effective_cpu_count_returns_positive() -> None:
@@ -458,11 +456,11 @@ def test_get_effective_memory_mb_returns_positive() -> None:
 
 
 def test_compute_pool_workers_respects_resources(monkeypatch: pytest.MonkeyPatch) -> None:
-    """With 2 CPUs and 3GB memory, pool should be small despite high desired count."""
+    """With 2 CPUs and 3GB memory, pool should be small."""
     monkeypatch.setattr("src.pipeline.worker_pool.get_effective_cpu_count", lambda: 2)
     monkeypatch.setattr("src.pipeline.worker_pool.get_effective_memory_mb", lambda: 3072)
-    result = compute_pool_workers(2, 10, override=None)
-    # cpu_budget=1, mem_budget=2, desired=20 → min(20, 1, 2, 16) = 1
+    result = compute_pool_workers()
+    # cpu_budget=1, mem_budget=2 → min(1, 2, 16) = 1
     assert result == 1
 
 
@@ -470,6 +468,6 @@ def test_compute_pool_workers_larger_machine(monkeypatch: pytest.MonkeyPatch) ->
     """With 8 CPUs and 16GB memory, more workers are allowed."""
     monkeypatch.setattr("src.pipeline.worker_pool.get_effective_cpu_count", lambda: 8)
     monkeypatch.setattr("src.pipeline.worker_pool.get_effective_memory_mb", lambda: 16384)
-    result = compute_pool_workers(2, 5, override=None)
-    # cpu_budget=7, mem_budget=15, desired=10 → min(10, 7, 15, 16) = 7
+    result = compute_pool_workers()
+    # cpu_budget=7, mem_budget=15 → min(7, 15, 16) = 7
     assert result == 7

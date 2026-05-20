@@ -526,32 +526,16 @@ export class KubernetesCliJobService {
         jobAny.spec.activeDeadlineSeconds = recipeResources.timeout_seconds;
       }
       if (
-        typeof recipeResources.processing_workers === 'number' &&
-        recipeResources.processing_workers > 0
+        typeof recipeResources.max_pool_workers === 'number' &&
+        recipeResources.max_pool_workers > 0
       ) {
         const existing = container.env || [];
         const idx = existing.findIndex(
-          (e: any) => e.name === 'CLASSIFYRE_PROCESSING_WORKERS',
+          (e: any) => e.name === 'CLASSIFYRE_MAX_POOL_WORKERS',
         );
         const entry = {
-          name: 'CLASSIFYRE_PROCESSING_WORKERS',
-          value: String(recipeResources.processing_workers),
-        };
-        if (idx >= 0) existing[idx] = entry;
-        else existing.push(entry);
-        container.env = existing;
-      }
-      if (
-        typeof recipeResources.detector_max_concurrent === 'number' &&
-        recipeResources.detector_max_concurrent > 0
-      ) {
-        const existing = container.env || [];
-        const idx = existing.findIndex(
-          (e: any) => e.name === 'CLASSIFYRE_DETECTOR_MAX_CONCURRENT',
-        );
-        const entry = {
-          name: 'CLASSIFYRE_DETECTOR_MAX_CONCURRENT',
-          value: String(recipeResources.detector_max_concurrent),
+          name: 'CLASSIFYRE_MAX_POOL_WORKERS',
+          value: String(recipeResources.max_pool_workers),
         };
         if (idx >= 0) existing[idx] = entry;
         else existing.push(entry);
