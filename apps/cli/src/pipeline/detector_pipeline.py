@@ -300,10 +300,11 @@ class DetectorPipeline:
                     content=page_content,
                     content_type=text_content_type,
                     asset_name=asset.name,
+                    page_num=page_num,
                 )
                 elapsed = int((time.monotonic() - t0) * 1000)
-                logger.debug(
-                    "  %s page %d: %d findings (%dms)",
+                logger.info(
+                    "  %s page %d done: %d findings (%dms)",
                     asset.name, page_num, len(page_findings), elapsed,
                 )
                 return page_findings, page_types, page_errors, page_content, page_num
@@ -393,10 +394,11 @@ class DetectorPipeline:
                     content=page_content,
                     content_type=text_content_type,
                     asset_name=asset.name,
+                    page_num=page_num,
                 )
                 elapsed = int((time.monotonic() - t0) * 1000)
-                logger.debug(
-                    "  %s page %d: %d findings (%dms)",
+                logger.info(
+                    "  %s page %d done: %d findings (%dms)",
                     asset.name, page_num, len(page_findings), elapsed,
                 )
                 return page_findings, page_types, page_errors, page_content, page_num
@@ -552,6 +554,7 @@ class DetectorPipeline:
         content: str | bytes,
         content_type: str,
         asset_name: str = "",
+        page_num: int | None = None,
     ) -> tuple[list[DetectionResult], list[DetectorType], list[str]]:
         """Run all compatible detectors for a single payload.
 
@@ -562,7 +565,10 @@ class DetectorPipeline:
         if not content:
             return [], [], []
 
-        tasks: list[asyncio.Task[list[DetectionResult]] | asyncio.Future[list[DetectionResult]]] = []
+        page_tag = f"p{page_num}" if page_num is not None else ""
+        tasks: list[asyncio.Task[Any] | asyncio.Future[Any]] = []
+        task_start_times: list[float] = []
+        task_via: list[str] = []
         runnable_detectors: list[BaseDetector] = []
 
         for detector in detectors:
@@ -571,9 +577,11 @@ class DetectorPipeline:
                 continue
 
             runnable_detectors.append(detector)
+            task_start_times.append(time.monotonic())
             if self._can_use_pool(detector):
                 info = self._get_detector_info(detector)
                 assert info is not None
+                task_via.append("pool")
                 tasks.append(
                     asyncio.ensure_future(
                         self._worker_pool.run_detector(  # type: ignore[union-attr]
@@ -586,6 +594,7 @@ class DetectorPipeline:
                     )
                 )
             else:
+                task_via.append("local")
                 tasks.append(
                     asyncio.ensure_future(
                         self._run_single_detector(detector, content, content_type)
@@ -617,16 +626,33 @@ class DetectorPipeline:
         errors: list[str] = []
         detected_at = datetime.now(UTC)
 
-        for detector, result in zip(runnable_detectors, results, strict=False):
+        for i, (detector, result) in enumerate(
+            zip(runnable_detectors, results, strict=False)
+        ):
             detector_name = detector.__class__.__name__
+            via = task_via[i]
+            loc = f"{asset_name}:{page_tag}" if page_tag else asset_name
+
             if isinstance(result, Exception):
-                logger.error("Detector %s failed for %s: %s", detector_name, asset_name, result)
+                wall_ms = int((time.monotonic() - task_start_times[i]) * 1000)
+                logger.error(
+                    "  [%s] %s on %s: FAILED in %dms — %s",
+                    via, detector_name, loc, wall_ms, result,
+                )
                 errors.append(f"{detector_name}: {result}")
                 continue
 
+            # Pool returns (findings, worker_pid, elapsed_ms); in-process returns list
+            worker_pid: int | None = None
+            if isinstance(result, tuple):
+                finding_list, worker_pid, worker_elapsed = result
+            else:
+                finding_list = result
+                worker_elapsed = int((time.monotonic() - task_start_times[i]) * 1000)
+
             detector_findings: list[DetectionResult] = []
-            if isinstance(result, list):
-                for finding in result:
+            if isinstance(finding_list, list):
+                for finding in finding_list:
                     if isinstance(finding, DetectionResult):
                         finding_with_meta = finding.model_copy(
                             update={
@@ -636,15 +662,17 @@ class DetectorPipeline:
                         )
                         detector_findings.append(finding_with_meta)
 
+            pid_tag = f"w{worker_pid}" if worker_pid else via
             if detector_findings:
                 logger.info(
-                    "  %s on %s: %d finding(s)",
-                    detector_name,
-                    asset_name,
-                    len(detector_findings),
+                    "  [%s] %s on %s: %d finding(s) in %dms",
+                    pid_tag, detector_name, loc, len(detector_findings), worker_elapsed,
                 )
             else:
-                logger.info("  %s on %s: no findings", detector_name, asset_name)
+                logger.info(
+                    "  [%s] %s on %s: clean (%dms)",
+                    pid_tag, detector_name, loc, worker_elapsed,
+                )
 
             all_findings.extend(detector_findings)
 

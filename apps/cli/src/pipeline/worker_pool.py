@@ -32,13 +32,26 @@ _worker_init_errors: dict[str, str] = {}
 _worker_pid: int | None = None
 
 
+class _WorkerResult:
+    """Container for results + metadata from a worker process."""
+
+    __slots__ = ("elapsed_ms", "findings", "worker_pid")
+
+    def __init__(
+        self, findings: list[dict[str, Any]], worker_pid: int, elapsed_ms: int
+    ) -> None:
+        self.findings = findings
+        self.worker_pid = worker_pid
+        self.elapsed_ms = elapsed_ms
+
+
 def _detect_in_worker(
     detector_name: str,
     detector_type: str,
     config_json: str,
     content: str | bytes,
     content_type: str,
-) -> list[dict[str, Any]]:
+) -> _WorkerResult:
     """Run a single detector on *content* inside a worker process.
 
     This is a module-level function so it can be pickled by
@@ -96,15 +109,16 @@ def _detect_in_worker(
         results = asyncio.run(detector.detect(content, content_type))
 
     elapsed_ms = int((time.monotonic() - t0) * 1000)
-    logging.getLogger(__name__).debug(
+    logging.getLogger(__name__).info(
         "Worker %d ran %s: %d findings in %dms",
         pid, detector_name, len(results), elapsed_ms,
     )
 
-    return [
+    findings = [
         r.model_dump(mode="json", exclude_none=True) if hasattr(r, "model_dump") else r
         for r in results
     ]
+    return _WorkerResult(findings=findings, worker_pid=pid, elapsed_ms=elapsed_ms)
 
 
 # I/O-bound detectors should stay in the asyncio event loop, not the pool.
@@ -153,13 +167,16 @@ class DetectorWorkerPool:
         config_json: str,
         content: str | bytes,
         content_type: str,
-    ) -> list[DetectionResult]:
-        """Submit a single detection task to the process pool."""
+    ) -> tuple[list[DetectionResult], int, int]:
+        """Submit a single detection task to the process pool.
+
+        Returns (findings, worker_pid, elapsed_ms).
+        """
         if self._shutdown:
             raise RuntimeError("DetectorWorkerPool is shut down")
 
         loop = asyncio.get_running_loop()
-        raw_results: list[dict[str, Any]] = await loop.run_in_executor(
+        result: _WorkerResult = await loop.run_in_executor(
             self._pool,
             _detect_in_worker,
             detector_name,
@@ -168,7 +185,8 @@ class DetectorWorkerPool:
             content,
             content_type,
         )
-        return [DetectionResult.model_validate(r) for r in raw_results]
+        findings = [DetectionResult.model_validate(r) for r in result.findings]
+        return findings, result.worker_pid, result.elapsed_ms
 
     def shutdown(self, *, wait: bool = True, cancel_futures: bool = False) -> None:
         if self._shutdown:
