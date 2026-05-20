@@ -1216,7 +1216,6 @@ export class AssetService {
     },
   ) {
     const finalizeRun = options?.finalizeRun ?? true;
-    const isFullScan = options?.isFullScan ?? true;
     const skipFindings = options?.skipFindings ?? false;
     const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
 
@@ -1254,7 +1253,6 @@ export class AssetService {
         runnerId,
         source.type,
         existingAssetsMap,
-        isFullScan,
         skipFindings,
       );
 
@@ -1398,6 +1396,48 @@ export class AssetService {
           });
         }
 
+        // Resolve findings on assets that were scanned but whose findings
+        // were not re-detected. finding.runnerId is updated on create/re-detect,
+        // so a stale runnerId means the finding was absent from this run.
+        const staleFindings = await tx.finding.findMany({
+          where: {
+            sourceId,
+            status: FindingStatus.OPEN,
+            runnerId: { not: runnerId },
+            asset: {
+              runnerId,
+              status: { not: AssetStatus.DELETED },
+            },
+          },
+        });
+
+        for (const finding of staleFindings.filter(
+          (f) => !hasManualStatusOverride(f),
+        )) {
+          const currentHistory = Array.isArray(finding.history)
+            ? finding.history
+            : [];
+          await tx.finding.update({
+            where: { id: finding.id },
+            data: {
+              status: FindingStatus.RESOLVED,
+              runnerId,
+              resolvedAt: now,
+              resolutionReason: 'Detection no longer present in scan',
+              history: [
+                ...currentHistory,
+                {
+                  timestamp: now,
+                  runnerId,
+                  eventType: HistoryEventType.RESOLVED,
+                  status: FindingStatus.RESOLVED,
+                  changeReason: 'Detection no longer present in scan',
+                },
+              ],
+            },
+          });
+        }
+
         // Update runner stats with deleted count
         await tx.runner.update({
           where: { id: runnerId },
@@ -1416,7 +1456,6 @@ export class AssetService {
     runnerId: string,
     sourceType: AssetType,
     existingAssetsMap: Map<string, Asset>,
-    isFullScan: boolean = true,
     skipFindings: boolean = false,
   ): Promise<{
     created: number;
@@ -1858,59 +1897,6 @@ export class AssetService {
               detectorVersion: 1,
               pipelineResult: detection.pipelineResult,
               extractedAt: detection.detectedAt ?? new Date(),
-            });
-          }
-        }
-
-        // For full scans (strategy=ALL), resolve findings that were not re-detected
-        // on scanned assets — absence means the finding is genuinely gone.
-        // For partial scans (RANDOM/LATEST), skip this: only matched findings are
-        // updated; unmatched findings on sampled assets are left open because the
-        // sampling may not cover every detection on every run.
-        if (isFullScan) {
-          const hasManualStatusOverride = (finding: any) => {
-            const history = Array.isArray(finding.history)
-              ? finding.history
-              : [];
-            const lastStatusChange = [...history]
-              .reverse()
-              .find(
-                (entry: any) =>
-                  entry.eventType === HistoryEventType.STATUS_CHANGED,
-              );
-            return lastStatusChange
-              ? lastStatusChange.status !== FindingStatus.OPEN
-              : false;
-          };
-
-          const toResolve = Array.from(existingMap.values()).filter(
-            (f: any) =>
-              f.status === FindingStatus.OPEN && !hasManualStatusOverride(f),
-          );
-
-          for (const finding of toResolve) {
-            const currentHistory = Array.isArray(finding.history)
-              ? finding.history
-              : [];
-
-            await tx.finding.update({
-              where: { id: finding.id },
-              data: {
-                status: FindingStatus.RESOLVED,
-                runnerId,
-                resolvedAt: new Date(),
-                resolutionReason: 'Detection no longer present in scan',
-                history: [
-                  ...currentHistory,
-                  {
-                    timestamp: new Date(),
-                    runnerId,
-                    eventType: HistoryEventType.RESOLVED,
-                    status: FindingStatus.RESOLVED,
-                    changeReason: 'Detection no longer present in scan',
-                  },
-                ],
-              },
             });
           }
         }
