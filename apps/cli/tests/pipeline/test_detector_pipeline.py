@@ -215,7 +215,7 @@ async def test_pipeline_logs_configured_detector_name(caplog: pytest.LogCaptureF
 
 
 @pytest.mark.asyncio
-async def test_pipeline_truncates_content_and_sets_scan_stats() -> None:
+async def test_pipeline_passes_full_content_and_sets_scan_stats() -> None:
     content = "x" * 25
     source = DummySource({"type": "DUMMY"}, content=content)
     detector = RecordingDetector(["text/plain"])
@@ -224,15 +224,14 @@ async def test_pipeline_truncates_content_and_sets_scan_stats() -> None:
         detectors=[detector],
         source=source,
         runner_id="runner-2",
-        content_size_limit=10,
     )
 
     [asset] = await pipeline.process([make_asset("2")])
     assert asset.findings is not None
     assert len(asset.findings) == 1
 
-    # Content should be truncated before detection
-    assert asset.findings[0].matched_content == "x" * 10
+    # Full content should be passed to detectors
+    assert asset.findings[0].matched_content == content
 
     # Scan stats should reflect original content size and detectors run
     assert asset.scan_stats is not None
@@ -608,7 +607,7 @@ async def test_pipeline_runs_text_and_binary_detectors_together() -> None:
 
 
 @pytest.mark.asyncio
-async def test_pipeline_truncation_warning_in_scan_stats() -> None:
+async def test_pipeline_no_truncation_warning_in_scan_stats() -> None:
     content = "x" * 50
     source = DummySource({"type": "DUMMY"}, content=content)
     detector = RecordingDetector(["text/plain"])
@@ -617,13 +616,14 @@ async def test_pipeline_truncation_warning_in_scan_stats() -> None:
         detectors=[detector],
         source=source,
         runner_id="runner-trunc",
-        content_size_limit=10,
     )
 
     [asset] = await pipeline.process([make_asset("trunc")])
     assert asset.scan_stats is not None
-    assert asset.scan_stats.warnings is not None
-    assert any("truncated" in w.lower() for w in asset.scan_stats.warnings)
+    assert not any(
+        "truncated" in w.lower()
+        for w in (asset.scan_stats.warnings or [])
+    )
 
 
 class FailingDetector(BaseDetector):
