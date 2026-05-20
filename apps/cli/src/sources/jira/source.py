@@ -64,7 +64,6 @@ class JiraSource(BaseSource):
         content_options = self._content_options()
         self.include_comments = content_options.include_comments is not False
         self.include_attachments = content_options.include_attachments is not False
-        self.attachment_max_bytes = int(content_options.attachment_max_bytes or 5_242_880)
 
         self._seen_asset_hashes: set[str] = set()
         self._hash_to_url: dict[str, str] = {}
@@ -524,9 +523,6 @@ class JiraSource(BaseSource):
             logger.warning("Failed to fetch Jira attachment bytes for %s: %s", attachment_url, exc)
             return None
 
-        if self.attachment_max_bytes > 0 and len(file_bytes) > self.attachment_max_bytes:
-            file_bytes = file_bytes[: self.attachment_max_bytes]
-
         mime_type = resolve_mime_type(
             file_bytes,
             declared_mime_type=declared_mime,
@@ -558,9 +554,6 @@ class JiraSource(BaseSource):
         except Exception as exc:
             logger.warning("Failed to fetch Jira attachment %s: %s", attachment_url, exc)
             return None
-
-        if self.attachment_max_bytes > 0 and len(file_bytes) > self.attachment_max_bytes:
-            file_bytes = file_bytes[: self.attachment_max_bytes]
 
         parsed = self.parse_asset_bytes(
             file_bytes,

@@ -135,31 +135,37 @@ def test_is_io_bound_detector_secrets() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _pool_start_method() -> str:
+    import multiprocessing
+    available = multiprocessing.get_all_start_methods()
+    return "fork" if "fork" in available else "forkserver"
+
+
 def test_pool_create_and_shutdown() -> None:
-    pool = DetectorWorkerPool(max_workers=2, mp_start_method="forkserver")
+    pool = DetectorWorkerPool(max_workers=2, mp_start_method=_pool_start_method())
     assert pool.max_workers == 2
     pool.shutdown(wait=True)
 
 
 def test_pool_double_shutdown_is_safe() -> None:
-    pool = DetectorWorkerPool(max_workers=1, mp_start_method="forkserver")
+    pool = DetectorWorkerPool(max_workers=1, mp_start_method=_pool_start_method())
     pool.shutdown()
     pool.shutdown()
 
 
 def test_pool_context_manager() -> None:
-    with DetectorWorkerPool(max_workers=1, mp_start_method="forkserver") as pool:
+    with DetectorWorkerPool(max_workers=1, mp_start_method=_pool_start_method()) as pool:
         assert pool.max_workers == 1
 
 
 def test_pool_caps_workers_at_16() -> None:
-    pool = DetectorWorkerPool(max_workers=32, mp_start_method="forkserver")
+    pool = DetectorWorkerPool(max_workers=32, mp_start_method=_pool_start_method())
     assert pool.max_workers == 16
     pool.shutdown()
 
 
 def test_pool_min_workers_is_1() -> None:
-    pool = DetectorWorkerPool(max_workers=0, mp_start_method="forkserver")
+    pool = DetectorWorkerPool(max_workers=0, mp_start_method=_pool_start_method())
     assert pool.max_workers == 1
     pool.shutdown()
 
@@ -172,7 +178,7 @@ def test_pool_min_workers_is_1() -> None:
 @pytest.mark.asyncio
 async def test_pool_run_detector_returns_findings() -> None:
     """Submit content with an AWS key pattern to the secrets detector via the pool."""
-    pool = DetectorWorkerPool(max_workers=2, mp_start_method="forkserver")
+    pool = DetectorWorkerPool(max_workers=2, mp_start_method=_pool_start_method())
     try:
         content = "AKIAIOSFODNN7EXAMPLE"
         findings, worker_pid, elapsed_ms = await pool.run_detector(
@@ -193,7 +199,7 @@ async def test_pool_run_detector_returns_findings() -> None:
 @pytest.mark.asyncio
 async def test_pool_run_detector_no_findings_for_clean_content() -> None:
     """Clean content should return zero findings."""
-    pool = DetectorWorkerPool(max_workers=1, mp_start_method="forkserver")
+    pool = DetectorWorkerPool(max_workers=1, mp_start_method=_pool_start_method())
     try:
         findings, worker_pid, _elapsed_ms = await pool.run_detector(
             detector_name="secrets",
@@ -211,7 +217,7 @@ async def test_pool_run_detector_no_findings_for_clean_content() -> None:
 @pytest.mark.asyncio
 async def test_pool_concurrent_detections() -> None:
     """Submit multiple tasks concurrently and verify all return."""
-    pool = DetectorWorkerPool(max_workers=4, mp_start_method="forkserver")
+    pool = DetectorWorkerPool(max_workers=4, mp_start_method=_pool_start_method())
     try:
         content = "AKIAIOSFODNN7EXAMPLE"
         tasks = [
@@ -235,7 +241,7 @@ async def test_pool_concurrent_detections() -> None:
 
 @pytest.mark.asyncio
 async def test_pool_raises_after_shutdown() -> None:
-    pool = DetectorWorkerPool(max_workers=1, mp_start_method="forkserver")
+    pool = DetectorWorkerPool(max_workers=1, mp_start_method=_pool_start_method())
     pool.shutdown()
 
     with pytest.raises(RuntimeError, match="shut down"):
@@ -275,7 +281,7 @@ async def test_pipeline_without_pool_falls_back_to_in_process() -> None:
 @pytest.mark.asyncio
 async def test_pipeline_with_pool_processes_asset() -> None:
     """Pipeline routes detection through the pool when detector info is registered."""
-    pool = DetectorWorkerPool(max_workers=2, mp_start_method="forkserver")
+    pool = DetectorWorkerPool(max_workers=2, mp_start_method=_pool_start_method())
     try:
         content = "AKIAIOSFODNN7EXAMPLE"
         source = DummySource({"type": "DUMMY"}, content=content)
@@ -391,7 +397,7 @@ async def test_streaming_flush_fires_at_threshold() -> None:
 @pytest.mark.asyncio
 async def test_pool_pipeline_multiple_assets() -> None:
     """Multiple assets processed through the pool return correct results."""
-    pool = DetectorWorkerPool(max_workers=4, mp_start_method="forkserver")
+    pool = DetectorWorkerPool(max_workers=4, mp_start_method=_pool_start_method())
     try:
         content = "AKIAIOSFODNN7EXAMPLE"
         source = DummySource({"type": "DUMMY"}, content=content)
