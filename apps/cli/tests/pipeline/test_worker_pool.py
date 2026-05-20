@@ -174,15 +174,17 @@ async def test_pool_run_detector_returns_findings() -> None:
     pool = DetectorWorkerPool(max_workers=2, mp_start_method="forkserver")
     try:
         content = "AKIAIOSFODNN7EXAMPLE"
-        results = await pool.run_detector(
+        findings, worker_pid, elapsed_ms = await pool.run_detector(
             detector_name="secrets",
             detector_type="SECRETS",
             config_json="{}",
             content=content,
             content_type="text/plain",
         )
-        assert len(results) >= 1
-        assert all(isinstance(r, DetectionResult) for r in results)
+        assert len(findings) >= 1
+        assert all(isinstance(r, DetectionResult) for r in findings)
+        assert isinstance(worker_pid, int) and worker_pid > 0
+        assert isinstance(elapsed_ms, int) and elapsed_ms >= 0
     finally:
         pool.shutdown()
 
@@ -192,14 +194,15 @@ async def test_pool_run_detector_no_findings_for_clean_content() -> None:
     """Clean content should return zero findings."""
     pool = DetectorWorkerPool(max_workers=1, mp_start_method="forkserver")
     try:
-        results = await pool.run_detector(
+        findings, worker_pid, elapsed_ms = await pool.run_detector(
             detector_name="secrets",
             detector_type="SECRETS",
             config_json="{}",
             content="Hello, this is perfectly normal text.",
             content_type="text/plain",
         )
-        assert results == []
+        assert findings == []
+        assert isinstance(worker_pid, int) and worker_pid > 0
     finally:
         pool.shutdown()
 
@@ -222,8 +225,9 @@ async def test_pool_concurrent_detections() -> None:
         ]
         results = await asyncio.gather(*tasks)
         assert len(results) == 8
-        for result_list in results:
-            assert len(result_list) >= 1
+        for findings, worker_pid, elapsed_ms in results:
+            assert len(findings) >= 1
+            assert worker_pid > 0
     finally:
         pool.shutdown()
 
