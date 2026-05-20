@@ -179,6 +179,14 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     sink_started = True
 
                     from .pipeline.detector_pipeline import DetectorPipeline
+                    from .pipeline.worker_pool import DetectorWorkerPool
+
+                    pool_workers = args.max_pool_workers or min(
+                        args.processing_workers * args.detector_max_concurrent,
+                        os.cpu_count() or 4,
+                        16,
+                    )
+                    worker_pool: DetectorWorkerPool | None = None
 
                     pipeline = DetectorPipeline.from_recipe(
                         recipe,
@@ -187,6 +195,16 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         max_concurrent_assets=args.detector_max_concurrent,
                     )
                     has_detectors = bool(pipeline.detectors)
+
+                    if has_detectors:
+                        worker_pool = DetectorWorkerPool(max_workers=pool_workers)
+                        pipeline = DetectorPipeline.from_recipe(
+                            recipe,
+                            source,
+                            runner_id,
+                            max_concurrent_assets=args.detector_max_concurrent,
+                            worker_pool=worker_pool,
+                        )
 
                     # --- Phase 1: Discovery ---
                     source.set_discovery_only(True)
@@ -228,6 +246,13 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         workers = args.processing_workers
                         semaphore = _asyncio.Semaphore(workers)
                         processed_count = 0
+                        logger.info(
+                            "Phase 2 starting: %d assets, processing_workers=%d, "
+                            "detector_max_concurrent=%d, pool_workers=%s",
+                            len(all_stubs), workers,
+                            args.detector_max_concurrent,
+                            worker_pool.max_workers if worker_pool else "none",
+                        )
                         error_count = 0
 
                         async def _process_one(asset: Any) -> None:
@@ -340,6 +365,9 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                 "Failed to mark sink failure: %s", sink_error, exc_info=True
                             )
                     raise
+                finally:
+                    if worker_pool is not None:
+                        worker_pool.shutdown(wait=True)
 
         except Exception as e:
             logger.debug("Traceback for %s failure:", args.command, exc_info=True)
@@ -538,6 +566,12 @@ def main() -> None:
         default=None,
         help="Number of parallel asset-processing workers in Phase 2 (default: 2, env: CLASSIFYRE_PROCESSING_WORKERS)",
     )
+    parser.add_argument(
+        "--max-pool-workers",
+        type=int,
+        default=None,
+        help="Max OS processes in the detector pool (default: processing_workers * detector_max_concurrent, env: CLASSIFYRE_MAX_POOL_WORKERS)",
+    )
 
     args = parser.parse_args()
 
@@ -564,6 +598,13 @@ def main() -> None:
         except ValueError:
             args.processing_workers = 2
     args.processing_workers = max(args.processing_workers, 1)
+
+    if args.max_pool_workers is None:
+        env_val = os.environ.get("CLASSIFYRE_MAX_POOL_WORKERS")
+        try:
+            args.max_pool_workers = int(env_val) if env_val else None
+        except ValueError:
+            args.max_pool_workers = None
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)

@@ -1,7 +1,10 @@
 """Pipeline for running detectors on extracted assets."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
+import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -19,8 +22,20 @@ from ..models.generated_single_asset_scan_results import (
 from ..sources.base import BaseSource
 from ..utils.file_parser import resolve_mime_type
 from .content_provider import ContentProvider
+from .worker_pool import DetectorWorkerPool, is_io_bound_detector
 
 logger = logging.getLogger(__name__)
+
+
+class _DetectorInfo:
+    """Serialisable metadata for routing a detector through the process pool."""
+
+    __slots__ = ("config_json", "detector_name", "detector_type")
+
+    def __init__(self, detector_name: str, detector_type: str, config_json: str) -> None:
+        self.detector_name = detector_name
+        self.detector_type = detector_type
+        self.config_json = config_json
 
 
 class DetectorPipeline:
@@ -38,24 +53,16 @@ class DetectorPipeline:
         content_size_limit: int = 1_048_576,  # 1MB default
         max_concurrent_assets: int = 10,
         content_provider: ContentProvider | None = None,
+        worker_pool: DetectorWorkerPool | None = None,
     ):
-        """
-        Initialize detector pipeline.
-
-        Args:
-            detectors: List of detector instances to run
-            source: Source instance for fetching content
-            runner_id: ID of the runner executing this pipeline
-            content_size_limit: Maximum content size in bytes
-            max_concurrent_assets: Max assets to process in parallel within a batch
-            content_provider: Optional provider — if None, source is used directly
-        """
         self.detectors = detectors
         self.source = source
         self.runner_id = runner_id
         self.content_size_limit = content_size_limit
         self.max_concurrent_assets = max_concurrent_assets
         self._detector_semaphore = asyncio.Semaphore(max_concurrent_assets)
+        self._worker_pool = worker_pool
+        self._detector_info: dict[int, _DetectorInfo] = {}
         if content_provider is not None:
             self.content_provider: ContentProvider = content_provider
         else:
@@ -63,6 +70,22 @@ class DetectorPipeline:
 
             self.content_provider = ParsedContentProvider(source)
         self.init_warnings: list[str] = []
+
+    def _register_detector_info(
+        self, detector: BaseDetector, info: _DetectorInfo
+    ) -> None:
+        self._detector_info[id(detector)] = info
+
+    def _get_detector_info(self, detector: BaseDetector) -> _DetectorInfo | None:
+        return self._detector_info.get(id(detector))
+
+    def _can_use_pool(self, detector: BaseDetector) -> bool:
+        if self._worker_pool is None:
+            return False
+        info = self._get_detector_info(detector)
+        if info is None:
+            return False
+        return not is_io_bound_detector(info.detector_name)
 
     async def process(self, assets: list[SingleAssetScanResults]) -> list[SingleAssetScanResults]:
         """Process assets through detector pipeline, returning all results at once."""
@@ -74,11 +97,7 @@ class DetectorPipeline:
     async def process_stream(
         self, assets: list[SingleAssetScanResults]
     ) -> AsyncGenerator[SingleAssetScanResults, None]:
-        """Process assets concurrently, yielding in completion order.
-
-        Total concurrent detector invocations across all assets and pages
-        are bounded by ``self._detector_semaphore``.
-        """
+        """Process assets concurrently, yielding in completion order."""
         tasks = {asyncio.create_task(self.process_single_asset(a)) for a in assets}
         for coro in asyncio.as_completed(tasks):
             yield await coro
@@ -90,19 +109,11 @@ class DetectorPipeline:
         on_findings_flushed: Callable[[list[DetectionResult]], Awaitable[None]] | None = None,
         findings_flush_size: int = 50,
     ) -> SingleAssetScanResults:
-        """Process a single asset through detectors.
-
-        When *on_findings_flushed* is provided the text-detector phase switches to
-        sequential page processing and calls the callback every *findings_flush_size*
-        new findings so callers can push partial results without waiting for the full
-        asset (important for ALL-strategy tabular sources with thousands of pages).
-        """
-        # 1. If no detectors, return asset as-is with empty findings
+        """Process a single asset through detectors."""
         if not self.detectors:
             asset.findings = []
             return asset
 
-        # Record scan start time
         scan_started = datetime.now(UTC)
         ocr_enabled = self.source.ocr_enabled()
         text_content_type = self._text_content_type_for_asset(asset.asset_type, ocr_enabled)
@@ -149,7 +160,10 @@ class DetectorPipeline:
 
         all_active = text_detectors + binary_detectors + link_detectors
         detector_names = [self._detector_log_label(d) for d in all_active]
-        logger.info("Scanning %s [%s]", asset.name, ", ".join(detector_names))
+        pool_tag = "[pool]" if self._worker_pool else "[in-process]"
+        logger.info(
+            "%s Scanning %s [%s]", pool_tag, asset.name, ", ".join(detector_names)
+        )
 
         findings: list[DetectionResult] = []
         detector_types_run: list[DetectorType] = []
@@ -231,15 +245,19 @@ class DetectorPipeline:
 
         if findings:
             logger.info(
-                "Scanned %s: %d finding(s) in %dms",
-                asset.name,
-                len(findings),
-                scan_duration,
+                "%s Scanned %s: %d finding(s) in %dms",
+                pool_tag, asset.name, len(findings), scan_duration,
             )
         else:
-            logger.info("Scanned %s: no findings (%dms)", asset.name, scan_duration)
+            logger.info(
+                "%s Scanned %s: no findings (%dms)", pool_tag, asset.name, scan_duration
+            )
 
         return asset
+
+    # ------------------------------------------------------------------
+    # Text detector execution
+    # ------------------------------------------------------------------
 
     async def _run_text_detectors_for_asset(
         self,
@@ -265,28 +283,36 @@ class DetectorPipeline:
         warnings: list[str] = []
         errors: list[str] = []
         content_size = 0
+        page_index = 0
 
         pending_tasks: set[
-            asyncio.Task[tuple[list[DetectionResult], list[DetectorType], list[str], str]]
+            asyncio.Task[tuple[list[DetectionResult], list[DetectorType], list[str], str, int]]
         ] = set()
 
         async def _detect_page(
             page_content: str,
-        ) -> tuple[list[DetectionResult], list[DetectorType], list[str], str]:
+            page_num: int,
+        ) -> tuple[list[DetectionResult], list[DetectorType], list[str], str, int]:
             async with self._detector_semaphore:
+                t0 = time.monotonic()
                 page_findings, page_types, page_errors = await self._run_detectors(
                     detectors=detectors,
                     content=page_content,
                     content_type=text_content_type,
                     asset_name=asset.name,
                 )
-                return page_findings, page_types, page_errors, page_content
+                elapsed = int((time.monotonic() - t0) * 1000)
+                logger.debug(
+                    "  %s page %d: %d findings (%dms)",
+                    asset.name, page_num, len(page_findings), elapsed,
+                )
+                return page_findings, page_types, page_errors, page_content, page_num
 
         def _collect_done() -> None:
             done = {t for t in pending_tasks if t.done()}
             for task in done:
                 pending_tasks.discard(task)
-                page_findings, page_types, page_errors, page_content = task.result()
+                page_findings, page_types, page_errors, page_content, _pn = task.result()
                 findings.extend(page_findings)
                 errors.extend(page_errors)
                 nonlocal detector_types_run
@@ -302,6 +328,7 @@ class DetectorPipeline:
                     )
 
         async for text_content in self._iter_text_content_pages(asset):
+            page_index += 1
             content_size += len(text_content)
 
             detector_content = text_content
@@ -317,7 +344,7 @@ class DetectorPipeline:
             if not detector_content:
                 continue
 
-            task = asyncio.create_task(_detect_page(detector_content))
+            task = asyncio.create_task(_detect_page(detector_content, page_index))
             pending_tasks.add(task)
             _collect_done()
 
@@ -342,15 +369,65 @@ class DetectorPipeline:
         on_findings_flushed: Callable[[list[DetectionResult]], Awaitable[None]],
         findings_flush_size: int = 50,
     ) -> tuple[list[DetectionResult], list[DetectorType], int, list[str], list[str]]:
-        """Sequential variant: processes one page at a time and calls back every N findings."""
+        """Concurrent page processing with periodic flush of accumulated findings."""
         findings: list[DetectionResult] = []
         detector_types_run: list[DetectorType] = []
         warnings: list[str] = []
         errors: list[str] = []
         content_size = 0
         unflushed_count = 0
+        page_index = 0
+
+        pending_tasks: set[
+            asyncio.Task[tuple[list[DetectionResult], list[DetectorType], list[str], str, int]]
+        ] = set()
+
+        async def _detect_page(
+            page_content: str,
+            page_num: int,
+        ) -> tuple[list[DetectionResult], list[DetectorType], list[str], str, int]:
+            async with self._detector_semaphore:
+                t0 = time.monotonic()
+                page_findings, page_types, page_errors = await self._run_detectors(
+                    detectors=detectors,
+                    content=page_content,
+                    content_type=text_content_type,
+                    asset_name=asset.name,
+                )
+                elapsed = int((time.monotonic() - t0) * 1000)
+                logger.debug(
+                    "  %s page %d: %d findings (%dms)",
+                    asset.name, page_num, len(page_findings), elapsed,
+                )
+                return page_findings, page_types, page_errors, page_content, page_num
+
+        async def _collect_done_and_flush() -> None:
+            nonlocal detector_types_run, unflushed_count
+            done = {t for t in pending_tasks if t.done()}
+            for task in done:
+                pending_tasks.discard(task)
+                page_findings, page_types, page_errors, page_content, _pn = task.result()
+                for finding in page_findings:
+                    self.content_provider.enrich_finding_location(
+                        finding, asset, page_content,
+                    )
+                findings.extend(page_findings)
+                errors.extend(page_errors)
+                detector_types_run = self._merge_detector_types(
+                    detector_types_run, page_types,
+                )
+                unflushed_count += len(page_findings)
+
+            if unflushed_count >= findings_flush_size and unflushed_count > 0:
+                logger.debug(
+                    "  %s flushing %d findings (%d total)",
+                    asset.name, unflushed_count, len(findings),
+                )
+                await on_findings_flushed(list(findings))
+                unflushed_count = 0
 
         async for text_content in self._iter_text_content_pages(asset):
+            page_index += 1
             content_size += len(text_content)
 
             detector_content = text_content
@@ -366,25 +443,13 @@ class DetectorPipeline:
             if not detector_content:
                 continue
 
-            async with self._detector_semaphore:
-                page_findings, page_types, page_errors = await self._run_detectors(
-                    detectors=detectors,
-                    content=detector_content,
-                    content_type=text_content_type,
-                    asset_name=asset.name,
-                )
+            task = asyncio.create_task(_detect_page(detector_content, page_index))
+            pending_tasks.add(task)
+            await _collect_done_and_flush()
 
-            for finding in page_findings:
-                self.content_provider.enrich_finding_location(finding, asset, detector_content)
-
-            findings.extend(page_findings)
-            errors.extend(page_errors)
-            detector_types_run = self._merge_detector_types(detector_types_run, page_types)
-            unflushed_count += len(page_findings)
-
-            if unflushed_count >= findings_flush_size and page_findings:
-                await on_findings_flushed(list(findings))
-                unflushed_count = 0
+        if pending_tasks:
+            await asyncio.gather(*pending_tasks)
+            await _collect_done_and_flush()
 
         if content_size == 0 and warn_on_empty_content:
             msg = f"No content available for asset {asset.name}"
@@ -392,6 +457,10 @@ class DetectorPipeline:
             warnings.append(msg)
 
         return findings, detector_types_run, content_size, warnings, errors
+
+    # ------------------------------------------------------------------
+    # Content iteration & binary detectors
+    # ------------------------------------------------------------------
 
     async def _iter_text_content_pages(self, asset: SingleAssetScanResults):
         candidate_ids: list[str] = []
@@ -472,63 +541,9 @@ class DetectorPipeline:
 
         return [], [], [], []
 
-    @staticmethod
-    def _resolve_binary_mime_type(
-        *,
-        raw_bytes: bytes,
-        declared_mime_type: str,
-        asset: SingleAssetScanResults,
-    ) -> str:
-        file_name = str(asset.name or "").strip() or str(asset.external_url or "").strip()
-        return resolve_mime_type(
-            raw_bytes,
-            declared_mime_type=declared_mime_type,
-            file_name=file_name,
-        )
-
-    @staticmethod
-    def _is_binary_detector(detector: BaseDetector) -> bool:
-        """Return True if the detector handles binary content types (images, etc.)."""
-        for ct in detector.get_supported_content_types():
-            if ct.startswith(("image/", "audio/", "video/")) or ct == "application/octet-stream":
-                return True
-        return False
-
-    @staticmethod
-    def _detector_log_label(detector: BaseDetector) -> str:
-        """Return a human-readable detector label for logs."""
-        config_name = getattr(getattr(detector, "config", None), "name", None)
-        if isinstance(config_name, str) and config_name.strip():
-            return config_name.strip()
-
-        detector_name = getattr(detector, "detector_name", "")
-        if isinstance(detector_name, str) and detector_name.strip() and detector_name != "base":
-            return detector_name.strip()
-
-        return detector.__class__.__name__
-
-    @staticmethod
-    def _merge_detector_types(
-        existing: list[DetectorType],
-        incoming: list[DetectorType],
-    ) -> list[DetectorType]:
-        merged = list(existing)
-        seen = set(existing)
-        for detector_type in incoming:
-            if detector_type in seen:
-                continue
-            seen.add(detector_type)
-            merged.append(detector_type)
-        return merged
-
-    async def _fetch_content(self, asset: SingleAssetScanResults) -> tuple[str, str]:
-        """Fetch content for an asset."""
-        content_type = self._asset_type_to_content_type(asset.asset_type)
-
-        async for text_content in self._iter_text_content_pages(asset):
-            return text_content, content_type
-
-        return "", content_type
+    # ------------------------------------------------------------------
+    # Core detector execution
+    # ------------------------------------------------------------------
 
     async def _run_detectors(
         self,
@@ -538,18 +553,44 @@ class DetectorPipeline:
         content_type: str,
         asset_name: str = "",
     ) -> tuple[list[DetectionResult], list[DetectorType], list[str]]:
-        """Run all compatible detectors in parallel for a single payload."""
+        """Run all compatible detectors for a single payload.
+
+        CPU-bound detectors are routed through the process pool when
+        available; I/O-bound detectors (e.g. broken_links) always run
+        in the current event loop.
+        """
         if not content:
             return [], [], []
 
-        tasks = []
+        tasks: list[asyncio.Task[list[DetectionResult]] | asyncio.Future[list[DetectionResult]]] = []
         runnable_detectors: list[BaseDetector] = []
 
         for detector in detectors:
             supported = detector.get_supported_content_types()
-            if self._supports_content_type(supported, content_type):
-                tasks.append(self._run_single_detector(detector, content, content_type))
-                runnable_detectors.append(detector)
+            if not self._supports_content_type(supported, content_type):
+                continue
+
+            runnable_detectors.append(detector)
+            if self._can_use_pool(detector):
+                info = self._get_detector_info(detector)
+                assert info is not None
+                tasks.append(
+                    asyncio.ensure_future(
+                        self._worker_pool.run_detector(  # type: ignore[union-attr]
+                            detector_name=info.detector_name,
+                            detector_type=info.detector_type,
+                            config_json=info.config_json,
+                            content=content,
+                            content_type=content_type,
+                        )
+                    )
+                )
+            else:
+                tasks.append(
+                    asyncio.ensure_future(
+                        self._run_single_detector(detector, content, content_type)
+                    )
+                )
 
         if not tasks:
             return [], [], []
@@ -609,6 +650,10 @@ class DetectorPipeline:
 
         return all_findings, detector_types_run, errors
 
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
     def _build_links_payload(self, links: list[str] | None) -> str:
         if not links:
             return ""
@@ -632,7 +677,7 @@ class DetectorPipeline:
     async def _run_single_detector(
         self, detector: BaseDetector, content: str | bytes, content_type: str
     ) -> list[DetectionResult]:
-        """Run a single detector."""
+        """Run a single detector in-process."""
         return await detector.detect(content, content_type)
 
     def _text_content_type_for_asset(
@@ -640,11 +685,9 @@ class DetectorPipeline:
         asset_type: OutputAssetType,
         ocr_enabled: bool,
     ) -> str | None:
-        """Map an asset type to the text payload MIME used for text-capable detectors."""
         mapping = {
             OutputAssetType.TXT: "text/plain",
             OutputAssetType.TABLE: "text/plain",
-            # URL assets usually resolve to HTML pages and are scanned as extracted text.
             OutputAssetType.URL: "text/html",
         }
         if asset_type in mapping:
@@ -652,6 +695,39 @@ class DetectorPipeline:
         if ocr_enabled and asset_type in {OutputAssetType.IMAGE, OutputAssetType.BINARY}:
             return "text/plain"
         return None
+
+    @staticmethod
+    def _resolve_binary_mime_type(
+        *,
+        raw_bytes: bytes,
+        declared_mime_type: str,
+        asset: SingleAssetScanResults,
+    ) -> str:
+        file_name = str(asset.name or "").strip() or str(asset.external_url or "").strip()
+        return resolve_mime_type(
+            raw_bytes,
+            declared_mime_type=declared_mime_type,
+            file_name=file_name,
+        )
+
+    @staticmethod
+    def _is_binary_detector(detector: BaseDetector) -> bool:
+        for ct in detector.get_supported_content_types():
+            if ct.startswith(("image/", "audio/", "video/")) or ct == "application/octet-stream":
+                return True
+        return False
+
+    @staticmethod
+    def _detector_log_label(detector: BaseDetector) -> str:
+        config_name = getattr(getattr(detector, "config", None), "name", None)
+        if isinstance(config_name, str) and config_name.strip():
+            return config_name.strip()
+
+        detector_name = getattr(detector, "detector_name", "")
+        if isinstance(detector_name, str) and detector_name.strip() and detector_name != "base":
+            return detector_name.strip()
+
+        return detector.__class__.__name__
 
     @staticmethod
     def _asset_has_binary_primary_payload(asset_type: OutputAssetType) -> bool:
@@ -663,10 +739,21 @@ class DetectorPipeline:
             OutputAssetType.OTHER,
         }
 
+    @staticmethod
+    def _merge_detector_types(
+        existing: list[DetectorType],
+        incoming: list[DetectorType],
+    ) -> list[DetectorType]:
+        merged = list(existing)
+        seen = set(existing)
+        for detector_type in incoming:
+            if detector_type in seen:
+                continue
+            seen.add(detector_type)
+            merged.append(detector_type)
+        return merged
+
     def _supports_content_type(self, supported: list[str], content_type: str) -> bool:
-        """
-        Check MIME compatibility, including wildcard and text fallback behavior.
-        """
         if content_type in supported:
             return True
 
@@ -676,12 +763,22 @@ class DetectorPipeline:
                 if content_type.startswith(prefix):
                     return True
 
-        # Compatibility fallback: text detectors that declare text/plain
-        # should still process extracted HTML text content.
         if content_type == "text/html" and "text/plain" in supported:
             return True
 
         return False
+
+    async def _fetch_content(self, asset: SingleAssetScanResults) -> tuple[str, str]:
+        content_type = self._asset_type_to_content_type(asset.asset_type)
+
+        async for text_content in self._iter_text_content_pages(asset):
+            return text_content, content_type
+
+        return "", content_type
+
+    # ------------------------------------------------------------------
+    # Factory
+    # ------------------------------------------------------------------
 
     @classmethod
     def from_recipe(
@@ -690,19 +787,22 @@ class DetectorPipeline:
         source: BaseSource,
         runner_id: str,
         max_concurrent_assets: int = 10,
-    ) -> "DetectorPipeline":
+        worker_pool: DetectorWorkerPool | None = None,
+    ) -> DetectorPipeline:
         """Create pipeline from recipe configuration."""
         from ..detectors import get_detector
         from ..detectors.config import parse_detector_config
 
-        # New schema: detectors is an array of {type, enabled, config}
         detector_configs = recipe.get("detectors", [])
 
         if not detector_configs:
-            # Return empty pipeline (no detectors)
-            return cls(detectors=[], source=source, runner_id=runner_id)
+            return cls(
+                detectors=[], source=source, runner_id=runner_id,
+                worker_pool=worker_pool,
+            )
 
-        detectors = []
+        detectors: list[BaseDetector] = []
+        detector_infos: list[tuple[BaseDetector, _DetectorInfo]] = []
         init_warnings: list[str] = []
 
         for detector_item in detector_configs:
@@ -720,7 +820,16 @@ class DetectorPipeline:
 
                 detector = get_detector(detector_name, typed_config)
                 detectors.append(detector)
-                logger.info(f"Initialized detector: {detector_name}")
+
+                config_json = typed_config.model_dump_json()
+                info = _DetectorInfo(
+                    detector_name=detector_name,
+                    detector_type=detector_type,
+                    config_json=config_json,
+                )
+                detector_infos.append((detector, info))
+
+                logger.info("Initialized detector: %s", detector_name)
             except Exception as e:
                 msg = f"Failed to initialize detector {detector_type}: {e}"
                 logger.error(msg)
@@ -737,6 +846,9 @@ class DetectorPipeline:
             content_size_limit=content_size_limit,
             max_concurrent_assets=max_concurrent_assets,
             content_provider=ParsedContentProvider(source),
+            worker_pool=worker_pool,
         )
+        for detector, info in detector_infos:
+            pipeline._register_detector_info(detector, info)
         pipeline.init_warnings = init_warnings
         return pipeline
