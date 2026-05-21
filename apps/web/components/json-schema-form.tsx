@@ -2552,6 +2552,23 @@ export const JsonSchemaForm = React.forwardRef<
                             />
                           </FormControl>
                         </FormItem>
+                        <FormItem>
+                          <FormLabel className="text-xs">Max Concurrent Assets</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="Auto (pool_workers × 2)"
+                              min={1}
+                              max={50}
+                              value={(val.max_concurrent_assets as number) ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                                update({ max_concurrent_assets: v && !isNaN(v) ? v : undefined });
+                              }}
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
