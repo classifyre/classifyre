@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -63,6 +64,8 @@ class PostgreSQLSource(BaseSource):
         self._table_lookup: dict[str, TableRef] = {}
         self._content_cache: dict[str, tuple[str, str]] = {}
         self._pk_columns_cache: dict[tuple[str, str, str], list[str]] = {}
+        self._conn_cache: dict[str, Any] = {}
+        self._conn_lock = threading.Lock()
 
     def _asset_type_value(self) -> str:
         type_value = self.config.type
@@ -102,6 +105,29 @@ class PostgreSQLSource(BaseSource):
         connection.autocommit = True
         return connection
 
+    def _get_cached_connection(self, database: str):
+        with self._conn_lock:
+            conn = self._conn_cache.get(database)
+            if conn is not None:
+                try:
+                    if conn.closed == 0:
+                        return conn
+                except Exception:
+                    pass
+                self._conn_cache.pop(database, None)
+            conn = self._connect(database)
+            self._conn_cache[database] = conn
+            return conn
+
+    def cleanup(self) -> None:
+        with self._conn_lock:
+            for conn in self._conn_cache.values():
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self._conn_cache.clear()
+
     def _resolve_databases(self) -> list[str]:
         scope_options = self._scope_options()
         include_all = bool(scope_options.include_all_databases)
@@ -114,21 +140,21 @@ class PostgreSQLSource(BaseSource):
 
         maintenance_database = scope_options.maintenance_database or "postgres"
         databases: list[str] = []
-        with self._connect(maintenance_database) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT datname
-                    FROM pg_database
-                    WHERE datistemplate = false
-                      AND datallowconn = true
-                      AND datname <> 'rdsadmin'
-                    ORDER BY datname
-                    """
-                )
-                for (database_name,) in cursor.fetchall():
-                    if isinstance(database_name, str) and database_name:
-                        databases.append(database_name)
+        conn = self._get_cached_connection(maintenance_database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT datname
+                FROM pg_database
+                WHERE datistemplate = false
+                  AND datallowconn = true
+                  AND datname <> 'rdsadmin'
+                ORDER BY datname
+                """
+            )
+            for (database_name,) in cursor.fetchall():
+                if isinstance(database_name, str) and database_name:
+                    databases.append(database_name)
 
         if configured_database and configured_database not in databases:
             databases.insert(0, configured_database)
@@ -164,24 +190,24 @@ class PostgreSQLSource(BaseSource):
         if cache_key in self._pk_columns_cache:
             return self._pk_columns_cache[cache_key]
         try:
-            with self._connect(table_ref.database) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT kcu.column_name
-                        FROM information_schema.table_constraints tc
-                        JOIN information_schema.key_column_usage kcu
-                          ON tc.constraint_name = kcu.constraint_name
-                         AND tc.table_schema = kcu.table_schema
-                         AND tc.table_name = kcu.table_name
-                        WHERE tc.constraint_type = 'PRIMARY KEY'
-                          AND tc.table_schema = %s
-                          AND tc.table_name = %s
-                        ORDER BY kcu.ordinal_position
-                        """,
-                        (table_ref.schema, table_ref.table),
-                    )
-                    cols = [row[0] for row in cursor.fetchall() if isinstance(row[0], str)]
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                     AND tc.table_schema = kcu.table_schema
+                     AND tc.table_name = kcu.table_name
+                    WHERE tc.constraint_type = 'PRIMARY KEY'
+                      AND tc.table_schema = %s
+                      AND tc.table_name = %s
+                    ORDER BY kcu.ordinal_position
+                    """,
+                    (table_ref.schema, table_ref.table),
+                )
+                cols = [row[0] for row in cursor.fetchall() if isinstance(row[0], str)]
         except Exception:
             cols = []
         self._pk_columns_cache[cache_key] = cols
@@ -195,36 +221,36 @@ class PostgreSQLSource(BaseSource):
         limit = int(table_limit) if table_limit else None
 
         tables: list[TableRef] = []
-        with self._connect(database) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT table_schema, table_name
-                    FROM information_schema.tables
-                    WHERE table_type = 'BASE TABLE'
-                    ORDER BY table_schema, table_name
-                    """
-                )
-                for schema_name, table_name in cursor.fetchall():
-                    if not isinstance(schema_name, str) or not isinstance(table_name, str):
-                        continue
-                    if schema_name in schema_denylist:
-                        continue
-                    if schema_allowlist and schema_name not in schema_allowlist:
-                        continue
+        conn = self._get_cached_connection(database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT table_schema, table_name
+                FROM information_schema.tables
+                WHERE table_type = 'BASE TABLE'
+                ORDER BY table_schema, table_name
+                """
+            )
+            for schema_name, table_name in cursor.fetchall():
+                if not isinstance(schema_name, str) or not isinstance(table_name, str):
+                    continue
+                if schema_name in schema_denylist:
+                    continue
+                if schema_allowlist and schema_name not in schema_allowlist:
+                    continue
 
-                    schema_table = f"{schema_name}.{table_name}".lower()
-                    db_schema_table = f"{database}.{schema_name}.{table_name}".lower()
-                    if (
-                        table_allowlist
-                        and schema_table not in table_allowlist
-                        and db_schema_table not in table_allowlist
-                    ):
-                        continue
+                schema_table = f"{schema_name}.{table_name}".lower()
+                db_schema_table = f"{database}.{schema_name}.{table_name}".lower()
+                if (
+                    table_allowlist
+                    and schema_table not in table_allowlist
+                    and db_schema_table not in table_allowlist
+                ):
+                    continue
 
-                    tables.append(TableRef(database=database, schema=schema_name, table=table_name))
-                    if limit is not None and len(tables) >= limit:
-                        break
+                tables.append(TableRef(database=database, schema=schema_name, table=table_name))
+                if limit is not None and len(tables) >= limit:
+                    break
         return tables
 
     def _iter_tables(self) -> list[TableRef]:
@@ -278,38 +304,38 @@ class PostgreSQLSource(BaseSource):
         links: dict[tuple[str, str, str], set[tuple[str, str, str]]] = {}
         for database, scoped_keys in by_database.items():
             try:
-                with self._connect(database) as conn:
-                    with conn.cursor() as cursor:
-                        cursor.execute(
-                            """
-                            SELECT
-                                source_ns.nspname AS source_schema,
-                                source_tbl.relname AS source_table,
-                                target_ns.nspname AS target_schema,
-                                target_tbl.relname AS target_table
-                            FROM pg_constraint AS fk
-                            JOIN pg_class AS source_tbl
-                              ON source_tbl.oid = fk.conrelid
-                            JOIN pg_namespace AS source_ns
-                              ON source_ns.oid = source_tbl.relnamespace
-                            JOIN pg_class AS target_tbl
-                              ON target_tbl.oid = fk.confrelid
-                            JOIN pg_namespace AS target_ns
-                              ON target_ns.oid = target_tbl.relnamespace
-                            WHERE fk.contype = 'f'
-                            """
-                        )
-                        for (
-                            source_schema,
-                            source_table,
-                            target_schema,
-                            target_table,
-                        ) in cursor.fetchall():
-                            source_key = (database, source_schema, source_table)
-                            target_key = (database, target_schema, target_table)
-                            if source_key not in scoped_keys or target_key not in scoped_keys:
-                                continue
-                            links.setdefault(source_key, set()).add(target_key)
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            source_ns.nspname AS source_schema,
+                            source_tbl.relname AS source_table,
+                            target_ns.nspname AS target_schema,
+                            target_tbl.relname AS target_table
+                        FROM pg_constraint AS fk
+                        JOIN pg_class AS source_tbl
+                          ON source_tbl.oid = fk.conrelid
+                        JOIN pg_namespace AS source_ns
+                          ON source_ns.oid = source_tbl.relnamespace
+                        JOIN pg_class AS target_tbl
+                          ON target_tbl.oid = fk.confrelid
+                        JOIN pg_namespace AS target_ns
+                          ON target_ns.oid = target_tbl.relnamespace
+                        WHERE fk.contype = 'f'
+                        """
+                    )
+                    for (
+                        source_schema,
+                        source_table,
+                        target_schema,
+                        target_table,
+                    ) in cursor.fetchall():
+                        source_key = (database, source_schema, source_table)
+                        target_key = (database, target_schema, target_table)
+                        if source_key not in scoped_keys or target_key not in scoped_keys:
+                            continue
+                        links.setdefault(source_key, set()).add(target_key)
             except Exception as exc:
                 logger.warning(
                     "Could not resolve foreign key links for database %s: %s",
@@ -411,19 +437,18 @@ class PostgreSQLSource(BaseSource):
         return None
 
     def _available_columns(self, table_ref: TableRef) -> list[str]:
-        with self._connect(table_ref.database) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT column_name
-                    FROM information_schema.columns
-                    WHERE table_schema = %s AND table_name = %s
-                    ORDER BY ordinal_position
-                    """,
-                    (table_ref.schema, table_ref.table),
-                )
-                columns = [column for (column,) in cursor.fetchall() if isinstance(column, str)]
-                return columns
+        conn = self._get_cached_connection(table_ref.database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = %s AND table_name = %s
+                ORDER BY ordinal_position
+                """,
+                (table_ref.schema, table_ref.table),
+            )
+            return [column for (column,) in cursor.fetchall() if isinstance(column, str)]
 
     def _resolve_latest_order_column(self, columns: list[str]) -> str | None:
         sampling = self._sampling()
@@ -479,13 +504,13 @@ class PostgreSQLSource(BaseSource):
 
     def _count_table_rows(self, table_ref: TableRef) -> int | None:
         try:
-            with self._connect(table_ref.database) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
-                    )
-                    row = cursor.fetchone()
-                    return int(row[0]) if row else None
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
+                )
+                row = cursor.fetchone()
+                return int(row[0]) if row else None
         except Exception:
             return None
 
@@ -527,14 +552,12 @@ class PostgreSQLSource(BaseSource):
     def _fetch_one_page(
         self, table_ref: TableRef, base_query: str, page_size: int, offset: int
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        with self._connect(table_ref.database) as conn:
-            paginated_query = f"{base_query} LIMIT %s OFFSET %s"
-            with conn.cursor() as cursor:
-                cursor.execute(paginated_query, [page_size, offset])
-                rows = list(cursor.fetchall())
-                column_names = (
-                    [desc[0] for desc in cursor.description] if cursor.description else []
-                )
+        conn = self._get_cached_connection(table_ref.database)
+        paginated_query = f"{base_query} LIMIT %s OFFSET %s"
+        with conn.cursor() as cursor:
+            cursor.execute(paginated_query, [page_size, offset])
+            rows = list(cursor.fetchall())
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
         return rows, column_names
 
     def _fetch_one_page_on_conn(
@@ -602,11 +625,11 @@ class PostgreSQLSource(BaseSource):
             rows_per_page = int(sampling.rows_per_page or 100)
             rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
         else:
-            with self._connect(table_ref.database) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(query, params if params else None)
-                    rows = cursor.fetchall()
-                    column_names = [desc[0] for desc in cursor.description or []]
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(query, params if params else None)
+                rows = cursor.fetchall()
+                column_names = [desc[0] for desc in cursor.description or []]
 
         if not column_names:
             return None

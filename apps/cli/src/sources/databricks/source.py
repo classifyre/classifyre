@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 from collections import deque
 from collections.abc import AsyncGenerator, Generator
 from contextlib import closing
@@ -114,6 +115,8 @@ class DatabricksSource(BaseSource):
 
         self._table_lookup: dict[str, TableRef] = {}
         self._content_cache: dict[str, tuple[str, str]] = {}
+        self._conn_cache: dict[str, Any] = {}
+        self._conn_lock = threading.Lock()
 
     def _validate_auth_configuration(self) -> None:
         required = self.config.required
@@ -310,6 +313,21 @@ class DatabricksSource(BaseSource):
             access_token=self._access_token_value(),
             _socket_timeout=self._timeout_seconds(),
         )
+
+    def _get_cached_sql_connection(self):
+        cache_key = "__default__"
+        with self._conn_lock:
+            conn = self._conn_cache.get(cache_key)
+            if conn is not None:
+                try:
+                    if conn.open:
+                        return conn
+                except Exception:
+                    pass
+                self._conn_cache.pop(cache_key, None)
+            conn = self._connect_sql()
+            self._conn_cache[cache_key] = conn
+            return conn
 
     def _catalog_allowlist(self) -> set[str] | None:
         configured = self._scope_options().include_catalogs
@@ -958,19 +976,19 @@ class DatabricksSource(BaseSource):
             "ORDER BY ordinal_position"
         )
 
-        with closing(self._connect_sql()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query)
-                columns: list[str] = []
-                for row in cursor.fetchall():
-                    candidate: Any | None = None
-                    try:
-                        candidate = row[0]  # type: ignore[index]
-                    except Exception:
-                        candidate = None
-                    if isinstance(candidate, str):
-                        columns.append(candidate)
-                return columns
+        conn = self._get_cached_sql_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            columns: list[str] = []
+            for row in cursor.fetchall():
+                candidate: Any | None = None
+                try:
+                    candidate = row[0]  # type: ignore[index]
+                except Exception:
+                    candidate = None
+                if isinstance(candidate, str):
+                    columns.append(candidate)
+            return columns
 
     def _resolve_latest_order_column(self, columns: list[str]) -> str | None:
         sampling = self._sampling()
@@ -1029,13 +1047,13 @@ class DatabricksSource(BaseSource):
 
     def _count_table_rows(self, table_ref: TableRef) -> int | None:
         try:
-            with closing(self._connect_sql()) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.catalog)}.{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
-                    )
-                    row = cursor.fetchone()
-                    return int(row[0]) if row else None
+            conn = self._get_cached_sql_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.catalog)}.{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
+                )
+                row = cursor.fetchone()
+                return int(row[0]) if row else None
         except Exception:
             return None
 
@@ -1076,14 +1094,12 @@ class DatabricksSource(BaseSource):
     def _fetch_one_page(
         self, table_ref: TableRef, base_query: str, page_size: int, offset: int
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        with closing(self._connect_sql()) as conn:
-            paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
-            with conn.cursor() as cursor:
-                cursor.execute(paginated_query)
-                rows = list(cursor.fetchall())
-                column_names = (
-                    [desc[0] for desc in cursor.description] if cursor.description else []
-                )
+        conn = self._get_cached_sql_connection()
+        paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
+        with conn.cursor() as cursor:
+            cursor.execute(paginated_query)
+            rows = list(cursor.fetchall())
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
         return rows, column_names
 
     def _fetch_one_page_on_conn(
@@ -1128,11 +1144,11 @@ class DatabricksSource(BaseSource):
             rows_per_page = int(sampling.rows_per_page or 100)
             rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
         else:
-            with closing(self._connect_sql()) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(query)
-                    rows = cursor.fetchall()
-                    column_names = [desc[0] for desc in cursor.description or []]
+            conn = self._get_cached_sql_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                column_names = [desc[0] for desc in cursor.description or []]
 
         if not column_names:
             logger.warning("No columns returned for %s; skipping", table_label)
@@ -1276,4 +1292,11 @@ class DatabricksSource(BaseSource):
         super().abort()
 
     def cleanup(self) -> None:
+        with self._conn_lock:
+            for conn in self._conn_cache.values():
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self._conn_cache.clear()
         self.session.close()
