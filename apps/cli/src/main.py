@@ -243,14 +243,23 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         import asyncio as _asyncio
 
                         processed_count = 0
+                        _pw = worker_pool.max_workers if worker_pool else 4
+                        max_concurrent = args.max_concurrent_assets or (_pw * 2)
+                        max_concurrent = max(1, max_concurrent)
+                        _asset_semaphore = _asyncio.Semaphore(max_concurrent)
                         logger.info(
-                            "Phase 2 starting: %d assets, pool_workers=%s",
+                            "Phase 2 starting: %d assets, pool_workers=%s, max_concurrent_assets=%d",
                             len(all_stubs),
                             worker_pool.max_workers if worker_pool else "none",
+                            max_concurrent,
                         )
                         error_count = 0
 
                         async def _process_one(asset: Any) -> None:
+                            async with _asset_semaphore:
+                                await _process_one_inner(asset)
+
+                        async def _process_one_inner(asset: Any) -> None:
                             nonlocal processed_count, error_count
                             asset_hash = getattr(asset, "hash", None) or ""
                             try:
@@ -553,6 +562,12 @@ def main() -> None:
         default=None,
         help="Max OS processes in the detector pool. Auto-sized from CPU/memory when omitted (env: CLASSIFYRE_MAX_POOL_WORKERS)",
     )
+    parser.add_argument(
+        "--max-concurrent-assets",
+        type=int,
+        default=None,
+        help="Max assets processed concurrently in Phase 2. Controls DB connection usage. Defaults to pool_workers*2 (env: CLASSIFYRE_MAX_CONCURRENT_ASSETS)",
+    )
 
     args = parser.parse_args()
 
@@ -570,6 +585,13 @@ def main() -> None:
             args.max_pool_workers = int(env_val) if env_val else None
         except ValueError:
             args.max_pool_workers = None
+
+    if args.max_concurrent_assets is None:
+        env_val = os.environ.get("CLASSIFYRE_MAX_CONCURRENT_ASSETS")
+        try:
+            args.max_concurrent_assets = int(env_val) if env_val else None
+        except ValueError:
+            args.max_concurrent_assets = None
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -590,6 +612,15 @@ def main() -> None:
         sys.exit(1)
 
     recipe = load_recipe(args.recipe)
+
+    # Resolve resource overrides from recipe when CLI args / env vars are not set
+    recipe_resources = recipe.get("resources") or {}
+    if args.max_pool_workers is None and isinstance(recipe_resources.get("max_pool_workers"), int):
+        args.max_pool_workers = recipe_resources["max_pool_workers"]
+    if args.max_concurrent_assets is None and isinstance(
+        recipe_resources.get("max_concurrent_assets"), int
+    ):
+        args.max_concurrent_assets = recipe_resources["max_concurrent_assets"]
 
     source_type = recipe.get("type", "").lower()
     if not source_type:

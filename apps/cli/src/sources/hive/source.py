@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from collections.abc import AsyncGenerator
 from contextlib import closing
 from dataclasses import dataclass
@@ -66,6 +67,8 @@ class HiveSource(BaseSource):
         self._table_lookup: dict[str, TableRef] = {}
         self._content_cache: dict[str, tuple[str, str]] = {}
         self._table_type_cache: dict[tuple[str, str], str] = {}
+        self._conn_cache: dict[str, Any] = {}
+        self._conn_lock = threading.Lock()
 
     def _asset_type_value(self) -> str:
         type_value = self.config.type
@@ -128,6 +131,31 @@ class HiveSource(BaseSource):
 
         return hive_module.connect(**connect_kwargs)
 
+    def _get_cached_connection(self, database: str | None = None):
+        cache_key = database or "__default__"
+        with self._conn_lock:
+            conn = self._conn_cache.get(cache_key)
+            if conn is not None:
+                try:
+                    cur = conn.cursor()
+                    cur.close()
+                    return conn
+                except Exception:
+                    pass
+                self._conn_cache.pop(cache_key, None)
+            conn = self._connect(database)
+            self._conn_cache[cache_key] = conn
+            return conn
+
+    def cleanup(self) -> None:
+        with self._conn_lock:
+            for conn in self._conn_cache.values():
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self._conn_cache.clear()
+
     def _excluded_databases(self) -> set[str]:
         configured = self._scope_options().exclude_databases or []
         excluded = {name.strip() for name in configured if name.strip()}
@@ -162,16 +190,16 @@ class HiveSource(BaseSource):
         databases: list[str] = []
 
         seed_database = configured_database or "default"
-        with closing(self._connect(seed_database)) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SHOW DATABASES")
-                for row in cursor.fetchall():
-                    database_name = row[0] if isinstance(row, tuple) and row else None
-                    if not isinstance(database_name, str) or not database_name:
-                        continue
-                    if database_name in excluded:
-                        continue
-                    databases.append(database_name)
+        conn = self._get_cached_connection(seed_database)
+        with conn.cursor() as cursor:
+            cursor.execute("SHOW DATABASES")
+            for row in cursor.fetchall():
+                database_name = row[0] if isinstance(row, tuple) and row else None
+                if not isinstance(database_name, str) or not database_name:
+                    continue
+                if database_name in excluded:
+                    continue
+                databases.append(database_name)
 
         if configured_database and configured_database not in databases:
             databases.insert(0, configured_database)
@@ -186,23 +214,23 @@ class HiveSource(BaseSource):
         object_type = "TABLE"
         try:
             query = f"DESCRIBE FORMATTED {_quote_identifier(database)}.{_quote_identifier(table)}"
-            with closing(self._connect(database)) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(query)
-                    for row in cursor.fetchall():
-                        if not isinstance(row, tuple) or not row:
-                            continue
+            conn = self._get_cached_connection(database)
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                for row in cursor.fetchall():
+                    if not isinstance(row, tuple) or not row:
+                        continue
 
-                        field_name = row[0]
-                        details = row[1] if len(row) > 1 else ""
-                        if not isinstance(field_name, str):
-                            continue
+                    field_name = row[0]
+                    details = row[1] if len(row) > 1 else ""
+                    if not isinstance(field_name, str):
+                        continue
 
-                        if field_name.strip().lower() == "table type:":
-                            detail_text = str(details).strip().upper()
-                            if "VIRTUAL_VIEW" in detail_text or "VIEW" in detail_text:
-                                object_type = "VIEW"
-                            break
+                    if field_name.strip().lower() == "table type:":
+                        detail_text = str(details).strip().upper()
+                        if "VIRTUAL_VIEW" in detail_text or "VIEW" in detail_text:
+                            object_type = "VIEW"
+                        break
         except Exception:
             object_type = "TABLE"
 
@@ -220,38 +248,38 @@ class HiveSource(BaseSource):
         limit = int(table_limit) if table_limit else None
 
         tables: list[TableRef] = []
-        with closing(self._connect(database)) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(f"SHOW TABLES IN {_quote_identifier(database)}")
-                for row in cursor.fetchall():
-                    table_name = row[0] if isinstance(row, tuple) and row else None
-                    if not isinstance(table_name, str) or not table_name:
-                        continue
+        conn = self._get_cached_connection(database)
+        with conn.cursor() as cursor:
+            cursor.execute(f"SHOW TABLES IN {_quote_identifier(database)}")
+            for row in cursor.fetchall():
+                table_name = row[0] if isinstance(row, tuple) and row else None
+                if not isinstance(table_name, str) or not table_name:
+                    continue
 
-                    normalized_table = table_name.lower()
-                    normalized_db_table = f"{database}.{table_name}".lower()
-                    if (
-                        object_allowlist
-                        and normalized_table not in object_allowlist
-                        and normalized_db_table not in object_allowlist
-                    ):
-                        continue
+                normalized_table = table_name.lower()
+                normalized_db_table = f"{database}.{table_name}".lower()
+                if (
+                    object_allowlist
+                    and normalized_table not in object_allowlist
+                    and normalized_db_table not in object_allowlist
+                ):
+                    continue
 
-                    object_type = self._resolve_object_type(database, table_name)
-                    if object_type == "VIEW" and not include_views:
-                        continue
-                    if object_type != "VIEW" and not include_tables:
-                        continue
+                object_type = self._resolve_object_type(database, table_name)
+                if object_type == "VIEW" and not include_views:
+                    continue
+                if object_type != "VIEW" and not include_tables:
+                    continue
 
-                    tables.append(
-                        TableRef(
-                            database=database,
-                            table=table_name,
-                            object_type=object_type,
-                        )
+                tables.append(
+                    TableRef(
+                        database=database,
+                        table=table_name,
+                        object_type=object_type,
                     )
-                    if limit is not None and len(tables) >= limit:
-                        break
+                )
+                if limit is not None and len(tables) >= limit:
+                    break
 
         return tables
 
@@ -411,21 +439,21 @@ class HiveSource(BaseSource):
         query = (
             f"DESCRIBE {_quote_identifier(table_ref.database)}.{_quote_identifier(table_ref.table)}"
         )
-        with closing(self._connect(table_ref.database)) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query)
-                columns: list[str] = []
-                for row in cursor.fetchall():
-                    if not isinstance(row, tuple) or not row:
-                        continue
-                    column_name = row[0]
-                    if not isinstance(column_name, str):
-                        continue
-                    normalized = column_name.strip()
-                    if not normalized or normalized.startswith("#"):
-                        continue
-                    columns.append(normalized)
-                return columns
+        conn = self._get_cached_connection(table_ref.database)
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            columns: list[str] = []
+            for row in cursor.fetchall():
+                if not isinstance(row, tuple) or not row:
+                    continue
+                column_name = row[0]
+                if not isinstance(column_name, str):
+                    continue
+                normalized = column_name.strip()
+                if not normalized or normalized.startswith("#"):
+                    continue
+                columns.append(normalized)
+            return columns
 
     def _resolve_latest_order_column(self, columns: list[str]) -> str | None:
         sampling = self._sampling()
@@ -480,13 +508,13 @@ class HiveSource(BaseSource):
 
     def _count_table_rows(self, table_ref: TableRef) -> int | None:
         try:
-            with closing(self._connect(table_ref.database)) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.database)}.{_quote_identifier(table_ref.table)}"
-                    )
-                    row = cursor.fetchone()
-                    return int(row[0]) if row else None
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.database)}.{_quote_identifier(table_ref.table)}"
+                )
+                row = cursor.fetchone()
+                return int(row[0]) if row else None
         except Exception:
             return None
 
@@ -528,14 +556,12 @@ class HiveSource(BaseSource):
     def _fetch_one_page(
         self, table_ref: TableRef, base_query: str, page_size: int, offset: int
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        with closing(self._connect(table_ref.database)) as conn:
-            paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
-            with conn.cursor() as cursor:
-                cursor.execute(paginated_query)
-                rows = list(cursor.fetchall())
-                column_names = (
-                    [desc[0] for desc in cursor.description] if cursor.description else []
-                )
+        conn = self._get_cached_connection(table_ref.database)
+        paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
+        with conn.cursor() as cursor:
+            cursor.execute(paginated_query)
+            rows = list(cursor.fetchall())
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
         return rows, column_names
 
     def _fetch_one_page_on_conn(
@@ -572,11 +598,11 @@ class HiveSource(BaseSource):
             rows_per_page = int(sampling.rows_per_page or 100)
             rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
         else:
-            with closing(self._connect(table_ref.database)) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(query)
-                    rows = cursor.fetchall()
-                    column_names = [desc[0] for desc in cursor.description or []]
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                column_names = [desc[0] for desc in cursor.description or []]
 
         if not column_names:
             return None

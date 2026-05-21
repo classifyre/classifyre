@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from collections.abc import AsyncGenerator
 from contextlib import closing
 from dataclasses import dataclass
@@ -79,6 +80,8 @@ class OracleSource(BaseSource):
         self._table_lookup: dict[str, ObjectRef] = {}
         self._content_cache: dict[str, tuple[str, str]] = {}
         self._pk_columns_cache: dict[tuple[str, str], list[str]] = {}
+        self._conn_cache: dict[str, Any] = {}
+        self._conn_lock = threading.Lock()
 
     def _asset_type_value(self) -> str:
         type_value = self.config.type
@@ -129,6 +132,30 @@ class OracleSource(BaseSource):
             connect_kwargs.pop("tcp_connect_timeout", None)
             return self._oracledb.connect(**connect_kwargs)
 
+    def _get_cached_connection(self):
+        cache_key = "__default__"
+        with self._conn_lock:
+            conn = self._conn_cache.get(cache_key)
+            if conn is not None:
+                try:
+                    conn.ping()
+                    return conn
+                except Exception:
+                    pass
+                self._conn_cache.pop(cache_key, None)
+            conn = self._connect()
+            self._conn_cache[cache_key] = conn
+            return conn
+
+    def cleanup(self) -> None:
+        with self._conn_lock:
+            for conn in self._conn_cache.values():
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self._conn_cache.clear()
+
     def _schema_allowlist(self) -> set[str] | None:
         configured = self._scope_options().include_schemas
         if not configured:
@@ -170,95 +197,95 @@ class OracleSource(BaseSource):
 
         objects: list[ObjectRef] = []
 
-        with closing(self._connect()) as conn:
-            with conn.cursor() as cursor:
-                if include_tables:
-                    cursor.execute(
-                        """
-                        SELECT owner, table_name
-                        FROM all_tables
-                        ORDER BY owner, table_name
-                        """
+        conn = self._get_cached_connection()
+        with conn.cursor() as cursor:
+            if include_tables:
+                cursor.execute(
+                    """
+                    SELECT owner, table_name
+                    FROM all_tables
+                    ORDER BY owner, table_name
+                    """
+                )
+                for row in cursor.fetchall():
+                    if not isinstance(row, tuple) or len(row) < 2:
+                        continue
+                    schema_name = row[0]
+                    object_name = row[1]
+                    if not isinstance(schema_name, str) or not isinstance(object_name, str):
+                        continue
+
+                    schema_upper = schema_name.upper()
+                    if schema_upper in schema_denylist:
+                        continue
+                    if schema_allowlist and schema_upper not in schema_allowlist:
+                        continue
+
+                    scoped_name = f"{schema_upper}.{object_name}".lower()
+                    service_scoped_name = (
+                        f"{self._service_name}.{schema_upper}.{object_name}".lower()
                     )
-                    for row in cursor.fetchall():
-                        if not isinstance(row, tuple) or len(row) < 2:
-                            continue
-                        schema_name = row[0]
-                        object_name = row[1]
-                        if not isinstance(schema_name, str) or not isinstance(object_name, str):
-                            continue
+                    if (
+                        object_allowlist
+                        and scoped_name not in object_allowlist
+                        and service_scoped_name not in object_allowlist
+                    ):
+                        continue
 
-                        schema_upper = schema_name.upper()
-                        if schema_upper in schema_denylist:
-                            continue
-                        if schema_allowlist and schema_upper not in schema_allowlist:
-                            continue
-
-                        scoped_name = f"{schema_upper}.{object_name}".lower()
-                        service_scoped_name = (
-                            f"{self._service_name}.{schema_upper}.{object_name}".lower()
+                    objects.append(
+                        ObjectRef(
+                            service_name=self._service_name,
+                            schema=schema_upper,
+                            name=object_name,
+                            object_type="TABLE",
                         )
-                        if (
-                            object_allowlist
-                            and scoped_name not in object_allowlist
-                            and service_scoped_name not in object_allowlist
-                        ):
-                            continue
-
-                        objects.append(
-                            ObjectRef(
-                                service_name=self._service_name,
-                                schema=schema_upper,
-                                name=object_name,
-                                object_type="TABLE",
-                            )
-                        )
-                        if limit is not None and len(objects) >= limit:
-                            return objects
-
-                if include_views:
-                    cursor.execute(
-                        """
-                        SELECT owner, view_name
-                        FROM all_views
-                        ORDER BY owner, view_name
-                        """
                     )
-                    for row in cursor.fetchall():
-                        if not isinstance(row, tuple) or len(row) < 2:
-                            continue
-                        schema_name = row[0]
-                        object_name = row[1]
-                        if not isinstance(schema_name, str) or not isinstance(object_name, str):
-                            continue
+                    if limit is not None and len(objects) >= limit:
+                        return objects
 
-                        schema_upper = schema_name.upper()
-                        if schema_upper in schema_denylist:
-                            continue
-                        if schema_allowlist and schema_upper not in schema_allowlist:
-                            continue
+            if include_views:
+                cursor.execute(
+                    """
+                    SELECT owner, view_name
+                    FROM all_views
+                    ORDER BY owner, view_name
+                    """
+                )
+                for row in cursor.fetchall():
+                    if not isinstance(row, tuple) or len(row) < 2:
+                        continue
+                    schema_name = row[0]
+                    object_name = row[1]
+                    if not isinstance(schema_name, str) or not isinstance(object_name, str):
+                        continue
 
-                        scoped_name = f"{schema_upper}.{object_name}".lower()
-                        service_scoped_name = (
-                            f"{self._service_name}.{schema_upper}.{object_name}".lower()
+                    schema_upper = schema_name.upper()
+                    if schema_upper in schema_denylist:
+                        continue
+                    if schema_allowlist and schema_upper not in schema_allowlist:
+                        continue
+
+                    scoped_name = f"{schema_upper}.{object_name}".lower()
+                    service_scoped_name = (
+                        f"{self._service_name}.{schema_upper}.{object_name}".lower()
+                    )
+                    if (
+                        object_allowlist
+                        and scoped_name not in object_allowlist
+                        and service_scoped_name not in object_allowlist
+                    ):
+                        continue
+
+                    objects.append(
+                        ObjectRef(
+                            service_name=self._service_name,
+                            schema=schema_upper,
+                            name=object_name,
+                            object_type="VIEW",
                         )
-                        if (
-                            object_allowlist
-                            and scoped_name not in object_allowlist
-                            and service_scoped_name not in object_allowlist
-                        ):
-                            continue
-
-                        objects.append(
-                            ObjectRef(
-                                service_name=self._service_name,
-                                schema=schema_upper,
-                                name=object_name,
-                                object_type="VIEW",
-                            )
-                        )
-                        if limit is not None and len(objects) >= limit:
-                            return objects
+                    )
+                    if limit is not None and len(objects) >= limit:
+                        return objects
 
         return objects
 
@@ -314,43 +341,43 @@ class OracleSource(BaseSource):
             return links
 
         try:
-            with closing(self._connect()) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT
-                            src.owner AS source_owner,
-                            src.table_name AS source_table,
-                            tgt.owner AS target_owner,
-                            tgt.table_name AS target_table
-                        FROM all_constraints src
-                        JOIN all_constraints tgt
-                          ON src.r_owner = tgt.owner
-                         AND src.r_constraint_name = tgt.constraint_name
-                        WHERE src.constraint_type = 'R'
-                        """
-                    )
-                    for row in cursor.fetchall():
-                        if not isinstance(row, tuple) or len(row) < 4:
-                            continue
+            conn = self._get_cached_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        src.owner AS source_owner,
+                        src.table_name AS source_table,
+                        tgt.owner AS target_owner,
+                        tgt.table_name AS target_table
+                    FROM all_constraints src
+                    JOIN all_constraints tgt
+                      ON src.r_owner = tgt.owner
+                     AND src.r_constraint_name = tgt.constraint_name
+                    WHERE src.constraint_type = 'R'
+                    """
+                )
+                for row in cursor.fetchall():
+                    if not isinstance(row, tuple) or len(row) < 4:
+                        continue
 
-                        source_schema = row[0]
-                        source_name = row[1]
-                        target_schema = row[2]
-                        target_name = row[3]
-                        if (
-                            not isinstance(source_schema, str)
-                            or not isinstance(source_name, str)
-                            or not isinstance(target_schema, str)
-                            or not isinstance(target_name, str)
-                        ):
-                            continue
+                    source_schema = row[0]
+                    source_name = row[1]
+                    target_schema = row[2]
+                    target_name = row[3]
+                    if (
+                        not isinstance(source_schema, str)
+                        or not isinstance(source_name, str)
+                        or not isinstance(target_schema, str)
+                        or not isinstance(target_name, str)
+                    ):
+                        continue
 
-                        source_key = (source_schema.upper(), source_name)
-                        target_key = (target_schema.upper(), target_name)
-                        if source_key not in table_keys or target_key not in table_keys:
-                            continue
-                        links.setdefault(source_key, set()).add(target_key)
+                    source_key = (source_schema.upper(), source_name)
+                    target_key = (target_schema.upper(), target_name)
+                    if source_key not in table_keys or target_key not in table_keys:
+                        continue
+                    links.setdefault(source_key, set()).add(target_key)
         except Exception as exc:
             logger.warning("Could not resolve Oracle foreign key links: %s", exc)
 
@@ -375,46 +402,46 @@ class OracleSource(BaseSource):
 
         links: dict[tuple[str, str], set[tuple[str, str]]] = {}
         try:
-            with closing(self._connect()) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT
-                            owner,
-                            name,
-                            referenced_owner,
-                            referenced_name,
-                            referenced_type
-                        FROM all_dependencies
-                        WHERE type = 'VIEW'
-                          AND referenced_type IN ('TABLE', 'VIEW')
-                        """
-                    )
-                    for row in cursor.fetchall():
-                        if not isinstance(row, tuple) or len(row) < 5:
-                            continue
+            conn = self._get_cached_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        owner,
+                        name,
+                        referenced_owner,
+                        referenced_name,
+                        referenced_type
+                    FROM all_dependencies
+                    WHERE type = 'VIEW'
+                      AND referenced_type IN ('TABLE', 'VIEW')
+                    """
+                )
+                for row in cursor.fetchall():
+                    if not isinstance(row, tuple) or len(row) < 5:
+                        continue
 
-                        owner = row[0]
-                        name = row[1]
-                        referenced_owner = row[2]
-                        referenced_name = row[3]
-                        referenced_type = row[4]
-                        if (
-                            not isinstance(owner, str)
-                            or not isinstance(name, str)
-                            or not isinstance(referenced_owner, str)
-                            or not isinstance(referenced_name, str)
-                        ):
-                            continue
-                        if not isinstance(referenced_type, str):
-                            continue
+                    owner = row[0]
+                    name = row[1]
+                    referenced_owner = row[2]
+                    referenced_name = row[3]
+                    referenced_type = row[4]
+                    if (
+                        not isinstance(owner, str)
+                        or not isinstance(name, str)
+                        or not isinstance(referenced_owner, str)
+                        or not isinstance(referenced_name, str)
+                    ):
+                        continue
+                    if not isinstance(referenced_type, str):
+                        continue
 
-                        source_key = (owner.upper(), name)
-                        target_key = (referenced_owner.upper(), referenced_name)
-                        if source_key not in view_keys or target_key not in object_keys:
-                            continue
+                    source_key = (owner.upper(), name)
+                    target_key = (referenced_owner.upper(), referenced_name)
+                    if source_key not in view_keys or target_key not in object_keys:
+                        continue
 
-                        links.setdefault(source_key, set()).add(target_key)
+                    links.setdefault(source_key, set()).add(target_key)
         except Exception as exc:
             logger.warning("Could not resolve Oracle view lineage links: %s", exc)
 
@@ -549,26 +576,26 @@ class OracleSource(BaseSource):
         return None
 
     def _available_columns(self, object_ref: ObjectRef) -> list[str]:
-        with closing(self._connect()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT column_name
-                    FROM all_tab_columns
-                    WHERE owner = :owner
-                      AND table_name = :table_name
-                    ORDER BY column_id
-                    """,
-                    {
-                        "owner": object_ref.schema,
-                        "table_name": object_ref.name,
-                    },
-                )
-                return [
-                    row[0]
-                    for row in cursor.fetchall()
-                    if isinstance(row, tuple) and row and isinstance(row[0], str)
-                ]
+        conn = self._get_cached_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT column_name
+                FROM all_tab_columns
+                WHERE owner = :owner
+                  AND table_name = :table_name
+                ORDER BY column_id
+                """,
+                {
+                    "owner": object_ref.schema,
+                    "table_name": object_ref.name,
+                },
+            )
+            return [
+                row[0]
+                for row in cursor.fetchall()
+                if isinstance(row, tuple) and row and isinstance(row[0], str)
+            ]
 
     def _resolve_latest_order_column(self, columns: list[str]) -> str | None:
         sampling = self._sampling()
@@ -630,13 +657,13 @@ class OracleSource(BaseSource):
 
     def _count_table_rows(self, object_ref: ObjectRef) -> int | None:
         try:
-            with closing(self._connect()) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        f"SELECT COUNT(*) FROM {_quote_identifier(object_ref.schema)}.{_quote_identifier(object_ref.name)}"
-                    )
-                    row = cursor.fetchone()
-                    return int(row[0]) if row else None
+            conn = self._get_cached_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {_quote_identifier(object_ref.schema)}.{_quote_identifier(object_ref.name)}"
+                )
+                row = cursor.fetchone()
+                return int(row[0]) if row else None
         except Exception:
             return None
 
@@ -686,14 +713,12 @@ class OracleSource(BaseSource):
     def _fetch_one_page(
         self, object_ref: ObjectRef, base_query: str, page_size: int, offset: int
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        with closing(self._connect()) as conn:
-            paginated_query = f"{base_query} OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
-            with conn.cursor() as cursor:
-                cursor.execute(paginated_query)
-                rows = list(cursor.fetchall())
-                column_names = (
-                    [desc[0] for desc in cursor.description] if cursor.description else []
-                )
+        conn = self._get_cached_connection()
+        paginated_query = f"{base_query} OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
+        with conn.cursor() as cursor:
+            cursor.execute(paginated_query)
+            rows = list(cursor.fetchall())
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
         return rows, column_names
 
     def _fetch_one_page_on_conn(
@@ -764,11 +789,11 @@ class OracleSource(BaseSource):
             rows_per_page = int(sampling.rows_per_page or 100)
             rows, column_names = self._fetch_one_page(object_ref, query, rows_per_page, 0)
         else:
-            with closing(self._connect()) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(query)
-                    rows = cursor.fetchall()
-                    column_names = [desc[0] for desc in cursor.description or []]
+            conn = self._get_cached_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                column_names = [desc[0] for desc in cursor.description or []]
 
         if not column_names:
             return None
@@ -919,30 +944,30 @@ class OracleSource(BaseSource):
             return []
 
         try:
-            with closing(self._connect()) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT cols.column_name
-                        FROM all_constraints cons
-                        JOIN all_cons_columns cols
-                          ON cons.owner = cols.owner
-                         AND cons.constraint_name = cols.constraint_name
-                        WHERE cons.constraint_type = 'P'
-                          AND cons.owner = :owner
-                          AND cons.table_name = :table_name
-                        ORDER BY cols.position
-                        """,
-                        {
-                            "owner": object_ref.schema,
-                            "table_name": object_ref.name,
-                        },
-                    )
-                    columns = [
-                        row[0]
-                        for row in cursor.fetchall()
-                        if isinstance(row, tuple) and row and isinstance(row[0], str)
-                    ]
+            conn = self._get_cached_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT cols.column_name
+                    FROM all_constraints cons
+                    JOIN all_cons_columns cols
+                      ON cons.owner = cols.owner
+                     AND cons.constraint_name = cols.constraint_name
+                    WHERE cons.constraint_type = 'P'
+                      AND cons.owner = :owner
+                      AND cons.table_name = :table_name
+                    ORDER BY cols.position
+                    """,
+                    {
+                        "owner": object_ref.schema,
+                        "table_name": object_ref.name,
+                    },
+                )
+                columns = [
+                    row[0]
+                    for row in cursor.fetchall()
+                    if isinstance(row, tuple) and row and isinstance(row[0], str)
+                ]
         except Exception:
             columns = []
 

@@ -228,6 +228,12 @@
           "minimum": 1,
           "maximum": 16,
           "description": "Max OS processes in the detector pool. Auto-sized from CPU/memory limits when omitted."
+        },
+        "max_concurrent_assets": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Max assets processed concurrently. Controls parallel DB connections. Defaults to pool_workers * 2 when omitted."
         }
       },
       "additionalProperties": false

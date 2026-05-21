@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from collections.abc import AsyncGenerator
 from contextlib import closing
 from dataclasses import dataclass
@@ -70,6 +71,8 @@ class MSSQLSource(BaseSource):
         self._content_cache: dict[str, tuple[str, str]] = {}
         self._pk_columns_cache: dict[tuple[str, str, str], list[str]] = {}
         self._unsupported_feature_warning_logged = False
+        self._conn_cache: dict[str, Any] = {}
+        self._conn_lock = threading.Lock()
 
     def _asset_type_value(self) -> str:
         type_value = self.config.type
@@ -153,6 +156,31 @@ class MSSQLSource(BaseSource):
             pass
         return connection
 
+    def _get_cached_connection(self, database: str | None = None):
+        cache_key = database or "__default__"
+        with self._conn_lock:
+            conn = self._conn_cache.get(cache_key)
+            if conn is not None:
+                try:
+                    cur = conn.cursor()
+                    cur.close()
+                    return conn
+                except Exception:
+                    pass
+                self._conn_cache.pop(cache_key, None)
+            conn = self._connect(database)
+            self._conn_cache[cache_key] = conn
+            return conn
+
+    def cleanup(self) -> None:
+        with self._conn_lock:
+            for conn in self._conn_cache.values():
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self._conn_cache.clear()
+
     def _excluded_databases(self) -> set[str]:
         configured = self._scope_options().exclude_databases or []
         excluded = {name.strip() for name in configured if name.strip()}
@@ -230,23 +258,23 @@ class MSSQLSource(BaseSource):
 
         excluded = self._excluded_databases()
         databases: list[str] = []
-        with closing(self._connect()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT name
-                    FROM sys.databases
-                    WHERE state_desc = 'ONLINE'
-                    ORDER BY name
-                    """
-                )
-                for row in cursor.fetchall():
-                    database_name = row[0] if isinstance(row, tuple) else None
-                    if not isinstance(database_name, str) or not database_name:
-                        continue
-                    if database_name in excluded:
-                        continue
-                    databases.append(database_name)
+        conn = self._get_cached_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT name
+                FROM sys.databases
+                WHERE state_desc = 'ONLINE'
+                ORDER BY name
+                """
+            )
+            for row in cursor.fetchall():
+                database_name = row[0] if isinstance(row, tuple) else None
+                if not isinstance(database_name, str) or not database_name:
+                    continue
+                if database_name in excluded:
+                    continue
+                databases.append(database_name)
 
         if configured_database and configured_database not in databases:
             databases.insert(0, configured_database)
@@ -263,29 +291,29 @@ class MSSQLSource(BaseSource):
             return []
 
         try:
-            with closing(self._connect(table_ref.database)) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT kcu.COLUMN_NAME
-                        FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
-                        JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-                          ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-                         AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
-                         AND tc.TABLE_NAME = kcu.TABLE_NAME
-                        WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
-                          AND tc.TABLE_CATALOG = %s
-                          AND tc.TABLE_SCHEMA = %s
-                          AND tc.TABLE_NAME = %s
-                        ORDER BY kcu.ORDINAL_POSITION
-                        """,
-                        (table_ref.database, table_ref.schema, table_ref.table),
-                    )
-                    columns = [
-                        row[0]
-                        for row in cursor.fetchall()
-                        if isinstance(row, tuple) and row and isinstance(row[0], str)
-                    ]
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT kcu.COLUMN_NAME
+                    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+                    JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+                      ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+                     AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
+                     AND tc.TABLE_NAME = kcu.TABLE_NAME
+                    WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
+                      AND tc.TABLE_CATALOG = %s
+                      AND tc.TABLE_SCHEMA = %s
+                      AND tc.TABLE_NAME = %s
+                    ORDER BY kcu.ORDINAL_POSITION
+                    """,
+                    (table_ref.database, table_ref.schema, table_ref.table),
+                )
+                columns = [
+                    row[0]
+                    for row in cursor.fetchall()
+                    if isinstance(row, tuple) and row and isinstance(row[0], str)
+                ]
         except Exception:
             columns = []
 
@@ -305,56 +333,56 @@ class MSSQLSource(BaseSource):
         limit = int(table_limit) if table_limit else None
 
         tables: list[TableRef] = []
-        with closing(self._connect(database)) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
-                    FROM INFORMATION_SCHEMA.TABLES
-                    WHERE TABLE_CATALOG = %s
-                    ORDER BY TABLE_SCHEMA, TABLE_NAME
-                    """,
-                    (database,),
-                )
-                for row in cursor.fetchall():
-                    if not isinstance(row, tuple) or len(row) < 3:
-                        continue
+        conn = self._get_cached_connection(database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_CATALOG = %s
+                ORDER BY TABLE_SCHEMA, TABLE_NAME
+                """,
+                (database,),
+            )
+            for row in cursor.fetchall():
+                if not isinstance(row, tuple) or len(row) < 3:
+                    continue
 
-                    schema_name = row[0]
-                    table_name = row[1]
-                    table_type = row[2]
-                    if not isinstance(schema_name, str) or not isinstance(table_name, str):
-                        continue
-                    if schema_name in schema_denylist:
-                        continue
-                    if schema_allowlist and schema_name not in schema_allowlist:
-                        continue
+                schema_name = row[0]
+                table_name = row[1]
+                table_type = row[2]
+                if not isinstance(schema_name, str) or not isinstance(table_name, str):
+                    continue
+                if schema_name in schema_denylist:
+                    continue
+                if schema_allowlist and schema_name not in schema_allowlist:
+                    continue
 
-                    is_view = str(table_type).upper() == "VIEW"
-                    if is_view and not include_views:
-                        continue
-                    if not is_view and not include_tables:
-                        continue
+                is_view = str(table_type).upper() == "VIEW"
+                if is_view and not include_views:
+                    continue
+                if not is_view and not include_tables:
+                    continue
 
-                    scoped_name = f"{schema_name}.{table_name}".lower()
-                    db_scoped_name = f"{database}.{schema_name}.{table_name}".lower()
-                    if (
-                        object_allowlist
-                        and scoped_name not in object_allowlist
-                        and db_scoped_name not in object_allowlist
-                    ):
-                        continue
+                scoped_name = f"{schema_name}.{table_name}".lower()
+                db_scoped_name = f"{database}.{schema_name}.{table_name}".lower()
+                if (
+                    object_allowlist
+                    and scoped_name not in object_allowlist
+                    and db_scoped_name not in object_allowlist
+                ):
+                    continue
 
-                    tables.append(
-                        TableRef(
-                            database=database,
-                            schema=schema_name,
-                            table=table_name,
-                            object_type="VIEW" if is_view else "TABLE",
-                        )
+                tables.append(
+                    TableRef(
+                        database=database,
+                        schema=schema_name,
+                        table=table_name,
+                        object_type="VIEW" if is_view else "TABLE",
                     )
-                    if limit is not None and len(tables) >= limit:
-                        break
+                )
+                if limit is not None and len(tables) >= limit:
+                    break
 
         return tables
 
@@ -418,27 +446,27 @@ class MSSQLSource(BaseSource):
         links: dict[tuple[str, str, str], set[tuple[str, str, str]]] = {}
         for database, scoped_keys in by_database.items():
             try:
-                with closing(self._connect(database)) as conn:
-                    with conn.cursor() as cursor:
-                        cursor.execute(
-                            """
-                            SELECT
-                                OBJECT_SCHEMA_NAME(fk.parent_object_id) AS source_schema,
-                                OBJECT_NAME(fk.parent_object_id) AS source_table,
-                                OBJECT_SCHEMA_NAME(fk.referenced_object_id) AS target_schema,
-                                OBJECT_NAME(fk.referenced_object_id) AS target_table
-                            FROM sys.foreign_keys fk
-                            """
-                        )
-                        for row in cursor.fetchall():
-                            if not isinstance(row, tuple) or len(row) < 4:
-                                continue
-                            source_schema, source_table, target_schema, target_table = row
-                            source_key = (database, str(source_schema), str(source_table))
-                            target_key = (database, str(target_schema), str(target_table))
-                            if source_key not in scoped_keys or target_key not in table_keys:
-                                continue
-                            links.setdefault(source_key, set()).add(target_key)
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            OBJECT_SCHEMA_NAME(fk.parent_object_id) AS source_schema,
+                            OBJECT_NAME(fk.parent_object_id) AS source_table,
+                            OBJECT_SCHEMA_NAME(fk.referenced_object_id) AS target_schema,
+                            OBJECT_NAME(fk.referenced_object_id) AS target_table
+                        FROM sys.foreign_keys fk
+                        """
+                    )
+                    for row in cursor.fetchall():
+                        if not isinstance(row, tuple) or len(row) < 4:
+                            continue
+                        source_schema, source_table, target_schema, target_table = row
+                        source_key = (database, str(source_schema), str(source_table))
+                        target_key = (database, str(target_schema), str(target_table))
+                        if source_key not in scoped_keys or target_key not in table_keys:
+                            continue
+                        links.setdefault(source_key, set()).add(target_key)
             except Exception as exc:
                 logger.warning(
                     "Could not resolve foreign key links for database %s: %s",
@@ -466,36 +494,36 @@ class MSSQLSource(BaseSource):
         links: dict[tuple[str, str, str], set[tuple[str, str, str]]] = {}
         for database, scoped_views in by_database.items():
             try:
-                with closing(self._connect(database)) as conn:
-                    with conn.cursor() as cursor:
-                        cursor.execute(
-                            """
-                            SELECT
-                              OBJECT_SCHEMA_NAME(dep.referencing_id) AS source_schema,
-                              OBJECT_NAME(dep.referencing_id) AS source_name,
-                              OBJECT_SCHEMA_NAME(dep.referenced_id) AS target_schema,
-                              OBJECT_NAME(dep.referenced_id) AS target_name
-                            FROM sys.sql_expression_dependencies dep
-                            JOIN sys.views v ON dep.referencing_id = v.object_id
-                            WHERE dep.referenced_id IS NOT NULL
-                            """
-                        )
-                        for row in cursor.fetchall():
-                            if not isinstance(row, tuple) or len(row) < 4:
-                                continue
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                          OBJECT_SCHEMA_NAME(dep.referencing_id) AS source_schema,
+                          OBJECT_NAME(dep.referencing_id) AS source_name,
+                          OBJECT_SCHEMA_NAME(dep.referenced_id) AS target_schema,
+                          OBJECT_NAME(dep.referenced_id) AS target_name
+                        FROM sys.sql_expression_dependencies dep
+                        JOIN sys.views v ON dep.referencing_id = v.object_id
+                        WHERE dep.referenced_id IS NOT NULL
+                        """
+                    )
+                    for row in cursor.fetchall():
+                        if not isinstance(row, tuple) or len(row) < 4:
+                            continue
 
-                            source_schema, source_name, target_schema, target_name = row
-                            source_key = (database, str(source_schema), str(source_name))
-                            target_key = (database, str(target_schema), str(target_name))
+                        source_schema, source_name, target_schema, target_name = row
+                        source_key = (database, str(source_schema), str(source_name))
+                        target_key = (database, str(target_schema), str(target_name))
 
-                            if source_key not in scoped_views:
-                                continue
-                            if target_key not in table_keys:
-                                continue
-                            if source_key not in view_keys:
-                                continue
+                        if source_key not in scoped_views:
+                            continue
+                        if target_key not in table_keys:
+                            continue
+                        if source_key not in view_keys:
+                            continue
 
-                            links.setdefault(source_key, set()).add(target_key)
+                        links.setdefault(source_key, set()).add(target_key)
             except Exception as exc:
                 logger.warning(
                     "Could not resolve view lineage links for database %s: %s",
@@ -632,24 +660,24 @@ class MSSQLSource(BaseSource):
         return None
 
     def _available_columns(self, table_ref: TableRef) -> list[str]:
-        with closing(self._connect(table_ref.database)) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT COLUMN_NAME
-                    FROM INFORMATION_SCHEMA.COLUMNS
-                    WHERE TABLE_CATALOG = %s
-                      AND TABLE_SCHEMA = %s
-                      AND TABLE_NAME = %s
-                    ORDER BY ORDINAL_POSITION
-                    """,
-                    (table_ref.database, table_ref.schema, table_ref.table),
-                )
-                return [
-                    row[0]
-                    for row in cursor.fetchall()
-                    if isinstance(row, tuple) and row and isinstance(row[0], str)
-                ]
+        conn = self._get_cached_connection(table_ref.database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COLUMN_NAME
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_CATALOG = %s
+                  AND TABLE_SCHEMA = %s
+                  AND TABLE_NAME = %s
+                ORDER BY ORDINAL_POSITION
+                """,
+                (table_ref.database, table_ref.schema, table_ref.table),
+            )
+            return [
+                row[0]
+                for row in cursor.fetchall()
+                if isinstance(row, tuple) and row and isinstance(row[0], str)
+            ]
 
     def _resolve_latest_order_column(self, columns: list[str]) -> str | None:
         sampling = self._sampling()
@@ -709,13 +737,13 @@ class MSSQLSource(BaseSource):
 
     def _count_table_rows(self, table_ref: TableRef) -> int | None:
         try:
-            with closing(self._connect(table_ref.database)) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
-                    )
-                    row = cursor.fetchone()
-                    return int(row[0]) if row else None
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
+                )
+                row = cursor.fetchone()
+                return int(row[0]) if row else None
         except Exception:
             return None
 
@@ -758,17 +786,15 @@ class MSSQLSource(BaseSource):
     def _fetch_one_page(
         self, table_ref: TableRef, base_query: str, page_size: int, offset: int
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        with closing(self._connect(table_ref.database)) as conn:
-            paginated_query = (
-                f"{base_query} ORDER BY (SELECT NULL) "
-                f"OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
-            )
-            with conn.cursor() as cursor:
-                cursor.execute(paginated_query)
-                rows = list(cursor.fetchall())
-                column_names = (
-                    [desc[0] for desc in cursor.description] if cursor.description else []
-                )
+        conn = self._get_cached_connection(table_ref.database)
+        paginated_query = (
+            f"{base_query} ORDER BY (SELECT NULL) "
+            f"OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute(paginated_query)
+            rows = list(cursor.fetchall())
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
         return rows, column_names
 
     def _fetch_one_page_on_conn(
@@ -856,11 +882,11 @@ class MSSQLSource(BaseSource):
             rows_per_page = int(sampling.rows_per_page or 100)
             rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
         else:
-            with closing(self._connect(table_ref.database)) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(query)
-                    rows = cursor.fetchall()
-                    column_names = [desc[0] for desc in cursor.description or []]
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                column_names = [desc[0] for desc in cursor.description or []]
 
         if not column_names:
             return None

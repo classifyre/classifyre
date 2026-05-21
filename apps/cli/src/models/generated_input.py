@@ -169,6 +169,12 @@ class ResourceOverrides(BaseModel):
         ge=1,
         le=16,
     )
+    max_concurrent_assets: int | None = Field(
+        None,
+        description='Max assets processed concurrently. Controls parallel DB connections. Defaults to pool_workers * 2 when omitted.',
+        ge=1,
+        le=50,
+    )
 
 
 class Detector(BaseModel):
