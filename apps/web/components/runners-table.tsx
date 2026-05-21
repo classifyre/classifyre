@@ -436,12 +436,12 @@ export function RunnersTable({
           }
         >
           <MultiSelectTrigger className="h-9 w-[220px] border-2 border-border rounded-[4px]">
-            <MultiSelectValue placeholder="Sources" />
+            <MultiSelectValue placeholder={t("common.sources")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
-              placeholder: "Search sources...",
-              emptyMessage: "No sources found",
+              placeholder: t("runners.searchSources"),
+              emptyMessage: t("runners.noSourcesFound"),
             }}
           >
             <MultiSelectGroup>
@@ -473,8 +473,8 @@ export function RunnersTable({
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
-              placeholder: "Search trigger types...",
-              emptyMessage: "No trigger types found",
+              placeholder: t("runners.searchTriggerTypes"),
+              emptyMessage: t("runners.noTriggerTypesFound"),
             }}
           >
             <MultiSelectGroup>
@@ -490,7 +490,7 @@ export function RunnersTable({
         {isFilterLoading ? (
           <div className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Updating
+            {t("runners.updating")}
           </div>
         ) : null}
       </div>
@@ -520,41 +520,41 @@ export function RunnersTable({
                 <TableRow>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     {renderSortableHead(
-                      "Triggered",
+                      t("runners.columns.triggered"),
                       SearchRunnersSortByEnum.TriggeredAt,
                     )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     {renderSortableHead(
-                      "Source",
+                      t("runners.columns.source"),
                       SearchRunnersSortByEnum.SourceName,
                     )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     {renderSortableHead(
-                      "Status",
+                      t("runners.columns.status"),
                       SearchRunnersSortByEnum.Status,
                     )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Trigger
+                      {t("runners.columns.trigger")}
                     </span>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     {renderSortableHead(
-                      "Duration",
+                      t("runners.columns.duration"),
                       SearchRunnersSortByEnum.DurationMs,
                     )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Assets
+                      {t("runners.columns.assets")}
                     </span>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     {renderSortableHead(
-                      "Findings",
+                      t("runners.columns.findings"),
                       SearchRunnersSortByEnum.TotalFindings,
                     )}
                   </TableHead>
@@ -626,13 +626,13 @@ export function RunnersTable({
                                 : ""
                             }
                           >
-                            {formatEnumLabel(runner.triggerType)}
+                            {t(`triggerTypes.${runner.triggerType}`)}
                           </span>
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {runner.triggeredBy === "pg-boss"
-                            ? "Scheduler"
-                            : runner.triggeredBy || "System"}
+                            ? t("runners.scheduler")
+                            : runner.triggeredBy || t("common.none")}
                         </div>
                       </TableCell>
                       <TableCell className="py-2">

@@ -16,6 +16,7 @@ import {
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
 import { EChartBox } from "@/components/echart-box";
+import { useTranslation } from "@/hooks/use-translation";
 
 type AtlasView = "matrix" | "source_map" | "focus";
 type DensityMode = "compact" | "balanced" | "expanded";
@@ -165,6 +166,7 @@ export function AssetRelationshipGraph({
   maxNodes?: number;
   maxReferencedNodes?: number;
 }) {
+  const { t } = useTranslation();
   const [themeColors, setThemeColors] = useState<ThemeColors>(() =>
     resolveThemeColors(),
   );
@@ -800,7 +802,7 @@ export function AssetRelationshipGraph({
               onValueChange={(value) => setDensity(value as DensityMode)}
             >
               <SelectTrigger className="border-2 border-border rounded-[4px]">
-                <SelectValue placeholder="Density" />
+                <SelectValue placeholder={t("assets.graph.density")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="compact">Compact</SelectItem>
@@ -810,7 +812,7 @@ export function AssetRelationshipGraph({
             </Select>
             <Select value={focusSource} onValueChange={setFocusSource}>
               <SelectTrigger className="border-2 border-border rounded-[4px]">
-                <SelectValue placeholder="Focus source" />
+                <SelectValue placeholder={t("assets.graph.focusSource")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">Auto focus</SelectItem>
