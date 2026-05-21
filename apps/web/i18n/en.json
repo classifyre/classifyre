@@ -903,6 +903,11 @@
   },
   "scans": {
     "title": "Scans",
+    "subtitle": "Search run history and filter by operational status from one surface.",
+    "runTrend": "Run Trend",
+    "runTrendDescription": "Status distribution over the selected timeline.",
+    "topSourcesByVolume": "Top Sources by Run Volume",
+    "createScan": "Create Scan",
     "runNotFound": "Run Not Found",
     "viewAllScans": "View All Scans",
     "tabOverview": "Overview",
@@ -966,7 +971,48 @@
     "sourceUnavailable": "Source is not available for this run",
     "newRunStarted": "New run started",
     "failedToStop": "Failed to stop run",
-    "failedToStart": "Failed to start new run"
+    "failedToStart": "Failed to start new run",
+    "updatingCharts": "Updating charts...",
+    "windowDays": {
+      "7days": "7 days",
+      "30days": "30 days",
+      "90days": "90 days"
+    },
+    "stats": {
+      "findings": "Findings",
+      "criticalHigh": "Critical + High",
+      "assets": "Assets",
+      "open": "Open",
+      "resolved": "Resolved"
+    },
+    "runProgress": {
+      "title": "Run Progress",
+      "description": "Estimated from processed assets",
+      "progress": "Progress",
+      "durationSoFar": "Duration so far: {{duration}}"
+    },
+    "runTimeline": {
+      "title": "Run Timeline",
+      "description": "Execution timestamps",
+      "triggered": "Triggered",
+      "started": "Started",
+      "completed": "Completed",
+      "duration": "Duration",
+      "triggeredBy": "Triggered By",
+      "na": "N/A"
+    },
+    "assetDelta": {
+      "title": "Asset Delta",
+      "description": "Changes produced by this run",
+      "created": "Created",
+      "updated": "Updated",
+      "unchanged": "Unchanged"
+    },
+    "sourceContext": {
+      "title": "Source Context",
+      "openSource": "Open Source"
+    },
+    "sourceRun": "{{source}} Run"
   },
   "sandbox": {
     "title": "Sandbox",
@@ -985,7 +1031,24 @@
       "findings": "Findings",
       "noRuns": "No sandbox runs found",
       "noRunsHint": "Adjust filters to broaden the run search.",
-      "loading": "Loading runs..."
+      "loading": "Loading runs...",
+      "file": "File",
+      "content": "Content",
+      "mimeType": "MIME Type",
+      "size": "Size",
+      "duration": "Duration",
+      "topFindings": "Top Findings",
+      "when": "When",
+      "allRuns": "All runs",
+      "withFindings": "With findings",
+      "noFindings": "No findings",
+      "newestFirst": "Newest first",
+      "oldestFirst": "Oldest first",
+      "mostFindings": "Most findings",
+      "fileNameAZ": "File name A-Z",
+      "largestFile": "Largest file",
+      "updating": "Updating",
+      "refreshingRuns": "Refreshing runs"
     },
     "monitorDesc": "Monitor sandbox runs and inspect detector findings",
     "newScan": "New sandbox scan",
@@ -1014,12 +1077,33 @@
     "openAction": "Open notification action",
     "dismiss": "Dismiss notification"
   },
+  "triggerTypes": {
+    "MANUAL": "Manual",
+    "SCHEDULED": "Scheduled",
+    "WEBHOOK": "Webhook",
+    "API": "API"
+  },
   "runners": {
     "search": "Search runs, sources, trigger, status",
     "triggerType": "Trigger type",
     "noRuns": "No runs found",
     "noRunsHint": "Adjust filters to broaden the run search.",
     "loading": "Loading runs...",
+    "scheduler": "Scheduler",
+    "columns": {
+      "triggered": "Triggered",
+      "source": "Source",
+      "status": "Status",
+      "trigger": "Trigger",
+      "duration": "Duration",
+      "assets": "Assets",
+      "findings": "Findings"
+    },
+    "searchSources": "Search sources...",
+    "noSourcesFound": "No sources found",
+    "searchTriggerTypes": "Search trigger types...",
+    "noTriggerTypesFound": "No trigger types found",
+    "updating": "Updating",
     "status": {
       "completed": "Completed",
       "warning": "Warning",

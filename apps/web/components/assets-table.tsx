@@ -1206,8 +1206,8 @@ export function AssetsTable({
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">{t("common.rowsPerPage")}</span>
           <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
-              <SelectValue placeholder="Rows" />
+<SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
+                <SelectValue placeholder={t("common.rowsPerPage")} />
             </SelectTrigger>
             <SelectContent>
               {PAGE_SIZE_OPTIONS.map((size) => (

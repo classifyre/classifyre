@@ -348,7 +348,7 @@ export default function DiscoveryPage() {
               </p>
               <Select value={windowDays} onValueChange={setWindowDays}>
                 <SelectTrigger className="h-7 w-[100px] text-[10px] bg-background border-2 border-border text-foreground rounded-[4px] font-mono">
-                  <SelectValue placeholder="Window" />
+                  <SelectValue placeholder={t("common.window")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="7">

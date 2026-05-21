@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown, Search } from "lucide-react";
+import { useTranslation } from "@/hooks/use-translation";
 import {
   type CustomDetectorTrainingRunDto,
   type CustomDetectorTrainingStatus,
@@ -110,6 +111,7 @@ type CustomDetectorTrainingHistoryTableProps = {
 export function CustomDetectorTrainingHistoryTable({
   history,
 }: CustomDetectorTrainingHistoryTableProps) {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<
     CustomDetectorTrainingStatus | "ALL"
@@ -226,7 +228,7 @@ export function CustomDetectorTrainingHistoryTable({
           }}
         >
           <SelectTrigger className="h-9 min-w-[180px] border-2 border-border rounded-[4px]">
-            <SelectValue placeholder="All statuses" />
+            <SelectValue placeholder={t("common.status")} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All statuses</SelectItem>

@@ -903,6 +903,11 @@
   },
   "scans": {
     "title": "Scans",
+    "subtitle": "Ausführungsverlauf durchsuchen und nach operativem Status filtern.",
+    "runTrend": "Ausführungstrend",
+    "runTrendDescription": "Statusverteilung über den gewählten Zeitraum.",
+    "topSourcesByVolume": "Top-Quellen nach Ausführungsvolumen",
+    "createScan": "Scan erstellen",
     "runNotFound": "Ausführung nicht gefunden",
     "viewAllScans": "Alle Scans anzeigen",
     "tabOverview": "Übersicht",
@@ -966,7 +971,48 @@
     "sourceUnavailable": "Quelle ist für diese Ausführung nicht verfügbar",
     "newRunStarted": "Neue Ausführung gestartet",
     "failedToStop": "Ausführung konnte nicht gestoppt werden",
-    "failedToStart": "Neue Ausführung konnte nicht gestartet werden"
+    "failedToStart": "Neue Ausführung konnte nicht gestartet werden",
+    "updatingCharts": "Diagramme werden aktualisiert...",
+    "windowDays": {
+      "7days": "7 Tage",
+      "30days": "30 Tage",
+      "90days": "90 Tage"
+    },
+    "stats": {
+      "findings": "Befunde",
+      "criticalHigh": "Kritisch + Hoch",
+      "assets": "Assets",
+      "open": "Offen",
+      "resolved": "Behoben"
+    },
+    "runProgress": {
+      "title": "Ausführungsfortschritt",
+      "description": "Geschätzt aus verarbeiteten Assets",
+      "progress": "Fortschritt",
+      "durationSoFar": "Bisherige Dauer: {{duration}}"
+    },
+    "runTimeline": {
+      "title": "Ausführungszeitachse",
+      "description": "Ausführungszeitstempel",
+      "triggered": "Ausgelöst",
+      "started": "Gestartet",
+      "completed": "Abgeschlossen",
+      "duration": "Dauer",
+      "triggeredBy": "Ausgelöst von",
+      "na": "N/V"
+    },
+    "assetDelta": {
+      "title": "Asset-Delta",
+      "description": "Von dieser Ausführung erzeugte Änderungen",
+      "created": "Erstellt",
+      "updated": "Aktualisiert",
+      "unchanged": "Unverändert"
+    },
+    "sourceContext": {
+      "title": "Quellkontext",
+      "openSource": "Quelle öffnen"
+    },
+    "sourceRun": "{{source}}-Ausführung"
   },
   "sandbox": {
     "title": "Sandbox",
@@ -985,7 +1031,24 @@
       "findings": "Befunde",
       "noRuns": "Keine Sandbox-Ausführungen gefunden",
       "noRunsHint": "Filter anpassen, um die Suche zu erweitern.",
-      "loading": "Ausführungen werden geladen..."
+      "loading": "Ausführungen werden geladen...",
+      "file": "Datei",
+      "content": "Inhalt",
+      "mimeType": "MIME-Typ",
+      "size": "Größe",
+      "duration": "Dauer",
+      "topFindings": "Top-Befunde",
+      "when": "Wann",
+      "allRuns": "Alle Ausführungen",
+      "withFindings": "Mit Befunden",
+      "noFindings": "Ohne Befunde",
+      "newestFirst": "Neueste zuerst",
+      "oldestFirst": "Älteste zuerst",
+      "mostFindings": "Meiste Befunde",
+      "fileNameAZ": "Dateiname A-Z",
+      "largestFile": "Größte Datei",
+      "updating": "Wird aktualisiert",
+      "refreshingRuns": "Ausführungen werden aktualisiert"
     },
     "monitorDesc": "Sandbox-Läufe überwachen und Detektor-Befunde prüfen",
     "newScan": "Neuer Sandbox-Scan",
@@ -1014,16 +1077,37 @@
     "openAction": "Benachrichtigungsaktion öffnen",
     "dismiss": "Benachrichtigung schließen"
   },
+  "triggerTypes": {
+    "MANUAL": "Manuell",
+    "SCHEDULED": "Geplant",
+    "WEBHOOK": "Webhook",
+    "API": "API"
+  },
   "runners": {
     "search": "Ausführungen, Quellen, Auslöser, Status suchen",
     "triggerType": "Auslösertyp",
     "noRuns": "Keine Ausführungen gefunden",
     "noRunsHint": "Filter anpassen, um die Suche zu erweitern.",
     "loading": "Ausführungen werden geladen...",
+    "scheduler": "Planer",
+    "columns": {
+      "triggered": "Ausgelöst",
+      "source": "Quelle",
+      "status": "Status",
+      "trigger": "Auslöser",
+      "duration": "Dauer",
+      "assets": "Assets",
+      "findings": "Befunde"
+    },
+    "searchSources": "Quellen suchen...",
+    "noSourcesFound": "Keine Quellen gefunden",
+    "searchTriggerTypes": "Auslösertypen suchen...",
+    "noTriggerTypesFound": "Keine Auslösertypen gefunden",
+    "updating": "Wird aktualisiert",
     "status": {
       "completed": "Abgeschlossen",
       "warning": "Warnung",
-      "running": "Läuft...",
+      "running": "Läuft",
       "pending": "Ausstehend",
       "error": "Fehler"
     },
@@ -1063,6 +1147,37 @@
         "message": "Nachricht"
       }
     }
+  },
+  "forms": {
+    "title": "Protokolle",
+    "description": "Geparste Runner-Protokolle mit Level-Erkennung",
+    "search": "Nachricht suchen",
+    "allLevels": "Alle Level",
+    "searchLevels": "Level suchen…",
+    "noLevelsFound": "Keine Level gefunden",
+    "newestFirst": "Neueste zuerst",
+    "oldestFirst": "Älteste zuerst",
+    "noLogs": "Keine Protokolle verfügbar",
+    "noLogsHint": "Keine Protokolleinträge entsprechen Ihrer Suche.",
+    "autoRefresh": "Automatische Aktualisierung",
+    "wrapLines": "Zeilenumbruch",
+    "refresh": "Aktualisieren",
+    "downloadVisible": "Sichtbare herunterladen",
+    "downloadAll": "Alle herunterladen",
+    "loadMore": "Mehr laden",
+    "jumpToLatest": "Zum Neuesten springen",
+    "showing": "{{filtered}} / {{total}} geladen angezeigt",
+    "autoRefreshEnabled": "Automatische Aktualisierung aktiviert (alle 2 Sek.)",
+    "autoRefreshPaused": "Automatische Aktualisierung pausiert",
+    "runnerCompleted": "Runner abgeschlossen",
+    "copyRow": "Zeile kopieren",
+    "copied": "Kopiert",
+    "downloaded": "Sichtbare Protokolle heruntergeladen",
+    "downloadedCount": "{{count}} Protokolleinträge heruntergeladen",
+    "copiedRows": "{{count}} Protokollzeilen kopiert",
+    "noLogsDownload": "Keine Protokolle zum Herunterladen verfügbar",
+    "noRowsToCopy": "Mindestens eine Zeile zum Kopieren auswählen",
+    "loadedEntries": "geladen"
   },
   "forms": {
     "sourceName": "Quellenname",
