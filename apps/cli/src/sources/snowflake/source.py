@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from collections.abc import AsyncGenerator
 from contextlib import closing
 from dataclasses import dataclass
@@ -77,6 +78,8 @@ class SnowflakeSource(BaseSource):
 
         self._table_lookup: dict[str, TableRef] = {}
         self._content_cache: dict[str, tuple[str, str]] = {}
+        self._conn_cache: dict[str, Any] = {}
+        self._conn_lock = threading.Lock()
 
     def _validate_auth_configuration(self) -> None:
         required = self.config.required
@@ -214,6 +217,30 @@ class SnowflakeSource(BaseSource):
 
         return self._snowflake.connect(**connect_kwargs)
 
+    def _get_cached_connection(self):
+        cache_key = "__default__"
+        with self._conn_lock:
+            conn = self._conn_cache.get(cache_key)
+            if conn is not None:
+                try:
+                    if not conn.is_closed():
+                        return conn
+                except Exception:
+                    pass
+                self._conn_cache.pop(cache_key, None)
+            conn = self._connect()
+            self._conn_cache[cache_key] = conn
+            return conn
+
+    def cleanup(self) -> None:
+        with self._conn_lock:
+            for conn in self._conn_cache.values():
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self._conn_cache.clear()
+
     def _fetch_dict_rows(self, cursor: Any) -> list[dict[str, Any]]:
         rows = cursor.fetchall()
         description = getattr(cursor, "description", None) or []
@@ -285,16 +312,16 @@ class SnowflakeSource(BaseSource):
 
         excluded = self._excluded_databases()
         databases: list[str] = []
-        with closing(self._connect()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SHOW DATABASES")
-                for row in self._fetch_dict_rows(cursor):
-                    database_name = row.get("NAME")
-                    if not isinstance(database_name, str) or not database_name:
-                        continue
-                    if database_name.upper() in excluded:
-                        continue
-                    databases.append(database_name)
+        conn = self._get_cached_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SHOW DATABASES")
+            for row in self._fetch_dict_rows(cursor):
+                database_name = row.get("NAME")
+                if not isinstance(database_name, str) or not database_name:
+                    continue
+                if database_name.upper() in excluded:
+                    continue
+                databases.append(database_name)
 
         if configured_database and configured_database not in databases:
             databases.insert(0, configured_database)
@@ -319,48 +346,48 @@ class SnowflakeSource(BaseSource):
             ORDER BY TABLE_SCHEMA, TABLE_NAME
         """
         tables: list[TableRef] = []
-        with closing(self._connect()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query)
-                for row in self._fetch_dict_rows(cursor):
-                    schema_name = row.get("TABLE_SCHEMA")
-                    table_name = row.get("TABLE_NAME")
-                    table_type = row.get("TABLE_TYPE")
-                    if not isinstance(schema_name, str) or not isinstance(table_name, str):
-                        continue
+        conn = self._get_cached_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            for row in self._fetch_dict_rows(cursor):
+                schema_name = row.get("TABLE_SCHEMA")
+                table_name = row.get("TABLE_NAME")
+                table_type = row.get("TABLE_TYPE")
+                if not isinstance(schema_name, str) or not isinstance(table_name, str):
+                    continue
 
-                    schema_upper = schema_name.upper()
-                    if schema_upper in schema_denylist:
-                        continue
-                    if schema_allowlist and schema_upper not in schema_allowlist:
-                        continue
+                schema_upper = schema_name.upper()
+                if schema_upper in schema_denylist:
+                    continue
+                if schema_allowlist and schema_upper not in schema_allowlist:
+                    continue
 
-                    normalized_type = str(table_type).upper()
-                    is_view = "VIEW" in normalized_type
-                    if is_view and not include_views:
-                        continue
-                    if not is_view and not include_tables:
-                        continue
+                normalized_type = str(table_type).upper()
+                is_view = "VIEW" in normalized_type
+                if is_view and not include_views:
+                    continue
+                if not is_view and not include_tables:
+                    continue
 
-                    scoped_name = f"{schema_name}.{table_name}".lower()
-                    db_scoped_name = f"{database}.{schema_name}.{table_name}".lower()
-                    if (
-                        object_allowlist
-                        and scoped_name not in object_allowlist
-                        and db_scoped_name not in object_allowlist
-                    ):
-                        continue
+                scoped_name = f"{schema_name}.{table_name}".lower()
+                db_scoped_name = f"{database}.{schema_name}.{table_name}".lower()
+                if (
+                    object_allowlist
+                    and scoped_name not in object_allowlist
+                    and db_scoped_name not in object_allowlist
+                ):
+                    continue
 
-                    tables.append(
-                        TableRef(
-                            database=database,
-                            schema=schema_name,
-                            table=table_name,
-                            object_type="VIEW" if is_view else "TABLE",
-                        )
+                tables.append(
+                    TableRef(
+                        database=database,
+                        schema=schema_name,
+                        table=table_name,
+                        object_type="VIEW" if is_view else "TABLE",
                     )
-                    if limit is not None and len(tables) >= limit:
-                        break
+                )
+                if limit is not None and len(tables) >= limit:
+                    break
 
         return tables
 
@@ -442,44 +469,44 @@ class SnowflakeSource(BaseSource):
 
         links: dict[tuple[str, str, str], set[tuple[str, str, str]]] = {}
         try:
-            with closing(self._connect()) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(query)
-                    for row in self._fetch_dict_rows(cursor):
-                        source_db = row.get("REFERENCING_DATABASE")
-                        source_schema = row.get("REFERENCING_SCHEMA")
-                        source_table = row.get("REFERENCING_OBJECT_NAME")
-                        source_domain = row.get("REFERENCING_OBJECT_DOMAIN")
-                        target_db = row.get("REFERENCED_DATABASE")
-                        target_schema = row.get("REFERENCED_SCHEMA")
-                        target_table = row.get("REFERENCED_OBJECT_NAME")
-                        if not all(
-                            isinstance(value, str)
-                            for value in (
-                                source_db,
-                                source_schema,
-                                source_table,
-                                source_domain,
-                                target_db,
-                                target_schema,
-                                target_table,
-                            )
-                        ):
-                            continue
+            conn = self._get_cached_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                for row in self._fetch_dict_rows(cursor):
+                    source_db = row.get("REFERENCING_DATABASE")
+                    source_schema = row.get("REFERENCING_SCHEMA")
+                    source_table = row.get("REFERENCING_OBJECT_NAME")
+                    source_domain = row.get("REFERENCING_OBJECT_DOMAIN")
+                    target_db = row.get("REFERENCED_DATABASE")
+                    target_schema = row.get("REFERENCED_SCHEMA")
+                    target_table = row.get("REFERENCED_OBJECT_NAME")
+                    if not all(
+                        isinstance(value, str)
+                        for value in (
+                            source_db,
+                            source_schema,
+                            source_table,
+                            source_domain,
+                            target_db,
+                            target_schema,
+                            target_table,
+                        )
+                    ):
+                        continue
 
-                        source_key = (source_db, source_schema, source_table)
-                        target_key = (target_db, target_schema, target_table)
-                        if source_key not in known_keys or target_key not in known_keys:
-                            continue
+                    source_key = (source_db, source_schema, source_table)
+                    target_key = (target_db, target_schema, target_table)
+                    if source_key not in known_keys or target_key not in known_keys:
+                        continue
 
-                        source_is_view = source_key in view_keys
-                        source_is_table = source_key in table_keys
-                        if source_is_view and not self._include_view_lineage_enabled():
-                            continue
-                        if source_is_table and not self._include_table_lineage_enabled():
-                            continue
+                    source_is_view = source_key in view_keys
+                    source_is_table = source_key in table_keys
+                    if source_is_view and not self._include_view_lineage_enabled():
+                        continue
+                    if source_is_table and not self._include_table_lineage_enabled():
+                        continue
 
-                        links.setdefault(source_key, set()).add(target_key)
+                    links.setdefault(source_key, set()).add(target_key)
         except Exception as exc:
             logger.warning("Could not resolve Snowflake lineage links: %s", exc)
 
@@ -605,14 +632,14 @@ class SnowflakeSource(BaseSource):
               AND TABLE_NAME = %s
             ORDER BY ORDINAL_POSITION
         """
-        with closing(self._connect()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query, [table_ref.schema, table_ref.table])
-                return [
-                    row.get("COLUMN_NAME")
-                    for row in self._fetch_dict_rows(cursor)
-                    if isinstance(row.get("COLUMN_NAME"), str)
-                ]
+        conn = self._get_cached_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(query, [table_ref.schema, table_ref.table])
+            return [
+                row.get("COLUMN_NAME")
+                for row in self._fetch_dict_rows(cursor)
+                if isinstance(row.get("COLUMN_NAME"), str)
+            ]
 
     def _resolve_latest_order_column(self, columns: list[str]) -> str | None:
         sampling = self._sampling()
@@ -671,13 +698,13 @@ class SnowflakeSource(BaseSource):
 
     def _count_table_rows(self, table_ref: TableRef) -> int | None:
         try:
-            with closing(self._connect()) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.database)}.{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
-                    )
-                    row = cursor.fetchone()
-                    return int(row[0]) if row else None
+            conn = self._get_cached_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.database)}.{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
+                )
+                row = cursor.fetchone()
+                return int(row[0]) if row else None
         except Exception:
             return None
 
@@ -731,15 +758,13 @@ class SnowflakeSource(BaseSource):
     def _fetch_one_page(
         self, table_ref: TableRef, base_query: str, page_size: int, offset: int
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        with closing(self._connect()) as conn:
-            paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
-            with conn.cursor() as cursor:
-                cursor.execute(paginated_query, [])
-                raw_batch = list(cursor.fetchall())
-                description = getattr(cursor, "description", None) or []
-                column_names = [
-                    str(col[0]) for col in description if isinstance(col, tuple) and col
-                ]
+        conn = self._get_cached_connection()
+        paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
+        with conn.cursor() as cursor:
+            cursor.execute(paginated_query, [])
+            raw_batch = list(cursor.fetchall())
+            description = getattr(cursor, "description", None) or []
+            column_names = [str(col[0]) for col in description if isinstance(col, tuple) and col]
         rows = self._normalize_rows(raw_batch, column_names)
         return rows, column_names
 
@@ -764,14 +789,14 @@ class SnowflakeSource(BaseSource):
             rows_per_page = int(sampling.rows_per_page or 100)
             rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
         else:
-            with closing(self._connect()) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(query, params)
-                    raw_rows = cursor.fetchall()
-                    description = getattr(cursor, "description", None) or []
-                    column_names = [
-                        str(col[0]) for col in description if isinstance(col, tuple) and col
-                    ]
+            conn = self._get_cached_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(query, params)
+                raw_rows = cursor.fetchall()
+                description = getattr(cursor, "description", None) or []
+                column_names = [
+                    str(col[0]) for col in description if isinstance(col, tuple) and col
+                ]
             rows = self._normalize_rows(raw_rows, column_names)
 
         if not column_names:

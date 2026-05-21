@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import ssl as ssl_module
+import threading
 from collections.abc import AsyncGenerator
 from contextlib import closing
 from dataclasses import dataclass
@@ -70,6 +71,8 @@ class MySQLSource(BaseSource):
         self._table_lookup: dict[str, TableRef] = {}
         self._content_cache: dict[str, tuple[str, str]] = {}
         self._pk_columns_cache: dict[tuple[str, str], list[str]] = {}
+        self._conn_cache: dict[str, Any] = {}
+        self._conn_lock = threading.Lock()
 
     def _asset_type_value(self) -> str:
         type_value = self.config.type
@@ -144,6 +147,30 @@ class MySQLSource(BaseSource):
         connection.autocommit(True)
         return connection
 
+    def _get_cached_connection(self, database: str | None = None):
+        cache_key = database or "__default__"
+        with self._conn_lock:
+            conn = self._conn_cache.get(cache_key)
+            if conn is not None:
+                try:
+                    if conn.open:
+                        return conn
+                except Exception:
+                    pass
+                self._conn_cache.pop(cache_key, None)
+            conn = self._connect(database)
+            self._conn_cache[cache_key] = conn
+            return conn
+
+    def cleanup(self) -> None:
+        with self._conn_lock:
+            for conn in self._conn_cache.values():
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self._conn_cache.clear()
+
     def _excluded_databases(self) -> set[str]:
         configured = self._scope_options().exclude_databases or []
         excluded = {db.strip() for db in configured if db.strip()}
@@ -166,16 +193,16 @@ class MySQLSource(BaseSource):
 
         excluded = self._excluded_databases()
         databases: list[str] = []
-        with closing(self._connect()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SHOW DATABASES")
-                for row in cursor.fetchall():
-                    database_name = row[0] if isinstance(row, tuple) else None
-                    if not isinstance(database_name, str) or not database_name:
-                        continue
-                    if database_name in excluded:
-                        continue
-                    databases.append(database_name)
+        conn = self._get_cached_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SHOW DATABASES")
+            for row in cursor.fetchall():
+                database_name = row[0] if isinstance(row, tuple) else None
+                if not isinstance(database_name, str) or not database_name:
+                    continue
+                if database_name in excluded:
+                    continue
+                databases.append(database_name)
 
         if configured_database and configured_database not in databases:
             databases.insert(0, configured_database)
@@ -196,20 +223,20 @@ class MySQLSource(BaseSource):
         if cache_key in self._pk_columns_cache:
             return self._pk_columns_cache[cache_key]
         try:
-            with self._connect(table_ref.database) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT column_name
-                        FROM information_schema.key_column_usage
-                        WHERE constraint_name = 'PRIMARY'
-                          AND table_schema = %s
-                          AND table_name = %s
-                        ORDER BY ordinal_position
-                        """,
-                        (table_ref.database, table_ref.table),
-                    )
-                    cols = [row[0] for row in cursor.fetchall() if isinstance(row[0], str)]
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT column_name
+                    FROM information_schema.key_column_usage
+                    WHERE constraint_name = 'PRIMARY'
+                      AND table_schema = %s
+                      AND table_name = %s
+                    ORDER BY ordinal_position
+                    """,
+                    (table_ref.database, table_ref.table),
+                )
+                cols = [row[0] for row in cursor.fetchall() if isinstance(row[0], str)]
         except Exception:
             cols = []
         self._pk_columns_cache[cache_key] = cols
@@ -221,35 +248,35 @@ class MySQLSource(BaseSource):
         limit = int(table_limit) if table_limit else None
 
         tables: list[TableRef] = []
-        with closing(self._connect(database)) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT table_name
-                    FROM information_schema.tables
-                    WHERE table_schema = %s
-                      AND table_type = 'BASE TABLE'
-                    ORDER BY table_name
-                    """,
-                    (database,),
-                )
-                for row in cursor.fetchall():
-                    table_name = row[0] if isinstance(row, tuple) else None
-                    if not isinstance(table_name, str) or not table_name:
-                        continue
+        conn = self._get_cached_connection(database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = %s
+                  AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+                """,
+                (database,),
+            )
+            for row in cursor.fetchall():
+                table_name = row[0] if isinstance(row, tuple) else None
+                if not isinstance(table_name, str) or not table_name:
+                    continue
 
-                    normalized_table = table_name.lower()
-                    normalized_db_table = f"{database}.{table_name}".lower()
-                    if (
-                        table_allowlist
-                        and normalized_table not in table_allowlist
-                        and normalized_db_table not in table_allowlist
-                    ):
-                        continue
+                normalized_table = table_name.lower()
+                normalized_db_table = f"{database}.{table_name}".lower()
+                if (
+                    table_allowlist
+                    and normalized_table not in table_allowlist
+                    and normalized_db_table not in table_allowlist
+                ):
+                    continue
 
-                    tables.append(TableRef(database=database, table=table_name))
-                    if limit is not None and len(tables) >= limit:
-                        break
+                tables.append(TableRef(database=database, table=table_name))
+                if limit is not None and len(tables) >= limit:
+                    break
         return tables
 
     def _iter_tables(self) -> list[TableRef]:
@@ -307,30 +334,30 @@ class MySQLSource(BaseSource):
         links: dict[tuple[str, str], set[tuple[str, str]]] = {}
         for database, scoped_keys in by_database.items():
             try:
-                with closing(self._connect(database)) as conn:
-                    with conn.cursor() as cursor:
-                        cursor.execute(
-                            """
-                            SELECT
-                                TABLE_SCHEMA AS source_database,
-                                TABLE_NAME AS source_table,
-                                REFERENCED_TABLE_SCHEMA AS target_database,
-                                REFERENCED_TABLE_NAME AS target_table
-                            FROM information_schema.KEY_COLUMN_USAGE
-                            WHERE TABLE_SCHEMA = %s
-                              AND REFERENCED_TABLE_SCHEMA IS NOT NULL
-                              AND REFERENCED_TABLE_NAME IS NOT NULL
-                            """,
-                            (database,),
-                        )
-                        for source_db, source_table, target_db, target_table in cursor.fetchall():
-                            source_key = (source_db, source_table)
-                            target_key = (target_db, target_table)
-                            if source_key not in scoped_keys:
-                                continue
-                            if target_key not in table_keys:
-                                continue
-                            links.setdefault(source_key, set()).add(target_key)
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            TABLE_SCHEMA AS source_database,
+                            TABLE_NAME AS source_table,
+                            REFERENCED_TABLE_SCHEMA AS target_database,
+                            REFERENCED_TABLE_NAME AS target_table
+                        FROM information_schema.KEY_COLUMN_USAGE
+                        WHERE TABLE_SCHEMA = %s
+                          AND REFERENCED_TABLE_SCHEMA IS NOT NULL
+                          AND REFERENCED_TABLE_NAME IS NOT NULL
+                        """,
+                        (database,),
+                    )
+                    for source_db, source_table, target_db, target_table in cursor.fetchall():
+                        source_key = (source_db, source_table)
+                        target_key = (target_db, target_table)
+                        if source_key not in scoped_keys:
+                            continue
+                        if target_key not in table_keys:
+                            continue
+                        links.setdefault(source_key, set()).add(target_key)
             except Exception as exc:
                 logger.warning(
                     "Could not resolve foreign key links for database %s: %s",
@@ -431,23 +458,23 @@ class MySQLSource(BaseSource):
         return None
 
     def _available_columns(self, table_ref: TableRef) -> list[str]:
-        with closing(self._connect(table_ref.database)) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT column_name
-                    FROM information_schema.columns
-                    WHERE table_schema = %s
-                      AND table_name = %s
-                    ORDER BY ordinal_position
-                    """,
-                    (table_ref.database, table_ref.table),
-                )
-                return [
-                    row[0]
-                    for row in cursor.fetchall()
-                    if isinstance(row, tuple) and row and isinstance(row[0], str)
-                ]
+        conn = self._get_cached_connection(table_ref.database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = %s
+                  AND table_name = %s
+                ORDER BY ordinal_position
+                """,
+                (table_ref.database, table_ref.table),
+            )
+            return [
+                row[0]
+                for row in cursor.fetchall()
+                if isinstance(row, tuple) and row and isinstance(row[0], str)
+            ]
 
     def _resolve_latest_order_column(self, columns: list[str]) -> str | None:
         sampling = self._sampling()
@@ -503,13 +530,13 @@ class MySQLSource(BaseSource):
 
     def _count_table_rows(self, table_ref: TableRef) -> int | None:
         try:
-            with closing(self._connect(table_ref.database)) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.database)}.{_quote_identifier(table_ref.table)}"
-                    )
-                    row = cursor.fetchone()
-                    return int(row[0]) if row else None
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.database)}.{_quote_identifier(table_ref.table)}"
+                )
+                row = cursor.fetchone()
+                return int(row[0]) if row else None
         except Exception:
             return None
 
@@ -550,14 +577,12 @@ class MySQLSource(BaseSource):
     def _fetch_one_page(
         self, table_ref: TableRef, base_query: str, page_size: int, offset: int
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        with closing(self._connect(table_ref.database)) as conn:
-            paginated_query = f"{base_query} LIMIT %s OFFSET %s"
-            with conn.cursor() as cursor:
-                cursor.execute(paginated_query, [page_size, offset])
-                rows = list(cursor.fetchall())
-                column_names = (
-                    [desc[0] for desc in cursor.description] if cursor.description else []
-                )
+        conn = self._get_cached_connection(table_ref.database)
+        paginated_query = f"{base_query} LIMIT %s OFFSET %s"
+        with conn.cursor() as cursor:
+            cursor.execute(paginated_query, [page_size, offset])
+            rows = list(cursor.fetchall())
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
         return rows, column_names
 
     def _fetch_one_page_on_conn(
@@ -625,11 +650,11 @@ class MySQLSource(BaseSource):
             rows_per_page = int(sampling.rows_per_page or 100)
             rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
         else:
-            with closing(self._connect(table_ref.database)) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(query, params if params else None)
-                    rows = cursor.fetchall()
-                    column_names = [desc[0] for desc in cursor.description or []]
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(query, params if params else None)
+                rows = cursor.fetchall()
+                column_names = [desc[0] for desc in cursor.description or []]
 
         if not column_names:
             return None

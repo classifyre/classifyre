@@ -137,6 +137,7 @@ def test_is_io_bound_detector_secrets() -> None:
 
 def _pool_start_method() -> str:
     import multiprocessing
+
     available = multiprocessing.get_all_start_methods()
     return "fork" if "fork" in available else "forkserver"
 
