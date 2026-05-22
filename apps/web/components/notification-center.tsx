@@ -30,6 +30,7 @@ import {
 import { formatRelative } from "@/lib/date";
 import { useNotificationsWebSocket } from "@/hooks/use-notifications-websocket";
 import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
 
 type ListNotificationsRequest = NonNullable<
   Parameters<
@@ -38,12 +39,6 @@ type ListNotificationsRequest = NonNullable<
 >;
 
 const TAKE = 12;
-const TYPE_LABELS: Record<NotificationResponseDto["type"], string> = {
-  [NotificationResponseDtoTypeEnum.Scan]: "Scan",
-  [NotificationResponseDtoTypeEnum.Finding]: "Finding",
-  [NotificationResponseDtoTypeEnum.Source]: "Source",
-  [NotificationResponseDtoTypeEnum.System]: "System",
-};
 const SEVERITY_BADGE_VARIANT: Record<
   NotificationResponseDto["severity"],
   "critical" | "high" | "medium" | "low" | "info"
@@ -226,7 +221,7 @@ export function NotificationCenter() {
           <div className="flex items-center gap-2">
             {unreadCount > 0 && (
               <Badge className="rounded-[3px] border border-primary-foreground bg-accent px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.12em] text-accent-foreground">
-                {unreadCount} unread
+                {unreadCount} {t("notifications.unread")}
               </Badge>
             )}
             <Button
@@ -237,7 +232,7 @@ export function NotificationCenter() {
               disabled={unreadCount === 0}
             >
               <CheckCheck className="mr-1 h-3.5 w-3.5" />
-              Mark all
+              {t("notifications.markAll")}
             </Button>
           </div>
         </div>
@@ -255,7 +250,7 @@ export function NotificationCenter() {
                 {t("notifications.noNotifications")}
               </p>
               <p className="text-xs text-muted-foreground">
-                You are fully caught up.
+                {t("notifications.allCaughtUp")}
               </p>
             </div>
           ) : (
@@ -280,11 +275,13 @@ export function NotificationCenter() {
                           variant="outline"
                           className="px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.12em]"
                         >
-                          {TYPE_LABELS[item.type]}
+                          {t(
+                            `notifications.types.${item.type}` as TranslationKey,
+                          )}
                         </Badge>
                         {!item.read && (
                           <Badge className="px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.12em]">
-                            Unread
+                            {t("notifications.unread")}
                           </Badge>
                         )}
                       </div>
@@ -311,7 +308,7 @@ export function NotificationCenter() {
                           className="h-7 rounded-[4px] border-2 border-border px-2 text-[10px] font-mono uppercase tracking-[0.12em]"
                           onClick={() => void handleMarkAsRead(item.id)}
                         >
-                          Read
+                          {t("notifications.read")}
                         </Button>
                       )}
 
@@ -321,7 +318,9 @@ export function NotificationCenter() {
                         className="h-7 w-7 rounded-[4px] border-2 border-border"
                         onClick={() => void handleToggleImportant(item)}
                         aria-label={
-                          item.important ? "Remove important" : "Mark important"
+                          item.important
+                            ? t("notifications.removeImportant")
+                            : t("notifications.markImportant")
                         }
                       >
                         {item.important ? (
@@ -364,7 +363,10 @@ export function NotificationCenter() {
 
         <div className="shrink-0 flex items-center justify-between border-t-2 border-border px-3 py-2">
           <p className="text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
-            Showing {Math.min(notifications.length, total)} of {total}
+            {t("notifications.showing", {
+              count: Math.min(notifications.length, total),
+              total,
+            })}
           </p>
           <Button
             asChild
@@ -373,7 +375,7 @@ export function NotificationCenter() {
             className="h-8 rounded-[4px] border-2 border-border px-3"
           >
             <Link href="/notifications" onClick={() => setOpen(false)}>
-              Go to notifications center
+              {t("notifications.goToNotifications")}
             </Link>
           </Button>
         </div>

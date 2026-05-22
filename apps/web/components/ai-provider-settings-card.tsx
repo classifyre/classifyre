@@ -36,19 +36,20 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
-
-const PROVIDER_LABELS: Record<AiProviderConfigResponseDtoProviderEnum, string> =
-  {
-    OPENAI_COMPATIBLE: "OpenAI-Compatible",
-    CLAUDE: "Claude (Anthropic)",
-    GEMINI: "Gemini (Google)",
-  };
+import type { TranslationKey } from "@/i18n";
 
 const DEFAULT_MODELS: Record<AiProviderConfigResponseDtoProviderEnum, string> =
   {
     OPENAI_COMPATIBLE: "gpt-4o",
     CLAUDE: "claude-sonnet-4-5",
     GEMINI: "gemini-2.0-flash",
+  };
+
+const PROVIDER_LABELS: Record<AiProviderConfigResponseDtoProviderEnum, string> =
+  {
+    OPENAI_COMPATIBLE: "OpenAI-Compatible",
+    CLAUDE: "Claude (Anthropic)",
+    GEMINI: "Gemini (Google)",
   };
 
 type Draft = {
@@ -115,12 +116,12 @@ export function AiProviderSettingsCard() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Failed to load AI provider settings",
+          : t("aiProvider.failedToLoad"),
       );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   React.useEffect(() => {
     void load();
@@ -167,7 +168,7 @@ export function AiProviderSettingsCard() {
         const msg =
           saveError instanceof Error
             ? saveError.message
-            : "Failed to save settings";
+            : t("settings.failedToSave");
         setError(msg);
         toast.error(msg);
         throw saveError;
@@ -175,7 +176,7 @@ export function AiProviderSettingsCard() {
         setSaving(false);
       }
     },
-    [draft],
+    [draft, t],
   );
 
   const handleSave = React.useCallback(async () => {
@@ -248,14 +249,12 @@ export function AiProviderSettingsCard() {
           <div className="flex items-center gap-2">
             <BrainCircuit className="h-4 w-4" />
             <p className="text-xs font-mono uppercase tracking-[0.14em]">
-              AI Provider
+              {t("aiProvider.title")}
             </p>
           </div>
-          <CardTitle>AI provider configuration</CardTitle>
+          <CardTitle>{t("aiProvider.configuration")}</CardTitle>
           <CardDescription>
-            Configure which AI provider and model the API uses for assistant
-            features. The API key is stored encrypted and never returned in
-            plaintext.
+            {t("aiProvider.configurationDesc")}
           </CardDescription>
         </div>
       </CardHeader>
@@ -264,7 +263,7 @@ export function AiProviderSettingsCard() {
         {loading ? (
           <div className="flex min-h-24 items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Loading AI provider settings…
+            {t("aiProvider.loading")}
           </div>
         ) : null}
 
@@ -276,11 +275,10 @@ export function AiProviderSettingsCard() {
 
         {!loading && config ? (
           <>
-            {/* Provider selector */}
             <div className="space-y-2">
               <Label className="text-xs font-mono uppercase tracking-[0.12em]">
                 <Server className="mr-1.5 inline h-3.5 w-3.5" />
-                Provider
+                {t("aiProvider.provider")}
               </Label>
               <Select
                 value={draft.provider}
@@ -300,17 +298,16 @@ export function AiProviderSettingsCard() {
                     ) as AiProviderConfigResponseDtoProviderEnum[]
                   ).map((p) => (
                     <SelectItem key={p} value={p}>
-                      {PROVIDER_LABELS[p]}
+                      {t(`aiProvider.providers.${p}` as TranslationKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Model */}
             <div className="space-y-2">
               <Label className="text-xs font-mono uppercase tracking-[0.12em]">
-                Model
+                {t("aiProvider.model")}
               </Label>
               <Input
                 className="h-10 rounded-[4px] border-2 border-border font-mono text-sm"
@@ -322,11 +319,10 @@ export function AiProviderSettingsCard() {
               />
             </div>
 
-            {/* Base URL — OpenAI-compatible only */}
             {isOpenAiCompatible ? (
               <div className="space-y-2">
                 <Label className="text-xs font-mono uppercase tracking-[0.12em]">
-                  Base URL
+                  {t("aiProvider.baseUrl")}
                 </Label>
                 <Input
                   className="h-10 rounded-[4px] border-2 border-border font-mono text-sm"
@@ -337,17 +333,15 @@ export function AiProviderSettingsCard() {
                   }
                 />
                 <p className="text-xs text-muted-foreground">
-                  Endpoint used for OpenAI-compatible requests (e.g. OpenRouter,
-                  Ollama, Azure OpenAI).
+                  {t("aiProvider.baseUrlDesc")}
                 </p>
               </div>
             ) : null}
 
-            {/* API Key */}
             <div className="space-y-2">
               <Label className="text-xs font-mono uppercase tracking-[0.12em]">
                 <KeyRound className="mr-1.5 inline h-3.5 w-3.5" />
-                API Key
+                {t("aiProvider.apiKey")}
               </Label>
               {config.hasApiKey && !editingKey ? (
                 <Input
@@ -364,8 +358,8 @@ export function AiProviderSettingsCard() {
                   type="password"
                   placeholder={
                     config.hasApiKey
-                      ? "Enter new key to replace…"
-                      : "Enter API key…"
+                      ? t("aiProvider.enterNewKey")
+                      : t("aiProvider.enterApiKey")
                   }
                   value={draft.apiKey}
                   onChange={(e) =>
@@ -377,8 +371,8 @@ export function AiProviderSettingsCard() {
               )}
               <p className="text-xs text-muted-foreground">
                 {config.hasApiKey
-                  ? "Key stored. Click the field to replace it."
-                  : "The key is encrypted at rest and never returned."}
+                  ? t("aiProvider.keyStored")
+                  : t("aiProvider.keyNotStored")}
               </p>
             </div>
 
@@ -390,8 +384,8 @@ export function AiProviderSettingsCard() {
                 disabled={saving || testing || !canTest}
                 title={
                   !canTest
-                    ? "Enter or keep an API key to test the provider"
-                    : "Send a test code task to the configured AI provider"
+                    ? t("aiProvider.needApiKey")
+                    : t("aiProvider.testDescription")
                 }
               >
                 {testing ? (
@@ -399,7 +393,7 @@ export function AiProviderSettingsCard() {
                 ) : (
                   <Zap className="mr-2 h-3.5 w-3.5" />
                 )}
-                Test connection
+                {t("aiProvider.testConnection")}
               </Button>
               <Button
                 onClick={() => void handleSave()}
@@ -411,7 +405,7 @@ export function AiProviderSettingsCard() {
                 ) : (
                   <Save className="mr-2 h-3.5 w-3.5" />
                 )}
-                Save
+                {t("aiProvider.save")}
               </Button>
             </div>
 
@@ -425,7 +419,11 @@ export function AiProviderSettingsCard() {
                 <span className="font-mono text-xs text-foreground/80">
                   {"error" in testResult
                     ? testResult.error
-                    : `Connection OK · ${testResult.provider} · ${testResult.model}`}
+                    : t("aiProvider.connectionOk") +
+                      " · " +
+                      testResult.provider +
+                      " · " +
+                      testResult.model}
                 </span>
               </div>
             ) : null}
