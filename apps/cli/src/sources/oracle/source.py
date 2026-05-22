@@ -165,9 +165,7 @@ class OracleSource(BaseTabularSource):
         self, table_ref: TableRef, base_query: str, page_size: int, offset: int
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
         conn = self._get_cached_connection(table_ref.database)
-        paginated_query = (
-            f"{base_query} OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
-        )
+        paginated_query = f"{base_query} OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
         with conn.cursor() as cursor:
             cursor.execute(paginated_query)
             rows = list(cursor.fetchall())
@@ -187,9 +185,7 @@ class OracleSource(BaseTabularSource):
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
         bind: dict[str, Any] = {}
         if last_pk_values is None:
-            paginated_query = (
-                f"{base_query} ORDER BY {pk_order} FETCH FIRST {page_size} ROWS ONLY"
-            )
+            paginated_query = f"{base_query} ORDER BY {pk_order} FETCH FIRST {page_size} ROWS ONLY"
         elif len(pk_columns) == 1:
             where = f"WHERE {self._quote_identifier(pk_columns[0])} > :pk0"
             paginated_query = (
@@ -503,7 +499,8 @@ class OracleSource(BaseTabularSource):
                         row[3],
                     )
                     if not all(
-                        isinstance(v, str) for v in (source_schema, source_name, target_schema, target_name)
+                        isinstance(v, str)
+                        for v in (source_schema, source_name, target_schema, target_name)
                     ):
                         continue
 

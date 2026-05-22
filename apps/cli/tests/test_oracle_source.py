@@ -91,9 +91,7 @@ def test_oracle_test_connection_success(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(
         source,
         "_iter_tables",
-        lambda: [
-            TableRef(database="some_db", schema="HR", table="EMPLOYEES", object_type="TABLE")
-        ],
+        lambda: [TableRef(database="some_db", schema="HR", table="EMPLOYEES", object_type="TABLE")],
     )
     monkeypatch.setattr(source, "_connect", _DummyConnection)
 
@@ -216,9 +214,7 @@ async def test_oracle_extract_runs_detector_pipeline_when_enabled(
     monkeypatch.setattr(
         source,
         "_iter_tables",
-        lambda: [
-            TableRef(database="some_db", schema="HR", table="EMPLOYEES", object_type="TABLE")
-        ],
+        lambda: [TableRef(database="some_db", schema="HR", table="EMPLOYEES", object_type="TABLE")],
     )
     monkeypatch.setattr(source, "_collect_foreign_key_links", lambda _tables: {})
 

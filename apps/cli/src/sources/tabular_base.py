@@ -237,9 +237,7 @@ class BaseTabularSource(BaseSource):
                 if not self._accept_table(table_allowlist, database, schema_name, table_name):
                     continue
 
-                tables.append(
-                    TableRef(database=database, schema=schema_name, table=table_name)
-                )
+                tables.append(TableRef(database=database, schema=schema_name, table=table_name))
                 if limit is not None and len(tables) >= limit:
                     break
         return tables
@@ -650,9 +648,7 @@ class BaseTabularSource(BaseSource):
         table_label = table_ref.display_name
 
         total_rows = self._count_table_rows(table_ref)
-        total_batches = (
-            ((total_rows + rows_per_page - 1) // rows_per_page) if total_rows else None
-        )
+        total_batches = ((total_rows + rows_per_page - 1) // rows_per_page) if total_rows else None
         if total_rows is not None and total_batches is not None:
             logger.info(
                 "Full scan %s: %d rows, %d batches of %d",
@@ -700,9 +696,7 @@ class BaseTabularSource(BaseSource):
                         last_pk_values,
                     )
                 else:
-                    rows = await asyncio.to_thread(
-                        self._cursor_fetchmany, cursor, rows_per_page
-                    )
+                    rows = await asyncio.to_thread(self._cursor_fetchmany, cursor, rows_per_page)
                     if not rows:
                         break
 

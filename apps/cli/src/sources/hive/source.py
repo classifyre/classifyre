@@ -266,8 +266,7 @@ class HiveSource(BaseTabularSource):
 
     def _available_columns(self, table_ref: TableRef) -> list[str]:
         query = (
-            f"DESCRIBE {_quote_identifier(table_ref.database)}"
-            f".{_quote_identifier(table_ref.table)}"
+            f"DESCRIBE {_quote_identifier(table_ref.database)}.{_quote_identifier(table_ref.table)}"
         )
         conn = self._get_cached_connection(table_ref.database)
         with conn.cursor() as cursor:

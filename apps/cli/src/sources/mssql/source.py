@@ -216,8 +216,7 @@ class MSSQLSource(BaseTabularSource):
     ) -> tuple[list[tuple[Any, ...]], list[str]]:
         if last_pk_values is None:
             paginated_query = (
-                f"{base_query} ORDER BY {pk_order} "
-                f"OFFSET 0 ROWS FETCH NEXT {page_size} ROWS ONLY"
+                f"{base_query} ORDER BY {pk_order} OFFSET 0 ROWS FETCH NEXT {page_size} ROWS ONLY"
             )
             params: list[Any] = []
         elif len(pk_columns) == 1:
