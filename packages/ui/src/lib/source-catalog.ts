@@ -209,6 +209,14 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMeta> = {
     category: "COLLABORATION",
     keywords: ["support", "requests", "tickets", "queues"],
   },
+  SQLITE: {
+    label: "SQLite",
+    description:
+      "Scan tables in a local SQLite database file with no server required.",
+    icon: "SQLITE",
+    category: "DATABASES",
+    keywords: ["sql", "file", "embedded", "local", "rdbms"],
+  },
 };
 
 function fallbackLabelFromType(sourceType: string): string {

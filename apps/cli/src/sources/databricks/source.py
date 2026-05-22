@@ -203,9 +203,7 @@ class DatabricksSource(BaseTabularSource):
         if not isinstance(token, str) or not token.strip():
             raise ValueError("Databricks token response did not include access_token")
         expires_in = int(payload.get("expires_in", 3600))
-        self._access_token_expiry = datetime.now(UTC) + timedelta(
-            seconds=max(expires_in - 300, 0)
-        )
+        self._access_token_expiry = datetime.now(UTC) + timedelta(seconds=max(expires_in - 300, 0))
         return token.strip()
 
     def _access_token_value(self) -> str:
@@ -475,7 +473,9 @@ class DatabricksSource(BaseTabularSource):
         schemas = [
             name
             for entry in values
-            if isinstance((name := entry.get("name")), str) and name and self._schema_allowed(catalog, name)
+            if isinstance((name := entry.get("name")), str)
+            and name
+            and self._schema_allowed(catalog, name)
         ]
         schemas.sort()
         logger.info("Catalog %s: found %d schema(s)", catalog, len(schemas))
