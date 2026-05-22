@@ -385,6 +385,17 @@ export default function RunnerDetailPage() {
     return aggregated;
   }, [runnerId]);
 
+  const sourceName = runner?.source?.name || "Unknown source";
+  const sourceType = runner?.source?.type || "CUSTOM";
+  const SourceTypeIcon = getSourceIcon(sourceType);
+  const sourceDetailsId = runner?.sourceId || runner?.source?.id;
+
+  useEffect(() => {
+    if (sourceName && runner) {
+      document.title = `${t("scans.sourceRun", { source: sourceName })} | ${t("app.name")}`;
+    }
+  }, [sourceName, runner, t]);
+
   if (loading && !runner) {
     return (
       <div className="space-y-6">
@@ -421,11 +432,6 @@ export default function RunnerDetailPage() {
   if (!runner) {
     return null;
   }
-
-  const sourceName = runner.source?.name || "Unknown source";
-  const sourceType = runner.source?.type || "CUSTOM";
-  const SourceTypeIcon = getSourceIcon(sourceType);
-  const sourceDetailsId = runner.sourceId || runner.source?.id;
 
   const assetsTotal = assetsCharts.totals.totalAssets;
   const progress = calculateProgress(runner);
