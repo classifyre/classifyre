@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   Archivo_Black,
   IBM_Plex_Mono,
@@ -7,6 +8,9 @@ import {
 
 import "@workspace/ui/globals.css";
 import { Providers } from "@/components/providers";
+import { DocumentTitleUpdater } from "@/components/document-title-updater";
+import enTranslations from "@/i18n/en";
+import { translate } from "@/i18n";
 
 const fontSerif = Archivo_Black({
   subsets: ["latin"],
@@ -32,6 +36,13 @@ const fontHero = League_Gothic({
   variable: "--font-hero",
 });
 
+export const metadata: Metadata = {
+  title: {
+    template: `%s | ${translate(enTranslations, "app.name")}`,
+    default: translate(enTranslations, "app.name"),
+  },
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -42,7 +53,10 @@ export default function RootLayout({
       <body
         className={`${fontSerif.variable} ${fontSans.variable} ${fontMono.variable} ${fontHero.variable} font-sans antialiased`}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          <DocumentTitleUpdater />
+          {children}
+        </Providers>
       </body>
     </html>
   );

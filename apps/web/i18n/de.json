@@ -173,6 +173,7 @@
     "totalAssets": "Gesamte Assets",
     "detail": {
       "sourceDetails": "Quellendetails",
+      "title": "Quellendetails",
       "sourceDetailsDesc": "Betriebliche Übersicht und Aktivitäten für diese Quelle.",
       "lastUpdated": "Zuletzt aktualisiert",
       "lastScan": "Letzter Scan",
@@ -610,6 +611,12 @@
   },
   "detectors": {
     "title": "Custom-Detektoren",
+    "detail": {
+      "title": "Detektor-Details"
+    },
+    "new": {
+      "title": "Neuer Detektor"
+    },
     "search": "Erkennungsname, Schlüssel, Beschreibung, Quellen suchen",
     "allMethods": "Alle Methoden",
     "loadError": "Erkennungskatalog konnte nicht geladen werden",
@@ -905,6 +912,9 @@
   },
   "scans": {
     "title": "Scans",
+    "detail": {
+      "title": "Scan-Details"
+    },
     "subtitle": "Ausführungsverlauf durchsuchen und nach operativem Status filtern.",
     "runTrend": "Ausführungstrend",
     "runTrendDescription": "Statusverteilung über den gewählten Zeitraum.",
@@ -1354,6 +1364,7 @@
     "configValidationFailed": "Konfiguration hat die Schema-Validierung nicht bestanden"
   },
   "discovery": {
+    "title": "Übersicht",
     "securityBrief": "Sicherheitsübersicht",
     "allFindings": "Alle Befunde · letzte {{days}} Tage",
     "findingsToReview": "Zu prüfende Befunde",
@@ -1442,6 +1453,9 @@
     "createFirstMetric": "Erste Metrik erstellen",
     "glossary": {
       "backToSemantic": "Zurück zur semantischen Schicht",
+      "detail": {
+        "title": "Glossar-Begriff"
+      },
       "newTitle": "Neuer Geschäftsbegriff",
       "newDescription": "Geschäftskonzept definieren und Erkennungsfiltern zuordnen",
       "termDetails": "Begriffsdetails",
@@ -1490,6 +1504,9 @@
     },
     "metrics": {
       "backToSemantic": "Zurück zur semantischen Schicht",
+      "detail": {
+        "title": "Metrik-Details"
+      },
       "newTitle": "Neue Metrik",
       "newDescription": "Verwaltete Metrik definieren, die für Ihr Unternehmen wichtig ist",
       "metricDetails": "Metrikdetails",
