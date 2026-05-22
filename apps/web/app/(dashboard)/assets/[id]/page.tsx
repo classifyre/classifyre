@@ -120,6 +120,12 @@ export default function AssetDetailPage() {
     };
   }, [assetDetails?.id]);
 
+  useEffect(() => {
+    if (assetLabel && assetLabel !== assetId) {
+      document.title = `${assetLabel} | ${t("app.name")}`;
+    }
+  }, [assetLabel, assetId, t]);
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
