@@ -84,6 +84,7 @@
     "findings": "findings",
     "statusError": "Error",
     "statusPending": "Pending",
+    "statusWarning": "Warning",
     "notSet": "Not set"
   },
   "settings": {

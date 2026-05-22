@@ -84,6 +84,7 @@
     "findings": "Befunde",
     "statusError": "Fehler",
     "statusPending": "Ausstehend",
+    "statusWarning": "Warnung",
     "notSet": "Nicht festgelegt"
   },
   "settings": {
