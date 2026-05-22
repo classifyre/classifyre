@@ -240,6 +240,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     PENDING: t("sources.statusPending"),
     RUNNING: t("sources.running"),
     COMPLETED: t("sources.statusCompleted"),
+    WARNING: t("sources.statusWarning"),
     ERROR: t("sources.statusError"),
   };
 

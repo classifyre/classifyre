@@ -619,7 +619,7 @@ export function FindingsTable({
           }}
         >
           <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
-            <MultiSelectValue placeholder="Severity" />
+            <MultiSelectValue placeholder={t("common.severity")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
@@ -716,7 +716,7 @@ export function FindingsTable({
           }
         >
           <MultiSelectTrigger className="h-9 w-[170px] border-2 border-border rounded-[4px]">
-            <MultiSelectValue placeholder="Status" />
+            <MultiSelectValue placeholder={t("common.status")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
@@ -741,7 +741,7 @@ export function FindingsTable({
           }
         >
           <MultiSelectTrigger className="h-9 w-[200px] border-2 border-border rounded-[4px]">
-            <MultiSelectValue placeholder="Sources" />
+            <MultiSelectValue placeholder={t("common.sources")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
@@ -1229,7 +1229,7 @@ export function FindingsTable({
           </span>
           <Select value={pageSize} onValueChange={setPageSize}>
             <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
-              <SelectValue placeholder="Rows" />
+              <SelectValue placeholder={t("common.rowsPerPage")} />
             </SelectTrigger>
             <SelectContent>
               {PAGE_SIZE_OPTIONS.map((size) => (

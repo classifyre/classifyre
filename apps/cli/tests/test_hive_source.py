@@ -114,9 +114,9 @@ async def test_hive_extract_streams_assets_in_batches(
 ) -> None:
     source = HiveSource(_recipe())
     tables = [
-        TableRef(database="default", table="customers", object_type="TABLE"),
-        TableRef(database="default", table="orders", object_type="TABLE"),
-        TableRef(database="default", table="v_orders", object_type="VIEW"),
+        TableRef(database="default", schema=None, table="customers", object_type="TABLE"),
+        TableRef(database="default", schema=None, table="orders", object_type="TABLE"),
+        TableRef(database="default", schema=None, table="v_orders", object_type="VIEW"),
     ]
     monkeypatch.setattr(source, "_iter_tables", lambda: tables)
     monkeypatch.setattr(source, "_collect_foreign_key_links", lambda _tables: {})
@@ -143,7 +143,7 @@ async def test_hive_fetch_content_uses_cache(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = HiveSource(_recipe())
-    table_ref = TableRef(database="default", table="customers", object_type="TABLE")
+    table_ref = TableRef(database="default", schema=None, table="customers", object_type="TABLE")
     asset = source._table_to_asset(table_ref)
     source._table_lookup[asset.hash] = table_ref
 
@@ -175,7 +175,7 @@ def test_hive_latest_sampling_falls_back_to_random() -> None:
             },
         )
     )
-    table_ref = TableRef(database="default", table="customers", object_type="TABLE")
+    table_ref = TableRef(database="default", schema=None, table="customers", object_type="TABLE")
 
     query, params = source._build_sampling_query(table_ref, ["id", "name"])
 
@@ -186,7 +186,7 @@ def test_hive_latest_sampling_falls_back_to_random() -> None:
 
 def test_hive_all_strategy_omits_limit() -> None:
     source = HiveSource(_recipe(sampling={"strategy": "ALL"}))
-    table_ref = TableRef(database="default", table="customers", object_type="TABLE")
+    table_ref = TableRef(database="default", schema=None, table="customers", object_type="TABLE")
 
     query, params = source._build_sampling_query(table_ref, ["id", "name"])
 
@@ -210,7 +210,7 @@ async def test_hive_extract_runs_detector_pipeline_when_enabled(
     monkeypatch.setattr(
         source,
         "_iter_tables",
-        lambda: [TableRef(database="default", table="customers", object_type="TABLE")],
+        lambda: [TableRef(database="default", schema=None, table="customers", object_type="TABLE")],
     )
     monkeypatch.setattr(source, "_collect_foreign_key_links", lambda _tables: {})
 
@@ -253,7 +253,7 @@ async def test_hive_fetch_content_pages_batches_for_all_strategy(
             }
         )
     )
-    table_ref = TableRef(database="app_db", table="events", object_type="TABLE")
+    table_ref = TableRef(database="app_db", schema=None, table="events", object_type="TABLE")
     asset = source._table_to_asset(table_ref)
 
     all_rows: list[tuple[Any, ...]] = [(i, f"item{i}") for i in range(1, 13)]

@@ -28,6 +28,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { FINDING_SEVERITY_COLOR_BY_LEVEL } from "@workspace/ui/lib/finding-severity";
 import { formatRelative } from "@/lib/date";
 import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
 
 type DiscoveryWindowDays = 7 | 30 | 90;
 
@@ -348,7 +349,7 @@ export default function DiscoveryPage() {
               </p>
               <Select value={windowDays} onValueChange={setWindowDays}>
                 <SelectTrigger className="h-7 w-[100px] text-[10px] bg-background border-2 border-border text-foreground rounded-[4px] font-mono">
-                  <SelectValue placeholder="Window" />
+                  <SelectValue placeholder={t("common.window")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="7">
@@ -436,7 +437,7 @@ export default function DiscoveryPage() {
                     }}
                   />
                   <span className="text-sm uppercase tracking-[0.15em] text-white/90 font-mono group-hover/sev:text-white">
-                    {sev}
+                    {t(`findings.severityLabels.${sev.toUpperCase()}` as TranslationKey)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">

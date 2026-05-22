@@ -12,6 +12,10 @@ Name | Type
 `config` | object
 `currentRunnerId` | string
 `runnerStatus` | string
+`lastRunStatus` | string
+`lastRunAt` | Date
+`lastErrorMessage` | string
+`consecutiveFailures` | number
 `createdAt` | Date
 `updatedAt` | Date
 `scheduleEnabled` | boolean
@@ -32,6 +36,10 @@ const example = {
   "config": null,
   "currentRunnerId": null,
   "runnerStatus": PENDING,
+  "lastRunStatus": COMPLETED,
+  "lastRunAt": 2026-01-31T10:00Z,
+  "lastErrorMessage": null,
+  "consecutiveFailures": 0,
   "createdAt": 2026-01-31T10:00Z,
   "updatedAt": 2026-01-31T10:00Z,
   "scheduleEnabled": false,

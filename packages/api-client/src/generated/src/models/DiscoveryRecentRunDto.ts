@@ -109,6 +109,7 @@ export const DiscoveryRecentRunDtoStatusEnum = {
     Pending: 'PENDING',
     Running: 'RUNNING',
     Completed: 'COMPLETED',
+    Warning: 'WARNING',
     Error: 'ERROR'
 } as const;
 export type DiscoveryRecentRunDtoStatusEnum = typeof DiscoveryRecentRunDtoStatusEnum[keyof typeof DiscoveryRecentRunDtoStatusEnum];
