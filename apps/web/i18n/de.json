@@ -149,6 +149,7 @@
     "noStatusesFound": "Keine Status gefunden",
     "statusPending": "Ausstehend",
     "statusCompleted": "Abgeschlossen",
+    "statusWarning": "Warnung",
     "statusError": "Fehler",
     "scheduleEnabled": "Zeitplan aktiv",
     "findingsLatestRun": "Befunde aus letztem Lauf",

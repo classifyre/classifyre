@@ -149,6 +149,7 @@
     "noStatusesFound": "No statuses found",
     "statusPending": "Pending",
     "statusCompleted": "Completed",
+    "statusWarning": "Warning",
     "statusError": "Error",
     "scheduleEnabled": "Schedule enabled",
     "findingsLatestRun": "Findings from latest run",
