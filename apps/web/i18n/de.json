@@ -84,6 +84,7 @@
     "findings": "Befunde",
     "statusError": "Fehler",
     "statusPending": "Ausstehend",
+    "statusWarning": "Warnung",
     "notSet": "Nicht festgelegt"
   },
   "settings": {
@@ -148,6 +149,7 @@
     "noStatusesFound": "Keine Status gefunden",
     "statusPending": "Ausstehend",
     "statusCompleted": "Abgeschlossen",
+    "statusWarning": "Warnung",
     "statusError": "Fehler",
     "scheduleEnabled": "Zeitplan aktiv",
     "findingsLatestRun": "Befunde aus letztem Lauf",
@@ -903,6 +905,11 @@
   },
   "scans": {
     "title": "Scans",
+    "subtitle": "Ausführungsverlauf durchsuchen und nach operativem Status filtern.",
+    "runTrend": "Ausführungstrend",
+    "runTrendDescription": "Statusverteilung über den gewählten Zeitraum.",
+    "topSourcesByVolume": "Top-Quellen nach Ausführungsvolumen",
+    "createScan": "Scan erstellen",
     "runNotFound": "Ausführung nicht gefunden",
     "viewAllScans": "Alle Scans anzeigen",
     "tabOverview": "Übersicht",
@@ -966,7 +973,48 @@
     "sourceUnavailable": "Quelle ist für diese Ausführung nicht verfügbar",
     "newRunStarted": "Neue Ausführung gestartet",
     "failedToStop": "Ausführung konnte nicht gestoppt werden",
-    "failedToStart": "Neue Ausführung konnte nicht gestartet werden"
+    "failedToStart": "Neue Ausführung konnte nicht gestartet werden",
+    "updatingCharts": "Diagramme werden aktualisiert...",
+    "windowDays": {
+      "7days": "7 Tage",
+      "30days": "30 Tage",
+      "90days": "90 Tage"
+    },
+    "stats": {
+      "findings": "Befunde",
+      "criticalHigh": "Kritisch + Hoch",
+      "assets": "Assets",
+      "open": "Offen",
+      "resolved": "Behoben"
+    },
+    "runProgress": {
+      "title": "Ausführungsfortschritt",
+      "description": "Geschätzt aus verarbeiteten Assets",
+      "progress": "Fortschritt",
+      "durationSoFar": "Bisherige Dauer: {{duration}}"
+    },
+    "runTimeline": {
+      "title": "Ausführungszeitachse",
+      "description": "Ausführungszeitstempel",
+      "triggered": "Ausgelöst",
+      "started": "Gestartet",
+      "completed": "Abgeschlossen",
+      "duration": "Dauer",
+      "triggeredBy": "Ausgelöst von",
+      "na": "N/V"
+    },
+    "assetDelta": {
+      "title": "Asset-Delta",
+      "description": "Von dieser Ausführung erzeugte Änderungen",
+      "created": "Erstellt",
+      "updated": "Aktualisiert",
+      "unchanged": "Unverändert"
+    },
+    "sourceContext": {
+      "title": "Quellkontext",
+      "openSource": "Quelle öffnen"
+    },
+    "sourceRun": "{{source}}-Ausführung"
   },
   "sandbox": {
     "title": "Sandbox",
@@ -985,7 +1033,24 @@
       "findings": "Befunde",
       "noRuns": "Keine Sandbox-Ausführungen gefunden",
       "noRunsHint": "Filter anpassen, um die Suche zu erweitern.",
-      "loading": "Ausführungen werden geladen..."
+      "loading": "Ausführungen werden geladen...",
+      "file": "Datei",
+      "content": "Inhalt",
+      "mimeType": "MIME-Typ",
+      "size": "Größe",
+      "duration": "Dauer",
+      "topFindings": "Top-Befunde",
+      "when": "Wann",
+      "allRuns": "Alle Ausführungen",
+      "withFindings": "Mit Befunden",
+      "noFindings": "Ohne Befunde",
+      "newestFirst": "Neueste zuerst",
+      "oldestFirst": "Älteste zuerst",
+      "mostFindings": "Meiste Befunde",
+      "fileNameAZ": "Dateiname A-Z",
+      "largestFile": "Größte Datei",
+      "updating": "Wird aktualisiert",
+      "refreshingRuns": "Ausführungen werden aktualisiert"
     },
     "monitorDesc": "Sandbox-Läufe überwachen und Detektor-Befunde prüfen",
     "newScan": "Neuer Sandbox-Scan",
@@ -1012,7 +1077,26 @@
     "searchNote": "Suche wird auf die aktuelle Seite angewendet",
     "loading": "Benachrichtigungen werden geladen…",
     "openAction": "Benachrichtigungsaktion öffnen",
-    "dismiss": "Benachrichtigung schließen"
+    "dismiss": "Benachrichtigung schließen",
+    "markAll": "Alle markieren",
+    "read": "Gelesen",
+    "removeImportant": "Wichtig entfernen",
+    "markImportant": "Als wichtig markieren",
+    "allCaughtUp": "Sie sind auf dem neuesten Stand.",
+    "goToNotifications": "Zum Benachrichtigungszentrum",
+    "showing": "Zeige {{count}} von {{total}}",
+    "types": {
+      "SCAN": "Scan",
+      "FINDING": "Befund",
+      "SOURCE": "Quelle",
+      "SYSTEM": "System"
+    }
+  },
+  "triggerTypes": {
+    "MANUAL": "Manuell",
+    "SCHEDULED": "Geplant",
+    "WEBHOOK": "Webhook",
+    "API": "API"
   },
   "runners": {
     "search": "Ausführungen, Quellen, Auslöser, Status suchen",
@@ -1020,10 +1104,25 @@
     "noRuns": "Keine Ausführungen gefunden",
     "noRunsHint": "Filter anpassen, um die Suche zu erweitern.",
     "loading": "Ausführungen werden geladen...",
+    "scheduler": "Planer",
+    "columns": {
+      "triggered": "Ausgelöst",
+      "source": "Quelle",
+      "status": "Status",
+      "trigger": "Auslöser",
+      "duration": "Dauer",
+      "assets": "Assets",
+      "findings": "Befunde"
+    },
+    "searchSources": "Quellen suchen...",
+    "noSourcesFound": "Keine Quellen gefunden",
+    "searchTriggerTypes": "Auslösertypen suchen...",
+    "noTriggerTypesFound": "Keine Auslösertypen gefunden",
+    "updating": "Wird aktualisiert",
     "status": {
       "completed": "Abgeschlossen",
       "warning": "Warnung",
-      "running": "Läuft...",
+      "running": "Läuft",
       "pending": "Ausstehend",
       "error": "Fehler"
     },
@@ -1065,6 +1164,37 @@
     }
   },
   "forms": {
+    "title": "Protokolle",
+    "description": "Geparste Runner-Protokolle mit Level-Erkennung",
+    "search": "Nachricht suchen",
+    "allLevels": "Alle Level",
+    "searchLevels": "Level suchen…",
+    "noLevelsFound": "Keine Level gefunden",
+    "newestFirst": "Neueste zuerst",
+    "oldestFirst": "Älteste zuerst",
+    "noLogs": "Keine Protokolle verfügbar",
+    "noLogsHint": "Keine Protokolleinträge entsprechen Ihrer Suche.",
+    "autoRefresh": "Automatische Aktualisierung",
+    "wrapLines": "Zeilenumbruch",
+    "refresh": "Aktualisieren",
+    "downloadVisible": "Sichtbare herunterladen",
+    "downloadAll": "Alle herunterladen",
+    "loadMore": "Mehr laden",
+    "jumpToLatest": "Zum Neuesten springen",
+    "showing": "{{filtered}} / {{total}} geladen angezeigt",
+    "autoRefreshEnabled": "Automatische Aktualisierung aktiviert (alle 2 Sek.)",
+    "autoRefreshPaused": "Automatische Aktualisierung pausiert",
+    "runnerCompleted": "Runner abgeschlossen",
+    "copyRow": "Zeile kopieren",
+    "copied": "Kopiert",
+    "downloaded": "Sichtbare Protokolle heruntergeladen",
+    "downloadedCount": "{{count}} Protokolleinträge heruntergeladen",
+    "copiedRows": "{{count}} Protokollzeilen kopiert",
+    "noLogsDownload": "Keine Protokolle zum Herunterladen verfügbar",
+    "noRowsToCopy": "Mindestens eine Zeile zum Kopieren auswählen",
+    "loadedEntries": "geladen"
+  },
+  "forms": {
     "sourceName": "Quellenname",
     "sourceNameDesc": "Dieser Quelle einen eindeutigen, aussagekräftigen Namen geben.",
     "requiredFields": "Pflichtfelder",
@@ -1096,10 +1226,10 @@
     "template": "Vorlage",
     "noTemplatesAvailable": "Für diese Quelle sind noch keine Vorlagen verfügbar."
   },
-  "mcp": {
+"mcp": {
     "enable": "MCP aktivieren",
     "cursorWorkspace": "Cursor lokaler Arbeitsbereich",
-    "tokenCreated": "MCP-Token erstellt. Jetzt kopieren, da er danach nicht mehr angezeigt wird.",
+    "tokenCreated": "MCP-Token erstellt. Kopieren Sie ihn jetzt, da er nicht erneut angezeigt wird.",
     "tokenReactivated": "Token reaktiviert",
     "tokenRevoked": "Token widerrufen",
     "enabled": "MCP aktiviert",
@@ -1107,7 +1237,58 @@
     "tokenDeleted": "Token gelöscht",
     "tokenUpdated": "Token aktualisiert",
     "tokenNameRequired": "Token-Name ist erforderlich",
-    "failedToUpdate": "MCP-Einstellung konnte nicht aktualisiert werden"
+    "failedToUpdate": "MCP-Einstellung konnte nicht aktualisiert werden",
+    "token": "Token",
+    "title": "MCP-Server",
+    "exposeDesc": "Classifyre für MCP-Clients verfügbar machen",
+    "exposeDescLong": "Erstellen Sie Einmal-Token für IDEs, Agents und Workspace-spezifische MCP-Clients. Token werden von der API generiert, nur als Hashes gespeichert, und der Klartextwert wird nur einmal bei der Erstellung zurückgegeben.",
+    "refresh": "Aktualisieren",
+    "createToken": "Token erstellen",
+    "loading": "MCP-Einstellungen werden geladen…",
+    "failedToLoad": "MCP-Einstellungen konnten nicht geladen werden",
+    "disabledNotice": "MCP ist deaktiviert. Der /mcp-Endpunkt gibt 503 zurück, bis Sie ihn oben wieder aktivieren.",
+    "tokenReady": "{{name}} ist bereit. Dieses Token wird nur einmal angezeigt.",
+    "tokenReadyDesc": "Kopieren Sie es jetzt in Ihren MCP-Client oder Secret Manager. Nachdem Sie diese Meldung geschlossen haben, bleibt nur die maskierte Vorschau.",
+    "copyToken": "Token kopieren",
+    "dismiss": "Schließen",
+    "storedPreview": "Gespeicherte Vorschau: {{preview}}",
+    "connection": "Verbindung",
+    "endpoint": "Endpunkt",
+    "transport": "Transport",
+    "authorization": "Autorisierung",
+    "requestPattern": "Anfragemuster",
+    "bestPractice": "Bewährte Methode",
+    "tokens": "Token",
+    "noTokens": "Noch keine MCP-Token. Erstellen Sie einen pro Client oder Workspace, um Zugriffe unabhängig zu rotieren und zu widerrufen.",
+    "active": "Aktiv",
+    "revoked": "Widerrufen",
+    "lastUsed": "Zuletzt verwendet {{relative}}",
+    "neverUsed": "Nie verwendet",
+    "created": "Erstellt {{date}}",
+    "updated": "Aktualisiert {{date}}",
+    "revokedAt": "Widerrufen am {{date}}",
+    "usedAt": "Verwendet am {{date}}",
+    "noAuthYet": "Noch keine erfolgreiche Autorisierung",
+    "edit": "Bearbeiten",
+    "revoke": "Widerrufen",
+    "reactivate": "Reaktivieren",
+    "delete": "Löschen",
+    "createTitle": "MCP-Token erstellen",
+    "createDesc": "Die API generiert das Token, gibt es einmal zum Kopieren zurück und speichert nur einen Hash plus maskierte Vorschau.",
+    "tokenName": "Token-Name",
+    "bestPracticeTip": "Bewährte Methode: Geben Sie einen Token pro MCP-Client, Workspace oder Umgebung aus, damit Sie sie unabhängig rotieren und widerrufen können.",
+    "cancel": "Abbrechen",
+    "creating": "Wird erstellt…",
+    "editTitle": "MCP-Token bearbeiten",
+    "editDesc": "Aktualisieren Sie den Anzeigenamen oder Zugriffsstatus. Token-Material wird nicht gespeichert und kann nicht wiederhergestellt werden.",
+    "allowAuth": "MCP-Authentifizierung zulassen",
+    "allowAuthDesc": "Deaktivieren Sie diesen Token, um den Zugriff zu widerrufen, ohne den Datensatz zu löschen.",
+    "saving": "Wird gespeichert…",
+    "saveChanges": "Änderungen speichern",
+    "deleteTitle": "MCP-Token löschen?",
+    "deleteDesc": "Löschen Sie {{name}} und machen Sie sein Bearer-Token dauerhaft ungültig.",
+    "deleteDescGeneral": "Löschen Sie diesen Token und machen Sie sein Bearer-Token dauerhaft ungültig.",
+    "deleteWarning": "Gelöschte Token können nicht wiederhergestellt werden. Jeder MCP-Client, der dieses Token verwendet, wird sofort aufhören sich zu authentifizieren."
   },
   "schedule": {
     "cronPlaceholder": "z.B. 30 6 * * 1-5",
@@ -1127,8 +1308,35 @@
       "weekly": "Sonntagabend"
     }
   },
-  "aiProvider": {
-    "saved": "KI-Anbietereinstellungen gespeichert"
+"aiProvider": {
+    "saved": "KI-Anbietereinstellungen gespeichert",
+    "title": "KI-Anbieter",
+    "configuration": "KI-Anbieterkonfiguration",
+    "configurationDesc": "Konfigurieren Sie, welchen KI-Anbieter und welches Modell die API für Assistant-Funktionen verwendet. Der API-Schlüssel wird verschlüsselt gespeichert und niemals im Klartext zurückgegeben.",
+    "loading": "KI-Anbietereinstellungen werden geladen…",
+    "failedToLoad": "KI-Anbietereinstellungen konnten nicht geladen werden",
+    "provider": "Anbieter",
+    "model": "Modell",
+    "baseUrl": "Basis-URL",
+    "baseUrlDesc": "Endpunkt für OpenAI-kompatible Anfragen (z.B. OpenRouter, Ollama, Azure OpenAI).",
+    "apiKey": "API-Schlüssel",
+    "keyStored": "Schlüssel gespeichert. Klicken Sie auf das Feld, um ihn zu ersetzen.",
+    "keyNotStored": "Der Schlüssel wird im Ruhezustand verschlüsselt und niemals zurückgegeben.",
+    "enterNewKey": "Neuen Schlüssel zum Ersetzen eingeben…",
+    "enterApiKey": "API-Schlüssel eingeben…",
+    "testConnection": "Verbindung testen",
+    "save": "Speichern",
+    "testing": "Wird getestet…",
+    "saving": "Wird gespeichert…",
+    "connectionOk": "Verbindung OK",
+    "connectionFailed": "Verbindung fehlgeschlagen",
+    "needApiKey": "Geben Sie einen API-Schlüssel ein oder behalten Sie ihn, um den Anbieter zu testen",
+    "testDescription": "Senden Sie eine Test-Code-Aufgabe an den konfigurierten KI-Anbieter",
+    "providers": {
+      "OPENAI_COMPATIBLE": "OpenAI-kompatibel",
+      "CLAUDE": "Claude (Anthropic)",
+      "GEMINI": "Gemini (Google)"
+    }
   },
   "clipboard": {
     "copied": "{{label}} kopiert",

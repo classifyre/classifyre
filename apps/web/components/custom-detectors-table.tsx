@@ -305,7 +305,7 @@ export function CustomDetectorsTable() {
                     }
                 >
                     <SelectTrigger className="h-9 min-w-[150px] border-2 border-border rounded-[4px]">
-                        <SelectValue placeholder="Status"/>
+                        <SelectValue placeholder={t("common.status")}/>
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="ALL">All status</SelectItem>
@@ -319,7 +319,7 @@ export function CustomDetectorsTable() {
                     onValueChange={(value) => setUsageFilter(value as typeof usageFilter)}
                 >
                     <SelectTrigger className="h-9 min-w-[170px] border-2 border-border rounded-[4px]">
-                        <SelectValue placeholder="Usage"/>
+                        <SelectValue placeholder={t("detectors.sourcesUsing")}/>
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="ALL">All usage</SelectItem>

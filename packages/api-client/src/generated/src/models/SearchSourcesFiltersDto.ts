@@ -67,6 +67,8 @@ export const SearchSourcesFiltersDtoTypeEnum = {
     Databricks: 'DATABRICKS',
     Snowflake: 'SNOWFLAKE',
     Mongodb: 'MONGODB',
+    Neo4J: 'NEO4J',
+    Sqlite: 'SQLITE',
     Powerbi: 'POWERBI',
     Tableau: 'TABLEAU',
     Custom: 'CUSTOM'
@@ -80,6 +82,7 @@ export const SearchSourcesFiltersDtoStatusEnum = {
     Pending: 'PENDING',
     Running: 'RUNNING',
     Completed: 'COMPLETED',
+    Warning: 'WARNING',
     Error: 'ERROR'
 } as const;
 export type SearchSourcesFiltersDtoStatusEnum = typeof SearchSourcesFiltersDtoStatusEnum[keyof typeof SearchSourcesFiltersDtoStatusEnum];
