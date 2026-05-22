@@ -173,6 +173,7 @@
     "totalAssets": "Total Assets",
     "detail": {
       "sourceDetails": "Source Details",
+      "title": "Source Details",
       "sourceDetailsDesc": "Operational and activity overview for this source.",
       "lastUpdated": "Last Updated",
       "lastScan": "Last Scan",
@@ -610,6 +611,12 @@
   },
   "detectors": {
     "title": "Custom Detectors",
+    "detail": {
+      "title": "Detector Details"
+    },
+    "new": {
+      "title": "New Detector"
+    },
     "search": "Search detector name, key, description, sources",
     "allMethods": "All methods",
     "loadError": "Could not load detector catalog",
@@ -905,6 +912,9 @@
   },
   "scans": {
     "title": "Scans",
+    "detail": {
+      "title": "Scan Details"
+    },
     "subtitle": "Search run history and filter by operational status from one surface.",
     "runTrend": "Run Trend",
     "runTrendDescription": "Status distribution over the selected timeline.",
@@ -1323,6 +1333,7 @@
     "configValidationFailed": "Configuration failed schema validation"
   },
   "discovery": {
+    "title": "Overview",
     "securityBrief": "Security Brief",
     "allFindings": "All findings · last {{days}} days",
     "findingsToReview": "Findings to review",
@@ -1411,6 +1422,9 @@
     "createFirstMetric": "Create First Metric",
     "glossary": {
       "backToSemantic": "Back to Semantic Layer",
+      "detail": {
+        "title": "Glossary Term"
+      },
       "newTitle": "New Business Term",
       "newDescription": "Define a business concept and map it to detection filters",
       "termDetails": "Term Details",
@@ -1459,6 +1473,9 @@
     },
     "metrics": {
       "backToSemantic": "Back to Semantic Layer",
+      "detail": {
+        "title": "Metric Details"
+      },
       "newTitle": "New Metric",
       "newDescription": "Define a governed metric to measure what matters to your business",
       "metricDetails": "Metric Details",
