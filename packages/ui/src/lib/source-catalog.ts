@@ -213,7 +213,7 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMeta> = {
     label: "SQLite",
     description:
       "Scan tables in a local SQLite database file with no server required.",
-    icon: "SQLITE",
+    icon: CreateSourceDtoTypeEnum.Sqlite,
     category: "DATABASES",
     keywords: ["sql", "file", "embedded", "local", "rdbms"],
   },

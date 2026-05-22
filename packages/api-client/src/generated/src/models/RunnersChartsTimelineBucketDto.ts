@@ -54,6 +54,12 @@ export interface RunnersChartsTimelineBucketDto {
      * @type {number}
      * @memberof RunnersChartsTimelineBucketDto
      */
+    warning: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof RunnersChartsTimelineBucketDto
+     */
     failed: number;
 }
 
@@ -66,6 +72,7 @@ export function instanceOfRunnersChartsTimelineBucketDto(value: object): value i
     if (!('running' in value) || value['running'] === undefined) return false;
     if (!('queued' in value) || value['queued'] === undefined) return false;
     if (!('completed' in value) || value['completed'] === undefined) return false;
+    if (!('warning' in value) || value['warning'] === undefined) return false;
     if (!('failed' in value) || value['failed'] === undefined) return false;
     return true;
 }
@@ -85,6 +92,7 @@ export function RunnersChartsTimelineBucketDtoFromJSONTyped(json: any, ignoreDis
         'running': json['running'],
         'queued': json['queued'],
         'completed': json['completed'],
+        'warning': json['warning'],
         'failed': json['failed'],
     };
 }
@@ -105,6 +113,7 @@ export function RunnersChartsTimelineBucketDtoToJSONTyped(value?: RunnersChartsT
         'running': value['running'],
         'queued': value['queued'],
         'completed': value['completed'],
+        'warning': value['warning'],
         'failed': value['failed'],
     };
 }
