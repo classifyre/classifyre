@@ -722,6 +722,8 @@ export const SourceAssetsControllerListSourceAssetsSourceTypesEnum = {
     Databricks: 'DATABRICKS',
     Snowflake: 'SNOWFLAKE',
     Mongodb: 'MONGODB',
+    Neo4J: 'NEO4J',
+    Sqlite: 'SQLITE',
     Powerbi: 'POWERBI',
     Tableau: 'TABLEAU',
     Custom: 'CUSTOM'

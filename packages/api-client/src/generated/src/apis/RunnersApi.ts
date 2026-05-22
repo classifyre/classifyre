@@ -19,15 +19,21 @@ import type {
   CreateExternalRunnerDto,
   DeleteRunnerResponseDto,
   ListRunnersResponseDto,
+  RegisterDiscoveredAssetsDto,
+  RegisterDiscoveredAssetsResponseDto,
+  RunnerAssetProgressDto,
   RunnerDto,
   RunnerLogsResponseDto,
   SearchRunnerLogsBodyDto,
+  SearchRunnersAssetsRequestDto,
+  SearchRunnersAssetsResponseDto,
   SearchRunnersChartsRequestDto,
   SearchRunnersChartsResponseDto,
   SearchRunnersRequestDto,
   SearchRunnersResponseDto,
   StartRunnerDto,
   StopRunnerResponseDto,
+  UpdateRunnerAssetStatusDto,
 } from '../models/index';
 import {
     CliRunnerControllerUpdateRunnerStatusRequestFromJSON,
@@ -38,12 +44,22 @@ import {
     DeleteRunnerResponseDtoToJSON,
     ListRunnersResponseDtoFromJSON,
     ListRunnersResponseDtoToJSON,
+    RegisterDiscoveredAssetsDtoFromJSON,
+    RegisterDiscoveredAssetsDtoToJSON,
+    RegisterDiscoveredAssetsResponseDtoFromJSON,
+    RegisterDiscoveredAssetsResponseDtoToJSON,
+    RunnerAssetProgressDtoFromJSON,
+    RunnerAssetProgressDtoToJSON,
     RunnerDtoFromJSON,
     RunnerDtoToJSON,
     RunnerLogsResponseDtoFromJSON,
     RunnerLogsResponseDtoToJSON,
     SearchRunnerLogsBodyDtoFromJSON,
     SearchRunnerLogsBodyDtoToJSON,
+    SearchRunnersAssetsRequestDtoFromJSON,
+    SearchRunnersAssetsRequestDtoToJSON,
+    SearchRunnersAssetsResponseDtoFromJSON,
+    SearchRunnersAssetsResponseDtoToJSON,
     SearchRunnersChartsRequestDtoFromJSON,
     SearchRunnersChartsRequestDtoToJSON,
     SearchRunnersChartsResponseDtoFromJSON,
@@ -56,6 +72,8 @@ import {
     StartRunnerDtoToJSON,
     StopRunnerResponseDtoFromJSON,
     StopRunnerResponseDtoToJSON,
+    UpdateRunnerAssetStatusDtoFromJSON,
+    UpdateRunnerAssetStatusDtoToJSON,
 } from '../models/index';
 
 export interface CliRunnerControllerCreateExternalRunnerRequest {
@@ -68,6 +86,10 @@ export interface CliRunnerControllerDeleteRunnerRequest {
 }
 
 export interface CliRunnerControllerGetRunnerRequest {
+    runnerId: string;
+}
+
+export interface CliRunnerControllerGetRunnerAssetProgressRequest {
     runnerId: string;
 }
 
@@ -86,6 +108,11 @@ export interface CliRunnerControllerListSourceRunnersRequest {
     take?: number;
 }
 
+export interface CliRunnerControllerRegisterDiscoveredAssetsRequest {
+    runnerId: string;
+    registerDiscoveredAssetsDto: RegisterDiscoveredAssetsDto;
+}
+
 export interface CliRunnerControllerSearchRunnerLogsRequest {
     runnerId: string;
     searchRunnerLogsBodyDto: SearchRunnerLogsBodyDto;
@@ -100,9 +127,18 @@ export interface CliRunnerControllerStopRunnerRequest {
     runnerId: string;
 }
 
+export interface CliRunnerControllerUpdateRunnerAssetStatusesRequest {
+    runnerId: string;
+    updateRunnerAssetStatusDto: UpdateRunnerAssetStatusDto;
+}
+
 export interface CliRunnerControllerUpdateRunnerStatusOperationRequest {
     runnerId: string;
     cliRunnerControllerUpdateRunnerStatusRequest: CliRunnerControllerUpdateRunnerStatusRequest;
+}
+
+export interface SearchRunnersControllerSearchRunnerAssetsRequest {
+    searchRunnersAssetsRequestDto: SearchRunnersAssetsRequestDto;
 }
 
 export interface SearchRunnersControllerSearchRunnersRequest {
@@ -233,6 +269,43 @@ export class RunnersApi extends runtime.BaseAPI {
     }
 
     /**
+     * Get runner asset processing progress
+     */
+    async cliRunnerControllerGetRunnerAssetProgressRaw(requestParameters: CliRunnerControllerGetRunnerAssetProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RunnerAssetProgressDto>> {
+        if (requestParameters['runnerId'] == null) {
+            throw new runtime.RequiredError(
+                'runnerId',
+                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerGetRunnerAssetProgress().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/runners/{runnerId}/assets/progress`;
+        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RunnerAssetProgressDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Get runner asset processing progress
+     */
+    async cliRunnerControllerGetRunnerAssetProgress(requestParameters: CliRunnerControllerGetRunnerAssetProgressRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RunnerAssetProgressDto> {
+        const response = await this.cliRunnerControllerGetRunnerAssetProgressRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * List all runners
      */
     async cliRunnerControllerListRunnersRaw(requestParameters: CliRunnerControllerListRunnersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ListRunnersResponseDto>> {
@@ -327,6 +400,53 @@ export class RunnersApi extends runtime.BaseAPI {
      */
     async cliRunnerControllerListSourceRunners(requestParameters: CliRunnerControllerListSourceRunnersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ListRunnersResponseDto> {
         const response = await this.cliRunnerControllerListSourceRunnersRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Register discovered asset hashes for a runner
+     */
+    async cliRunnerControllerRegisterDiscoveredAssetsRaw(requestParameters: CliRunnerControllerRegisterDiscoveredAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RegisterDiscoveredAssetsResponseDto>> {
+        if (requestParameters['runnerId'] == null) {
+            throw new runtime.RequiredError(
+                'runnerId',
+                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerRegisterDiscoveredAssets().'
+            );
+        }
+
+        if (requestParameters['registerDiscoveredAssetsDto'] == null) {
+            throw new runtime.RequiredError(
+                'registerDiscoveredAssetsDto',
+                'Required parameter "registerDiscoveredAssetsDto" was null or undefined when calling cliRunnerControllerRegisterDiscoveredAssets().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/runners/{runnerId}/assets/discover`;
+        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RegisterDiscoveredAssetsDtoToJSON(requestParameters['registerDiscoveredAssetsDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RegisterDiscoveredAssetsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Register discovered asset hashes for a runner
+     */
+    async cliRunnerControllerRegisterDiscoveredAssets(requestParameters: CliRunnerControllerRegisterDiscoveredAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RegisterDiscoveredAssetsResponseDto> {
+        const response = await this.cliRunnerControllerRegisterDiscoveredAssetsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -455,6 +575,52 @@ export class RunnersApi extends runtime.BaseAPI {
     }
 
     /**
+     * Update processing status of runner assets
+     */
+    async cliRunnerControllerUpdateRunnerAssetStatusesRaw(requestParameters: CliRunnerControllerUpdateRunnerAssetStatusesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['runnerId'] == null) {
+            throw new runtime.RequiredError(
+                'runnerId',
+                'Required parameter "runnerId" was null or undefined when calling cliRunnerControllerUpdateRunnerAssetStatuses().'
+            );
+        }
+
+        if (requestParameters['updateRunnerAssetStatusDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateRunnerAssetStatusDto',
+                'Required parameter "updateRunnerAssetStatusDto" was null or undefined when calling cliRunnerControllerUpdateRunnerAssetStatuses().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/runners/{runnerId}/assets/status`;
+        urlPath = urlPath.replace(`{${"runnerId"}}`, encodeURIComponent(String(requestParameters['runnerId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateRunnerAssetStatusDtoToJSON(requestParameters['updateRunnerAssetStatusDto']),
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Update processing status of runner assets
+     */
+    async cliRunnerControllerUpdateRunnerAssetStatuses(requestParameters: CliRunnerControllerUpdateRunnerAssetStatusesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.cliRunnerControllerUpdateRunnerAssetStatusesRaw(requestParameters, initOverrides);
+    }
+
+    /**
      * Update runner status
      */
     async cliRunnerControllerUpdateRunnerStatusRaw(requestParameters: CliRunnerControllerUpdateRunnerStatusOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -498,6 +664,47 @@ export class RunnersApi extends runtime.BaseAPI {
      */
     async cliRunnerControllerUpdateRunnerStatus(requestParameters: CliRunnerControllerUpdateRunnerStatusOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.cliRunnerControllerUpdateRunnerStatusRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Returns paginated runner_assets rows for a specific runner, joined with the resolved asset record and its findings.
+     * Search runner assets
+     */
+    async searchRunnersControllerSearchRunnerAssetsRaw(requestParameters: SearchRunnersControllerSearchRunnerAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SearchRunnersAssetsResponseDto>> {
+        if (requestParameters['searchRunnersAssetsRequestDto'] == null) {
+            throw new runtime.RequiredError(
+                'searchRunnersAssetsRequestDto',
+                'Required parameter "searchRunnersAssetsRequestDto" was null or undefined when calling searchRunnersControllerSearchRunnerAssets().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/search/runner-assets`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: SearchRunnersAssetsRequestDtoToJSON(requestParameters['searchRunnersAssetsRequestDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SearchRunnersAssetsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Returns paginated runner_assets rows for a specific runner, joined with the resolved asset record and its findings.
+     * Search runner assets
+     */
+    async searchRunnersControllerSearchRunnerAssets(requestParameters: SearchRunnersControllerSearchRunnerAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SearchRunnersAssetsResponseDto> {
+        const response = await this.searchRunnersControllerSearchRunnerAssetsRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -591,6 +798,7 @@ export const CliRunnerControllerListRunnersStatusEnum = {
     Pending: 'PENDING',
     Running: 'RUNNING',
     Completed: 'COMPLETED',
+    Warning: 'WARNING',
     Error: 'ERROR'
 } as const;
 export type CliRunnerControllerListRunnersStatusEnum = typeof CliRunnerControllerListRunnersStatusEnum[keyof typeof CliRunnerControllerListRunnersStatusEnum];
@@ -601,6 +809,7 @@ export const CliRunnerControllerListSourceRunnersStatusEnum = {
     Pending: 'PENDING',
     Running: 'RUNNING',
     Completed: 'COMPLETED',
+    Warning: 'WARNING',
     Error: 'ERROR'
 } as const;
 export type CliRunnerControllerListSourceRunnersStatusEnum = typeof CliRunnerControllerListSourceRunnersStatusEnum[keyof typeof CliRunnerControllerListSourceRunnersStatusEnum];

@@ -1,32 +1,30 @@
 
-# RunnersChartsTotalsDto
+# RunnerAssetProgressDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`totalRuns` | number
-`running` | number
-`queued` | number
-`completed` | number
-`warning` | number
-`failed` | number
+`pending` | number
+`processing` | number
+`processed` | number
+`error` | number
+`total` | number
 
 ## Example
 
 ```typescript
-import type { RunnersChartsTotalsDto } from '@workspace/api-client'
+import type { RunnerAssetProgressDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "totalRuns": null,
-  "running": null,
-  "queued": null,
-  "completed": null,
-  "warning": null,
-  "failed": null,
-} satisfies RunnersChartsTotalsDto
+  "pending": null,
+  "processing": null,
+  "processed": null,
+  "error": null,
+  "total": null,
+} satisfies RunnerAssetProgressDto
 
 console.log(example)
 
@@ -35,7 +33,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as RunnersChartsTotalsDto
+const exampleParsed = JSON.parse(exampleJSON) as RunnerAssetProgressDto
 console.log(exampleParsed)
 ```
 

@@ -46,6 +46,7 @@ docs/FindingHistoryEntryDto.md
 docs/FindingLocationDto.md
 docs/FindingResponseDto.md
 docs/FindingsApi.md
+docs/FindingsBySeverityDto.md
 docs/FindingsChartsTimelineBucketDto.md
 docs/FindingsChartsTopAssetDto.md
 docs/FindingsChartsTotalsDto.md
@@ -80,6 +81,11 @@ docs/ParsedTrainingExampleDto.md
 docs/QueryDashboardMetricsDto.md
 docs/QueryMetricDto.md
 docs/QueryMetricTimeSeriesDto.md
+docs/RegisterDiscoveredAssetsDto.md
+docs/RegisterDiscoveredAssetsResponseDto.md
+docs/RunnerAssetItemDto.md
+docs/RunnerAssetProgressDto.md
+docs/RunnerAssetStatusUpdateItem.md
 docs/RunnerDto.md
 docs/RunnerLogEntryDto.md
 docs/RunnerLogsResponseDto.md
@@ -115,6 +121,10 @@ docs/SearchFindingsRequestDto.md
 docs/SearchFindingsResponseDto.md
 docs/SearchRunnerItemDto.md
 docs/SearchRunnerLogsBodyDto.md
+docs/SearchRunnersAssetsFiltersInputDto.md
+docs/SearchRunnersAssetsPageDto.md
+docs/SearchRunnersAssetsRequestDto.md
+docs/SearchRunnersAssetsResponseDto.md
 docs/SearchRunnersChartsOptionsDto.md
 docs/SearchRunnersChartsRequestDto.md
 docs/SearchRunnersChartsResponseDto.md
@@ -153,6 +163,7 @@ docs/UpdateInstanceSettingsDto.md
 docs/UpdateMcpTokenDto.md
 docs/UpdateMetricDefinitionDto.md
 docs/UpdateNotificationImportanceDto.md
+docs/UpdateRunnerAssetStatusDto.md
 docs/UpdateSourceDto.md
 package.json
 src/apis/AIApi.ts
@@ -211,6 +222,7 @@ src/models/FinalizeIngestRunDto.ts
 src/models/FindingHistoryEntryDto.ts
 src/models/FindingLocationDto.ts
 src/models/FindingResponseDto.ts
+src/models/FindingsBySeverityDto.ts
 src/models/FindingsChartsTimelineBucketDto.ts
 src/models/FindingsChartsTopAssetDto.ts
 src/models/FindingsChartsTotalsDto.ts
@@ -242,6 +254,11 @@ src/models/ParsedTrainingExampleDto.ts
 src/models/QueryDashboardMetricsDto.ts
 src/models/QueryMetricDto.ts
 src/models/QueryMetricTimeSeriesDto.ts
+src/models/RegisterDiscoveredAssetsDto.ts
+src/models/RegisterDiscoveredAssetsResponseDto.ts
+src/models/RunnerAssetItemDto.ts
+src/models/RunnerAssetProgressDto.ts
+src/models/RunnerAssetStatusUpdateItem.ts
 src/models/RunnerDto.ts
 src/models/RunnerLogEntryDto.ts
 src/models/RunnerLogsResponseDto.ts
@@ -275,6 +292,10 @@ src/models/SearchFindingsRequestDto.ts
 src/models/SearchFindingsResponseDto.ts
 src/models/SearchRunnerItemDto.ts
 src/models/SearchRunnerLogsBodyDto.ts
+src/models/SearchRunnersAssetsFiltersInputDto.ts
+src/models/SearchRunnersAssetsPageDto.ts
+src/models/SearchRunnersAssetsRequestDto.ts
+src/models/SearchRunnersAssetsResponseDto.ts
 src/models/SearchRunnersChartsOptionsDto.ts
 src/models/SearchRunnersChartsRequestDto.ts
 src/models/SearchRunnersChartsResponseDto.ts
@@ -309,6 +330,7 @@ src/models/UpdateInstanceSettingsDto.ts
 src/models/UpdateMcpTokenDto.ts
 src/models/UpdateMetricDefinitionDto.ts
 src/models/UpdateNotificationImportanceDto.ts
+src/models/UpdateRunnerAssetStatusDto.ts
 src/models/UpdateSourceDto.ts
 src/models/index.ts
 src/runtime.ts
