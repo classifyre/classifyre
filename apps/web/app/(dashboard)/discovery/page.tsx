@@ -28,6 +28,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { FINDING_SEVERITY_COLOR_BY_LEVEL } from "@workspace/ui/lib/finding-severity";
 import { formatRelative } from "@/lib/date";
 import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
 
 type DiscoveryWindowDays = 7 | 30 | 90;
 
@@ -436,7 +437,7 @@ export default function DiscoveryPage() {
                     }}
                   />
                   <span className="text-sm uppercase tracking-[0.15em] text-white/90 font-mono group-hover/sev:text-white">
-                    {sev}
+                    {t(`findings.severityLabels.${sev.toUpperCase()}` as TranslationKey)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">

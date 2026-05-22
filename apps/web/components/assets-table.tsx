@@ -401,25 +401,17 @@ function FindingsSubTable({
               </span>
             </TableCell>
             <TableCell>
-              <Badge
-                variant="outline"
-                className="gap-1.5 border px-2 py-0.5 text-[11px] uppercase tracking-[0.04em]"
-                style={{
-                  color: severityColor(finding.severity),
-                  borderColor: `${severityColor(finding.severity)}55`,
-                  backgroundColor: `${severityColor(finding.severity)}14`,
-                }}
+              <SeverityBadge
+                severity={finding.severity.toLowerCase() as "critical" | "high" | "medium" | "low" | "info"}
               >
-                <span
-                  className="h-2 w-2 rounded-[2px]"
-                  style={{ backgroundColor: severityColor(finding.severity) }}
-                />
-                {formatEnumLabel(finding.severity)}
-              </Badge>
+                {t(`findings.severityLabels.${finding.severity.toUpperCase()}` as TranslationKey)}
+              </SeverityBadge>
             </TableCell>
-            <TableCell>
-              <StatusBadge status={toStatusBadgeValue(finding.status)} />
-            </TableCell>
+<TableCell>
+                            <StatusBadge status={toStatusBadgeValue(finding.status)}>
+                              {t(`findings.statusLabels.${finding.status}` as TranslationKey)}
+                            </StatusBadge>
+                          </TableCell>
             <TableCell>
               <div className="text-xs group-hover:underline group-focus-visible:underline">
                 {formatDate(finding.detectedAt)}
@@ -846,7 +838,7 @@ export function AssetsTable({
         {isFilterLoading ? (
           <div className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Sources
+            {t("common.sources")}
           </div>
         ) : null}
       </div>
@@ -1065,7 +1057,13 @@ export function AssetsTable({
                           <Badge
                             variant={statusVariant[asset.status] || "outline"}
                           >
-                            {asset.status}
+                            {asset.status === "NEW"
+                              ? t("assets.assetNew" as TranslationKey)
+                              : asset.status === "UPDATED"
+                                ? t("assets.assetUpdated" as TranslationKey)
+                                : asset.status === "UNCHANGED"
+                                  ? t("assets.assetUnchanged" as TranslationKey)
+                                  : asset.status}
                           </Badge>
                         </TableCell>
 
@@ -1099,7 +1097,7 @@ export function AssetsTable({
                                     | "info"
                                 }
                               >
-                                {formatEnumLabel(highestSeverity)}
+                                {t(`findings.severityLabels.${highestSeverity.toUpperCase()}` as TranslationKey)}
                               </SeverityBadge>
                               <span className="text-xs text-muted-foreground">
                                 {totalFindings}
@@ -1124,7 +1122,7 @@ export function AssetsTable({
                                   key={entry.status}
                                   status={toStatusBadgeValue(entry.status)}
                                 >
-                                  {STATUS_LABELS[entry.status] ?? entry.status}{" "}
+                                  {t(`findings.statusLabels.${entry.status}` as TranslationKey)}{" "}
                                   · {entry.count}
                                 </StatusBadge>
                               ))}

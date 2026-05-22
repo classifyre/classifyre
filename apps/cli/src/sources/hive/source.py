@@ -1,12 +1,6 @@
 from __future__ import annotations
 
-import asyncio
 import logging
-import threading
-from collections.abc import AsyncGenerator
-from contextlib import closing
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any
 
 from ...models.generated_input import (
@@ -14,37 +8,21 @@ from ...models.generated_input import (
     HiveOptionalConnection,
     HiveOptionalScope,
     SamplingConfig,
-    SamplingStrategy,
 )
-from ...models.generated_single_asset_scan_results import (
-    AssetType as OutputAssetType,
-)
-from ...models.generated_single_asset_scan_results import (
-    DetectionResult,
-    SingleAssetScanResults,
-)
-from ...utils.hashing import hash_id, unhash_id
-from ..base import BaseSource
 from ..dependencies import require_module
-from ..tabular_utils import build_tabular_location, format_tabular_sample_content
+from ..tabular_base import BaseTabularSource
+from ..tabular_utils import TableRef
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_EXCLUDED_DATABASES = {"information_schema", "sys"}
 
 
-@dataclass(frozen=True)
-class TableRef:
-    database: str
-    table: str
-    object_type: str
-
-
 def _quote_identifier(identifier: str) -> str:
     return f"`{identifier.replace('`', '``')}`"
 
 
-class HiveSource(BaseSource):
+class HiveSource(BaseTabularSource):
     source_type = "hive"
 
     def __init__(
@@ -64,11 +42,13 @@ class HiveSource(BaseSource):
         )
         self._host = self.config.required.host
         self._port = int(self.config.required.port)
-        self._table_lookup: dict[str, TableRef] = {}
-        self._content_cache: dict[str, tuple[str, str]] = {}
         self._table_type_cache: dict[tuple[str, str], str] = {}
-        self._conn_cache: dict[str, Any] = {}
-        self._conn_lock = threading.Lock()
+
+    # ── Identity ─────────────────────────────────────────────────────────
+
+    @property
+    def _source_label(self) -> str:
+        return "Hive"
 
     def _asset_type_value(self) -> str:
         type_value = self.config.type
@@ -76,6 +56,8 @@ class HiveSource(BaseSource):
 
     def _sampling(self) -> SamplingConfig:
         return self.config.sampling
+
+    # ── Connection ───────────────────────────────────────────────────────
 
     def _connection_options(self) -> HiveOptionalConnection:
         if self.config.optional and self.config.optional.connection:
@@ -87,31 +69,23 @@ class HiveSource(BaseSource):
             return self.config.optional.scope
         return HiveOptionalScope()
 
-    def _username(self) -> str:
-        return self.config.masked.username
-
-    def _password(self) -> str:
-        return self.config.masked.password
-
     def _connection_scheme(self) -> str:
         connection = self._connection_options()
         scheme = (
             connection.scheme.value if hasattr(connection.scheme, "value") else connection.scheme
         )
-        if not scheme:
-            return "hive"
-        return str(scheme)
+        return str(scheme) if scheme else "hive"
 
-    def _connect(self, database: str | None = None):
+    def _connect(self, database: str | None = None) -> Any:
         connection_options = self._connection_options()
         scope_options = self._scope_options()
-
         target_database = database or scope_options.database or "default"
+
         connect_kwargs: dict[str, Any] = {
             "host": self._host,
             "port": int(self._port),
-            "username": self._username(),
-            "password": self._password(),
+            "username": self.config.masked.username,
+            "password": self.config.masked.password,
             "database": target_database,
         }
 
@@ -128,55 +102,59 @@ class HiveSource(BaseSource):
         hive_module = self._pyhive_hive
         if not hasattr(hive_module, "connect"):
             raise RuntimeError("PyHive module does not expose hive.connect")
-
         return hive_module.connect(**connect_kwargs)
 
-    def _get_cached_connection(self, database: str | None = None):
-        cache_key = database or "__default__"
-        with self._conn_lock:
-            conn = self._conn_cache.get(cache_key)
-            if conn is not None:
-                try:
-                    cur = conn.cursor()
-                    cur.close()
-                    return conn
-                except Exception:
-                    pass
-                self._conn_cache.pop(cache_key, None)
-            conn = self._connect(database)
-            self._conn_cache[cache_key] = conn
-            return conn
+    # ── Dialect hooks ────────────────────────────────────────────────────
 
-    def cleanup(self) -> None:
-        with self._conn_lock:
-            for conn in self._conn_cache.values():
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-            self._conn_cache.clear()
+    def _quote_identifier(self, identifier: str) -> str:
+        return _quote_identifier(identifier)
 
-    def _excluded_databases(self) -> set[str]:
-        configured = self._scope_options().exclude_databases or []
-        excluded = {name.strip() for name in configured if name.strip()}
-        if not excluded:
-            excluded = set(_DEFAULT_EXCLUDED_DATABASES)
-        return excluded
+    def _random_order_expr(self) -> str:
+        return "rand()"
 
-    def _object_allowlist(self) -> set[str]:
-        include_objects = self._scope_options().include_objects or []
-        return {entry.strip().lower() for entry in include_objects if entry.strip()}
+    def _table_select_fqn(self, table_ref: TableRef) -> str:
+        return (
+            f"{self._quote_identifier(table_ref.database)}"
+            f".{self._quote_identifier(table_ref.table)}"
+        )
 
-    def _include_tables_enabled(self) -> bool:
-        return self._scope_options().include_tables is not False
+    # ── Hive uses LIMIT N inline (no param placeholders) ─────────────────
 
-    def _include_views_enabled(self) -> bool:
-        return self._scope_options().include_views is not False
+    def _build_sampling_query(
+        self, table_ref: TableRef, columns: list[str]
+    ) -> tuple[str, list[Any]]:
+        from ...models.generated_input import SamplingStrategy
+
+        sampling = self._sampling()
+        if not columns:
+            raise ValueError(f"Table {table_ref.display_name} has no readable columns")
+
+        quoted_columns = ", ".join(self._quote_identifier(c) for c in columns)
+        from_expr = self._table_select_fqn(table_ref)
+        query = f"SELECT {quoted_columns} FROM {from_expr}"
+
+        strategy = sampling.strategy
+        if strategy == SamplingStrategy.ALL:
+            return query, []
+
+        if strategy == SamplingStrategy.LATEST:
+            order_column = self._resolve_latest_order_column(columns)
+            if order_column:
+                query += f" ORDER BY {self._quote_identifier(order_column)} DESC"
+            elif sampling.fallback_to_random is not False:
+                query += f" ORDER BY {self._random_order_expr()}"
+        elif strategy == SamplingStrategy.RANDOM:
+            query += f" ORDER BY {self._random_order_expr()}"
+
+        query += f" LIMIT {int(sampling.rows_per_page or 100)}"
+        return query, []
+
+    # ── Database / table discovery (HiveQL) ──────────────────────────────
 
     def _resolve_databases(self) -> list[str]:
-        scope_options = self._scope_options()
-        include_all = bool(scope_options.include_all_databases)
-        configured_database = scope_options.database
+        scope = self._scope_options()
+        include_all = bool(scope.include_all_databases)
+        configured_database = scope.database
 
         if not include_all:
             if configured_database:
@@ -187,24 +165,34 @@ class HiveSource(BaseSource):
             )
 
         excluded = self._excluded_databases()
+        seed = configured_database or "default"
         databases: list[str] = []
-
-        seed_database = configured_database or "default"
-        conn = self._get_cached_connection(seed_database)
+        conn = self._get_cached_connection(seed)
         with conn.cursor() as cursor:
             cursor.execute("SHOW DATABASES")
             for row in cursor.fetchall():
-                database_name = row[0] if isinstance(row, tuple) and row else None
-                if not isinstance(database_name, str) or not database_name:
-                    continue
-                if database_name in excluded:
-                    continue
-                databases.append(database_name)
+                name = row[0] if isinstance(row, tuple) and row else None
+                if isinstance(name, str) and name and name not in excluded:
+                    databases.append(name)
 
         if configured_database and configured_database not in databases:
             databases.insert(0, configured_database)
-
         return databases
+
+    def _excluded_databases(self) -> set[str]:
+        configured = self._scope_options().exclude_databases or []
+        excluded = {name.strip() for name in configured if name.strip()}
+        return excluded if excluded else set(_DEFAULT_EXCLUDED_DATABASES)
+
+    def _include_tables_enabled(self) -> bool:
+        return self._scope_options().include_tables is not False
+
+    def _include_views_enabled(self) -> bool:
+        return self._scope_options().include_views is not False
+
+    def _object_allowlist(self) -> set[str]:
+        include_objects = self._scope_options().include_objects or []
+        return {entry.strip().lower() for entry in include_objects if entry.strip()}
 
     def _resolve_object_type(self, database: str, table: str) -> str:
         cache_key = (database, table)
@@ -220,13 +208,9 @@ class HiveSource(BaseSource):
                 for row in cursor.fetchall():
                     if not isinstance(row, tuple) or not row:
                         continue
-
                     field_name = row[0]
                     details = row[1] if len(row) > 1 else ""
-                    if not isinstance(field_name, str):
-                        continue
-
-                    if field_name.strip().lower() == "table type:":
+                    if isinstance(field_name, str) and field_name.strip().lower() == "table type:":
                         detail_text = str(details).strip().upper()
                         if "VIRTUAL_VIEW" in detail_text or "VIEW" in detail_text:
                             object_type = "VIEW"
@@ -244,8 +228,8 @@ class HiveSource(BaseSource):
             return []
 
         object_allowlist = self._object_allowlist()
-        table_limit = self._scope_options().table_limit
-        limit = int(table_limit) if table_limit else None
+        limit_val = self._scope_options().table_limit
+        limit = int(limit_val) if limit_val else None
 
         tables: list[TableRef] = []
         conn = self._get_cached_connection(database)
@@ -255,14 +239,7 @@ class HiveSource(BaseSource):
                 table_name = row[0] if isinstance(row, tuple) and row else None
                 if not isinstance(table_name, str) or not table_name:
                     continue
-
-                normalized_table = table_name.lower()
-                normalized_db_table = f"{database}.{table_name}".lower()
-                if (
-                    object_allowlist
-                    and normalized_table not in object_allowlist
-                    and normalized_db_table not in object_allowlist
-                ):
+                if not self._accept_table(object_allowlist, database, None, table_name):
                     continue
 
                 object_type = self._resolve_object_type(database, table_name)
@@ -273,171 +250,24 @@ class HiveSource(BaseSource):
 
                 tables.append(
                     TableRef(
-                        database=database,
-                        table=table_name,
-                        object_type=object_type,
+                        database=database, schema=None, table=table_name, object_type=object_type
                     )
                 )
                 if limit is not None and len(tables) >= limit:
                     break
-
         return tables
 
-    def _iter_tables(self) -> list[TableRef]:
-        tables: list[TableRef] = []
-        for database in self._resolve_databases():
-            if self._aborted:
-                break
-            try:
-                tables.extend(self._list_tables_for_database(database))
-            except Exception as exc:
-                logger.warning("Skipping database %s due to listing error: %s", database, exc)
-        return tables
+    # ── Hive has no PKs or FKs ───────────────────────────────────────────
 
-    def test_connection(self) -> dict[str, Any]:
-        logger.info("Testing connection to Hive...")
-        result = {
-            "timestamp": datetime.now(UTC).isoformat(),
-            "source_type": self.recipe.get("type"),
-        }
+    def _query_primary_key_columns(self, table_ref: TableRef) -> list[str]:
+        return []
 
-        try:
-            databases = self._resolve_databases()
-            if not databases:
-                raise ValueError("No databases available for scanning")
-
-            with closing(self._connect(databases[0])) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("SELECT 1")
-                    cursor.fetchone()
-
-            result["status"] = "SUCCESS"
-            result["message"] = (
-                f"Successfully connected to Hive. Reachable databases: {len(databases)}."
-            )
-        except Exception as exc:
-            result["status"] = "FAILURE"
-            result["message"] = f"Failed to connect to Hive: {exc}"
-
-        return result
-
-    def _table_key(self, table_ref: TableRef) -> tuple[str, str]:
-        return (table_ref.database, table_ref.table)
-
-    def _table_raw_id(self, table_ref: TableRef) -> str:
-        return f"{table_ref.database}_#_{table_ref.table}"
-
-    def _collect_foreign_key_links(
-        self,
-        _tables: list[TableRef],
-    ) -> dict[tuple[str, str], set[tuple[str, str]]]:
-        return {}
-
-    def _table_to_asset(
-        self,
-        table_ref: TableRef,
-        *,
-        links: list[str] | None = None,
-    ) -> SingleAssetScanResults:
-        asset_name = f"{table_ref.database}.{table_ref.table}"
-        raw_id = self._table_raw_id(table_ref)
-        asset_hash = self.generate_hash_id(raw_id)
-        external_url = (
-            f"{self._connection_scheme()}://{self._host}:{self._port}/"
-            f"{table_ref.database}/{table_ref.table}"
-        )
-
-        metadata = {
-            "database": table_ref.database,
-            "table": table_ref.table,
-            "object_type": table_ref.object_type,
-            "sampling": {
-                "strategy": str(self._sampling().strategy),
-            },
-        }
-
-        now = datetime.now(UTC)
-        return SingleAssetScanResults(
-            hash=asset_hash,
-            checksum=self.calculate_checksum(metadata),
-            name=asset_name,
-            external_url=external_url,
-            links=links or [],
-            asset_type=OutputAssetType.TABLE,
-            source_id=self.source_id,
-            created_at=now,
-            updated_at=now,
-            runner_id=self.runner_id,
-        )
-
-    STREAM_DETECTIONS = True
-
-    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
-        if self._aborted:
-            return
-
-        tables = self._iter_tables()
-        table_hash_by_key: dict[tuple[str, str], str] = {
-            self._table_key(table_ref): self.generate_hash_id(self._table_raw_id(table_ref))
-            for table_ref in tables
-        }
-        table_fk_links = self._collect_foreign_key_links(tables)
-
-        batch: list[SingleAssetScanResults] = []
-        for table_ref in tables:
-            if self._aborted:
-                return
-
-            key = self._table_key(table_ref)
-            linked_hashes = [
-                table_hash_by_key[target]
-                for target in sorted(table_fk_links.get(key, set()))
-                if target in table_hash_by_key
-            ]
-
-            asset = self._table_to_asset(table_ref, links=linked_hashes)
-            self._table_lookup[asset.hash] = table_ref
-            batch.append(asset)
-
-            if len(batch) >= self.BATCH_SIZE:
-                yield batch
-                batch = []
-
-        if batch:
-            yield batch
-
-    def generate_hash_id(self, asset_id: str) -> str:
-        return hash_id(self._asset_type_value(), asset_id)
-
-    def _parse_table_ref_from_asset_id(self, asset_id: str) -> TableRef | None:
-        if asset_id in self._table_lookup:
-            return self._table_lookup[asset_id]
-
-        decoded = asset_id
-        if "_#_" not in decoded:
-            try:
-                decoded = unhash_id(asset_id)
-            except Exception:
-                decoded = asset_id
-
-        parts = decoded.split("_#_")
-        if len(parts) >= 3 and parts[0].upper() == "HIVE":
-            return TableRef(
-                database=parts[-2],
-                table=parts[-1],
-                object_type="TABLE",
-            )
-        if len(parts) >= 2:
-            return TableRef(
-                database=parts[-2],
-                table=parts[-1],
-                object_type="TABLE",
-            )
-        return None
+    # ── Column metadata (HiveQL DESCRIBE) ────────────────────────────────
 
     def _available_columns(self, table_ref: TableRef) -> list[str]:
         query = (
-            f"DESCRIBE {_quote_identifier(table_ref.database)}.{_quote_identifier(table_ref.table)}"
+            f"DESCRIBE {_quote_identifier(table_ref.database)}"
+            f".{_quote_identifier(table_ref.table)}"
         )
         conn = self._get_cached_connection(table_ref.database)
         with conn.cursor() as cursor:
@@ -446,290 +276,30 @@ class HiveSource(BaseSource):
             for row in cursor.fetchall():
                 if not isinstance(row, tuple) or not row:
                     continue
-                column_name = row[0]
-                if not isinstance(column_name, str):
+                col_name = row[0]
+                if not isinstance(col_name, str):
                     continue
-                normalized = column_name.strip()
-                if not normalized or normalized.startswith("#"):
-                    continue
-                columns.append(normalized)
+                normalized = col_name.strip()
+                if normalized and not normalized.startswith("#"):
+                    columns.append(normalized)
             return columns
 
-    def _resolve_latest_order_column(self, columns: list[str]) -> str | None:
-        sampling = self._sampling()
-        configured = sampling.order_by_column
-        if configured and configured in columns:
-            return configured
+    # ── External URL ─────────────────────────────────────────────────────
 
-        priority_candidates = (
-            "updated_at",
-            "modified_at",
-            "created_at",
-            "inserted_at",
-            "timestamp",
-            "ts",
-            "date",
+    def _build_external_url(self, table_ref: TableRef) -> str:
+        return (
+            f"{self._connection_scheme()}://{self._host}:{self._port}/"
+            f"{table_ref.database}/{table_ref.table}"
         )
-        for candidate in priority_candidates:
-            if candidate in columns:
-                return candidate
+
+    def _extra_asset_metadata(self, table_ref: TableRef) -> dict[str, Any]:
+        return {"object_type": table_ref.object_type}
+
+    # ── Parse table ref from asset ID ────────────────────────────────────
+
+    def _table_ref_from_parts(self, parts: list[str]) -> TableRef | None:
+        if len(parts) >= 3 and parts[0].upper() == "HIVE":
+            return TableRef(database=parts[-2], schema=None, table=parts[-1], object_type="TABLE")
+        if len(parts) >= 2:
+            return TableRef(database=parts[-2], schema=None, table=parts[-1], object_type="TABLE")
         return None
-
-    def _build_sampling_query(
-        self, table_ref: TableRef, columns: list[str]
-    ) -> tuple[str, list[Any]]:
-        sampling = self._sampling()
-        if not columns:
-            raise ValueError(
-                f"Table {table_ref.database}.{table_ref.table} has no readable columns"
-            )
-
-        quoted_columns = ", ".join(_quote_identifier(column) for column in columns)
-        from_expr = f"{_quote_identifier(table_ref.database)}.{_quote_identifier(table_ref.table)}"
-
-        strategy = sampling.strategy
-        if strategy == SamplingStrategy.ALL:
-            query = f"SELECT {quoted_columns} FROM {from_expr}"
-            return query, []
-
-        query = f"SELECT {quoted_columns} FROM {from_expr}"
-
-        if strategy == SamplingStrategy.LATEST:
-            order_column = self._resolve_latest_order_column(columns)
-            if order_column:
-                query += f" ORDER BY {_quote_identifier(order_column)} DESC"
-            elif sampling.fallback_to_random is not False:
-                query += " ORDER BY rand()"
-        elif strategy == SamplingStrategy.RANDOM:
-            query += " ORDER BY rand()"
-
-        query += f" LIMIT {int(sampling.rows_per_page or 100)}"
-        return query, []
-
-    def _count_table_rows(self, table_ref: TableRef) -> int | None:
-        try:
-            conn = self._get_cached_connection(table_ref.database)
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.database)}.{_quote_identifier(table_ref.table)}"
-                )
-                row = cursor.fetchone()
-                return int(row[0]) if row else None
-        except Exception:
-            return None
-
-    def _serialize_cell(self, value: Any) -> str:
-        if value is None:
-            return "null"
-        if isinstance(value, memoryview):
-            value = value.tobytes()
-        if isinstance(value, (bytes, bytearray)):
-            return f"<{len(value)} bytes>"
-        if isinstance(value, datetime):
-            return value.isoformat()
-        return str(value)
-
-    def _format_sample_content(
-        self,
-        table_ref: TableRef,
-        column_names: list[str],
-        rows: list[tuple[Any, ...]],
-        row_offset: int = 0,
-    ) -> tuple[str, str]:
-        sampling = self._sampling()
-        return format_tabular_sample_content(
-            scope_label="table",
-            scope_value=f"{table_ref.database}.{table_ref.table}",
-            strategy=sampling.strategy,
-            rows=rows,
-            column_names=column_names,
-            serialize_cell=self._serialize_cell,
-            include_column_names=sampling.include_column_names is not False,
-            object_type=table_ref.object_type,
-            raw_metadata={
-                "database": table_ref.database,
-                "table": table_ref.table,
-            },
-            row_offset=row_offset,
-        )
-
-    def _fetch_one_page(
-        self, table_ref: TableRef, base_query: str, page_size: int, offset: int
-    ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        conn = self._get_cached_connection(table_ref.database)
-        paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
-        with conn.cursor() as cursor:
-            cursor.execute(paginated_query)
-            rows = list(cursor.fetchall())
-            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
-        return rows, column_names
-
-    def _fetch_one_page_on_conn(
-        self,
-        conn: Any,
-        base_query: str,
-        page_size: int,
-        offset: int,
-    ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        paginated_query = f"{base_query} LIMIT {page_size} OFFSET {offset}"
-        with conn.cursor() as cursor:
-            cursor.execute(paginated_query)
-            rows = list(cursor.fetchall())
-            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
-        return rows, column_names
-
-    @staticmethod
-    def _cursor_execute(cursor: Any, query: str) -> list[str]:
-        cursor.execute(query)
-        return [desc[0] for desc in cursor.description] if cursor.description else []
-
-    @staticmethod
-    def _cursor_fetchmany(cursor: Any, size: int) -> list[tuple[Any, ...]]:
-        return list(cursor.fetchmany(size))
-
-    def _fetch_sample_rows(
-        self, table_ref: TableRef
-    ) -> tuple[list[tuple[Any, ...]], list[str]] | None:
-        columns = self._available_columns(table_ref)
-        sampling = self._sampling()
-        query, _params = self._build_sampling_query(table_ref, columns)
-
-        if sampling.strategy == SamplingStrategy.ALL:
-            rows_per_page = int(sampling.rows_per_page or 100)
-            rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
-        else:
-            conn = self._get_cached_connection(table_ref.database)
-            with conn.cursor() as cursor:
-                cursor.execute(query)
-                rows = cursor.fetchall()
-                column_names = [desc[0] for desc in cursor.description or []]
-
-        if not column_names:
-            return None
-        return rows, column_names
-
-    def _sample_table_rows(self, table_ref: TableRef) -> tuple[str, str] | None:
-        result = self._fetch_sample_rows(table_ref)
-        if result is None:
-            return None
-        rows, column_names = result
-        return self._format_sample_content(table_ref, column_names, rows)
-
-    async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
-        cached = self._content_cache.get(asset_id)
-        if cached:
-            return cached
-
-        table_ref = self._parse_table_ref_from_asset_id(asset_id)
-        if not table_ref:
-            return None
-
-        sampled = self._sample_table_rows(table_ref)
-
-        if sampled is None:
-            return None
-
-        self._content_cache[asset_id] = sampled
-        return sampled
-
-    async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
-        sampling = self._sampling()
-        table_ref = self._parse_table_ref_from_asset_id(asset_id)
-        if not table_ref:
-            return
-
-        if sampling.strategy != SamplingStrategy.ALL:
-            result = self._fetch_sample_rows(table_ref)
-            if result is None:
-                return
-            rows, column_names = result
-            for i, row in enumerate(rows):
-                formatted = self._format_sample_content(
-                    table_ref, column_names, [row], row_offset=i
-                )
-                self._content_cache[asset_id] = formatted
-                yield formatted
-            return
-
-        columns = self._available_columns(table_ref)
-        query, _ = self._build_sampling_query(table_ref, columns)
-        rows_per_page = int(sampling.rows_per_page or 100)
-        table_label = f"{table_ref.database}.{table_ref.table}"
-
-        total_rows = self._count_table_rows(table_ref)
-        total_batches = ((total_rows + rows_per_page - 1) // rows_per_page) if total_rows else None
-        if total_rows is not None and total_batches is not None:
-            logger.info(
-                "Full scan %s: %d rows, %d batches of %d",
-                table_label,
-                total_rows,
-                total_batches,
-                rows_per_page,
-            )
-
-        # Stream rows via fetchmany — O(1) per page at any offset, no PK needed.
-        # Each fetchmany() advances the server-side result pointer without re-scanning.
-        row_offset = 0
-        page_num = 1
-
-        conn = self._connect(table_ref.database)
-        cursor = conn.cursor()
-        try:
-            column_names = await asyncio.to_thread(self._cursor_execute, cursor, query)
-            if not column_names:
-                return
-
-            while not self._aborted:
-                if total_batches is not None:
-                    logger.info("%s batch %d/%d", table_label, page_num, total_batches)
-
-                rows = await asyncio.to_thread(self._cursor_fetchmany, cursor, rows_per_page)
-                if not rows:
-                    break
-
-                # Yield each row individually so detection runs in parallel with fetching.
-                for i, row in enumerate(rows):
-                    formatted = self._format_sample_content(
-                        table_ref, column_names, [row], row_offset=row_offset + i
-                    )
-                    if formatted:
-                        self._content_cache[asset_id] = formatted
-                        yield formatted
-
-                row_offset += len(rows)
-                page_num += 1
-                if len(rows) < rows_per_page:
-                    break
-        finally:
-            try:
-                cursor.close()
-            except Exception:
-                pass
-            conn.close()
-
-    def enrich_finding_location(
-        self,
-        finding: DetectionResult,
-        asset: SingleAssetScanResults,
-        text_content: str,
-    ) -> None:
-        del text_content
-        table_ref = self._table_lookup.get(asset.hash)
-        if not table_ref:
-            return
-
-        path = f"{table_ref.database}.{table_ref.table}"
-        cached = self._content_cache.get(asset.hash)
-        raw_content = cached[0] if cached else None
-        metadata = finding.metadata or {}
-        finding.location = build_tabular_location(
-            raw_content=raw_content,
-            matched_content=finding.matched_content,
-            base_path=path,
-            row_index=metadata.get("tabular_row_index"),
-            column_name=metadata.get("tabular_column_name"),
-        )
-
-    def abort(self) -> None:
-        logger.info("Aborting Hive extraction...")
-        super().abort()
