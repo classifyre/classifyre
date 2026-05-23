@@ -120,7 +120,6 @@ jobs:
             "
           )"
           tag="v${version}"
-          next_version="$(VERSION="${version}" node -e "const [major, minor, patch] = process.env.VERSION.split('.').map(Number); process.stdout.write([major, minor, patch + 1].join('.'))")"
 
           if git rev-parse "${tag}" >/dev/null 2>&1; then
             echo "::error::Tag ${tag} already exists locally"
@@ -133,7 +132,6 @@ jobs:
 
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
-          echo "next_version=${next_version}" >> "${GITHUB_OUTPUT}"
 
       - name: Configure git
         run: |
@@ -314,35 +312,15 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Update develop to SNAPSHOT
+      - name: Merge release back to develop
         env:
-          NEXT_VERSION: ${{ steps.versions.outputs.next_version }}
+          VERSION: ${{ steps.versions.outputs.version }}
         run: |
           set -euo pipefail
           git fetch origin develop
           git checkout develop
-
-          node scripts/set-release-version.mjs "${NEXT_VERSION}-SNAPSHOT"
-          (cd apps/cli && uv lock)
-          (cd packages/schemas && uv lock)
-
-          git add \
-            package.json \
-            apps/api/package.json \
-            apps/blog/package.json \
-            apps/docs/package.json \
-            apps/web/package.json \
-            apps/cli/package.json \
-            apps/cli/pyproject.toml \
-            apps/cli/uv.lock \
-            packages/api-client/package.json \
-            packages/devops/package.json \
-            packages/schemas/package.json \
-            packages/schemas/pyproject.toml \
-            packages/schemas/uv.lock \
-            helm/classifyre/Chart.yaml
-
-          git commit -m "chore: set develop to v${NEXT_VERSION}-SNAPSHOT"
+          git merge origin/main --no-edit \
+            -m "chore: merge release v${VERSION} back to develop"
           git push origin develop
 
       - name: Setup kubectl
