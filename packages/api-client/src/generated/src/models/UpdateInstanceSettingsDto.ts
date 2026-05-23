@@ -56,7 +56,6 @@ export interface UpdateInstanceSettingsDto {
  * @export
  */
 export const UpdateInstanceSettingsDtoLanguageEnum = {
-    Automatic: 'AUTOMATIC',
     English: 'ENGLISH',
     German: 'GERMAN'
 } as const;
