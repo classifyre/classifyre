@@ -7,6 +7,12 @@ import {
   InstanceSettingsResponseDtoTimeFormatEnum,
 } from "@workspace/api-client";
 import { setDateFormattingPreferences } from "@/lib/date";
+import {
+  resolveLanguage,
+  type LanguageSetting,
+  type ResolvedLanguage,
+} from "@/lib/locale-detection";
+import { setLanguageCookie } from "@/lib/language-cookie";
 
 type InstanceSettingsResponse = Awaited<
   ReturnType<typeof api.instanceSettings.instanceSettingsControllerGetSettings>
@@ -20,6 +26,7 @@ type UpdateInstanceSettingsPayload = NonNullable<
 
 type InstanceSettingsContextValue = {
   settings: InstanceSettingsResponse;
+  resolvedLanguage: ResolvedLanguage;
   loading: boolean;
   saving: boolean;
   error: string | null;
@@ -34,7 +41,7 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   aiEnabled: true,
   mcpEnabled: true,
   demoMode: false,
-  language: InstanceSettingsResponseDtoLanguageEnum.English,
+  language: InstanceSettingsResponseDtoLanguageEnum.Automatic,
   timezone: "UTC",
   timeFormat: InstanceSettingsResponseDtoTimeFormatEnum.TwelveHour,
   createdAt: new Date(0),
@@ -44,9 +51,12 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
 const InstanceSettingsContext =
   React.createContext<InstanceSettingsContextValue | null>(null);
 
-function applyDatePreferences(settings: InstanceSettingsResponse) {
+function applyDatePreferences(
+  settings: InstanceSettingsResponse,
+  language: ResolvedLanguage,
+) {
   setDateFormattingPreferences({
-    language: settings.language,
+    language,
     timezone: settings.timezone,
     timeFormat: settings.timeFormat,
   });
@@ -70,14 +80,17 @@ export function InstanceSettingsProvider({
       const response =
         await api.instanceSettings.instanceSettingsControllerGetSettings();
       setSettings(response);
-      applyDatePreferences(response);
+      applyDatePreferences(
+        response,
+        resolveLanguage(response.language as LanguageSetting),
+      );
     } catch (loadError) {
       const message =
         loadError instanceof Error
           ? loadError.message
           : "Failed to load instance settings";
       setError(message);
-      applyDatePreferences(DEFAULT_SETTINGS);
+      applyDatePreferences(DEFAULT_SETTINGS, "ENGLISH");
     } finally {
       setLoading(false);
     }
@@ -95,7 +108,10 @@ export function InstanceSettingsProvider({
           });
 
         setSettings(response);
-        applyDatePreferences(response);
+        applyDatePreferences(
+          response,
+          resolveLanguage(response.language as LanguageSetting),
+        );
         return response;
       } catch (updateError) {
         const message =
@@ -111,6 +127,12 @@ export function InstanceSettingsProvider({
     [],
   );
 
+  const resolvedLanguage = React.useMemo<ResolvedLanguage>(() => {
+    const resolved = resolveLanguage(settings.language as LanguageSetting);
+    setLanguageCookie(resolved);
+    return resolved;
+  }, [settings.language]);
+
   React.useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -118,13 +140,14 @@ export function InstanceSettingsProvider({
   const value = React.useMemo<InstanceSettingsContextValue>(
     () => ({
       settings,
+      resolvedLanguage,
       loading,
       saving,
       error,
       refresh,
       updateSettings,
     }),
-    [settings, loading, saving, error, refresh, updateSettings],
+    [settings, resolvedLanguage, loading, saving, error, refresh, updateSettings],
   );
 
   return (

@@ -189,6 +189,11 @@ export default function SettingsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
+                    value={InstanceSettingsResponseDtoLanguageEnum.Automatic}
+                  >
+                    {t("settings.languages.AUTOMATIC")}
+                  </SelectItem>
+                  <SelectItem
                     value={InstanceSettingsResponseDtoLanguageEnum.English}
                   >
                     {t("settings.languages.ENGLISH")}

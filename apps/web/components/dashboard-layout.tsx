@@ -29,6 +29,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { AssistantWorkflowTrigger } from "./assistant-workflow-provider";
+import { LanguageSwitcher } from "./language-switcher";
 import { useInstanceSettings } from "./instance-settings-provider";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
@@ -342,6 +343,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               </Tooltip>
             )}
             <AssistantWorkflowTrigger />
+            <LanguageSwitcher />
             <ThemeToggle />
             <NotificationCenter />
             <Button

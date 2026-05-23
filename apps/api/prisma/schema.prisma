@@ -375,7 +375,7 @@ model InstanceSettings {
   id         Int              @id @default(1)
   aiEnabled  Boolean          @default(true) @map("ai_enabled")
   mcpEnabled Boolean          @default(true) @map("mcp_enabled")
-  language   InstanceLanguage @default(ENGLISH)
+  language   InstanceLanguage @default(AUTOMATIC)
   timezone   String           @default("UTC")
   timeFormat InstanceTimeFormat @default(TWELVE_HOUR) @map("time_format")
   createdAt  DateTime         @default(now()) @map("created_at")
@@ -482,6 +482,7 @@ enum NotificationType {
 }
 
 enum InstanceLanguage {
+  AUTOMATIC
   ENGLISH
   GERMAN
 }
