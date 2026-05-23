@@ -80,7 +80,6 @@ export interface InstanceSettingsResponseDto {
  * @export
  */
 export const InstanceSettingsResponseDtoLanguageEnum = {
-    Automatic: 'AUTOMATIC',
     English: 'ENGLISH',
     German: 'GERMAN'
 } as const;
