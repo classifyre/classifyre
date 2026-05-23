@@ -66,14 +66,20 @@ function getTimezoneOffsetLabel(timezone: string) {
   }
 }
 
-function getTimezoneLabel(timezone: string) {
+function getTimezoneLabel(timezone: string, autoLabel: string) {
+  if (timezone === "AUTOMATIC") return autoLabel;
   return `${timezone} (${getTimezoneOffsetLabel(timezone)})`;
 }
 
 function getTimezoneOptions(currentTimezone: string) {
-  return Array.from(new Set([...COMMON_TIMEZONES, currentTimezone])).sort(
-    (a, b) => a.localeCompare(b),
-  );
+  const zones = Array.from(
+    new Set(
+      [...COMMON_TIMEZONES, currentTimezone].filter(
+        (tz) => tz !== "AUTOMATIC",
+      ),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+  return ["AUTOMATIC", ...zones];
 }
 
 export default function SettingsPage() {
@@ -232,6 +238,11 @@ export default function SettingsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
+                    value={InstanceSettingsResponseDtoTimeFormatEnum.Automatic}
+                  >
+                    {t("settings.languages.AUTOMATIC")}
+                  </SelectItem>
+                  <SelectItem
                     value={InstanceSettingsResponseDtoTimeFormatEnum.TwelveHour}
                   >
                     {t("settings.timeFormat12")}
@@ -261,7 +272,7 @@ export default function SettingsPage() {
                 <SelectContent>
                   {timezoneOptions.map((timezone) => (
                     <SelectItem key={timezone} value={timezone}>
-                      {getTimezoneLabel(timezone)}
+                      {getTimezoneLabel(timezone, t("settings.languages.AUTOMATIC"))}
                     </SelectItem>
                   ))}
                 </SelectContent>

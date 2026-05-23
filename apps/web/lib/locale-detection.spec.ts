@@ -2,7 +2,19 @@ import {
   resolveLocaleTag,
   detectBrowserLanguage,
   resolveLanguage,
+  detectBrowserTimeFormat,
+  resolveTimeFormat,
+  detectBrowserTimezone,
+  resolveTimezone,
+  AUTOMATIC_TIMEZONE,
 } from "./locale-detection";
+import {
+  getLanguageOverride,
+  setLanguageOverride,
+  clearLanguageOverride,
+} from "./language-cookie";
+
+// ─── resolveLocaleTag ───────────────────────────────────────────────
 
 describe("resolveLocaleTag", () => {
   it.each([
@@ -28,6 +40,8 @@ describe("resolveLocaleTag", () => {
     expect(resolveLocaleTag(tag)).toBe(expected);
   });
 });
+
+// ─── detectBrowserLanguage ──────────────────────────────────────────
 
 describe("detectBrowserLanguage", () => {
   const originalNavigator = globalThis.navigator;
@@ -86,10 +100,14 @@ describe("detectBrowserLanguage", () => {
   });
 });
 
+// ─── resolveLanguage ────────────────────────────────────────────────
+
 describe("resolveLanguage", () => {
+  const originalNavigator = globalThis.navigator;
+
   afterEach(() => {
     Object.defineProperty(globalThis, "navigator", {
-      value: globalThis.navigator,
+      value: originalNavigator,
       writable: true,
       configurable: true,
     });
@@ -119,5 +137,121 @@ describe("resolveLanguage", () => {
       configurable: true,
     });
     expect(resolveLanguage("AUTOMATIC")).toBe("ENGLISH");
+  });
+});
+
+// ─── detectBrowserTimeFormat ────────────────────────────────────────
+
+describe("detectBrowserTimeFormat", () => {
+  it("returns a valid time format", () => {
+    const result = detectBrowserTimeFormat();
+    expect(["TWELVE_HOUR", "TWENTY_FOUR_HOUR"]).toContain(result);
+  });
+});
+
+// ─── resolveTimeFormat ──────────────────────────────────────────────
+
+describe("resolveTimeFormat", () => {
+  it("passes through TWELVE_HOUR unchanged", () => {
+    expect(resolveTimeFormat("TWELVE_HOUR")).toBe("TWELVE_HOUR");
+  });
+
+  it("passes through TWENTY_FOUR_HOUR unchanged", () => {
+    expect(resolveTimeFormat("TWENTY_FOUR_HOUR")).toBe("TWENTY_FOUR_HOUR");
+  });
+
+  it("resolves AUTOMATIC to a valid time format", () => {
+    const result = resolveTimeFormat("AUTOMATIC");
+    expect(["TWELVE_HOUR", "TWENTY_FOUR_HOUR"]).toContain(result);
+  });
+});
+
+// ─── detectBrowserTimezone ──────────────────────────────────────────
+
+describe("detectBrowserTimezone", () => {
+  it("returns a non-empty IANA timezone string", () => {
+    const tz = detectBrowserTimezone();
+    expect(typeof tz).toBe("string");
+    expect(tz.length).toBeGreaterThan(0);
+  });
+});
+
+// ─── resolveTimezone ────────────────────────────────────────────────
+
+describe("resolveTimezone", () => {
+  it("passes through a specific timezone unchanged", () => {
+    expect(resolveTimezone("Europe/Berlin")).toBe("Europe/Berlin");
+  });
+
+  it("passes through UTC unchanged", () => {
+    expect(resolveTimezone("UTC")).toBe("UTC");
+  });
+
+  it("resolves AUTOMATIC to an IANA timezone", () => {
+    const tz = resolveTimezone(AUTOMATIC_TIMEZONE);
+    expect(typeof tz).toBe("string");
+    expect(tz).not.toBe("AUTOMATIC");
+    expect(tz.length).toBeGreaterThan(0);
+  });
+});
+
+// ─── language cookie ────────────────────────────────────────────────
+
+describe("language cookie", () => {
+  let cookieStore: string;
+
+  beforeEach(() => {
+    cookieStore = "";
+    Object.defineProperty(globalThis, "document", {
+      value: {
+        get cookie() {
+          return cookieStore;
+        },
+        set cookie(v: string) {
+          const [pair] = v.split(";");
+          const [name, val] = (pair ?? "").split("=");
+          if (!name) return;
+          const isDelete = v.includes("max-age=0");
+          const entries = cookieStore
+            .split("; ")
+            .filter((e) => e && !e.startsWith(`${name}=`));
+          if (!isDelete && val) entries.push(`${name}=${val}`);
+          cookieStore = entries.join("; ");
+        },
+      },
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  it("returns null when no cookie is set", () => {
+    expect(getLanguageOverride()).toBeNull();
+  });
+
+  it("persists and reads AUTOMATIC", () => {
+    setLanguageOverride("AUTOMATIC");
+    expect(getLanguageOverride()).toBe("AUTOMATIC");
+  });
+
+  it("persists and reads ENGLISH", () => {
+    setLanguageOverride("ENGLISH");
+    expect(getLanguageOverride()).toBe("ENGLISH");
+  });
+
+  it("persists and reads GERMAN", () => {
+    setLanguageOverride("GERMAN");
+    expect(getLanguageOverride()).toBe("GERMAN");
+  });
+
+  it("ignores invalid cookie values", () => {
+    document.cookie = "classifyre-language=FRENCH; path=/";
+    expect(getLanguageOverride()).toBeNull();
+  });
+
+  it("clearLanguageOverride removes the cookie", () => {
+    setLanguageOverride("GERMAN");
+    expect(getLanguageOverride()).toBe("GERMAN");
+    clearLanguageOverride();
+    expect(getLanguageOverride()).toBeNull();
   });
 });

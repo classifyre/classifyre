@@ -376,8 +376,8 @@ model InstanceSettings {
   aiEnabled  Boolean          @default(true) @map("ai_enabled")
   mcpEnabled Boolean          @default(true) @map("mcp_enabled")
   language   InstanceLanguage @default(AUTOMATIC)
-  timezone   String           @default("UTC")
-  timeFormat InstanceTimeFormat @default(TWELVE_HOUR) @map("time_format")
+  timezone   String           @default("AUTOMATIC")
+  timeFormat InstanceTimeFormat @default(AUTOMATIC) @map("time_format")
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
 
@@ -488,6 +488,7 @@ enum InstanceLanguage {
 }
 
 enum InstanceTimeFormat {
+  AUTOMATIC
   TWELVE_HOUR
   TWENTY_FOUR_HOUR
 }
