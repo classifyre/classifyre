@@ -72,6 +72,9 @@ class _DummyConnection:
     def cursor(self) -> _DummyCursor:
         return _DummyCursor()
 
+    def close(self) -> None:
+        return None
+
     def __enter__(self) -> _DummyConnection:
         return self
 

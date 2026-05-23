@@ -180,6 +180,7 @@ export const RunnerDtoStatusEnum = {
     Pending: 'PENDING',
     Running: 'RUNNING',
     Completed: 'COMPLETED',
+    Warning: 'WARNING',
     Error: 'ERROR'
 } as const;
 export type RunnerDtoStatusEnum = typeof RunnerDtoStatusEnum[keyof typeof RunnerDtoStatusEnum];

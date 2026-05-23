@@ -59,6 +59,9 @@
     },
     {
       "$ref": "#/definitions/ServiceDeskInput"
+    },
+    {
+      "$ref": "#/definitions/SQLiteInput"
     }
   ],
   "definitions": {
@@ -83,7 +86,8 @@
         "TABLEAU",
         "CONFLUENCE",
         "JIRA",
-        "SERVICEDESK"
+        "SERVICEDESK",
+        "SQLITE"
       ],
       "description": "Type of the asset or source"
     },
@@ -228,6 +232,12 @@
           "minimum": 1,
           "maximum": 16,
           "description": "Max OS processes in the detector pool. Auto-sized from CPU/memory limits when omitted."
+        },
+        "max_concurrent_assets": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Max assets processed concurrently. Controls parallel DB connections. Defaults to pool_workers * 2 when omitted."
         }
       },
       "additionalProperties": false
@@ -2157,7 +2167,7 @@
         "cluster_host": {
           "type": "string",
           "minLength": 1,
-          "description": "Atlas SRV cluster host or full mongodb+srv:// URI (for example, cluster.abc123.mongodb.net or mongodb+srv://cluster.abc123.mongodb.net). If a full URI is supplied, the host is extracted and credentials are discarded \u2014 set them in masked fields instead."
+          "description": "Atlas SRV cluster host or full mongodb+srv:// URI (for example, cluster.abc123.mongodb.net or mongodb+srv://cluster.abc123.mongodb.net). If a full URI is supplied, the host is extracted and credentials are discarded — set them in masked fields instead."
         }
       },
       "required": [
@@ -4224,6 +4234,95 @@
           "required": [
             "required",
             "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SQLiteRequired": {
+      "title": "SQLiteRequired",
+      "type": "object",
+      "properties": {
+        "database_path": {
+          "type": "string",
+          "description": "Absolute or relative path to the SQLite database file (e.g. /data/app.db)"
+        }
+      },
+      "required": [
+        "database_path"
+      ],
+      "additionalProperties": false
+    },
+    "SQLiteOptionalScope": {
+      "title": "SQLiteOptionalScope",
+      "type": "object",
+      "description": "Table selection scope.",
+      "properties": {
+        "include_tables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional table allowlist. Only tables in this list will be scanned."
+        },
+        "table_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of table assets extracted"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SQLiteOptional": {
+      "title": "SQLiteOptional",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/definitions/SQLiteOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SQLiteInput": {
+      "title": "SQLiteInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "SQLITE"
+            },
+            "required": {
+              "$ref": "#/definitions/SQLiteRequired"
+            },
+            "masked": {
+              "type": "object",
+              "description": "SQLite has no credentials; this section is intentionally empty.",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "optional": {
+              "$ref": "#/definitions/SQLiteOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
             "sampling"
           ],
           "additionalProperties": false

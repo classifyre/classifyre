@@ -286,14 +286,13 @@ export default function ScansPage() {
             {t("scans.title")}
           </h1>
           <p className="text-muted-foreground">
-            Search run history and filter by operational status from one
-            surface.
+            {t("scans.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={() => setWizardOpen(true)}>
             <Play className="mr-2 h-4 w-4" />
-            Create Scan
+            {t("scans.createScan")}
           </Button>
         </div>
         <ScanWizard open={wizardOpen} onOpenChange={setWizardOpen} />
@@ -308,7 +307,7 @@ export default function ScansPage() {
       {isLoading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="ml-2 text-sm">Loading scans visualizations...</span>
+          <span className="ml-2 text-sm">{t("common.loading")} scans visualizations...</span>
         </div>
       ) : (
         <>
@@ -376,20 +375,20 @@ export default function ScansPage() {
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <div>
                       <CardTitle className="text-sm uppercase tracking-[0.08em]">
-                        Run Trend
+                        {t("scans.runTrend")}
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
-                        Status distribution over the selected timeline.
+                        {t("scans.runTrendDescription")}
                       </p>
                     </div>
                     <Select value={windowDays} onValueChange={setWindowDays}>
                       <SelectTrigger className="h-8 w-[104px] text-xs border-2 border-border rounded-[4px] font-mono">
-                        <SelectValue placeholder="Window" />
+                        <SelectValue placeholder={t("common.window")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="7">7 days</SelectItem>
-                        <SelectItem value="30">30 days</SelectItem>
-                        <SelectItem value="90">90 days</SelectItem>
+                        <SelectItem value="7">{t("scans.windowDays.7days")}</SelectItem>
+                        <SelectItem value="30">{t("scans.windowDays.30days")}</SelectItem>
+                        <SelectItem value="90">{t("scans.windowDays.90days")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </CardHeader>
@@ -401,7 +400,7 @@ export default function ScansPage() {
                 <Card className="panel-card rounded-[6px]">
                   <CardHeader>
                     <CardTitle className="text-sm uppercase tracking-[0.08em]">
-                      Top Sources by Run Volume
+                      {t("scans.topSourcesByVolume")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -458,7 +457,7 @@ export default function ScansPage() {
               <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[6px] bg-background/55 backdrop-blur-[1px]">
                 <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Updating charts...
+                  {t("scans.updatingCharts")}
                 </div>
               </div>
             )}

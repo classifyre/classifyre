@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Database,
-  Shield,
   ScanSearch,
   Settings,
   AlertTriangle,
@@ -54,8 +54,14 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <Shield className="size-4" />
+                <div className="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg">
+                  <Image
+                    src="/clasifyre_icon.png"
+                    width={32}
+                    height={32}
+                    alt="Classifyre"
+                    className="size-full object-cover"
+                  />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-serif font-bold">

@@ -112,9 +112,9 @@ async def test_mysql_extract_streams_assets_in_batches(
 ) -> None:
     source = MySQLSource(_recipe())
     tables = [
-        TableRef(database="app_db", table="users"),
-        TableRef(database="app_db", table="orders"),
-        TableRef(database="analytics", table="events"),
+        TableRef(database="app_db", schema=None, table="users"),
+        TableRef(database="app_db", schema=None, table="orders"),
+        TableRef(database="analytics", schema=None, table="events"),
     ]
     monkeypatch.setattr(source, "_iter_tables", lambda: tables)
     monkeypatch.setattr(
@@ -148,7 +148,7 @@ async def test_mysql_fetch_content_uses_cache(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = MySQLSource(_recipe())
-    table_ref = TableRef(database="app_db", table="users")
+    table_ref = TableRef(database="app_db", schema=None, table="users")
     asset = source._table_to_asset(table_ref)
     source._table_lookup[asset.hash] = table_ref
 
@@ -180,7 +180,7 @@ def test_mysql_latest_sampling_falls_back_to_random() -> None:
             }
         )
     )
-    table_ref = TableRef(database="app_db", table="users")
+    table_ref = TableRef(database="app_db", schema=None, table="users")
 
     query, params = source._build_sampling_query(table_ref, ["id", "email"])
 
@@ -202,7 +202,7 @@ async def test_mysql_fetch_content_pages_batches_for_all_strategy(
             }
         )
     )
-    table_ref = TableRef(database="app_db", table="users")
+    table_ref = TableRef(database="app_db", schema=None, table="users")
     asset = source._table_to_asset(table_ref)
 
     all_rows: list[tuple[Any, ...]] = [(i, f"user{i}") for i in range(1, 13)]
@@ -269,7 +269,7 @@ def test_mysql_sample_table_rows_no_batching_for_random_strategy(
 ) -> None:
     """With strategy=RANDOM, a single LIMIT query is used — no OFFSET batching."""
     source = MySQLSource(_recipe(sampling={"strategy": "RANDOM", "rows_per_page": 10}))
-    table_ref = TableRef(database="app_db", table="users")
+    table_ref = TableRef(database="app_db", schema=None, table="users")
 
     queries_issued: list[str] = []
 
@@ -333,7 +333,7 @@ async def test_mysql_extract_runs_detector_pipeline_when_enabled(
     monkeypatch.setattr(
         source,
         "_iter_tables",
-        lambda: [TableRef(database="app_db", table="users")],
+        lambda: [TableRef(database="app_db", schema=None, table="users")],
     )
     monkeypatch.setattr(source, "_collect_foreign_key_links", lambda _tables: {})
 

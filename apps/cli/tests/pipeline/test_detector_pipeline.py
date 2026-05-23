@@ -620,10 +620,7 @@ async def test_pipeline_no_truncation_warning_in_scan_stats() -> None:
 
     [asset] = await pipeline.process([make_asset("trunc")])
     assert asset.scan_stats is not None
-    assert not any(
-        "truncated" in w.lower()
-        for w in (asset.scan_stats.warnings or [])
-    )
+    assert not any("truncated" in w.lower() for w in (asset.scan_stats.warnings or []))
 
 
 class FailingDetector(BaseDetector):

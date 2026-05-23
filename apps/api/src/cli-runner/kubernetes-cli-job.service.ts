@@ -525,18 +525,28 @@ export class KubernetesCliJobService {
       ) {
         jobAny.spec.activeDeadlineSeconds = recipeResources.timeout_seconds;
       }
+      const envOverrides: Array<{ name: string; value: string }> = [];
       if (
         typeof recipeResources.max_pool_workers === 'number' &&
         recipeResources.max_pool_workers > 0
       ) {
-        const existing = container.env || [];
-        const idx = existing.findIndex(
-          (e: any) => e.name === 'CLASSIFYRE_MAX_POOL_WORKERS',
-        );
-        const entry = {
+        envOverrides.push({
           name: 'CLASSIFYRE_MAX_POOL_WORKERS',
           value: String(recipeResources.max_pool_workers),
-        };
+        });
+      }
+      if (
+        typeof recipeResources.max_concurrent_assets === 'number' &&
+        recipeResources.max_concurrent_assets > 0
+      ) {
+        envOverrides.push({
+          name: 'CLASSIFYRE_MAX_CONCURRENT_ASSETS',
+          value: String(recipeResources.max_concurrent_assets),
+        });
+      }
+      for (const entry of envOverrides) {
+        const existing = container.env || [];
+        const idx = existing.findIndex((e: any) => e.name === entry.name);
         if (idx >= 0) existing[idx] = entry;
         else existing.push(entry);
         container.env = existing;

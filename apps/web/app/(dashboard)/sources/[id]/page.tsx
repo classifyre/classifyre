@@ -345,6 +345,12 @@ export default function SourceViewPage() {
     { key: "unchanged", label: t("sources.assetUnchanged"), value: totals.unchangedAssets },
   ];
 
+  useEffect(() => {
+    if (source?.name) {
+      document.title = `${source.name} | ${t("app.name")}`;
+    }
+  }, [source?.name, t]);
+
   if (isLoading) {
     return (
       <div className="space-y-6">
