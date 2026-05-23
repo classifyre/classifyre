@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
+  ArrowDown,
+  ArrowUp,
   CalendarClock,
+  ChevronsUpDown,
   Filter,
   Loader2,
   Play,
@@ -16,8 +19,13 @@ import {
 import {
   AssetListItemDtoSourceTypeEnum,
   api,
+  SearchSourcesSortByEnum,
+  SearchSourcesSortOrderEnum,
   type SearchSourcesRequestDto,
   type SearchSourcesResponseDto,
+  type SearchSourcesSortBy,
+  type SearchSourcesSortOrder,
+  type RunnerDto,
   type StartRunnerDto,
 } from "@workspace/api-client";
 import {
@@ -55,6 +63,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components";
 import { getSourceIcon } from "../lib/source-type-icon";
+import { mergeRunnerIntoSearchSourceItem } from "@/lib/runner-ws-merge";
 import { DeleteSourceAction } from "./delete-source-action";
 import {
   getRunnerStatusBadgeLabel,
@@ -62,6 +71,7 @@ import {
   isRunnerStatusRunning,
 } from "../lib/runner-status-badge";
 import { useUrlParams } from "../lib/url-filters";
+import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 
@@ -71,6 +81,11 @@ type FilterDraft = {
   search: string;
   types: SourceTypeFilter[];
   statuses: RunnerStatusFilter[];
+};
+
+type SortDraft = {
+  by: SearchSourcesSortBy;
+  order: SearchSourcesSortOrder;
 };
 
 type SourceFilters = NonNullable<SearchSourcesRequestDto["filters"]>;
@@ -83,6 +98,11 @@ const DEFAULT_DRAFT: FilterDraft = {
   search: "",
   types: [],
   statuses: [],
+};
+
+const DEFAULT_SORT: SortDraft = {
+  by: SearchSourcesSortByEnum.CreatedAt,
+  order: SearchSourcesSortOrderEnum.Desc,
 };
 
 const SOURCE_TYPE_OPTIONS = Object.values(
@@ -161,13 +181,53 @@ function formatCronSchedule(
   return t("sources.scheduleLabel");
 }
 
+function getSortIcon({
+  active,
+  order,
+}: {
+  active: boolean;
+  order: SearchSourcesSortOrder;
+}) {
+  if (!active) {
+    return <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />;
+  }
+
+  if (order === SearchSourcesSortOrderEnum.Asc) {
+    return <ArrowUp className="h-3.5 w-3.5" />;
+  }
+
+  return <ArrowDown className="h-3.5 w-3.5" />;
+}
+
+function nextSort(current: SortDraft, field: SearchSourcesSortBy): SortDraft {
+  if (current.by === field) {
+    return {
+      by: field,
+      order:
+        current.order === SearchSourcesSortOrderEnum.Asc
+          ? SearchSourcesSortOrderEnum.Desc
+          : SearchSourcesSortOrderEnum.Asc,
+    };
+  }
+
+  const defaultOrder =
+    field === SearchSourcesSortByEnum.CreatedAt ||
+    field === SearchSourcesSortByEnum.UpdatedAt ||
+    field === SearchSourcesSortByEnum.LastRunAt
+      ? SearchSourcesSortOrderEnum.Desc
+      : SearchSourcesSortOrderEnum.Asc;
+
+  return {
+    by: field,
+    order: defaultOrder,
+  };
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 type SourcesTableProps = {
   onTotalsChange?: (totals: SearchSourcesResponseDto["totals"] | null) => void;
 };
-
-// ─── Refresh counter helper ───────────────────────────────────────────────────
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -180,6 +240,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     PENDING: t("sources.statusPending"),
     RUNNING: t("sources.running"),
     COMPLETED: t("sources.statusCompleted"),
+    WARNING: t("sources.statusWarning"),
     ERROR: t("sources.statusError"),
   };
 
@@ -191,6 +252,23 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     types: searchParams.getAll("type") as SourceTypeFilter[],
     statuses: searchParams.getAll("status") as RunnerStatusFilter[],
   }));
+  const [sort, setSort] = useState<SortDraft>(() => {
+    const by = searchParams.get("sortBy") as SearchSourcesSortBy | null;
+    const order = searchParams.get("sortOrder") as SearchSourcesSortOrder | null;
+    return {
+      by:
+        by &&
+        (Object.values(SearchSourcesSortByEnum) as string[]).includes(by)
+          ? by
+          : DEFAULT_SORT.by,
+      order:
+        order &&
+        (Object.values(SearchSourcesSortOrderEnum) as string[]).includes(order)
+          ? order
+          : DEFAULT_SORT.order,
+    };
+  });
+
   const [pageSize, setPageSize] = useState(String(PAGE_SIZE_OPTIONS[0]));
   const [page, setPage] = useState(1);
   const [refreshCount, setRefreshCount] = useState(0);
@@ -202,6 +280,28 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     sourceId: string;
     action: "scan" | "stop";
   } | null>(null);
+
+  const applyRunnerWsEvent = useCallback((runner: RunnerDto) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      let changed = false;
+      const items = prev.items.map((source) => {
+        const next = mergeRunnerIntoSearchSourceItem(source, runner);
+        if (next) {
+          changed = true;
+          return next;
+        }
+        return source;
+      });
+      return changed ? { ...prev, items } : prev;
+    });
+  }, []);
+
+  useRunnerWebSocket({
+    trackRunnersList: false,
+    onRunnerUpdate: applyRunnerWsEvent,
+    onRunnerCreated: applyRunnerWsEvent,
+  });
 
   const resolvedPageSize = Number(pageSize);
 
@@ -216,7 +316,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // ── Sync draft to URL ────────────────────────────────────────────────────
+  // ── Sync draft + sort to URL ─────────────────────────────────────────────
 
   const urlSynced = useRef(false);
   useEffect(() => {
@@ -228,14 +328,16 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
       q: draft.search || null,
       type: draft.types.length > 0 ? draft.types : null,
       status: draft.statuses.length > 0 ? draft.statuses : null,
+      sortBy: sort.by !== DEFAULT_SORT.by ? sort.by : null,
+      sortOrder: sort.order !== DEFAULT_SORT.order ? sort.order : null,
     });
-  }, [draft, setParams]);
+  }, [draft, sort, setParams]);
 
-  // ── Reset page on filter change ──────────────────────────────────────────
+  // ── Reset page on filter/sort change ─────────────────────────────────────
 
   useEffect(() => {
     setPage(1);
-  }, [draft, pageSize]);
+  }, [draft, pageSize, sort.by, sort.order]);
 
   // ── Fetch sources ────────────────────────────────────────────────────────
 
@@ -252,7 +354,12 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             type: draft.types.length > 0 ? draft.types : undefined,
             status: draft.statuses.length > 0 ? draft.statuses : undefined,
           },
-          page: { skip, limit: resolvedPageSize },
+          page: {
+            skip,
+            limit: resolvedPageSize,
+            sortBy: sort.by,
+            sortOrder: sort.order,
+          },
         });
         if (!active) return;
         setData(response);
@@ -281,7 +388,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     return () => {
       active = false;
     };
-  }, [draft, page, resolvedPageSize, refreshCount, onTotalsChange]);
+  }, [draft, page, resolvedPageSize, sort.by, sort.order, refreshCount, onTotalsChange]);
 
   // ── Derived ──────────────────────────────────────────────────────────────
 
@@ -332,6 +439,25 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     }
   };
 
+  const renderSortableHead = (label: string, field: SearchSourcesSortBy) => {
+    const active = sort.by === field;
+
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-8 px-1.5 font-medium"
+        onClick={() => setSort((current) => nextSort(current, field))}
+      >
+        <span>{label}</span>
+        {getSortIcon({
+          active,
+          order: sort.order,
+        })}
+      </Button>
+    );
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -343,8 +469,8 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search sources…"
-            className="h-9 pl-9 border-2 border-black rounded-[4px]"
+            placeholder={t("sources.searchPlaceholder")}
+            className="h-9 pl-9 border-2 border-border rounded-[4px]"
           />
         </div>
 
@@ -357,8 +483,8 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[200px] border-2 border-black rounded-[4px]">
-            <MultiSelectValue placeholder="Source type" />
+          <MultiSelectTrigger className="h-9 w-[200px] border-2 border-border rounded-[4px]">
+            <MultiSelectValue placeholder={t("sources.sourceType")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
@@ -385,8 +511,8 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-black rounded-[4px]">
-            <MultiSelectValue placeholder="Runner status" />
+          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
+            <MultiSelectValue placeholder={t("sources.runnerStatus")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
@@ -430,24 +556,18 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
               <TableHeader className="sticky top-0 z-20 bg-white/95 dark:bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
                 <TableRow>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      {t("sources.columns.source")}
-                    </span>
+                    {renderSortableHead(t("sources.columns.source"), SearchSourcesSortByEnum.Name)}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      {t("sources.columns.type")}
-                    </span>
+                    {renderSortableHead(t("sources.columns.type"), SearchSourcesSortByEnum.Type)}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      {t("sources.columns.runner")}
-                    </span>
+                    {renderSortableHead(t("sources.columns.runner"), SearchSourcesSortByEnum.Status)}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                        <span className="cursor-default px-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                           {t("sources.columns.lastRunStats")}
                         </span>
                       </TooltipTrigger>
@@ -457,14 +577,10 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                     </Tooltip>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      {t("sources.columns.lastRun")}
-                    </span>
+                    {renderSortableHead(t("sources.columns.lastRun"), SearchSourcesSortByEnum.LastRunAt)}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      {t("sources.columns.created")}
-                    </span>
+                    {renderSortableHead(t("sources.columns.created"), SearchSourcesSortByEnum.CreatedAt)}
                   </TableHead>
                   <TableHead className="bg-white/95 text-right dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -556,7 +672,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                                   data-icon="inline-start"
                                 />
                               )}
-                              {getRunnerStatusBadgeLabel(source.runnerStatus)}
+                              {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
                             </Badge>
                           </Button>
                         ) : (
@@ -570,7 +686,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                                 data-icon="inline-start"
                               />
                             )}
-                            {getRunnerStatusBadgeLabel(source.runnerStatus)}
+                            {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
                           </Badge>
                         )}
                         {runner?.durationMs != null && (
@@ -607,13 +723,11 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                             {runner.totalFindings > 0 && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Badge
-                                    variant="secondary"
+                                  <p
                                     className="text-[11px]"
                                   >
-                                    {runner.totalFindings} finding
-                                    {runner.totalFindings !== 1 ? "s" : ""}
-                                  </Badge>
+                                    {runner.totalFindings} {t(runner.totalFindings === 1 ? "common.finding" : "common.findings")}
+                                  </p>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   {t("sources.findingsLatestRun")}
@@ -634,7 +748,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                                     variant="destructive"
                                     className="text-[11px] cursor-default"
                                   >
-                                    Error
+                                    {t("common.statusError")}
                                   </Badge>
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-[300px] break-words">
@@ -714,7 +828,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                             <>
                               <Button
                                 size="sm"
-                                className="h-8 rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+                                className="h-8 rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
                                 onClick={() =>
                                   runner?.id
                                     ? router.push(`/scans/${runner.id}`)
@@ -743,7 +857,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                           ) : (
                             <Button
                               size="sm"
-                              className="h-8 rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+                              className="h-8 rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
                               disabled={isStarting}
                               onClick={() => handleScan(source.id)}
                             >
@@ -757,7 +871,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 rounded-[4px] border-2 border-black"
+                            className="h-8 rounded-[4px] border-2 border-border"
                             onClick={() =>
                               router.push(`/sources/${source.id}/edit`)
                             }
@@ -796,8 +910,8 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             {t("common.rowsPerPage")}
           </span>
           <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] border-2 border-black rounded-[4px]">
-              <SelectValue placeholder="Rows" />
+            <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
+              <SelectValue placeholder={t("common.rowsPerPage")} />
             </SelectTrigger>
             <SelectContent>
               {PAGE_SIZE_OPTIONS.map((size) => (
@@ -809,8 +923,8 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
           </Select>
           <span className="text-xs text-muted-foreground">
             {total > 0
-              ? `${((clampedPage - 1) * resolvedPageSize + 1).toLocaleString()}–${Math.min(clampedPage * resolvedPageSize, total).toLocaleString()} of ${total.toLocaleString()}`
-              : "0 sources"}
+              ? `${((clampedPage - 1) * resolvedPageSize + 1).toLocaleString()}–${Math.min(clampedPage * resolvedPageSize, total).toLocaleString()} ${t("common.of")} ${total.toLocaleString()}`
+              : t("common.noItems", { label: t("common.sources") })}
           </span>
         </div>
 
@@ -833,7 +947,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                 const prev = pageItems[index - 1];
                 const showEllipsis = prev && pageNumber - prev > 1;
                 return (
-                  <div key={`page-group-${pageNumber}`} className="contents">
+                  <Fragment key={`page-group-${pageNumber}`}>
                     {showEllipsis && (
                       <PaginationItem>
                         <PaginationEllipsis />
@@ -851,7 +965,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                         {pageNumber}
                       </PaginationLink>
                     </PaginationItem>
-                  </div>
+                  </Fragment>
                 );
               })}
               <PaginationItem>

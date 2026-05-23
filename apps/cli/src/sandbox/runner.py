@@ -40,7 +40,7 @@ class SandboxRunner:
                     raw_config=raw_config,
                 )
 
-                detector = get_detector(detector_name, typed_config)  # type: ignore[arg-type]
+                detector = get_detector(detector_name, typed_config)
                 detectors.append(detector)
                 logger.info(f"Initialized sandbox detector: {detector_name}")
             except Exception as e:
@@ -48,20 +48,25 @@ class SandboxRunner:
 
         return detectors
 
+    @staticmethod
+    def _is_binary_detector(detector: Any) -> bool:
+        for ct in detector.get_supported_content_types():
+            if ct.startswith(("image/", "audio/", "video/")) or ct == "application/octet-stream":
+                return True
+        return False
+
+    @staticmethod
+    def _supports_mime(supported: list[str], mime_type: str) -> bool:
+        if mime_type in supported:
+            return True
+        for s in supported:
+            if s.endswith("/*") and mime_type.startswith(s[:-1]):
+                return True
+        return False
+
     async def run_async(self, file_path: Path) -> tuple[ParsedFile, list[DetectionResult]]:
         """Parse the file and run all enabled detectors."""
         parsed = parse_file(file_path)
-
-        if parsed.is_binary or not parsed.text_content.strip():
-            return parsed, []
-
-        text = parsed.text_content
-        if len(text) > _CONTENT_SIZE_LIMIT:
-            logger.warning(
-                f"Content size ({len(text)} bytes) exceeds limit "
-                f"({_CONTENT_SIZE_LIMIT} bytes); truncating."
-            )
-            text = text[:_CONTENT_SIZE_LIMIT]
 
         detectors = self._build_detectors()
         if not detectors:
@@ -69,11 +74,45 @@ class SandboxRunner:
 
         tasks = []
         active_detectors = []
-        for detector in detectors:
-            supported = detector.get_supported_content_types()
-            if "text/plain" in supported:
-                tasks.append(detector.detect(text, "text/plain"))
-                active_detectors.append(detector)
+
+        if parsed.is_binary:
+            raw_bytes = file_path.read_bytes()
+            mime_type = parsed.mime_type
+            if len(raw_bytes) > _CONTENT_SIZE_LIMIT:
+                logger.warning(
+                    f"Binary content ({len(raw_bytes)} bytes) exceeds limit "
+                    f"({_CONTENT_SIZE_LIMIT} bytes); truncating."
+                )
+                raw_bytes = raw_bytes[:_CONTENT_SIZE_LIMIT]
+            for detector in detectors:
+                if self._is_binary_detector(detector) and self._supports_mime(
+                    detector.get_supported_content_types(), mime_type
+                ):
+                    tasks.append(detector.detect(raw_bytes, mime_type))
+                    active_detectors.append(detector)
+        else:
+            if parsed.parse_error:
+                logger.warning(
+                    "Text extraction failed (%s): %s", parsed.mime_type, parsed.parse_error
+                )
+            text = parsed.text_content
+            if not text.strip():
+                logger.warning(
+                    "No text content extracted from %s file; skipping text detectors.",
+                    parsed.mime_type,
+                )
+                return parsed, []
+            if len(text) > _CONTENT_SIZE_LIMIT:
+                logger.warning(
+                    f"Content size ({len(text)} bytes) exceeds limit "
+                    f"({_CONTENT_SIZE_LIMIT} bytes); truncating."
+                )
+                text = text[:_CONTENT_SIZE_LIMIT]
+            for detector in detectors:
+                supported = detector.get_supported_content_types()
+                if "text/plain" in supported:
+                    tasks.append(detector.detect(text, "text/plain"))
+                    active_detectors.append(detector)
 
         if not tasks:
             return parsed, []

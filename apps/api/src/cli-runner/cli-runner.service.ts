@@ -15,6 +15,7 @@ import {
   AssetType,
   Prisma,
   RunnerExecutionMode,
+  RunnerAssetStatus,
   RunnerStatus,
   Source,
   TriggerType,
@@ -40,6 +41,12 @@ import {
 } from '../dto/search-runners-request.dto';
 import { SearchRunnersChartsRequestDto } from '../dto/search-runners-charts-request.dto';
 import { SearchRunnersChartsResponseDto } from '../dto/search-runners-charts-response.dto';
+import {
+  SearchRunnersAssetsRequestDto,
+  SearchRunnersAssetsSortBy,
+  SearchRunnersAssetsSortOrder,
+} from '../dto/search-runners-assets-request.dto';
+import { SearchRunnersAssetsResponseDto } from '../dto/search-runners-assets-response.dto';
 
 type SourceRunSnapshot = {
   runnerStatus: RunnerStatus | null;
@@ -57,6 +64,7 @@ type ActiveExecutionRecord = {
 
 const TERMINAL_RUNNER_STATUSES = new Set<RunnerStatus>([
   RunnerStatus.COMPLETED,
+  RunnerStatus.WARNING,
   RunnerStatus.ERROR,
 ]);
 
@@ -127,6 +135,8 @@ export class CliRunnerService implements OnApplicationBootstrap {
         `Preserved ${preservedActiveRunners} active runner(s) across startup reconciliation`,
       );
     }
+
+    void this.dequeueNextPendingRunner();
   }
 
   private isTerminalRunnerStatus(status: RunnerStatus): boolean {
@@ -504,18 +514,30 @@ export class CliRunnerService implements OnApplicationBootstrap {
       throw error;
     }
 
+    const canStart = await this.canStartNewRunner();
+    if (!canStart) {
+      this.logger.log(
+        `Runner ${runner.id} queued as PENDING — concurrency limit reached`,
+      );
+      const runnerDto = await this.getRunnerStatus(runner.id);
+      if (runnerDto && this.runnerEventsGateway) {
+        this.runnerEventsGateway.emitRunnerCreated(runnerDto as any);
+      }
+      return runner;
+    }
+
     this.logger.log(
       `Starting ${triggerType.toLowerCase()} run ${runner.id} for source ${sourceId} in ${executionMode.toLowerCase()} mode`,
     );
 
-    // Start CLI process (async, don't wait)
     void this.executeCliAsync(
       runner.id,
       sourceWithDecryptedConfig,
       hasSuccessfulRuns,
     );
 
-    // Emit WebSocket event for runner created
+    void this.pruneOldRunners(sourceId);
+
     const runnerDto = await this.getRunnerStatus(runner.id);
     if (runnerDto && this.runnerEventsGateway) {
       this.runnerEventsGateway.emitRunnerCreated(runnerDto as any);
@@ -968,14 +990,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         runnerId,
       );
 
-      const latestRunner = await this.prisma.runner.findUnique({
-        where: { id: runnerId },
-        select: { status: true },
-      });
-      if (!latestRunner || latestRunner.status !== RunnerStatus.RUNNING) {
-        this.logger.log(
-          `Runner ${runnerId} exited with code ${exitCode} after status changed to ${latestRunner?.status ?? 'MISSING'}; skipping final transition.`,
-        );
+      if (await this.shouldSkipRunnerFinalTransition(runnerId, exitCode)) {
         return;
       }
 
@@ -1009,17 +1024,99 @@ export class CliRunnerService implements OnApplicationBootstrap {
         this.persistKubernetesExecutionIdentity(runnerId, jobName, namespace),
     );
     const output = result.output || '';
+    if (await this.shouldSkipRunnerFinalTransition(runnerId, result.exitCode)) {
+      return;
+    }
     if (result.exitCode === 0) {
       await this.completeRunner(runnerId);
       return;
     }
 
-    await this.failRunner(runnerId, output || 'CLI Kubernetes Job failed', {
+    const baseMessage = this.kubernetesExitMessage(result.exitCode);
+    const cliError = this.extractLastCliError(output);
+    const contextParts = [result.failureContext, cliError].filter(Boolean);
+    const errorMessage =
+      contextParts.length > 0
+        ? `${baseMessage}\n\n${contextParts.join('\n\n')}`
+        : baseMessage;
+
+    await this.failRunner(runnerId, errorMessage, {
       exitCode: result.exitCode,
       output,
       jobName: result.jobName,
       namespace: result.namespace,
     });
+  }
+
+  private async shouldSkipRunnerFinalTransition(
+    runnerId: string,
+    exitCode: number,
+  ): Promise<boolean> {
+    const latestRunner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { status: true },
+    });
+
+    if (!latestRunner || latestRunner.status !== RunnerStatus.RUNNING) {
+      this.logger.log(
+        `Runner ${runnerId} exited with code ${exitCode} after status changed to ${latestRunner?.status ?? 'MISSING'}; skipping final transition.`,
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  private kubernetesExitMessage(exitCode: number): string {
+    if (exitCode === 137) {
+      return 'Job was killed by the system (OOMKilled: process exceeded the memory limit).';
+    }
+    if (exitCode === 143) {
+      return 'Job was terminated (SIGTERM: deadline or manual stop exceeded).';
+    }
+    if (exitCode === 1) {
+      return 'Job exited with an error.';
+    }
+    return `Job failed with exit code ${exitCode}.`;
+  }
+
+  private extractLastCliError(output: string): string | undefined {
+    if (!output) return undefined;
+
+    const lines = output.split('\n');
+
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const errorMatch = line.match(
+        /^(?:ERROR|CRITICAL|FATAL):[^\s]*\s+(.+)$/i,
+      );
+      if (errorMatch) {
+        return errorMatch[1].slice(0, 1000);
+      }
+
+      if (/^Traceback \(most recent call last\)/i.test(line)) {
+        const traceLines = lines.slice(i).join('\n').slice(0, 1500);
+        return traceLines;
+      }
+    }
+
+    const lastNonEmpty = lines
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .slice(-3)
+      .join('\n');
+
+    if (
+      lastNonEmpty &&
+      !/^INFO:/i.test(lastNonEmpty) &&
+      lastNonEmpty.length > 5
+    ) {
+      return lastNonEmpty.slice(0, 1000);
+    }
+
+    return undefined;
   }
 
   private async persistKubernetesExecutionIdentity(
@@ -1225,13 +1322,21 @@ export class CliRunnerService implements OnApplicationBootstrap {
           this.logger.warn(`Failed to parse CLI test output: ${error.message}`);
           payload = {
             status: 'FAILURE',
-            message: 'Failed to parse CLI test output.',
+            message: `Failed to parse CLI test output: ${trimmedOutput.substring(0, 1000)}${trimmedOutput.length > 1000 ? '...' : ''}`,
           };
         }
       }
 
-      if (exitCode !== 0 && payload.status !== 'FAILURE') {
-        payload.status = 'FAILURE';
+      if (exitCode !== 0) {
+        if (payload.status !== 'FAILURE') {
+          payload.status = 'FAILURE';
+        }
+        if (
+          (payload.message === 'Connection test failed.' || !payload.message) &&
+          stderr?.trim()
+        ) {
+          payload.message = stderr.trim();
+        }
       }
 
       return payload;
@@ -1263,6 +1368,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           : 'Connection test failed.',
     };
 
+    const nonJsonLines: string[] = [];
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) {
@@ -1274,13 +1380,23 @@ export class CliRunnerService implements OnApplicationBootstrap {
           payload = parsed as Record<string, any>;
         }
       } catch {
-        // Ignore non-JSON log lines.
+        nonJsonLines.push(trimmed);
       }
     }
 
-    if (result.exitCode !== 0 && payload.status !== 'FAILURE') {
-      payload.status = 'FAILURE';
+    if (result.exitCode !== 0) {
+      if (payload.status !== 'FAILURE') {
+        payload.status = 'FAILURE';
+      }
+      if (
+        (payload.message === 'Connection test failed.' || !payload.message) &&
+        nonJsonLines.length > 0
+      ) {
+        // Use last 20 non-JSON lines as error message
+        payload.message = nonJsonLines.slice(-20).join('\n');
+      }
     }
+
     if (!payload.message) {
       payload.message =
         result.exitCode === 0
@@ -1381,6 +1497,25 @@ export class CliRunnerService implements OnApplicationBootstrap {
     } catch {
       // Process might have exited between lookup and kill.
       return false;
+    }
+  }
+
+  private async stopKubernetesJobSafely(
+    runnerId: string,
+    runner: { jobName: string | null; jobNamespace: string | null },
+  ): Promise<void> {
+    try {
+      await this.kubernetesCliJobService?.stopRunnerJob(runnerId, {
+        jobName: runner.jobName || undefined,
+        namespace: runner.jobNamespace || undefined,
+      });
+    } catch (error) {
+      // Job may have already finished, been evicted, or never started (e.g.
+      // ImagePullBackOff). Log and continue — the DB record still needs to be
+      // marked stopped so the source is unblocked.
+      this.logger.warn(
+        `Could not stop Kubernetes job for runner ${runnerId} (proceeding with DB stop): ${String(error)}`,
+      );
     }
   }
 
@@ -1489,6 +1624,20 @@ export class CliRunnerService implements OnApplicationBootstrap {
     sourceStatus: RunnerStatus;
   }): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      await tx.runnerAsset.updateMany({
+        where: {
+          runnerId: params.runnerId,
+          status: {
+            in: [RunnerAssetStatus.PENDING, RunnerAssetStatus.PROCESSING],
+          },
+        },
+        data: {
+          status: RunnerAssetStatus.ERROR,
+          completedAt: new Date(),
+          errorMessage: 'Runner terminated before asset processing completed',
+        },
+      });
+
       await tx.runner.update({
         where: { id: params.runnerId },
         data: params.runnerData,
@@ -1525,28 +1674,69 @@ export class CliRunnerService implements OnApplicationBootstrap {
     const { assetsCreated, assetsUpdated, assetsUnchanged, totalFindings } =
       await this.computeRunnerStats(runnerId);
 
-    await this.transitionRunnerToTerminalState({
-      runnerId,
-      sourceId: runner.sourceId,
-      sourceStatus: RunnerStatus.COMPLETED,
-      runnerData: {
-        status: RunnerStatus.COMPLETED,
-        completedAt,
-        durationMs,
-        assetsCreated,
-        assetsUpdated,
-        assetsUnchanged,
-        totalFindings,
-      },
-    });
+    const { finalStatus, warningMessage } = await this.prisma.$transaction(
+      async (tx) => {
+        await tx.runnerAsset.updateMany({
+          where: {
+            runnerId,
+            status: {
+              in: [RunnerAssetStatus.PENDING, RunnerAssetStatus.PROCESSING],
+            },
+          },
+          data: {
+            status: RunnerAssetStatus.ERROR,
+            completedAt,
+            errorMessage: 'Runner completed before asset processing finished',
+          },
+        });
 
-    // Reset consecutive failure tracking on the source
+        const [errorCount, totalCount] = await Promise.all([
+          tx.runnerAsset.count({
+            where: { runnerId, status: RunnerAssetStatus.ERROR },
+          }),
+          tx.runnerAsset.count({ where: { runnerId } }),
+        ]);
+
+        const hasErrors = errorCount > 0;
+        const status = hasErrors
+          ? RunnerStatus.WARNING
+          : RunnerStatus.COMPLETED;
+        const message = hasErrors
+          ? `${errorCount} of ${totalCount} assets failed processing`
+          : undefined;
+
+        await tx.runner.update({
+          where: { id: runnerId },
+          data: {
+            status,
+            completedAt,
+            durationMs,
+            assetsCreated,
+            assetsUpdated,
+            assetsUnchanged,
+            totalFindings,
+            ...(message && { errorMessage: message }),
+          },
+        });
+
+        await this.transitionSourceToTerminalState(
+          tx,
+          runner.sourceId,
+          runnerId,
+          status,
+        );
+
+        return { finalStatus: status, warningMessage: message };
+      },
+    );
+
     await this.prisma.source.update({
       where: { id: runner.sourceId },
       data: {
         consecutiveFailures: 0,
-        lastRunStatus: RunnerStatus.COMPLETED,
+        lastRunStatus: finalStatus,
         lastRunAt: completedAt,
+        lastErrorMessage: warningMessage ?? null,
       },
     });
 
@@ -1675,6 +1865,8 @@ export class CliRunnerService implements OnApplicationBootstrap {
         }
       }
     }
+
+    void this.dequeueNextPendingRunner();
   }
 
   private async failRunner(
@@ -1767,6 +1959,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           consecutiveFailures: { increment: 1 },
           lastRunStatus: RunnerStatus.ERROR,
           lastRunAt: now,
+          lastErrorMessage: normalizedMessage.slice(0, 2000),
         },
         select: { consecutiveFailures: true },
       });
@@ -1803,6 +1996,8 @@ export class CliRunnerService implements OnApplicationBootstrap {
         );
       }
     }
+
+    void this.dequeueNextPendingRunner();
   }
 
   private getFriendlyErrorMessage(raw: string): string {
@@ -1845,6 +2040,45 @@ export class CliRunnerService implements OnApplicationBootstrap {
     const s = ['th', 'st', 'nd', 'rd'];
     const v = n % 100;
     return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
+  }
+
+  private resolveMaxRunnersPerSource(): number {
+    const raw = process.env.MAX_RUNNERS_PER_SOURCE;
+    if (!raw) return 5;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 5;
+  }
+
+  private async pruneOldRunners(sourceId: string): Promise<void> {
+    const limit = this.resolveMaxRunnersPerSource();
+    if (limit === 0) return;
+
+    const terminated = await this.prisma.runner.findMany({
+      where: {
+        sourceId,
+        status: { in: [RunnerStatus.COMPLETED, RunnerStatus.ERROR] },
+      },
+      orderBy: { triggeredAt: 'desc' },
+      select: { id: true },
+    });
+
+    const toDelete = terminated.slice(limit);
+    if (toDelete.length === 0) return;
+
+    for (const { id } of toDelete) {
+      try {
+        await this.runnerLogStorage.deleteRunnerLogs(id);
+        await this.prisma.runner.delete({ where: { id } });
+      } catch (error) {
+        this.logger.warn(
+          `Failed to prune old runner ${id} for source ${sourceId}: ${String(error)}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Pruned ${toDelete.length} old runner(s) for source ${sourceId} (limit: ${limit})`,
+    );
   }
 
   private async getBaselineFindings(
@@ -1918,7 +2152,11 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
   }
 
-  async updateRunnerStatus(runnerId: string, status: RunnerStatus) {
+  async updateRunnerStatus(
+    runnerId: string,
+    status: RunnerStatus,
+    errorMessage?: string,
+  ) {
     const runner = await this.prisma.runner.findUnique({
       where: { id: runnerId },
       select: {
@@ -1944,17 +2182,11 @@ export class CliRunnerService implements OnApplicationBootstrap {
       return this.getRunnerStatus(runnerId);
     }
 
-    await this.runnerLogStorage.finalizeRunner(runnerId);
-    await this.transitionRunnerToTerminalState({
+    await this.failRunner(
       runnerId,
-      sourceId: runner.sourceId,
-      sourceStatus: status,
-      runnerData: {
-        status,
-        completedAt: new Date(),
-        errorMessage: 'Runner marked as ERROR by upstream executor',
-      },
-    });
+      errorMessage ?? 'Runner marked as ERROR by upstream executor',
+      { source: 'upstream_executor' },
+    );
 
     const runnerDto = await this.getRunnerStatus(runnerId);
 
@@ -1964,6 +2196,154 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
 
     return runnerDto;
+  }
+
+  async registerDiscoveredAssets(
+    runnerId: string,
+    assetHashes: string[],
+  ): Promise<{ registered: number }> {
+    if (!assetHashes.length) return { registered: 0 };
+
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { id: true },
+    });
+    if (!runner) {
+      throw new NotFoundException(`Runner ${runnerId} not found`);
+    }
+
+    const result = await this.prisma.runnerAsset.createMany({
+      data: assetHashes.map((hash) => ({
+        runnerId,
+        assetHash: hash,
+        status: RunnerAssetStatus.PENDING,
+      })),
+      skipDuplicates: true,
+    });
+
+    return { registered: result.count };
+  }
+
+  async updateRunnerAssetStatuses(
+    runnerId: string,
+    updates: Array<{
+      assetHash: string;
+      status: 'PROCESSING' | 'PROCESSED' | 'ERROR';
+      errorMessage?: string;
+      findingsTotal?: number;
+      findingsBySeverity?: object;
+      findingsByDetector?: object;
+    }>,
+  ): Promise<void> {
+    if (!updates.length) return;
+
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { id: true },
+    });
+    if (!runner) {
+      throw new NotFoundException(`Runner ${runnerId} not found`);
+    }
+
+    const now = new Date();
+    await this.prisma.$transaction(
+      updates.map((update) => {
+        const isProcessing = update.status === 'PROCESSING';
+        const isProcessed = update.status === 'PROCESSED';
+        const status = isProcessing
+          ? RunnerAssetStatus.PROCESSING
+          : isProcessed
+            ? RunnerAssetStatus.PROCESSED
+            : RunnerAssetStatus.ERROR;
+
+        return this.prisma.runnerAsset.update({
+          where: {
+            runnerId_assetHash: { runnerId, assetHash: update.assetHash },
+          },
+          data: {
+            status,
+            ...(isProcessing ? { startedAt: now } : { completedAt: now }),
+            errorMessage: isProcessing
+              ? undefined
+              : update.errorMessage?.slice(0, 4000),
+            ...(update.findingsTotal !== undefined && {
+              findingsTotal: update.findingsTotal,
+            }),
+            ...(update.findingsBySeverity !== undefined && {
+              findingsBySeverity: update.findingsBySeverity,
+            }),
+            ...(update.findingsByDetector !== undefined && {
+              findingsByDetector: update.findingsByDetector,
+            }),
+          },
+        });
+      }),
+    );
+  }
+
+  async markRunnerAssetProcessing(
+    runnerId: string,
+    assetHash: string,
+  ): Promise<void> {
+    await this.prisma.runnerAsset.update({
+      where: {
+        runnerId_assetHash: { runnerId, assetHash },
+      },
+      data: {
+        status: RunnerAssetStatus.PROCESSING,
+        startedAt: new Date(),
+      },
+    });
+  }
+
+  async getRunnerAssetProgress(runnerId: string): Promise<{
+    pending: number;
+    processing: number;
+    processed: number;
+    error: number;
+    total: number;
+  }> {
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { id: true },
+    });
+    if (!runner) {
+      throw new NotFoundException(`Runner ${runnerId} not found`);
+    }
+
+    const counts = await this.prisma.runnerAsset.groupBy({
+      by: ['status'],
+      where: { runnerId },
+      _count: true,
+    });
+
+    const result = {
+      pending: 0,
+      processing: 0,
+      processed: 0,
+      error: 0,
+      total: 0,
+    };
+    for (const row of counts) {
+      const count = row._count;
+      switch (row.status) {
+        case RunnerAssetStatus.PENDING:
+          result.pending = count;
+          break;
+        case RunnerAssetStatus.PROCESSING:
+          result.processing = count;
+          break;
+        case RunnerAssetStatus.PROCESSED:
+          result.processed = count;
+          break;
+        case RunnerAssetStatus.ERROR:
+          result.error = count;
+          break;
+      }
+      result.total += count;
+    }
+
+    return result;
   }
 
   async stopRunner(runnerId: string) {
@@ -1991,10 +2371,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
     switch (runner.executionMode) {
       case RunnerExecutionMode.KUBERNETES:
-        await this.kubernetesCliJobService?.stopRunnerJob(runnerId, {
-          jobName: runner.jobName || undefined,
-          namespace: runner.jobNamespace || undefined,
-        });
+        await this.stopKubernetesJobSafely(runnerId, runner);
         break;
       case RunnerExecutionMode.EXTERNAL:
         throw new BadRequestException(
@@ -2004,10 +2381,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       default: {
         const environment = process.env.ENVIRONMENT || 'development';
         if (this.isKubernetesExecutionEnabled(environment)) {
-          await this.kubernetesCliJobService?.stopRunnerJob(runnerId, {
-            jobName: runner.jobName || undefined,
-            namespace: runner.jobNamespace || undefined,
-          });
+          await this.stopKubernetesJobSafely(runnerId, runner);
           break;
         }
 
@@ -2092,6 +2466,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
     runnerId: string;
     cursor?: string;
     take?: number | string;
+    search?: string;
+    levels?: string[];
+    sortOrder?: 'asc' | 'desc';
+    streams?: string[];
   }) {
     const runner = await this.prisma.runner.findUnique({
       where: { id: params.runnerId },
@@ -2498,6 +2876,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           running: number | string;
           queued: number | string;
           completed: number | string;
+          warning: number | string;
           failed: number | string;
         }>
       >(Prisma.sql`
@@ -2506,6 +2885,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           COUNT(*) FILTER (WHERE r.status = 'RUNNING')::int AS "running",
           COUNT(*) FILTER (WHERE r.status = 'PENDING')::int AS "queued",
           COUNT(*) FILTER (WHERE r.status = 'COMPLETED')::int AS "completed",
+          COUNT(*) FILTER (WHERE r.status = 'WARNING')::int AS "warning",
           COUNT(*) FILTER (WHERE r.status = 'ERROR')::int AS "failed"
         FROM runners r
         INNER JOIN sources s ON s.id = r.source_id
@@ -2518,6 +2898,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           running: number | string;
           queued: number | string;
           completed: number | string;
+          warning: number | string;
           failed: number | string;
         }>
       >(Prisma.sql`
@@ -2527,6 +2908,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           COUNT(*) FILTER (WHERE r.status = 'RUNNING')::int AS running,
           COUNT(*) FILTER (WHERE r.status = 'PENDING')::int AS queued,
           COUNT(*) FILTER (WHERE r.status = 'COMPLETED')::int AS completed,
+          COUNT(*) FILTER (WHERE r.status = 'WARNING')::int AS warning,
           COUNT(*) FILTER (WHERE r.status = 'ERROR')::int AS failed
         FROM runners r
         INNER JOIN sources s ON s.id = r.source_id
@@ -2568,6 +2950,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       running: this.toInt(totalsRow?.running),
       queued: this.toInt(totalsRow?.queued),
       completed: this.toInt(totalsRow?.completed),
+      warning: this.toInt(totalsRow?.warning),
       failed: this.toInt(totalsRow?.failed),
     };
 
@@ -2578,6 +2961,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         running: number;
         queued: number;
         completed: number;
+        warning: number;
         failed: number;
       }
     >();
@@ -2590,6 +2974,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         running: 0,
         queued: 0,
         completed: 0,
+        warning: 0,
         failed: 0,
       });
     }
@@ -2603,6 +2988,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       existing.running = this.toInt(row.running);
       existing.queued = this.toInt(row.queued);
       existing.completed = this.toInt(row.completed);
+      existing.warning = this.toInt(row.warning);
       existing.failed = this.toInt(row.failed);
     }
 
@@ -2665,5 +3051,266 @@ export class CliRunnerService implements OnApplicationBootstrap {
     ]);
 
     return { runners, total, skip, take };
+  }
+
+  private resolveMaxConcurrentRunners(): number {
+    const raw = process.env.MAX_CONCURRENT_RUNNERS;
+    if (!raw) return 0;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  }
+
+  private async canStartNewRunner(): Promise<boolean> {
+    const limit = this.resolveMaxConcurrentRunners();
+    if (limit === 0) return true;
+    const running = await this.prisma.runner.count({
+      where: { status: RunnerStatus.RUNNING },
+    });
+    return running < limit;
+  }
+
+  private async dequeueNextPendingRunner(): Promise<void> {
+    if (!(await this.canStartNewRunner())) return;
+
+    const pending = await this.prisma.runner.findFirst({
+      where: { status: RunnerStatus.PENDING, startedAt: null },
+      orderBy: { triggeredAt: 'asc' },
+      include: { source: true },
+    });
+    if (!pending) return;
+
+    const claimed = await this.prisma.runner.updateMany({
+      where: { id: pending.id, status: RunnerStatus.PENDING },
+      data: { status: RunnerStatus.RUNNING },
+    });
+    if (claimed.count !== 1) return;
+
+    try {
+      const source = pending.source;
+      const decryptedConfig = this.toDecryptedRecipeConfig(source.config);
+      const recipeWithFeedback = await this.hydrateCustomDetectorsForRun(
+        source.id,
+        decryptedConfig,
+      );
+      const sourceWithDecryptedConfig = {
+        ...source,
+        config: recipeWithFeedback,
+      };
+      await this.runnerLogStorage.initializeRunner(pending.id);
+
+      const hasSuccessfulRuns = !!(await this.prisma.runner.findFirst({
+        where: { sourceId: source.id, status: RunnerStatus.COMPLETED },
+        select: { id: true },
+      }));
+
+      this.logger.log(
+        `Dequeued pending runner ${pending.id} for source ${source.id}`,
+      );
+
+      void this.executeCliAsync(
+        pending.id,
+        sourceWithDecryptedConfig,
+        hasSuccessfulRuns,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to dequeue runner ${pending.id}: ${String(error)}`,
+      );
+      await this.failRunner(pending.id, String(error), { source: 'dequeue' });
+    }
+  }
+
+  async searchRunnerAssets(
+    request: SearchRunnersAssetsRequestDto,
+  ): Promise<SearchRunnersAssetsResponseDto> {
+    const { filters, page } = request;
+    const skip = Math.max(0, Number(page?.skip ?? 0));
+    const limit = Math.min(200, Math.max(1, Number(page?.limit ?? 50)));
+    const sortBy = page?.sortBy ?? SearchRunnersAssetsSortBy.STATUS_PRIORITY;
+    const sortOrder = page?.sortOrder ?? SearchRunnersAssetsSortOrder.ASC;
+
+    const where: Prisma.RunnerAssetWhereInput = {
+      runnerId: filters.runnerId,
+      ...(filters.status?.length ? { status: { in: filters.status } } : {}),
+      ...(filters.search?.trim()
+        ? {
+            assetHash: { contains: filters.search.trim(), mode: 'insensitive' },
+          }
+        : {}),
+    };
+
+    let runnerAssets: Awaited<
+      ReturnType<typeof this.prisma.runnerAsset.findMany>
+    >;
+    let total = 0;
+
+    if (sortBy === SearchRunnersAssetsSortBy.STATUS_PRIORITY) {
+      const statusPriorityOrder = `CASE status
+        WHEN 'PROCESSING' THEN 1
+        WHEN 'ERROR' THEN 2
+        WHEN 'PENDING' THEN 3
+        WHEN 'PROCESSED' THEN 4
+        ELSE 5
+      END`;
+      const secondaryDir =
+        sortOrder === SearchRunnersAssetsSortOrder.DESC ? 'DESC' : 'ASC';
+
+      const conditions: string[] = [];
+      const params: unknown[] = [];
+
+      conditions.push(`runner_id = $${params.length + 1}`);
+      params.push(filters.runnerId);
+
+      if (filters.status?.length) {
+        const placeholders = filters.status.map(
+          (_, i) => `$${params.length + i + 1}::"RunnerAssetStatus"`,
+        );
+        conditions.push(`status IN (${placeholders.join(', ')})`);
+        params.push(...filters.status);
+      }
+
+      if (filters.search?.trim()) {
+        conditions.push(`asset_hash ILIKE $${params.length + 1}`);
+        params.push(`%${filters.search.trim()}%`);
+      }
+
+      const whereClause = conditions.join(' AND ');
+
+      const countResult = await this.prisma.$queryRawUnsafe<
+        [{ count: bigint }]
+      >(
+        `SELECT COUNT(*) AS count FROM runner_assets WHERE ${whereClause}`,
+        ...params,
+      );
+      total = Number(countResult[0]?.count ?? 0);
+
+      params.push(limit, skip);
+      const rawRows = await this.prisma.$queryRawUnsafe<
+        Array<{
+          runner_id: string;
+          asset_hash: string;
+          status: string;
+          started_at: Date | null;
+          completed_at: Date | null;
+          error_message: string | null;
+          findings_total: number | null;
+          findings_by_severity: Record<string, number> | null;
+          findings_by_detector: Record<string, number> | null;
+          created_at: Date;
+        }>
+      >(
+        `SELECT * FROM runner_assets
+         WHERE ${whereClause}
+         ORDER BY ${statusPriorityOrder}, created_at ${secondaryDir}
+         LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        ...params,
+      );
+      runnerAssets = rawRows.map((row) => ({
+        runnerId: row.runner_id,
+        assetHash: row.asset_hash,
+        status: row.status as any,
+        startedAt: row.started_at,
+        completedAt: row.completed_at,
+        errorMessage: row.error_message,
+        findingsTotal: row.findings_total,
+        findingsBySeverity: row.findings_by_severity,
+        findingsByDetector: row.findings_by_detector,
+        createdAt: row.created_at,
+      }));
+    } else {
+      const orderDir =
+        sortOrder === SearchRunnersAssetsSortOrder.DESC ? 'desc' : 'asc';
+      const orderBy: Prisma.RunnerAssetOrderByWithRelationInput =
+        sortBy === SearchRunnersAssetsSortBy.STATUS
+          ? { status: orderDir }
+          : sortBy === SearchRunnersAssetsSortBy.ASSET_HASH
+            ? { assetHash: orderDir }
+            : sortBy === SearchRunnersAssetsSortBy.COMPLETED_AT
+              ? { completedAt: orderDir }
+              : sortBy === SearchRunnersAssetsSortBy.FINDINGS_TOTAL
+                ? { findingsTotal: orderDir }
+                : { createdAt: orderDir };
+
+      const [rows, count] = await this.prisma.$transaction([
+        this.prisma.runnerAsset.findMany({ where, orderBy, skip, take: limit }),
+        this.prisma.runnerAsset.count({ where }),
+      ]);
+      runnerAssets = rows;
+      total = count;
+    }
+
+    if (runnerAssets.length === 0) {
+      return { items: [], total: total ?? 0, skip, limit };
+    }
+
+    const hashes = [...new Set(runnerAssets.map((ra) => ra.assetHash))];
+    const assets = await this.prisma.asset.findMany({
+      where: { hash: { in: hashes } },
+      select: {
+        id: true,
+        hash: true,
+        name: true,
+        externalUrl: true,
+        links: true,
+        checksum: true,
+        assetType: true,
+        sourceType: true,
+        sourceId: true,
+        runnerId: true,
+        lastScannedAt: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const assetByHash = new Map(assets.map((a) => [a.hash, a]));
+
+    const items = runnerAssets.map((ra) => {
+      const asset = assetByHash.get(ra.assetHash) ?? null;
+
+      return {
+        runnerId: ra.runnerId,
+        assetHash: ra.assetHash,
+        status: ra.status,
+        startedAt: ra.startedAt,
+        completedAt: ra.completedAt,
+        errorMessage: ra.errorMessage,
+        createdAt: ra.createdAt,
+        findingsTotal: ra.findingsTotal ?? null,
+        findingsBySeverity:
+          ra.findingsBySeverity != null &&
+          typeof ra.findingsBySeverity === 'object' &&
+          !Array.isArray(ra.findingsBySeverity)
+            ? (ra.findingsBySeverity as Record<string, number>)
+            : null,
+        findingsByDetector:
+          ra.findingsByDetector != null &&
+          typeof ra.findingsByDetector === 'object' &&
+          !Array.isArray(ra.findingsByDetector)
+            ? (ra.findingsByDetector as Record<string, Record<string, number>>)
+            : null,
+        asset: asset
+          ? {
+              id: asset.id,
+              hash: asset.hash,
+              checksum: asset.checksum,
+              name: asset.name ?? '',
+              externalUrl: asset.externalUrl ?? '',
+              links: asset.links as string[],
+              assetType: asset.assetType,
+              sourceType: asset.sourceType,
+              sourceId: asset.sourceId,
+              runnerId: asset.runnerId ?? null,
+              lastScannedAt: asset.lastScannedAt ?? null,
+              status: asset.status,
+              createdAt: asset.createdAt,
+              updatedAt: asset.updatedAt,
+            }
+          : null,
+      };
+    });
+
+    return { items, total, skip, limit };
   }
 }

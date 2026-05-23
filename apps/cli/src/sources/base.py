@@ -1,9 +1,12 @@
 import os
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator
-from typing import Any
+from collections.abc import AsyncGenerator, Generator
+from typing import TYPE_CHECKING, Any
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
+
+if TYPE_CHECKING:
+    from ..utils.file_parser import ParsedBytes
 from ..utils.hashing import calculate_checksum, normalize_http_url
 from ..utils.validation import validate_output
 from .recipe_normalizer import normalize_source_recipe
@@ -14,7 +17,7 @@ class BaseSource(ABC):
     Abstract base class for all metadata extraction sources.
     """
 
-    # Default batch size for streaming results
+    # Default batch size for streaming asset results
     BATCH_SIZE: int = 50
     HAS_SUCCESSFUL_RUN_ENV = "CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN"
 
@@ -40,21 +43,11 @@ class BaseSource(ABC):
         self.source_id = source_id
         self.runner_id = runner_id
         self._aborted = False
+        self._discovery_only = False
+        self._attachment_name_by_hash: dict[str, str] = {}
 
     def _apply_initial_sampling_override(self, recipe: dict[str, Any]) -> None:
-        sampling = recipe.get("sampling")
-        if not isinstance(sampling, dict):
-            return
-
-        if sampling.get("fetch_all_until_first_success") is not True:
-            return
-
-        has_successful_run = self._read_bool_env(self.HAS_SUCCESSFUL_RUN_ENV)
-        if has_successful_run is not False:
-            return
-
-        sampling["strategy"] = "ALL"
-        sampling.pop("limit", None)
+        pass
 
     @staticmethod
     def _read_bool_env(name: str) -> bool | None:
@@ -68,6 +61,13 @@ class BaseSource(ABC):
             return False
         return None
 
+    def set_discovery_only(self, value: bool) -> None:
+        self._discovery_only = value
+
+    def evict_asset_cache(self, asset_hash: str) -> None:
+        """Free cached content for a processed asset. Override in subclasses."""
+        pass
+
     @abstractmethod
     def test_connection(self) -> dict[str, Any]:
         """
@@ -76,31 +76,46 @@ class BaseSource(ABC):
         """
         pass
 
-    @abstractmethod
+    STREAM_DETECTIONS: bool = False
+
     async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         """
-        The main extraction logic. Yields batches of extracted items.
-        Each batch is a list of SingleAssetScanResults objects.
+        Orchestrates extraction + detection.  Calls ``extract_raw()`` for batches,
+        then runs the detector pipeline (if configured) before yielding results.
 
-        This streaming approach allows:
-        - Memory-efficient processing of large datasets
-        - Real-time progress updates
-        - Incremental database commits (avoiding transaction timeouts)
+        Sources should override ``extract_raw()`` instead of this method.
+        """
+        pipeline = self._build_pipeline()
+        async for batch in self.extract_raw():
+            if pipeline:
+                if self.STREAM_DETECTIONS:
+                    async for processed in pipeline.process_stream(batch):
+                        yield [processed]
+                    continue
+                batch = await pipeline.process(batch)  # noqa: PLW2901
+            if batch:
+                yield batch
+
+    @abstractmethod
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+        """
+        The main extraction logic.  Yields batches of raw assets **without**
+        running detectors.  The base ``extract()`` wraps this with pipeline
+        processing automatically.
 
         Yields:
             Batches of SingleAssetScanResults objects
         """
-        # Subclasses should implement this as an async generator
-        # Example:
-        # batch = []
-        # for item in items:
-        #     batch.append(transform(item))
-        #     if len(batch) >= self.BATCH_SIZE:
-        #         yield batch
-        #         batch = []
-        # if batch:
-        #     yield batch
-        yield []  # Make this a generator for type checking
+        yield []
+
+    def _build_pipeline(self) -> Any:
+        config = getattr(self, "config", None)
+        detectors = getattr(config, "detectors", None) if config else None
+        if not detectors or not any(getattr(d, "enabled", False) for d in detectors):
+            return None
+        from ..pipeline.detector_pipeline import DetectorPipeline
+
+        return DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
     @abstractmethod
     def generate_hash_id(self, asset_id: str) -> str:
@@ -163,6 +178,75 @@ class BaseSource(ABC):
                 return fallback_value
 
         raise ValueError("Asset external_url is required")
+
+    def _attachment_file_name(self, asset_id: str, fallback_url: str) -> str:
+        """Return the stored file name for an attachment, or fallback_url if not recorded."""
+        stored = self._attachment_name_by_hash.get(asset_id)
+        if isinstance(stored, str) and stored.strip():
+            return stored.strip()
+        return fallback_url
+
+    def ocr_enabled(self) -> bool:
+        """Return whether sampling-level OCR is enabled for this source."""
+        config = getattr(self, "config", None)
+        sampling = getattr(config, "sampling", None) if config is not None else None
+        return bool(getattr(sampling, "enable_ocr", False))
+
+    def parse_asset_bytes(
+        self,
+        file_bytes: bytes,
+        *,
+        declared_mime_type: str | None = None,
+        file_name: str = "",
+    ) -> "ParsedBytes":
+        from ..utils.file_parser import parse_bytes
+
+        return parse_bytes(
+            file_bytes,
+            declared_mime_type=declared_mime_type,
+            file_name=file_name,
+            enable_ocr=self.ocr_enabled(),
+        )
+
+    def iter_asset_pages(
+        self,
+        file_bytes: bytes,
+        mime_type: str,
+        batch_size: int = 100,
+        include_column_names: bool = True,
+        *,
+        file_name: str = "",
+    ) -> Generator[str, None, None]:
+        from ..utils.file_parser import iter_file_pages
+
+        return iter_file_pages(
+            file_bytes,
+            mime_type,
+            batch_size,
+            include_column_names,
+            file_name=file_name,
+            enable_ocr=self.ocr_enabled(),
+        )
+
+    async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
+        """
+        Fetch raw bytes and MIME type for an asset (for binary/image detectors).
+
+        Returns (raw_bytes, mime_type) or None if binary content is not available.
+        Sources that store raw file bytes should override this method.
+        """
+        return None
+
+    async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
+        """
+        Async generator yielding (raw_content, text_content) pages for an asset.
+
+        Default: yields a single result from fetch_content.
+        Tabular sources override this to stream pages for ALL strategy.
+        """
+        result = await self.fetch_content(asset_id)
+        if result:
+            yield result
 
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
         """

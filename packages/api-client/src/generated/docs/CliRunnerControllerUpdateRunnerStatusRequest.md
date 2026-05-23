@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `status` | string
+`errorMessage` | string
 
 ## Example
 
@@ -16,6 +17,7 @@ import type { CliRunnerControllerUpdateRunnerStatusRequest } from '@workspace/ap
 // TODO: Update the object below with actual values
 const example = {
   "status": null,
+  "errorMessage": null,
 } satisfies CliRunnerControllerUpdateRunnerStatusRequest
 
 console.log(example)

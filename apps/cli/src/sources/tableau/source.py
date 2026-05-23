@@ -42,14 +42,6 @@ logger = logging.getLogger(__name__)
 _RETRIABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504]
 
 
-def _truncate_text(value: str, max_chars: int) -> str:
-    if len(value) <= max_chars:
-        return value
-    if max_chars <= 3:
-        return value[:max_chars]
-    return f"{value[: max_chars - 3]}..."
-
-
 @dataclass(frozen=True)
 class TableauAssetRef:
     raw_id: str
@@ -599,11 +591,10 @@ class TableauSource(BaseSource):
         if sampling.strategy == SamplingStrategy.ALL:
             return refs
 
-        limit = int(sampling.limit or 100)
-        if limit >= len(refs):
-            return refs
-
         if sampling.strategy == SamplingStrategy.RANDOM:
+            limit = int(sampling.rows_per_page or 100)
+            if limit >= len(refs):
+                return refs
             generator = random.Random(0)
             sampled_indexes = sorted(generator.sample(range(len(refs)), k=limit))
             return [refs[index] for index in sampled_indexes]
@@ -614,6 +605,7 @@ class TableauSource(BaseSource):
 
         if not has_order_values and sampling.fallback_to_random is not False:
             generator = random.Random(0)
+            limit = int(sampling.rows_per_page or 100)
             sampled_indexes = sorted(generator.sample(range(len(refs)), k=limit))
             return [refs[index] for index in sampled_indexes]
 
@@ -623,6 +615,7 @@ class TableauSource(BaseSource):
             scored.append((parsed is not None, effective, ref))
 
         scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        limit = int(sampling.rows_per_page or 100)
         return [item[2] for item in scored[:limit]]
 
     def _asset_from_ref(
@@ -679,15 +672,11 @@ class TableauSource(BaseSource):
 
         return result
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    STREAM_DETECTIONS = True
+
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
-
-        pipeline = None
-        if self.config.detectors and any(detector.enabled for detector in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
         refs = self._sample_refs(self._discover_assets())
         hash_by_raw = {ref.raw_id: self.generate_hash_id(ref.raw_id) for ref in refs}
@@ -708,14 +697,10 @@ class TableauSource(BaseSource):
             batch.append(self._asset_from_ref(ref, links=linked_hashes))
 
             if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    batch = await pipeline.process(batch)
                 yield batch
                 batch = []
 
         if batch:
-            if pipeline:
-                batch = await pipeline.process(batch)
             yield batch
 
     def generate_hash_id(self, asset_id: str) -> str:
@@ -723,7 +708,6 @@ class TableauSource(BaseSource):
 
     def _format_asset_content(self, ref: TableauAssetRef) -> tuple[str, str]:
         sampling = self._sampling()
-        max_total_chars = int(sampling.max_total_chars or 20000)
         lines = [
             f"site={ref.site}",
             f"kind={ref.kind}",
@@ -749,7 +733,7 @@ class TableauSource(BaseSource):
             if total_views is not None:
                 lines.append(f"total_views={total_views}")
 
-        text_content = _truncate_text("\n".join(lines), max_total_chars)
+        text_content = "\n".join(lines)
         raw_content = json.dumps(
             {
                 "kind": ref.kind,

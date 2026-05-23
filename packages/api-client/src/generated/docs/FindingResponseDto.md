@@ -24,6 +24,7 @@ Name | Type
 `contextBefore` | string
 `contextAfter` | string
 `location` | [FindingLocationDto](FindingLocationDto.md)
+`metadata` | { [key: string]: any; }
 `status` | string
 `resolutionReason` | string
 `comment` | string
@@ -62,6 +63,7 @@ const example = {
   "contextBefore": null,
   "contextAfter": null,
   "location": null,
+  "metadata": null,
   "status": null,
   "resolutionReason": null,
   "comment": null,

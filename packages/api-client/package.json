@@ -1,6 +1,6 @@
 {
   "name": "@workspace/api-client",
-  "version": "0.2.34",
+  "version": "0.4.4",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
@@ -22,7 +22,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@openapitools/openapi-generator-cli": "2.31.0",
+    "@openapitools/openapi-generator-cli": "2.33.1",
     "@types/node": "^25.5.2",
     "typescript": "^5.9.3"
   }

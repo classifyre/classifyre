@@ -1,237 +1,185 @@
-"""Threat detector using YARA rules."""
+"""YARA-based threat detector — compiles structured rule objects into a live ruleset."""
 
+import asyncio
 import logging
+import re
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import (
+    DetectorConfig,
+    Severity,
+    ThreatDetectorConfig,
+    YaraRuleConfig,
+)
 from ...models.generated_single_asset_scan_results import DetectionResult, DetectorType, Location
 from ..base import BaseDetector
-from ..dependencies import MissingDependencyError, require_module
+from ..dependencies import require_module
 
 logger = logging.getLogger(__name__)
+
+_SEVERITY_MAP: dict[str, Severity] = {
+    "critical": Severity.critical,
+    "high": Severity.high,
+    "medium": Severity.medium,
+    "low": Severity.low,
+}
+
+_SEVERITY_ORDER: dict[str, int] = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+
+_SAFE_NAME = re.compile(r"[^A-Za-z0-9_]")
+
+
+def _sanitize_name(name: str) -> str:
+    sanitized = _SAFE_NAME.sub("_", name)
+    return ("_" + sanitized) if sanitized and sanitized[0].isdigit() else sanitized or "Rule"
+
+
+def _build_source(rules: list[YaraRuleConfig]) -> str:
+    parts: list[str] = []
+    for rule in rules:
+        strings_block = "\n".join(
+            f"        $s{i} = {pattern}" for i, pattern in enumerate(rule.strings)
+        )
+        desc = (rule.description or "").replace('"', '\\"')
+        sev = rule.severity.value if hasattr(rule.severity, "value") else str(rule.severity)
+        cat = (rule.category or "").replace('"', '\\"')
+        parts.append(
+            f"rule {_sanitize_name(rule.name)} {{\n"
+            f"    meta:\n"
+            f'        description = "{desc}"\n'
+            f'        severity = "{sev}"\n'
+            f'        category = "{cat}"\n'
+            f"    strings:\n"
+            f"{strings_block}\n"
+            f"    condition:\n"
+            f"        {rule.condition}\n"
+            f"}}"
+        )
+    return "\n\n".join(parts)
 
 
 class YaraDetector(BaseDetector):
     """
-    Detector for threats and malware using YARA rules.
+    Threat detector powered by yara-python.
 
-    Detects various threat patterns including:
-    - Suspicious Windows API calls
-    - Shell script exploits
-    - Malware patterns
-    - Potentially malicious code
+    Takes structured rule objects from config, compiles them into a YARA ruleset,
+    and scans extracted text or raw bytes for matches. Use the bundled examples in
+    all_detectors_examples.json as starting points and extend with custom rules.
     """
 
     detector_type = "yara"
     detector_name = "yara"
 
-    def __init__(self, config: DetectorConfig | None = None):
-        """Initialize YARA threat detector with built-in rules."""
+    def __init__(self, config: DetectorConfig | None = None) -> None:
         super().__init__(config)
+        self._yara = require_module("yara", "yara", ["security"])
+        self._threat_config = (
+            config if isinstance(config, ThreatDetectorConfig) else ThreatDetectorConfig()
+        )
+        self._rules = self._compile()
 
+    def _compile(self) -> object | None:
+        rules = self._threat_config.rules
+        if not rules:
+            return None
+        source = _build_source(rules)
         try:
-            yara_module = require_module("yara", "yara", ["security", "detectors"])
-
-            # Define YARA rules for common threats
-            rules_source = """
-            rule Suspicious_Windows_APIs {
-                meta:
-                    description = "Detects suspicious Windows API calls"
-                    severity = "high"
-                strings:
-                    $api1 = "CreateRemoteThread" nocase
-                    $api2 = "VirtualAllocEx" nocase
-                    $api3 = "WriteProcessMemory" nocase
-                    $api4 = "VirtualAlloc" nocase
-                    $api5 = "LoadLibrary" nocase
-                    $api6 = "GetProcAddress" nocase
-                condition:
-                    any of ($api*)
-            }
-
-            rule Suspicious_Shell_Commands {
-                meta:
-                    description = "Detects suspicious shell commands"
-                    severity = "high"
-                strings:
-                    $cmd1 = "rm -rf /" nocase
-                    $cmd2 = "curl" nocase
-                    $cmd3 = "wget" nocase
-                    $cmd4 = "> /dev/null" nocase
-                    $cmd5 = "eval(" nocase
-                    $cmd6 = "base64 -d" nocase
-                condition:
-                    2 of ($cmd*)
-            }
-
-            rule Potential_Code_Injection {
-                meta:
-                    description = "Detects potential code injection patterns"
-                    severity = "critical"
-                strings:
-                    $inject1 = "eval(" nocase
-                    $inject2 = "exec(" nocase
-                    $inject3 = "system(" nocase
-                    $inject4 = "shell_exec" nocase
-                    $inject5 = "passthru" nocase
-                condition:
-                    any of ($inject*)
-            }
-
-            rule Suspicious_Network_Activity {
-                meta:
-                    description = "Detects suspicious network activity patterns"
-                    severity = "medium"
-                strings:
-                    $net1 = "nc -e" nocase
-                    $net2 = "netcat" nocase
-                    $net3 = "/dev/tcp/" nocase
-                    $net4 = "socket.connect" nocase
-                condition:
-                    any of ($net*)
-            }
-
-            rule Obfuscation_Patterns {
-                meta:
-                    description = "Detects common obfuscation patterns"
-                    severity = "medium"
-                strings:
-                    $obf1 = "base64" nocase
-                    $obf2 = { 5C 78 }
-                    $obf3 = "chr(" nocase
-                    $obf4 = "fromCharCode" nocase
-                condition:
-                    2 of ($obf*)
-            }
-            """
-
-            # Compile YARA rules
-            self.rules = yara_module.compile(source=rules_source)
-            logger.debug("Initialized YARA detector with built-in rules")
-
-        except MissingDependencyError:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to initialize YARA detector: {e}")
-            raise
+            return self._yara.compile(source=source)
+        except Exception:
+            logger.exception("YARA compilation failed")
+            return None
 
     async def detect(
-        self, content: str | bytes, content_type: str = "application/octet-stream"
+        self, content: str | bytes, content_type: str = "text/plain"
     ) -> list[DetectionResult]:
-        """
-        Detect threats using YARA rules.
+        if self._rules is None:
+            return []
+        return await asyncio.to_thread(self._detect_sync, content, content_type)
 
-        Args:
-            content: Content to scan (bytes or string)
-            content_type: MIME type
+    def _detect_sync(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
+        if self._rules is None:
+            return []
 
-        Returns:
-            List of detection results for found threats
-        """
-        results: list[DetectionResult] = []
+        data = content if isinstance(content, bytes) else content.encode("utf-8", errors="ignore")
+        timeout = self._threat_config.timeout or 60
 
         try:
-            # Convert string to bytes if needed
-            if isinstance(content, str):
-                content_bytes = content.encode("utf-8", errors="ignore")
+            matches = self._rules.match(data=data, timeout=timeout)
+        except Exception as exc:
+            if "timeout" in str(exc).lower():
+                logger.warning("YARA scan timed out after %ds on %s", timeout, content_type)
             else:
-                content_bytes = content
+                logger.error("YARA scan error on %s: %s", content_type, exc)
+            return []
 
-            # Scan with YARA rules
-            matches = self.rules.match(data=content_bytes)
+        threshold = self._threat_config.confidence_threshold or 0.7
+        results: list[DetectionResult] = []
 
-            # Process each match
-            for match in matches:
-                # Get metadata
-                severity_str = match.meta.get("severity", "medium")
-                description = match.meta.get("description", match.rule)
+        for match in matches:
+            meta: dict[str, object] = getattr(match, "meta", {}) or {}
+            rule_name = str(getattr(match, "rule", "unknown"))
+            description = str(meta.get("description", rule_name))
+            severity = _SEVERITY_MAP.get(str(meta.get("severity", "medium")), Severity.medium)
 
-                # Determine severity
-                severity = self._parse_severity(severity_str)
+            matched_texts = [
+                inst.matched_data.decode("utf-8", errors="replace")
+                for sm in getattr(match, "strings", [])
+                for inst in getattr(sm, "instances", [])
+            ]
+            count = len(matched_texts)
+            confidence = min(0.70 + max(count - 1, 0) * 0.04, 0.99)
+            if confidence < threshold:
+                continue
 
-                # Get matched strings (YARA 4.x format)
-                matched_strings = []
-                for string_match in match.strings:
-                    # In YARA 4.x, string_match has: identifier, instances
-                    # instances is a list of (offset, instance_data, matched_data) tuples
-                    for instance in string_match.instances:
-                        matched_strings.append(
-                            instance.matched_data.decode("utf-8", errors="ignore")
-                        )
-
-                # Calculate confidence based on number of matches
-                confidence = min(0.7 + (len(matched_strings) * 0.05), 0.99)
-
-                # Apply confidence threshold
-                if confidence < (self.config.confidence_threshold or 0.7):
-                    continue
-
-                # Create detection result
-                result = DetectionResult(
+            results.append(
+                DetectionResult(
                     detector_type=DetectorType.YARA,
-                    finding_type=match.rule,
+                    finding_type=rule_name,
                     category="THREAT",
                     severity=severity,
                     confidence=confidence,
-                    matched_content=", ".join(matched_strings[:3]),  # Show first 3 matches
+                    matched_content=", ".join(matched_texts[:3]),
                     location=Location(
                         path=f"yara:{content_type}",
-                        description=f"matched rule {match.rule}",
+                        description=description,
                     ),
                     metadata={
+                        "rule": rule_name,
                         "description": description,
-                        "match_count": len(match.strings),
-                        "rule_name": match.rule,
+                        "match_count": count,
+                        "tags": list(getattr(match, "tags", [])),
                     },
                 )
+            )
 
-                results.append(result)
-
-        except Exception as e:
-            logger.error(f"Error detecting threats: {e}")
-            logger.exception(e)
-
-        # Sort by severity and confidence
-        results.sort(key=lambda r: (r.severity.value, r.confidence), reverse=True)
-
-        # Apply max_findings limit if configured
-        if self.config.max_findings and len(results) > self.config.max_findings:
-            results = results[: self.config.max_findings]
-
-        return results
+        results.sort(
+            key=lambda r: (_SEVERITY_ORDER.get(r.severity.value, 0), r.confidence),
+            reverse=True,
+        )
+        max_f = self._threat_config.max_findings
+        return results[:max_f] if max_f and len(results) > max_f else results
 
     def get_supported_content_types(self) -> list[str]:
-        """Return supported content types for threat detection."""
         return [
-            "application/octet-stream",
-            "application/x-executable",
-            "application/x-sh",
-            "application/x-python",
-            "application/javascript",
+            "text/plain",
+            "text/html",
+            "text/csv",
+            "text/markdown",
             "text/x-python",
             "text/x-shellscript",
-            "text/plain",
+            "text/javascript",
+            "application/json",
+            "application/xml",
+            "application/pdf",
+            "application/octet-stream",
+            "application/x-sh",
+            "application/x-executable",
+            "application/javascript",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ]
 
     def requires_gpu(self) -> bool:
-        """YARA runs on CPU only."""
         return False
-
-    def _parse_severity(self, severity_str: str) -> Severity:
-        """
-        Parse severity string to Severity enum.
-
-        Args:
-            severity_str: Severity as string
-
-        Returns:
-            Severity enum value
-        """
-        severity_map = {
-            "critical": Severity.critical,
-            "high": Severity.high,
-            "medium": Severity.medium,
-            "low": Severity.low,
-            "info": Severity.info,
-        }
-
-        return severity_map.get(severity_str.lower(), Severity.medium)

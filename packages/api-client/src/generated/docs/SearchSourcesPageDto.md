@@ -8,6 +8,8 @@ Name | Type
 ------------ | -------------
 `skip` | number
 `limit` | number
+`sortBy` | string
+`sortOrder` | string
 
 ## Example
 
@@ -18,6 +20,8 @@ import type { SearchSourcesPageDto } from '@workspace/api-client'
 const example = {
   "skip": null,
   "limit": null,
+  "sortBy": null,
+  "sortOrder": null,
 } satisfies SearchSourcesPageDto
 
 console.log(example)

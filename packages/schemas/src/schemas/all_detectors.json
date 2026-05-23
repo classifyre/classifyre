@@ -4,9 +4,6 @@
   "description": "Merged detector schemas with all detector types and common definitions",
   "oneOf": [
     {
-      "$ref": "#/definitions/ContentDetectorConfig"
-    },
-    {
       "$ref": "#/definitions/SecretsDetectorConfig"
     },
     {
@@ -19,19 +16,10 @@
       "$ref": "#/definitions/BrokenLinksDetectorConfig"
     },
     {
-      "$ref": "#/definitions/ContentQualityDetectorConfig"
-    },
-    {
-      "$ref": "#/definitions/ClassificationDetectorConfig"
-    },
-    {
-      "$ref": "#/definitions/DeidScoreDetectorConfig"
-    },
-    {
-      "$ref": "#/definitions/BiasDetectorConfig"
-    },
-    {
       "$ref": "#/definitions/CustomDetectorConfig"
+    },
+    {
+      "$ref": "#/definitions/CodeSecurityDetectorConfig"
     },
     {
       "$ref": "#/definitions/GenericDetectorConfig"
@@ -43,28 +31,9 @@
       "enum": [
         "SECRETS",
         "PII",
-        "TOXIC",
-        "NSFW",
         "YARA",
         "BROKEN_LINKS",
-        "PROMPT_INJECTION",
-        "PHISHING_URL",
-        "SPAM",
-        "LANGUAGE",
         "CODE_SECURITY",
-        "PLAGIARISM",
-        "IMAGE_VIOLENCE",
-        "OCR_PII",
-        "DEID_SCORE",
-        "HATE_SPEECH",
-        "AI_GENERATED",
-        "CONTENT_QUALITY",
-        "BIAS",
-        "DUPLICATE",
-        "DOMAIN_CLASS",
-        "CONTENT_TYPE",
-        "SENSITIVITY_TIER",
-        "JURISDICTION_TAG",
         "CUSTOM"
       ],
       "description": "Type of detector for content analysis"
@@ -263,34 +232,6 @@
           "notes": "Identifies personal data (e.g., names, emails, IDs) that must be protected for privacy and compliance."
         },
         {
-          "detector_type": "TOXIC",
-          "lifecycle_status": "active",
-          "priority": "P1",
-          "categories": [
-            "CONTENT"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "detoxify",
-          "notes": "Flags harmful or abusive language that could damage user experience or brand reputation."
-        },
-        {
-          "detector_type": "NSFW",
-          "lifecycle_status": "active",
-          "priority": "P1",
-          "categories": [
-            "CONTENT"
-          ],
-          "supported_asset_types": [
-            "IMAGE"
-          ],
-          "recommended_model": "nudenet",
-          "notes": "Detects inappropriate or explicit content not suitable for workplace or general audiences."
-        },
-        {
           "detector_type": "YARA",
           "lifecycle_status": "active",
           "priority": "P1",
@@ -323,67 +264,6 @@
           "notes": "Finds non-working or invalid links that reduce content quality and user trust."
         },
         {
-          "detector_type": "PROMPT_INJECTION",
-          "lifecycle_status": "active",
-          "priority": "P0",
-          "categories": [
-            "SECURITY"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "protectai/deberta-v3-base-prompt-injection-v2",
-          "notes": "Detects attempts to manipulate AI systems with malicious or hidden instructions."
-        },
-        {
-          "detector_type": "PHISHING_URL",
-          "lifecycle_status": "active",
-          "priority": "P2",
-          "categories": [
-            "THREAT",
-            "SECURITY"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "CrabInHoney/urlbert-tiny-phishing-classifier",
-          "notes": "Identifies suspicious links designed to steal credentials or sensitive information."
-        },
-        {
-          "detector_type": "SPAM",
-          "lifecycle_status": "active",
-          "priority": "P2",
-          "categories": [
-            "QUALITY"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "mrm8488/bert-tiny-finetuned-sms-spam-detection",
-          "notes": "Flags low-quality or irrelevant bulk content often used for unsolicited promotion."
-        },
-        {
-          "detector_type": "LANGUAGE",
-          "lifecycle_status": "active",
-          "priority": "P2",
-          "categories": [
-            "QUALITY"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "fast-langdetect",
-          "notes": "Detects the language of the content to support localization and processing rules."
-        },
-        {
           "detector_type": "CODE_SECURITY",
           "lifecycle_status": "active",
           "priority": "P3",
@@ -400,205 +280,6 @@
           "notes": "Identifies vulnerabilities or insecure patterns in source code (e.g., hardcoded secrets)."
         },
         {
-          "detector_type": "PLAGIARISM",
-          "lifecycle_status": "planned",
-          "priority": "P4",
-          "categories": [
-            "QUALITY",
-            "COMPLIANCE"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL",
-            "OTHER"
-          ],
-          "recommended_model": "datasketch + all-MiniLM-L6-v2",
-          "notes": "Detects copied or unoriginal content that may violate intellectual property rules."
-        },
-        {
-          "detector_type": "IMAGE_VIOLENCE",
-          "lifecycle_status": "experimental",
-          "priority": "P4",
-          "categories": [
-            "CONTENT"
-          ],
-          "supported_asset_types": [
-            "IMAGE"
-          ],
-          "recommended_model": null,
-          "notes": "Identifies violent or graphic imagery that may be unsafe or non-compliant. Commercial rollout is deferred until a model with verified license terms is selected."
-        },
-        {
-          "detector_type": "OCR_PII",
-          "lifecycle_status": "planned",
-          "priority": "P4",
-          "categories": [
-            "PRIVACY",
-            "COMPLIANCE"
-          ],
-          "supported_asset_types": [
-            "IMAGE"
-          ],
-          "recommended_model": "tesseract + presidio-analyzer",
-          "notes": "Extracts and detects personal data from images or scanned documents using OCR."
-        },
-        {
-          "detector_type": "DEID_SCORE",
-          "lifecycle_status": "planned",
-          "priority": "P0",
-          "categories": [
-            "PRIVACY",
-            "COMPLIANCE"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE"
-          ],
-          "recommended_model": "presidio-analyzer + pycanon + scrubadub",
-          "notes": "Measures how well sensitive data has been anonymized or removed from content."
-        },
-        {
-          "detector_type": "HATE_SPEECH",
-          "lifecycle_status": "planned",
-          "priority": "P2",
-          "categories": [
-            "CONTENT",
-            "COMPLIANCE"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "facebook/roberta-hate-speech-dynabench-r4-target",
-          "notes": "Flags content that promotes discrimination or hatred toward individuals or groups."
-        },
-        {
-          "detector_type": "AI_GENERATED",
-          "lifecycle_status": "planned",
-          "priority": "P1",
-          "categories": [
-            "CONTENT",
-            "COMPLIANCE"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "distilbert-base-uncased (RAID fine-tuned)",
-          "notes": "Estimates whether content was generated by AI rather than a human (probabilistic)."
-        },
-        {
-          "detector_type": "CONTENT_QUALITY",
-          "lifecycle_status": "planned",
-          "priority": "P2",
-          "categories": [
-            "QUALITY"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "sentence-transformers/all-MiniLM-L6-v2 + textstat",
-          "notes": "Evaluates clarity, usefulness, and overall quality of content for end users."
-        },
-        {
-          "detector_type": "BIAS",
-          "lifecycle_status": "active",
-          "priority": "P2",
-          "categories": [
-            "FAIRNESS",
-            "CONTENT"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "valurank/distilroberta-bias",
-          "notes": "Detects potential bias or unfair language that could lead to ethical or reputational risks."
-        },
-        {
-          "detector_type": "DUPLICATE",
-          "lifecycle_status": "planned",
-          "priority": "P2",
-          "categories": [
-            "QUALITY"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "datasketch (MinHash LSH)",
-          "notes": "Identifies repeated or highly similar content across documents or datasets."
-        },
-        {
-          "detector_type": "DOMAIN_CLASS",
-          "lifecycle_status": "planned",
-          "priority": "P2",
-          "categories": [
-            "CLASSIFICATION"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "typeform/distilbert-base-uncased-mnli",
-          "notes": "Classifies content into business domains (e.g., finance, legal, healthcare)."
-        },
-        {
-          "detector_type": "CONTENT_TYPE",
-          "lifecycle_status": "planned",
-          "priority": "P3",
-          "categories": [
-            "CLASSIFICATION"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "typeform/distilbert-base-uncased-mnli",
-          "notes": "Identifies the format or type of content (e.g., email, contract, code, image)."
-        },
-        {
-          "detector_type": "SENSITIVITY_TIER",
-          "lifecycle_status": "planned",
-          "priority": "P2",
-          "categories": [
-            "CLASSIFICATION",
-            "COMPLIANCE"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "typeform/distilbert-base-uncased-mnli",
-          "notes": "Assigns a sensitivity level (e.g., public, internal, confidential, restricted)."
-        },
-        {
-          "detector_type": "JURISDICTION_TAG",
-          "lifecycle_status": "planned",
-          "priority": "P3",
-          "categories": [
-            "CLASSIFICATION",
-            "COMPLIANCE"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
-          "recommended_model": "fast-langdetect + rules engine",
-          "notes": "Tags content with relevant legal or geographic context (e.g., GDPR, US, EU)."
-        },
-        {
           "detector_type": "CUSTOM",
           "lifecycle_status": "active",
           "priority": "P0",
@@ -612,8 +293,8 @@
             "URL",
             "IMAGE"
           ],
-          "recommended_model": "mDeBERTa-v3 + SetFit + GLiNER",
-          "notes": "User-defined rules tailored to specific business needs or internal policies."
+          "recommended_model": "mDeBERTa-v3 + SetFit + GLiNER + HuggingFace transformers",
+          "notes": "User-defined rules and pipelines tailored to specific business needs. Supports regex, GLiNER2, LLM, text classification, image classification, feature extraction, and object detection pipelines."
         }
       ]
     },
@@ -658,61 +339,162 @@
         "end"
       ]
     },
-    "ContentEnabledPattern": {
-      "type": "string",
-      "enum": [
-        "toxicity",
-        "severe_toxicity",
-        "obscene",
-        "threat",
-        "insult",
-        "identity_attack",
-        "nsfw",
-        "nsfw_explicit"
-      ],
-      "description": "Content detector pattern types"
-    },
     "SecretsEnabledPattern": {
       "type": "string",
       "enum": [
+        "artifactory",
         "aws",
+        "azure_storage",
+        "basic_auth",
+        "cloudant",
+        "discord",
         "github",
-        "slack",
-        "stripe",
-        "google",
-        "azure",
+        "gitlab",
+        "high_entropy_base64",
+        "high_entropy_hex",
+        "ibm_cloud_iam",
+        "ibm_cos_hmac",
+        "ip_public",
+        "jwt",
+        "keyword",
+        "mailchimp",
+        "npm",
+        "openai",
         "private_key",
-        "generic_api_key",
-        "generic_secret"
+        "pypi",
+        "sendgrid",
+        "slack",
+        "softlayer",
+        "square_oauth",
+        "stripe",
+        "telegram",
+        "twilio"
       ],
-      "description": "Secrets detector pattern types"
+      "description": "Secrets detector pattern types. Each value maps to a detect-secrets plugin: artifactory=ArtifactoryDetector, aws=AWSKeyDetector, azure_storage=AzureStorageKeyDetector, basic_auth=BasicAuthDetector, cloudant=CloudantDetector, discord=DiscordBotTokenDetector, github=GitHubTokenDetector, gitlab=GitLabTokenDetector, high_entropy_base64=Base64HighEntropyString, high_entropy_hex=HexHighEntropyString, ibm_cloud_iam=IbmCloudIamDetector, ibm_cos_hmac=IbmCosHmacDetector, ip_public=IPPublicDetector, jwt=JwtTokenDetector, keyword=KeywordDetector, mailchimp=MailchimpDetector, npm=NpmDetector, openai=OpenAIDetector, private_key=PrivateKeyDetector, pypi=PypiTokenDetector, sendgrid=SendGridDetector, slack=SlackDetector, softlayer=SoftlayerDetector, square_oauth=SquareOAuthDetector, stripe=StripeDetector, telegram=TelegramBotTokenDetector, twilio=TwilioKeyDetector."
     },
     "PIIEnabledPattern": {
       "type": "string",
       "enum": [
-        "credit_card",
-        "ssn",
-        "email",
-        "phone_number",
-        "person",
-        "location",
-        "ip_address",
-        "iban_code",
-        "us_passport",
-        "us_driver_license",
-        "austrian_svnr",
-        "swiss_ahv",
-        "german_tax_id",
-        "eu_national_id",
-        "date_of_birth"
+        "CREDIT_CARD",
+        "CRYPTO",
+        "DATE_TIME",
+        "EMAIL_ADDRESS",
+        "IBAN_CODE",
+        "IP_ADDRESS",
+        "NRP",
+        "LOCATION",
+        "PERSON",
+        "PHONE_NUMBER",
+        "MEDICAL_LICENSE",
+        "URL",
+        "US_BANK_NUMBER",
+        "US_DRIVER_LICENSE",
+        "US_ITIN",
+        "US_PASSPORT",
+        "US_SSN",
+        "UK_NHS",
+        "ES_NIF",
+        "ES_NIE",
+        "IT_FISCAL_CODE",
+        "IT_DRIVER_LICENSE",
+        "IT_VAR_CODE",
+        "IT_PASSPORT",
+        "IT_IDENTITY_CARD",
+        "SG_NRIC_FIN",
+        "SG_UEN",
+        "AU_ABN",
+        "AU_ACN",
+        "AU_TFN",
+        "AU_MEDICARE",
+        "IN_PAN",
+        "IN_AADHAAR",
+        "IN_VEHICLE_REGISTRATION",
+        "IN_VOTER",
+        "FI_PERSONAL_IDENTITY_CODE",
+        "PL_PESEL",
+        "AT_SVNR",
+        "CH_AHV",
+        "DE_TAX_ID",
+        "EU_NATIONAL_ID"
       ],
-      "description": "PII detector pattern types"
+      "description": "Presidio entity types for PII detection. Global: CREDIT_CARD, CRYPTO, DATE_TIME, EMAIL_ADDRESS, IBAN_CODE, IP_ADDRESS, NRP, LOCATION, PERSON, PHONE_NUMBER, MEDICAL_LICENSE, URL. USA: US_BANK_NUMBER, US_DRIVER_LICENSE, US_ITIN, US_PASSPORT, US_SSN. UK: UK_NHS. Spain: ES_NIF, ES_NIE. Italy: IT_FISCAL_CODE, IT_DRIVER_LICENSE, IT_VAR_CODE, IT_PASSPORT, IT_IDENTITY_CARD. Singapore: SG_NRIC_FIN, SG_UEN. Australia: AU_ABN, AU_ACN, AU_TFN, AU_MEDICARE. India: IN_PAN, IN_AADHAAR, IN_VEHICLE_REGISTRATION, IN_VOTER. Finland: FI_PERSONAL_IDENTITY_CODE. Poland: PL_PESEL. DACH: AT_SVNR, CH_AHV, DE_TAX_ID, EU_NATIONAL_ID."
     },
-    "DetectorConfig": {
+    "PIIRecognizerPattern": {
       "type": "object",
-      "description": "Configuration for detector",
+      "description": "Regex pattern entry for a custom Presidio recognizer",
       "properties": {
-        "enabled_patterns": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable name for this pattern"
+        },
+        "regex": {
+          "type": "string",
+          "description": "Regular expression to match the entity"
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence score assigned when this pattern matches (0-1)"
+        }
+      },
+      "required": [
+        "name",
+        "regex",
+        "score"
+      ],
+      "additionalProperties": false
+    },
+    "PIICustomRecognizer": {
+      "type": "object",
+      "description": "Ad-hoc Presidio recognizer added at runtime. Supports regex patterns, deny-list terms, or both. The recognizer is registered in the analyzer engine and applies to all scans with this config.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique name for this recognizer"
+        },
+        "supported_entity": {
+          "type": "string",
+          "description": "Entity label produced when this recognizer fires (e.g. MY_EMPLOYEE_ID)"
+        },
+        "supported_language": {
+          "type": "string",
+          "default": "en",
+          "description": "BCP-47 language code this recognizer applies to"
+        },
+        "patterns": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PIIRecognizerPattern"
+              },
+              "minItems": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Regex patterns for this recognizer"
+        },
+        "deny_list": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Exact-match deny-list terms for this recognizer"
+        },
+        "context": {
           "anyOf": [
             {
               "type": "array",
@@ -725,76 +507,23 @@
             }
           ],
           "default": null,
-          "description": "List of enabled pattern names"
-        },
-        "severity_threshold": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Severity"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Minimum severity to report"
-        },
-        "confidence_threshold": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1,
-          "default": 0.7,
-          "description": "Minimum confidence to report (0-1)"
-        },
-        "max_findings": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Maximum number of findings to return"
+          "description": "Context words that boost the score when found near a match (e.g. ['zip', 'code'])"
         }
-      }
+      },
+      "required": [
+        "name",
+        "supported_entity"
+      ],
+      "additionalProperties": false
     },
-    "ContentDetectorConfig": {
-      "title": "ContentDetectorConfig",
-      "description": "Configuration for content safety detectors",
-      "allOf": [
-        {
-          "$ref": "#/definitions/DetectorConfig"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "enabled_patterns": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/ContentEnabledPattern"
-              },
-              "description": "Specific content types to detect"
-            },
-            "model_name": {
-              "type": "string",
-              "enum": [
-                "original",
-                "unbiased",
-                "multilingual"
-              ],
-              "default": "original",
-              "title": "ContentModelName",
-              "description": "Detoxify model variant"
-            }
-          }
-        }
-      ]
+    "DetectorConfig": {
+      "type": "object",
+      "description": "Base configuration for detector",
+      "properties": {}
     },
     "SecretsDetectorConfig": {
       "title": "SecretsDetectorConfig",
-      "description": "Configuration for secrets detector",
+      "description": "Configuration for secrets detector powered by detect-secrets",
       "allOf": [
         {
           "$ref": "#/definitions/DetectorConfig"
@@ -803,11 +532,79 @@
           "type": "object",
           "properties": {
             "enabled_patterns": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/SecretsEnabledPattern"
-              },
-              "description": "Specific secret types to detect"
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/SecretsEnabledPattern"
+                  },
+                  "minItems": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Subset of detect-secrets plugins to enable. When null all supported plugins are active."
+            },
+            "entropy_limit_base64": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0,
+                  "maximum": 8.0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Entropy threshold for Base64HighEntropyString (0-8). Defaults to detect-secrets built-in of 4.5 when null. Lower values catch more secrets but increase false positives."
+            },
+            "entropy_limit_hex": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0,
+                  "maximum": 8.0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Entropy threshold for HexHighEntropyString (0-8). Defaults to detect-secrets built-in of 3.0 when null. Lower values catch more secrets but increase false positives."
+            },
+            "confidence_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.7,
+              "description": "Minimum confidence score to report a finding (0-1)"
+            },
+            "max_findings": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum number of findings to return per asset"
+            },
+            "severity_threshold": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Severity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Minimum severity level to include in results. Findings below this threshold are suppressed."
             }
           }
         }
@@ -815,7 +612,7 @@
     },
     "PIIDetectorConfig": {
       "title": "PIIDetectorConfig",
-      "description": "Configuration for PII detector",
+      "description": "Configuration for PII detector powered by Microsoft Presidio",
       "allOf": [
         {
           "$ref": "#/definitions/DetectorConfig"
@@ -824,24 +621,186 @@
           "type": "object",
           "properties": {
             "enabled_patterns": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/PIIEnabledPattern"
-              },
-              "description": "Specific PII types to detect"
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/PIIEnabledPattern"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Presidio entity types to detect. When null, all supported entities are enabled. Use PIIEnabledPattern values (e.g. EMAIL_ADDRESS, US_SSN, CREDIT_CARD)."
             },
             "language": {
               "type": "string",
               "default": "en",
-              "description": "Language code for NER models"
+              "description": "BCP-47 language code for NER models (e.g. en, de, es)"
+            },
+            "spacy_model": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "spaCy model to load (e.g. en_core_web_sm, en_core_web_lg). Defaults to en_core_web_sm when null."
+            },
+            "spacy_model_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Wheel URL for the spaCy model. When set and the model is not installed, the CLI installs it at runtime."
+            },
+            "custom_recognizers": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/PIICustomRecognizer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Ad-hoc recognizers added to the Presidio registry at runtime. Each entry defines a regex-pattern or deny-list recognizer for a custom entity type."
+            },
+            "max_length": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Override spaCy's nlp.max_length (default 1,000,000 chars). Set higher than your longest expected input to avoid the E088 error. Prefer chunk_size for very large texts."
+            },
+            "chunk_size": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Split text into chunks of this many characters before analysis. Findings from all chunks are merged with corrected offsets. When null the full text is passed as-is (subject to max_length)."
+            },
+            "chunk_overlap": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 0,
+              "description": "Character overlap between consecutive chunks. Helps detect entities that span a chunk boundary."
+            },
+            "confidence_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.7,
+              "description": "Minimum Presidio confidence score to report a finding (0-1)"
+            },
+            "max_findings": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum number of findings to return per asset"
             }
           }
         }
       ]
     },
+    "YaraRuleConfig": {
+      "title": "YaraRuleConfig",
+      "description": "A single YARA rule definition. Strings are assigned identifiers $s0, $s1, … in order and can be referenced in the condition by index or via 'any of them' / 'N of ($s*)'.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Rule identifier — letters, digits, and underscores only. Must be unique within a config.",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Human-readable description of what the rule detects."
+        },
+        "severity": {
+          "$ref": "#/definitions/Severity",
+          "description": "Severity level emitted when the rule fires."
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Free-form tag for grouping findings, e.g. 'secrets', 'malware', 'supply_chain'."
+        },
+        "strings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "YARA string patterns with optional modifiers. Assigned identifiers $s0, $s1, … in declaration order. Supported formats: regex (/pattern/ [ascii|wide|nocase|fullword]), literal (\"text\" [modifiers]), hex ({ HH HH … })."
+        },
+        "condition": {
+          "type": "string",
+          "description": "YARA condition expression, e.g. 'any of them', '2 of ($s*)', '$s0 and $s1'."
+        }
+      },
+      "required": [
+        "name",
+        "severity",
+        "strings",
+        "condition"
+      ]
+    },
     "ThreatDetectorConfig": {
       "title": "ThreatDetectorConfig",
-      "description": "Configuration for threat detector",
+      "description": "YARA-based threat detector. Compile one or more structured rule objects into a live YARA ruleset that is scanned against extracted asset content. Use the bundled examples as starting points and compose additional rules as needed.",
       "allOf": [
         {
           "$ref": "#/definitions/DetectorConfig"
@@ -849,21 +808,56 @@
         {
           "type": "object",
           "properties": {
-            "enabled_patterns": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "YARA rule names to enable"
-            },
-            "rules_path": {
-              "type": "string",
-              "description": "Path to custom YARA rules directory"
+            "rules": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/YaraRuleConfig"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Rules to compile and run. When null or empty no scan is performed."
             },
             "timeout": {
               "type": "integer",
               "default": 60,
-              "description": "Timeout for YARA scanning in seconds"
+              "description": "Maximum seconds to spend scanning a single asset before aborting."
+            },
+            "confidence_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.7,
+              "description": "Minimum confidence score to report a finding (0-1). YARA confidence is computed from match count."
+            },
+            "max_findings": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum number of findings to return per asset"
+            },
+            "severity_threshold": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Severity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Minimum severity level to include in results. Findings below this threshold are suppressed."
             }
           }
         }
@@ -872,12 +866,6 @@
     "BrokenLinksDetectorConfig": {
       "title": "BrokenLinksDetectorConfig",
       "description": "Configuration for broken links detector",
-      "type": "object",
-      "properties": {}
-    },
-    "ContentQualityDetectorConfig": {
-      "title": "ContentQualityDetectorConfig",
-      "description": "Configuration for content quality scoring detectors",
       "allOf": [
         {
           "$ref": "#/definitions/DetectorConfig"
@@ -885,119 +873,17 @@
         {
           "type": "object",
           "properties": {
-            "readability_weight": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1,
-              "default": 0.4,
-              "description": "Weight applied to readability signal in composite score"
-            },
-            "coherence_weight": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1,
-              "default": 0.35,
-              "description": "Weight applied to coherence signal in composite score"
-            },
-            "density_weight": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1,
-              "default": 0.25,
-              "description": "Weight applied to information-density signal in composite score"
-            },
-            "min_score_threshold": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 100,
-              "default": 40,
-              "description": "Minimum quality score threshold to report"
-            }
-          }
-        }
-      ]
-    },
-    "ClassificationDetectorConfig": {
-      "title": "ClassificationDetectorConfig",
-      "description": "Configuration for classification and tagging detectors",
-      "allOf": [
-        {
-          "$ref": "#/definitions/DetectorConfig"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "enabled_patterns": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Optional subset of labels/tags to include for this classifier"
-            }
-          }
-        }
-      ]
-    },
-    "DeidScoreDetectorConfig": {
-      "title": "DeidScoreDetectorConfig",
-      "description": "Configuration for de-identification completeness scoring detector",
-      "allOf": [
-        {
-          "$ref": "#/definitions/PIIDetectorConfig"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "min_k_anonymity": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 5,
-              "description": "Minimum target k-anonymity threshold for risk evaluation"
-            },
-            "min_l_diversity": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 2,
-              "description": "Minimum target l-diversity threshold for risk evaluation"
-            },
-            "quasi_identifiers": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/PIIEnabledPattern"
-              },
-              "description": "Quasi-identifiers used for re-identification risk calculations"
-            }
-          }
-        }
-      ]
-    },
-    "BiasEnabledPattern": {
-      "type": "string",
-      "enum": [
-        "gender_bias",
-        "racial_bias",
-        "age_bias",
-        "religious_bias",
-        "political_bias"
-      ],
-      "description": "Bias detector pattern types"
-    },
-    "BiasDetectorConfig": {
-      "title": "BiasDetectorConfig",
-      "description": "Configuration for fairness and bias detector",
-      "allOf": [
-        {
-          "$ref": "#/definitions/DetectorConfig"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "enabled_patterns": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/BiasEnabledPattern"
-              },
-              "description": "Specific bias signals to detect"
+            "max_findings": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum number of broken link findings to return per asset"
             }
           }
         }
@@ -1008,7 +894,8 @@
       "enum": [
         "RULESET",
         "CLASSIFIER",
-        "ENTITY"
+        "ENTITY",
+        "PIPELINE"
       ],
       "description": "Execution method for custom detector logic"
     },
@@ -1092,12 +979,18 @@
         },
         "type": {
           "type": "string",
-          "enum": ["string", "number", "boolean", "list[string]", "list[number]"],
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "list[string]",
+            "list[number]"
+          ],
           "default": "string"
         },
         "entity_label": {
           "type": "string",
-          "description": "GLiNER entity label (ENTITY and CLASSIFIER methods)"
+          "description": "GLiNER2 schema label used for extraction (ENTITY and CLASSIFIER methods)"
         },
         "regex_pattern": {
           "type": "string",
@@ -1110,7 +1003,13 @@
         },
         "aggregate": {
           "type": "string",
-          "enum": ["first", "last", "list", "join", "count"],
+          "enum": [
+            "first",
+            "last",
+            "list",
+            "join",
+            "count"
+          ],
           "default": "list",
           "description": "How to aggregate multiple matches"
         },
@@ -1131,7 +1030,9 @@
           "description": "If true, skip saving extraction when this field is empty"
         }
       },
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "additionalProperties": false
     },
     "CustomExtractorConfig": {
@@ -1144,12 +1045,14 @@
         },
         "fields": {
           "type": "array",
-          "items": { "$ref": "#/definitions/CustomExtractorField" },
+          "items": {
+            "$ref": "#/definitions/CustomExtractorField"
+          },
           "minItems": 1
         },
         "gliner_model": {
           "type": "string",
-          "default": "urchade/gliner_multi-v2.1"
+          "default": "fastino/gliner2-base-v1"
         },
         "content_limit": {
           "type": "integer",
@@ -1159,7 +1062,9 @@
           "description": "Chars of content to pass to extractor (classifier matched_content is only 320 chars)"
         }
       },
-      "required": ["fields"],
+      "required": [
+        "fields"
+      ],
       "additionalProperties": false
     },
     "CustomRulesetConfig": {
@@ -1273,9 +1178,17 @@
           },
           "default": []
         },
+        "entity_descriptions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Optional GLiNER2 schema descriptions keyed by entity label"
+        },
         "model": {
           "type": "string",
-          "default": "urchade/gliner_multi-v2.1"
+          "default": "fastino/gliner2-base-v1"
         }
       },
       "additionalProperties": false
@@ -1302,8 +1215,7 @@
               "type": "string"
             },
             "method": {
-              "$ref": "#/definitions/CustomDetectorMethod",
-              "default": "RULESET"
+              "$ref": "#/definitions/CustomDetectorMethod"
             },
             "languages": {
               "type": "array",
@@ -1327,25 +1239,688 @@
             "extractor": {
               "$ref": "#/definitions/CustomExtractorConfig",
               "description": "Optional structured extraction — runs when detector fires"
+            },
+            "pipeline_schema": {
+              "$ref": "#/definitions/AnyPipelineSchema"
+            },
+            "max_findings": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum number of findings to return per asset"
             }
           },
           "required": [
             "custom_detector_key",
-            "name",
-            "method"
+            "name"
           ],
           "additionalProperties": false
         }
       ]
     },
-    "GenericDetectorConfig": {
-      "title": "GenericDetectorConfig",
-      "description": "Generic config for detectors without specialised parameters",
+    "CodeSecurityDetectorConfig": {
+      "title": "CodeSecurityDetectorConfig",
+      "description": "Configuration for the code security detector powered by Bandit static analysis. Use skips/tests to control which Bandit checks run.",
       "allOf": [
         {
           "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "skips": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^B[0-9]+$"
+                  },
+                  "minItems": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Bandit test IDs to skip (e.g. ['B101', 'B105']). When null all tests run. Takes precedence over tests when both are set."
+            },
+            "tests": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^B[0-9]+$"
+                  },
+                  "minItems": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Explicit list of Bandit test IDs to run (e.g. ['B102', 'B301']). When null all tests (minus skips) run."
+            },
+            "severity_threshold": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Severity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Minimum Bandit issue severity to report. Findings below this threshold are suppressed."
+            },
+            "confidence_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.7,
+              "description": "Minimum confidence score to report a finding (0-1)"
+            },
+            "max_findings": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum number of findings to return per asset"
+            }
+          }
         }
       ]
+    },
+    "GenericDetectorConfig": {
+      "title": "GenericDetectorConfig",
+      "description": "Generic config for detectors without specialised parameters.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/DetectorConfig"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "confidence_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.7,
+              "description": "Minimum confidence score to report a finding (0-1)"
+            },
+            "max_findings": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum number of findings to return per asset"
+            }
+          }
+        }
+      ]
+    },
+    "PipelineEntityDefinition": {
+      "title": "PipelineEntityDefinition",
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string",
+          "default": ""
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "PipelineModelConfig": {
+      "title": "PipelineModelConfig",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PipelineClassificationDefinition": {
+      "title": "PipelineClassificationDefinition",
+      "type": "object",
+      "properties": {
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "multi_label": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "PipelineValidationRule": {
+      "title": "PipelineValidationRule",
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "default": ""
+        },
+        "type": {
+          "type": "string",
+          "default": "regex"
+        },
+        "pattern": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PipelineValidationConfig": {
+      "title": "PipelineValidationConfig",
+      "type": "object",
+      "properties": {
+        "confidence_threshold": {
+          "type": "number",
+          "default": 0.7
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PipelineValidationRule"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PipelineResult": {
+      "title": "PipelineResult",
+      "type": "object",
+      "properties": {
+        "entities": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "classification": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RegexPatternDefinition": {
+      "title": "RegexPatternDefinition",
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "Regular expression pattern (RE2 syntax recommended)"
+        },
+        "flags": {
+          "description": "Legacy integer flags (e.g. re.IGNORECASE). Prefer the boolean fields below instead."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the pattern"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low", "info"],
+          "description": "Severity level assigned to findings from this pattern. When omitted, defaults to high (confidence is always 1.0 for regex)."
+        },
+        "case_sensitive": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether matching is case-sensitive. Set to false for case-insensitive matching."
+        },
+        "dot_nl": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the dot (.) metacharacter matches newline characters."
+        },
+        "literal": {
+          "type": "boolean",
+          "default": false,
+          "description": "Treat the pattern as a literal string instead of a regular expression."
+        },
+        "longest_match": {
+          "type": "boolean",
+          "default": false,
+          "description": "Prefer the longest possible match instead of the first match (RE2 only)."
+        },
+        "max_mem": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum memory (bytes) for the RE2 automaton. RE2 only; ignored with stdlib fallback."
+        },
+        "group": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Capture group index to extract as matched content. 0 = entire match (default)."
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "additionalProperties": false
+    },
+    "PipelineSeverityRule": {
+      "title": "PipelineSeverityRule",
+      "type": "object",
+      "description": "Maps a predicted label to a severity level. Pattern is matched case-insensitively as a substring of the label.",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "Case-insensitive substring matched against the predicted label (e.g. 'spam', 'nsfw', 'person')."
+        },
+        "severity": {
+          "$ref": "#/definitions/Severity"
+        }
+      },
+      "required": [
+        "pattern",
+        "severity"
+      ],
+      "additionalProperties": false
+    },
+    "GLiNER2PipelineSchema": {
+      "title": "GLiNER2PipelineSchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "GLINER2"
+          ],
+          "default": "GLINER2"
+        },
+        "entities": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/PipelineEntityDefinition"
+          }
+        },
+        "classification": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/PipelineClassificationDefinition"
+          }
+        },
+        "model": {
+          "$ref": "#/definitions/PipelineModelConfig"
+        },
+        "validation": {
+          "$ref": "#/definitions/PipelineValidationConfig"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RegexPipelineSchema": {
+      "title": "RegexPipelineSchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "REGEX"
+          ],
+          "default": "REGEX"
+        },
+        "patterns": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/RegexPatternDefinition"
+          }
+        },
+        "validation": {
+          "$ref": "#/definitions/PipelineValidationConfig"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LLMPipelineSchema": {
+      "title": "LLMPipelineSchema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "LLM"
+          ],
+          "default": "LLM"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TextClassificationPipelineSchema": {
+      "title": "TextClassificationPipelineSchema",
+      "type": "object",
+      "description": "Text classification pipeline using a HuggingFace fine-tuned model. Runs a single model; create multiple custom detectors to run multiple classifiers.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["TEXT_CLASSIFICATION"],
+          "default": "TEXT_CLASSIFICATION"
+        },
+        "model": {
+          "type": "string",
+          "description": "HuggingFace hub ID (e.g. 'mrm8488/bert-tiny-finetuned-sms-spam-detection') or absolute local directory path."
+        },
+        "model_revision": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null,
+          "description": "Git branch, tag, or commit hash when fetching from the HuggingFace hub."
+        },
+        "device": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": "cpu",
+          "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
+        },
+        "top_k": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null,
+          "description": "Maximum number of top predictions to return. When null all labels above confidence_threshold are returned."
+        },
+        "function_to_apply": {
+          "anyOf": [
+            { "type": "string", "enum": ["sigmoid", "softmax", "none"] },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Score normalization: 'softmax' for single-label, 'sigmoid' for multi-label, 'none' for raw logits."
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.7,
+          "description": "Minimum prediction confidence to report a label as a finding (0-1)."
+        },
+        "severity": {
+          "anyOf": [{ "$ref": "#/definitions/Severity" }, { "type": "null" }],
+          "default": "info",
+          "description": "Default severity when no severity_map rule matches."
+        },
+        "severity_map": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": { "$ref": "#/definitions/PipelineSeverityRule" }
+            },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Ordered rules mapping predicted labels to severity levels. First matching rule wins."
+        },
+        "max_length": {
+          "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }],
+          "default": null,
+          "description": "Override the tokenizer's maximum sequence length."
+        },
+        "chunk_size": {
+          "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }],
+          "default": null,
+          "description": "Split text into chunks of this many characters before classification."
+        },
+        "chunk_overlap": {
+          "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }],
+          "default": 0,
+          "description": "Character overlap between consecutive chunks."
+        }
+      },
+      "required": ["model"],
+      "additionalProperties": false
+    },
+    "ImageClassificationPipelineSchema": {
+      "title": "ImageClassificationPipelineSchema",
+      "type": "object",
+      "description": "Image classification pipeline using a HuggingFace vision model. Runs a single model; create multiple custom detectors to run multiple classifiers.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["IMAGE_CLASSIFICATION"],
+          "default": "IMAGE_CLASSIFICATION"
+        },
+        "model": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null,
+          "description": "HuggingFace hub ID or local path. Defaults to 'google/vit-base-patch16-224' when null."
+        },
+        "model_revision": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null,
+          "description": "Git branch, tag, or commit hash when fetching from the HuggingFace hub."
+        },
+        "device": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": "cpu",
+          "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
+        },
+        "top_k": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null,
+          "description": "Maximum number of top predictions to return per image."
+        },
+        "function_to_apply": {
+          "anyOf": [
+            { "type": "string", "enum": ["sigmoid", "softmax", "none"] },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Score normalization applied after the model forward pass."
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.0,
+          "description": "Minimum prediction confidence to report a label as a finding (0-1). Defaults to 0 so all top_k predictions are reported."
+        },
+        "severity_map": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": { "$ref": "#/definitions/PipelineSeverityRule" }
+            },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Ordered rules mapping predicted labels to severity levels. Labels with no matching rule receive 'info' severity."
+        }
+      },
+      "additionalProperties": false
+    },
+    "FeatureExtractionPipelineSchema": {
+      "title": "FeatureExtractionPipelineSchema",
+      "type": "object",
+      "description": "Feature extraction (embedding) pipeline using a HuggingFace model. Runs a single encoder; create multiple custom detectors to run multiple embedding models.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["FEATURE_EXTRACTION"],
+          "default": "FEATURE_EXTRACTION"
+        },
+        "model": {
+          "type": "string",
+          "description": "HuggingFace hub ID (e.g. 'BAAI/bge-base-en-v1.5', 'sentence-transformers/all-MiniLM-L6-v2') or absolute local directory path."
+        },
+        "model_revision": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null,
+          "description": "Git branch, tag, or commit hash when fetching from the HuggingFace hub."
+        },
+        "device": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": "cpu",
+          "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
+        },
+        "pooling_strategy": {
+          "type": "string",
+          "enum": ["mean", "cls", "max", "none"],
+          "default": "mean",
+          "description": "How to aggregate per-token hidden states into a single embedding vector."
+        },
+        "normalize_embeddings": {
+          "type": "boolean",
+          "default": true,
+          "description": "L2-normalise the final embedding vector. Recommended for cosine-similarity workloads."
+        },
+        "truncation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Truncate input to the model's maximum sequence length."
+        },
+        "max_length": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null,
+          "description": "Override the tokenizer's default maximum sequence length."
+        },
+        "batch_size": {
+          "type": "integer",
+          "default": 8,
+          "description": "Number of texts to encode in a single forward pass."
+        },
+        "chunk_size": {
+          "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }],
+          "default": null,
+          "description": "Split text into chunks of this many characters before embedding. Each chunk produces its own finding."
+        },
+        "chunk_overlap": {
+          "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }],
+          "default": 0,
+          "description": "Character overlap between consecutive chunks."
+        }
+      },
+      "required": ["model"],
+      "additionalProperties": false
+    },
+    "ObjectDetectionPipelineSchema": {
+      "title": "ObjectDetectionPipelineSchema",
+      "type": "object",
+      "description": "Object detection pipeline using a HuggingFace model. Runs a single detector; create multiple custom detectors to run multiple detection models.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["OBJECT_DETECTION"],
+          "default": "OBJECT_DETECTION"
+        },
+        "model": {
+          "type": "string",
+          "description": "HuggingFace hub ID (e.g. 'facebook/detr-resnet-50', 'hustvl/yolos-small') or absolute local directory path."
+        },
+        "model_revision": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null,
+          "description": "Git branch, tag, or commit hash when fetching from the HuggingFace hub."
+        },
+        "device": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": "cpu",
+          "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5,
+          "description": "Minimum detection confidence to report an object as a finding (0-1)."
+        },
+        "top_k": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null,
+          "description": "Keep only the top-k highest-confidence detections per image."
+        },
+        "nms_threshold": {
+          "anyOf": [
+            { "type": "number", "minimum": 0, "maximum": 1 },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "IoU threshold for non-maximum suppression. When null the model's default post-processing is used."
+        },
+        "min_box_area": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null,
+          "description": "Minimum bounding-box area in pixels (width × height). Smaller detections are suppressed."
+        },
+        "severity_map": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": { "$ref": "#/definitions/PipelineSeverityRule" }
+            },
+            { "type": "null" }
+          ],
+          "default": null,
+          "description": "Ordered rules mapping detected object labels to severity levels. Labels with no matching rule receive 'info' severity."
+        }
+      },
+      "required": ["model"],
+      "additionalProperties": false
+    },
+    "AnyPipelineSchema": {
+      "title": "AnyPipelineSchema",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/GLiNER2PipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/RegexPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/LLMPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/TextClassificationPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/ImageClassificationPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/FeatureExtractionPipelineSchema"
+        },
+        {
+          "$ref": "#/definitions/ObjectDetectionPipelineSchema"
+        }
+      ],
+      "discriminator": {
+        "propertyName": "type"
+      }
     }
   }
 }

@@ -40,6 +40,33 @@ export interface FindingDrawerSaveData {
   comment?: string;
 }
 
+export type FindingDetailDrawerLocale = "en" | "de";
+
+export type DrawerStrings = {
+  title: string;
+  description: string;
+  closeAriaLabel: string;
+  statusSectionLabel: string;
+  severitySectionLabel: string;
+  commentSectionLabel: string;
+  commentPlaceholder: string;
+  confidenceSectionLabel: string;
+  saveChanges: string;
+  saving: string;
+  firstDetected: string;
+  lastDetected: string;
+  openFor: string;
+  resolvedAt: string;
+  setBy: string;
+  manual: string;
+  confidenceHigh: string;
+  confidenceMedium: string;
+  confidenceLow: string;
+  confidenceVeryLow: string;
+  statusLabels: Record<FindingDrawerStatus, string>;
+  severityLabels: Record<FindingDrawerSeverity, string>;
+};
+
 export interface FindingDetailDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -59,21 +86,81 @@ export interface FindingDetailDrawerProps {
   };
   onSave?: (data: FindingDrawerSaveData) => void;
   isSaving?: boolean;
+  locale?: FindingDetailDrawerLocale;
+  strings?: Partial<DrawerStrings>;
 }
 
-const statusLabels: Record<FindingDrawerStatus, string> = {
-  OPEN: "Open",
-  FALSE_POSITIVE: "False Positive",
-  RESOLVED: "Resolved",
-  IGNORED: "Ignored",
-};
-
-const severityLabels: Record<FindingDrawerSeverity, string> = {
-  CRITICAL: "Critical",
-  HIGH: "High",
-  MEDIUM: "Medium",
-  LOW: "Low",
-  INFO: "Info",
+const i18n: Record<FindingDetailDrawerLocale, DrawerStrings> = {
+  en: {
+    title: "Details",
+    description: "Review and adjust finding status, severity, and notes.",
+    closeAriaLabel: "Close details",
+    statusSectionLabel: "Status",
+    severitySectionLabel: "Severity",
+    commentSectionLabel: "Comment",
+    commentPlaceholder: "Add a note to this finding…",
+    confidenceSectionLabel: "Confidence",
+    saveChanges: "Save changes",
+    saving: "Saving…",
+    firstDetected: "First detected",
+    lastDetected: "Last detected",
+    openFor: "Open for",
+    resolvedAt: "Resolved",
+    setBy: "Set by",
+    manual: "Manual",
+    confidenceHigh: "High",
+    confidenceMedium: "Medium",
+    confidenceLow: "Low",
+    confidenceVeryLow: "Very Low",
+    statusLabels: {
+      OPEN: "Open",
+      FALSE_POSITIVE: "False Positive",
+      RESOLVED: "Resolved",
+      IGNORED: "Ignored",
+    },
+    severityLabels: {
+      CRITICAL: "Critical",
+      HIGH: "High",
+      MEDIUM: "Medium",
+      LOW: "Low",
+      INFO: "Info",
+    },
+  },
+  de: {
+    title: "Details",
+    description: "Befundstatus, Schweregrad und Notizen prüfen und anpassen.",
+    closeAriaLabel: "Details schließen",
+    statusSectionLabel: "Status",
+    severitySectionLabel: "Schweregrad",
+    commentSectionLabel: "Kommentar",
+    commentPlaceholder: "Notiz zu diesem Befund hinzufügen…",
+    confidenceSectionLabel: "Konfidenz",
+    saveChanges: "Änderungen speichern",
+    saving: "Wird gespeichert…",
+    firstDetected: "Erstmals erkannt",
+    lastDetected: "Zuletzt erkannt",
+    openFor: "Offen seit",
+    resolvedAt: "Behoben",
+    setBy: "Gesetzt durch",
+    manual: "Manuell",
+    confidenceHigh: "Hoch",
+    confidenceMedium: "Mittel",
+    confidenceLow: "Niedrig",
+    confidenceVeryLow: "Sehr niedrig",
+    statusLabels: {
+      OPEN: "Offen",
+      FALSE_POSITIVE: "Falsch positiv",
+      RESOLVED: "Behoben",
+      IGNORED: "Ignoriert",
+    },
+    severityLabels: {
+      CRITICAL: "Kritisch",
+      HIGH: "Hoch",
+      MEDIUM: "Mittel",
+      LOW: "Niedrig",
+      INFO: "Info",
+    },
+  },
 };
 
 function toStatusBadgeValue(status: FindingDrawerStatus) {
@@ -227,14 +314,14 @@ function confidenceColor(pct: number): string {
   return "#ef4444";
 }
 
-function confidenceLabel(pct: number): string {
-  if (pct >= 80) return "High";
-  if (pct >= 60) return "Medium";
-  if (pct >= 40) return "Low";
-  return "Very Low";
+function confidenceLabel(pct: number, s: DrawerStrings): string {
+  if (pct >= 80) return s.confidenceHigh;
+  if (pct >= 60) return s.confidenceMedium;
+  if (pct >= 40) return s.confidenceLow;
+  return s.confidenceVeryLow;
 }
 
-function ConfidenceMeter({ value }: { value: number }) {
+function ConfidenceMeter({ value, s }: { value: number; s: DrawerStrings }) {
   const pct = Math.round(Math.min(1, Math.max(0, value)) * 100);
   const segments = 5;
   const filled = Math.round((pct / 100) * segments);
@@ -266,7 +353,7 @@ function ConfidenceMeter({ value }: { value: number }) {
             {pct}%
           </span>
           <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-            {confidenceLabel(pct)}
+            {confidenceLabel(pct, s)}
           </span>
         </div>
       </div>
@@ -280,7 +367,18 @@ export function FindingDetailDrawer({
   finding,
   onSave,
   isSaving,
+  locale,
+  strings,
 }: FindingDetailDrawerProps) {
+  const base = i18n[locale ?? "en"];
+  const s: DrawerStrings = strings
+    ? {
+        ...base,
+        ...strings,
+        statusLabels: { ...base.statusLabels, ...strings.statusLabels },
+        severityLabels: { ...base.severityLabels, ...strings.severityLabels },
+      }
+    : base;
   const [draftStatus, setDraftStatus] = React.useState<FindingDrawerStatus>(
     finding.status,
   );
@@ -323,13 +421,13 @@ export function FindingDetailDrawer({
         <DrawerHeader className="border-b">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
-              <DrawerTitle>Details</DrawerTitle>
+              <DrawerTitle>{s.title}</DrawerTitle>
               <DrawerDescription>
-                Review and adjust finding status, severity, and notes.
+                {s.description}
               </DrawerDescription>
             </div>
             <DrawerClose asChild>
-              <Button variant="ghost" size="icon" aria-label="Close details">
+              <Button variant="ghost" size="icon" aria-label={s.closeAriaLabel}>
                 <X className="h-4 w-4" />
               </Button>
             </DrawerClose>
@@ -341,11 +439,11 @@ export function FindingDetailDrawer({
             {/* ── Status ── */}
             <div className="space-y-2">
               <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
-                Status
+                {s.statusSectionLabel}
               </p>
               <div className="flex items-center gap-2">
                 <StatusBadge status={toStatusBadgeValue(draftStatus)}>
-                  {statusLabels[draftStatus]}
+                  {s.statusLabels[draftStatus]}
                 </StatusBadge>
                 <Select
                   value={draftStatus}
@@ -358,9 +456,9 @@ export function FindingDetailDrawer({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.keys(statusLabels).map((status) => (
+                    {Object.keys(s.statusLabels).map((status) => (
                       <SelectItem key={status} value={status}>
-                        {statusLabels[status as FindingDrawerStatus]}
+                        {s.statusLabels[status as FindingDrawerStatus]}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -371,11 +469,11 @@ export function FindingDetailDrawer({
             {/* ── Severity ── */}
             <div className="space-y-2">
               <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
-                Severity
+                {s.severitySectionLabel}
               </p>
               <div className="flex items-center gap-2">
                 <SeverityBadge severity={toSeverityBadgeValue(draftSeverity)}>
-                  {severityLabels[draftSeverity]}
+                  {s.severityLabels[draftSeverity]}
                 </SeverityBadge>
                 <Select
                   value={draftSeverity}
@@ -388,9 +486,9 @@ export function FindingDetailDrawer({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.keys(severityLabels).map((severity) => (
+                    {Object.keys(s.severityLabels).map((severity) => (
                       <SelectItem key={severity} value={severity}>
-                        {severityLabels[severity as FindingDrawerSeverity]}
+                        {s.severityLabels[severity as FindingDrawerSeverity]}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -401,14 +499,14 @@ export function FindingDetailDrawer({
             {/* ── Comment ── */}
             <div className="space-y-2">
               <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
-                Comment
+                {s.commentSectionLabel}
               </p>
               <Textarea
                 value={draftComment}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                   setDraftComment(e.target.value)
                 }
-                placeholder="Add a note to this finding…"
+                placeholder={s.commentPlaceholder}
                 disabled={!onSave || isSaving}
                 className="min-h-[80px] resize-none border-2 border-border rounded-[4px] text-sm"
                 rows={3}
@@ -422,7 +520,7 @@ export function FindingDetailDrawer({
                 disabled={isSaving}
                 className="w-full border-2 border-[#b7ff00]/30 bg-[#0b0f0a] text-[#b7ff00] hover:bg-[#0b0f0a]/80 rounded-[4px] font-mono text-xs uppercase tracking-[0.1em]"
               >
-                {isSaving ? "Saving…" : "Save changes"}
+                {isSaving ? s.saving : s.saveChanges}
               </Button>
             )}
 
@@ -433,9 +531,9 @@ export function FindingDetailDrawer({
               <>
                 <div className="space-y-2">
                   <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
-                    Confidence
+                    {s.confidenceSectionLabel}
                   </p>
-                  <ConfidenceMeter value={finding.confidence} />
+                  <ConfidenceMeter value={finding.confidence} s={s} />
                 </div>
                 <Separator />
               </>
@@ -443,20 +541,20 @@ export function FindingDetailDrawer({
 
             {/* ── Dates ── */}
             <div className="space-y-3">
-              <DateDetailRow label="First detected" value={occurredAt} />
-              <DateDetailRow label="Last detected" value={detectedAt} />
-              <DetailRow label="Open for">
+              <DateDetailRow label={s.firstDetected} value={occurredAt} />
+              <DateDetailRow label={s.lastDetected} value={detectedAt} />
+              <DetailRow label={s.openFor}>
                 <span className="font-mono text-xs">{openedFor}</span>
               </DetailRow>
               {finding.resolvedAt && (
-                <DateDetailRow label="Resolved" value={finding.resolvedAt} />
+                <DateDetailRow label={s.resolvedAt} value={finding.resolvedAt} />
               )}
             </div>
 
             <Separator />
 
             {/* ── Set by (runner link) ── */}
-            <DetailRow label="Set by">
+            <DetailRow label={s.setBy}>
               {finding.runnerHref ? (
                 <a
                   href={finding.runnerHref}
@@ -466,7 +564,7 @@ export function FindingDetailDrawer({
                 </a>
               ) : (
                 <span className="font-mono text-xs text-muted-foreground">
-                  Manual
+                  {s.manual}
                 </span>
               )}
             </DetailRow>

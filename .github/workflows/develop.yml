@@ -1,14 +1,28 @@
-name: Feature Branch Deployment
+name: Deploy Image
 
-# Manual deployment workflow for rolling any existing image tag into the
-# classifyre-develop namespace on the VPS.
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: "Target environment / namespace"
+        required: true
+        default: "classifyre-develop"
+        type: choice
+        options:
+          - classifyre-develop
+          - classifyre
       image_tag:
-        description: "Docker image tag to deploy to the develop namespace"
+        description: "Docker image tag to deploy (branch name, version, etc.)"
         required: false
         default: "develop"
+      demo_mode:
+        description: "Enable demo mode"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
 
 permissions:
   contents: read
@@ -17,26 +31,37 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
-  deploy-develop:
-    name: Deploy Image To Develop Namespace
+  deploy:
+    name: Deploy ${{ inputs.image_tag || 'develop' }} → ${{ inputs.environment || 'classifyre-develop' }}
     runs-on: ubuntu-latest
 
     env:
       DOCKER_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
-      HELM_RELEASE_NAME: classifyre-develop
-      HELM_NAMESPACE: classifyre-develop
-      HELM_VALUES_FILE: ./helm/classifyre/values-vps-develop.yaml
+      HELM_NAMESPACE: ${{ inputs.environment || 'classifyre-develop' }}
       IMAGE_TAG: ${{ inputs.image_tag || 'develop' }}
+      DEMO_MODE: ${{ inputs.demo_mode || 'true' }}
 
     steps:
+      - name: Derive environment settings
+        id: env
+        run: |
+          set -euo pipefail
+          ns="${{ env.HELM_NAMESPACE }}"
+          if [[ "${ns}" == "classifyre" ]]; then
+            echo "release_name=classifyre"           >> "$GITHUB_OUTPUT"
+            echo "values_file=./helm/classifyre/values-vps.yaml" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_name=classifyre-develop"   >> "$GITHUB_OUTPUT"
+            echo "values_file=./helm/classifyre/values-vps-develop.yaml" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          # Keep deploy config stable and ignore the UI ref selector.
           ref: develop
 
       - name: Setup kubectl
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
@@ -52,16 +77,23 @@ jobs:
         run: kubectl cluster-info
 
       - name: Show deployment target
+        env:
+          HELM_RELEASE_NAME: ${{ steps.env.outputs.release_name }}
+          HELM_VALUES_FILE: ${{ steps.env.outputs.values_file }}
         run: |
           set -euo pipefail
-          echo "Namespace: ${HELM_NAMESPACE}"
-          echo "Release: ${HELM_RELEASE_NAME}"
-          echo "Image tag: ${IMAGE_TAG}"
-          echo "API image: ${DOCKER_NAMESPACE}/api:${IMAGE_TAG}"
-          echo "Web image: ${DOCKER_NAMESPACE}/web:${IMAGE_TAG}"
-          echo "CLI image: ${DOCKER_NAMESPACE}/cli:${IMAGE_TAG}"
+          echo "Namespace:   ${HELM_NAMESPACE}"
+          echo "Release:     ${HELM_RELEASE_NAME}"
+          echo "Values file: ${HELM_VALUES_FILE}"
+          echo "Image tag:   ${IMAGE_TAG}"
+          echo "API image:   ${DOCKER_NAMESPACE}/api:${IMAGE_TAG}"
+          echo "Web image:   ${DOCKER_NAMESPACE}/web:${IMAGE_TAG}"
+          echo "CLI image:   ${DOCKER_NAMESPACE}/cli:${IMAGE_TAG}"
+          echo "Demo mode:   ${DEMO_MODE}"
 
       - name: Clear pending Helm operation
+        env:
+          HELM_RELEASE_NAME: ${{ steps.env.outputs.release_name }}
         run: |
           set -euo pipefail
 
@@ -87,7 +119,10 @@ jobs:
           echo "Deleting stale Helm release secret for pending revision ${last_revision}."
           kubectl -n "${HELM_NAMESPACE}" delete secret "sh.helm.release.v1.${HELM_RELEASE_NAME}.v${last_revision}" --ignore-not-found=true
 
-      - name: Deploy develop with Helm
+      - name: Deploy with Helm
+        env:
+          HELM_RELEASE_NAME: ${{ steps.env.outputs.release_name }}
+          HELM_VALUES_FILE: ${{ steps.env.outputs.values_file }}
         run: |
           set -euo pipefail
 
@@ -101,16 +136,24 @@ jobs:
             --set api.cliJobs.image.tag="${IMAGE_TAG}" \
             --set frontend.image.repository="${DOCKER_NAMESPACE}/web" \
             --set frontend.image.tag="${IMAGE_TAG}" \
+            --set-string api.env.DEMO_MODE="${DEMO_MODE}" \
             --wait \
             --timeout 15m
 
-      - name: Force web rollout
+      - name: Force rollouts
+        env:
+          HELM_RELEASE_NAME: ${{ steps.env.outputs.release_name }}
         run: |
           set -euo pipefail
-          kubectl -n "${HELM_NAMESPACE}" rollout restart deployment/"${HELM_RELEASE_NAME}-web"
-          kubectl -n "${HELM_NAMESPACE}" rollout status deployment/"${HELM_RELEASE_NAME}-web" --timeout=10m
+          for deployment in api web; do
+            echo "Forcing rollout for ${HELM_RELEASE_NAME}-${deployment}"
+            kubectl -n "${HELM_NAMESPACE}" rollout restart deployment/"${HELM_RELEASE_NAME}-${deployment}"
+            kubectl -n "${HELM_NAMESPACE}" rollout status deployment/"${HELM_RELEASE_NAME}-${deployment}" --timeout=10m
+          done
 
       - name: Show rollout status
+        env:
+          HELM_RELEASE_NAME: ${{ steps.env.outputs.release_name }}
         run: |
           set -euo pipefail
           kubectl -n "${HELM_NAMESPACE}" get deploy,pods,svc

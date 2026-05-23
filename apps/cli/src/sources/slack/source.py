@@ -164,6 +164,18 @@ class SlackSource(BaseSource):
 
         return result
 
+    def _ensure_team_id(self) -> None:
+        if self.team_id:
+            return
+        try:
+            payload = self._request("get", "auth.test")
+        except Exception:
+            logger.debug("Slack auth.test failed while resolving team_id", exc_info=True)
+            return
+        team_id = payload.get("team_id")
+        if isinstance(team_id, str) and team_id.strip():
+            self.team_id = team_id.strip()
+
     def _normalize_ts(self, value: str | None) -> str | None:
         if not value:
             return None
@@ -224,18 +236,14 @@ class SlackSource(BaseSource):
             )
         return {"channels": results}
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    STREAM_DETECTIONS = True
+
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
 
         logger.info("Extracting Slack messages...")
-
-        pipeline = None
-        if self.config.detectors and any(d.enabled for d in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
-            logger.info("Detector pipeline initialized")
+        self._ensure_team_id()
 
         channel_ids, channel_lookup = self._resolve_channels()
 
@@ -251,7 +259,6 @@ class SlackSource(BaseSource):
             async for batch in self._stream_channel_batches(
                 channel_id,
                 channel_name,
-                pipeline,
             ):
                 yield batch
 
@@ -272,10 +279,9 @@ class SlackSource(BaseSource):
         self,
         channel_id: str,
         channel_name: str,
-        pipeline: Any | None,
     ) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         assets = self._iter_channel_assets(channel_id, channel_name)
-        async for batch in self._yield_batches(assets, pipeline):
+        async for batch in self._yield_batches(assets):
             yield batch
 
     def _iter_channel_assets(
@@ -291,7 +297,6 @@ class SlackSource(BaseSource):
     async def _yield_batches(
         self,
         assets: Iterable[SingleAssetScanResults],
-        pipeline: Any | None,
     ) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         batch: list[SingleAssetScanResults] = []
 
@@ -301,14 +306,10 @@ class SlackSource(BaseSource):
             batch.append(asset)
 
             if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    batch = await pipeline.process(batch)
                 yield batch
                 batch = []
 
         if batch:
-            if pipeline:
-                batch = await pipeline.process(batch)
             yield batch
 
     def _iter_channel_messages(self, channel_id: str) -> Iterable[dict[str, Any]]:
@@ -317,9 +318,7 @@ class SlackSource(BaseSource):
         ingestion_options = self._ingestion_options()
         time_range_options = self._time_range_options()
         sampling = self.config.sampling
-        max_total: int | None = (
-            None if sampling.strategy == SamplingStrategy.ALL else (sampling.limit or 100)
-        )
+        max_total: int | None = None if sampling.strategy == SamplingStrategy.ALL else 100
         oldest = self._normalize_ts(time_range_options.oldest)
         latest = self._normalize_ts(time_range_options.latest)
         batch_size = min(int(ingestion_options.batch_size or 200), 200)
@@ -430,8 +429,8 @@ class SlackSource(BaseSource):
         return f"slack://channel?channel={channel_id}&message={ts}"
 
     def generate_hash_id(self, asset_id: str) -> str:
-        workspace = self.workspace or self.team_id or "slack"
-        raw_id = f"{workspace}_#_{asset_id}"
+        identity = self.workspace or self.team_id or "slack"
+        raw_id = f"{identity}_#_{asset_id}"
         type_value = (
             self.config.type.value if hasattr(self.config.type, "value") else str(self.config.type)
         )

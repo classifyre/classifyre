@@ -37,6 +37,7 @@ const TABULAR_TYPES = new Set([
   'HIVE',
   'DATABRICKS',
   'SNOWFLAKE',
+  'SQLITE',
 ]);
 
 export function getSourceCategory(type: string): 'TABULAR' | 'UNSTRUCTURED' {

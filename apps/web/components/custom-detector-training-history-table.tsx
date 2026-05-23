@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown, Search } from "lucide-react";
+import { useTranslation } from "@/hooks/use-translation";
 import {
   type CustomDetectorTrainingRunDto,
   type CustomDetectorTrainingStatus,
@@ -110,6 +111,7 @@ type CustomDetectorTrainingHistoryTableProps = {
 export function CustomDetectorTrainingHistoryTable({
   history,
 }: CustomDetectorTrainingHistoryTableProps) {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<
     CustomDetectorTrainingStatus | "ALL"
@@ -214,7 +216,7 @@ export function CustomDetectorTrainingHistoryTable({
               setPage(1);
             }}
             placeholder="Search status, strategy, or error"
-            className="h-9 rounded-[4px] border-2 border-black pl-9"
+            className="h-9 rounded-[4px] border-2 border-border pl-9"
           />
         </div>
 
@@ -225,8 +227,8 @@ export function CustomDetectorTrainingHistoryTable({
             setPage(1);
           }}
         >
-          <SelectTrigger className="h-9 min-w-[180px] border-2 border-black rounded-[4px]">
-            <SelectValue placeholder="All statuses" />
+          <SelectTrigger className="h-9 min-w-[180px] border-2 border-border rounded-[4px]">
+            <SelectValue placeholder={t("common.status")} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All statuses</SelectItem>
@@ -238,7 +240,7 @@ export function CustomDetectorTrainingHistoryTable({
         </Select>
       </div>
 
-      <div className="overflow-hidden rounded-[6px] border-2 border-black bg-background shadow-[6px_6px_0_#000]">
+      <div className="overflow-hidden rounded-[6px] border-2 border-border bg-background shadow-[6px_6px_0_var(--color-border)]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -264,10 +266,11 @@ export function CustomDetectorTrainingHistoryTable({
               </TableRow>
             ) : (
               pagedRows.map((run) => (
-                <TableRow key={run.id}>
+                <TableRow key={run.id} data-testid="training-history-row" data-status={run.status} data-strategy={run.strategy ?? ""}>
                   <TableCell>{formatDate(run.startedAt)}</TableCell>
                   <TableCell>
                     <Badge
+                      data-testid="training-run-status"
                       className={`rounded-[4px] border text-[10px] ${getRunnerStatusBadgeTone(
                         detectorTrainingStatusToRunnerStatus(run.status),
                       )}`}
@@ -275,7 +278,7 @@ export function CustomDetectorTrainingHistoryTable({
                       {run.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>{run.strategy ?? "-"}</TableCell>
+                  <TableCell data-testid="training-run-strategy">{run.strategy ?? "-"}</TableCell>
                   <TableCell>{run.trainedExamples ?? "-"}</TableCell>
                   <TableCell>{renderDuration(run)}</TableCell>
                   <TableCell className="max-w-[360px] truncate text-xs text-muted-foreground">
@@ -288,7 +291,7 @@ export function CustomDetectorTrainingHistoryTable({
         </Table>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[4px] border border-black/20 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[4px] border border-border/20 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
         <span>
           Showing <strong>{pagedRows.length}</strong> of{" "}
           <strong>{total}</strong> training runs
@@ -302,7 +305,7 @@ export function CustomDetectorTrainingHistoryTable({
               setPage(1);
             }}
           >
-            <SelectTrigger className="h-8 w-[88px] rounded-[4px] border border-black/30 bg-background text-xs">
+            <SelectTrigger className="h-8 w-[88px] rounded-[4px] border border-border/30 bg-background text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -1236,6 +1236,277 @@ describe('AssetService', () => {
       expect(result.deleted).toBe(0);
     });
 
+    describe('finding resolution by sampling strategy', () => {
+      const existingAsset = {
+        id: 'db-asset-scan-1',
+        hash: 'asset-scan-1',
+        checksum: 'checksum-scan-1',
+        name: 'Scanned Asset',
+        externalUrl: 'https://example.com/scan',
+        links: [],
+        assetType: 'TXT',
+        sourceType: AssetType.WORDPRESS,
+        status: AssetStatus.NEW,
+        runnerId: 'old-runner',
+        sourceId,
+        lastScannedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const existingFindingIdentity = generateDetectionIdentity({
+        assetId: existingAsset.id,
+        detectorType: 'PII',
+        findingType: 'EMAIL',
+        matchedContent: 'secret@example.com',
+      });
+
+      const existingFinding = {
+        id: 'finding-to-check',
+        detectionIdentity: existingFindingIdentity,
+        assetId: existingAsset.id,
+        sourceId,
+        runnerId: 'old-runner',
+        detectorType: 'PII',
+        findingType: 'EMAIL',
+        category: 'pii',
+        severity: 'HIGH',
+        confidence: 0.9,
+        matchedContent: 'secret@example.com',
+        status: FindingStatus.OPEN,
+        history: [],
+        resolvedAt: null,
+        resolutionReason: null,
+      };
+
+      // Asset comes in clean (no findings)
+      const incomingAssets = [
+        {
+          hash: 'asset-scan-1',
+          checksum: 'checksum-scan-1',
+          name: 'Scanned Asset',
+          external_url: 'https://example.com/scan',
+          links: [],
+          asset_type: 'TXT',
+          findings: [],
+        },
+      ];
+
+      function buildMockTransaction(
+        findingUpdateFn: jest.Mock,
+        existingFindings: any[],
+      ) {
+        return (callback: any) => {
+          const tx = {
+            asset: {
+              createMany: jest.fn().mockResolvedValue({}),
+              update: jest.fn().mockResolvedValue({}),
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              findMany: jest.fn().mockResolvedValue([]),
+            },
+            finding: {
+              findMany: jest.fn().mockResolvedValue(existingFindings),
+              createMany: jest.fn().mockResolvedValue({}),
+              update: findingUpdateFn,
+            },
+            runner: {
+              update: jest.fn().mockResolvedValue({}),
+            },
+          };
+          return callback(tx);
+        };
+      }
+
+      beforeEach(() => {
+        mockPrismaService.asset.findMany.mockResolvedValue([existingAsset]);
+      });
+
+      it('should NOT resolve findings during bulkIngest (resolution moved to finalizeIngestRun)', async () => {
+        const findingUpdate = jest.fn().mockResolvedValue({});
+        mockPrismaService.$transaction.mockImplementation(
+          buildMockTransaction(findingUpdate, [existingFinding]),
+        );
+
+        await service.bulkIngest(sourceId, runnerId, incomingAssets, {
+          isFullScan: true,
+        });
+
+        const resolveCall = findingUpdate.mock.calls.find(
+          ([args]: any) => args?.data?.status === FindingStatus.RESOLVED,
+        );
+        expect(resolveCall).toBeUndefined();
+      });
+
+      it('should still update (re-detect) a matched finding regardless of isFullScan', async () => {
+        const matchedFinding = {
+          ...existingFinding,
+          confidence: 0.5, // Different confidence → triggers update
+        };
+        const incomingWithFinding = [
+          {
+            ...incomingAssets[0],
+            findings: [
+              {
+                detector_type: 'PII',
+                finding_type: 'EMAIL',
+                category: 'pii',
+                severity: 'HIGH',
+                confidence: 0.9, // Changed confidence
+                matched_content: 'secret@example.com',
+                detected_at: new Date().toISOString(),
+              },
+            ],
+          },
+        ];
+
+        for (const isFullScan of [true, false]) {
+          const findingUpdate = jest.fn().mockResolvedValue({});
+          mockPrismaService.$transaction.mockImplementation(
+            buildMockTransaction(findingUpdate, [matchedFinding]),
+          );
+
+          await service.bulkIngest(sourceId, runnerId, incomingWithFinding, {
+            isFullScan,
+          });
+
+          // The matched finding should be updated (re-detected), not resolved
+          expect(findingUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              where: { id: matchedFinding.id },
+              data: expect.not.objectContaining({
+                status: FindingStatus.RESOLVED,
+              }),
+            }),
+          );
+        }
+      });
+    });
+
+    describe('finalizeIngestRun finding resolution', () => {
+      const staleFinding = {
+        id: 'stale-finding-1',
+        sourceId,
+        assetId: 'asset-1',
+        runnerId: 'old-runner',
+        status: FindingStatus.OPEN,
+        history: [],
+      };
+
+      beforeEach(() => {
+        mockPrismaService.source.findUnique.mockResolvedValue({
+          id: sourceId,
+          type: AssetType.WORDPRESS,
+        });
+        mockPrismaService.runner.findUnique.mockResolvedValue({
+          id: runnerId,
+          sourceId,
+        });
+      });
+
+      function buildFinalizeTx(opts: {
+        missingAssets?: any[];
+        deletedAssetFindings?: any[];
+        staleFindings?: any[];
+        findingUpdate?: jest.Mock;
+      }) {
+        const findingUpdate =
+          opts.findingUpdate ?? jest.fn().mockResolvedValue({});
+        let findManyCallCount = 0;
+
+        return {
+          findingUpdate,
+          mockImpl: (callback: any) => {
+            const tx = {
+              asset: {
+                updateMany: jest.fn().mockResolvedValue({}),
+              },
+              finding: {
+                findMany: jest.fn().mockImplementation(() => {
+                  findManyCallCount++;
+                  if (findManyCallCount === 1) {
+                    return Promise.resolve(opts.deletedAssetFindings ?? []);
+                  }
+                  return Promise.resolve(opts.staleFindings ?? []);
+                }),
+                update: findingUpdate,
+              },
+              runner: {
+                update: jest.fn().mockResolvedValue({}),
+              },
+            };
+            return callback(tx);
+          },
+        };
+      }
+
+      it('should resolve stale findings on scanned assets during finalize (isFullScan=true)', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          { id: 'missing-asset', hash: 'missing-hash' },
+        ]);
+
+        const { findingUpdate, mockImpl } = buildFinalizeTx({
+          deletedAssetFindings: [],
+          staleFindings: [staleFinding],
+        });
+        mockPrismaService.$transaction.mockImplementation(mockImpl);
+
+        await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash-1'],
+          true,
+        );
+
+        expect(findingUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: staleFinding.id },
+            data: expect.objectContaining({
+              status: FindingStatus.RESOLVED,
+              resolutionReason: 'Detection no longer present in scan',
+            }),
+          }),
+        );
+      });
+
+      it('should NOT resolve findings with manual status override during finalize', async () => {
+        const manuallyOverriddenFinding = {
+          ...staleFinding,
+          history: [
+            {
+              eventType: HistoryEventType.STATUS_CHANGED,
+              status: FindingStatus.IGNORED,
+            },
+          ],
+        };
+
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+        const { findingUpdate, mockImpl } = buildFinalizeTx({
+          staleFindings: [manuallyOverriddenFinding],
+        });
+        mockPrismaService.$transaction.mockImplementation(mockImpl);
+
+        await service.finalizeIngestRun(sourceId, runnerId, [], true);
+
+        const resolveCall = findingUpdate.mock.calls.find(
+          ([args]: any) => args?.data?.status === FindingStatus.RESOLVED,
+        );
+        expect(resolveCall).toBeUndefined();
+      });
+
+      it('should NOT resolve any findings when isFullScan=false (RANDOM/LATEST)', async () => {
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['hash-1'],
+          false,
+        );
+
+        expect(result.deleted).toBe(0);
+        expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      });
+    });
+
     it('should accumulate findings without deleting old ones', async () => {
       const incomingAssets = [
         {

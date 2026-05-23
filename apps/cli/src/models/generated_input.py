@@ -35,11 +35,13 @@ class AssetType(StrEnum):
     DATABRICKS = 'DATABRICKS'
     SNOWFLAKE = 'SNOWFLAKE'
     MONGODB = 'MONGODB'
+    NEO4J = 'NEO4J'
     POWERBI = 'POWERBI'
     TABLEAU = 'TABLEAU'
     CONFLUENCE = 'CONFLUENCE'
     JIRA = 'JIRA'
     SERVICEDESK = 'SERVICEDESK'
+    SQLITE = 'SQLITE'
 
 
 class SourceCategory(StrEnum):
@@ -58,28 +60,9 @@ class DetectorType(StrEnum):
 
     SECRETS = 'SECRETS'
     PII = 'PII'
-    TOXIC = 'TOXIC'
-    NSFW = 'NSFW'
     YARA = 'YARA'
     BROKEN_LINKS = 'BROKEN_LINKS'
-    PROMPT_INJECTION = 'PROMPT_INJECTION'
-    PHISHING_URL = 'PHISHING_URL'
-    SPAM = 'SPAM'
-    LANGUAGE = 'LANGUAGE'
     CODE_SECURITY = 'CODE_SECURITY'
-    PLAGIARISM = 'PLAGIARISM'
-    IMAGE_VIOLENCE = 'IMAGE_VIOLENCE'
-    OCR_PII = 'OCR_PII'
-    DEID_SCORE = 'DEID_SCORE'
-    HATE_SPEECH = 'HATE_SPEECH'
-    AI_GENERATED = 'AI_GENERATED'
-    CONTENT_QUALITY = 'CONTENT_QUALITY'
-    BIAS = 'BIAS'
-    DUPLICATE = 'DUPLICATE'
-    DOMAIN_CLASS = 'DOMAIN_CLASS'
-    CONTENT_TYPE = 'CONTENT_TYPE'
-    SENSITIVITY_TIER = 'SENSITIVITY_TIER'
-    JURISDICTION_TAG = 'JURISDICTION_TAG'
     CUSTOM = 'CUSTOM'
 
 
@@ -118,22 +101,16 @@ class SamplingStrategy(StrEnum):
 
 class SamplingConfig(BaseModel):
     """
-    Controls how much content is extracted from each source. Apply to every source type: for tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake) limit is rows per table; for unstructured/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk) limit is items/pages/documents/assets per run.
+    Controls how content is extracted from each source. For tabular sources rows_per_page controls both sample size for RANDOM/LATEST and pagination batch size for ALL.
     """
 
     model_config = ConfigDict(
         extra='forbid',
     )
     strategy: SamplingStrategy
-    fetch_all_until_first_success: bool | None = Field(
+    enable_ocr: bool | None = Field(
         False,
-        description='When true, force strategy ALL until this source gets its first successful run. After the first successful run, use strategy/limit as configured.',
-    )
-    limit: int | None = Field(
-        100,
-        description='Maximum number of items to sample per asset (rows for tabular, pages/items for unstructured). Ignored when strategy is ALL.',
-        ge=1,
-        le=100000,
+        description='When true, enable OCR/text extraction for supported binary documents and images before routing text-capable detectors.',
     )
     order_by_column: str | None = Field(
         None,
@@ -143,27 +120,61 @@ class SamplingConfig(BaseModel):
         True,
         description='Tabular sources only. Fallback to RANDOM ordering when LATEST mode cannot resolve an ordering column.',
     )
-    max_columns: int | None = Field(
-        25,
-        description='Tabular sources only. Maximum number of columns to include per sampled row.',
-        ge=1,
-        le=500,
-    )
-    max_cell_chars: int | None = Field(
-        512,
-        description='Tabular sources only. Maximum characters per cell in detector payload formatting.',
-        ge=16,
-        le=50000,
-    )
-    max_total_chars: int | None = Field(
-        20000,
-        description='Tabular sources only. Maximum total formatted payload size sent to detectors per asset.',
-        ge=128,
-        le=500000,
-    )
     include_column_names: bool | None = Field(
         True,
         description='Tabular sources only. Include column names in sampled detector payload rows.',
+    )
+    rows_per_page: int | None = Field(
+        100,
+        description='Tabular sources only. Number of rows per sample (RANDOM/LATEST) or per pagination batch (ALL). Controls memory usage during large table scans.',
+        ge=10,
+        le=10000,
+    )
+
+
+class Requests(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    cpu: str | None = Field(None, description='CPU request (e.g. 500m)')
+    memory: str | None = Field(None, description='Memory request (e.g. 1Gi)')
+
+
+class Limits(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    cpu: str | None = Field(None, description='CPU limit (e.g. 2)')
+    memory: str | None = Field(None, description='Memory limit (e.g. 4Gi)')
+
+
+class ResourceOverrides(BaseModel):
+    """
+    Override K8s job resources and timeout for this source.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    requests: Requests | None = None
+    limits: Limits | None = None
+    timeout_seconds: int | None = Field(
+        None,
+        description='Max runtime in seconds (overrides activeDeadlineSeconds)',
+        ge=60,
+        le=86400,
+    )
+    max_pool_workers: int | None = Field(
+        None,
+        description='Max OS processes in the detector pool. Auto-sized from CPU/memory limits when omitted.',
+        ge=1,
+        le=16,
+    )
+    max_concurrent_assets: int | None = Field(
+        None,
+        description='Max assets processed concurrently. Controls parallel DB connections. Defaults to pool_workers * 2 when omitted.',
+        ge=1,
+        le=50,
     )
 
 
@@ -641,6 +652,18 @@ class PostgreSQLOptional(BaseModel):
     scope: PostgreSQLOptionalScope | None = None
 
 
+class MySQLSSLMode(StrEnum):
+    """
+    SSL/TLS connection mode. DISABLED: no TLS; PREFERRED: TLS when available (default); REQUIRED: mandate TLS without certificate verification; VERIFY_CA: mandate TLS and verify the CA certificate (requires ssl_ca); VERIFY_IDENTITY: mandate TLS, verify CA, and verify server hostname.
+    """
+
+    DISABLED = 'DISABLED'
+    PREFERRED = 'PREFERRED'
+    REQUIRED = 'REQUIRED'
+    VERIFY_CA = 'VERIFY_CA'
+    VERIFY_IDENTITY = 'VERIFY_IDENTITY'
+
+
 class MySQLRequired(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -655,6 +678,10 @@ class MySQLMasked(BaseModel):
     )
     username: str = Field(..., description='Database username')
     password: str = Field(..., description='Database password')
+    ssl_ca: str | None = Field(
+        None,
+        description='PEM-encoded CA certificate for SSL/TLS verification. Paste the full certificate content (-----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----). Required when ssl_mode is VERIFY_CA or VERIFY_IDENTITY.',
+    )
 
 
 class MySQLOptionalConnection(BaseModel):
@@ -667,6 +694,11 @@ class MySQLOptionalConnection(BaseModel):
     )
     connect_timeout_seconds: int | None = Field(
         10, description='Connection timeout in seconds', ge=1, le=120
+    )
+    ssl_mode: MySQLSSLMode | None = 'PREFERRED'
+    allow_public_key_retrieval: bool | None = Field(
+        False,
+        description='Allow automatic RSA public key retrieval from the server for caching_sha2_password authentication (MySQL 8+). Only needed when not using SSL and connecting to MySQL 8 servers using the default authentication plugin.',
     )
 
 
@@ -1784,6 +1816,7 @@ class CoreInput(BaseModel):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class Type(StrEnum):
@@ -1804,15 +1837,17 @@ class Type(StrEnum):
     DATABRICKS = 'DATABRICKS'
     SNOWFLAKE = 'SNOWFLAKE'
     MONGODB = 'MONGODB'
+    NEO4J = 'NEO4J'
     POWERBI = 'POWERBI'
     TABLEAU = 'TABLEAU'
     CONFLUENCE = 'CONFLUENCE'
     JIRA = 'JIRA'
     SERVICEDESK = 'SERVICEDESK'
+    SQLITE = 'SQLITE'
 
 
 class SlackInput(CoreInput):
-    type: Literal['SLACK'] = 'SLACK'
+    type: Literal['SLACK'] = Field('SLACK', description='Type of the asset or source')
     required: SlackRequired
     masked: SlackMaskedBotToken | SlackMaskedUserToken | SlackMaskedToken = Field(
         ..., title='SlackMasked'
@@ -1826,10 +1861,13 @@ class SlackInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class S3CompatibleStorageInput(CoreInput):
-    type: Literal['S3_COMPATIBLE_STORAGE'] = 'S3_COMPATIBLE_STORAGE'
+    type: Literal['S3_COMPATIBLE_STORAGE'] = Field(
+        'S3_COMPATIBLE_STORAGE', description='Type of the asset or source'
+    )
     required: S3CompatibleStorageRequired
     masked: S3CompatibleStorageMasked | None = None
     optional: S3CompatibleStorageOptional | None = None
@@ -1841,10 +1879,13 @@ class S3CompatibleStorageInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class AzureBlobStorageInput(CoreInput):
-    type: Literal['AZURE_BLOB_STORAGE'] = 'AZURE_BLOB_STORAGE'
+    type: Literal['AZURE_BLOB_STORAGE'] = Field(
+        'AZURE_BLOB_STORAGE', description='Type of the asset or source'
+    )
     required: AzureBlobStorageRequired
     masked: AzureBlobStorageMasked | None = None
     optional: AzureBlobStorageOptional | None = None
@@ -1856,10 +1897,13 @@ class AzureBlobStorageInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class GoogleCloudStorageInput(CoreInput):
-    type: Literal['GOOGLE_CLOUD_STORAGE'] = 'GOOGLE_CLOUD_STORAGE'
+    type: Literal['GOOGLE_CLOUD_STORAGE'] = Field(
+        'GOOGLE_CLOUD_STORAGE', description='Type of the asset or source'
+    )
     required: GoogleCloudStorageRequired
     masked: GoogleCloudStorageMasked | None = None
     optional: GoogleCloudStorageOptional | None = None
@@ -1871,10 +1915,13 @@ class GoogleCloudStorageInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class WordPressInput(CoreInput):
-    type: Literal['WORDPRESS'] = 'WORDPRESS'
+    type: Literal['WORDPRESS'] = Field(
+        'WORDPRESS', description='Type of the asset or source'
+    )
     required: WordPressRequired
     masked: WordPressMasked
     optional: WordPressOptional | None = None
@@ -1886,10 +1933,13 @@ class WordPressInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class PostgreSQLInput(CoreInput):
-    type: Literal['POSTGRESQL'] = 'POSTGRESQL'
+    type: Literal['POSTGRESQL'] = Field(
+        'POSTGRESQL', description='Type of the asset or source'
+    )
     required: PostgreSQLRequired
     masked: PostgreSQLMasked
     optional: PostgreSQLOptional | None = None
@@ -1901,10 +1951,11 @@ class PostgreSQLInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class MySQLInput(CoreInput):
-    type: Literal['MYSQL'] = 'MYSQL'
+    type: Literal['MYSQL'] = Field('MYSQL', description='Type of the asset or source')
     required: MySQLRequired
     masked: MySQLMasked
     optional: MySQLOptional | None = None
@@ -1916,10 +1967,11 @@ class MySQLInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class MSSQLInput(CoreInput):
-    type: Literal['MSSQL'] = 'MSSQL'
+    type: Literal['MSSQL'] = Field('MSSQL', description='Type of the asset or source')
     required: MSSQLRequired
     masked: MSSQLMasked
     optional: MSSQLOptional | None = None
@@ -1931,10 +1983,11 @@ class MSSQLInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class OracleInput(CoreInput):
-    type: Literal['ORACLE'] = 'ORACLE'
+    type: Literal['ORACLE'] = Field('ORACLE', description='Type of the asset or source')
     required: OracleRequired
     masked: OracleMasked
     optional: OracleOptional | None = None
@@ -1946,10 +1999,11 @@ class OracleInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class HiveInput(CoreInput):
-    type: Literal['HIVE'] = 'HIVE'
+    type: Literal['HIVE'] = Field('HIVE', description='Type of the asset or source')
     required: HiveRequired
     masked: HiveMasked
     optional: HiveOptional | None = None
@@ -1961,10 +2015,13 @@ class HiveInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class DatabricksInput(CoreInput):
-    type: Literal['DATABRICKS'] = 'DATABRICKS'
+    type: Literal['DATABRICKS'] = Field(
+        'DATABRICKS', description='Type of the asset or source'
+    )
     required: DatabricksRequiredPat | DatabricksRequiredServicePrincipal = Field(
         ..., title='DatabricksRequired'
     )
@@ -1980,10 +2037,13 @@ class DatabricksInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class SnowflakeInput(CoreInput):
-    type: Literal['SNOWFLAKE'] = 'SNOWFLAKE'
+    type: Literal['SNOWFLAKE'] = Field(
+        'SNOWFLAKE', description='Type of the asset or source'
+    )
     required: (
         SnowflakeRequiredDefaultAuthenticator
         | SnowflakeRequiredExternalBrowserAuthenticator
@@ -2005,10 +2065,13 @@ class SnowflakeInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class MongoDBInput(CoreInput):
-    type: Literal['MONGODB'] = 'MONGODB'
+    type: Literal['MONGODB'] = Field(
+        'MONGODB', description='Type of the asset or source'
+    )
     required: MongoDBRequiredAtlas | MongoDBRequiredOnPrem = Field(
         ..., title='MongoDBRequired'
     )
@@ -2024,10 +2087,137 @@ class MongoDBInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
+class Neo4jRequired(BaseModel):
+    """
+    Neo4j connection endpoint. Accepts bolt://, neo4j://, or neo4j+s:// URIs.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    uri: str = Field(
+        ...,
+        description='Bolt or Neo4j URI (e.g. bolt://localhost:7687 or neo4j+s://abc123.databases.neo4j.io)',
+    )
+    database: str | None = Field(
+        None,
+        description='Target database name (defaults to "neo4j"). Multi-database requires Neo4j 4.0+.',
+    )
+
+
+class Neo4jMaskedUsernamePassword(BaseModel):
+    """
+    Neo4j basic auth credentials.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    username: str = Field(..., description='Neo4j username (typically "neo4j")')
+    password: str = Field(..., description='Neo4j password')
+
+
+class Neo4jMaskedNone(BaseModel):
+    """
+    No authentication (local dev / anonymous access).
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class TrustStrategy(StrEnum):
+    """
+    Certificate trust strategy. TRUST_ALL_CERTIFICATES is useful for self-signed certs in dev.
+    """
+
+    TRUST_ALL_CERTIFICATES = 'TRUST_ALL_CERTIFICATES'
+    TRUST_SYSTEM_CA_SIGNED_CERTIFICATES = 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES'
+
+
+class Neo4jOptionalConnection(BaseModel):
+    """
+    Neo4j driver connection tuning options.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection_timeout_ms: int | None = Field(
+        30000, description='Driver connection timeout in milliseconds.', ge=1000
+    )
+    max_connection_pool_size: int | None = Field(
+        10, description='Maximum number of connections in the driver pool.', ge=1
+    )
+    encrypted: bool | None = Field(
+        None, description='Force encrypted connection (overrides URI scheme detection).'
+    )
+    trust_strategy: TrustStrategy | None = Field(
+        None,
+        description='Certificate trust strategy. TRUST_ALL_CERTIFICATES is useful for self-signed certs in dev.',
+    )
+
+
+class Neo4jOptionalScope(BaseModel):
+    """
+    Controls which node labels and relationships are included.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_labels: list[str] | None = Field(
+        None,
+        description='Allowlist of node labels to scan. If empty, all labels are included.',
+    )
+    exclude_labels: list[str] | None = Field(
+        None, description='Denylist of node labels to skip (case-sensitive).'
+    )
+    node_limit_per_label: int | None = Field(
+        None,
+        description='Maximum number of assets (node labels) to emit per extraction run.',
+        ge=1,
+    )
+    include_relationships: bool | None = Field(
+        True,
+        description='When true, relationship edges between labels are resolved and stored as asset links.',
+    )
+
+
+class Neo4jOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: Neo4jOptionalConnection | None = None
+    scope: Neo4jOptionalScope | None = None
+
+
+class Neo4jInput(CoreInput):
+    type: Literal['NEO4J'] = Field('NEO4J', description='Type of the asset or source')
+    required: Neo4jRequired
+    masked: Neo4jMaskedUsernamePassword | Neo4jMaskedNone = Field(
+        ..., title='Neo4jMasked'
+    )
+    optional: Neo4jOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class PowerBIInput(CoreInput):
-    type: Literal['POWERBI'] = 'POWERBI'
+    type: Literal['POWERBI'] = Field(
+        'POWERBI', description='Type of the asset or source'
+    )
     required: PowerBIRequiredServicePrincipal | PowerBIRequiredAccessToken = Field(
         ..., title='PowerBIRequired'
     )
@@ -2043,10 +2233,13 @@ class PowerBIInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class TableauInput(CoreInput):
-    type: Literal['TABLEAU'] = 'TABLEAU'
+    type: Literal['TABLEAU'] = Field(
+        'TABLEAU', description='Type of the asset or source'
+    )
     required: TableauRequiredUsernamePassword | TableauRequiredPersonalAccessToken = (
         Field(..., title='TableauRequired')
     )
@@ -2062,6 +2255,7 @@ class TableauInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class ConfluenceRequired(BaseModel):
@@ -2109,7 +2303,7 @@ class ConfluenceOptionalConnection(BaseModel):
     )
 
 
-class Type15(StrEnum):
+class Type16(StrEnum):
     """
     Filter spaces by space type
     """
@@ -2146,7 +2340,7 @@ class ConfluenceOptionalScopeSpaces(BaseModel):
     keys: list[str] | None = Field(
         None, description='Filter spaces by keys (up to 250)', max_length=250
     )
-    type: Type15 | None = Field(None, description='Filter spaces by space type')
+    type: Type16 | None = Field(None, description='Filter spaces by space type')
     status: Status | None = Field(None, description='Filter spaces by status')
     labels: list[str] | None = Field(
         None,
@@ -2412,7 +2606,7 @@ class ServiceDeskOptional(BaseModel):
     content: ServiceDeskOptionalContent | None = None
 
 
-class Type16(StrEnum):
+class Type17(StrEnum):
     """
     Type of the asset or source
     """
@@ -2430,15 +2624,19 @@ class Type16(StrEnum):
     DATABRICKS = 'DATABRICKS'
     SNOWFLAKE = 'SNOWFLAKE'
     MONGODB = 'MONGODB'
+    NEO4J = 'NEO4J'
     POWERBI = 'POWERBI'
     TABLEAU = 'TABLEAU'
     CONFLUENCE = 'CONFLUENCE'
     JIRA = 'JIRA'
     SERVICEDESK = 'SERVICEDESK'
+    SQLITE = 'SQLITE'
 
 
 class ConfluenceInput(CoreInput):
-    type: Literal['CONFLUENCE'] = 'CONFLUENCE'
+    type: Literal['CONFLUENCE'] = Field(
+        'CONFLUENCE', description='Type of the asset or source'
+    )
     required: ConfluenceRequired
     masked: ConfluenceMasked
     optional: ConfluenceOptional | None = None
@@ -2450,10 +2648,11 @@ class ConfluenceInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class JiraInput(CoreInput):
-    type: Literal['JIRA'] = 'JIRA'
+    type: Literal['JIRA'] = Field('JIRA', description='Type of the asset or source')
     required: JiraRequired
     masked: JiraMasked
     optional: JiraOptional | None = None
@@ -2465,10 +2664,13 @@ class JiraInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class ServiceDeskInput(CoreInput):
-    type: Literal['SERVICEDESK'] = 'SERVICEDESK'
+    type: Literal['SERVICEDESK'] = Field(
+        'SERVICEDESK', description='Type of the asset or source'
+    )
     required: ServiceDeskRequired
     masked: ServiceDeskMasked
     optional: ServiceDeskOptional | None = None
@@ -2480,6 +2682,60 @@ class ServiceDeskInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
+class SQLiteRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    database_path: str = Field(
+        ...,
+        description='Absolute or relative path to the SQLite database file (e.g. /data/app.db)',
+    )
+
+
+class SQLiteOptionalScope(BaseModel):
+    """
+    Table selection scope.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_tables: list[str] | None = Field(
+        None,
+        description='Optional table allowlist. Only tables in this list will be scanned.',
+    )
+    table_limit: int | None = Field(
+        None, description='Optional cap on number of table assets extracted', ge=1
+    )
+
+
+class SQLiteOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    scope: SQLiteOptionalScope | None = None
+
+
+class SQLiteInput(CoreInput):
+    type: Literal['SQLITE'] = Field('SQLITE', description='Type of the asset or source')
+    required: SQLiteRequired
+    masked: dict[str, Any] | None = Field(
+        None,
+        description='SQLite has no credentials; this section is intentionally empty.',
+    )
+    optional: SQLiteOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
 
 
 class SourceInput(
@@ -2496,12 +2752,14 @@ class SourceInput(
         | DatabricksInput
         | SnowflakeInput
         | MongoDBInput
+        | Neo4jInput
         | PowerBIInput
         | TableauInput
         | WordPressInput
         | ConfluenceInput
         | JiraInput
         | ServiceDeskInput
+        | SQLiteInput
     ]
 ):
     root: (
@@ -2517,12 +2775,14 @@ class SourceInput(
         | DatabricksInput
         | SnowflakeInput
         | MongoDBInput
+        | Neo4jInput
         | PowerBIInput
         | TableauInput
         | WordPressInput
         | ConfluenceInput
         | JiraInput
         | ServiceDeskInput
+        | SQLiteInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

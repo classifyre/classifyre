@@ -52,6 +52,46 @@ def test_slack_generate_hash_id():
     assert unhash_id(hashed_id) == expected_raw
 
 
+def test_slack_generate_hash_id_workspace_takes_priority_over_team_id():
+    """workspace slug must stay the primary namespace key for backward compatibility.
+
+    Existing deployments hash Slack assets with the workspace slug. Switching to
+    team_id would silently change every asset ID and break scan deduplication.
+    """
+    recipe = {
+        "type": "SLACK",
+        "required": {"workspace": "acme"},
+        "masked": {"bot_token": "xoxb-test-token"},
+    }
+
+    source = SlackSource(recipe)
+    source.team_id = "T123"
+    asset_id = "C123456_#_1700000000.000000"
+
+    hashed_id = source.generate_hash_id(asset_id)
+
+    expected_raw = "SLACK_#_acme_#_C123456_#_1700000000.000000"
+    assert unhash_id(hashed_id) == expected_raw
+
+
+def test_slack_generate_hash_id_uses_team_id_when_no_workspace():
+    """When workspace is not configured, team_id is the fallback namespace."""
+    recipe = {
+        "type": "SLACK",
+        "required": {},
+        "masked": {"bot_token": "xoxb-test-token"},
+    }
+
+    source = SlackSource(recipe)
+    source.team_id = "T999"
+    asset_id = "C000_#_1700000001.000000"
+
+    hashed_id = source.generate_hash_id(asset_id)
+
+    expected_raw = "SLACK_#_T999_#_C000_#_1700000001.000000"
+    assert unhash_id(hashed_id) == expected_raw
+
+
 def test_normalize_http_url_resolves_relative_paths():
     normalized = normalize_http_url("/images/photo.jpg", base_url="https://blog.example.com")
     assert normalized == "https://blog.example.com/images/photo.jpg"

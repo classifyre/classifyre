@@ -1,12 +1,15 @@
 "use client";
 
 import * as React from "react";
+import { useTranslation } from "@/hooks/use-translation";
 import Editor from "@monaco-editor/react";
 import {
   useForm,
+  useFieldArray,
   type Control,
   type FieldPath,
   type FieldValues,
+  type PathValue,
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -54,6 +57,7 @@ import {
   getSourceSectionKnowledge,
 } from "@/lib/assistant-knowledge";
 import { collectMissingRequiredFields } from "@/lib/assistant-form-utils";
+import type { TranslationKey } from "@/i18n";
 import {
   isIngestionSourceType,
   type IngestionSourceType,
@@ -90,9 +94,14 @@ function flattenFormErrors(
   });
 }
 
-function formatPlaceholder(name: string, schema: JSONSchema7): string {
+function formatPlaceholder(
+  name: string,
+  schema: JSONSchema7,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): string {
   return (
-    schema.description || `Enter ${formatLabel(name, schema).toLowerCase()}`
+    schema.description ||
+    t("forms.enterValue") + " " + formatLabel(name, schema).toLowerCase()
   );
 }
 
@@ -497,12 +506,12 @@ function collectDefaults(schema: JSONSchema7): unknown {
     }
   }
 
-  if (schema.oneOf && Array.isArray(schema.oneOf)) {
-    for (const option of schema.oneOf) {
-      const defaults = collectDefaults(option as JSONSchema7);
-      if (defaults !== undefined) return defaults;
-    }
-  }
+  // Do NOT collect defaults for oneOf schemas. oneOf represents a discriminated
+  // union where the user must explicitly choose an option. Pre-populating from
+  // const discriminators (e.g. {deployment: "ATLAS"}) causes the first option to
+  // be auto-selected on initial render, which mounts child <FormField>s before
+  // the parent oneOf <FormField> runs its registration effect — triggering a
+  // react-hook-form crash (Cannot read properties of undefined (reading 'mount')).
 
   if (isObjectSchema(schema) && schema.properties) {
     const obj: Record<string, unknown> = {};
@@ -708,6 +717,150 @@ interface SchemaFieldProps {
   autoDetectSensitiveFields?: boolean;
 }
 
+function OneOfFieldInner({
+  field,
+  fieldPath,
+  label,
+  required,
+  hideLabel,
+  disabled,
+  normalizedSchema,
+  control,
+  forceMasked,
+  autoDetectSensitiveFields,
+}: {
+  field: {
+    value: unknown;
+    onChange: (value: unknown) => void;
+  };
+  fieldPath: string;
+  label: string;
+  required: boolean;
+  hideLabel: boolean;
+  disabled: boolean;
+  normalizedSchema: JSONSchema7;
+  control: Control<FieldValues>;
+  forceMasked: boolean;
+  autoDetectSensitiveFields: boolean;
+}) {
+  const { t } = useTranslation();
+  const oneOfOptions = React.useMemo(
+    () => (normalizedSchema.oneOf || []) as JSONSchema7[],
+    [normalizedSchema.oneOf],
+  );
+  const [hasMounted, setHasMounted] = React.useState(false);
+  const hasInitializedRequiredDefault = React.useRef(false);
+
+  React.useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (!required || !hasMounted || hasInitializedRequiredDefault.current) {
+      return;
+    }
+    if (field.value !== undefined || oneOfOptions.length === 0) {
+      return;
+    }
+
+    // Initialize required oneOf fields after mount to avoid react-hook-form
+    // registration timing issues during the initial render pass.
+    field.onChange(createOneOfValue(oneOfOptions[0]!));
+    hasInitializedRequiredDefault.current = true;
+  }, [field, hasMounted, oneOfOptions, required]);
+
+  // Only attempt auto-selection when the field has an explicit value.
+  // Treating undefined as {} would cause empty-property options to score 0 and
+  // appear "selected" even though the real form value is still undefined.
+  const currentValue =
+    field.value !== undefined && isPlainObject(field.value) ? field.value : null;
+  const selectedOption =
+    currentValue !== null ? findSelectedOneOfOption(oneOfOptions, currentValue) : null;
+  const fallbackOption = required && hasMounted ? oneOfOptions[0] || null : null;
+  const activeOption = selectedOption ?? fallbackOption;
+  const selectedKey = selectedOption
+    ? getOneOfOptionIdentity(
+        selectedOption as JSONSchema7,
+        oneOfOptions.indexOf(selectedOption) ?? 0,
+      )
+    : fallbackOption
+      ? getOneOfOptionIdentity(fallbackOption, oneOfOptions.indexOf(fallbackOption))
+      : "";
+
+  return (
+    <FormItem>
+      {!hideLabel && (
+        <FormLabel className="capitalize">
+          {label}
+          {required && <span className="text-destructive"> *</span>}
+        </FormLabel>
+      )}
+      <div className="space-y-4">
+        <Select
+          onValueChange={(value) => {
+            if (value === "__none__") {
+              field.onChange(null);
+              return;
+            }
+            const option = oneOfOptions.find((opt, index) => {
+              return getOneOfOptionIdentity(opt as JSONSchema7, index) === value;
+            });
+
+            if (option) {
+              field.onChange(createOneOfValue(option as JSONSchema7));
+            } else {
+              field.onChange(null);
+            }
+          }}
+          value={selectedKey || (!required ? "__none__" : "")}
+          disabled={disabled}
+        >
+          <FormControl>
+            <SelectTrigger data-testid={`select-${String(label).toLowerCase().replace(/[^a-z0-9]/g, "-")}`}>
+              <SelectValue placeholder={t("common.selectOption")} />
+            </SelectTrigger>
+          </FormControl>
+          <SelectContent>
+            {!required && <SelectItem value="__none__">{t("common.notSet")}</SelectItem>}
+            {oneOfOptions.map((option, idx) => {
+              const opt = option as JSONSchema7;
+              const optionValue = getOneOfOptionIdentity(opt, idx);
+              const optionLabel = getOneOfOptionLabel(opt, idx);
+              const optionDescription = opt.description || "";
+              return (
+                <SelectItem key={idx} value={optionValue}>
+                  <div>
+                    <div className="font-medium">{optionLabel}</div>
+                    {optionDescription && (
+                      <div className="text-xs text-muted-foreground">
+                        {optionDescription}
+                      </div>
+                    )}
+                  </div>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+
+        {activeOption && (activeOption as JSONSchema7).properties && (
+          <div className="rounded-md border border-muted/40 bg-muted/10 p-4">
+            <SchemaObjectFields
+              schema={activeOption as JSONSchema7}
+              control={control}
+              path={fieldPath}
+              disabled={disabled}
+              forceMasked={forceMasked}
+              autoDetectSensitiveFields={autoDetectSensitiveFields}
+            />
+          </div>
+        )}
+      </div>
+      <FormMessage />
+    </FormItem>
+  );
+}
+
 function ObjectJsonEditorControl({
   fieldName,
   label,
@@ -727,6 +880,7 @@ function ObjectJsonEditorControl({
   hideLabel: boolean;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
   const serializedFieldValue = React.useMemo(
     () => formatJsonObjectValue(schema, value),
     [schema, value],
@@ -749,7 +903,7 @@ function ObjectJsonEditorControl({
 
     if (rawValue.trim() === "") {
       lastSyncedValueRef.current = "";
-      setParseError(required ? "Enter a JSON object." : null);
+      setParseError(required ? t("forms.enterValue") : null);
       onChange(undefined);
       return;
     }
@@ -758,7 +912,7 @@ function ObjectJsonEditorControl({
       const parsed = JSON.parse(rawValue);
 
       if (!isPlainObject(parsed)) {
-        setParseError("Value must be a JSON object.");
+        setParseError(t("validation.configValidationFailed"));
         onChange(undefined);
         return;
       }
@@ -767,7 +921,7 @@ function ObjectJsonEditorControl({
       setParseError(null);
       onChange(parsed);
     } catch {
-      setParseError("Enter valid JSON.");
+      setParseError(t("validation.configValidationFailed"));
       onChange(undefined);
     }
   };
@@ -881,6 +1035,7 @@ function SchemaObjectFields({
   forceMasked?: boolean;
   autoDetectSensitiveFields?: boolean;
 }) {
+  const { t } = useTranslation();
   const properties = schema.properties || {};
   const required = new Set(schema.required || []);
   const entries = Object.entries(properties).filter(
@@ -890,7 +1045,7 @@ function SchemaObjectFields({
   if (entries.length === 0) {
     return (
       <div className="text-sm text-muted-foreground">
-        No configurable fields available.
+        {t("sources.detail.noRequiredDetails")}
       </div>
     );
   }
@@ -919,6 +1074,91 @@ function SchemaObjectFields({
   );
 }
 
+function ComplexObjectArrayField({
+  control,
+  fieldName,
+  fieldPath,
+  itemsSchema,
+  label,
+  required,
+  hideLabel,
+  disabled,
+  forceMasked,
+  autoDetectSensitiveFields,
+}: {
+  control: Control<FieldValues>;
+  fieldName: FieldPath<FieldValues>;
+  fieldPath: string;
+  itemsSchema: JSONSchema7;
+  label: string;
+  required: boolean;
+  hideLabel: boolean;
+  disabled: boolean;
+  forceMasked: boolean;
+  autoDetectSensitiveFields: boolean;
+}) {
+  const { t } = useTranslation();
+  const { fields, append, remove } = useFieldArray({ control, name: fieldName });
+
+  return (
+    <FormItem>
+      {!hideLabel && (
+        <FormLabel className="capitalize">
+          {label}
+          {required && <span className="text-destructive"> *</span>}
+        </FormLabel>
+      )}
+      <div className="space-y-3">
+        {fields.length === 0 && (
+          <div className="text-sm text-muted-foreground">
+            {t("forms.noItemsAdded", { label: label.toLowerCase() })}
+          </div>
+        )}
+        {fields.map((fieldEntry, index) => (
+          <Card key={fieldEntry.id} className="shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                {t("forms.itemIndex", { index: index + 1 })}
+              </CardTitle>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => remove(index)}
+                disabled={disabled}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <SchemaObjectFields
+                schema={itemsSchema}
+                control={control}
+                path={`${fieldPath}.${index}`}
+                disabled={disabled}
+                forceMasked={forceMasked}
+                autoDetectSensitiveFields={autoDetectSensitiveFields}
+              />
+            </CardContent>
+          </Card>
+        ))}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => append(getInitialValue(itemsSchema))}
+          disabled={disabled}
+          data-testid={`btn-add-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          {t("forms.addItem", { label })}
+        </Button>
+      </div>
+      <FormMessage />
+    </FormItem>
+  );
+}
+
 function SchemaField({
   name,
   schema,
@@ -930,6 +1170,7 @@ function SchemaField({
   forceMasked = false,
   autoDetectSensitiveFields = true,
 }: SchemaFieldProps) {
+  const { t } = useTranslation();
   const nullable = hasNullType(schema);
   const normalizedSchema = normalizeAnyOfSchema(schema);
   const fieldPath = path ? `${path}.${name}` : name;
@@ -943,97 +1184,19 @@ function SchemaField({
         control={control}
         name={fieldName}
         render={({ field }) => {
-          const currentValue = isPlainObject(field.value) ? field.value : {};
-          const selectedOption = findSelectedOneOfOption(
-            (normalizedSchema.oneOf || []) as JSONSchema7[],
-            currentValue,
-          );
-          const selectedKey = selectedOption
-            ? getOneOfOptionIdentity(
-                selectedOption as JSONSchema7,
-                (normalizedSchema.oneOf || []).indexOf(selectedOption) ?? 0,
-              )
-            : "";
-
           return (
-            <FormItem>
-              {!hideLabel && (
-                <FormLabel className="capitalize">
-                  {label}
-                  {required && <span className="text-destructive"> *</span>}
-                </FormLabel>
-              )}
-              <div className="space-y-4">
-                <Select
-                  onValueChange={(value) => {
-                    if (value === "__none__") {
-                      field.onChange(null);
-                      return;
-                    }
-                    const option = normalizedSchema.oneOf?.find(
-                      (opt, index) => {
-                        return (
-                          getOneOfOptionIdentity(opt as JSONSchema7, index) ===
-                          value
-                        );
-                      },
-                    );
-
-                    if (option) {
-                      field.onChange(createOneOfValue(option as JSONSchema7));
-                    } else {
-                      field.onChange(null);
-                    }
-                  }}
-                  value={selectedKey || (!required ? "__none__" : "")}
-                  disabled={disabled}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select option" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {!required && (
-                      <SelectItem value="__none__">Not set</SelectItem>
-                    )}
-                    {normalizedSchema.oneOf?.map((option, idx) => {
-                      const opt = option as JSONSchema7;
-                      const optionValue = getOneOfOptionIdentity(opt, idx);
-                      const optionLabel = getOneOfOptionLabel(opt, idx);
-                      const optionDescription = opt.description || "";
-                      return (
-                        <SelectItem key={idx} value={optionValue}>
-                          <div>
-                            <div className="font-medium">{optionLabel}</div>
-                            {optionDescription && (
-                              <div className="text-xs text-muted-foreground">
-                                {optionDescription}
-                              </div>
-                            )}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-
-                {selectedOption &&
-                  (selectedOption as JSONSchema7).properties && (
-                    <div className="rounded-md border border-muted/40 bg-muted/10 p-4">
-                      <SchemaObjectFields
-                        schema={selectedOption as JSONSchema7}
-                        control={control}
-                        path={fieldPath}
-                        disabled={disabled}
-                        forceMasked={forceMasked}
-                        autoDetectSensitiveFields={autoDetectSensitiveFields}
-                      />
-                    </div>
-                  )}
-              </div>
-              <FormMessage />
-            </FormItem>
+            <OneOfFieldInner
+              field={field}
+              fieldPath={fieldPath}
+              label={label}
+              required={required}
+              hideLabel={hideLabel}
+              disabled={disabled}
+              normalizedSchema={normalizedSchema}
+              control={control}
+              forceMasked={forceMasked}
+              autoDetectSensitiveFields={autoDetectSensitiveFields}
+            />
           );
         }}
       />
@@ -1093,6 +1256,23 @@ function SchemaField({
     const hasEnumItems =
       Array.isArray(itemsSchema.enum) && itemsSchema.enum.length > 0;
 
+    if (!hasEnumItems && isObjectSchema(itemsSchema) && itemsSchema.properties) {
+      return (
+        <ComplexObjectArrayField
+          control={control}
+          fieldName={fieldName}
+          fieldPath={fieldPath}
+          itemsSchema={itemsSchema}
+          label={label}
+          required={required}
+          hideLabel={hideLabel}
+          disabled={disabled}
+          forceMasked={forceMasked}
+          autoDetectSensitiveFields={autoDetectSensitiveFields}
+        />
+      );
+    }
+
     return (
       <FormField
         control={control}
@@ -1119,7 +1299,7 @@ function SchemaField({
               <div className="space-y-3">
                 {items.length === 0 && !hasEnumItems && (
                   <div className="text-sm text-muted-foreground">
-                    No {label.toLowerCase()} added yet.
+                    {t("forms.noItemsAdded", { label: label.toLowerCase() })}
                   </div>
                 )}
                 {hasEnumItems && (
@@ -1149,6 +1329,7 @@ function SchemaField({
                         <ToggleGroupItem
                           key={String(option)}
                           value={String(option)}
+                          data-testid={`toggle-option-${String(option)}`}
                         >
                           {String(option).replace(/_/g, " ")}
                         </ToggleGroupItem>
@@ -1169,7 +1350,7 @@ function SchemaField({
                           <Card key={index} className="shadow-none">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                               <CardTitle className="text-sm font-medium">
-                                Item {index + 1}
+                                {t("forms.itemIndex", { index: index + 1 })}
                               </CardTitle>
                               <Button
                                 type="button"
@@ -1241,7 +1422,7 @@ function SchemaField({
                                 disabled={disabled}
                               >
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select option" />
+                                  <SelectValue placeholder={t("common.selectOption")} />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {options.map((option) => (
@@ -1281,7 +1462,7 @@ function SchemaField({
                               />
                             </FormControl>
                             <span className="text-sm text-muted-foreground">
-                              Item {index + 1}
+                              {t("forms.itemIndex", { index: index + 1 })}
                             </span>
                             <Button
                               type="button"
@@ -1312,6 +1493,7 @@ function SchemaField({
                                 }}
                                 autoComplete="off"
                                 disabled={disabled}
+                                data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${index}`}
                               />
                             </FormControl>
                             <Button
@@ -1336,13 +1518,13 @@ function SchemaField({
                                 handleValueChange(event.target.value)
                               }
                               placeholder={
-                                itemsSchema.description || "Enter value"
+                                itemsSchema.description || t("forms.enterValue")
                               }
                               autoComplete="off"
                               disabled={disabled}
+                              data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${index}`}
                             />
-                          </FormControl>
-                          <Button
+                          </FormControl>                          <Button
                             type="button"
                             variant="ghost"
                             size="icon"
@@ -1361,9 +1543,10 @@ function SchemaField({
                       size="sm"
                       onClick={addItem}
                       disabled={disabled}
+                      data-testid={`btn-add-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Add {label}
+                      {t("forms.addItem", { label })}
                     </Button>
                   </>
                 )}
@@ -1414,13 +1597,13 @@ function SchemaField({
             >
               <FormControl>
                 <SelectTrigger>
-                  <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
+                  <SelectValue placeholder={t("common.selectOption")} />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
                 {(nullable || !required) && (
                   <SelectItem value="__none__">
-                    {nullable ? "None" : "Not set"}
+                    {nullable ? t("common.none") : t("common.notSet")}
                   </SelectItem>
                 )}
                 {options.map((option) => (
@@ -1488,10 +1671,14 @@ function SchemaField({
                 {...field}
                 value={field.value ?? ""}
                 onChange={(event) => {
-                  field.onChange(event.target.value);
+                  const raw = event.target.value;
+                  // Store "" directly so RHF doesn't reset to the registered default.
+                  // The zod preprocess converts "" → undefined on validation/submit.
+                  field.onChange(raw === "" ? "" : coerceNumberInput(raw));
                 }}
                 autoComplete="off"
                 disabled={disabled}
+                data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
               />
             </FormControl>
             <FormMessage />
@@ -1507,7 +1694,8 @@ function SchemaField({
       (name.toLowerCase().includes("password") ||
         name.toLowerCase().includes("token") ||
         name.toLowerCase().includes("secret") ||
-        name.toLowerCase().includes("key")));
+        name.toLowerCase().includes("key") ||
+        name.toLowerCase().includes("ssl_ca")));
   const isUrl =
     normalizedSchema.format === "uri" || name.toLowerCase().includes("url");
   const isLongField = isLongText(normalizedSchema);
@@ -1528,28 +1716,31 @@ function SchemaField({
             {isPassword ? (
               <Input
                 type="password"
-                placeholder={formatPlaceholder(name, normalizedSchema)}
+                placeholder={formatPlaceholder(name, normalizedSchema, t)}
                 {...field}
                 value={field.value ?? ""}
                 autoComplete="new-password"
                 disabled={disabled}
+                data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
               />
             ) : isLongField ? (
               <Textarea
-                placeholder={formatPlaceholder(name, normalizedSchema)}
+                placeholder={formatPlaceholder(name, normalizedSchema, t)}
                 {...field}
                 value={field.value ?? ""}
                 autoComplete="off"
                 disabled={disabled}
+                data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
               />
             ) : (
               <Input
                 type={isUrl ? "url" : "text"}
-                placeholder={formatPlaceholder(name, normalizedSchema)}
+                placeholder={formatPlaceholder(name, normalizedSchema, t)}
                 {...field}
                 value={field.value ?? ""}
                 autoComplete="off"
                 disabled={disabled}
+                data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
               />
             )}
           </FormControl>
@@ -1576,6 +1767,7 @@ export interface JsonSchemaFormProps {
   assistantSourceType?: string;
   schedule?: ScheduleValue;
   onScheduleChange?: (value: ScheduleValue) => void;
+  showActions?: boolean;
 }
 
 export interface JsonSchemaFormHandle {
@@ -1640,17 +1832,22 @@ export const JsonSchemaForm = React.forwardRef<
     onSubmit,
     onSecondarySubmit,
     onCancel,
-    submitLabel = "Submit",
+    submitLabel,
     secondarySubmitLabel,
-    cancelLabel = "Cancel",
+    cancelLabel,
     showCancel = true,
     disabled = false,
     assistantSourceType,
     schedule,
     onScheduleChange,
+    showActions = true,
   },
   ref,
 ) {
+  const { t } = useTranslation();
+  const finalSubmitLabel = submitLabel || t("common.submit");
+  const finalCancelLabel = cancelLabel || t("common.cancel");
+
   const zodSchema = React.useMemo(() => {
     const shape: Record<string, z.ZodTypeAny> = {};
     const required = schema.required || [];
@@ -1684,8 +1881,14 @@ export const JsonSchemaForm = React.forwardRef<
     resolver: zodResolver(zodSchema),
     defaultValues: mergedDefaults as FormValues,
   });
+  const hasInitializedResetRef = React.useRef(false);
 
   React.useEffect(() => {
+    if (!hasInitializedResetRef.current) {
+      hasInitializedResetRef.current = true;
+      return;
+    }
+
     form.reset(mergedDefaults as FormValues);
   }, [form, mergedDefaults]);
 
@@ -1697,7 +1900,7 @@ export const JsonSchemaForm = React.forwardRef<
         for (const patch of patches) {
           form.setValue(
             patch.path as FieldPath<FormValues>,
-            patch.value as any,
+            patch.value as PathValue<FormValues, FieldPath<FormValues>>,
             {
               shouldDirty: true,
               shouldTouch: true,
@@ -1762,6 +1965,7 @@ export const JsonSchemaForm = React.forwardRef<
   const maskedBlock = getBlockEntry(["masked", "masked_fields"]);
   const optionalBlock = getBlockEntry(["optional", "optional_fields"]);
   const samplingBlock = getBlockEntry(["sampling"]);
+  const resourcesBlock = getBlockEntry(["resources"]);
 
   const TABULAR_SOURCE_TYPE_MAP: Record<IngestionSourceType, boolean> = {
     WORDPRESS: false,
@@ -1777,11 +1981,13 @@ export const JsonSchemaForm = React.forwardRef<
     DATABRICKS: true,
     SNOWFLAKE: true,
     MONGODB: false,
+    NEO4J: false,
     POWERBI: false,
     TABLEAU: false,
     CONFLUENCE: false,
     JIRA: false,
     SERVICEDESK: false,
+    SQLITE: true,
   };
   const isTabular =
     assistantSourceType && isIngestionSourceType(assistantSourceType)
@@ -1794,6 +2000,7 @@ export const JsonSchemaForm = React.forwardRef<
       maskedBlock?.key,
       optionalBlock?.key,
       samplingBlock?.key,
+      resourcesBlock?.key,
     ].filter(Boolean) as string[],
   );
 
@@ -1871,8 +2078,8 @@ export const JsonSchemaForm = React.forwardRef<
               : null;
             return (
               <AiAssistedCard
-                title="Source Name"
-                description="Give this source a clear, unique name so it stands out later."
+                title={t("forms.sourceName")}
+                description={t("forms.sourceNameDesc")}
                 knowledge={knowledge}
                 promptContext={
                   assistantSourceType && knowledge
@@ -1911,7 +2118,7 @@ export const JsonSchemaForm = React.forwardRef<
             );
             return (
               <AiAssistedCard
-                title="Required fields"
+                title={t("forms.requiredFields")}
                 description={undefined}
                 knowledge={section.knowledge}
                 promptContext={
@@ -1952,7 +2159,7 @@ export const JsonSchemaForm = React.forwardRef<
             );
             return (
               <AiAssistedCard
-                title="Authentication"
+                title={t("forms.authentication")}
                 description={undefined}
                 knowledge={section.knowledge}
                 promptContext={
@@ -1996,13 +2203,14 @@ export const JsonSchemaForm = React.forwardRef<
           >
             <AccordionItem
               value="optional-parameters"
-              className="border-black/70 shadow-[6px_6px_0_#000]"
+              className="border-border/70 shadow-[6px_6px_0_var(--color-border)]"
             >
               <AccordionTrigger
                 className="hover:no-underline"
-                caption="Additional settings you can configure when the default connection setup is not enough."
+                caption={t("forms.optionalParametersDesc")}
+                data-testid="accordion-trigger-optional"
               >
-                Optional Parameters
+                {t("forms.optionalParameters")}
               </AccordionTrigger>
               <AccordionContent className="space-y-4">
                 {optionalBlockEntries.map(([key, value]) => {
@@ -2056,8 +2264,8 @@ export const JsonSchemaForm = React.forwardRef<
 
                 {legacyOptionalSimpleEntries.length > 0 && (
                   <AiAssistedCard
-                    title="Additional Configuration"
-                    description="General optional fields that fine-tune this source."
+                    title={t("forms.additionalConfig")}
+                    description={t("forms.additionalConfigDesc")}
                     withShadow={false}
                   >
                     <div className="grid gap-4 md:grid-cols-2">
@@ -2140,9 +2348,9 @@ export const JsonSchemaForm = React.forwardRef<
             const section = resolveKnowledge("required", "configuration");
             return (
               <AiAssistedCard
-                title="Required Configuration"
+                title={t("forms.requiredConfig")}
                 description={
-                  schema.description || "Complete these fields to finish setup."
+                  schema.description || t("sources.stepper.sourceDetailsDesc")
                 }
                 knowledge={section.knowledge}
                 promptContext={
@@ -2221,7 +2429,7 @@ export const JsonSchemaForm = React.forwardRef<
         {samplingBlock && (
           <FormField
             control={form.control}
-            name={samplingBlock.key as never}
+            name={samplingBlock.key}
             render={({ field }) => (
               <SamplingCard
                 value={field.value as SamplingValue}
@@ -2230,6 +2438,144 @@ export const JsonSchemaForm = React.forwardRef<
                 disabled={disabled}
               />
             )}
+          />
+        )}
+
+        {resourcesBlock && (
+          <FormField
+            control={form.control}
+            name={resourcesBlock.key}
+            render={({ field }) => {
+              const val = (field.value ?? {}) as Record<string, unknown>;
+              const update = (patch: Record<string, unknown>) => {
+                const merged = { ...val, ...patch };
+                const cleaned = Object.fromEntries(
+                  Object.entries(merged).filter(
+                    ([, v]) =>
+                      v !== undefined &&
+                      v !== "" &&
+                      !(typeof v === "object" && v !== null && Object.values(v as Record<string, unknown>).every((x) => !x)),
+                  ),
+                );
+                field.onChange(Object.keys(cleaned).length ? cleaned : undefined);
+              };
+              const requests = (val.requests ?? {}) as Record<string, string>;
+              const limits = (val.limits ?? {}) as Record<string, string>;
+              return (
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="resources" className="border-none">
+                    <AccordionTrigger className="py-2 text-sm font-medium">
+                      Resources
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormItem>
+                          <FormLabel className="text-xs">CPU Request</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Default: 500m"
+                              value={requests.cpu ?? ""}
+                              onChange={(e) =>
+                                update({ requests: { ...requests, cpu: e.target.value || undefined } })
+                              }
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                        <FormItem>
+                          <FormLabel className="text-xs">Memory Request</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Default: 1Gi"
+                              value={requests.memory ?? ""}
+                              onChange={(e) =>
+                                update({ requests: { ...requests, memory: e.target.value || undefined } })
+                              }
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                        <FormItem>
+                          <FormLabel className="text-xs">CPU Limit</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Default: 2"
+                              value={limits.cpu ?? ""}
+                              onChange={(e) =>
+                                update({ limits: { ...limits, cpu: e.target.value || undefined } })
+                              }
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                        <FormItem>
+                          <FormLabel className="text-xs">Memory Limit</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Default: 4Gi"
+                              value={limits.memory ?? ""}
+                              onChange={(e) =>
+                                update({ limits: { ...limits, memory: e.target.value || undefined } })
+                              }
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                        <FormItem className="col-span-2">
+                          <FormLabel className="text-xs">Timeout (seconds)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="Default: 14400"
+                              value={(val.timeout_seconds as number) ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                                update({ timeout_seconds: v && !isNaN(v) ? v : undefined });
+                              }}
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                        <FormItem>
+                          <FormLabel className="text-xs">Max Pool Workers</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="Auto (from CPU/memory)"
+                              min={1}
+                              max={16}
+                              value={(val.max_pool_workers as number) ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                                update({ max_pool_workers: v && !isNaN(v) ? v : undefined });
+                              }}
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                        <FormItem>
+                          <FormLabel className="text-xs">Max Concurrent Assets</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="Auto (pool_workers × 2)"
+                              min={1}
+                              max={50}
+                              value={(val.max_concurrent_assets as number) ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                                update({ max_concurrent_assets: v && !isNaN(v) ? v : undefined });
+                              }}
+                              disabled={disabled}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              );
+            }}
           />
         )}
 
@@ -2243,44 +2589,45 @@ export const JsonSchemaForm = React.forwardRef<
 
         {shouldShowValidationBanner && (
           <div className="rounded-[4px] border-2 border-destructive/70 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            Validation failed. Complete all required fields before testing or
-            saving.
+            {t("forms.validationFailed")}
           </div>
         )}
 
-        <div className="flex flex-col justify-end gap-2 border-t pt-4 sm:flex-row">
-          {showCancel && onCancel && (
+        {showActions && (
+          <div className="flex flex-col justify-end gap-2 border-t pt-4 sm:flex-row">
+            {showCancel && onCancel && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={disabled}
+                className="rounded-[4px] border-2 border-border"
+              >
+                {finalCancelLabel}
+              </Button>
+            )}
+            {onSecondarySubmit && secondarySubmitLabel && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSecondarySubmit}
+                disabled={disabled}
+                className="rounded-[4px] border-2 border-border"
+                data-testid="btn-test-source"
+              >
+                {secondarySubmitLabel}
+              </Button>
+            )}
             <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
+              type="submit"
               disabled={disabled}
-              className="rounded-[4px] border-2 border-black"
+              className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
+              data-testid="btn-save-source"
             >
-              {cancelLabel}
+              {finalSubmitLabel}
             </Button>
-          )}
-          {onSecondarySubmit && secondarySubmitLabel && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleSecondarySubmit}
-              disabled={disabled}
-              className="rounded-[4px] border-2 border-black"
-              data-testid="btn-test-source"
-            >
-              {secondarySubmitLabel}
-            </Button>
-          )}
-          <Button
-            type="submit"
-            disabled={disabled}
-            className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
-            data-testid="btn-save-source"
-          >
-            {submitLabel}
-          </Button>
-        </div>
+          </div>
+        )}
       </form>
     </Form>
   );

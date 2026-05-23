@@ -3,7 +3,7 @@
 import pytest
 
 from src.detectors.secrets.detector import SecretsDetector
-from src.models.generated_detectors import DetectorConfig, Severity
+from src.models.generated_detectors import SecretsDetectorConfig, Severity
 
 
 @pytest.mark.asyncio
@@ -18,9 +18,9 @@ async def test_secrets_detector_initialization():
 @pytest.mark.asyncio
 async def test_secrets_detector_initialization_with_config():
     """Test secrets detector with custom config."""
-    config = DetectorConfig(confidence_threshold=0.95)
+    config = SecretsDetectorConfig(confidence_threshold=0.95)
     detector = SecretsDetector(config)
-    assert detector.config.confidence_threshold == 0.95
+    assert detector._cfg.confidence_threshold == 0.95
 
 
 @pytest.mark.asyncio
@@ -128,7 +128,7 @@ async def test_no_false_positives_clean_content(sample_clean_content):
 @pytest.mark.asyncio
 async def test_confidence_threshold_filtering():
     """Test that confidence threshold filters low-confidence results."""
-    config = DetectorConfig(confidence_threshold=0.95)
+    config = SecretsDetectorConfig(confidence_threshold=0.95)
     detector = SecretsDetector(config)
 
     # Ambiguous content that might have low confidence
@@ -198,9 +198,70 @@ async def test_max_findings_limit():
     key3=AKIAIOSFODNN7THIRD
     """
 
-    config = DetectorConfig(max_findings=1)
+    config = SecretsDetectorConfig(max_findings=1)
     detector = SecretsDetector(config)
     results = await detector.detect(content)
 
     # Should limit to max_findings
     assert len(results) <= 1
+
+
+@pytest.mark.asyncio
+async def test_plugin_discovery_populates_specs():
+    """Test that _discover_plugins finds all expected detect-secrets plugins."""
+    from src.detectors.secrets.detector import _get_plugin_specs
+
+    specs = _get_plugin_specs()
+
+    # Core plugins should always be discoverable
+    assert "aws" in specs
+    assert "private_key" in specs
+    assert "slack" in specs
+    assert "github" in specs
+
+    # Each entry should be a (module_path, class_name) tuple
+    for _key, (mod, cls) in specs.items():
+        assert mod.startswith("detect_secrets.plugins.")
+        assert cls.endswith("Detector") or "HighEntropyString" in cls
+
+
+@pytest.mark.asyncio
+async def test_build_plugins_instantiates_without_errors():
+    """Test that _build_plugins creates plugin instances without temp files."""
+    detector = SecretsDetector()
+    plugins = detector._build_plugins()
+
+    # Should have at least the core plugins
+    assert len(plugins) > 0
+
+    # Each plugin should have an analyze_line method
+    for plugin in plugins:
+        assert hasattr(plugin, "analyze_line")
+
+
+@pytest.mark.asyncio
+async def test_detect_runs_entirely_in_memory():
+    """Test that detect() never touches the filesystem."""
+    import tempfile
+
+    detector = SecretsDetector()
+    content = "AWS_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE\n"
+
+    # Track whether any temp files were created during detection
+    original_mkstemp = tempfile.mkstemp
+    temp_created = []
+
+    def tracking_mkstemp(*args, **kwargs):
+        temp_created.append(True)
+        return original_mkstemp(*args, **kwargs)
+
+    tempfile.mkstemp = tracking_mkstemp
+    try:
+        results = await detector.detect(content)
+    finally:
+        tempfile.mkstemp = original_mkstemp
+
+    # No temp files should have been created
+    assert len(temp_created) == 0
+    # But we should still get findings
+    assert len(results) >= 1

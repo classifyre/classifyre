@@ -25,12 +25,12 @@ export default function SourcesPage() {
             {t("sources.title")}
           </h1>
           <p className="text-muted-foreground">
-            Manage your data sources and connections
+            {t("sources.description")}
           </p>
         </div>
         <Button onClick={() => router.push("/sources/new")}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Source
+          {t("sources.addSource")}
         </Button>
       </div>
 

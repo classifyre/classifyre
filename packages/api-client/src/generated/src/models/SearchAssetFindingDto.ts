@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.
+ * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -136,6 +136,12 @@ export interface SearchAssetFindingDto {
      */
     location?: FindingLocationDto;
     /**
+     * Detector-specific metadata (key-value pairs)
+     * @type {{ [key: string]: any; }}
+     * @memberof SearchAssetFindingDto
+     */
+    metadata?: { [key: string]: any; };
+    /**
      * 
      * @type {string}
      * @memberof SearchAssetFindingDto
@@ -198,28 +204,9 @@ export interface SearchAssetFindingDto {
 export const SearchAssetFindingDtoDetectorTypeEnum = {
     Secrets: 'SECRETS',
     Pii: 'PII',
-    Toxic: 'TOXIC',
-    Nsfw: 'NSFW',
     Yara: 'YARA',
     BrokenLinks: 'BROKEN_LINKS',
-    PromptInjection: 'PROMPT_INJECTION',
-    PhishingUrl: 'PHISHING_URL',
-    Spam: 'SPAM',
-    Language: 'LANGUAGE',
     CodeSecurity: 'CODE_SECURITY',
-    Plagiarism: 'PLAGIARISM',
-    ImageViolence: 'IMAGE_VIOLENCE',
-    OcrPii: 'OCR_PII',
-    DeidScore: 'DEID_SCORE',
-    HateSpeech: 'HATE_SPEECH',
-    AiGenerated: 'AI_GENERATED',
-    ContentQuality: 'CONTENT_QUALITY',
-    Bias: 'BIAS',
-    Duplicate: 'DUPLICATE',
-    DomainClass: 'DOMAIN_CLASS',
-    ContentType: 'CONTENT_TYPE',
-    SensitivityTier: 'SENSITIVITY_TIER',
-    JurisdictionTag: 'JURISDICTION_TAG',
     Custom: 'CUSTOM'
 } as const;
 export type SearchAssetFindingDtoDetectorTypeEnum = typeof SearchAssetFindingDtoDetectorTypeEnum[keyof typeof SearchAssetFindingDtoDetectorTypeEnum];
@@ -297,6 +284,7 @@ export function SearchAssetFindingDtoFromJSONTyped(json: any, ignoreDiscriminato
         'contextBefore': json['contextBefore'] == null ? undefined : json['contextBefore'],
         'contextAfter': json['contextAfter'] == null ? undefined : json['contextAfter'],
         'location': json['location'] == null ? undefined : FindingLocationDtoFromJSON(json['location']),
+        'metadata': json['metadata'] == null ? undefined : json['metadata'],
         'status': json['status'],
         'resolutionReason': json['resolutionReason'] == null ? undefined : json['resolutionReason'],
         'comment': json['comment'] == null ? undefined : json['comment'],
@@ -338,6 +326,7 @@ export function SearchAssetFindingDtoToJSONTyped(value?: SearchAssetFindingDto |
         'contextBefore': value['contextBefore'],
         'contextAfter': value['contextAfter'],
         'location': FindingLocationDtoToJSON(value['location']),
+        'metadata': value['metadata'],
         'status': value['status'],
         'resolutionReason': value['resolutionReason'],
         'comment': value['comment'],

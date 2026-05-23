@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from typing import Any
 from urllib.parse import quote
 
@@ -71,13 +72,12 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
             self._cached_client = self._build_client()
         return self._cached_client
 
-    def _list_objects(self) -> list[ObjectRef]:
+    def _list_objects(self) -> Iterator[ObjectRef]:
         client = self._client()
         bucket = self._required_bucket()
         prefix = self._prefix()
         max_keys = self._max_keys_per_page()
 
-        object_refs: list[ObjectRef] = []
         continuation_token: str | None = None
 
         while True:
@@ -102,13 +102,11 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
                 if not self._object_matches_extension_filters(key):
                     continue
 
-                object_refs.append(
-                    ObjectRef(
-                        key=key,
-                        size=size,
-                        last_modified=self._parse_datetime(item.get("LastModified")),
-                        etag=str(item.get("ETag")).strip('"') if item.get("ETag") else None,
-                    )
+                yield ObjectRef(
+                    key=key,
+                    size=size,
+                    last_modified=self._parse_datetime(item.get("LastModified")),
+                    etag=str(item.get("ETag")).strip('"') if item.get("ETag") else None,
                 )
 
             if not response.get("IsTruncated"):
@@ -117,20 +115,11 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
             if not continuation_token:
                 break
 
-        return object_refs
-
-    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None, bool]:
+    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         client = self._client()
         bucket = self._required_bucket()
-        max_bytes = self._max_object_bytes()
 
-        params: dict[str, Any] = {"Bucket": bucket, "Key": ref.key}
-        truncated = False
-        if ref.size > max_bytes:
-            params["Range"] = f"bytes=0-{max_bytes - 1}"
-            truncated = True
-
-        response = client.get_object(**params)
+        response = client.get_object(Bucket=bucket, Key=ref.key)
         body = response["Body"]
         try:
             file_bytes = body.read()
@@ -141,7 +130,7 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
                 logger.debug("Failed to close S3 response body")
 
         content_type = response.get("ContentType")
-        return file_bytes, str(content_type) if content_type else None, truncated
+        return file_bytes, str(content_type) if content_type else None
 
     def _external_url(self, key: str) -> str:
         bucket = self._required_bucket()

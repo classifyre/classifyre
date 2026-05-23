@@ -135,28 +135,9 @@
       "enum": [
         "SECRETS",
         "PII",
-        "TOXIC",
-        "NSFW",
         "YARA",
         "BROKEN_LINKS",
-        "PROMPT_INJECTION",
-        "PHISHING_URL",
-        "SPAM",
-        "LANGUAGE",
         "CODE_SECURITY",
-        "PLAGIARISM",
-        "IMAGE_VIOLENCE",
-        "OCR_PII",
-        "DEID_SCORE",
-        "HATE_SPEECH",
-        "AI_GENERATED",
-        "CONTENT_QUALITY",
-        "BIAS",
-        "DUPLICATE",
-        "DOMAIN_CLASS",
-        "CONTENT_TYPE",
-        "SENSITIVITY_TIER",
-        "JURISDICTION_TAG",
         "CUSTOM"
       ],
       "description": "Type of detector for content analysis"
@@ -297,6 +278,20 @@
         "findings_count": {
           "description": "Total number of findings detected",
           "type": "integer"
+        },
+        "warnings": {
+          "description": "Non-fatal issues during scan (e.g. content truncation, empty content)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "errors": {
+          "description": "Detector errors during scan",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "required": [
@@ -438,8 +433,13 @@
         },
         "extracted_data": {
           "anyOf": [
-            { "additionalProperties": true, "type": "object" },
-            { "type": "null" }
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
           ],
           "default": null,
           "description": "Structured field values extracted from matched content",
@@ -447,8 +447,12 @@
         },
         "extraction_method": {
           "anyOf": [
-            { "type": "string" },
-            { "type": "null" }
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
           ],
           "default": null,
           "description": "Which extraction strategy was used: REGEX, GLINER, CLASSIFIER_GLINER",

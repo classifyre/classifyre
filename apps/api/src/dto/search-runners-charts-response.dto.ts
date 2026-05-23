@@ -5,6 +5,7 @@ export class RunnersChartsTotalsDto {
   @ApiProperty() running: number;
   @ApiProperty() queued: number;
   @ApiProperty() completed: number;
+  @ApiProperty() warning: number;
   @ApiProperty() failed: number;
 }
 
@@ -14,6 +15,7 @@ export class RunnersChartsTimelineBucketDto {
   @ApiProperty() running: number;
   @ApiProperty() queued: number;
   @ApiProperty() completed: number;
+  @ApiProperty() warning: number;
   @ApiProperty() failed: number;
 }
 

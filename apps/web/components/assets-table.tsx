@@ -73,6 +73,8 @@ import {
   DetectorSummaryBadges,
   TopFindingsBadges,
 } from "./finding-summary-badges";
+import { useTranslation } from "../hooks/use-translation";
+import type { TranslationKey } from "../i18n";
 
 type AssetsTableScope = {
   sourceId?: string;
@@ -328,14 +330,16 @@ function nextSort(current: SortDraft, field: SearchAssetsSortBy): SortDraft {
 function FindingsSubTable({
   findings,
   onFindingClick,
+  t,
 }: {
   findings: SearchAssetFindingDto[];
   onFindingClick: (findingId: string) => void;
+  t: (key: TranslationKey) => string;
 }) {
   if (findings.length === 0) {
     return (
       <div className="py-4 text-center text-xs uppercase tracking-[0.14em] text-muted-foreground">
-        No findings returned for this asset
+        {t("assets.subTable.noFindings")}
       </div>
     );
   }
@@ -345,25 +349,25 @@ function FindingsSubTable({
       <TableHeader>
         <TableRow className="bg-muted/30">
           <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            Detector
+            {t("assets.subTable.detector")}
           </TableHead>
           <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            Type
+            {t("assets.subTable.type")}
           </TableHead>
           <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            Category
+            {t("common.category")}
           </TableHead>
           <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            Severity
+            {t("common.severity")}
           </TableHead>
           <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            Status
+            {t("common.status")}
           </TableHead>
           <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            Detected
+            {t("assets.subTable.detected")}
           </TableHead>
           <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-            Matched Content
+            {t("assets.subTable.matchedContent")}
           </TableHead>
         </TableRow>
       </TableHeader>
@@ -397,25 +401,17 @@ function FindingsSubTable({
               </span>
             </TableCell>
             <TableCell>
-              <Badge
-                variant="outline"
-                className="gap-1.5 border px-2 py-0.5 text-[11px] uppercase tracking-[0.04em]"
-                style={{
-                  color: severityColor(finding.severity),
-                  borderColor: `${severityColor(finding.severity)}55`,
-                  backgroundColor: `${severityColor(finding.severity)}14`,
-                }}
+              <SeverityBadge
+                severity={finding.severity.toLowerCase() as "critical" | "high" | "medium" | "low" | "info"}
               >
-                <span
-                  className="h-2 w-2 rounded-[2px]"
-                  style={{ backgroundColor: severityColor(finding.severity) }}
-                />
-                {formatEnumLabel(finding.severity)}
-              </Badge>
+                {t(`findings.severityLabels.${finding.severity.toUpperCase()}` as TranslationKey)}
+              </SeverityBadge>
             </TableCell>
-            <TableCell>
-              <StatusBadge status={toStatusBadgeValue(finding.status)} />
-            </TableCell>
+<TableCell>
+                            <StatusBadge status={toStatusBadgeValue(finding.status)}>
+                              {t(`findings.statusLabels.${finding.status}` as TranslationKey)}
+                            </StatusBadge>
+                          </TableCell>
             <TableCell>
               <div className="text-xs group-hover:underline group-focus-visible:underline">
                 {formatDate(finding.detectedAt)}
@@ -448,6 +444,7 @@ export function AssetsTable({
   assetStatuses = EMPTY_ASSET_STATUSES,
   onAssetStatusesChange,
 }: AssetsTableProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const { searchParams, setParams } = useUrlParams();
 
@@ -711,8 +708,8 @@ export function AssetsTable({
           <Input
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Search assets"
-            className="h-9 pl-9 border-2 border-black rounded-[4px]"
+            placeholder={t("assets.search")}
+            className="h-9 pl-9 border-2 border-border rounded-[4px]"
           />
         </div>
 
@@ -726,11 +723,11 @@ export function AssetsTable({
               }))
             }
           >
-            <SelectTrigger className="h-9 w-[200px] border-2 border-black rounded-[4px]">
-              <SelectValue placeholder="All sources" />
+            <SelectTrigger className="h-9 w-[200px] border-2 border-border rounded-[4px]">
+              <SelectValue placeholder={t("assets.allSources")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>All sources</SelectItem>
+              <SelectItem value={ALL}>{t("assets.allSources")}</SelectItem>
               {sourceOptions.map((source) => (
                 <SelectItem key={source.id} value={source.id}>
                   {source.name}
@@ -749,13 +746,13 @@ export function AssetsTable({
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-black rounded-[4px]">
-            <MultiSelectValue placeholder="Severity" />
+          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
+            <MultiSelectValue placeholder={t("common.severity")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
-              placeholder: "Search severities...",
-              emptyMessage: "No severities found",
+              placeholder: t("assets.searchSeverity"),
+              emptyMessage: t("assets.noSeveritiesFound"),
             }}
           >
             <MultiSelectGroup>
@@ -763,7 +760,7 @@ export function AssetsTable({
                 <MultiSelectItem key={severity} value={severity}>
                   <span className="inline-flex items-center gap-2">
                     <span
-                      className="h-2.5 w-2.5 rounded-[2px] border border-black/20"
+                      className="h-2.5 w-2.5 rounded-[2px] border border-border/20"
                       style={{
                         backgroundColor:
                           FINDING_SEVERITY_COLOR_BY_ENUM[severity],
@@ -786,13 +783,13 @@ export function AssetsTable({
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[220px] border-2 border-black rounded-[4px]">
-            <MultiSelectValue placeholder="Detector types" />
+          <MultiSelectTrigger className="h-9 w-[220px] border-2 border-border rounded-[4px]">
+            <MultiSelectValue placeholder={t("assets.detectorTypes")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
-              placeholder: "Search detector types...",
-              emptyMessage: "No detector types found",
+              placeholder: t("assets.searchDetectorTypes"),
+              emptyMessage: t("assets.noDetectorTypesFound"),
             }}
           >
             <MultiSelectGroup>
@@ -811,13 +808,13 @@ export function AssetsTable({
             onAssetStatusesChange?.(values as AssetStatusFilterValue[])
           }
         >
-          <MultiSelectTrigger className="h-9 w-[170px] border-2 border-black rounded-[4px]">
-            <MultiSelectValue placeholder="Asset status" />
+          <MultiSelectTrigger className="h-9 w-[170px] border-2 border-border rounded-[4px]">
+            <MultiSelectValue placeholder={t("assets.assetStatus")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
-              placeholder: "Search statuses...",
-              emptyMessage: "No statuses found",
+              placeholder: t("assets.searchStatuses"),
+              emptyMessage: t("assets.noStatusesFound"),
             }}
           >
             <MultiSelectGroup>
@@ -841,7 +838,7 @@ export function AssetsTable({
         {isFilterLoading ? (
           <div className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Sources
+            {t("common.sources")}
           </div>
         ) : null}
       </div>
@@ -856,13 +853,13 @@ export function AssetsTable({
         {showInitialLoading ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="ml-2 text-sm">Loading assets...</span>
+            <span className="ml-2 text-sm">{t("assets.loading")}</span>
           </div>
         ) : !hasRows ? (
           <EmptyState
             icon={Filter}
-            title="No assets found"
-            description="Adjust the filters and run the search again."
+            title={t("assets.noAssets")}
+            description={t("assets.noAssetsHint")}
           />
         ) : (
           <div className="max-h-[70vh] overflow-auto rounded-[4px] bg-white dark:bg-card">
@@ -871,48 +868,38 @@ export function AssetsTable({
                 <TableRow>
                   <TableHead className="w-8 bg-white/95 dark:bg-card/95" />
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead("Asset", SearchAssetsSortByEnum.Name)}
+                    {renderSortableHead(t("assets.columns.asset"), SearchAssetsSortByEnum.Name)}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(
-                      "Source",
-                      SearchAssetsSortByEnum.SourceId,
-                    )}
+                    {renderSortableHead(t("common.source"), SearchAssetsSortByEnum.SourceId)}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          Source Type
+                          {t("assets.columns.sourceType")}
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        The type of data source this asset belongs to
+                        {t("assets.columns.sourceTypeDesc")}
                       </TooltipContent>
                     </Tooltip>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(
-                      "Asset Type",
-                      SearchAssetsSortByEnum.AssetType,
-                    )}
+                    {renderSortableHead(t("assets.columns.assetType"), SearchAssetsSortByEnum.AssetType)}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(
-                      "Status",
-                      SearchAssetsSortByEnum.Status,
-                    )}
+                    {renderSortableHead(t("common.status"), SearchAssetsSortByEnum.Status)}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          Detectors
+                          {t("assets.columns.detectors")}
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        Active detectors that fired on this asset and their
-                        finding counts
+                        {t("assets.columns.detectorsDesc")}
                       </TooltipContent>
                     </Tooltip>
                   </TableHead>
@@ -920,11 +907,11 @@ export function AssetsTable({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          Top Findings
+                          {t("assets.columns.topFindings")}
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        Most frequent finding types on this asset
+                        {t("assets.columns.topFindingsDesc")}
                       </TooltipContent>
                     </Tooltip>
                   </TableHead>
@@ -932,11 +919,11 @@ export function AssetsTable({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          Severity
+                          {t("common.severity")}
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        Highest severity finding and total findings count
+                        {t("assets.columns.severityDesc")}
                       </TooltipContent>
                     </Tooltip>
                   </TableHead>
@@ -944,25 +931,19 @@ export function AssetsTable({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          Status Mix
+                          {t("assets.columns.statusMix")}
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        Breakdown of finding statuses on this asset
+                        {t("assets.columns.statusMixDesc")}
                       </TooltipContent>
                     </Tooltip>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(
-                      "Last Scanned",
-                      SearchAssetsSortByEnum.LastScannedAt,
-                    )}
+                    {renderSortableHead(t("assets.columns.lastScanned"), SearchAssetsSortByEnum.LastScannedAt)}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(
-                      "Updated",
-                      SearchAssetsSortByEnum.UpdatedAt,
-                    )}
+                    {renderSortableHead(t("common.updated"), SearchAssetsSortByEnum.UpdatedAt)}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -986,7 +967,7 @@ export function AssetsTable({
 
                   return (
                     <Fragment key={asset.id}>
-                      <TableRow>
+                      <TableRow data-testid="asset-row">
                         <TableCell className="py-2">
                           {canExpand ? (
                             <Button
@@ -1019,6 +1000,7 @@ export function AssetsTable({
                                   onClick={() =>
                                     router.push(`/assets/${asset.id}`)
                                   }
+                                  data-testid="asset-name"
                                 >
                                   <span className="truncate text-sm font-medium inline-block max-w-[280px]">
                                     {assetName}
@@ -1075,7 +1057,13 @@ export function AssetsTable({
                           <Badge
                             variant={statusVariant[asset.status] || "outline"}
                           >
-                            {asset.status}
+                            {asset.status === "NEW"
+                              ? t("assets.assetNew" as TranslationKey)
+                              : asset.status === "UPDATED"
+                                ? t("assets.assetUpdated" as TranslationKey)
+                                : asset.status === "UNCHANGED"
+                                  ? t("assets.assetUnchanged" as TranslationKey)
+                                  : asset.status}
                           </Badge>
                         </TableCell>
 
@@ -1109,7 +1097,7 @@ export function AssetsTable({
                                     | "info"
                                 }
                               >
-                                {formatEnumLabel(highestSeverity)}
+                                {t(`findings.severityLabels.${highestSeverity.toUpperCase()}` as TranslationKey)}
                               </SeverityBadge>
                               <span className="text-xs text-muted-foreground">
                                 {totalFindings}
@@ -1134,7 +1122,7 @@ export function AssetsTable({
                                   key={entry.status}
                                   status={toStatusBadgeValue(entry.status)}
                                 >
-                                  {STATUS_LABELS[entry.status] ?? entry.status}{" "}
+                                  {t(`findings.statusLabels.${entry.status}` as TranslationKey)}{" "}
                                   · {entry.count}
                                 </StatusBadge>
                               ))}
@@ -1189,6 +1177,7 @@ export function AssetsTable({
                               onFindingClick={(findingId) =>
                                 router.push(`/findings/${findingId}`)
                               }
+                              t={t}
                             />
                           </TableCell>
                         </TableRow>
@@ -1205,7 +1194,7 @@ export function AssetsTable({
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[4px] bg-background/45 backdrop-blur-[1px]">
             <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Updating assets...
+              {t("assets.columns.updating")}
             </div>
           </div>
         ) : null}
@@ -1213,10 +1202,10 @@ export function AssetsTable({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t pt-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Rows per page</span>
+          <span className="text-xs text-muted-foreground">{t("common.rowsPerPage")}</span>
           <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] border-2 border-black rounded-[4px]">
-              <SelectValue placeholder="Rows" />
+<SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
+                <SelectValue placeholder={t("common.rowsPerPage")} />
             </SelectTrigger>
             <SelectContent>
               {PAGE_SIZE_OPTIONS.map((size) => (

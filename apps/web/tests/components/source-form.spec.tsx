@@ -138,10 +138,7 @@ test("jira source submits when bounded scope is provided", async ({
   expect(scope?.["project_keys"]).toEqual(["PLAT"]);
 });
 
-test("sampling checkbox submits fetch_all_until_first_success", async ({
-  mount,
-}) => {
-  let submitted: Record<string, unknown> | null = null;
+test("rows per page only appears for tabular full scans", async ({ mount }) => {
   const component = await mount(
     <SourceForm
       sourceType="POSTGRESQL"
@@ -158,23 +155,14 @@ test("sampling checkbox submits fetch_all_until_first_success", async ({
         },
         sampling: { strategy: "RANDOM" },
       }}
-      onSubmit={(data) => {
-        submitted = data;
-      }}
+      onSubmit={() => {}}
       showCancel={false}
     />,
   );
 
-  await component
-    .getByRole("checkbox", { name: /fetch all until first success/i })
-    .click();
-  await component.getByRole("button", { name: /create source/i }).click();
+  await expect(component.getByText(/rows per page/i)).toHaveCount(0);
 
-  expect(submitted).not.toBeNull();
-  if (!submitted) {
-    throw new Error("Expected submitted payload");
-  }
-  const payload = submitted as unknown as Record<string, unknown>;
-  const sampling = payload["sampling"] as Record<string, unknown> | undefined;
-  expect(sampling?.["fetch_all_until_first_success"]).toBe(true);
+  await component.getByTestId("sampling-strategy-ALL").click();
+  await component.getByRole("button", { name: /advanced/i }).click();
+  await expect(component.getByText(/rows per page/i)).toHaveCount(1);
 });

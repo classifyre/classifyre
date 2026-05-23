@@ -1,6 +1,6 @@
 {
   "name": "classifyre",
-  "version": "0.2.34",
+  "version": "0.4.4",
   "private": true,
   "scripts": {
     "build": "turbo build --filter=!@workspace/devops",
@@ -31,14 +31,14 @@
     "ops:helm:lint": "turbo run helm:lint --filter=@workspace/devops",
     "ops:helm:docs": "turbo run helm:docs --filter=@workspace/devops",
     "ops:helm:docs:check": "turbo run helm:docs:check --filter=@workspace/devops",
-    "ops:helm:snapshot": "turbo run helm:snapshot --filter=@workspace/devops",
-    "ops:helm:snapshot:check": "turbo run helm:snapshot:check --filter=@workspace/devops",
+    "ops:helm:snapshot": "turbo run helm:snpshot --filter=@workspace/devops",
+    "ops:helm:snapshot:check": "turbo run helm:snpshot:check --filter=@workspace/devops",
     "ops:helm:test": "turbo run helm:test --filter=@workspace/devops",
     "test:all": "bun run test && bun run test:e2e",
     "prepare": "husky"
   },
   "devDependencies": {
-    "@openapitools/openapi-generator-cli": "^2.31.0",
+    "@openapitools/openapi-generator-cli": "^2.33.1",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "husky": "^9.1.7",
@@ -59,6 +59,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "next": "16.1.7",
-    "react-medium-image-zoom": "5.4.1"
+    "react-medium-image-zoom": "5.4.1",
+    "@playwright/test": "1.59.1"
   }
 }

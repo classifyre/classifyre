@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.
+ * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { ParseTrainingExamplesSkippedReasonsDto } from './ParseTrainingExamplesSkippedReasonsDto';
+import {
+    ParseTrainingExamplesSkippedReasonsDtoFromJSON,
+    ParseTrainingExamplesSkippedReasonsDtoFromJSONTyped,
+    ParseTrainingExamplesSkippedReasonsDtoToJSON,
+    ParseTrainingExamplesSkippedReasonsDtoToJSONTyped,
+} from './ParseTrainingExamplesSkippedReasonsDto';
 import type { ParsedTrainingExampleDto } from './ParsedTrainingExampleDto';
 import {
     ParsedTrainingExampleDtoFromJSON,
@@ -63,6 +70,30 @@ export interface ParseTrainingExamplesResponseDto {
      * @memberof ParseTrainingExamplesResponseDto
      */
     examples: Array<ParsedTrainingExampleDto>;
+    /**
+     * All column headers found in the file (xlsx/csv only)
+     * @type {Array<string>}
+     * @memberof ParseTrainingExamplesResponseDto
+     */
+    availableColumns?: Array<string>;
+    /**
+     * Column header auto-detected as the label column
+     * @type {string}
+     * @memberof ParseTrainingExamplesResponseDto
+     */
+    detectedLabelColumn?: string;
+    /**
+     * Column header auto-detected as the text column
+     * @type {string}
+     * @memberof ParseTrainingExamplesResponseDto
+     */
+    detectedTextColumn?: string;
+    /**
+     * Breakdown of why rows were skipped
+     * @type {ParseTrainingExamplesSkippedReasonsDto}
+     * @memberof ParseTrainingExamplesResponseDto
+     */
+    skippedReasons?: ParseTrainingExamplesSkippedReasonsDto;
 }
 
 /**
@@ -94,6 +125,10 @@ export function ParseTrainingExamplesResponseDtoFromJSONTyped(json: any, ignoreD
         'skippedRows': json['skippedRows'],
         'warnings': json['warnings'],
         'examples': ((json['examples'] as Array<any>).map(ParsedTrainingExampleDtoFromJSON)),
+        'availableColumns': json['availableColumns'] == null ? undefined : json['availableColumns'],
+        'detectedLabelColumn': json['detectedLabelColumn'] == null ? undefined : json['detectedLabelColumn'],
+        'detectedTextColumn': json['detectedTextColumn'] == null ? undefined : json['detectedTextColumn'],
+        'skippedReasons': json['skippedReasons'] == null ? undefined : ParseTrainingExamplesSkippedReasonsDtoFromJSON(json['skippedReasons']),
     };
 }
 
@@ -114,6 +149,10 @@ export function ParseTrainingExamplesResponseDtoToJSONTyped(value?: ParseTrainin
         'skippedRows': value['skippedRows'],
         'warnings': value['warnings'],
         'examples': ((value['examples'] as Array<any>).map(ParsedTrainingExampleDtoToJSON)),
+        'availableColumns': value['availableColumns'],
+        'detectedLabelColumn': value['detectedLabelColumn'],
+        'detectedTextColumn': value['detectedTextColumn'],
+        'skippedReasons': ParseTrainingExamplesSkippedReasonsDtoToJSON(value['skippedReasons']),
     };
 }
 

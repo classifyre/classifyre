@@ -24,7 +24,6 @@ def _recipe() -> dict:
         },
         "sampling": {
             "strategy": "LATEST",
-            "limit": 5,
         },
     }
 
@@ -67,7 +66,6 @@ async def test_azure_blob_storage_fetch_content_uses_object_ref_cache(monkeypatc
             text_content="hello world",
             parse_error=None,
             downloaded_bytes=11,
-            truncated=False,
         ),
     )
 

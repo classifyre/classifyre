@@ -19,22 +19,21 @@ class BaseDetector(ABC):
     detector_name: str = "base"
 
     def __init__(self, config: DetectorConfig | None = None):
-        """
-        Initialize detector with optional configuration.
-
-        Args:
-            config: Detector configuration (confidence threshold, max findings, etc.)
-        """
-        self.config = config or DetectorConfig()
+        self.config: DetectorConfig = config if config is not None else DetectorConfig()
         self._initialized = False
 
     @abstractmethod
-    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
+    async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
         """
         Scan content and return findings.
 
+        Text detectors receive ``str``; image/binary detectors receive ``bytes``.
+        Implementations should return an empty list for unsupported content types.
+
         Args:
-            content: The content to scan (text, bytes, etc.)
+            content: The content to scan — text (str) or binary (bytes)
             content_type: MIME type of content (e.g., 'text/plain', 'image/jpeg')
 
         Returns:

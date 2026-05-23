@@ -72,6 +72,14 @@ api:
     TEMP_DIR: /tmp
     # -- Filesystem directory for runner execution logs.
     RUNNER_LOGS_DIR: /var/lib/classifyre/runner-logs
+    # -- Maximum number of completed/failed runs to keep per source. Older runs are
+    # -- deleted (including their logs) when a new run is triggered and the count
+    # -- exceeds this value. Set to "0" to disable cleanup.
+    MAX_RUNNERS_PER_SOURCE: "5"
+    # -- Maximum number of runners that can execute concurrently across all sources.
+    # -- New runs are queued in PENDING state when this limit is reached.
+    # -- Set to "0" to disable the limit (unlimited concurrency).
+    MAX_CONCURRENT_RUNNERS: "3"
     # -- Enable read-only demo mode. When "true" all mutating API operations return 403.
     DEMO_MODE: "false"
 
@@ -239,20 +247,25 @@ api:
     serviceAccountName: ""
     # -- Retry attempts for failed CLI jobs.
     backoffLimit: 2
-    # -- Max runtime per CLI job (seconds).
-    activeDeadlineSeconds: 3600
+    # -- Max runtime per CLI job (seconds). Increase for large data sources.
+    activeDeadlineSeconds: 14400
     # -- TTL for completed CLI jobs (seconds). Ignored when cleanup policy deletes jobs immediately.
     ttlSecondsAfterFinished: 1800
     # -- Cleanup policy for CLI jobs: none, failed, or always.
     cleanupPolicy: always
-    # -- Max time API waits for job completion (seconds).
-    waitTimeoutSeconds: 3900
+    # -- Max time API waits for job completion (seconds). Should exceed activeDeadlineSeconds.
+    waitTimeoutSeconds: 15300
     # -- Poll interval while waiting for job completion (milliseconds).
     pollIntervalMs: 2000
     # -- Working directory inside CLI job container.
     workDir: /app/apps/cli
     # -- Allow CLI to auto-install optional detector dependencies.
     autoInstallOptionalDeps: true
+    # -- Number of detector-processed assets to accumulate before pushing findings to the API.
+    detectorFlushBatchSize: 5
+    # -- Optional override for the auto-scaled process pool size (1-16).
+    # When unset, the pool auto-sizes from cgroup CPU/memory limits.
+    # maxPoolWorkers:
 
     resources:
       # -- CLI job resource requests.
@@ -370,13 +383,22 @@ frontend:
     NEXT_PUBLIC_API_URL: /api
 
   posthog:
-    # -- Enable PostHog analytics. When false, no tracking script is injected.
+    # -- Enable PostHog analytics. When false, no env vars are injected.
     enabled: false
-    # -- PostHog project API key (phc_...). Required when enabled=true.
-    apiKey: ""
-    # -- PostHog ingest host. Defaults to /ingest so requests are proxied
-    # -- through the web container (avoids ad-blocker issues).
-    host: "/ingest"
+    # -- PostHog project token (phc_...). Required when enabled=true.
+    token: ""
+    # -- Client-side ingest host sent to the browser SDK (NEXT_PUBLIC_POSTHOG_HOST).
+    # -- Defaults to /classifyre-usr so requests are proxied through the web
+    # -- container, bypassing ad-blockers. Override with a managed reverse proxy
+    # -- subdomain (e.g. https://e.yourcompany.com) for extra reliability.
+    host: "/classifyre-usr"
+    # -- PostHog UI host for toolbar links etc. (NEXT_PUBLIC_POSTHOG_UI_HOST).
+    # -- Use https://eu.posthog.com for EU Cloud.
+    uiHost: "https://us.posthog.com"
+    # -- Upstream PostHog ingest endpoint used server-side by the proxy route
+    # -- (POSTHOG_INGEST_HOST). Never exposed to the browser.
+    # -- Use https://eu.i.posthog.com for EU Cloud, or your managed proxy CNAME.
+    ingestHost: "https://us.i.posthog.com"
 
   # -- Extra environment variables for web container.
   extraEnv: []
@@ -586,8 +608,8 @@ postgres:
         memory: 256Mi
       # -- Embedded Postgres resource limits.
       limits:
-        cpu: "1"
-        memory: 1Gi
+        cpu: "2"
+        memory: 4Gi
 
   external:
     # -- External Postgres host.
@@ -649,3 +671,29 @@ priorityClasses:
   batchName: batch-low-priority
   # -- Numeric priority value for batch workloads.
   batchValue: 1000
+
+telemetry:
+  # -- Enable OpenTelemetry instrumentation for API, web, and CLI components.
+  # -- When false, TELEMETRY_DISABLED=1 is injected into all workloads.
+  # -- Opt out: set enabled=false, or set TELEMETRY_DISABLED=1 / DO_NOT_TRACK=1 at runtime.
+  enabled: true
+
+  # -- OTLP endpoint all components export to (traces, metrics, logs).
+  # -- Defaults to the Classifyre-hosted receiver. Override to point at your own
+  # -- OTel Collector (e.g. deploy helm/otel-receiver in your own cluster):
+  # --   otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318"
+  otlpEndpoint: "https://otel.classifyre.com"
+
+  # -- OTLP export protocol: "http/protobuf" (default) or "grpc".
+  otlpProtocol: "http/protobuf"
+
+  # -- Deployment environment tag attached to every span/metric/log.
+  deployEnv: "production"
+
+  instanceId:
+    # -- Persist a stable anonymous instance UUID in a ConfigMap so it survives upgrades.
+    enabled: true
+    # -- Use an existing ConfigMap instead of creating one. Must contain instanceId.configMapKey.
+    existingConfigMap: ""
+    # -- Key inside the ConfigMap that holds the UUID string.
+    configMapKey: instance-id

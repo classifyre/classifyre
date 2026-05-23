@@ -23,7 +23,7 @@ Use these schema paths when configuring any S3-compatible provider:
 - `config.optional.scope.include_object_metadata`: Include object metadata
 - `config.optional.scope.include_content_preview`: Download content for MIME/text preview
 - `config.sampling.strategy`: `RANDOM`, `LATEST`, or `ALL`
-- `config.sampling.limit`: Item limit (required unless strategy is `ALL`)
+- `config.sampling.rows_per_page`: Item limit per sample run (default 100, ignored when strategy is `ALL`)
 
 ## Backblaze B2 Example
 
@@ -51,8 +51,7 @@ Use these schema paths when configuring any S3-compatible provider:
     }
   },
   "sampling": {
-    "strategy": "LATEST",
-    "limit": 100
+    "strategy": "LATEST"
   }
 }
 ```

@@ -1,0 +1,78 @@
+{{- if .Values.grafana.enabled -}}
+{{- $releaseName := .Release.Name -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "otel-receiver.fullname" . }}-grafana-datasources
+  labels:
+    {{- include "otel-receiver.labels" . | nindent 4 }}
+    # Picked up by the Grafana sidecar when grafana.sidecar.datasources.enabled=true
+    grafana_datasource: "1"
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      {{- if .Values.tempo.enabled }}
+      - name: Tempo
+        type: tempo
+        uid: tempo
+        access: proxy
+        url: http://{{ $releaseName }}-tempo:3200
+        jsonData:
+          tracesToLogsV2:
+            datasourceUid: loki
+            spanStartTimeShift: "-1m"
+            spanEndTimeShift: "1m"
+            filterByTraceID: true
+            filterBySpanID: false
+          lokiSearch:
+            datasourceUid: loki
+          nodeGraph:
+            enabled: true
+          # Enable TraceQL metrics (local-blocks processor must be on in Tempo)
+          traceQuery:
+            timeShiftEnabled: true
+            spanStartTimeShift: "-1m"
+            spanEndTimeShift: "1m"
+        isDefault: false
+        editable: true
+      {{- end }}
+      {{- if .Values.loki.enabled }}
+      - name: Loki
+        type: loki
+        uid: loki
+        access: proxy
+        url: http://{{ $releaseName }}-loki-gateway:80
+        jsonData:
+          derivedFields:
+            - name: TraceID
+              matcherRegex: '"trace_id":"(\w+)"'
+              url: "$${__value.raw}"
+              datasourceUid: tempo
+        isDefault: {{ if not (index .Values "mimir-distributed" "enabled") }}true{{ else }}false{{ end }}
+        editable: true
+      {{- end }}
+      {{- if index .Values "mimir-distributed" "enabled" }}
+      - name: Mimir
+        type: prometheus
+        uid: mimir
+        access: proxy
+        url: http://{{ $releaseName }}-mimir-distributed-nginx/prometheus
+        jsonData:
+          httpMethod: POST
+          exemplarTraceIdDestinations:
+            - name: traceID
+              datasourceUid: tempo
+        isDefault: true
+        editable: true
+      {{- end }}
+      {{- if and (index .Values "opentelemetry-collector" "enabled") (not (index .Values "mimir-distributed" "enabled")) }}
+      - name: Prometheus (OTel self-metrics)
+        type: prometheus
+        uid: prometheus
+        access: proxy
+        url: http://{{ $releaseName }}-opentelemetry-collector:8888
+        isDefault: false
+        editable: true
+      {{- end }}
+{{- end }}

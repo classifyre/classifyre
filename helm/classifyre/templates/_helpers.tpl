@@ -133,3 +133,49 @@ password
 {{- define "classifyre.apiMaskedConfigSecretKey" -}}
 {{- default "CLASSIFYRE_MASKED_CONFIG_KEY" .Values.api.maskedConfigEncryption.secretKey -}}
 {{- end -}}
+
+{{/*
+Resolved OTLP endpoint. Empty string when telemetry is disabled or no endpoint configured.
+*/}}
+{{- define "classifyre.otelEndpoint" -}}
+{{- if .Values.telemetry.enabled -}}
+{{- .Values.telemetry.otlpEndpoint -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Name of the instance-ID ConfigMap.
+*/}}
+{{- define "classifyre.instanceIdConfigMapName" -}}
+{{- if .Values.telemetry.instanceId.existingConfigMap -}}
+{{- .Values.telemetry.instanceId.existingConfigMap -}}
+{{- else -}}
+{{- printf "%s-instance-id" (include "classifyre.fullname" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Shared OTel environment variables injected into API, web, and CLI job containers.
+Renders nothing when telemetry is disabled.
+*/}}
+{{- define "classifyre.telemetryEnv" -}}
+{{- if .Values.telemetry.enabled -}}
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: {{ include "classifyre.otelEndpoint" . | quote }}
+- name: OTEL_EXPORTER_OTLP_PROTOCOL
+  value: {{ .Values.telemetry.otlpProtocol | quote }}
+- name: DEPLOY_ENV
+  value: {{ .Values.telemetry.deployEnv | quote }}
+{{- if .Values.telemetry.instanceId.enabled }}
+- name: CLASSIFYRE_INSTANCE_ID
+  valueFrom:
+    configMapKeyRef:
+      name: {{ include "classifyre.instanceIdConfigMapName" . }}
+      key: {{ .Values.telemetry.instanceId.configMapKey }}
+      optional: true
+{{- end }}
+{{- else -}}
+- name: TELEMETRY_DISABLED
+  value: "1"
+{{- end -}}
+{{- end -}}

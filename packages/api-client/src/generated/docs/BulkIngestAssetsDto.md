@@ -9,6 +9,7 @@ Name | Type
 `runnerId` | string
 `assets` | Array&lt;object&gt;
 `finalizeRun` | boolean
+`skipFindings` | boolean
 
 ## Example
 
@@ -20,6 +21,7 @@ const example = {
   "runnerId": runner-123-abc,
   "assets": [{"hash":"V09SRFBSRVNTXyNfaHR0cHM6Ly9ibG9nLmV4YW1wbGUuY29tXyNfcG9zdHNfMTIz","name":"My Document","external_url":"https://blog.example.com/posts/my-document","checksum":"a1b2c3d4","links":[],"asset_type":"URL","created_at":"2023-01-01T12:00:00Z","updated_at":"2023-01-01T12:00:00Z","findings":[{"finding_type":"email","category":"pii","severity":"medium","confidence":0.95,"matched_content":"john@example.com"}]}],
   "finalizeRun": null,
+  "skipFindings": null,
 } satisfies BulkIngestAssetsDto
 
 console.log(example)

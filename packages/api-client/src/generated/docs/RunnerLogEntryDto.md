@@ -10,6 +10,7 @@ Name | Type
 `timestamp` | string
 `stream` | string
 `message` | string
+`level` | string
 
 ## Example
 
@@ -22,6 +23,7 @@ const example = {
   "timestamp": null,
   "stream": null,
   "message": null,
+  "level": null,
 } satisfies RunnerLogEntryDto
 
 console.log(example)

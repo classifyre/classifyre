@@ -72,7 +72,51 @@ jobs:
       - name: Generate docs artifacts
         run: bun run docs:generate
 
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Build
+        run: bun run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
+      - name: Stage CI artifacts
+        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
+        run: |
+          # Ensure static docs are exported and synced into web public assets.
+          bun run docs:bundle
+          bash ./scripts/stage-docker-artifacts.sh /tmp/classifyre-ci-artifacts
+
+      - name: Upload api build
+        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
+        uses: actions/upload-artifact@v7
+        with:
+          name: api-build
+          path: /tmp/classifyre-ci-artifacts/api-dist
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload codegen
+        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
+        uses: actions/upload-artifact@v7
+        with:
+          name: codegen
+          path: /tmp/classifyre-ci-artifacts/codegen
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload web dist
+        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-dist
+          path: /tmp/classifyre-ci-artifacts/web-dist
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Verify generated files are committed
+        if: success() || failure()
         run: |
           if ! git diff --quiet -- \
             apps/docs/src/_generated/helm-values.mdx \
@@ -97,69 +141,29 @@ jobs:
           fi
 
       - name: Lint
+        if: success() || failure()
         run: bun run lint
 
-      - name: Typecheck
-        run: bun run typecheck
-
-      - name: Build
-        run: bun run build
-        env:
-          NEXT_TELEMETRY_DISABLED: 1
-
       - name: Install Playwright browsers
+        if: success() || failure()
         run: cd apps/web && bunx playwright install --with-deps chromium
 
       - name: Unit tests
+        if: success() || failure()
         run: bun run test
 
       - name: API integration tests
-        if: env.INTEGRATION_DATABASE_URL != ''
+        if: (success() || failure()) && env.INTEGRATION_DATABASE_URL != ''
         env:
           DATABASE_URL: ${{ env.INTEGRATION_DATABASE_URL }}
           INTEGRATION_TEST_RESET_DB: "1"
           INTEGRATION_TEST_SCHEMA_KEY: ${{ github.head_ref || github.ref_name }}
         run: cd apps/api && bun run test:integration:run
 
-      - name: Stage CI artifacts
-        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
-        run: |
-          # Ensure static docs are exported and synced into web public assets.
-          bun run docs:bundle
-          bash ./scripts/stage-docker-artifacts.sh /tmp/classifyre-ci-artifacts
-
-      - name: Upload api build
-        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
-        uses: actions/upload-artifact@v6
-        with:
-          name: api-build
-          path: /tmp/classifyre-ci-artifacts/api-dist
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Upload codegen
-        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
-        uses: actions/upload-artifact@v6
-        with:
-          name: codegen
-          path: /tmp/classifyre-ci-artifacts/codegen
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Upload web dist
-        if: github.event_name != 'workflow_call' && github.event.action != 'closed'
-        uses: actions/upload-artifact@v6
-        with:
-          name: web-dist
-          path: /tmp/classifyre-ci-artifacts/web-dist
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 1
-
   docker:
     name: Build ${{ matrix.name }} (linux/amd64,linux/arm64)
     needs: [validate]
-    if: github.event_name != 'workflow_call' && github.event.action != 'closed'
+    if: always() && !cancelled() && needs.validate.result != 'skipped' && github.event_name != 'workflow_call' && github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
@@ -217,7 +221,7 @@ jobs:
         # QEMU binfmt handlers overrides Rosetta 2 and causes bun (in api-builder)
         # to SIGSEGV inside linux/amd64 containers on an arm64 host.
         if: ${{ !env.ACT }}
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64,amd64
 
@@ -225,7 +229,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

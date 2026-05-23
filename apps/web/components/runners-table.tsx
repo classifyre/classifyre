@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
@@ -60,6 +60,11 @@ import {
   getRunnerStatusBadgeTone,
   isRunnerStatusRunning,
 } from "../lib/runner-status-badge";
+import {
+  mergeRunnerWsIntoRow,
+  runnerMatchesRunnersListFilters,
+} from "@/lib/runner-ws-merge";
+import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import { useTranslation } from "@/hooks/use-translation";
 
 type RunnerStatusFilterValue = SearchRunnersStatus;
@@ -189,6 +194,7 @@ export function RunnersTable({
   const [isLoading, setIsLoading] = useState(false);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [wsBump, setWsBump] = useState(0);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -252,6 +258,70 @@ export function RunnersTable({
       ? resolvedPageSize
       : DEFAULT_PAGE_SIZE;
 
+  const pageRef = useRef(page);
+  const sortRef = useRef(sort);
+  const filtersRef = useRef(effectiveFilters);
+  const safePageSizeRef = useRef(safePageSize);
+  pageRef.current = page;
+  sortRef.current = sort;
+  filtersRef.current = effectiveFilters;
+  safePageSizeRef.current = safePageSize;
+
+  useRunnerWebSocket({
+    trackRunnersList: false,
+    onRunnerUpdate: (runner) => {
+      setData((prev) => {
+        if (!prev) return prev;
+        const idx = prev.items.findIndex((r) => r.id === runner.id);
+        if (idx < 0) return prev;
+        const existing = prev.items[idx];
+        if (!existing) return prev;
+        const nextItems = [...prev.items];
+        nextItems[idx] = mergeRunnerWsIntoRow(existing, runner);
+        return { ...prev, items: nextItems };
+      });
+    },
+    onRunnerCreated: (runner) => {
+      let prepended = false;
+      setData((prev) => {
+        if (!prev) return prev;
+        const existingIdx = prev.items.findIndex((r) => r.id === runner.id);
+        if (existingIdx >= 0) {
+          const existing = prev.items[existingIdx];
+          if (!existing) return prev;
+          const nextItems = [...prev.items];
+          nextItems[existingIdx] = mergeRunnerWsIntoRow(existing, runner);
+          return { ...prev, items: nextItems };
+        }
+
+        const pageOk = pageRef.current === 1;
+        const sortOk =
+          sortRef.current.by === SearchRunnersSortByEnum.TriggeredAt &&
+          sortRef.current.order === SearchRunnersSortOrderEnum.Desc;
+        const filters = filtersRef.current;
+        if (
+          pageOk &&
+          sortOk &&
+          runnerMatchesRunnersListFilters(runner, filters)
+        ) {
+          prepended = true;
+          return {
+            ...prev,
+            items: [runner, ...prev.items].slice(0, safePageSizeRef.current),
+            total: prev.total + 1,
+          };
+        }
+        return prev;
+      });
+      if (
+        !prepended &&
+        runnerMatchesRunnersListFilters(runner, filtersRef.current)
+      ) {
+        setWsBump((n) => n + 1);
+      }
+    },
+  });
+
   useEffect(() => {
     let active = true;
 
@@ -302,7 +372,7 @@ export function RunnersTable({
     return () => {
       active = false;
     };
-  }, [effectiveFilters, page, safePageSize, sort.by, sort.order]);
+  }, [effectiveFilters, page, safePageSize, sort.by, sort.order, wsBump]);
 
   const rows = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -352,7 +422,7 @@ export function RunnersTable({
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder={t("runners.search")}
-            className="h-9 pl-9 border-2 border-black rounded-[4px]"
+            className="h-9 pl-9 border-2 border-border rounded-[4px]"
           />
         </div>
 
@@ -365,13 +435,13 @@ export function RunnersTable({
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[220px] border-2 border-black rounded-[4px]">
-            <MultiSelectValue placeholder="Sources" />
+          <MultiSelectTrigger className="h-9 w-[220px] border-2 border-border rounded-[4px]">
+            <MultiSelectValue placeholder={t("common.sources")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
-              placeholder: "Search sources...",
-              emptyMessage: "No sources found",
+              placeholder: t("runners.searchSources"),
+              emptyMessage: t("runners.noSourcesFound"),
             }}
           >
             <MultiSelectGroup>
@@ -398,13 +468,13 @@ export function RunnersTable({
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[190px] border-2 border-black rounded-[4px]">
+          <MultiSelectTrigger className="h-9 w-[190px] border-2 border-border rounded-[4px]">
             <MultiSelectValue placeholder={t("runners.triggerType")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
-              placeholder: "Search trigger types...",
-              emptyMessage: "No trigger types found",
+              placeholder: t("runners.searchTriggerTypes"),
+              emptyMessage: t("runners.noTriggerTypesFound"),
             }}
           >
             <MultiSelectGroup>
@@ -420,7 +490,7 @@ export function RunnersTable({
         {isFilterLoading ? (
           <div className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Updating
+            {t("runners.updating")}
           </div>
         ) : null}
       </div>
@@ -450,41 +520,41 @@ export function RunnersTable({
                 <TableRow>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     {renderSortableHead(
-                      "Triggered",
+                      t("runners.columns.triggered"),
                       SearchRunnersSortByEnum.TriggeredAt,
                     )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     {renderSortableHead(
-                      "Source",
+                      t("runners.columns.source"),
                       SearchRunnersSortByEnum.SourceName,
                     )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     {renderSortableHead(
-                      "Status",
+                      t("runners.columns.status"),
                       SearchRunnersSortByEnum.Status,
                     )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Trigger
+                      {t("runners.columns.trigger")}
                     </span>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     {renderSortableHead(
-                      "Duration",
+                      t("runners.columns.duration"),
                       SearchRunnersSortByEnum.DurationMs,
                     )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Assets
+                      {t("runners.columns.assets")}
                     </span>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     {renderSortableHead(
-                      "Findings",
+                      t("runners.columns.findings"),
                       SearchRunnersSortByEnum.TotalFindings,
                     )}
                   </TableHead>
@@ -541,7 +611,7 @@ export function RunnersTable({
                               data-icon="inline-start"
                             />
                           )}
-                          {getRunnerStatusBadgeLabel(runner.status)}
+                          {t(getRunnerStatusBadgeLabel(runner.status))}
                         </Badge>
                       </TableCell>
                       <TableCell className="py-2">
@@ -556,13 +626,13 @@ export function RunnersTable({
                                 : ""
                             }
                           >
-                            {formatEnumLabel(runner.triggerType)}
+                            {t(`triggerTypes.${runner.triggerType}`)}
                           </span>
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {runner.triggeredBy === "pg-boss"
-                            ? "Scheduler"
-                            : runner.triggeredBy || "System"}
+                            ? t("runners.scheduler")
+                            : runner.triggeredBy || t("common.none")}
                         </div>
                       </TableCell>
                       <TableCell className="py-2">
@@ -591,7 +661,7 @@ export function RunnersTable({
             {t("common.rowsPerPage")}
           </span>
           <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] border-2 border-black rounded-[4px]">
+            <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
               <SelectValue placeholder={t("common.rows")} />
             </SelectTrigger>
             <SelectContent>

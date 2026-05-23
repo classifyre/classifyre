@@ -3,25 +3,20 @@
 import pytest
 
 from src.detectors.broken_links.detector import BrokenLinksDetector
-from src.detectors.content.language_detector import LanguageDetector
-from src.detectors.content.nsfw_detector import NSFWDetector
-from src.detectors.content.spam_detector import SpamDetector
-from src.detectors.content.toxic_detector import ToxicDetector
 from src.detectors.custom.detector import CustomDetector
 from src.detectors.dependencies import MissingDependencyError
 from src.detectors.pii.detector import PIIDetector
 from src.detectors.secrets.detector import SecretsDetector
 from src.detectors.threat.code_security_detector import CodeSecurityDetector
-from src.detectors.threat.phishing_url_detector import PhishingURLDetector
-from src.detectors.threat.prompt_injection_detector import PromptInjectionDetector
 from src.detectors.threat.yara_detector import YaraDetector
 from src.models.generated_detectors import (
     BrokenLinksDetectorConfig,
-    ContentDetectorConfig,
     CustomDetectorConfig,
     DetectorConfig,
     DetectorType,
     PIIDetectorConfig,
+    RegexPatternDefinition,
+    RegexPipelineSchema,
     SecretsDetectorConfig,
     ThreatDetectorConfig,
 )
@@ -38,7 +33,6 @@ class TestDetectorTypesMatchSchema:
         try:
             detector = SecretsDetector(SecretsDetectorConfig())
             assert detector.detector_type == "secrets"
-            # Verify it can be converted to DetectorType enum
             assert DetectorType(detector.detector_type.upper()) == DetectorType.SECRETS
             assert (
                 ScanResultDetectorType(detector.detector_type.upper())
@@ -52,7 +46,6 @@ class TestDetectorTypesMatchSchema:
         try:
             detector = PIIDetector(PIIDetectorConfig())
             assert detector.detector_type == "pii"
-            # Verify it can be converted to DetectorType enum
             assert DetectorType(detector.detector_type.upper()) == DetectorType.PII
             assert (
                 ScanResultDetectorType(detector.detector_type.upper()) == ScanResultDetectorType.PII
@@ -60,40 +53,11 @@ class TestDetectorTypesMatchSchema:
         except MissingDependencyError:
             pytest.skip("Presidio not installed, skipping PII detector test")
 
-    def test_toxic_detector_type(self):
-        """Test ToxicDetector has correct detector_type."""
-        try:
-            detector = ToxicDetector(ContentDetectorConfig())
-            assert detector.detector_type == "toxic"
-            # Verify it can be converted to DetectorType enum
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.TOXIC
-            assert (
-                ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.TOXIC
-            )
-        except MissingDependencyError:
-            pytest.skip("PyTorch not installed, skipping toxic detector test")
-
-    def test_nsfw_detector_type(self):
-        """Test NSFWDetector has correct detector_type."""
-        try:
-            detector = NSFWDetector(ContentDetectorConfig())
-            assert detector.detector_type == "nsfw"
-            # Verify it can be converted to DetectorType enum
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.NSFW
-            assert (
-                ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.NSFW
-            )
-        except MissingDependencyError:
-            pytest.skip("PyTorch not installed, skipping nsfw detector test")
-
     def test_yara_detector_type(self):
         """Test YaraDetector has correct detector_type."""
         try:
             detector = YaraDetector(ThreatDetectorConfig())
             assert detector.detector_type == "yara"
-            # Verify it can be converted to DetectorType enum
             assert DetectorType(detector.detector_type.upper()) == DetectorType.YARA
             assert (
                 ScanResultDetectorType(detector.detector_type.upper())
@@ -118,7 +82,9 @@ class TestDetectorTypesMatchSchema:
             CustomDetectorConfig(
                 custom_detector_key="cust_test_rules",
                 name="Test Custom Rules",
-                method="RULESET",
+                pipeline_schema=RegexPipelineSchema(
+                    patterns={"x": RegexPatternDefinition(pattern=r"\d+")}
+                ),
             )
         )
         assert detector.detector_type == "custom"
@@ -126,58 +92,6 @@ class TestDetectorTypesMatchSchema:
         assert (
             ScanResultDetectorType(detector.detector_type.upper()) == ScanResultDetectorType.CUSTOM
         )
-
-    def test_prompt_injection_detector_type(self):
-        """Test PromptInjectionDetector has correct detector_type."""
-        try:
-            detector = PromptInjectionDetector()
-            assert detector.detector_type == "prompt_injection"
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.PROMPT_INJECTION
-            assert (
-                ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.PROMPT_INJECTION
-            )
-        except MissingDependencyError:
-            pytest.skip("transformers/torch not installed, skipping prompt injection test")
-
-    def test_phishing_url_detector_type(self):
-        """Test PhishingURLDetector has correct detector_type."""
-        try:
-            detector = PhishingURLDetector()
-            assert detector.detector_type == "phishing_url"
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.PHISHING_URL
-            assert (
-                ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.PHISHING_URL
-            )
-        except MissingDependencyError:
-            pytest.skip("transformers/torch not installed, skipping phishing URL test")
-
-    def test_spam_detector_type(self):
-        """Test SpamDetector has correct detector_type."""
-        try:
-            detector = SpamDetector()
-            assert detector.detector_type == "spam"
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.SPAM
-            assert (
-                ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.SPAM
-            )
-        except MissingDependencyError:
-            pytest.skip("transformers/torch not installed, skipping spam test")
-
-    def test_language_detector_type(self):
-        """Test LanguageDetector has correct detector_type."""
-        try:
-            detector = LanguageDetector()
-            assert detector.detector_type == "language"
-            assert DetectorType(detector.detector_type.upper()) == DetectorType.LANGUAGE
-            assert (
-                ScanResultDetectorType(detector.detector_type.upper())
-                == ScanResultDetectorType.LANGUAGE
-            )
-        except MissingDependencyError:
-            pytest.skip("fast-langdetect not installed, skipping language test")
 
     def test_code_security_detector_type(self):
         """Test CodeSecurityDetector has correct detector_type."""
@@ -197,26 +111,18 @@ class TestDetectorTypesMatchSchema:
         detectors = [
             (SecretsDetector, SecretsDetectorConfig()),
             (PIIDetector, PIIDetectorConfig()),
-            (ToxicDetector, ContentDetectorConfig()),
-            (NSFWDetector, ContentDetectorConfig()),
             (YaraDetector, ThreatDetectorConfig()),
             (BrokenLinksDetector, BrokenLinksDetectorConfig()),
-            (PromptInjectionDetector, None),
-            (PhishingURLDetector, None),
-            (SpamDetector, None),
-            (LanguageDetector, None),
             (CodeSecurityDetector, None),
         ]
 
         for detector_class, config in detectors:
             try:
                 detector = detector_class(config) if config is not None else detector_class()
-                # This should not raise an exception
                 detector_type_upper = detector.detector_type.upper()
                 _ = DetectorType(detector_type_upper)
                 _ = ScanResultDetectorType(detector_type_upper)
             except MissingDependencyError:
-                # Skip detectors that require missing dependencies
                 continue
 
     def test_invalid_detector_type_raises_error(self):
@@ -225,38 +131,19 @@ class TestDetectorTypesMatchSchema:
             DetectorType("INVALID")
 
         with pytest.raises(ValueError, match="is not a valid DetectorType"):
-            DetectorType("THREAT")  # Common mistake
+            DetectorType("THREAT")
 
         with pytest.raises(ValueError, match="is not a valid DetectorType"):
-            DetectorType("CONTENT")  # Common mistake
+            DetectorType("CONTENT")
 
     def test_detector_type_enum_values(self):
         """Test that all expected DetectorType enum values exist."""
         expected_types = {
             "SECRETS",
             "PII",
-            "TOXIC",
-            "NSFW",
             "YARA",
             "BROKEN_LINKS",
-            "PROMPT_INJECTION",
-            "PHISHING_URL",
-            "SPAM",
-            "LANGUAGE",
             "CODE_SECURITY",
-            "PLAGIARISM",
-            "IMAGE_VIOLENCE",
-            "OCR_PII",
-            "DEID_SCORE",
-            "HATE_SPEECH",
-            "AI_GENERATED",
-            "CONTENT_QUALITY",
-            "BIAS",
-            "DUPLICATE",
-            "DOMAIN_CLASS",
-            "CONTENT_TYPE",
-            "SENSITIVITY_TIER",
-            "JURISDICTION_TAG",
             "CUSTOM",
         }
         actual_types = {dt.value for dt in DetectorType}
@@ -293,38 +180,12 @@ class TestDetectorConfigMapping:
         """Test PIIDetector accepts PIIDetectorConfig."""
         try:
             config = PIIDetectorConfig(
-                enabled_patterns=["email", "phone_number"], confidence_threshold=0.75
+                enabled_patterns=["EMAIL_ADDRESS", "PHONE_NUMBER"], confidence_threshold=0.75
             )
             detector = PIIDetector(config)
             assert detector.config == config
         except MissingDependencyError:
             pytest.skip("Presidio not installed, skipping PII config test")
-
-    def test_toxic_uses_content_config(self):
-        """Test ToxicDetector accepts ContentDetectorConfig."""
-        try:
-            config = ContentDetectorConfig(
-                enabled_patterns=["toxicity", "threat"],
-                model_name="unbiased",
-                confidence_threshold=0.7,
-            )
-            detector = ToxicDetector(config)
-            assert detector.config == config
-        except MissingDependencyError:
-            pytest.skip("PyTorch not installed, skipping toxic detector test")
-
-    def test_nsfw_uses_content_config(self):
-        """Test NSFWDetector accepts ContentDetectorConfig."""
-        try:
-            config = ContentDetectorConfig(
-                enabled_patterns=["nsfw", "nsfw_explicit"],
-                model_name="original",
-                confidence_threshold=0.8,
-            )
-            detector = NSFWDetector(config)
-            assert detector.config == config
-        except MissingDependencyError:
-            pytest.skip("PyTorch not installed, skipping nsfw detector test")
 
     def test_yara_uses_threat_config(self):
         """Test YaraDetector accepts ThreatDetectorConfig."""
@@ -346,7 +207,9 @@ class TestDetectorConfigMapping:
         config = CustomDetectorConfig(
             custom_detector_key="cust_test_classifier",
             name="Test Custom Classifier",
-            method="CLASSIFIER",
+            pipeline_schema=RegexPipelineSchema(
+                patterns={"x": RegexPatternDefinition(pattern=r"\d+")}
+            ),
         )
         detector = CustomDetector(config)
         assert detector.config == config
@@ -360,21 +223,17 @@ class TestDetectorNames:
         detectors = [
             (SecretsDetector, SecretsDetectorConfig(), "secrets"),
             (PIIDetector, PIIDetectorConfig(), "pii"),
-            (ToxicDetector, ContentDetectorConfig(), "toxic"),
-            (NSFWDetector, ContentDetectorConfig(), "nsfw"),
             (YaraDetector, ThreatDetectorConfig(), "yara"),
             (BrokenLinksDetector, BrokenLinksDetectorConfig(), "broken_links"),
-            (PromptInjectionDetector, DetectorConfig(), "prompt_injection"),
-            (PhishingURLDetector, DetectorConfig(), "phishing_url"),
-            (SpamDetector, DetectorConfig(), "spam"),
-            (LanguageDetector, DetectorConfig(), "language"),
             (CodeSecurityDetector, DetectorConfig(), "code_security"),
             (
                 CustomDetector,
                 CustomDetectorConfig(
                     custom_detector_key="cust_test_names",
                     name="Custom Name Test",
-                    method="RULESET",
+                    pipeline_schema=RegexPipelineSchema(
+                        patterns={"x": RegexPatternDefinition(pattern=r"\d+")}
+                    ),
                 ),
                 "custom",
             ),
@@ -387,7 +246,6 @@ class TestDetectorNames:
                 assert detector.detector_type == expected_name
                 assert detector.detector_name == detector.detector_type
             except MissingDependencyError:
-                # Skip detectors that require missing dependencies
                 continue
 
 

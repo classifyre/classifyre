@@ -43,21 +43,19 @@ class BrokenLinksDetector(BaseDetector):
     _MAX_CONCURRENCY = 12
     _USER_AGENT = "classifyre-broken-links-detector/1.0"
 
-    def __init__(
-        self,
-        config: DetectorConfig | BrokenLinksDetectorConfig | None = None,
-    ) -> None:
-        # BrokenLinks config is intentionally minimal; keep base defaults.
-        if isinstance(config, DetectorConfig):
-            super().__init__(config)
-        else:
-            super().__init__(DetectorConfig())
+    def __init__(self, config: DetectorConfig | None = None) -> None:
+        super().__init__(config)
+        self._cfg: BrokenLinksDetectorConfig = (
+            config if isinstance(config, BrokenLinksDetectorConfig) else BrokenLinksDetectorConfig()
+        )
         self._session = requests.Session()
         self._session.headers.update({"User-Agent": self._USER_AGENT})
 
     async def detect(
-        self, content: str, content_type: str = "application/x.asset-links"
+        self, content: str | bytes, content_type: str = "application/x.asset-links"
     ) -> list[DetectionResult]:
+        if isinstance(content, bytes):
+            return []
         if content_type not in self.get_supported_content_types():
             return []
 
@@ -103,9 +101,8 @@ class BrokenLinksDetector(BaseDetector):
                 )
             )
 
-        max_findings = getattr(self.config, "max_findings", None)
-        if isinstance(max_findings, int) and max_findings > 0:
-            findings = findings[:max_findings]
+        if self._cfg.max_findings and len(findings) > self._cfg.max_findings:
+            findings = findings[: self._cfg.max_findings]
 
         return findings
 

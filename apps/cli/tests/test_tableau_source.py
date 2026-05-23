@@ -25,7 +25,6 @@ def _username_password_recipe(**overrides: Any) -> dict[str, Any]:
         },
         "sampling": {
             "strategy": "RANDOM",
-            "limit": 10,
         },
     }
     base.update(overrides)
@@ -46,7 +45,6 @@ def _pat_recipe(**overrides: Any) -> dict[str, Any]:
         },
         "sampling": {
             "strategy": "RANDOM",
-            "limit": 10,
         },
     }
     base.update(overrides)
@@ -200,12 +198,11 @@ def test_tableau_builds_personal_access_token_auth() -> None:
     assert auth.site_id == "classifyre"
 
 
-def test_tableau_sampling_random_respects_limit() -> None:
+def test_tableau_sampling_random_returns_all_when_below_limit() -> None:
     source = TableauSource(
         _pat_recipe(
             sampling={
                 "strategy": "RANDOM",
-                "limit": 2,
             }
         )
     )
@@ -224,16 +221,15 @@ def test_tableau_sampling_random_respects_limit() -> None:
 
     sampled = source._sample_refs(refs)
 
-    assert len(sampled) == 2
+    assert len(sampled) == 5
     assert all(sample in refs for sample in sampled)
 
 
-def test_tableau_sampling_latest_uses_updated_at_and_limit() -> None:
+def test_tableau_sampling_latest_uses_updated_at() -> None:
     source = TableauSource(
         _pat_recipe(
             sampling={
                 "strategy": "LATEST",
-                "limit": 2,
                 "order_by_column": "updated_at",
             }
         )
@@ -252,7 +248,7 @@ def test_tableau_sampling_latest_uses_updated_at_and_limit() -> None:
 
     sampled = source._sample_refs(refs)
 
-    assert [ref.asset_id for ref in sampled] == ["2", "1"]
+    assert [ref.asset_id for ref in sampled] == ["2", "1", "0"]
 
 
 def test_tableau_sampling_all_keeps_everything() -> None:

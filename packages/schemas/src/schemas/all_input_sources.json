@@ -40,6 +40,9 @@
       "$ref": "#/definitions/MongoDBInput"
     },
     {
+      "$ref": "#/definitions/Neo4jInput"
+    },
+    {
       "$ref": "#/definitions/PowerBIInput"
     },
     {
@@ -56,6 +59,9 @@
     },
     {
       "$ref": "#/definitions/ServiceDeskInput"
+    },
+    {
+      "$ref": "#/definitions/SQLiteInput"
     }
   ],
   "definitions": {
@@ -75,11 +81,13 @@
         "DATABRICKS",
         "SNOWFLAKE",
         "MONGODB",
+        "NEO4J",
         "POWERBI",
         "TABLEAU",
         "CONFLUENCE",
         "JIRA",
-        "SERVICEDESK"
+        "SERVICEDESK",
+        "SQLITE"
       ],
       "description": "Type of the asset or source"
     },
@@ -96,28 +104,9 @@
       "enum": [
         "SECRETS",
         "PII",
-        "TOXIC",
-        "NSFW",
         "YARA",
         "BROKEN_LINKS",
-        "PROMPT_INJECTION",
-        "PHISHING_URL",
-        "SPAM",
-        "LANGUAGE",
         "CODE_SECURITY",
-        "PLAGIARISM",
-        "IMAGE_VIOLENCE",
-        "OCR_PII",
-        "DEID_SCORE",
-        "HATE_SPEECH",
-        "AI_GENERATED",
-        "CONTENT_QUALITY",
-        "BIAS",
-        "DUPLICATE",
-        "DOMAIN_CLASS",
-        "CONTENT_TYPE",
-        "SENSITIVITY_TIER",
-        "JURISDICTION_TAG",
         "CUSTOM"
       ],
       "description": "Type of detector for content analysis"
@@ -155,22 +144,15 @@
     "SamplingConfig": {
       "title": "SamplingConfig",
       "type": "object",
-      "description": "Controls how much content is extracted from each source. Apply to every source type: for tabular sources (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake) limit is rows per table; for unstructured/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk) limit is items/pages/documents/assets per run.",
+      "description": "Controls how content is extracted from each source. For tabular sources rows_per_page controls both sample size for RANDOM/LATEST and pagination batch size for ALL.",
       "properties": {
         "strategy": {
           "$ref": "#/definitions/SamplingStrategy"
         },
-        "fetch_all_until_first_success": {
+        "enable_ocr": {
           "type": "boolean",
           "default": false,
-          "description": "When true, force strategy ALL until this source gets its first successful run. After the first successful run, use strategy/limit as configured."
-        },
-        "limit": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 100000,
-          "default": 100,
-          "description": "Maximum number of items to sample per asset (rows for tabular, pages/items for unstructured). Ignored when strategy is ALL."
+          "description": "When true, enable OCR/text extraction for supported binary documents and images before routing text-capable detectors."
         },
         "order_by_column": {
           "type": "string",
@@ -181,31 +163,17 @@
           "default": true,
           "description": "Tabular sources only. Fallback to RANDOM ordering when LATEST mode cannot resolve an ordering column."
         },
-        "max_columns": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 500,
-          "default": 25,
-          "description": "Tabular sources only. Maximum number of columns to include per sampled row."
-        },
-        "max_cell_chars": {
-          "type": "integer",
-          "minimum": 16,
-          "maximum": 50000,
-          "default": 512,
-          "description": "Tabular sources only. Maximum characters per cell in detector payload formatting."
-        },
-        "max_total_chars": {
-          "type": "integer",
-          "minimum": 128,
-          "maximum": 500000,
-          "default": 20000,
-          "description": "Tabular sources only. Maximum total formatted payload size sent to detectors per asset."
-        },
         "include_column_names": {
           "type": "boolean",
           "default": true,
           "description": "Tabular sources only. Include column names in sampled detector payload rows."
+        },
+        "rows_per_page": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 10000,
+          "default": 100,
+          "description": "Tabular sources only. Number of rows per sample (RANDOM/LATEST) or per pagination batch (ALL). Controls memory usage during large table scans."
         }
       },
       "required": [
@@ -213,13 +181,64 @@
       ],
       "default": {
         "strategy": "RANDOM",
-        "fetch_all_until_first_success": false,
-        "limit": 100,
+        "enable_ocr": false,
         "fallback_to_random": true,
-        "max_columns": 25,
-        "max_cell_chars": 512,
-        "max_total_chars": 20000,
-        "include_column_names": true
+        "include_column_names": true,
+        "rows_per_page": 100
+      },
+      "additionalProperties": false
+    },
+    "ResourceOverrides": {
+      "title": "ResourceOverrides",
+      "type": "object",
+      "description": "Override K8s job resources and timeout for this source.",
+      "properties": {
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "description": "CPU request (e.g. 500m)"
+            },
+            "memory": {
+              "type": "string",
+              "description": "Memory request (e.g. 1Gi)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "description": "CPU limit (e.g. 2)"
+            },
+            "memory": {
+              "type": "string",
+              "description": "Memory limit (e.g. 4Gi)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400,
+          "description": "Max runtime in seconds (overrides activeDeadlineSeconds)"
+        },
+        "max_pool_workers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Max OS processes in the detector pool. Auto-sized from CPU/memory limits when omitted."
+        },
+        "max_concurrent_assets": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Max assets processed concurrently. Controls parallel DB connections. Defaults to pool_workers * 2 when omitted."
+        }
       },
       "additionalProperties": false
     },
@@ -916,6 +935,18 @@
       },
       "additionalProperties": false
     },
+    "MySQLSSLMode": {
+      "type": "string",
+      "enum": [
+        "DISABLED",
+        "PREFERRED",
+        "REQUIRED",
+        "VERIFY_CA",
+        "VERIFY_IDENTITY"
+      ],
+      "default": "PREFERRED",
+      "description": "SSL/TLS connection mode. DISABLED: no TLS; PREFERRED: TLS when available (default); REQUIRED: mandate TLS without certificate verification; VERIFY_CA: mandate TLS and verify the CA certificate (requires ssl_ca); VERIFY_IDENTITY: mandate TLS, verify CA, and verify server hostname."
+    },
     "MySQLRequired": {
       "title": "MySQLRequired",
       "type": "object",
@@ -950,6 +981,10 @@
         "password": {
           "type": "string",
           "description": "Database password"
+        },
+        "ssl_ca": {
+          "type": "string",
+          "description": "PEM-encoded CA certificate for SSL/TLS verification. Paste the full certificate content (-----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----). Required when ssl_mode is VERIFY_CA or VERIFY_IDENTITY."
         }
       },
       "required": [
@@ -969,6 +1004,14 @@
           "maximum": 120,
           "default": 10,
           "description": "Connection timeout in seconds"
+        },
+        "ssl_mode": {
+          "$ref": "#/definitions/MySQLSSLMode"
+        },
+        "allow_public_key_retrieval": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow automatic RSA public key retrieval from the server for caching_sha2_password authentication (MySQL 8+). Only needed when not using SSL and connecting to MySQL 8 servers using the default authentication plugin."
         }
       },
       "additionalProperties": false
@@ -2783,6 +2826,9 @@
         },
         "sampling": {
           "$ref": "#/definitions/SamplingConfig"
+        },
+        "resources": {
+          "$ref": "#/definitions/ResourceOverrides"
         }
       },
       "required": [
@@ -2819,6 +2865,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -2859,6 +2908,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -2898,6 +2950,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -2937,6 +2992,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -2976,6 +3034,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3016,6 +3077,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3056,6 +3120,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3096,6 +3163,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3136,6 +3206,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3176,6 +3249,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3216,6 +3292,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3256,6 +3335,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3296,6 +3378,186 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Neo4jRequired": {
+      "title": "Neo4jRequired",
+      "type": "object",
+      "description": "Neo4j connection endpoint. Accepts bolt://, neo4j://, or neo4j+s:// URIs.",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "description": "Bolt or Neo4j URI (e.g. bolt://localhost:7687 or neo4j+s://abc123.databases.neo4j.io)"
+        },
+        "database": {
+          "type": "string",
+          "description": "Target database name (defaults to \"neo4j\"). Multi-database requires Neo4j 4.0+."
+        }
+      },
+      "required": [
+        "uri"
+      ],
+      "additionalProperties": false
+    },
+    "Neo4jMaskedUsernamePassword": {
+      "title": "Neo4jMaskedUsernamePassword",
+      "type": "object",
+      "description": "Neo4j basic auth credentials.",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Neo4j username (typically \"neo4j\")"
+        },
+        "password": {
+          "type": "string",
+          "description": "Neo4j password"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "Neo4jMaskedNone": {
+      "title": "Neo4jMaskedNone",
+      "type": "object",
+      "description": "No authentication (local dev / anonymous access).",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "Neo4jMasked": {
+      "title": "Neo4jMasked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/Neo4jMaskedUsernamePassword"
+        },
+        {
+          "$ref": "#/definitions/Neo4jMaskedNone"
+        }
+      ]
+    },
+    "Neo4jOptionalConnection": {
+      "title": "Neo4jOptionalConnection",
+      "type": "object",
+      "description": "Neo4j driver connection tuning options.",
+      "properties": {
+        "connection_timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "default": 30000,
+          "description": "Driver connection timeout in milliseconds."
+        },
+        "max_connection_pool_size": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10,
+          "description": "Maximum number of connections in the driver pool."
+        },
+        "encrypted": {
+          "type": "boolean",
+          "description": "Force encrypted connection (overrides URI scheme detection)."
+        },
+        "trust_strategy": {
+          "type": "string",
+          "enum": [
+            "TRUST_ALL_CERTIFICATES",
+            "TRUST_SYSTEM_CA_SIGNED_CERTIFICATES"
+          ],
+          "description": "Certificate trust strategy. TRUST_ALL_CERTIFICATES is useful for self-signed certs in dev."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Neo4jOptionalScope": {
+      "title": "Neo4jOptionalScope",
+      "type": "object",
+      "description": "Controls which node labels and relationships are included.",
+      "properties": {
+        "include_labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Allowlist of node labels to scan. If empty, all labels are included."
+        },
+        "exclude_labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Denylist of node labels to skip (case-sensitive)."
+        },
+        "node_limit_per_label": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of assets (node labels) to emit per extraction run."
+        },
+        "include_relationships": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, relationship edges between labels are resolved and stored as asset links."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Neo4jOptional": {
+      "title": "Neo4jOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/Neo4jOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/Neo4jOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Neo4jInput": {
+      "title": "Neo4jInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "NEO4J"
+            },
+            "required": {
+              "$ref": "#/definitions/Neo4jRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/Neo4jMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/Neo4jOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3336,6 +3598,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3376,6 +3641,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3872,6 +4140,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3912,6 +4183,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
@@ -3952,11 +4226,103 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
             }
           },
           "required": [
             "required",
             "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SQLiteRequired": {
+      "title": "SQLiteRequired",
+      "type": "object",
+      "properties": {
+        "database_path": {
+          "type": "string",
+          "description": "Absolute or relative path to the SQLite database file (e.g. /data/app.db)"
+        }
+      },
+      "required": [
+        "database_path"
+      ],
+      "additionalProperties": false
+    },
+    "SQLiteOptionalScope": {
+      "title": "SQLiteOptionalScope",
+      "type": "object",
+      "description": "Table selection scope.",
+      "properties": {
+        "include_tables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional table allowlist. Only tables in this list will be scanned."
+        },
+        "table_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of table assets extracted"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SQLiteOptional": {
+      "title": "SQLiteOptional",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/definitions/SQLiteOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SQLiteInput": {
+      "title": "SQLiteInput",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "SQLITE"
+            },
+            "required": {
+              "$ref": "#/definitions/SQLiteRequired"
+            },
+            "masked": {
+              "type": "object",
+              "description": "SQLite has no credentials; this section is intentionally empty.",
+              "properties": {},
+              "additionalProperties": false
+            },
+            "optional": {
+              "$ref": "#/definitions/SQLiteOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
             "sampling"
           ],
           "additionalProperties": false

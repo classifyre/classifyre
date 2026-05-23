@@ -79,3 +79,63 @@ updates:
       # One PR for all minor/patch bumps; majors get individual PRs (breaking changes).
       python-non-major:
         update-types: [minor, patch]
+
+  # ── Python Schemas ──────────────────────────────────────────────────────────
+  - package-ecosystem: uv
+    directory: /packages/schemas
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+    labels: [dependencies, python]
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      python-non-major:
+        update-types: [minor, patch]
+
+  # ── Docker ──────────────────────────────────────────────────────────────────
+  - package-ecosystem: docker
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: "chore(docker)"
+    groups:
+      docker-non-major:
+        update-types: [minor, patch]
+
+  # ── Helm: classifyre ────────────────────────────────────────────────────────
+  - package-ecosystem: helm
+    directory: /helm/classifyre
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+    labels: [dependencies, helm]
+    commit-message:
+      prefix: "chore(helm)"
+    groups:
+      helm-non-major:
+        update-types: [minor, patch]
+
+  # ── Helm: otel-receiver ─────────────────────────────────────────────────────
+  - package-ecosystem: helm
+    directory: /helm/otel-receiver
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+    labels: [dependencies, helm]
+    commit-message:
+      prefix: "chore(helm)"
+    groups:
+      helm-non-major:
+        update-types: [minor, patch]

@@ -1,50 +1,46 @@
-"""PII detector using Microsoft Presidio."""
+"""PII detector powered by Microsoft Presidio."""
 
+import asyncio
 import importlib
 import logging
-import os
 import re
-import tempfile
+import subprocess
+import sys
 import warnings
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, ClassVar
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import DetectorConfig, PIIDetectorConfig, Severity
 from ...models.generated_single_asset_scan_results import DetectionResult, DetectorType, Location
 from ..base import BaseDetector
 from ..dependencies import MissingDependencyError, require_module
 
 logger = logging.getLogger(__name__)
-_PRESIDIO_FILTER_INSTALLED = False
+
+_PRESIDIO_LOG_FILTER_INSTALLED = False
 
 
 class _PresidioNoiseFilter(logging.Filter):
+    """Suppresses noisy but harmless Presidio initialization warnings."""
+
+    _SUPPRESSED = (
+        "Recognizer not added to registry because language is not supported by registry",
+        "model_to_presidio_entity_mapping is missing from configuration",
+        "low_score_entity_names is missing from configuration",
+        "labels_to_ignore is missing from configuration",
+        "Fetching all recognizers for language",
+    )
+
     def filter(self, record: logging.LogRecord) -> bool:
-        message = record.getMessage()
-        if (
-            "Recognizer not added to registry because language is not supported by registry"
-            in message
+        msg = record.getMessage()
+        if any(s in msg for s in self._SUPPRESSED):
+            return False
+        if "Entity " in msg and (
+            "is not mapped to a Presidio entity" in msg
+            or "doesn't have the corresponding recognizer in language" in msg
         ):
             return False
-        if "model_to_presidio_entity_mapping is missing from configuration" in message:
-            return False
-        if "low_score_entity_names is missing from configuration" in message:
-            return False
-        if "labels_to_ignore is missing from configuration" in message:
-            return False
-        if "Entity " in message and "is not mapped to a Presidio entity" in message:
-            return False
         return True
-
-
-@dataclass
-class _FallbackPIIResult:
-    start: int
-    end: int
-    entity_type: str
-    score: float
-    recognition_metadata: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -54,123 +50,134 @@ class _TabularCell:
     value: str
 
 
-class _RegexPIIAnalyzer:
-    """Fallback analyzer used when Presidio runtime assets are unavailable."""
-
-    _PATTERNS: ClassVar[list[tuple[str, re.Pattern[str], float]]] = [
-        (
-            "EMAIL_ADDRESS",
-            re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
-            0.99,
-        ),
-        (
-            "US_SSN",
-            re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
-            0.95,
-        ),
-        (
-            "PHONE_NUMBER",
-            re.compile(r"\b(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}\b"),
-            0.9,
-        ),
-        (
-            "CREDIT_CARD",
-            re.compile(r"\b(?:\d[ -]*?){13,16}\b"),
-            0.9,
-        ),
-        (
-            "IP_ADDRESS",
-            re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
-            0.9,
-        ),
-    ]
-
-    def analyze(self, text: str, language: str = "en") -> list[_FallbackPIIResult]:
-        del language
-        findings: list[_FallbackPIIResult] = []
-
-        for entity_type, pattern, score in self._PATTERNS:
-            for match in pattern.finditer(text):
-                findings.append(
-                    _FallbackPIIResult(
-                        start=match.start(),
-                        end=match.end(),
-                        entity_type=entity_type,
-                        score=score,
-                        recognition_metadata={"recognizer_name": "regex_fallback"},
-                    )
-                )
-
-        # Deterministic ordering for predictable test behavior.
-        findings.sort(key=lambda item: (item.start, item.end, item.entity_type))
-        return findings
-
-    def get_supported_entities(self) -> list[str]:
-        return [entity for entity, _pattern, _score in self._PATTERNS]
-
-
 class PIIDetector(BaseDetector):
     """
-    Detector for Personally Identifiable Information (PII) using Presidio.
+    PII detector powered by Microsoft Presidio.
 
-    Detects various types of PII including:
-    - Social Security Numbers (SSN)
-    - Credit Card Numbers
-    - Email Addresses
-    - Phone Numbers
-    - Person Names
-    - Locations
-    - IP Addresses
-    - US Driver Licenses
-    - US Passports
-    - IBAN Codes
+    Detects personally identifiable information across global and regional entity types,
+    covering all built-in Presidio recognizers plus optional ad-hoc custom recognizers
+    defined in configuration.
+
+    Supported regions: Global, USA, UK, Spain, Italy, Singapore, Australia, India,
+    Finland, Poland, DACH (Germany / Austria / Switzerland).
     """
 
     detector_type = "pii"
     detector_name = "pii"
-    _ENTITY_PATTERN_MAP: ClassVar[dict[str, str]] = {
-        "CREDIT_CARD": "credit_card",
-        "US_SSN": "ssn",
-        "EMAIL_ADDRESS": "email",
-        "PHONE_NUMBER": "phone_number",
-        "PERSON": "person",
-        "LOCATION": "location",
-        "IP_ADDRESS": "ip_address",
-        "IBAN_CODE": "iban_code",
-        "US_PASSPORT": "us_passport",
-        "US_DRIVER_LICENSE": "us_driver_license",
-        "AT_SVNR": "austrian_svnr",
-        "CH_AHV": "swiss_ahv",
-        "DE_TAX_ID": "german_tax_id",
-        "EU_NATIONAL_ID": "eu_national_id",
-    }
-    _PATTERN_ENTITY_MAP: ClassVar[dict[str, set[str]]] = {
-        "credit_card": {"CREDIT_CARD"},
-        "ssn": {"US_SSN"},
-        "email": {"EMAIL_ADDRESS"},
-        "phone_number": {"PHONE_NUMBER"},
-        "person": {"PERSON"},
-        "location": {"LOCATION"},
-        "ip_address": {"IP_ADDRESS"},
-        "iban_code": {"IBAN_CODE"},
-        "us_passport": {"US_PASSPORT"},
-        "us_driver_license": {"US_DRIVER_LICENSE"},
-        "austrian_svnr": {"AT_SVNR"},
-        "swiss_ahv": {"CH_AHV"},
-        "german_tax_id": {"DE_TAX_ID"},
-        "eu_national_id": {"EU_NATIONAL_ID"},
-        "date_of_birth": {"DATE_TIME"},
-    }
-    _REGEX_ANALYZER_ENTITIES: ClassVar[set[str]] = {
+
+    # All entity types supported by built-in Presidio recognizers.
+    _ALL_SUPPORTED_ENTITIES: ClassVar[set[str]] = {
+        # Global
         "CREDIT_CARD",
-        "US_SSN",
+        "CRYPTO",
+        "DATE_TIME",
         "EMAIL_ADDRESS",
-        "PHONE_NUMBER",
+        "IBAN_CODE",
         "IP_ADDRESS",
+        "NRP",
+        "LOCATION",
+        "PERSON",
+        "PHONE_NUMBER",
+        "MEDICAL_LICENSE",
+        "URL",
+        # USA
+        "US_BANK_NUMBER",
+        "US_DRIVER_LICENSE",
+        "US_ITIN",
+        "US_PASSPORT",
+        "US_SSN",
+        # UK
+        "UK_NHS",
+        # Spain
+        "ES_NIF",
+        "ES_NIE",
+        # Italy
+        "IT_FISCAL_CODE",
+        "IT_DRIVER_LICENSE",
+        "IT_VAR_CODE",
+        "IT_PASSPORT",
+        "IT_IDENTITY_CARD",
+        # Singapore
+        "SG_NRIC_FIN",
+        "SG_UEN",
+        # Australia
+        "AU_ABN",
+        "AU_ACN",
+        "AU_TFN",
+        "AU_MEDICARE",
+        # India
+        "IN_PAN",
+        "IN_AADHAAR",
+        "IN_VEHICLE_REGISTRATION",
+        "IN_VOTER",
+        # Finland
+        "FI_PERSONAL_IDENTITY_CODE",
+        # Poland
+        "PL_PESEL",
+        # DACH
+        "AT_SVNR",
+        "CH_AHV",
+        "DE_TAX_ID",
+        "EU_NATIONAL_ID",
     }
-    _TABULAR_ROW_RE: ClassVar[re.Pattern[str]] = re.compile(r"^row_(\d+):$")
-    _TABULAR_CELL_RE: ClassVar[re.Pattern[str]] = re.compile(r"^  ([^:]+):(?: ?(.*))?$")
-    _TABULAR_CONTINUATION_RE: ClassVar[re.Pattern[str]] = re.compile(r"^    (.*)$")
+
+    # Entity types that carry low signal in structured column values unless the column
+    # explicitly indicates free text (e.g. description, notes, body).
+    _NON_TEXT_ENTITY_TYPES: ClassVar[set[str]] = {"PERSON", "LOCATION", "DATE_TIME", "NRP"}
+
+    # Maps individual column-name tokens to the entity types relevant for that column.
+    _COLUMN_ENTITY_HINTS: ClassVar[dict[str, set[str]]] = {
+        "email": {"EMAIL_ADDRESS"},
+        "mail": {"EMAIL_ADDRESS"},
+        "phone": {"PHONE_NUMBER"},
+        "mobile": {"PHONE_NUMBER"},
+        "tel": {"PHONE_NUMBER"},
+        "telephone": {"PHONE_NUMBER"},
+        "fax": {"PHONE_NUMBER"},
+        "name": {"PERSON"},
+        "person": {"PERSON"},
+        "address": {"LOCATION"},
+        "location": {"LOCATION"},
+        "city": {"LOCATION"},
+        "state": {"LOCATION"},
+        "country": {"LOCATION"},
+        "postal": {"LOCATION"},
+        "postcode": {"LOCATION"},
+        "zipcode": {"LOCATION"},
+        "zip": {"LOCATION"},
+        "ip": {"IP_ADDRESS"},
+        "ssn": {"US_SSN"},
+        "passport": {"US_PASSPORT"},
+        "driver": {"US_DRIVER_LICENSE"},
+        "license": {"US_DRIVER_LICENSE"},
+        "iban": {"IBAN_CODE"},
+        "svnr": {"AT_SVNR"},
+        "ahv": {"CH_AHV"},
+        "tax": {"DE_TAX_ID"},
+        "national": {"EU_NATIONAL_ID"},
+        "card": {"CREDIT_CARD"},
+        "credit": {"CREDIT_CARD"},
+        "crypto": {"CRYPTO"},
+        "wallet": {"CRYPTO"},
+        "url": {"URL"},
+        "uri": {"URL"},
+        "website": {"URL"},
+        "nhs": {"UK_NHS"},
+        "medicare": {"AU_MEDICARE"},
+        "tfn": {"AU_TFN"},
+        "abn": {"AU_ABN"},
+        "acn": {"AU_ACN"},
+        "pan": {"IN_PAN"},
+        "aadhaar": {"IN_AADHAAR"},
+        "nric": {"SG_NRIC_FIN"},
+        "fin": {"SG_NRIC_FIN"},
+        "uen": {"SG_UEN"},
+        "pesel": {"PL_PESEL"},
+        "nif": {"ES_NIF"},
+        "nie": {"ES_NIE"},
+        "medical": {"MEDICAL_LICENSE"},
+    }
+
     _FREE_TEXT_COLUMN_TOKENS: ClassVar[set[str]] = {
         "text",
         "body",
@@ -210,310 +217,364 @@ class PIIDetector(BaseDetector):
     }
     _URL_COLUMN_TOKENS: ClassVar[set[str]] = {"url", "uri", "website", "web", "link", "domain"}
     _ID_COLUMN_TOKENS: ClassVar[set[str]] = {"id", "uuid", "guid", "key", "source", "row"}
-    _COLUMN_PATTERN_HINTS: ClassVar[dict[str, set[str]]] = {
-        "email": {"email"},
-        "mail": {"email"},
-        "phone": {"phone_number"},
-        "mobile": {"phone_number"},
-        "tel": {"phone_number"},
-        "telephone": {"phone_number"},
-        "fax": {"phone_number"},
-        "name": {"person"},
-        "person": {"person"},
-        "address": {"location"},
-        "location": {"location"},
-        "city": {"location"},
-        "state": {"location"},
-        "country": {"location"},
-        "postal": {"location"},
-        "postcode": {"location"},
-        "zipcode": {"location"},
-        "zip": {"location"},
-        "ip": {"ip_address"},
-        "ssn": {"ssn"},
-        "passport": {"us_passport"},
-        "driver": {"us_driver_license"},
-        "license": {"us_driver_license"},
-        "iban": {"iban_code"},
-        "svnr": {"austrian_svnr"},
-        "ahv": {"swiss_ahv"},
-        "tax": {"german_tax_id"},
-        "national": {"eu_national_id"},
-        "card": {"credit_card"},
-        "credit": {"credit_card"},
-    }
-    _NON_TEXT_ENTITY_PATTERNS: ClassVar[set[str]] = {"person", "location", "date_of_birth"}
 
-    @staticmethod
-    def _is_runtime_dependency_failure(error: Exception) -> bool:
-        """Return True when analyzer failed due to missing optional runtime data."""
-        if isinstance(error, ModuleNotFoundError):
-            return True
-        error_text = str(error).lower()
-        if "no module named" in error_text:
-            return True
-        if "phonenumbers.data.region_" in error_text:
-            return True
-        return False
+    _TABULAR_ROW_RE: ClassVar[re.Pattern[str]] = re.compile(r"^row_(\d+):$")
+    _TABULAR_CELL_RE: ClassVar[re.Pattern[str]] = re.compile(r"^  ([^:]+):(?: ?(.*))?$")
+    _TABULAR_CONTINUATION_RE: ClassVar[re.Pattern[str]] = re.compile(r"^    (.*)$")
 
-    def __init__(self, config: DetectorConfig | None = None):
-        """Initialize PII detector with Presidio."""
+    # Fall back to full-text analysis when a page has more than this many cells.
+    # Per-cell analysis at scale causes O(rowsxcolumns) Presidio calls per page.
+    _TABULAR_CELL_LIMIT: ClassVar[int] = 200
+
+    def __init__(self, config: DetectorConfig | None = None) -> None:
         super().__init__(config)
-
-        # Initialize Presidio analyzer
+        self._cfg: PIIDetectorConfig = (
+            config if isinstance(config, PIIDetectorConfig) else PIIDetectorConfig()
+        )
+        self._init_error: MissingDependencyError | None = None
+        self.analyzer: Any = None
+        self._supported_entities_cache: frozenset[str] | None = None
         try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore",
-                    message=r"`torch\.jit\.script` is deprecated\..*",
-                    category=DeprecationWarning,
-                    module=r"torch\.jit\._script",
-                )
-
-                global _PRESIDIO_FILTER_INSTALLED  # noqa: PLW0603
-                if not _PRESIDIO_FILTER_INSTALLED:
-                    logging.getLogger("presidio-analyzer").addFilter(_PresidioNoiseFilter())
-                    _PRESIDIO_FILTER_INSTALLED = True
-
-                cache_dir = os.environ.get("TLDEXTRACT_CACHE")
-                if not cache_dir:
-                    default_cache = Path(tempfile.gettempdir()) / "tldextract-cache"
-                    default_cache.mkdir(parents=True, exist_ok=True)
-                    os.environ["TLDEXTRACT_CACHE"] = str(default_cache)
-
-                presidio_module = require_module(
-                    "presidio_analyzer",
-                    "pii",
-                    ["privacy", "detectors"],
-                )
-                AnalyzerEngine = presidio_module.AnalyzerEngine  # noqa: N806
-
-                try:
-                    spacy = importlib.import_module("spacy")
-                except Exception:
-                    logger.warning("spaCy not available, using basic analyzer")
-                    self.analyzer = AnalyzerEngine()
-                    self._supported_entities = self.analyzer.get_supported_entities()
-                    return
-
-                # Try to load spaCy model directly
-                try:
-                    nlp = spacy.load("en_core_web_sm")
-                    logger.debug("Loaded spaCy model en_core_web_sm")
-                except OSError:
-                    # Model not found, try to create a basic analyzer without NLP
-                    logger.warning("spaCy model not found, using basic analyzer")
-                    self.analyzer = AnalyzerEngine()
-                    self._supported_entities = self.analyzer.get_supported_entities()
-                    return
-
-                # Manually set the spacy model to avoid download attempts
-                nlp_engine_module = require_module(
-                    "presidio_analyzer.nlp_engine",
-                    "pii",
-                    ["privacy", "detectors"],
-                )
-                SpacyNlpEngine = nlp_engine_module.SpacyNlpEngine  # noqa: N806
-                NerModelConfiguration = nlp_engine_module.NerModelConfiguration  # noqa: N806
-                ner_config_module = require_module(
-                    "presidio_analyzer.nlp_engine.ner_model_configuration",
-                    "pii",
-                    ["privacy", "detectors"],
-                )
-
-                ner_config = NerModelConfiguration(
-                    labels_to_ignore=[
-                        "CARDINAL",
-                        "ORDINAL",
-                        "QUANTITY",
-                        "FAC",
-                        "WORK_OF_ART",
-                        "PRODUCT",
-                        "EVENT",
-                        "LAW",
-                        "LANGUAGE",
-                        "PERCENT",
-                        "MONEY",
-                    ],
-                    model_to_presidio_entity_mapping=(
-                        ner_config_module.MODEL_TO_PRESIDIO_ENTITY_MAPPING
-                    ),
-                    low_score_entity_names=ner_config_module.LOW_SCORE_ENTITY_NAMES,
-                )
-                nlp_engine = SpacyNlpEngine(
-                    models=[{"lang_code": "en", "model_name": "en_core_web_sm"}],
-                    ner_model_configuration=ner_config,
-                )
-                nlp_engine.nlp = {"en": nlp}  # Set the loaded model directly
-
-                # Create analyzer
-                self.analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en"])
-
-                # Get list of supported entities
-                self._supported_entities = self.analyzer.get_supported_entities()
-                logger.debug(
-                    f"Initialized PII detector with {len(self._supported_entities)} entity types"
-                )
-
-        except MissingDependencyError:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to initialize Presidio analyzer: {e}")
-            logger.exception(e)
-            # Fallback to a lightweight regex analyzer so detector remains usable
-            # even when Presidio package data is missing in the runtime image.
-            self.analyzer = _RegexPIIAnalyzer()
-            self._supported_entities = self.analyzer.get_supported_entities()
+            self._initialize_analyzer()
+        except MissingDependencyError as exc:
+            self._init_error = exc
+            logger.warning("Presidio unavailable — PII detector will raise on first use: %s", exc)
+        except (FileNotFoundError, OSError) as exc:
+            self._init_error = MissingDependencyError(
+                "pii",
+                ["privacy", "detectors"],
+                f"Presidio installation is incomplete (missing data files): {exc}",
+            )
             logger.warning(
-                "PII detector initialized with regex fallback analyzer due to Presidio setup error"
+                "Presidio data files missing — PII detector will raise on first use: %s", exc
             )
 
-    def _enabled_pattern_keys(self) -> set[str] | None:
-        configured = getattr(self.config, "enabled_patterns", None)
-        if not configured:
+    # ------------------------------------------------------------------
+    # Initialization
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _patch_tldextract_offline() -> None:
+        # tldextract ignores the TLDEXTRACT_CACHE env var; without explicit config it
+        # downloads the public suffix list on first use, hanging pods with no egress.
+        # Replace the module-level extract instance with an offline one (bundled PSL)
+        # before Presidio's UrlRecognizer is loaded so it never makes a network call.
+        try:
+            import tldextract as _tl  # type: ignore[import-not-found, import-untyped]
+
+            offline = _tl.TLDExtract(
+                suffix_list_urls=(),
+                fallback_to_snapshot=True,
+            )
+            offline("example.com")  # force PSL load from bundled snapshot
+            _tl.extract = offline
+        except Exception as exc:
+            logger.debug("tldextract offline patch skipped: %s", exc)
+
+    def _initialize_analyzer(self) -> None:
+        """Build the Presidio AnalyzerEngine with NLP engine and custom recognizers."""
+        global _PRESIDIO_LOG_FILTER_INSTALLED  # noqa: PLW0603
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=r"`torch\.jit\.script` is deprecated\..*",
+                category=DeprecationWarning,
+            )
+
+            self._patch_tldextract_offline()
+
+            if not _PRESIDIO_LOG_FILTER_INSTALLED:
+                logging.getLogger("presidio-analyzer").addFilter(_PresidioNoiseFilter())
+                _PRESIDIO_LOG_FILTER_INSTALLED = True
+
+            presidio_module = require_module(
+                "presidio_analyzer",
+                "pii",
+                ["privacy", "detectors"],
+            )
+            AnalyzerEngine = presidio_module.AnalyzerEngine  # noqa: N806
+
+            nlp_engine = self._build_nlp_engine(presidio_module)
+            if nlp_engine is not None:
+                self.analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["en"])
+            else:
+                self.analyzer = AnalyzerEngine()
+
+            self._register_custom_recognizers(presidio_module)
+            self._probe_phone_recognizer()
+
+            self._supported_entities_cache = frozenset(self.analyzer.get_supported_entities())
+            logger.debug(
+                "PII detector initialized — %d built-in entity types, %d custom recognizers",
+                len(self._supported_entities_cache),
+                len(getattr(self.config, "custom_recognizers", None) or []),
+            )
+
+    def _build_nlp_engine(self, presidio_module: Any) -> Any | None:
+        """Return a SpacyNlpEngine for the configured model, or None to use the default."""
+        try:
+            spacy = importlib.import_module("spacy")
+        except ImportError:
+            logger.warning("spaCy not available; using default Presidio NLP engine")
             return None
 
-        normalized = {
-            str(pattern).strip().lower() for pattern in configured if str(pattern).strip()
-        }
+        cfg_model: str = getattr(self.config, "spacy_model", None) or "en_core_web_sm"
+        cfg_model_url: str | None = getattr(self.config, "spacy_model_url", None)
+
+        if cfg_model_url:
+            try:
+                spacy.load(cfg_model)
+            except OSError:
+                logger.info(
+                    "spaCy model '%s' not found; installing from %s", cfg_model, cfg_model_url
+                )
+                subprocess.run(
+                    [sys.executable, "-m", "pip", "install", cfg_model_url],
+                    check=True,
+                    capture_output=True,
+                )
+                importlib.invalidate_caches()
+
+        try:
+            nlp = spacy.load(cfg_model)
+        except OSError:
+            logger.warning("spaCy model '%s' not found; using default NLP engine", cfg_model)
+            return None
+
+        spacy_max_length: int | None = getattr(self._cfg, "max_length", None)
+        if spacy_max_length is not None:
+            nlp.max_length = spacy_max_length
+            logger.debug("Set spaCy nlp.max_length = %d", spacy_max_length)
+
+        nlp_engine_module = require_module(
+            "presidio_analyzer.nlp_engine",
+            "pii",
+            ["privacy", "detectors"],
+        )
+        ner_config_module = require_module(
+            "presidio_analyzer.nlp_engine.ner_model_configuration",
+            "pii",
+            ["privacy", "detectors"],
+        )
+
+        ner_config = nlp_engine_module.NerModelConfiguration(
+            labels_to_ignore=[
+                "CARDINAL",
+                "ORDINAL",
+                "QUANTITY",
+                "FAC",
+                "WORK_OF_ART",
+                "PRODUCT",
+                "EVENT",
+                "LAW",
+                "LANGUAGE",
+                "PERCENT",
+                "MONEY",
+            ],
+            model_to_presidio_entity_mapping=ner_config_module.MODEL_TO_PRESIDIO_ENTITY_MAPPING,
+            low_score_entity_names=ner_config_module.LOW_SCORE_ENTITY_NAMES,
+        )
+        nlp_engine = nlp_engine_module.SpacyNlpEngine(
+            models=[{"lang_code": "en", "model_name": cfg_model}],
+            ner_model_configuration=ner_config,
+        )
+        nlp_engine.nlp = {"en": nlp}
+        logger.debug("Loaded spaCy model '%s'", cfg_model)
+        return nlp_engine
+
+    def _register_custom_recognizers(self, presidio_module: Any) -> None:
+        """Add ad-hoc recognizers from config to the analyzer registry."""
+        custom_recognizers = getattr(self.config, "custom_recognizers", None) or []
+        if not custom_recognizers:
+            return
+
+        PatternRecognizer = presidio_module.PatternRecognizer  # noqa: N806
+        Pattern = presidio_module.Pattern  # noqa: N806
+
+        for rec in custom_recognizers:
+            raw_patterns = getattr(rec.patterns, "root", rec.patterns) or []
+            patterns = [Pattern(name=p.name, regex=p.regex, score=p.score) for p in raw_patterns]
+            raw_deny_list = getattr(rec.deny_list, "root", rec.deny_list)
+            deny_list = list(raw_deny_list) if raw_deny_list else None
+            context = list(rec.context) if rec.context else None
+
+            recognizer = PatternRecognizer(
+                supported_entity=rec.supported_entity,
+                name=rec.name,
+                supported_language=rec.supported_language or "en",
+                patterns=patterns or None,
+                deny_list=deny_list,
+                context=context,
+            )
+            self.analyzer.registry.add_recognizer(recognizer)
+            logger.debug(
+                "Registered custom recognizer '%s' → entity '%s'",
+                rec.name,
+                rec.supported_entity,
+            )
+
+    def _probe_phone_recognizer(self) -> None:
+        """Verify phonenumbers regional data loads correctly; remove PhoneRecognizer if broken.
+
+        phonenumbers >=9 uses __import__ with level=1 for lazy region loading, which can fail
+        in certain execution contexts (e.g. frozen environments, some uv/venv setups).
+        Probing once at init avoids per-call ModuleNotFoundError spam.
+        """
+        if self.analyzer is None:
+            return
+        try:
+            import phonenumbers
+
+            phonenumbers.parse("+12025551234", None)
+        except ModuleNotFoundError as exc:
+            logger.warning(
+                "phonenumbers regional data unavailable (%s) — PHONE_NUMBER entity disabled", exc
+            )
+            self.analyzer.registry.recognizers = [
+                r for r in self.analyzer.registry.recognizers if "phone" not in r.name.lower()
+            ]
+            self._ALL_SUPPORTED_ENTITIES = self._ALL_SUPPORTED_ENTITIES - {"PHONE_NUMBER"}
+            if self._supported_entities_cache is not None:
+                self._supported_entities_cache = self._supported_entities_cache - frozenset(
+                    {"PHONE_NUMBER"}
+                )
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
+    # Entity filtering
+    # ------------------------------------------------------------------
+
+    def _enabled_entities(self) -> set[str] | None:
+        """Return the set of enabled Presidio entity types, or None for all."""
+        configured = self._cfg.enabled_patterns
+        if not configured:
+            return None
+        normalized = {str(p).strip().upper() for p in configured if str(p).strip()}
         return normalized or None
 
     def _is_entity_enabled(self, entity_type: str) -> bool:
-        enabled_patterns = self._enabled_pattern_keys()
-        if enabled_patterns is None:
-            return True
+        enabled = self._enabled_entities()
+        return True if enabled is None else entity_type.upper() in enabled
 
-        mapped_pattern = self._ENTITY_PATTERN_MAP.get(entity_type.upper())
-        if mapped_pattern is None:
-            return False
-
-        return mapped_pattern in enabled_patterns
-
-    def _default_enabled_patterns(self) -> set[str]:
-        return set(self._ENTITY_PATTERN_MAP.values()) | {"date_of_birth"}
+    # ------------------------------------------------------------------
+    # Tabular column heuristics
+    # ------------------------------------------------------------------
 
     def _normalize_column_name(self, column_name: str) -> str:
         return re.sub(r"[^a-z0-9]+", " ", column_name.lower()).strip()
 
     def _column_tokens(self, column_name: str) -> set[str]:
         normalized = self._normalize_column_name(column_name)
-        return {token for token in normalized.split() if token}
+        return {t for t in normalized.split() if t}
 
     def _is_free_text_column(self, column_name: str) -> bool:
-        tokens = self._column_tokens(column_name)
-        return bool(tokens & self._FREE_TEXT_COLUMN_TOKENS)
+        return bool(self._column_tokens(column_name) & self._FREE_TEXT_COLUMN_TOKENS)
 
-    def _allowed_patterns_for_column(self, column_name: str) -> set[str]:
-        enabled_patterns = self._enabled_pattern_keys() or self._default_enabled_patterns()
+    def _allowed_entities_for_column(self, column_name: str) -> set[str]:
+        """Return the Presidio entity types that are relevant for this column name."""
+        enabled = self._enabled_entities() or self._ALL_SUPPORTED_ENTITIES
         tokens = self._column_tokens(column_name)
+
         if not tokens:
-            return enabled_patterns - self._NON_TEXT_ENTITY_PATTERNS
+            return enabled - self._NON_TEXT_ENTITY_TYPES
 
         if tokens & self._FREE_TEXT_COLUMN_TOKENS:
-            return enabled_patterns
+            return enabled
 
         allowed: set[str] = set()
         for token in tokens:
-            allowed.update(self._COLUMN_PATTERN_HINTS.get(token, set()))
+            allowed.update(self._COLUMN_ENTITY_HINTS.get(token, set()))
 
         if tokens & self._NAME_COLUMN_TOKENS and "company" not in tokens:
-            allowed.add("person")
+            allowed.add("PERSON")
         if tokens & self._EMAIL_COLUMN_TOKENS:
-            allowed.add("email")
+            allowed.add("EMAIL_ADDRESS")
         if tokens & self._PHONE_COLUMN_TOKENS:
-            allowed.add("phone_number")
+            allowed.add("PHONE_NUMBER")
         if tokens & self._ADDRESS_COLUMN_TOKENS:
-            allowed.add("location")
+            allowed.add("LOCATION")
 
         if allowed:
-            return allowed & enabled_patterns
+            return allowed & enabled
 
         if tokens & self._URL_COLUMN_TOKENS:
-            return {"ip_address"} & enabled_patterns
+            return {"IP_ADDRESS", "URL"} & enabled
 
         if tokens & self._ID_COLUMN_TOKENS:
             return set()
 
-        return enabled_patterns - self._NON_TEXT_ENTITY_PATTERNS
+        return enabled - self._NON_TEXT_ENTITY_TYPES
 
     def _is_entity_allowed_for_column(self, entity_type: str, column_name: str) -> bool:
-        allowed_patterns = self._allowed_patterns_for_column(column_name)
-        if not allowed_patterns:
+        allowed = self._allowed_entities_for_column(column_name)
+        if not allowed:
             return False
+        entity_upper = entity_type.upper()
+        if entity_upper not in self._ALL_SUPPORTED_ENTITIES:
+            # Custom entity: allow in free-text columns when no pattern filter is active.
+            return self._enabled_entities() is None and self._is_free_text_column(column_name)
+        return entity_upper in allowed
 
-        mapped_pattern = self._ENTITY_PATTERN_MAP.get(entity_type.upper())
-        if mapped_pattern is None:
-            return self._enabled_pattern_keys() is None and self._is_free_text_column(column_name)
-
-        return mapped_pattern in allowed_patterns
-
-    def _allowed_entity_types_for_patterns(self, patterns: set[str]) -> set[str]:
-        entity_types: set[str] = set()
-        for pattern in patterns:
-            entity_types.update(self._PATTERN_ENTITY_MAP.get(pattern, set()))
-        return entity_types
-
-    def _filter_results_by_entity_types(
-        self, analyzer_results: list[Any], entity_types: set[str] | None
-    ) -> list[Any]:
-        if not entity_types:
-            return analyzer_results
-        return [result for result in analyzer_results if result.entity_type in entity_types]
+    # ------------------------------------------------------------------
+    # Presidio analysis
+    # ------------------------------------------------------------------
 
     def _analyze_content(self, content: str, *, entities: list[str] | None = None) -> list[Any]:
+        if self.analyzer is None:
+            if self._init_error is not None:
+                raise self._init_error
+            return []
         try:
-            if entities is None:
-                return self.analyzer.analyze(text=content, language="en")
-            try:
-                return self.analyzer.analyze(text=content, language="en", entities=entities)
-            except TypeError as error:
-                if "unexpected keyword argument 'entities'" not in str(error):
-                    raise
-                analyzer_results = self.analyzer.analyze(text=content, language="en")
-                return self._filter_results_by_entity_types(analyzer_results, set(entities))
-        except Exception as e:
-            if self._is_runtime_dependency_failure(e) and not isinstance(
-                self.analyzer, _RegexPIIAnalyzer
-            ):
-                logger.warning(
-                    "PII analyzer runtime dependency unavailable (%s); switching to regex fallback",
-                    e,
+            return self.analyzer.analyze(text=content, language="en", entities=entities)
+        except ModuleNotFoundError as exc:
+            if "phonenumbers" in str(exc):
+                logger.warning("phonenumbers data missing mid-run; disabling PHONE_NUMBER entity")
+                self._probe_phone_recognizer()
+                # Retry without the now-removed phone recognizer
+                retry_entities = (
+                    [e for e in entities if e != "PHONE_NUMBER"] if entities is not None else None
                 )
-                self.analyzer = _RegexPIIAnalyzer()
-                self._supported_entities = self.analyzer.get_supported_entities()
                 try:
-                    analyzer_results = self.analyzer.analyze(text=content, language="en")
-                    return self._filter_results_by_entity_types(
-                        analyzer_results,
-                        set(entities) if entities else None,
+                    return self.analyzer.analyze(
+                        text=content, language="en", entities=retry_entities
                     )
-                except Exception as fallback_error:
-                    logger.error(
-                        "Error scanning for PII with fallback analyzer: %s", fallback_error
-                    )
-                    logger.exception(fallback_error)
+                except Exception:
                     return []
-
-            logger.error(f"Error scanning for PII: {e}")
+            logger.error("PII analysis failed: %s", exc)
+            logger.exception(exc)
+            return []
+        except Exception as e:
+            logger.error("PII analysis failed: %s", e)
             logger.exception(e)
             return []
+
+    def _analyzer_supported_entities(self) -> frozenset[str]:
+        if self._supported_entities_cache is not None:
+            return self._supported_entities_cache
+        if self.analyzer is None:
+            return frozenset()
+        self._supported_entities_cache = frozenset(self.analyzer.get_supported_entities())
+        return self._supported_entities_cache
 
     def _analyze_structured_cell(
         self, content: str, *, allowed_entity_types: set[str]
     ) -> list[Any]:
-        if not allowed_entity_types:
+        if not allowed_entity_types or self.analyzer is None:
+            if self.analyzer is None and self._init_error is not None:
+                raise self._init_error
             return []
 
-        if allowed_entity_types.issubset(self._REGEX_ANALYZER_ENTITIES):
-            analyzer_results = _RegexPIIAnalyzer().analyze(text=content, language="en")
-            return self._filter_results_by_entity_types(analyzer_results, allowed_entity_types)
-
-        supported_entity_types = set(self._supported_entities or [])
-        filtered_entity_types = allowed_entity_types & supported_entity_types
-        if not filtered_entity_types:
+        entities = sorted(allowed_entity_types & self._analyzer_supported_entities())
+        if not entities:
             return []
 
-        return self._analyze_content(content, entities=sorted(filtered_entity_types))
+        return self._analyze_content(content, entities=entities)
+
+    # ------------------------------------------------------------------
+    # Tabular content detection
+    # ------------------------------------------------------------------
 
     def _extract_tabular_cells(self, content: str) -> list[_TabularCell]:
         if "row_1:" not in content:
@@ -530,7 +591,6 @@ class PIIDetector(BaseDetector):
                 current_column_name = None
                 current_value_lines = []
                 return
-
             cells.append(
                 _TabularCell(
                     row_index=current_row_index,
@@ -570,6 +630,95 @@ class PIIDetector(BaseDetector):
         flush_cell()
         return [cell for cell in cells if cell.value]
 
+    def _should_keep_tabular_result(
+        self, *, cell: _TabularCell, entity_type: str, matched_content: str
+    ) -> bool:
+        if entity_type != "PERSON":
+            return True
+        if not self._is_free_text_column(cell.column_name):
+            return True
+        token_count = len(re.findall(r"[A-Za-z][A-Za-z'-]*", matched_content))
+        return token_count >= 2
+
+    def _dedupe_tabular_findings(self, findings: list[DetectionResult]) -> list[DetectionResult]:
+        deduped: dict[tuple[str, str, int | None, str | None], DetectionResult] = {}
+        ordered_keys: list[tuple[str, str, int | None, str | None]] = []
+
+        for finding in findings:
+            metadata = finding.metadata or {}
+            key = (
+                finding.finding_type,
+                finding.matched_content.strip(),
+                metadata.get("tabular_row_index"),
+                metadata.get("tabular_column_name"),
+            )
+            existing = deduped.get(key)
+            if existing is None:
+                deduped[key] = finding
+                ordered_keys.append(key)
+            elif finding.confidence > existing.confidence:
+                deduped[key] = finding
+
+        return [deduped[k] for k in ordered_keys]
+
+    def _detect_tabular_content(self, content: str) -> list[DetectionResult] | None:
+        cells = self._extract_tabular_cells(content)
+        if not cells:
+            return None
+
+        # For very wide/long pages fall back to full-text analysis to avoid O(N) Presidio calls.
+        if len(cells) > self._TABULAR_CELL_LIMIT:
+            logger.debug(
+                "Page has %d cells (> %d limit); using full-text analysis instead of per-cell",
+                len(cells),
+                self._TABULAR_CELL_LIMIT,
+            )
+            return None
+
+        threshold = self._cfg.confidence_threshold or 0.7
+        results: list[DetectionResult] = []
+
+        for cell in cells:
+            allowed = self._allowed_entities_for_column(cell.column_name)
+            if not allowed:
+                continue
+
+            for result in self._analyze_structured_cell(cell.value, allowed_entity_types=allowed):
+                if not self._is_entity_enabled(result.entity_type):
+                    continue
+                if not self._is_entity_allowed_for_column(result.entity_type, cell.column_name):
+                    continue
+
+                matched_content = cell.value[result.start : result.end]
+                if not self._should_keep_tabular_result(
+                    cell=cell,
+                    entity_type=result.entity_type,
+                    matched_content=matched_content,
+                ):
+                    continue
+
+                detection = self._build_detection_result(
+                    matched_content=matched_content,
+                    entity_type=result.entity_type,
+                    confidence=result.score,
+                    recognition_metadata=result.recognition_metadata,
+                    line_number=cell.row_index,
+                    start=result.start,
+                    end=result.end,
+                    metadata={
+                        "tabular_row_index": cell.row_index,
+                        "tabular_column_name": cell.column_name,
+                    },
+                )
+                if detection.confidence >= threshold:
+                    results.append(detection)
+
+        return self._dedupe_tabular_findings(results)
+
+    # ------------------------------------------------------------------
+    # Result construction
+    # ------------------------------------------------------------------
+
     def _build_detection_result(
         self,
         *,
@@ -582,7 +731,7 @@ class PIIDetector(BaseDetector):
         end: int,
         metadata: dict[str, Any] | None = None,
     ) -> DetectionResult:
-        base_metadata = {
+        base_metadata: dict[str, Any] = {
             "recognizer": recognition_metadata.get("recognizer_name", "unknown")
             if recognition_metadata
             else "unknown",
@@ -605,203 +754,130 @@ class PIIDetector(BaseDetector):
             metadata=base_metadata,
         )
 
-    def _dedupe_tabular_findings(self, findings: list[DetectionResult]) -> list[DetectionResult]:
-        deduped: dict[tuple[str, str, int | None, str | None], DetectionResult] = {}
-        ordered_keys: list[tuple[str, str, int | None, str | None]] = []
+    def _get_severity_for_entity(self, entity_type: str) -> Severity:
+        e = entity_type.upper()
 
-        for finding in findings:
-            metadata = finding.metadata or {}
-            key = (
-                finding.finding_type,
-                finding.matched_content.strip(),
-                metadata.get("tabular_row_index"),
-                metadata.get("tabular_column_name"),
-            )
-            existing = deduped.get(key)
-            if existing is None:
-                deduped[key] = finding
-                ordered_keys.append(key)
-                continue
-            if finding.confidence > existing.confidence:
-                deduped[key] = finding
+        # Critical — government IDs, financial account numbers, biometric IDs
+        if e in {
+            "CREDIT_CARD",
+            "CRYPTO",
+            "IBAN_CODE",
+            "US_SSN",
+            "US_PASSPORT",
+            "US_DRIVER_LICENSE",
+            "US_BANK_NUMBER",
+            "US_ITIN",
+            "UK_NHS",
+            "AT_SVNR",
+            "CH_AHV",
+            "DE_TAX_ID",
+            "EU_NATIONAL_ID",
+            "ES_NIF",
+            "ES_NIE",
+            "IT_FISCAL_CODE",
+            "IT_PASSPORT",
+            "IT_DRIVER_LICENSE",
+            "IT_IDENTITY_CARD",
+            "SG_NRIC_FIN",
+            "AU_TFN",
+            "AU_MEDICARE",
+            "IN_PAN",
+            "IN_AADHAAR",
+            "FI_PERSONAL_IDENTITY_CODE",
+            "PL_PESEL",
+        }:
+            return Severity.critical
 
-        return [deduped[key] for key in ordered_keys]
+        # High — contact identifiers, business numbers, less-direct personal IDs
+        if e in {
+            "EMAIL_ADDRESS",
+            "PHONE_NUMBER",
+            "IP_ADDRESS",
+            "MEDICAL_LICENSE",
+            "AU_ABN",
+            "AU_ACN",
+            "SG_UEN",
+            "IT_VAR_CODE",
+            "IN_VOTER",
+            "IN_VEHICLE_REGISTRATION",
+        }:
+            return Severity.high
 
-    def _should_keep_tabular_result(
-        self, *, cell: _TabularCell, entity_type: str, matched_content: str
-    ) -> bool:
-        if entity_type != "PERSON":
-            return True
-        if not self._is_free_text_column(cell.column_name):
-            return True
+        # Medium — contextual personal information
+        if e in {"PERSON", "LOCATION", "DATE_TIME", "NRP", "URL"}:
+            return Severity.medium
 
-        token_count = len(re.findall(r"[A-Za-z][A-Za-z'-]*", matched_content))
-        return token_count >= 2
+        return Severity.high
 
-    def _detect_tabular_content(self, content: str) -> list[DetectionResult] | None:
-        cells = self._extract_tabular_cells(content)
-        if not cells:
-            return None
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
+    async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
+        """Detect PII in *content* and return a list of :class:`DetectionResult` objects."""
+        if isinstance(content, bytes):
+            return []
+        # Presidio + spaCy NER are CPU-bound synchronous operations.  Running them
+        # directly in the async coroutine blocks the event loop for the duration of
+        # each page (seconds on CPU-limited pods), making the job appear frozen.
+        # Offloading to a thread keeps the loop alive and allows I/O to proceed.
+        return await asyncio.to_thread(self._detect_sync, content)
+
+    def _chunk_text(self, text: str) -> list[tuple[str, int]]:
+        """Return (chunk, offset) pairs. When chunk_size is null returns the full text at offset 0."""
+        chunk_size: int | None = getattr(self._cfg, "chunk_size", None)
+        if not chunk_size:
+            return [(text, 0)]
+        overlap: int = getattr(self._cfg, "chunk_overlap", None) or 0
+        step = max(1, chunk_size - overlap)
+        return [(text[i : i + chunk_size], i) for i in range(0, len(text), step)]
+
+    def _detect_sync(self, content: str) -> list[DetectionResult]:
+        tabular_results = self._detect_tabular_content(content)
+        if tabular_results is not None:
+            if self._cfg.max_findings and len(tabular_results) > self._cfg.max_findings:
+                return tabular_results[: self._cfg.max_findings]
+            return tabular_results
+
+        enabled = self._enabled_entities()
+        entities = sorted(enabled) if enabled else None
+        threshold = self._cfg.confidence_threshold or 0.7
         results: list[DetectionResult] = []
-        for cell in cells:
-            allowed_patterns = self._allowed_patterns_for_column(cell.column_name)
-            if not allowed_patterns:
-                continue
+        seen: set[tuple[str, int, int]] = set()
 
-            allowed_entity_types = self._allowed_entity_types_for_patterns(allowed_patterns)
-            analyzer_results = self._analyze_structured_cell(
-                cell.value,
-                allowed_entity_types=allowed_entity_types,
-            )
-            for result in analyzer_results:
+        for chunk, offset in self._chunk_text(content):
+            for result in self._analyze_content(chunk, entities=entities):
                 if not self._is_entity_enabled(result.entity_type):
                     continue
-                if not self._is_entity_allowed_for_column(result.entity_type, cell.column_name):
-                    continue
 
-                matched_content = cell.value[result.start : result.end]
-                if not self._should_keep_tabular_result(
-                    cell=cell,
-                    entity_type=result.entity_type,
-                    matched_content=matched_content,
-                ):
+                abs_start = result.start + offset
+                abs_end = result.end + offset
+                dedup_key = (result.entity_type, abs_start, abs_end)
+                if dedup_key in seen:
                     continue
-                detection_result = self._build_detection_result(
+                seen.add(dedup_key)
+
+                line_number = content[:abs_start].count("\n") + 1
+                matched_content = content[abs_start:abs_end]
+
+                detection = self._build_detection_result(
                     matched_content=matched_content,
                     entity_type=result.entity_type,
                     confidence=result.score,
                     recognition_metadata=result.recognition_metadata,
-                    line_number=cell.row_index,
-                    start=result.start,
-                    end=result.end,
-                    metadata={
-                        "tabular_row_index": cell.row_index,
-                        "tabular_column_name": cell.column_name,
-                    },
+                    line_number=line_number,
+                    start=abs_start,
+                    end=abs_end,
                 )
-                if detection_result.confidence >= (self.config.confidence_threshold or 0.7):
-                    results.append(detection_result)
+                if detection.confidence >= threshold:
+                    results.append(detection)
 
-        return self._dedupe_tabular_findings(results)
-
-    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
-        """
-        Detect PII in content using Presidio.
-
-        Args:
-            content: Text content to scan
-            content_type: MIME type (must be text-based)
-
-        Returns:
-            List of detection results for found PII
-        """
-        results: list[DetectionResult] = []
-
-        tabular_results = self._detect_tabular_content(content)
-        if tabular_results is not None:
-            if self.config.max_findings and len(tabular_results) > self.config.max_findings:
-                return tabular_results[: self.config.max_findings]
-            return tabular_results
-
-        analyzer_results = self._analyze_content(content)
-
-        # Process each detected PII entity
-        for result in analyzer_results:
-            if not self._is_entity_enabled(result.entity_type):
-                continue
-
-            # Calculate line number from offset
-            line_number = content[: result.start].count("\n") + 1
-
-            # Extract the matched content
-            matched_content = content[result.start : result.end]
-
-            # Create detection result
-            detection_result = self._build_detection_result(
-                matched_content=matched_content,
-                entity_type=result.entity_type,
-                confidence=result.score,
-                recognition_metadata=result.recognition_metadata,
-                line_number=line_number,
-                start=result.start,
-                end=result.end,
-            )
-
-            # Apply confidence threshold
-            if detection_result.confidence >= (self.config.confidence_threshold or 0.7):
-                results.append(detection_result)
-
-        # Apply max_findings limit if configured
-        if self.config.max_findings and len(results) > self.config.max_findings:
-            results = results[: self.config.max_findings]
+        if self._cfg.max_findings and len(results) > self._cfg.max_findings:
+            results = results[: self._cfg.max_findings]
 
         return results
 
     def get_supported_content_types(self) -> list[str]:
-        """Return supported content types for PII detection."""
-        return [
-            "text/plain",
-            "text/html",
-            "application/json",
-            "text/xml",
-        ]
-
-    def _get_severity_for_entity(self, entity_type: str) -> Severity:
-        """
-        Determine severity level based on PII entity type.
-
-        Args:
-            entity_type: Type of PII entity detected
-
-        Returns:
-            Severity level
-        """
-        entity_type_upper = entity_type.upper()
-
-        # Critical PII - financial and government IDs
-        if any(
-            keyword in entity_type_upper
-            for keyword in [
-                "CREDIT_CARD",
-                "US_SSN",
-                "US_PASSPORT",
-                "US_DRIVER_LICENSE",
-                "IBAN_CODE",
-                "CRYPTO",
-            ]
-        ):
-            return Severity.critical
-
-        # High severity - contact info and identifiers
-        if any(
-            keyword in entity_type_upper
-            for keyword in [
-                "EMAIL",
-                "PHONE",
-                "IP_ADDRESS",
-                "MEDICAL",
-                "AU_TFN",
-                "AU_ACN",
-                "AU_ABN",
-                "SG_NRIC",
-                "UK_NHS",
-            ]
-        ):
-            return Severity.high
-
-        # Medium severity - personal info
-        if any(
-            keyword in entity_type_upper
-            for keyword in [
-                "PERSON",
-                "LOCATION",
-                "DATE",
-                "NRP",  # National Registry Person
-                "URL",
-            ]
-        ):
-            return Severity.medium
-
-        # Default to high for any detected PII
-        return Severity.high
+        return ["text/plain", "text/html", "application/json", "text/xml"]

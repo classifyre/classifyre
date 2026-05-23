@@ -286,7 +286,7 @@ export default function SemanticLayerPage() {
           <Button
             size="sm"
             onClick={() => router.push("/semantic/metrics/new")}
-            className="rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+            className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
           >
             <Plus className="mr-1 h-3.5 w-3.5" />
             {t("semantic.newMetric")}
@@ -401,7 +401,7 @@ export default function SemanticLayerPage() {
                 <Button
                   onClick={handleExplore}
                   disabled={selectedMetrics.length === 0 || querying}
-                  className="w-full rounded-[4px] border-2 border-black bg-black text-white hover:bg-black/90"
+                  className="w-full rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
                 >
                   {querying ? t("semantic.running") : t("semantic.runExplore")}
                 </Button>

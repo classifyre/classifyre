@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.
+ * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -38,36 +38,18 @@ export interface UpdateCustomDetectorDto {
      */
     description?: string;
     /**
-     * Execution method for this custom detector
-     * @type {string}
-     * @memberof UpdateCustomDetectorDto
-     */
-    method?: UpdateCustomDetectorDtoMethodEnum;
-    /**
      * Whether this detector can be selected in sources
      * @type {boolean}
      * @memberof UpdateCustomDetectorDto
      */
     isActive?: boolean;
     /**
-     * Custom detector config payload
-     * @type {{ [key: string]: any; }}
+     * Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)
+     * @type {object}
      * @memberof UpdateCustomDetectorDto
      */
-    config?: { [key: string]: any; };
+    pipelineSchema?: object;
 }
-
-
-/**
- * @export
- */
-export const UpdateCustomDetectorDtoMethodEnum = {
-    Ruleset: 'RULESET',
-    Classifier: 'CLASSIFIER',
-    Entity: 'ENTITY'
-} as const;
-export type UpdateCustomDetectorDtoMethodEnum = typeof UpdateCustomDetectorDtoMethodEnum[keyof typeof UpdateCustomDetectorDtoMethodEnum];
-
 
 /**
  * Check if a given object implements the UpdateCustomDetectorDto interface.
@@ -89,9 +71,8 @@ export function UpdateCustomDetectorDtoFromJSONTyped(json: any, ignoreDiscrimina
         'name': json['name'] == null ? undefined : json['name'],
         'key': json['key'] == null ? undefined : json['key'],
         'description': json['description'] == null ? undefined : json['description'],
-        'method': json['method'] == null ? undefined : json['method'],
         'isActive': json['isActive'] == null ? undefined : json['isActive'],
-        'config': json['config'] == null ? undefined : json['config'],
+        'pipelineSchema': json['pipelineSchema'] == null ? undefined : json['pipelineSchema'],
     };
 }
 
@@ -109,9 +90,8 @@ export function UpdateCustomDetectorDtoToJSONTyped(value?: UpdateCustomDetectorD
         'name': value['name'],
         'key': value['key'],
         'description': value['description'],
-        'method': value['method'],
         'isActive': value['isActive'],
-        'config': value['config'],
+        'pipelineSchema': value['pipelineSchema'],
     };
 }
 

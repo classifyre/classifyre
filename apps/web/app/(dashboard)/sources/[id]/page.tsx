@@ -2,12 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  formatDate,
-  formatRelative,
-  formatDateUTC,
-  formatShortUTC,
-} from "@/lib/date";
+import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
   CalendarClock,
   CalendarOff,
@@ -36,10 +31,19 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { Separator } from "@workspace/ui/components/separator";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs";
 import { isIngestionSourceType } from "@workspace/ui/components/source-icon";
 import { AssetsTable } from "@/components/assets-table";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { DeleteSourceAction } from "@/components/delete-source-action";
+import { FindingsTable } from "@/components/findings-table";
+import type { FindingSelection } from "@/components/findings-table";
+import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
 import { getSourceSchema } from "@/lib/schema-loader";
 import { getSourceIcon } from "@/lib/source-type-icon";
 import {
@@ -65,41 +69,17 @@ type DetectorType = FindingResponseDto["detectorType"];
 const detectorDotClass: Partial<Record<DetectorType, string>> = {
   SECRETS: "bg-rose-500",
   PII: "bg-amber-500",
-  TOXIC: "bg-fuchsia-500",
-  NSFW: "bg-cyan-500",
   YARA: "bg-emerald-500",
   BROKEN_LINKS: "bg-orange-500",
-  PROMPT_INJECTION: "bg-violet-500",
-  HATE_SPEECH: "bg-rose-700",
-  AI_GENERATED: "bg-slate-500",
-  BIAS: "bg-lime-700",
-  CONTENT_QUALITY: "bg-sky-600",
-  DUPLICATE: "bg-teal-600",
-  DOMAIN_CLASS: "bg-cyan-700",
-  CONTENT_TYPE: "bg-blue-700",
-  SENSITIVITY_TIER: "bg-yellow-700",
-  JURISDICTION_TAG: "bg-violet-700",
   CUSTOM: "bg-indigo-600",
 };
 
-const detectorLabels: Partial<Record<DetectorType, string>> = {
-  SECRETS: "Secrets",
-  PII: "PII",
-  TOXIC: "Toxic",
-  NSFW: "NSFW",
-  YARA: "YARA",
-  BROKEN_LINKS: "Broken Links",
-  PROMPT_INJECTION: "Prompt Injection",
-  HATE_SPEECH: "Hate Speech",
-  AI_GENERATED: "AI Generated",
-  BIAS: "Bias",
-  CONTENT_QUALITY: "Content Quality",
-  DUPLICATE: "Duplicate",
-  DOMAIN_CLASS: "Domain Class",
-  CONTENT_TYPE: "Content Type",
-  SENSITIVITY_TIER: "Sensitivity Tier",
-  JURISDICTION_TAG: "Jurisdiction Tag",
-  CUSTOM: "Custom Detector",
+const detectorLabelKeys: Partial<Record<DetectorType, string>> = {
+  SECRETS: "findings.categories.secrets",
+  PII: "findings.categories.pii",
+  YARA: "findings.categories.yara",
+  BROKEN_LINKS: "findings.categories.brokenLinks",
+  CUSTOM: "findings.categories.custom",
 };
 
 const getApiBase = () =>
@@ -108,6 +88,7 @@ const getApiBase = () =>
     : (process.env.API_URL ?? "http://localhost:8000");
 
 export default function SourceViewPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useParams();
   const sourceId = params.id as string;
@@ -125,6 +106,16 @@ export default function SourceViewPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isStartingScan, setIsStartingScan] = useState(false);
+
+  // Findings tab bulk update
+  const [findingsSelection, setFindingsSelection] = useState<FindingSelection | null>(null);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [findingsTableKey, setFindingsTableKey] = useState(0);
+
+  const handleFindingsBulkSuccess = useCallback(() => {
+    setFindingsSelection(null);
+    setFindingsTableKey((k) => k + 1);
+  }, []);
 
   const fetchSourceData = useCallback(
     async (showLoading = true) => {
@@ -231,7 +222,6 @@ export default function SourceViewPage() {
 
   const SourceTypeIcon = getSourceIcon(source?.type);
 
-  // Derive required source fields from JSON schema.required section
   const requiredFields = useMemo(() => {
     if (!source?.type || !source?.config) return [];
     if (!isIngestionSourceType(source.type)) return [];
@@ -254,7 +244,6 @@ export default function SourceViewPage() {
     }));
   }, [source?.type, source?.config]);
 
-  // Derive enabled detectors from config
   const enabledDetectors = useMemo(() => {
     if (!source?.config) return [];
     const config = source.config as Record<string, unknown>;
@@ -283,10 +272,11 @@ export default function SourceViewPage() {
           (d as { type?: unknown }).type !== "CUSTOM",
       )
       .map((d) => {
+        const labelKey = detectorLabelKeys[d.type];
         return {
           id: d.type,
           type: d.type,
-          label: detectorLabels[d.type] ?? d.type,
+          label: labelKey ? t(labelKey as Parameters<typeof t>[0]) : d.type,
         };
       });
 
@@ -295,12 +285,12 @@ export default function SourceViewPage() {
       return {
         id: `CUSTOM:${id}`,
         type: "CUSTOM" as DetectorType,
-        label: mapped?.name ?? "Custom Detector",
+        label: mapped?.name ?? t("findings.categories.custom"),
       };
     });
 
     return [...builtIn, ...custom];
-  }, [customDetectorsById, source?.config]);
+  }, [customDetectorsById, source?.config, t]);
 
   const formatFieldValue = (value: unknown): string => {
     if (value === null || value === undefined) return "—";
@@ -349,11 +339,17 @@ export default function SourceViewPage() {
 
   const { totals } = assetCharts;
   const assetPanels = [
-    { key: "total", label: "Total Assets", value: totals.totalAssets },
-    { key: "new", label: "New", value: totals.newAssets },
-    { key: "updated", label: "Updated", value: totals.updatedAssets },
-    { key: "unchanged", label: "Unchanged", value: totals.unchangedAssets },
+    { key: "total", label: t("sources.totalAssets"), value: totals.totalAssets },
+    { key: "new", label: t("sources.assetNew"), value: totals.newAssets },
+    { key: "updated", label: t("sources.assetUpdated"), value: totals.updatedAssets },
+    { key: "unchanged", label: t("sources.assetUnchanged"), value: totals.unchangedAssets },
   ];
+
+  useEffect(() => {
+    if (source?.name) {
+      document.title = `${source.name} | ${t("app.name")}`;
+    }
+  }, [source?.name, t]);
 
   if (isLoading) {
     return (
@@ -362,7 +358,7 @@ export default function SourceViewPage() {
           <DetailBackButton fallbackHref="/sources" />
           <div>
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
-              Loading source...
+              {t("sources.loadingSource")}
             </h1>
           </div>
         </div>
@@ -377,16 +373,22 @@ export default function SourceViewPage() {
           <DetailBackButton fallbackHref="/sources" />
           <div>
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
-              Source not available
+              {t("sources.notAvailable")}
             </h1>
             <p className="text-muted-foreground">
-              {error || "We couldn't load this source."}
+              {error || t("sources.couldntLoad")}
             </p>
           </div>
         </div>
       </div>
     );
   }
+
+  const latestRunHref = source.currentRunnerId
+    ? `/scans/${source.currentRunnerId}`
+    : lastRunner?.id
+      ? `/scans/${lastRunner.id}`
+      : null;
 
   return (
     <div className="space-y-6">
@@ -402,7 +404,7 @@ export default function SourceViewPage() {
                 {source.name}
               </h1>
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <span>{source.type} source overview</span>
+                <span>{source.type} source</span>
                 <Badge
                   className={`rounded-[4px] border ${getRunnerStatusBadgeTone(source.runnerStatus)}`}
                 >
@@ -413,7 +415,7 @@ export default function SourceViewPage() {
                       data-icon="inline-start"
                     />
                   )}
-                  {getRunnerStatusBadgeLabel(source.runnerStatus)}
+                  {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
                 </Badge>
               </div>
             </div>
@@ -427,7 +429,7 @@ export default function SourceViewPage() {
               onClick={() => router.push(`/sources/${sourceId}/edit`)}
             >
               <Pencil className="h-4 w-4" />
-              Edit Source
+              {t("sources.editSource")}
             </Button>
             <DeleteSourceAction sourceId={sourceId} />
             <Button
@@ -437,10 +439,10 @@ export default function SourceViewPage() {
             >
               <Play className="h-4 w-4" />
               {isStartingScan
-                ? "Starting..."
+                ? t("common.starting")
                 : isSourceRunning
-                  ? "Running..."
-                  : "Run Scan"}
+                  ? t("common.runningLabel")
+                  : t("sources.runScan")}
             </Button>
           </div>
           {actionError && (
@@ -449,330 +451,392 @@ export default function SourceViewPage() {
         </div>
       </div>
 
-      <Separator />
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">
+          <TabsTrigger value="overview" className="rounded-[3px]">
+            {t("sources.detail.tabOverview")}
+          </TabsTrigger>
+          <TabsTrigger value="findings" className="rounded-[3px]">
+            {t("sources.detail.tabFindings")}
+          </TabsTrigger>
+          <TabsTrigger value="assets" className="rounded-[3px]">
+            {t("sources.detail.tabAssets")}
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        {assetPanels.map((panel) => (
-          <Card
-            key={panel.key}
-            className="border-2 border-border rounded-[6px]"
-          >
-            <CardContent className="p-4">
-              <p className="text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
-                {panel.label}
-              </p>
-              <p
-                className="mt-1 text-3xl font-black"
-                style={{ fontFamily: "var(--font-hero)" }}
+        <TabsContent value="overview" className="space-y-4">
+          <Separator />
+
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
+            {assetPanels.map((panel) => (
+              <Card
+                key={panel.key}
+                className="border-2 border-border rounded-[6px]"
               >
-                {panel.value.toLocaleString()}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Source Details</CardTitle>
-            <CardDescription>
-              Operational and activity overview for this source.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1">
-                <p className="text-xs uppercase text-muted-foreground">
-                  Status
-                </p>
-                <Badge
-                  className={`rounded-[4px] border ${getRunnerStatusBadgeTone(source.runnerStatus)}`}
-                >
-                  {isRunnerStatusRunning(source.runnerStatus) && (
-                    <Spinner
-                      size="sm"
-                      className="gap-0 [&_svg]:size-3"
-                      data-icon="inline-start"
-                    />
-                  )}
-                  {getRunnerStatusBadgeLabel(source.runnerStatus)}
-                </Badge>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs uppercase text-muted-foreground">Type</p>
-                <div className="inline-flex items-center gap-2">
-                  <SourceTypeIcon className="h-4 w-4 text-muted-foreground" />
-                  <Badge variant="outline" className="rounded-[4px]">
-                    {source.type ?? "—"}
-                  </Badge>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs uppercase text-muted-foreground">
-                  Created
-                </p>
-                <p className="text-sm">{formatDate(source.createdAt)}</p>
-                {source.createdAt && (
-                  <p className="text-xs text-muted-foreground">
-                    {formatRelative(source.createdAt)}
-                    {formatShortUTC(source.createdAt) && (
-                      <span className="text-muted-foreground/50">
-                        {" "}
-                        · {formatShortUTC(source.createdAt)}
-                      </span>
-                    )}
+                <CardContent className="p-4">
+                  <p className="text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
+                    {panel.label}
                   </p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs uppercase text-muted-foreground">
-                  Last Updated
-                </p>
-                <p className="text-sm">{formatDate(source.updatedAt)}</p>
-                {source.updatedAt && (
-                  <p className="text-xs text-muted-foreground">
-                    {formatRelative(source.updatedAt)}
-                    {formatShortUTC(source.updatedAt) && (
-                      <span className="text-muted-foreground/50">
-                        {" "}
-                        · {formatShortUTC(source.updatedAt)}
-                      </span>
-                    )}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs uppercase text-muted-foreground">
-                  Last Scan
-                </p>
-                <p className="text-sm">
-                  {lastRunner
-                    ? formatDate(lastRunner.triggeredAt)
-                    : "Not scanned yet"}
-                </p>
-                {lastRunner && (
-                  <p className="text-xs text-muted-foreground">
-                    {formatRelative(lastRunner.triggeredAt)}
-                    {formatShortUTC(lastRunner.triggeredAt) && (
-                      <span className="text-muted-foreground/50">
-                        {" "}
-                        · {formatShortUTC(lastRunner.triggeredAt)}
-                      </span>
-                    )}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs uppercase text-muted-foreground">
-                  Last Scan Status
-                </p>
-                {lastRunner ? (
-                  <Badge
-                    className={`rounded-[4px] border ${getRunnerStatusBadgeTone(lastRunner.status)}`}
+                  <p
+                    className="mt-1 text-3xl font-black"
+                    style={{ fontFamily: "var(--font-hero)" }}
                   >
-                    {isRunnerStatusRunning(lastRunner.status) && (
-                      <Spinner
-                        size="sm"
-                        className="gap-0 [&_svg]:size-3"
-                        data-icon="inline-start"
-                      />
-                    )}
-                    {getRunnerStatusBadgeLabel(lastRunner.status)}
-                  </Badge>
-                ) : (
-                  <p className="text-sm">—</p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs uppercase text-muted-foreground">
-                  Current Run
-                </p>
-                {source.currentRunnerId ? (
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="px-0"
-                    onClick={() =>
-                      router.push(`/scans/${source.currentRunnerId}`)
-                    }
-                  >
-                    View Run
-                    <ArrowUpRight className="h-3 w-3" />
-                  </Button>
-                ) : (
-                  <p className="text-sm">None</p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs uppercase text-muted-foreground">
-                  Last Run Summary
-                </p>
-                {lastRunner ? (
-                  <p className="text-sm">
-                    {lastRunner.totalFindings.toLocaleString()} findings ·{" "}
-                    {(
-                      lastRunner.assetsCreated +
-                      lastRunner.assetsUpdated +
-                      lastRunner.assetsUnchanged
-                    ).toLocaleString()}{" "}
-                    assets scanned
+                    {panel.value.toLocaleString()}
                   </p>
-                ) : (
-                  <p className="text-sm">—</p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs uppercase text-muted-foreground">
-                  Schedule
-                </p>
-                {source.scheduleEnabled ? (
-                  <div className="flex items-center gap-1.5 text-sm text-[#4a7c00] font-medium">
-                    <CalendarClock className="h-4 w-4 shrink-0" />
-                    <span className="font-mono text-xs">
-                      {source.scheduleCron ?? "—"}
-                    </span>
-                    {source.scheduleTimezone && (
-                      <span className="text-xs text-muted-foreground font-normal">
-                        ({source.scheduleTimezone})
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <CalendarOff className="h-4 w-4 shrink-0" />
-                    <span>Manual only</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Required Details</CardTitle>
-              <CardDescription>
-                Core required configuration for this source.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {requiredFields.length > 0 ? (
-                <div className="grid gap-3">
-                  {requiredFields.map(({ key, label, value }) => (
-                    <div
-                      key={key}
-                      className="flex items-start justify-between gap-4"
-                    >
-                      <p className="text-xs uppercase text-muted-foreground capitalize">
-                        {label}
-                      </p>
-                      <p
-                        className="text-sm text-right text-foreground/90 line-clamp-2 font-mono"
-                        title={String(value)}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>{t("sources.detail.sourceDetails")}</CardTitle>
+                <CardDescription>
+                  {t("sources.detail.sourceDetailsDesc")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase text-muted-foreground">
+                      {t("common.status")}
+                    </p>
+                    {latestRunHref ? (
+                      <button
+                        type="button"
+                        onClick={() => router.push(latestRunHref)}
+                        className="inline-flex cursor-pointer"
                       >
-                        {formatFieldValue(value)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No required details available.
-                </p>
-              )}
-
-              {enabledDetectors.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs uppercase text-muted-foreground">
-                    Active Detectors
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {enabledDetectors.map((detector) => (
+                        <Badge
+                          className={`rounded-[4px] border ${getRunnerStatusBadgeTone(source.runnerStatus)} hover:opacity-80 transition-opacity`}
+                        >
+                          {isRunnerStatusRunning(source.runnerStatus) && (
+                            <Spinner
+                              size="sm"
+                              className="gap-0 [&_svg]:size-3"
+                              data-icon="inline-start"
+                            />
+                          )}
+                          {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
+                        </Badge>
+                      </button>
+                    ) : (
                       <Badge
-                        key={detector.id}
-                        variant="outline"
-                        className="gap-1.5"
+                        className={`rounded-[4px] border ${getRunnerStatusBadgeTone(source.runnerStatus)}`}
                       >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${detectorDotClass[detector.type] ?? "bg-slate-400"}`}
-                        />
-                        {detector.label}
+                        {isRunnerStatusRunning(source.runnerStatus) && (
+                          <Spinner
+                            size="sm"
+                            className="gap-0 [&_svg]:size-3"
+                            data-icon="inline-start"
+                          />
+                        )}
+                        {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
                       </Badge>
-                    ))}
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase text-muted-foreground">{t("common.type")}</p>
+                    <div className="inline-flex items-center gap-2">
+                      <SourceTypeIcon className="h-4 w-4 text-muted-foreground" />
+                      <Badge variant="outline" className="rounded-[4px]">
+                        {source.type ?? "—"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase text-muted-foreground">
+                      {t("common.created")}
+                    </p>
+                    <p className="text-sm">{formatDate(source.createdAt)}</p>
+                    {source.createdAt && (
+                      <p className="text-xs text-muted-foreground">
+                        {formatRelative(source.createdAt)}
+                        {formatShortUTC(source.createdAt) && (
+                          <span className="text-muted-foreground/50">
+                            {" "}
+                            · {formatShortUTC(source.createdAt)}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase text-muted-foreground">
+                      {t("sources.detail.lastUpdated")}
+                    </p>
+                    <p className="text-sm">{formatDate(source.updatedAt)}</p>
+                    {source.updatedAt && (
+                      <p className="text-xs text-muted-foreground">
+                        {formatRelative(source.updatedAt)}
+                        {formatShortUTC(source.updatedAt) && (
+                          <span className="text-muted-foreground/50">
+                            {" "}
+                            · {formatShortUTC(source.updatedAt)}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase text-muted-foreground">
+                      {t("sources.detail.lastScan")}
+                    </p>
+                    <p className="text-sm">
+                      {lastRunner
+                        ? formatDate(lastRunner.triggeredAt)
+                        : t("sources.detail.notScannedYet")}
+                    </p>
+                    {lastRunner && (
+                      <p className="text-xs text-muted-foreground">
+                        {formatRelative(lastRunner.triggeredAt)}
+                        {formatShortUTC(lastRunner.triggeredAt) && (
+                          <span className="text-muted-foreground/50">
+                            {" "}
+                            · {formatShortUTC(lastRunner.triggeredAt)}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase text-muted-foreground">
+                      {t("sources.detail.lastScanStatus")}
+                    </p>
+                    {lastRunner ? (
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/scans/${lastRunner.id}`)}
+                        className="inline-flex cursor-pointer"
+                      >
+                        <Badge
+                          className={`rounded-[4px] border ${getRunnerStatusBadgeTone(lastRunner.status)} hover:opacity-80 transition-opacity`}
+                        >
+                          {isRunnerStatusRunning(lastRunner.status) && (
+                            <Spinner
+                              size="sm"
+                              className="gap-0 [&_svg]:size-3"
+                              data-icon="inline-start"
+                            />
+                          )}
+                          {t(getRunnerStatusBadgeLabel(lastRunner.status))}
+                        </Badge>
+                      </button>
+                    ) : (
+                      <p className="text-sm">—</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase text-muted-foreground">
+                      {t("sources.detail.currentRun")}
+                    </p>
+                    {source.currentRunnerId ? (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="px-0"
+                        onClick={() =>
+                          router.push(`/scans/${source.currentRunnerId}`)
+                        }
+                      >
+                        {t("sources.detail.viewRun")}
+                        <ArrowUpRight className="h-3 w-3" />
+                      </Button>
+                    ) : (
+                      <p className="text-sm">{t("common.none")}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase text-muted-foreground">
+                      {t("sources.detail.lastRunSummary")}
+                    </p>
+                    {lastRunner ? (
+                      <p className="text-sm">
+                        {t("sources.detail.runSummaryLine", {
+                          findings: lastRunner.totalFindings.toLocaleString(),
+                          assets: (
+                            lastRunner.assetsCreated +
+                            lastRunner.assetsUpdated +
+                            lastRunner.assetsUnchanged
+                          ).toLocaleString(),
+                        })}
+                      </p>
+                    ) : (
+                      <p className="text-sm">—</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase text-muted-foreground">
+                      {t("sources.detail.scheduleSection")}
+                    </p>
+                    {source.scheduleEnabled ? (
+                      <div className="flex items-center gap-1.5 text-sm text-[#4a7c00] font-medium">
+                        <CalendarClock className="h-4 w-4 shrink-0" />
+                        <span className="font-mono text-xs">
+                          {source.scheduleCron ?? "—"}
+                        </span>
+                        {source.scheduleTimezone && (
+                          <span className="text-xs text-muted-foreground font-normal">
+                            ({source.scheduleTimezone})
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <CalendarOff className="h-4 w-4 shrink-0" />
+                        <span>{t("sources.detail.manualOnly")}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Runners</CardTitle>
-              <CardDescription>Last 3 runs for this source.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {recentRunners.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  This source has not been scanned yet.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {recentRunners.map((runner) => (
-                    <button
-                      key={runner.id}
-                      type="button"
-                      onClick={() => router.push(`/scans/${runner.id}`)}
-                      className="flex w-full items-center justify-between gap-3 rounded-[4px] border px-2.5 py-2 text-left transition-colors hover:bg-muted/40"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            className={`rounded-[4px] border ${getRunnerStatusBadgeTone(runner.status)}`}
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("sources.detail.requiredDetails")}</CardTitle>
+                  <CardDescription>
+                    {t("sources.detail.requiredDetailsDesc")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {requiredFields.length > 0 ? (
+                    <div className="grid gap-3">
+                      {requiredFields.map(({ key, label, value }) => (
+                        <div
+                          key={key}
+                          className="flex items-start justify-between gap-4"
+                        >
+                          <p className="text-xs uppercase text-muted-foreground capitalize">
+                            {label}
+                          </p>
+                          <p
+                            className="text-sm text-right text-foreground/90 line-clamp-2 font-mono"
+                            title={String(value)}
                           >
-                            {isRunnerStatusRunning(runner.status) && (
-                              <Spinner
-                                size="sm"
-                                className="gap-0 [&_svg]:size-3"
-                                data-icon="inline-start"
-                              />
-                            )}
-                            {getRunnerStatusBadgeLabel(runner.status)}
-                          </Badge>
-                          <span className="truncate text-xs text-muted-foreground">
-                            {formatRelative(runner.triggeredAt)}
-                          </span>
+                            {formatFieldValue(value)}
+                          </p>
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {runner.totalFindings.toLocaleString()} findings ·{" "}
-                          {(
-                            runner.assetsCreated +
-                            runner.assetsUpdated +
-                            runner.assetsUnchanged
-                          ).toLocaleString()}{" "}
-                          assets
-                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {t("sources.detail.noRequiredDetails")}
+                    </p>
+                  )}
+
+                  {enabledDetectors.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs uppercase text-muted-foreground">
+                        {t("sources.detail.activeDetectors")}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {enabledDetectors.map((detector) => (
+                          <Badge
+                            key={detector.id}
+                            variant="outline"
+                            className="gap-1.5"
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${detectorDotClass[detector.type] ?? "bg-slate-400"}`}
+                            />
+                            {detector.label}
+                          </Badge>
+                        ))}
                       </div>
-                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-      <Suspense>
-        <AssetsTable scope={{ sourceId }} />
-      </Suspense>
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("sources.detail.recentRunners")}</CardTitle>
+                  <CardDescription>{t("sources.detail.recentRunnersDesc")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {recentRunners.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("sources.detail.notScannedMessage")}
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {recentRunners.map((runner) => (
+                        <button
+                          key={runner.id}
+                          type="button"
+                          onClick={() => router.push(`/scans/${runner.id}`)}
+                          className="flex w-full items-center justify-between gap-3 rounded-[4px] border px-2.5 py-2 text-left transition-colors hover:bg-muted/40"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                className={`rounded-[4px] border ${getRunnerStatusBadgeTone(runner.status)}`}
+                              >
+                                {isRunnerStatusRunning(runner.status) && (
+                                  <Spinner
+                                    size="sm"
+                                    className="gap-0 [&_svg]:size-3"
+                                    data-icon="inline-start"
+                                  />
+                                )}
+                                {t(getRunnerStatusBadgeLabel(runner.status))}
+                              </Badge>
+                              <span className="truncate text-xs text-muted-foreground">
+                                {formatRelative(runner.triggeredAt)}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {t("sources.detail.runSummaryLine", {
+                                findings: runner.totalFindings.toLocaleString(),
+                                assets: (
+                                  runner.assetsCreated +
+                                  runner.assetsUpdated +
+                                  runner.assetsUnchanged
+                                ).toLocaleString(),
+                              })}
+                            </p>
+                          </div>
+                          <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
 
-      {lastRunner && (
-        <div className="text-xs text-muted-foreground">
-          Last scan: {formatRelative(lastRunner.triggeredAt)}
-        </div>
-      )}
+        <TabsContent value="findings" className="space-y-4">
+          <Suspense>
+            <FindingsTable
+              key={findingsTableKey}
+              lockedFilters={{
+                sourceId: [sourceId],
+                includeResolved: true,
+              }}
+              onSelectionChange={setFindingsSelection}
+              onBulkUpdate={() => setBulkDialogOpen(true)}
+            />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="assets" className="space-y-4">
+          <Suspense>
+            <AssetsTable scope={{ sourceId }} />
+          </Suspense>
+        </TabsContent>
+      </Tabs>
+
+      <BulkUpdateDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        selection={findingsSelection}
+        onSuccess={handleFindingsBulkSuccess}
+      />
     </div>
   );
 }

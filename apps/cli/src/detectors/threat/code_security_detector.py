@@ -1,5 +1,6 @@
 """Code security detector using Bandit static analysis."""
 
+import asyncio
 import json
 import logging
 import subprocess
@@ -9,7 +10,12 @@ from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import (
+    CodeSecurityDetectorConfig,
+    DetectorConfig,
+    GenericDetectorConfig,
+    Severity,
+)
 from ...models.generated_single_asset_scan_results import (
     DetectionResult,
     DetectorType,
@@ -18,6 +24,14 @@ from ..base import BaseDetector
 from ..dependencies import MissingDependencyError, require_module
 
 logger = logging.getLogger(__name__)
+
+_SEVERITY_ORDER: dict[Severity, int] = {
+    Severity.info: 0,
+    Severity.low: 1,
+    Severity.medium: 2,
+    Severity.high: 3,
+    Severity.critical: 4,
+}
 
 
 class CodeSecurityDetector(BaseDetector):
@@ -28,6 +42,13 @@ class CodeSecurityDetector(BaseDetector):
 
     def __init__(self, config: DetectorConfig | None = None):
         super().__init__(config)
+        self._cfg: CodeSecurityDetectorConfig | GenericDetectorConfig
+        if isinstance(config, CodeSecurityDetectorConfig):
+            self._cfg = config
+        elif isinstance(config, GenericDetectorConfig):
+            self._cfg = config
+        else:
+            self._cfg = CodeSecurityDetectorConfig()
         # Importing `bandit` eagerly can trigger stevedore plugin discovery noise.
         # We only verify Bandit availability here; execution happens in a subprocess.
         if find_spec("bandit") is None:
@@ -58,7 +79,12 @@ class CodeSecurityDetector(BaseDetector):
             return 0.6
         return 0.5
 
-    def _run_bandit_json(self, content: str) -> tuple[list[dict[str, Any]], list[str]]:
+    def _run_bandit_json(
+        self,
+        content: str,
+        skips: list[str] | None = None,
+        tests: list[str] | None = None,
+    ) -> tuple[list[dict[str, Any]], list[str]]:
         with tempfile.NamedTemporaryFile(
             mode="w",
             suffix=".py",
@@ -69,8 +95,15 @@ class CodeSecurityDetector(BaseDetector):
             tmp_path = Path(handle.name)
 
         try:
+            cmd = [sys.executable, "-m", "bandit", "-q", "-f", "json"]
+            if tests:
+                cmd += ["--test", ",".join(tests)]
+            if skips:
+                cmd += ["--skip", ",".join(skips)]
+            cmd.append(str(tmp_path))
+
             proc = subprocess.run(
-                [sys.executable, "-m", "bandit", "-q", "-f", "json", str(tmp_path)],
+                cmd,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -98,23 +131,43 @@ class CodeSecurityDetector(BaseDetector):
         finally:
             tmp_path.unlink(missing_ok=True)
 
-    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
+    async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
+        if isinstance(content, bytes):
+            return []
         if not content.strip():
             return []
+        return await asyncio.to_thread(self._detect_sync, content)
 
-        threshold = self.config.confidence_threshold or 0.7
-        max_findings = self.config.max_findings or 25
+    def _detect_sync(self, content: str) -> list[DetectionResult]:
+        threshold = self._cfg.confidence_threshold or 0.7
+        max_findings = self._cfg.max_findings or 25
         findings: list[DetectionResult] = []
 
-        issues, errors = self._run_bandit_json(content)
+        skips: list[str] | None = None
+        tests: list[str] | None = None
+        severity_threshold: Severity | None = None
+        if isinstance(self._cfg, CodeSecurityDetectorConfig):
+            skips = self._cfg.skips
+            tests = self._cfg.tests
+            severity_threshold = self._cfg.severity_threshold
+
+        issues, errors = self._run_bandit_json(content, skips=skips, tests=tests)
         if not issues:
             if errors:
                 logger.debug(f"Bandit returned no issues with errors: {errors}")
             return []
 
+        min_severity_rank = _SEVERITY_ORDER.get(severity_threshold, 0) if severity_threshold else 0
+
         for issue in issues:
             confidence = self._confidence_from_bandit(str(issue.get("issue_confidence", "")))
             if confidence < threshold:
+                continue
+
+            severity = self._severity_from_bandit(str(issue.get("issue_severity", "")))
+            if _SEVERITY_ORDER.get(severity, 0) < min_severity_rank:
                 continue
 
             issue_text = str(issue.get("issue_text", "Potential insecure code pattern"))
@@ -126,7 +179,7 @@ class CodeSecurityDetector(BaseDetector):
                     detector_type=DetectorType.CODE_SECURITY,
                     finding_type=finding_type,
                     category="SECURITY",
-                    severity=self._severity_from_bandit(str(issue.get("issue_severity", ""))),
+                    severity=severity,
                     confidence=confidence,
                     matched_content=code_snippet or issue_text,
                     location=None,

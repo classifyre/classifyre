@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import pytest
 
 from src.models.generated_single_asset_scan_results import AssetType as OutputAssetType
-from src.sources.oracle.source import ObjectRef, OracleSource
+from src.sources.oracle.source import OracleSource
+from src.sources.tabular_utils import TableRef
 
 
 def _recipe(**overrides: Any) -> dict[str, Any]:
@@ -13,7 +15,7 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
         "type": "ORACLE",
         "required": {
             "host": "localhost",
-            "port": 1521,
+            "port": 11021,
             "service_name": "some_db",
         },
         "masked": {
@@ -30,9 +32,6 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
         },
         "sampling": {
             "strategy": "RANDOM",
-            "limit": 10,
-            "max_columns": 10,
-            "max_cell_chars": 256,
         },
     }
     base.update(overrides)
@@ -91,10 +90,8 @@ def test_oracle_test_connection_success(monkeypatch: pytest.MonkeyPatch) -> None
     source = OracleSource(_recipe())
     monkeypatch.setattr(
         source,
-        "_iter_objects",
-        lambda: [
-            ObjectRef(service_name="some_db", schema="HR", name="EMPLOYEES", object_type="TABLE")
-        ],
+        "_iter_tables",
+        lambda: [TableRef(database="some_db", schema="HR", table="EMPLOYEES", object_type="TABLE")],
     )
     monkeypatch.setattr(source, "_connect", _DummyConnection)
 
@@ -109,21 +106,19 @@ async def test_oracle_extract_streams_assets_in_batches(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = OracleSource(_recipe())
-    objects = [
-        ObjectRef(service_name="some_db", schema="HR", name="EMPLOYEES", object_type="TABLE"),
-        ObjectRef(service_name="some_db", schema="HR", name="DEPARTMENTS", object_type="TABLE"),
-        ObjectRef(service_name="some_db", schema="HR", name="test_v", object_type="VIEW"),
+    tables = [
+        TableRef(database="some_db", schema="HR", table="EMPLOYEES", object_type="TABLE"),
+        TableRef(database="some_db", schema="HR", table="DEPARTMENTS", object_type="TABLE"),
+        TableRef(database="some_db", schema="HR", table="test_v", object_type="VIEW"),
     ]
-    monkeypatch.setattr(source, "_iter_objects", lambda: objects)
+    monkeypatch.setattr(source, "_iter_tables", lambda: tables)
     monkeypatch.setattr(
         source,
         "_collect_foreign_key_links",
-        lambda _objects: {("HR", "EMPLOYEES"): {("HR", "DEPARTMENTS")}},
-    )
-    monkeypatch.setattr(
-        source,
-        "_collect_view_links",
-        lambda _objects: {("HR", "test_v"): {("HR", "EMPLOYEES")}},
+        lambda _tables: {
+            ("some_db", "HR", "EMPLOYEES"): {("some_db", "HR", "DEPARTMENTS")},
+            ("some_db", "HR", "test_v"): {("some_db", "HR", "EMPLOYEES")},
+        },
     )
 
     original_batch_size = OracleSource.BATCH_SIZE
@@ -136,7 +131,7 @@ async def test_oracle_extract_streams_assets_in_batches(
         OracleSource.BATCH_SIZE = original_batch_size
 
     assert [len(batch) for batch in batches] == [2, 1]
-    assert sum(len(batch) for batch in batches) == len(objects)
+    assert sum(len(batch) for batch in batches) == len(tables)
     assert all(asset.asset_type == OutputAssetType.TABLE for batch in batches for asset in batch)
     dept_hash = source.generate_hash_id("some_db_#_HR_#_DEPARTMENTS")
     emp_hash = source.generate_hash_id("some_db_#_HR_#_EMPLOYEES")
@@ -149,20 +144,18 @@ async def test_oracle_fetch_content_uses_cache(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = OracleSource(_recipe())
-    object_ref = ObjectRef(
-        service_name="some_db", schema="HR", name="EMPLOYEES", object_type="TABLE"
-    )
-    asset = source._object_to_asset(object_ref)
-    source._table_lookup[asset.hash] = object_ref
+    table_ref = TableRef(database="some_db", schema="HR", table="EMPLOYEES", object_type="TABLE")
+    asset = source._table_to_asset(table_ref)
+    source._table_lookup[asset.hash] = table_ref
 
     call_count = 0
 
-    def _sample(_object_ref: ObjectRef) -> tuple[str, str]:
+    def _sample(_table_ref: TableRef) -> tuple[str, str]:
         nonlocal call_count
         call_count += 1
         return ('{"rows":[]}', "sample rows payload")
 
-    monkeypatch.setattr(source, "_sample_object_rows", _sample)
+    monkeypatch.setattr(source, "_sample_table_rows", _sample)
 
     first = await source.fetch_content(asset.hash)
     second = await source.fetch_content(asset.hash)
@@ -178,29 +171,25 @@ def test_oracle_latest_sampling_falls_back_to_random() -> None:
         _recipe(
             sampling={
                 "strategy": "LATEST",
-                "limit": 5,
+                "rows_per_page": 10,
                 "fallback_to_random": True,
             },
         )
     )
-    object_ref = ObjectRef(
-        service_name="some_db", schema="HR", name="EMPLOYEES", object_type="TABLE"
-    )
+    table_ref = TableRef(database="some_db", schema="HR", table="EMPLOYEES", object_type="TABLE")
 
-    query, params = source._build_sampling_query(object_ref, ["ID", "NAME"])
+    query, params = source._build_sampling_query(table_ref, ["ID", "NAME"])
 
     assert "ORDER BY DBMS_RANDOM.VALUE" in query
-    assert "FETCH FIRST 5 ROWS ONLY" in query
+    assert "FETCH FIRST 10 ROWS ONLY" in query
     assert params == []
 
 
 def test_oracle_all_strategy_omits_limit() -> None:
     source = OracleSource(_recipe(sampling={"strategy": "ALL"}))
-    object_ref = ObjectRef(
-        service_name="some_db", schema="HR", name="EMPLOYEES", object_type="TABLE"
-    )
+    table_ref = TableRef(database="some_db", schema="HR", table="EMPLOYEES", object_type="TABLE")
 
-    query, params = source._build_sampling_query(object_ref, ["ID", "NAME"])
+    query, params = source._build_sampling_query(table_ref, ["ID", "NAME"])
 
     assert "FETCH FIRST" not in query
     assert params == []
@@ -224,13 +213,10 @@ async def test_oracle_extract_runs_detector_pipeline_when_enabled(
     source = OracleSource(_recipe(detectors=[{"type": "SECRETS", "enabled": True}]))
     monkeypatch.setattr(
         source,
-        "_iter_objects",
-        lambda: [
-            ObjectRef(service_name="some_db", schema="HR", name="EMPLOYEES", object_type="TABLE")
-        ],
+        "_iter_tables",
+        lambda: [TableRef(database="some_db", schema="HR", table="EMPLOYEES", object_type="TABLE")],
     )
-    monkeypatch.setattr(source, "_collect_foreign_key_links", lambda _objects: {})
-    monkeypatch.setattr(source, "_collect_view_links", lambda _objects: {})
+    monkeypatch.setattr(source, "_collect_foreign_key_links", lambda _tables: {})
 
     processed_batches: list[int] = []
 
@@ -238,6 +224,11 @@ async def test_oracle_extract_runs_detector_pipeline_when_enabled(
         async def process(self, batch: list[Any]) -> list[Any]:
             processed_batches.append(len(batch))
             return batch
+
+        async def process_stream(self, batch: list[Any]) -> AsyncGenerator[Any, None]:
+            processed_batches.append(len(batch))
+            for item in batch:
+                yield item
 
     monkeypatch.setattr(
         "src.pipeline.detector_pipeline.DetectorPipeline.from_recipe",
@@ -250,3 +241,80 @@ async def test_oracle_extract_runs_detector_pipeline_when_enabled(
 
     assert [len(batch) for batch in batches] == [1]
     assert processed_batches == [1]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_oracle_fetch_content_pages_batches_for_all_strategy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With strategy=ALL, fetch_content_pages must paginate via OFFSET/FETCH batches."""
+    source = OracleSource(
+        _recipe(
+            sampling={
+                "strategy": "ALL",
+                "rows_per_page": 10,
+            }
+        )
+    )
+    table_ref = TableRef(database="some_db", schema="HR", table="EMPLOYEES", object_type="TABLE")
+    asset = source._table_to_asset(table_ref)
+
+    all_rows: list[tuple[Any, ...]] = [(i, f"item{i}") for i in range(1, 13)]
+    queries_issued: list[str] = []
+
+    class _BatchCursor:
+        def __init__(self) -> None:
+            self.description = [
+                ("id", None, None, None, None, None, None),
+                ("name", None, None, None, None, None, None),
+            ]
+            self._rows: list[tuple[Any, ...]] = []
+
+        def execute(self, query: str, params: Any = None) -> None:
+            queries_issued.append(query)
+            import re
+
+            m = re.search(r"OFFSET\s+(\d+)\s+ROWS\s+FETCH\s+NEXT\s+(\d+)", query, re.IGNORECASE)
+            if m:
+                offset, batch_size = int(m.group(1)), int(m.group(2))
+            else:
+                offset, batch_size = 0, len(all_rows)
+            self._rows = all_rows[offset : offset + batch_size]
+
+        def fetchall(self) -> list[tuple[Any, ...]]:
+            return list(self._rows)
+
+        def fetchmany(self, size: int) -> list[tuple[Any, ...]]:
+            return list(self._rows[:size])
+
+        def __enter__(self) -> _BatchCursor:
+            return self
+
+        def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+            return None
+
+    class _BatchConnection:
+        def cursor(self) -> _BatchCursor:
+            return _BatchCursor()
+
+        def close(self) -> None:
+            return None
+
+        def __enter__(self) -> _BatchConnection:
+            return self
+
+        def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+            return None
+
+    monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
+    monkeypatch.setattr(source, "_connect", _BatchConnection)
+
+    pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
+
+    assert len(queries_issued) == 3
+    assert "COUNT" in queries_issued[0]
+    assert all("OFFSET" in q and "FETCH NEXT" in q for q in queries_issued[1:])
+    assert len(pages) == 12
+    assert "item1" in pages[0]
+    assert "item12" in pages[11]

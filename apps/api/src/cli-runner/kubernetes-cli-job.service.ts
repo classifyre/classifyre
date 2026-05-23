@@ -22,6 +22,7 @@ interface CliJobResult {
   output: string;
   jobName: string;
   namespace: string;
+  failureContext?: string;
 }
 
 type CliJobLogHandler = (chunk: string) => Promise<void> | void;
@@ -143,6 +144,15 @@ export class KubernetesCliJobService {
       });
     } catch (error: any) {
       if (this.isNotFound(error)) {
+        this.logger.warn(
+          `CLI Job ${jobRef.namespace}/${jobRef.jobName} not found - may have been stopped manually or already removed`,
+        );
+        return;
+      }
+      if (this.isCannotParseContentError(error)) {
+        this.logger.warn(
+          `deleteNamespacedJob(${jobRef.namespace}/${jobRef.jobName}) response had no Content-Type; treating as deleted.`,
+        );
         return;
       }
       throw error;
@@ -174,6 +184,12 @@ export class KubernetesCliJobService {
     } catch (error: any) {
       if (this.isNotFound(error)) {
         return false;
+      }
+      if (this.isCannotParseContentError(error)) {
+        this.logger.warn(
+          `readNamespacedJob(${namespace}/${jobName}) response had no Content-Type; assuming job is active.`,
+        );
+        return true;
       }
       throw error;
     }
@@ -487,6 +503,56 @@ export class KubernetesCliJobService {
     container.command = ['/bin/sh', '-lc'];
     container.args = [this.buildJobCommand(params.mode, workDir)];
 
+    // Apply per-source resource overrides from recipe
+    const recipeResources = (params.recipe as any)?.resources;
+    if (recipeResources && typeof recipeResources === 'object') {
+      container.resources = container.resources || {};
+      if (recipeResources.requests) {
+        container.resources.requests = {
+          ...(container.resources.requests || {}),
+          ...recipeResources.requests,
+        };
+      }
+      if (recipeResources.limits) {
+        container.resources.limits = {
+          ...(container.resources.limits || {}),
+          ...recipeResources.limits,
+        };
+      }
+      if (
+        typeof recipeResources.timeout_seconds === 'number' &&
+        recipeResources.timeout_seconds > 0
+      ) {
+        jobAny.spec.activeDeadlineSeconds = recipeResources.timeout_seconds;
+      }
+      const envOverrides: Array<{ name: string; value: string }> = [];
+      if (
+        typeof recipeResources.max_pool_workers === 'number' &&
+        recipeResources.max_pool_workers > 0
+      ) {
+        envOverrides.push({
+          name: 'CLASSIFYRE_MAX_POOL_WORKERS',
+          value: String(recipeResources.max_pool_workers),
+        });
+      }
+      if (
+        typeof recipeResources.max_concurrent_assets === 'number' &&
+        recipeResources.max_concurrent_assets > 0
+      ) {
+        envOverrides.push({
+          name: 'CLASSIFYRE_MAX_CONCURRENT_ASSETS',
+          value: String(recipeResources.max_concurrent_assets),
+        });
+      }
+      for (const entry of envOverrides) {
+        const existing = container.env || [];
+        const idx = existing.findIndex((e: any) => e.name === entry.name);
+        if (idx >= 0) existing[idx] = entry;
+        else existing.push(entry);
+        container.env = existing;
+      }
+    }
+
     return job;
   }
 
@@ -531,7 +597,12 @@ export class KubernetesCliJobService {
     namespace: string,
     jobName: string,
     onLogChunk?: CliJobLogHandler,
-  ): Promise<{ succeeded: boolean; exitCode?: number; output: string }> {
+  ): Promise<{
+    succeeded: boolean;
+    exitCode?: number;
+    output: string;
+    failureContext?: string;
+  }> {
     if (!this.batchApi) {
       throw new Error('Kubernetes batch API is not initialized');
     }
@@ -548,11 +619,39 @@ export class KubernetesCliJobService {
         latestOutput,
         onLogChunk,
       );
-      const response = await (this.batchApi as any).readNamespacedJob({
-        namespace,
-        name: jobName,
-      });
-      const job = this.unwrapBody<V1Job>(response);
+      let job: V1Job;
+      try {
+        const response = await (this.batchApi as any).readNamespacedJob({
+          namespace,
+          name: jobName,
+        });
+        job = this.unwrapBody<V1Job>(response);
+      } catch (error: any) {
+        if (this.isCannotParseContentError(error)) {
+          this.logger.warn(
+            `readNamespacedJob(${namespace}/${jobName}) response had no Content-Type; retrying poll.`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, pollMs));
+          continue;
+        }
+        const statusCode =
+          error?.code ?? error?.statusCode ?? error?.body?.code;
+        if (statusCode === 404) {
+          latestOutput = await this.syncJobLogs(
+            namespace,
+            jobName,
+            latestOutput,
+            onLogChunk,
+          );
+          return {
+            succeeded: false,
+            exitCode: undefined,
+            output: latestOutput,
+            failureContext: `Kubernetes Job ${namespace}/${jobName} was not found. It may have been deleted by TTL, evicted, or cleaned up before the status could be read.`,
+          };
+        }
+        throw error;
+      }
       const status = job.status;
       if ((status?.succeeded || 0) > 0) {
         latestOutput = await this.syncJobLogs(
@@ -572,7 +671,17 @@ export class KubernetesCliJobService {
           latestOutput,
           onLogChunk,
         );
-        return { succeeded: false, exitCode, output: latestOutput };
+        const failureContext = await this.buildFailureContext(
+          namespace,
+          pod,
+          exitCode,
+        );
+        return {
+          succeeded: false,
+          exitCode,
+          output: latestOutput,
+          failureContext,
+        };
       }
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }
@@ -596,20 +705,30 @@ export class KubernetesCliJobService {
     }
 
     const containerName = pod.spec?.containers?.[0]?.name;
-    const response = await (this.coreApi as any).readNamespacedPodLog({
-      namespace,
-      name: pod.metadata.name,
-      container: containerName,
-      timestamps: false,
-    });
-    const body = this.unwrapBody<string>(response);
-    if (typeof body === 'string') {
-      return body;
+    try {
+      const response = await (this.coreApi as any).readNamespacedPodLog({
+        namespace,
+        name: pod.metadata.name,
+        container: containerName,
+        timestamps: false,
+      });
+      const body = this.unwrapBody<string>(response);
+      if (typeof body === 'string') {
+        return body;
+      }
+      if (body && typeof (body as any).toString === 'function') {
+        return (body as any).toString();
+      }
+      return '';
+    } catch (error: any) {
+      if (this.isCannotParseContentError(error)) {
+        this.logger.warn(
+          `readNamespacedPodLog(${namespace}/${pod.metadata.name}) response had no Content-Type; returning empty logs.`,
+        );
+        return '';
+      }
+      throw error;
     }
-    if (body && typeof (body as any).toString === 'function') {
-      return (body as any).toString();
-    }
-    return '';
   }
 
   private async syncJobLogs(
@@ -651,22 +770,32 @@ export class KubernetesCliJobService {
       return undefined;
     }
 
-    const response = await (this.coreApi as any).listNamespacedPod({
-      namespace,
-      labelSelector: `job-name=${jobName}`,
-    });
-    const podList = this.unwrapBody<V1PodList>(response);
-    const pods = [...(podList.items || [])];
-    pods.sort((a, b) => {
-      const aTime = a.metadata?.creationTimestamp
-        ? new Date(a.metadata.creationTimestamp).getTime()
-        : 0;
-      const bTime = b.metadata?.creationTimestamp
-        ? new Date(b.metadata.creationTimestamp).getTime()
-        : 0;
-      return bTime - aTime;
-    });
-    return pods[0];
+    try {
+      const response = await (this.coreApi as any).listNamespacedPod({
+        namespace,
+        labelSelector: `job-name=${jobName}`,
+      });
+      const podList = this.unwrapBody<V1PodList>(response);
+      const pods = [...(podList.items || [])];
+      pods.sort((a, b) => {
+        const aTime = a.metadata?.creationTimestamp
+          ? new Date(a.metadata.creationTimestamp).getTime()
+          : 0;
+        const bTime = b.metadata?.creationTimestamp
+          ? new Date(b.metadata.creationTimestamp).getTime()
+          : 0;
+        return bTime - aTime;
+      });
+      return pods[0];
+    } catch (error: any) {
+      if (this.isCannotParseContentError(error)) {
+        this.logger.warn(
+          `listNamespacedPod(${namespace}, job-name=${jobName}) response had no Content-Type; returning undefined.`,
+        );
+        return undefined;
+      }
+      throw error;
+    }
   }
 
   private extractExitCodeFromPod(pod?: V1Pod): number | undefined {
@@ -678,6 +807,75 @@ export class KubernetesCliJobService {
       }
     }
     return undefined;
+  }
+
+  private extractTerminationReason(pod?: V1Pod): string | undefined {
+    const statuses = pod?.status?.containerStatuses || [];
+    for (const status of statuses) {
+      const reason =
+        status.state?.terminated?.reason ||
+        status.lastState?.terminated?.reason;
+      if (reason) {
+        return reason;
+      }
+    }
+    return undefined;
+  }
+
+  private async fetchPodWarningEvents(
+    namespace: string,
+    podName: string,
+  ): Promise<string> {
+    if (!this.coreApi) {
+      return '';
+    }
+    try {
+      const response = await (this.coreApi as any).listNamespacedEvent({
+        namespace,
+        fieldSelector: `involvedObject.name=${podName},type=Warning`,
+      });
+      const eventList = this.unwrapBody<any>(response);
+      const items: any[] = eventList?.items || [];
+      if (items.length === 0) {
+        return '';
+      }
+      return items
+        .map((e: any) =>
+          `  [${e.reason ?? 'Unknown'}] ${e.message ?? ''}`.trimEnd(),
+        )
+        .join('\n');
+    } catch {
+      return '';
+    }
+  }
+
+  private async buildFailureContext(
+    namespace: string,
+    pod: V1Pod | undefined,
+    exitCode: number | undefined,
+  ): Promise<string> {
+    const lines: string[] = [];
+
+    const reason = this.extractTerminationReason(pod);
+    if (reason) {
+      lines.push(`Termination reason: ${reason}`);
+    }
+
+    if (pod?.metadata?.name) {
+      const events = await this.fetchPodWarningEvents(
+        namespace,
+        pod.metadata.name,
+      );
+      if (events) {
+        lines.push(`Kubernetes warning events:\n${events}`);
+      }
+    }
+
+    if (lines.length === 0 && exitCode !== undefined) {
+      lines.push(`Pod exited with code ${exitCode}`);
+    }
+
+    return lines.join('\n\n');
   }
 
   private intEnv(name: string, defaultValue: number): number {
@@ -738,6 +936,12 @@ export class KubernetesCliJobService {
       if (this.isNotFound(error)) {
         return;
       }
+      if (this.isCannotParseContentError(error)) {
+        this.logger.warn(
+          `deleteNamespacedJob(${namespace}/${jobName}) response had no Content-Type; treating as deleted.`,
+        );
+        return;
+      }
       this.logger.warn(
         `Failed to clean up CLI Job ${namespace}/${jobName}: ${error?.message || error}`,
       );
@@ -765,6 +969,14 @@ export class KubernetesCliJobService {
     return response as T;
   }
 
+  private isCannotParseContentError(error: any): boolean {
+    const message =
+      error?.message || error?.body?.message || error?.response?.body?.message;
+    return (
+      typeof message === 'string' && message.includes('Cannot parse content')
+    );
+  }
+
   private isAlreadyExists(error: any): boolean {
     const status =
       error?.response?.statusCode || error?.statusCode || error?.status;
@@ -781,8 +993,27 @@ export class KubernetesCliJobService {
     if (status === 404) {
       return true;
     }
-    const reason = error?.body?.reason || error?.response?.body?.reason;
-    return reason === 'NotFound';
+    // ApiException from @kubernetes/client-node formats the message as
+    // "HTTP-Code: 404\nBody: ..." and stores body as a JSON string, not
+    // a parsed object, so we must handle both shapes.
+    if (
+      typeof error?.message === 'string' &&
+      /HTTP-Code:\s*404\b/.test(error.message)
+    ) {
+      return true;
+    }
+    const rawBody = error?.body ?? error?.response?.body;
+    let body: Record<string, unknown> | null = null;
+    if (rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)) {
+      body = rawBody as Record<string, unknown>;
+    } else if (typeof rawBody === 'string') {
+      try {
+        body = JSON.parse(rawBody) as Record<string, unknown>;
+      } catch {
+        /* ignore */
+      }
+    }
+    return body?.['reason'] === 'NotFound';
   }
 
   private isLogUnavailable(error: any): boolean {

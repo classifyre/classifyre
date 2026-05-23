@@ -1,14 +1,39 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { TriggerType, RunnerExecutionMode, RunnerStatus } from '@prisma/client';
+import {
+  TriggerType,
+  RunnerExecutionMode,
+  RunnerStatus,
+  RunnerAssetStatus,
+} from '@prisma/client';
 import {
   IsOptional,
   IsEnum,
   IsString,
   IsInt,
   Min,
-  IsNumberString,
+  IsArray,
+  IsObject,
+  ValidateNested,
+  ArrayMinSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export const LOG_LEVELS = [
+  'TRACE',
+  'DEBUG',
+  'INFO',
+  'WARN',
+  'ERROR',
+  'FATAL',
+  'UNKNOWN',
+] as const;
+export type LogLevel = (typeof LOG_LEVELS)[number];
+
+export const LOG_SORT_ORDERS = ['asc', 'desc'] as const;
+export type LogSortOrder = (typeof LOG_SORT_ORDERS)[number];
+
+export const LOG_STREAMS = ['stderr', 'stdout', 'combined'] as const;
+export type LogStream = (typeof LOG_STREAMS)[number];
 
 export class StartRunnerDto {
   @ApiProperty({ required: false })
@@ -162,10 +187,10 @@ export class DeleteRunnerResponseDto {
   message: string;
 }
 
-export class ListRunnerLogsQueryDto {
-  @ApiProperty({ required: false, description: 'Byte cursor for next page' })
+export class SearchRunnerLogsBodyDto {
+  @ApiProperty({ required: false, description: 'Opaque pagination cursor' })
   @IsOptional()
-  @IsNumberString()
+  @IsString()
   cursor?: string;
 
   @ApiProperty({ required: false, default: 200, minimum: 1, maximum: 1000 })
@@ -174,10 +199,48 @@ export class ListRunnerLogsQueryDto {
   @IsInt()
   @Min(1)
   take?: number = 200;
+
+  @ApiProperty({ required: false, description: 'Full-text search on message' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    enum: LOG_LEVELS,
+    description: 'Filter by log levels',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  levels?: string[];
+
+  @ApiProperty({
+    required: false,
+    enum: LOG_SORT_ORDERS,
+    default: 'asc',
+    description:
+      'asc = oldest first (cursor-based), desc = newest first (index-based)',
+  })
+  @IsOptional()
+  @IsString()
+  sortOrder?: LogSortOrder = 'asc';
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    enum: LOG_STREAMS,
+    description: 'Filter by stream type',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  streams?: string[];
 }
 
 export class RunnerLogEntryDto {
-  @ApiProperty({ description: 'Byte offset cursor for this log entry' })
+  @ApiProperty({ description: 'Opaque pagination cursor for this entry' })
   cursor: string;
 
   @ApiProperty({
@@ -189,12 +252,18 @@ export class RunnerLogEntryDto {
 
   @ApiProperty({
     description: 'Log stream source',
-    enum: ['stderr', 'stdout', 'combined'],
+    enum: LOG_STREAMS,
   })
   stream: 'stderr' | 'stdout' | 'combined';
 
   @ApiProperty()
   message: string;
+
+  @ApiProperty({
+    description: 'Inferred log level',
+    enum: LOG_LEVELS,
+  })
+  level: LogLevel;
 }
 
 export class RunnerLogsResponseDto {
@@ -215,4 +284,125 @@ export class RunnerLogsResponseDto {
 
   @ApiProperty({ minimum: 1, maximum: 1000 })
   take: number;
+}
+
+export class RegisterDiscoveredAssetsDto {
+  @ApiProperty({
+    type: [String],
+    description: 'Asset hashes to register as PENDING',
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMinSize(1)
+  assetHashes: string[];
+}
+
+export class FindingsBySeverityDto {
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  critical?: number;
+
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  high?: number;
+
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  medium?: number;
+
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  low?: number;
+
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  info?: number;
+}
+
+export class RunnerAssetStatusUpdateItem {
+  @ApiProperty({ description: 'Asset hash' })
+  @IsString()
+  assetHash: string;
+
+  @ApiProperty({ enum: ['PROCESSING', 'PROCESSED', 'ERROR'] })
+  @IsEnum(RunnerAssetStatus)
+  status: 'PROCESSING' | 'PROCESSED' | 'ERROR';
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  errorMessage?: string;
+
+  @ApiProperty({
+    required: false,
+    minimum: 0,
+    description: 'Total findings count',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  findingsTotal?: number;
+
+  @ApiProperty({
+    required: false,
+    type: FindingsBySeverityDto,
+    description: 'Finding counts per severity level',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => FindingsBySeverityDto)
+  findingsBySeverity?: FindingsBySeverityDto;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Finding counts per detector: { [detectorType]: { total, critical?, high?, … } }',
+  })
+  @IsOptional()
+  @IsObject()
+  findingsByDetector?: Record<
+    string,
+    { total: number } & Partial<FindingsBySeverityDto>
+  >;
+}
+
+export class UpdateRunnerAssetStatusDto {
+  @ApiProperty({ type: [RunnerAssetStatusUpdateItem] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RunnerAssetStatusUpdateItem)
+  @ArrayMinSize(1)
+  assets: RunnerAssetStatusUpdateItem[];
+}
+
+export class RegisterDiscoveredAssetsResponseDto {
+  @ApiProperty()
+  registered: number;
+}
+
+export class RunnerAssetProgressDto {
+  @ApiProperty()
+  pending: number;
+
+  @ApiProperty()
+  processing: number;
+
+  @ApiProperty()
+  processed: number;
+
+  @ApiProperty()
+  error: number;
+
+  @ApiProperty()
+  total: number;
 }

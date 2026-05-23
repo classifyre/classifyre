@@ -202,6 +202,7 @@ function normalizeDetectedMimeType(
 type SandboxCliResult = {
   mime_type: string;
   findings: unknown[];
+  parse_error?: string;
 };
 
 function sanitizeUnsupportedUnicodeEscapes(text: string): string {
@@ -485,6 +486,14 @@ export class SandboxService {
 
       const durationMs = Date.now() - startTime;
 
+      const parseError =
+        typeof result.parse_error === 'string' && result.parse_error
+          ? result.parse_error
+          : undefined;
+      if (parseError) {
+        this.logger.warn(`Sandbox run ${runId}: ${parseError}`);
+      }
+
       await this.prisma.sandboxRun.update({
         where: { id: runId },
         data: {
@@ -493,6 +502,7 @@ export class SandboxService {
           contentType: mimeToContentType(normalizedMimeType),
           findings: sanitizedFindings as any,
           durationMs,
+          ...(parseError ? { errorMessage: parseError } : {}),
         },
       });
     } catch (error: unknown) {
@@ -762,7 +772,7 @@ export class SandboxService {
 
     const records = await this.prisma.customDetector.findMany({
       where: { key: { in: keys } },
-      select: { key: true, name: true, method: true, config: true },
+      select: { key: true, name: true, pipelineSchema: true },
     });
 
     const byKey = new Map(records.map((r) => [r.key, r]));
@@ -793,16 +803,22 @@ export class SandboxService {
           ? (item.config as Record<string, unknown>)
           : {};
 
+      const isPipeline =
+        record.pipelineSchema &&
+        typeof record.pipelineSchema === 'object' &&
+        Object.keys(record.pipelineSchema).length > 0;
+
       return {
         ...item,
         config: {
-          ...(record.config as Record<string, unknown>),
           // caller-supplied overrides DB defaults, but identity fields are pinned
           ...existingConfig,
           // identity fields always come from DB to ensure correctness
           custom_detector_key: record.key,
           name: record.name,
-          method: record.method,
+          ...(isPipeline
+            ? { method: 'PIPELINE', pipeline_schema: record.pipelineSchema }
+            : {}),
         },
       };
     });

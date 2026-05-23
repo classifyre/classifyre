@@ -1,0 +1,52 @@
+Classifyre otel-receiver deployed!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ OTLP Collector endpoint (HTTP)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  http://{{ .Release.Name }}-opentelemetry-collector.{{ .Release.Namespace }}:4318
+
+Use this URL in your Classifyre Helm deployment:
+
+  helm upgrade <release> classifyre-core \
+    --set telemetry.enabled=true \
+    --set telemetry.otlpEndpoint="http://{{ .Release.Name }}-opentelemetry-collector.{{ .Release.Namespace }}:4318"
+
+Or in values.yaml:
+
+  telemetry:
+    enabled: true
+    otlpEndpoint: "http://{{ .Release.Name }}-opentelemetry-collector.{{ .Release.Namespace }}:4318"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Grafana
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{- if .Values.grafana.enabled }}
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ .Release.Name }}-grafana 3000:80
+
+  Username: admin
+  Password: (set via grafana.adminPassword — change in production!)
+{{- else }}
+  Grafana is disabled.
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Internal service endpoints
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{{- if .Values.tempo.enabled }}
+  Tempo:  http://{{ .Release.Name }}-tempo.{{ .Release.Namespace }}:3200
+{{- end }}
+{{- if .Values.loki.enabled }}
+  Loki:   http://{{ .Release.Name }}-loki-gateway.{{ .Release.Namespace }}:80
+{{- end }}
+{{- if index .Values "mimir-distributed" "enabled" }}
+  Mimir:  http://{{ .Release.Name }}-mimir-distributed-nginx.{{ .Release.Namespace }}/prometheus
+{{- end }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Production checklist
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  [ ] Change grafana.adminPassword
+  [ ] Configure object storage (S3/GCS/Azure) for Tempo, Loki, Mimir
+  [ ] Enable Mimir multi-tenancy if aggregating multiple environments
+  [ ] Set up Ingress / TLS for Grafana external access
+  [ ] Review resource limits for your expected data volume

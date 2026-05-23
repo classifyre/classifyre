@@ -1,4 +1,11 @@
 import { Configuration } from "./generated/src/runtime";
+import {
+  SearchFindingsFiltersInputDtoSeverityEnum,
+  SearchFindingsFiltersInputDtoStatusEnum,
+  SearchFindingsFiltersInputDtoDetectorTypeEnum,
+} from "./generated/src/models";
+import type { TrainingExampleDto, TrainingExampleItem } from "./types";
+export type { TrainingExampleDto, TrainingExampleItem } from "./types";
 import type {
   AiMessageDto,
   AiCompleteRequestDto,
@@ -56,6 +63,7 @@ export type {
   DeleteRunnerResponseDto,
   RunnerLogEntryDto,
   RunnerLogsResponseDto,
+  SearchRunnerLogsBodyDto,
   SourceInfoDto,
   StopRunnerResponseDto,
   StartRunnerDto,
@@ -119,6 +127,8 @@ export type {
   AssetListItemDto,
 } from "./generated/src/models";
 
+export { RunnerDtoFromJSON } from "./generated/src/models/RunnerDto";
+
 // Augmented FindingResponseDto: adds metadata field not present in the generated type.
 // The API returns metadata (detector-specific structured context) but the generated
 // OpenAPI client doesn't include it. We extend the type here so consumers get it typed.
@@ -145,6 +155,7 @@ export {
   UpdateAiProviderConfigDtoProviderEnum,
   SandboxRunDtoContentTypeEnum,
   SandboxRunDtoStatusEnum,
+  RunnerLogEntryDtoLevelEnum,
   // Finding enums used by web components
   FindingResponseDtoDetectorTypeEnum,
   FindingResponseDtoSeverityEnum,
@@ -178,6 +189,24 @@ export const SearchAssetsSortOrderEnum = {
 export type SearchAssetsSortOrder =
   (typeof SearchAssetsSortOrderEnum)[keyof typeof SearchAssetsSortOrderEnum];
 
+export const SearchSourcesSortByEnum = {
+  Name: "NAME",
+  Type: "TYPE",
+  Status: "STATUS",
+  CreatedAt: "CREATED_AT",
+  UpdatedAt: "UPDATED_AT",
+  LastRunAt: "LAST_RUN_AT",
+} as const;
+export type SearchSourcesSortBy =
+  (typeof SearchSourcesSortByEnum)[keyof typeof SearchSourcesSortByEnum];
+
+export const SearchSourcesSortOrderEnum = {
+  Asc: "ASC",
+  Desc: "DESC",
+} as const;
+export type SearchSourcesSortOrder =
+  (typeof SearchSourcesSortOrderEnum)[keyof typeof SearchSourcesSortOrderEnum];
+
 export type SearchAssetsPageInputDto = GeneratedSearchAssetsPageDto & {
   sortBy?: SearchAssetsSortBy;
   sortOrder?: SearchAssetsSortOrder;
@@ -196,7 +225,7 @@ export type SearchAssetsChartsRequestInputDto =
 export type SearchFindingsChartsRequestInputDto =
   GeneratedSearchFindingsChartsRequestDto;
 
-export type SearchRunnersStatus = "PENDING" | "RUNNING" | "COMPLETED" | "ERROR";
+export type SearchRunnersStatus = "PENDING" | "RUNNING" | "COMPLETED" | "WARNING" | "ERROR";
 export type SearchRunnersTriggerType =
   | "MANUAL"
   | "SCHEDULED"
@@ -257,6 +286,80 @@ export type SearchRunnersChartsRequestInputDto = {
     topSourcesLimit?: number;
   };
 };
+
+// ── Runner Assets search ──────────────────────────────────────────────────────
+
+export type RunnerAssetStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "PROCESSED"
+  | "ERROR";
+
+export const RunnerAssetStatusEnum = {
+  Pending: "PENDING",
+  Processing: "PROCESSING",
+  Processed: "PROCESSED",
+  Error: "ERROR",
+} as const;
+
+export const SearchRunnerAssetsSortByEnum = {
+  CreatedAt: "CREATED_AT",
+  Status: "STATUS",
+  StatusPriority: "STATUS_PRIORITY",
+  AssetHash: "ASSET_HASH",
+  CompletedAt: "COMPLETED_AT",
+  FindingsTotal: "FINDINGS_TOTAL",
+} as const;
+export type SearchRunnerAssetsSortBy =
+  (typeof SearchRunnerAssetsSortByEnum)[keyof typeof SearchRunnerAssetsSortByEnum];
+
+export const SearchRunnerAssetsSortOrderEnum = {
+  Asc: "ASC",
+  Desc: "DESC",
+} as const;
+export type SearchRunnerAssetsSortOrder =
+  (typeof SearchRunnerAssetsSortOrderEnum)[keyof typeof SearchRunnerAssetsSortOrderEnum];
+
+export type SearchRunnerAssetsFiltersInputDto = {
+  runnerId: string;
+  status?: RunnerAssetStatus[];
+  search?: string;
+};
+
+export type SearchRunnerAssetsPageInputDto = {
+  skip?: number;
+  limit?: number;
+  sortBy?: SearchRunnerAssetsSortBy;
+  sortOrder?: SearchRunnerAssetsSortOrder;
+};
+
+export type SearchRunnerAssetsRequestInputDto = {
+  filters: SearchRunnerAssetsFiltersInputDto;
+  page?: SearchRunnerAssetsPageInputDto;
+};
+
+export type RunnerAssetItemDto = {
+  runnerId: string;
+  assetHash: string;
+  status: RunnerAssetStatus;
+  startedAt: string | null;
+  completedAt: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  findingsTotal: number | null;
+  findingsBySeverity: Record<string, number> | null;
+  findingsByDetector: Record<string, Record<string, number>> | null;
+  asset: import("./generated/src/models").AssetListItemDto | null;
+};
+
+export type SearchRunnerAssetsResponseDto = {
+  items: RunnerAssetItemDto[];
+  total: number;
+  skip: number;
+  limit: number;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export type AssistantContextKey =
   | "source.create"
@@ -391,6 +494,7 @@ export type RunnersChartsTotalsDto = {
   running: number;
   queued: number;
   completed: number;
+  warning: number;
   failed: number;
 };
 
@@ -524,6 +628,10 @@ export type ParseTrainingExamplesResponseDto = {
   skippedRows: number;
   warnings: string[];
   examples: ParsedTrainingExampleDto[];
+  availableColumns?: string[];
+  detectedLabelColumn?: string;
+  detectedTextColumn?: string;
+  skippedReasons?: { missingLabel: number; missingText: number; duplicates: number };
 };
 
 export type CustomDetectorExtractionDto = {
@@ -825,6 +933,26 @@ class ApiClient {
     return (await response.json()) as SearchRunnersChartsResponseDto;
   }
 
+  async searchRunnerAssets(
+    request: SearchRunnerAssetsRequestInputDto,
+  ): Promise<SearchRunnerAssetsResponseDto> {
+    const basePath = this.config.basePath.replace(/\/$/, "");
+    const response = await fetch(`${basePath}/search/runner-assets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(
+        `search/runner-assets failed (${response.status}): ${message || "Unknown error"}`,
+      );
+    }
+
+    return (await response.json()) as SearchRunnerAssetsResponseDto;
+  }
+
   async listCustomDetectors(params?: {
     includeInactive?: boolean;
   }): Promise<CustomDetectorResponseDto[]> {
@@ -942,6 +1070,7 @@ class ApiClient {
   async parseCustomDetectorTrainingExamples(
     file: File | Blob,
     fileName?: string,
+    opts: { labelColumn?: string; textColumn?: string } = {},
   ): Promise<ParseTrainingExamplesResponseDto> {
     const basePath = this.config.basePath.replace(/\/$/, "");
     const formData = new FormData();
@@ -951,6 +1080,8 @@ class ApiClient {
         ? file.name
         : "training-data.txt");
     formData.set("file", file, fallbackName);
+    if (opts.labelColumn) formData.set("labelColumn", opts.labelColumn);
+    if (opts.textColumn) formData.set("textColumn", opts.textColumn);
 
     const response = await fetch(
       `${basePath}/custom-detectors/training-examples/parse`,
@@ -1212,6 +1343,68 @@ class ApiClient {
     }
 
     return (await response.json()) as { deleted: true };
+  }
+
+  async listTrainingExamples(detectorId: string): Promise<TrainingExampleDto[]> {
+    const basePath = this.config.basePath.replace(/\/$/, "");
+    const response = await fetch(
+      `${basePath}/custom-detectors/${detectorId}/training-examples`,
+    );
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(`training-examples GET failed (${response.status}): ${message}`);
+    }
+    return (await response.json()) as TrainingExampleDto[];
+  }
+
+  async saveTrainingExamples(
+    detectorId: string,
+    examples: TrainingExampleItem[],
+    clearExisting = false,
+  ): Promise<{ saved: number }> {
+    const basePath = this.config.basePath.replace(/\/$/, "");
+    const response = await fetch(
+      `${basePath}/custom-detectors/${detectorId}/training-examples`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ examples, clearExisting }),
+      },
+    );
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(`training-examples POST failed (${response.status}): ${message}`);
+    }
+    return (await response.json()) as { saved: number };
+  }
+
+  async deleteTrainingExample(
+    detectorId: string,
+    exampleId: string,
+  ): Promise<{ deleted: true }> {
+    const basePath = this.config.basePath.replace(/\/$/, "");
+    const response = await fetch(
+      `${basePath}/custom-detectors/${detectorId}/training-examples/${exampleId}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(`training-example DELETE failed (${response.status}): ${message}`);
+    }
+    return (await response.json()) as { deleted: true };
+  }
+
+  async clearTrainingExamples(detectorId: string): Promise<{ deleted: number }> {
+    const basePath = this.config.basePath.replace(/\/$/, "");
+    const response = await fetch(
+      `${basePath}/custom-detectors/${detectorId}/training-examples`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(`training-examples DELETE failed (${response.status}): ${message}`);
+    }
+    return (await response.json()) as { deleted: number };
   }
 
   async updateSchedule(

@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-cli"
-version = "0.2.34"
+version = "0.4.4"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -9,19 +9,19 @@ keywords = ["data", "metadata", "ingestion", "unstructured", "pii", "secrets"]
 dependencies = [
     "classifyre-schemas",
     "jsonschema>=4.26.0",
-    "pydantic>=2.12.5",
+    "pydantic>=2.13.4",
     "email-validator>=2.3.0",
-    "requests>=2.32.3",
+    "requests>=2.34.2",
     "en-core-web-sm",
     "beautifulsoup4>=4.12.0",
-    "lxml>=5.0.0",
+    "lxml>=6.1.1",
+    "sqlalchemy>=2.0.0,<3.0.0",
 ]
 
 [tool.uv.sources]
 # Local editable install for development — ignored when published to PyPI
 classifyre-schemas = { path = "../../packages/schemas", editable = true }
 en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
-de-core-news-lg = { url = "https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl" }
 
 [project.scripts]
 classifyre = "src.main:main"
@@ -35,86 +35,92 @@ packages = ["src"]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.8.0",
+    "ruff>=0.15.13",
     "mypy>=1.13.0",
-    "datamodel-code-generator>=0.45.0",
-    "pytest>=9.0.2",
+    "datamodel-code-generator>=0.57.0",
+    "pytest>=9.0.3",
     "pytest-asyncio>=0.24.0",
 ]
 privacy = [
-    "presidio-analyzer>=2.2.361",
-    "presidio-anonymizer>=2.2.361",
-    "spacy>=3.8.11",
-    "scrubadub>=2.0.1",
-    "phonenumbers>=9.0.25",
-    "pycanon>=1.1.0",
-    "commonregex>=1.5.4",
-    "pytesseract>=0.3.13",
-    "pillow>=12.1.1",
-    "de-core-news-lg",
+    "presidio-analyzer>=2.2.362",
+    "spacy>=3.8.14",
+    # phonenumbers 9.x introduced lazy region loading via __import__ which fails
+    # mid-run in frozen/venv contexts. 8.x eagerly loads all data at import time,
+    # avoiding ModuleNotFoundError during Presidio phone number analysis.
+    "phonenumbers>=8.13.0,<9.0.0",
+    "numpy>=1.26.0,<2.0.0",
 ]
 security = [
     "detect-secrets>=1.5.0",
     "bandit>=1.9.4",
     "yara-python>=4.5.4",
+]
+threat-ml = [
     "transformers>=4.50.0,<6.0.0",
-    "onnxruntime>=1.24.2",
-    "optimum[onnxruntime]>=2.1.0",
     "sentencepiece>=0.2.1",
-    "torch>=2.10.0",
+    "torch>=2.12.0",
 ]
 content = [
-    "detoxify>=0.5.2",
     "nudenet>=3.4.2",
     "transformers>=4.50.0,<6.0.0",
-    "onnxruntime>=1.24.2",
-    "torch>=2.10.0",
-    "pillow>=12.1.1",
+    "onnxruntime>=1.26.0",
+    "torch>=2.12.0",
+    "pillow>=12.2.0",
     "sentencepiece>=0.2.1",
 ]
 quality = [
-    "fast-langdetect>=1.0.0",
-    "datasketch>=1.9.0",
-    "sentence-transformers>=5.2.3",
+    "datasketch>=1.10.0",
+    "sentence-transformers>=5.5.0",
     "textstat>=0.7.13",
     "transformers>=4.50.0,<6.0.0",
-    "torch>=2.10.0",
+    "torch>=2.12.0",
     "sentencepiece>=0.2.1",
 ]
 classification = [
     "transformers>=4.50.0,<6.0.0",
-    "fast-langdetect>=1.0.0",
 ]
 custom = [
     "transformers>=4.50.0,<6.0.0",
-    "torch>=2.10.0",
+    "torch>=2.12.0",
+    "pillow>=12.2.0",
     "setfit>=1.1.3",
-    "datasets>=4.4.1",
+    "datasets>=4.8.5",
     "scikit-learn>=1.7.2",
-    "gliner>=0.2.22",
-    "sentence-transformers>=5.2.3",
+    "gliner2>=1.3.1",
+    "sentence-transformers>=5.5.0",
+]
+regex = [
+    "google-re2>=1.1",
 ]
 detectors = [
+    { include-group = "file-processing" },
     { include-group = "privacy" },
     { include-group = "security" },
+    { include-group = "threat-ml" },
     { include-group = "content" },
     { include-group = "quality" },
     { include-group = "classification" },
     { include-group = "custom" },
+    { include-group = "regex" },
 ]
 file-processing = [
     "filetype>=1.2.0",
     "pdfplumber>=0.11.9",
     "python-docx>=1.2.0",
     "openpyxl>=3.1.5",
-    "chardet>=5.2.0",
+    "chardet>=7.4.3",
     "pyarrow>=18.0.0",
 ]
+ocr = [
+    { include-group = "file-processing" },
+    "docling>=2.94.0",
+    "rapidocr-onnxruntime>=1.4.0",
+]
 postgresql = [
-    "psycopg2-binary>=2.9.9,<3.0.0",
+    "psycopg2-binary>=2.9.12,<3.0.0",
 ]
 mysql = [
-    "pymysql>=1.1.1,<2.0.0",
+    "pymysql>=1.2.0,<2.0.0",
 ]
 mssql = [
     "pymssql>=2.3.4,<3.0.0",
@@ -129,32 +135,41 @@ hive = [
     "pure-sasl>=0.6.2,<1.0.0",
 ]
 databricks = [
-    "databricks-sql-connector>=4.0.0,<5.0.0",
+    "databricks-sql-connector>=4.2.6,<5.0.0",
+    "pyarrow>=24.0.0",
 ]
 snowflake = [
-    "snowflake-connector-python>=4.0.0,<5.0.0",
+    "snowflake-connector-python>=4.5.0,<5.0.0",
 ]
 mongodb = [
-    "pymongo>=4.15.2,<5.0.0",
+    "pymongo>=4.17.0,<5.0.0",
+]
+neo4j = [
+    "neo4j>=5.0.0,<6.0.0",
 ]
 tableau = [
     "tableauserverclient>=0.38,<1.0.0",
 ]
 s3-compatible-storage = [
-    "boto3>=1.40.40,<2.0.0",
+    "boto3>=1.43.10,<2.0.0",
 ]
 azure-blob-storage = [
-    "azure-storage-blob>=12.26.0,<13.0.0",
-    "azure-identity>=1.25.1,<2.0.0",
+    "azure-storage-blob>=12.29.0,<13.0.0",
+    "azure-identity>=1.25.3,<2.0.0",
 ]
 google-cloud-storage = [
-    "google-cloud-storage>=3.4.0,<4.0.0",
+    "google-cloud-storage>=3.10.1,<4.0.0",
+]
+otel = [
+    "opentelemetry-sdk>=1.42.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.27.0",
 ]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
 src = ["src"]
+exclude = ["scripts/", "src/models/generated_*.py"]
 
 [tool.ruff.lint]
 select = [
@@ -201,7 +216,7 @@ disallow_any_generics = true
 no_implicit_optional = true
 show_error_codes = true
 plugins = ["pydantic.mypy"]
-exclude = ["scripts/"]
+exclude = ["scripts/", ".venv/"]
 
 [[tool.mypy.overrides]]
 module = ["jsonschema.*", "requests.*", "schemas.*"]
@@ -213,18 +228,22 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [
-    "detect_secrets.*",
+    "neo4j.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
     "cryptography.*",
     "presidio_analyzer.*",
-    "presidio_anonymizer.*",
     "spacy.*",
     "phonenumbers.*",
-    "detoxify.*",
     "transformers.*",
     "torch.*",
     "yara.*",
     "nudenet.*",
-    "fast_langdetect.*",
+    "detect_secrets.*",
+    "detect_secrets",
     "bandit.*",
     "datasketch.*",
     "sentence_transformers.*",
@@ -232,12 +251,40 @@ module = [
     "optimum.*",
     "onnxruntime.*",
     "timm.*",
+    "filetype.*",
+    "pdfplumber.*",
+    "docx.*",
+    "openpyxl.*",
+    "chardet.*",
+    "pyarrow.*",
+    "opentelemetry.*",
+    "PIL.*",
+    "gliner.*",
+    "gliner",
+    "datasets.*",
+    "datasets",
+    "setfit.*",
+    "setfit",
+    "sklearn.*",
+    "sklearn",
+    "numpy",
+    "numpy.*",
+    "tldextract",
+    "tldextract.*",
+    "re2",
+    "re2.*",
 ]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["filetype.*", "pdfplumber.*", "docx.*", "openpyxl.*", "chardet.*", "pyarrow.*"]
-ignore_missing_imports = true
+module = [
+    "src.detectors.*",
+    "src.models.detectors.*",
+    "src.sources.*",
+    "src.pipeline.*",
+    "src.utils.*",
+    "src.outputs.*",
+]
 
 [[tool.mypy.overrides]]
 module = [
@@ -246,12 +293,10 @@ module = [
     "src.models.generated_single_asset_scan_results",
     "scripts.*",
 ]
-# Generated files — suppress all mypy errors
 ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = ["tests.*"]
-# Tests don't need full strict typing
 ignore_errors = true
 
 [[tool.mypy.overrides]]
@@ -263,8 +308,7 @@ module = [
     "src.utils.*",
     "src.outputs.*",
 ]
-# Disable remaining false positives after pydantic plugin
-disable_error_code = ["call-arg", "assignment", "no-untyped-def", "no-untyped-call", "no-any-return", "union-attr", "attr-defined", "arg-type", "misc", "list-item", "comparison-overlap", "type-arg", "return-value", "dict-item", "unused-ignore"]
+disable_error_code = ["call-arg", "assignment", "no-untyped-def", "no-untyped-call", "no-any-return", "union-attr", "attr-defined", "arg-type", "misc", "list-item", "comparison-overlap", "type-arg", "return-value", "dict-item", "unused-ignore", "index", "union-attr", "method-assign", "import-not-found", "import-untyped"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

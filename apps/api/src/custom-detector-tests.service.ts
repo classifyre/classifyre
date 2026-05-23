@@ -137,8 +137,7 @@ export class CustomDetectorTestsService {
       id: string;
       key: string;
       name: string;
-      method: string;
-      config: unknown;
+      pipelineSchema: unknown;
       version: number;
     },
     scenario: { id: string; inputText: string; expectedOutcome: unknown },
@@ -147,31 +146,18 @@ export class CustomDetectorTestsService {
     const start = Date.now();
 
     try {
-      let actualOutput: Record<string, unknown>;
-
-      if (detector.method === 'RULESET') {
-        actualOutput = this.evaluateRuleset(
-          detector.config as Record<string, unknown>,
-          scenario.inputText,
-        );
-      } else {
-        actualOutput = await this.evaluateViaCli(
-          {
-            key: detector.key,
-            name: detector.name,
-            method: detector.method,
-            config: detector.config as Record<string, unknown>,
-          },
-          scenario.inputText,
-        );
-      }
+      const actualOutput = await this.evaluateViaCli(
+        {
+          key: detector.key,
+          name: detector.name,
+          pipelineSchema: detector.pipelineSchema as Record<string, unknown>,
+        },
+        scenario.inputText,
+      );
 
       const expected = scenario.expectedOutcome as Record<string, unknown>;
-      const status = this.compareOutcome(
-        detector.method,
-        expected,
-        actualOutput,
-      );
+      const schema = detector.pipelineSchema as Record<string, unknown>;
+      const status = this.compareOutcome(schema, expected, actualOutput);
 
       const result = await this.prisma.customDetectorTestResult.create({
         data: {
@@ -268,13 +254,11 @@ export class CustomDetectorTestsService {
     };
   }
 
-  // CLASSIFIER / ENTITY: write temp file and call CLI sandbox via K8s job or local process
   private async evaluateViaCli(
     detector: {
       key: string;
       name: string;
-      method: string;
-      config: Record<string, unknown>;
+      pipelineSchema: Record<string, unknown>;
     },
     inputText: string,
   ): Promise<Record<string, unknown>> {
@@ -298,17 +282,13 @@ export class CustomDetectorTestsService {
       await fs.mkdir(tmpDir, { recursive: true });
       await fs.writeFile(textFile, inputText, 'utf8');
 
-      // Use the same detectors.json format as the sandbox runner.
-      // CLI CustomDetectorConfig requires custom_detector_key, name, and method
-      // inside the `config` dict.
       const detectorEntry = {
         type: 'CUSTOM',
         enabled: true,
         config: {
-          ...detector.config,
           custom_detector_key: detector.key,
           name: detector.name,
-          method: detector.method,
+          pipeline_schema: detector.pipelineSchema,
         },
       };
       await fs.writeFile(
@@ -338,7 +318,10 @@ export class CustomDetectorTestsService {
           `uv run --locked --python ${shellEscape(venvPython)} ` +
           `python -m src.main sandbox ${shellEscape(textFile)} --detectors-file ${shellEscape(detectorsFile)}`;
 
-        const result = await execAsync(command, { timeout: 60_000 });
+        // Allow up to 3 min: first run installs optional dep groups + loads
+        // the model into memory, which can take 90–120 s on a cold start.
+        // Subsequent runs reuse the cached model and finish in ~10–15 s.
+        const result = await execAsync(command, { timeout: 180_000 });
         stdout = result.stdout;
       }
 
@@ -382,19 +365,23 @@ export class CustomDetectorTestsService {
       : '/app/cli';
   }
 
-  // Compare expected vs actual — returns PASS or FAIL
+  // Compare expected vs actual — returns PASS or FAIL.
+  // Dispatches on pipeline schema type; falls back to expected outcome shape.
   private compareOutcome(
-    method: string,
+    pipelineSchema: Record<string, unknown>,
     expected: Record<string, unknown>,
     actual: Record<string, unknown>,
   ): 'PASS' | 'FAIL' {
-    if (method === 'RULESET') {
+    const schemaType = (pipelineSchema.type as string | undefined) ?? '';
+
+    if (schemaType === 'REGEX') {
       const shouldMatch = Boolean(expected.shouldMatch);
       const didMatch = Boolean(actual.matched);
       return shouldMatch === didMatch ? 'PASS' : 'FAIL';
     }
 
-    if (method === 'CLASSIFIER') {
+    // For GLINER2 and unknown types: infer comparison from expected outcome shape.
+    if ('label' in expected) {
       const expectedLabel = (
         (expected.label as string | undefined) ?? ''
       ).toLowerCase();
@@ -404,14 +391,32 @@ export class CustomDetectorTestsService {
       const findings = Array.isArray(actual.findings) ? actual.findings : [];
       const hit = findings.some((f: unknown) => {
         const finding = f as Record<string, unknown>;
+        const metadata =
+          (finding.metadata as Record<string, unknown> | undefined) ?? {};
+
+        // finding_type uses the label_id with "class:" prefix, e.g.
+        // "class:european_country". Strip prefix and normalise underscores → spaces
+        // so it can be compared to the human-readable label ("european country").
         const rawType =
           (finding.finding_type as string | undefined) ??
           (finding.findingType as string | undefined) ??
           '';
-        // CLI prefixes CLASSIFIER finding types with "class:" (e.g. "class:sports").
-        // Strip it before comparing against the user-provided label.
-        const normalizedType = rawType.toLowerCase().replace(/^class:/, '');
-        const labelMatch = normalizedType === expectedLabel;
+        const normalizedType = rawType
+          .toLowerCase()
+          .replace(/^class:/, '')
+          .replace(/_/g, ' ');
+
+        // metadata.label_name carries the original human-readable label name
+        // (e.g. "European country"). Fall back to top-level label_name for
+        // older CLI output formats that emitted it there directly.
+        const labelName = (
+          (metadata.label_name as string | undefined) ??
+          (finding.label_name as string | undefined) ??
+          ''
+        ).toLowerCase();
+
+        const labelMatch =
+          normalizedType === expectedLabel || labelName === expectedLabel;
         const conf =
           typeof finding.confidence === 'number' ? finding.confidence : 1;
         return labelMatch && conf >= minConf;
@@ -420,7 +425,7 @@ export class CustomDetectorTestsService {
       return hit ? 'PASS' : 'FAIL';
     }
 
-    if (method === 'ENTITY') {
+    if ('entities' in expected) {
       const expectedEntities = Array.isArray(expected.entities)
         ? (expected.entities as Array<Record<string, unknown>>)
         : [];

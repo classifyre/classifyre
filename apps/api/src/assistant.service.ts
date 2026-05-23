@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
-import { CustomDetectorMethod } from '@prisma/client';
 import * as path from 'path';
 import {
   assistantChatRequestSchema,
@@ -784,12 +783,13 @@ function buildSystemPrompt(
         '  Example labels: [{"id":"advice","name":"Financial Advice"},{"id":"information","name":"Information"},{"id":"opinion","name":"Opinion"}]',
         '  classifier.training_examples items: { text (string), label (string) }',
         '',
-        'ENTITY — named span extraction (NER) via GLiNER. Multilingual.',
+        'ENTITY — named span extraction (NER) via GLiNER2. Multilingual and schema-driven.',
         '  Use when: you need to extract named spans: names, IBANs, phone numbers, addresses.',
         '  entity.entity_labels is a flat array of plain strings (the label names in English).',
         '  Example: ["PersonName","IBAN","PhoneNumber","Email"]',
+        '  Optional entity.entity_descriptions lets you explain labels to GLiNER2, e.g. { "IBAN": "bank account number" }.',
         '  NO "labels" field — the field is called entity_labels.',
-        '  entity.model (string, default "urchade/gliner_multi-v2.1") is optional.',
+        '  entity.model (string, default "fastino/gliner2-base-v1") is optional.',
         '',
         '## Key naming — ALWAYS derive from name, never leave as default',
         'The key must be a unique snake_case slug. Default "cust_detector" is a placeholder — ALWAYS replace it.',
@@ -810,6 +810,7 @@ function buildSystemPrompt(
         '  config.classifier.labels                       → [{id,name,description?}]  ← OBJECTS not strings',
         '  config.classifier.training_examples            → [{text,label}]',
         '  config.entity.entity_labels                    → ["string",...]  ← flat strings, field = entity_labels',
+        '  config.entity.entity_descriptions              → {"Label":"description",...}  ← optional GLiNER2 hints',
         '  config.confidence_threshold                    → number (0–1)',
         '  config.languages                               → ["de","en",...]',
         '',
@@ -856,7 +857,7 @@ function buildSystemPrompt(
                 '  description       → string (plain-language description)',
                 '  category          → string (e.g. "Security", "Privacy", "Compliance", "Content", "Operations")',
                 '  filterMapping     → object with optional arrays:',
-                '    filterMapping.detectorTypes   → string[] from: SECRETS, PII, TOXIC, NSFW, YARA, BROKEN_LINKS, PROMPT_INJECTION, PHISHING_URL, SPAM, LANGUAGE, CODE_SECURITY, PLAGIARISM, IMAGE_VIOLENCE, OCR_PII, DEID_SCORE, HATE_SPEECH, AI_GENERATED, CONTENT_QUALITY, BIAS, DUPLICATE, DOMAIN_CLASS, CONTENT_TYPE, SENSITIVITY_TIER, JURISDICTION_TAG, CUSTOM',
+                '    filterMapping.detectorTypes   → string[] from: SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM',
                 '    filterMapping.severities      → string[] from: CRITICAL, HIGH, MEDIUM, LOW, INFO',
                 '    filterMapping.statuses         → string[] from: OPEN, FALSE_POSITIVE, RESOLVED, IGNORED',
                 '    filterMapping.findingTypes     → string[] (free-form finding type strings)',
@@ -867,10 +868,9 @@ function buildSystemPrompt(
                 '## Translating business intent',
                 '  "I want to track exposed secrets and credentials" → detectorTypes: ["SECRETS"]',
                 '  "Show me personal data exposure" → detectorTypes: ["PII", "PHI"]',
-                '  "Track compliance issues" → detectorTypes: ["SENSITIVITY_TIER", "JURISDICTION_TAG"]',
                 '  "Show only critical issues" → severities: ["CRITICAL"]',
                 '  "Track unresolved problems" → statuses: ["OPEN"]',
-                '  "Content safety concerns" → detectorTypes: ["TOXIC", "NSFW", "BIAS"]',
+                '  "Content safety concerns" → detectorTypes: ["CUSTOM"]',
                 '',
                 '## Slug naming — ALWAYS derive from displayName',
                 'Rule: whenever you set displayName, IMMEDIATELY also set slug with a kebab-case version.',
@@ -1067,7 +1067,10 @@ function buildUpdateSourceArgs(context: AssistantPageContext) {
 
 function buildCreateDetectorArgs(context: AssistantPageContext) {
   const metadata = getAssistantMetadata(context);
-  const config = ensureRecord(metadata.config, 'context.metadata.config');
+  const pipelineSchema = ensureRecord(
+    metadata.pipeline_schema ?? metadata.pipelineSchema,
+    'context.metadata.pipeline_schema',
+  );
 
   return {
     name: ensureString(metadata.name, 'context.metadata.name'),
@@ -1077,9 +1080,8 @@ function buildCreateDetectorArgs(context: AssistantPageContext) {
       metadata.description.length > 0
         ? metadata.description
         : undefined,
-    method: ensureDetectorMethod(metadata.method, 'context.metadata.method'),
     isActive: typeof metadata.isActive === 'boolean' ? metadata.isActive : true,
-    config,
+    pipelineSchema,
   };
 }
 
@@ -1204,24 +1206,6 @@ function ensureString(value: unknown, label: string): string {
   }
 
   throw new BadRequestException(`${label} must be a non-empty string`);
-}
-
-function ensureDetectorMethod(
-  value: unknown,
-  label: string,
-): CustomDetectorMethod {
-  const normalized = ensureString(value, label).toUpperCase();
-  if (
-    normalized === CustomDetectorMethod.RULESET ||
-    normalized === CustomDetectorMethod.CLASSIFIER ||
-    normalized === CustomDetectorMethod.ENTITY
-  ) {
-    return normalized;
-  }
-
-  throw new BadRequestException(
-    `${label} must be one of RULESET, CLASSIFIER, ENTITY`,
-  );
 }
 
 function toDisplayString(value: unknown): string | null {

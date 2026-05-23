@@ -7,9 +7,8 @@
 Name | Type
 ------------ | -------------
 `name` | string
-`method` | string
 `description` | string
-`config` | { [key: string]: any; }
+`pipelineSchema` | { [key: string]: any; }
 
 ## Example
 
@@ -19,9 +18,8 @@ import type { CustomDetectorExampleDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "name": null,
-  "method": null,
   "description": null,
-  "config": null,
+  "pipelineSchema": null,
 } satisfies CustomDetectorExampleDto
 
 console.log(example)

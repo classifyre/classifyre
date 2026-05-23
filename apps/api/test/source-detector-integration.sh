@@ -54,8 +54,8 @@ else
     echo "Response: $RESPONSE"
 fi
 
-if echo "$RESPONSE" | jq -e '[.[].type] | contains(["SECRETS", "PII", "TOXIC", "NSFW", "YARA", "BROKEN_LINKS"])' > /dev/null; then
-    log_success "All detector types present (SECRETS, PII, TOXIC, NSFW, YARA, BROKEN_LINKS)"
+if echo "$RESPONSE" | jq -e '[.[].type] | contains(["SECRETS", "PII", "YARA", "BROKEN_LINKS", "CODE_SECURITY", "CUSTOM"])' > /dev/null; then
+    log_success "All detector types present (SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM)"
 else
     log_error "Missing detector types"
 fi
@@ -261,15 +261,14 @@ fi
 
 echo ""
 
-# Test 10: Add TOXIC and NSFW detectors
-log_test "10. Add TOXIC and NSFW detectors"
+# Test 10: Add CODE_SECURITY and CUSTOM detectors
+log_test "10. Add CODE_SECURITY and CUSTOM detectors"
 curl -s -X POST "$API_URL/sources/$SOURCE_ID/detectors" \
     -H "Content-Type: application/json" \
     -d '{
-        "detectorType": "TOXIC",
+        "detectorType": "CODE_SECURITY",
         "enabled": true,
         "config": {
-            "enabled_patterns": ["toxic", "threat"],
             "confidence_threshold": 0.75
         }
     }' > /dev/null
@@ -277,10 +276,20 @@ curl -s -X POST "$API_URL/sources/$SOURCE_ID/detectors" \
 curl -s -X POST "$API_URL/sources/$SOURCE_ID/detectors" \
     -H "Content-Type: application/json" \
     -d '{
-        "detectorType": "NSFW",
+        "detectorType": "CUSTOM",
         "enabled": true,
         "config": {
-            "confidence_threshold": 0.8
+            "custom_detector_key": "test-detector",
+            "name": "Test Detector",
+            "pipeline_schema": {
+                "type": "REGEX",
+                "patterns": {
+                    "test": {
+                        "pattern": "test",
+                        "description": "Test pattern"
+                    }
+                }
+            }
         }
     }' > /dev/null
 

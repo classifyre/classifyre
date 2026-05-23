@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.
+ * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -60,10 +60,10 @@ export interface CustomDetectorResponseDto {
     description?: string;
     /**
      * 
-     * @type {string}
+     * @type {{ [key: string]: any; }}
      * @memberof CustomDetectorResponseDto
      */
-    method: CustomDetectorResponseDtoMethodEnum;
+    pipelineSchema: { [key: string]: any; };
     /**
      * 
      * @type {boolean}
@@ -76,12 +76,6 @@ export interface CustomDetectorResponseDto {
      * @memberof CustomDetectorResponseDto
      */
     version: number;
-    /**
-     * 
-     * @type {{ [key: string]: any; }}
-     * @memberof CustomDetectorResponseDto
-     */
-    config: { [key: string]: any; };
     /**
      * 
      * @type {Date}
@@ -144,18 +138,6 @@ export interface CustomDetectorResponseDto {
     updatedAt: Date;
 }
 
-
-/**
- * @export
- */
-export const CustomDetectorResponseDtoMethodEnum = {
-    Ruleset: 'RULESET',
-    Classifier: 'CLASSIFIER',
-    Entity: 'ENTITY'
-} as const;
-export type CustomDetectorResponseDtoMethodEnum = typeof CustomDetectorResponseDtoMethodEnum[keyof typeof CustomDetectorResponseDtoMethodEnum];
-
-
 /**
  * Check if a given object implements the CustomDetectorResponseDto interface.
  */
@@ -163,10 +145,9 @@ export function instanceOfCustomDetectorResponseDto(value: object): value is Cus
     if (!('id' in value) || value['id'] === undefined) return false;
     if (!('key' in value) || value['key'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
-    if (!('method' in value) || value['method'] === undefined) return false;
+    if (!('pipelineSchema' in value) || value['pipelineSchema'] === undefined) return false;
     if (!('isActive' in value) || value['isActive'] === undefined) return false;
     if (!('version' in value) || value['version'] === undefined) return false;
-    if (!('config' in value) || value['config'] === undefined) return false;
     if (!('findingsCount' in value) || value['findingsCount'] === undefined) return false;
     if (!('sourcesUsingCount' in value) || value['sourcesUsingCount'] === undefined) return false;
     if (!('sourcesWithFindingsCount' in value) || value['sourcesWithFindingsCount'] === undefined) return false;
@@ -191,10 +172,9 @@ export function CustomDetectorResponseDtoFromJSONTyped(json: any, ignoreDiscrimi
         'key': json['key'],
         'name': json['name'],
         'description': json['description'] == null ? undefined : json['description'],
-        'method': json['method'],
+        'pipelineSchema': json['pipelineSchema'],
         'isActive': json['isActive'],
         'version': json['version'],
-        'config': json['config'],
         'lastTrainedAt': json['lastTrainedAt'] == null ? undefined : (new Date(json['lastTrainedAt'])),
         'lastTrainingSummary': json['lastTrainingSummary'] == null ? undefined : json['lastTrainingSummary'],
         'latestTrainingRun': json['latestTrainingRun'] == null ? undefined : CustomDetectorTrainingRunDtoFromJSON(json['latestTrainingRun']),
@@ -223,10 +203,9 @@ export function CustomDetectorResponseDtoToJSONTyped(value?: CustomDetectorRespo
         'key': value['key'],
         'name': value['name'],
         'description': value['description'],
-        'method': value['method'],
+        'pipelineSchema': value['pipelineSchema'],
         'isActive': value['isActive'],
         'version': value['version'],
-        'config': value['config'],
         'lastTrainedAt': value['lastTrainedAt'] == null ? value['lastTrainedAt'] : value['lastTrainedAt'].toISOString(),
         'lastTrainingSummary': value['lastTrainingSummary'],
         'latestTrainingRun': CustomDetectorTrainingRunDtoToJSON(value['latestTrainingRun']),

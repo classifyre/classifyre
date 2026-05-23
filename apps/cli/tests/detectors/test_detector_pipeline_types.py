@@ -22,8 +22,8 @@ class DummySource(BaseSource):
         """Test connection."""
         return {"status": "ok"}
 
-    async def extract(self):
-        """Extract assets."""
+    async def extract_raw(self):
+        """Extract raw assets."""
         yield []
 
     def generate_hash_id(self, asset_id: str) -> str:
@@ -112,76 +112,6 @@ class TestDetectorPipelineTypes:
         # Should be convertible to DetectorType enum
         assert DetectorType(detector.detector_type.upper()) == DetectorType.PII
 
-    def test_pipeline_from_recipe_toxic(self, mock_source):
-        """Test pipeline creation with TOXIC detector."""
-        try:
-            import torch
-
-            has_torch = hasattr(torch, "no_grad")
-        except ImportError:
-            has_torch = False
-
-        if not has_torch:
-            pytest.skip("PyTorch not installed, skipping toxic detector test")
-
-        recipe = {
-            "detectors": [
-                {
-                    "type": "TOXIC",
-                    "enabled": True,
-                    "config": {
-                        "enabled_patterns": ["toxicity", "threat"],
-                        "model_name": "unbiased",
-                        "confidence_threshold": 0.7,
-                    },
-                }
-            ]
-        }
-
-        pipeline = DetectorPipeline.from_recipe(recipe, source=mock_source, runner_id="test-runner")
-
-        if len(pipeline.detectors) == 0:
-            pytest.skip("YARA not installed, skipping yara pipeline test")
-
-        assert len(pipeline.detectors) == 1
-        detector = pipeline.detectors[0]
-        assert detector.detector_type == "toxic"
-        # Should be convertible to DetectorType enum
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.TOXIC
-
-    def test_pipeline_from_recipe_nsfw(self, mock_source):
-        """Test pipeline creation with NSFW detector."""
-        try:
-            import torch
-
-            has_torch = hasattr(torch, "no_grad")
-        except ImportError:
-            has_torch = False
-
-        if not has_torch:
-            pytest.skip("PyTorch not installed, skipping nsfw detector test")
-
-        recipe = {
-            "detectors": [
-                {
-                    "type": "NSFW",
-                    "enabled": True,
-                    "config": {
-                        "enabled_patterns": ["nsfw", "nsfw_explicit"],
-                        "confidence_threshold": 0.8,
-                    },
-                }
-            ]
-        }
-
-        pipeline = DetectorPipeline.from_recipe(recipe, source=mock_source, runner_id="test-runner")
-
-        assert len(pipeline.detectors) == 1
-        detector = pipeline.detectors[0]
-        assert detector.detector_type == "nsfw"
-        # Should be convertible to DetectorType enum
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.NSFW
-
     def test_pipeline_from_recipe_yara(self, mock_source):
         """Test pipeline creation with YARA detector."""
         if not self._is_dependency_available("yara"):
@@ -227,115 +157,6 @@ class TestDetectorPipelineTypes:
         assert detector.detector_type == "broken_links"
         assert DetectorType(detector.detector_type.upper()) == DetectorType.BROKEN_LINKS
 
-    def test_pipeline_from_recipe_prompt_injection(self, mock_source):
-        """Test pipeline creation with PROMPT_INJECTION detector."""
-        try:
-            import torch
-
-            has_torch = hasattr(torch, "no_grad")
-        except ImportError:
-            has_torch = False
-
-        if not has_torch or not self._is_dependency_available("transformers"):
-            pytest.skip("transformers/torch not installed, skipping prompt injection test")
-
-        recipe = {
-            "detectors": [
-                {
-                    "type": "PROMPT_INJECTION",
-                    "enabled": True,
-                    "config": {"confidence_threshold": 0.8},
-                }
-            ]
-        }
-
-        pipeline = DetectorPipeline.from_recipe(recipe, source=mock_source, runner_id="test-runner")
-
-        assert len(pipeline.detectors) == 1
-        detector = pipeline.detectors[0]
-        assert detector.detector_type == "prompt_injection"
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.PROMPT_INJECTION
-
-    def test_pipeline_from_recipe_phishing_url(self, mock_source):
-        """Test pipeline creation with PHISHING_URL detector."""
-        try:
-            import torch
-
-            has_torch = hasattr(torch, "no_grad")
-        except ImportError:
-            has_torch = False
-
-        if not has_torch or not self._is_dependency_available("transformers"):
-            pytest.skip("transformers/torch not installed, skipping phishing URL test")
-
-        recipe = {
-            "detectors": [
-                {
-                    "type": "PHISHING_URL",
-                    "enabled": True,
-                    "config": {"confidence_threshold": 0.8},
-                }
-            ]
-        }
-
-        pipeline = DetectorPipeline.from_recipe(recipe, source=mock_source, runner_id="test-runner")
-
-        assert len(pipeline.detectors) == 1
-        detector = pipeline.detectors[0]
-        assert detector.detector_type == "phishing_url"
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.PHISHING_URL
-
-    def test_pipeline_from_recipe_spam(self, mock_source):
-        """Test pipeline creation with SPAM detector."""
-        try:
-            import torch
-
-            has_torch = hasattr(torch, "no_grad")
-        except ImportError:
-            has_torch = False
-
-        if not has_torch or not self._is_dependency_available("transformers"):
-            pytest.skip("transformers/torch not installed, skipping spam test")
-
-        recipe = {
-            "detectors": [
-                {
-                    "type": "SPAM",
-                    "enabled": True,
-                    "config": {"confidence_threshold": 0.8},
-                }
-            ]
-        }
-
-        pipeline = DetectorPipeline.from_recipe(recipe, source=mock_source, runner_id="test-runner")
-
-        assert len(pipeline.detectors) == 1
-        detector = pipeline.detectors[0]
-        assert detector.detector_type == "spam"
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.SPAM
-
-    def test_pipeline_from_recipe_language(self, mock_source):
-        """Test pipeline creation with LANGUAGE detector."""
-        if not self._is_dependency_available("fast_langdetect"):
-            pytest.skip("fast-langdetect not installed, skipping language test")
-
-        recipe = {
-            "detectors": [
-                {
-                    "type": "LANGUAGE",
-                    "enabled": True,
-                    "config": {"confidence_threshold": 0.8},
-                }
-            ]
-        }
-
-        pipeline = DetectorPipeline.from_recipe(recipe, source=mock_source, runner_id="test-runner")
-
-        assert len(pipeline.detectors) == 1
-        detector = pipeline.detectors[0]
-        assert detector.detector_type == "language"
-        assert DetectorType(detector.detector_type.upper()) == DetectorType.LANGUAGE
-
     def test_pipeline_from_recipe_code_security(self, mock_source):
         """Test pipeline creation with CODE_SECURITY detector."""
         if not self._is_dependency_available("bandit"):
@@ -359,25 +180,23 @@ class TestDetectorPipelineTypes:
         assert DetectorType(detector.detector_type.upper()) == DetectorType.CODE_SECURITY
 
     def test_pipeline_from_recipe_custom_ruleset(self, mock_source):
-        """Test pipeline creation with CUSTOM detector."""
+        """Test pipeline creation with CUSTOM (REGEX) detector."""
         recipe = {
             "detectors": [
                 {
                     "type": "CUSTOM",
                     "enabled": True,
                     "config": {
-                        "custom_detector_key": "cust_pipeline_ruleset",
-                        "name": "Pipeline Custom",
-                        "method": "RULESET",
-                        "ruleset": {
-                            "keyword_rules": [
-                                {
-                                    "id": "kw_1",
-                                    "name": "Primary keywords",
-                                    "keywords": ["risk", "vertrag"],
+                        "custom_detector_key": "cust_pipeline_regex",
+                        "name": "Pipeline Custom Regex",
+                        "pipeline_schema": {
+                            "type": "REGEX",
+                            "patterns": {
+                                "keyword": {
+                                    "pattern": r"(?i)\b(?:risk|vertrag)\b",
+                                    "description": "Risk or contract keyword",
                                 }
-                            ],
-                            "regex_rules": [],
+                            },
                         },
                     },
                 }
@@ -391,6 +210,7 @@ class TestDetectorPipelineTypes:
         assert detector.detector_type == "custom"
         assert DetectorType(detector.detector_type.upper()) == DetectorType.CUSTOM
 
+    @pytest.mark.integration
     def test_pipeline_from_recipe_multiple_detectors(self, mock_source):
         """Test pipeline creation with multiple detector types."""
         if not (
@@ -501,14 +321,8 @@ class TestDetectorPipelineTypes:
         valid_types = [
             "SECRETS",
             "PII",
-            "TOXIC",
-            "NSFW",
             "YARA",
             "BROKEN_LINKS",
-            "PROMPT_INJECTION",
-            "PHISHING_URL",
-            "SPAM",
-            "LANGUAGE",
             "CODE_SECURITY",
             "CUSTOM",
         ]
