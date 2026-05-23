@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CalendarClock, RefreshCw } from "lucide-react";
+import { CalendarClock, RefreshCw, AlertCircle } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Switch } from "@workspace/ui/components/switch";
@@ -70,6 +70,7 @@ interface ScheduleCardProps {
   onSave?: (value: ScheduleValue) => Promise<void>;
   disabled?: boolean;
   className?: string;
+  error?: string;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -80,6 +81,7 @@ export function ScheduleCard({
   onSave,
   disabled,
   className,
+  error,
 }: ScheduleCardProps) {
   const { t } = useTranslation();
 
@@ -386,6 +388,12 @@ export function ScheduleCard({
           </Button>
         )}
       </div>
+      {error && (
+        <div className="flex items-center gap-1.5 px-3 py-2 rounded-[4px] bg-destructive/10 text-destructive text-[10px] font-mono">
+          <AlertCircle className="h-3 w-3 shrink-0" />
+          {error}
+        </div>
+      )}
     </div>
   );
 }

@@ -101,7 +101,7 @@ export function FindingExtractionCard({ findingId }: Props) {
             {entries.map(([field, value]) => (
               <div
                 key={field}
-                className="grid grid-cols-[160px_1fr] items-start gap-3 rounded-[4px] border border-black/10 px-3 py-2"
+                className="grid grid-cols-[160px_1fr] items-start gap-3 rounded-[4px] border border-border/10 px-3 py-2"
               >
                 <dt className="font-mono text-xs font-medium text-muted-foreground pt-0.5">
                   {field}

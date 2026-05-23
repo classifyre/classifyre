@@ -8,14 +8,14 @@ api:
 
   image:
     repository: classifyre/api
-    tag: "main"
+    tag: "feat-performance"
     pullPolicy: Always
 
   # API image defaults to /app/api, which is required for Prisma config discovery.
   startCommand: node dist/src/main.js
 
   env:
-    DEMO_MODE: "true"
+    DEMO_MODE: "false"
 
   autoscaling:
     enabled: false
@@ -26,7 +26,7 @@ api:
   cliJobs:
     image:
       repository: classifyre/cli
-      tag: "main"
+      tag: "feat-performance"
       pullPolicy: Always
     # Stamatatos06 / CLASSIFIER+ENTITY combos exhaust default 4Gi limit; bump to 6Gi.
     resources:
@@ -60,7 +60,7 @@ frontend:
 
   image:
     repository: classifyre/web
-    tag: "main"
+    tag: "feat-performance"
     pullPolicy: Always
 
   startCommand: node /app/apps/web/server.js

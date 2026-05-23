@@ -46,6 +46,7 @@ docs/FindingHistoryEntryDto.md
 docs/FindingLocationDto.md
 docs/FindingResponseDto.md
 docs/FindingsApi.md
+docs/FindingsBySeverityDto.md
 docs/FindingsChartsTimelineBucketDto.md
 docs/FindingsChartsTopAssetDto.md
 docs/FindingsChartsTotalsDto.md
@@ -75,10 +76,16 @@ docs/NotificationsApi.md
 docs/NotificationsControllerDeleteNotification200Response.md
 docs/NotificationsControllerMarkAllRead200Response.md
 docs/ParseTrainingExamplesResponseDto.md
+docs/ParseTrainingExamplesSkippedReasonsDto.md
 docs/ParsedTrainingExampleDto.md
 docs/QueryDashboardMetricsDto.md
 docs/QueryMetricDto.md
 docs/QueryMetricTimeSeriesDto.md
+docs/RegisterDiscoveredAssetsDto.md
+docs/RegisterDiscoveredAssetsResponseDto.md
+docs/RunnerAssetItemDto.md
+docs/RunnerAssetProgressDto.md
+docs/RunnerAssetStatusUpdateItem.md
 docs/RunnerDto.md
 docs/RunnerLogEntryDto.md
 docs/RunnerLogsResponseDto.md
@@ -89,6 +96,7 @@ docs/RunnersChartsTotalsDto.md
 docs/SandboxApi.md
 docs/SandboxRunDto.md
 docs/SandboxRunListResponseDto.md
+docs/SaveTrainingExamplesDto.md
 docs/SearchAssetFindingDto.md
 docs/SearchAssetItemDto.md
 docs/SearchAssetsChartsOptionsDto.md
@@ -112,6 +120,11 @@ docs/SearchFindingsPageDto.md
 docs/SearchFindingsRequestDto.md
 docs/SearchFindingsResponseDto.md
 docs/SearchRunnerItemDto.md
+docs/SearchRunnerLogsBodyDto.md
+docs/SearchRunnersAssetsFiltersInputDto.md
+docs/SearchRunnersAssetsPageDto.md
+docs/SearchRunnersAssetsRequestDto.md
+docs/SearchRunnersAssetsResponseDto.md
 docs/SearchRunnersChartsOptionsDto.md
 docs/SearchRunnersChartsRequestDto.md
 docs/SearchRunnersChartsResponseDto.md
@@ -138,6 +151,10 @@ docs/StartRunnerDto.md
 docs/StopRunnerResponseDto.md
 docs/TestConnectionResponseDto.md
 docs/TrainCustomDetectorDto.md
+docs/TrainingExampleDto.md
+docs/TrainingExampleItemDto.md
+docs/TrainingExamplesStatsDto.md
+docs/TrainingExamplesStatsDtoByLabelValue.md
 docs/UpdateAiProviderConfigDto.md
 docs/UpdateCustomDetectorDto.md
 docs/UpdateFindingDto.md
@@ -146,6 +163,7 @@ docs/UpdateInstanceSettingsDto.md
 docs/UpdateMcpTokenDto.md
 docs/UpdateMetricDefinitionDto.md
 docs/UpdateNotificationImportanceDto.md
+docs/UpdateRunnerAssetStatusDto.md
 docs/UpdateSourceDto.md
 package.json
 src/apis/AIApi.ts
@@ -204,6 +222,7 @@ src/models/FinalizeIngestRunDto.ts
 src/models/FindingHistoryEntryDto.ts
 src/models/FindingLocationDto.ts
 src/models/FindingResponseDto.ts
+src/models/FindingsBySeverityDto.ts
 src/models/FindingsChartsTimelineBucketDto.ts
 src/models/FindingsChartsTopAssetDto.ts
 src/models/FindingsChartsTotalsDto.ts
@@ -230,10 +249,16 @@ src/models/NotificationResponseDto.ts
 src/models/NotificationsControllerDeleteNotification200Response.ts
 src/models/NotificationsControllerMarkAllRead200Response.ts
 src/models/ParseTrainingExamplesResponseDto.ts
+src/models/ParseTrainingExamplesSkippedReasonsDto.ts
 src/models/ParsedTrainingExampleDto.ts
 src/models/QueryDashboardMetricsDto.ts
 src/models/QueryMetricDto.ts
 src/models/QueryMetricTimeSeriesDto.ts
+src/models/RegisterDiscoveredAssetsDto.ts
+src/models/RegisterDiscoveredAssetsResponseDto.ts
+src/models/RunnerAssetItemDto.ts
+src/models/RunnerAssetProgressDto.ts
+src/models/RunnerAssetStatusUpdateItem.ts
 src/models/RunnerDto.ts
 src/models/RunnerLogEntryDto.ts
 src/models/RunnerLogsResponseDto.ts
@@ -242,6 +267,7 @@ src/models/RunnersChartsTopSourceDto.ts
 src/models/RunnersChartsTotalsDto.ts
 src/models/SandboxRunDto.ts
 src/models/SandboxRunListResponseDto.ts
+src/models/SaveTrainingExamplesDto.ts
 src/models/SearchAssetFindingDto.ts
 src/models/SearchAssetItemDto.ts
 src/models/SearchAssetsChartsOptionsDto.ts
@@ -265,6 +291,11 @@ src/models/SearchFindingsPageDto.ts
 src/models/SearchFindingsRequestDto.ts
 src/models/SearchFindingsResponseDto.ts
 src/models/SearchRunnerItemDto.ts
+src/models/SearchRunnerLogsBodyDto.ts
+src/models/SearchRunnersAssetsFiltersInputDto.ts
+src/models/SearchRunnersAssetsPageDto.ts
+src/models/SearchRunnersAssetsRequestDto.ts
+src/models/SearchRunnersAssetsResponseDto.ts
 src/models/SearchRunnersChartsOptionsDto.ts
 src/models/SearchRunnersChartsRequestDto.ts
 src/models/SearchRunnersChartsResponseDto.ts
@@ -287,6 +318,10 @@ src/models/StartRunnerDto.ts
 src/models/StopRunnerResponseDto.ts
 src/models/TestConnectionResponseDto.ts
 src/models/TrainCustomDetectorDto.ts
+src/models/TrainingExampleDto.ts
+src/models/TrainingExampleItemDto.ts
+src/models/TrainingExamplesStatsDto.ts
+src/models/TrainingExamplesStatsDtoByLabelValue.ts
 src/models/UpdateAiProviderConfigDto.ts
 src/models/UpdateCustomDetectorDto.ts
 src/models/UpdateFindingDto.ts
@@ -295,6 +330,7 @@ src/models/UpdateInstanceSettingsDto.ts
 src/models/UpdateMcpTokenDto.ts
 src/models/UpdateMetricDefinitionDto.ts
 src/models/UpdateNotificationImportanceDto.ts
+src/models/UpdateRunnerAssetStatusDto.ts
 src/models/UpdateSourceDto.ts
 src/models/index.ts
 src/runtime.ts

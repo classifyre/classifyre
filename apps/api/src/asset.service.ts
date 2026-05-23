@@ -46,6 +46,7 @@ const findingForAssetSelect = {
   contextBefore: true,
   contextAfter: true,
   location: true,
+  metadata: true,
   status: true,
   resolutionReason: true,
   detectedAt: true,
@@ -75,6 +76,7 @@ type FindingForAssetListItem = Omit<
   | 'contextBefore'
   | 'contextAfter'
   | 'location'
+  | 'metadata'
   | 'resolutionReason'
   | 'firstDetectedAt'
   | 'lastDetectedAt'
@@ -92,6 +94,7 @@ type FindingForAssetListItem = Omit<
   contextBefore?: string;
   contextAfter?: string;
   location?: NormalizedFindingLocation;
+  metadata?: Record<string, unknown>;
   resolutionReason?: string;
   firstDetectedAt?: Date;
   lastDetectedAt?: Date;
@@ -874,6 +877,12 @@ export class AssetService {
         contextBefore: finding.contextBefore ?? undefined,
         contextAfter: finding.contextAfter ?? undefined,
         location: this.normalizeFindingLocation(finding.location),
+        metadata:
+          finding.metadata != null &&
+          typeof finding.metadata === 'object' &&
+          !Array.isArray(finding.metadata)
+            ? (finding.metadata as Record<string, unknown>)
+            : undefined,
         resolutionReason: finding.resolutionReason ?? undefined,
         firstDetectedAt: finding.firstDetectedAt ?? undefined,
         lastDetectedAt: finding.lastDetectedAt ?? undefined,
@@ -1202,9 +1211,12 @@ export class AssetService {
     assets: Record<string, any>[],
     options?: {
       finalizeRun?: boolean;
+      isFullScan?: boolean;
+      skipFindings?: boolean;
     },
   ) {
     const finalizeRun = options?.finalizeRun ?? true;
+    const skipFindings = options?.skipFindings ?? false;
     const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
 
     // Process in batches to avoid transaction timeout
@@ -1241,6 +1253,7 @@ export class AssetService {
         runnerId,
         source.type,
         existingAssetsMap,
+        skipFindings,
       );
 
       totalCreated += result.created;
@@ -1383,6 +1396,48 @@ export class AssetService {
           });
         }
 
+        // Resolve findings on assets that were scanned but whose findings
+        // were not re-detected. finding.runnerId is updated on create/re-detect,
+        // so a stale runnerId means the finding was absent from this run.
+        const staleFindings = await tx.finding.findMany({
+          where: {
+            sourceId,
+            status: FindingStatus.OPEN,
+            runnerId: { not: runnerId },
+            asset: {
+              runnerId,
+              status: { not: AssetStatus.DELETED },
+            },
+          },
+        });
+
+        for (const finding of staleFindings.filter(
+          (f) => !hasManualStatusOverride(f),
+        )) {
+          const currentHistory = Array.isArray(finding.history)
+            ? finding.history
+            : [];
+          await tx.finding.update({
+            where: { id: finding.id },
+            data: {
+              status: FindingStatus.RESOLVED,
+              runnerId,
+              resolvedAt: now,
+              resolutionReason: 'Detection no longer present in scan',
+              history: [
+                ...currentHistory,
+                {
+                  timestamp: now,
+                  runnerId,
+                  eventType: HistoryEventType.RESOLVED,
+                  status: FindingStatus.RESOLVED,
+                  changeReason: 'Detection no longer present in scan',
+                },
+              ],
+            },
+          });
+        }
+
         // Update runner stats with deleted count
         await tx.runner.update({
           where: { id: runnerId },
@@ -1401,6 +1456,7 @@ export class AssetService {
     runnerId: string,
     sourceType: AssetType,
     existingAssetsMap: Map<string, Asset>,
+    skipFindings: boolean = false,
   ): Promise<{
     created: number;
     updated: number;
@@ -1506,6 +1562,17 @@ export class AssetService {
           });
         }
 
+        // When streaming ingestion, stubs are sent before detector results.
+        // Skip all findings processing so existing findings are not resolved prematurely.
+        if (skipFindings) {
+          return {
+            created: assetsToCreate.length,
+            updated: assetsToUpdate.length,
+            unchanged: assetsUnchanged.length,
+            findings: 0,
+          };
+        }
+
         // Collect ALL scanned asset IDs — needed to resolve findings on assets
         // that were scanned clean (zero findings) in this batch.
         const allScannedAssetIds = new Set<string>();
@@ -1557,9 +1624,19 @@ export class AssetService {
                   contextBefore: finding.context_before || null,
                   contextAfter: finding.context_after || null,
                   location: finding.location || null,
+                  metadata: (() => {
+                    const raw = finding.metadata;
+                    if (!raw || typeof raw !== 'object') return null;
+                    const filtered = Object.fromEntries(
+                      Object.entries(raw as Record<string, unknown>).filter(
+                        ([k]) => k !== 'embedding',
+                      ),
+                    );
+                    return Object.keys(filtered).length > 0 ? filtered : null;
+                  })(),
                   detectedAt: new Date(finding.detected_at || Date.now()),
-                  extractedData: finding.extracted_data || null,
-                  extractionMethod: finding.extraction_method || null,
+                  pipelineResult:
+                    finding.pipeline_result || finding.extracted_data || null,
                 });
               }
             }
@@ -1631,7 +1708,7 @@ export class AssetService {
             // Strip extraction-only fields that don't belong on the Finding model
             const findingData = Object.fromEntries(
               Object.entries(detection as Record<string, unknown>).filter(
-                ([k]) => k !== 'extractedData' && k !== 'extractionMethod',
+                ([k]) => k !== 'pipelineResult',
               ),
             );
             toCreate.push({
@@ -1726,6 +1803,7 @@ export class AssetService {
                   contextBefore: detection.contextBefore,
                   contextAfter: detection.contextAfter,
                   location: detection.location,
+                  metadata: detection.metadata,
                   customDetectorId: detection.customDetectorId,
                   customDetectorKey: detection.customDetectorKey,
                   customDetectorName: detection.customDetectorName,
@@ -1763,6 +1841,7 @@ export class AssetService {
                   contextBefore: detection.contextBefore,
                   contextAfter: detection.contextAfter,
                   location: detection.location,
+                  metadata: detection.metadata,
                   customDetectorId: detection.customDetectorId,
                   customDetectorKey: detection.customDetectorKey,
                   customDetectorName: detection.customDetectorName,
@@ -1791,7 +1870,7 @@ export class AssetService {
         // We need to look up the finding IDs after createMany since Prisma doesn't return them
         const detectionsWithExtraction = Array.from(
           incomingDetections.values(),
-        ).filter((d) => d.extractedData != null && d.customDetectorKey);
+        ).filter((d) => d.pipelineResult != null && d.customDetectorKey);
         if (detectionsWithExtraction.length > 0) {
           const identities = detectionsWithExtraction.map(
             (d) => d.detectionIdentity,
@@ -1815,57 +1894,11 @@ export class AssetService {
               sourceId: detection.sourceId,
               assetId: detection.assetId,
               runnerId: detection.runnerId ?? null,
-              extractionMethod: detection.extractionMethod ?? 'UNKNOWN',
               detectorVersion: 1,
-              extractedData: detection.extractedData,
+              pipelineResult: detection.pipelineResult,
               extractedAt: detection.detectedAt ?? new Date(),
             });
           }
-        }
-
-        // Resolve findings not in current scan
-        const hasManualStatusOverride = (finding: any) => {
-          const history = Array.isArray(finding.history) ? finding.history : [];
-          const lastStatusChange = [...history]
-            .reverse()
-            .find(
-              (entry: any) =>
-                entry.eventType === HistoryEventType.STATUS_CHANGED,
-            );
-          return lastStatusChange
-            ? lastStatusChange.status !== FindingStatus.OPEN
-            : false;
-        };
-
-        const toResolve = Array.from(existingMap.values()).filter(
-          (f: any) =>
-            f.status === FindingStatus.OPEN && !hasManualStatusOverride(f),
-        );
-
-        for (const finding of toResolve) {
-          const currentHistory = Array.isArray(finding.history)
-            ? finding.history
-            : [];
-
-          await tx.finding.update({
-            where: { id: finding.id },
-            data: {
-              status: FindingStatus.RESOLVED,
-              runnerId,
-              resolvedAt: new Date(),
-              resolutionReason: 'Detection no longer present in scan',
-              history: [
-                ...currentHistory,
-                {
-                  timestamp: new Date(),
-                  runnerId,
-                  eventType: HistoryEventType.RESOLVED,
-                  status: FindingStatus.RESOLVED,
-                  changeReason: 'Detection no longer present in scan',
-                },
-              ],
-            },
-          });
         }
 
         return {

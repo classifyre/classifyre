@@ -1,0 +1,65 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# VPS overrides for otel-receiver — simple single-VPS deployment
+#   https://grafana.classifyre.com  →  NodePort 30300  →  Grafana :3000
+#   https://otel.classifyre.com     →  NodePort 30418  →  OTel Collector :4318
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Mimir distributed is too heavy for a single VPS (Kafka, 3 ingester zones, etc.)
+mimir-distributed:
+  enabled: false
+
+opentelemetry-collector:
+  service:
+    type: NodePort
+  ports:
+    otlp-http:
+      nodePort: 30418
+  # Remove Mimir from the metrics pipeline since mimir-distributed is disabled.
+  config:
+    exporters:
+      debug:
+        verbosity: basic
+      otlphttp/tempo:
+        endpoint: "http://otel-receiver-tempo:4318"
+      loki:
+        endpoint: "http://otel-receiver-loki-gateway:80/loki/api/v1/push"
+        headers:
+          X-Scope-OrgID: classifyre
+        default_labels_enabled:
+          exporter: false
+          job: true
+    service:
+      telemetry:
+        metrics:
+          address: "0.0.0.0:8888"
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, transform/pii, batch]
+          exporters: [debug, otlphttp/tempo]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [debug]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [debug, loki]
+
+promtail:
+  enabled: true
+  config:
+    clients:
+      - url: http://otel-receiver-loki-gateway/loki/api/v1/push
+
+grafana:
+  service:
+    type: NodePort
+    nodePort: 30300
+
+  grafana.ini:
+    server:
+      root_url: "https://grafana.classifyre.com/"
+    analytics:
+      reporting_enabled: false
+      check_for_updates: false

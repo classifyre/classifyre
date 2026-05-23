@@ -69,13 +69,18 @@ All URIs are relative to *http://localhost*
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerDelete**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerdelete) | **DELETE** /custom-detectors/{detectorId}/test-scenarios/{scenarioId} | 
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerList**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerlist) | **GET** /custom-detectors/{detectorId}/test-scenarios | 
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerRun**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerrun) | **POST** /custom-detectors/{detectorId}/test-scenarios/run | 
+*CustomDetectorsApi* | [**customDetectorsControllerClearTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollercleartrainingexamples) | **DELETE** /custom-detectors/{id}/training-examples | Delete all training examples for a detector
 *CustomDetectorsApi* | [**customDetectorsControllerCreate**](docs/CustomDetectorsApi.md#customdetectorscontrollercreate) | **POST** /custom-detectors | Create custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerDelete**](docs/CustomDetectorsApi.md#customdetectorscontrollerdelete) | **DELETE** /custom-detectors/{id} | Delete custom detector
+*CustomDetectorsApi* | [**customDetectorsControllerDeleteTrainingExample**](docs/CustomDetectorsApi.md#customdetectorscontrollerdeletetrainingexample) | **DELETE** /custom-detectors/{id}/training-examples/{exampleId} | Delete a single training example
 *CustomDetectorsApi* | [**customDetectorsControllerGetById**](docs/CustomDetectorsApi.md#customdetectorscontrollergetbyid) | **GET** /custom-detectors/{id} | Get custom detector by ID
 *CustomDetectorsApi* | [**customDetectorsControllerList**](docs/CustomDetectorsApi.md#customdetectorscontrollerlist) | **GET** /custom-detectors | List custom detectors
 *CustomDetectorsApi* | [**customDetectorsControllerListExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollerlistexamples) | **GET** /custom-detectors/examples | List custom detector starter examples
+*CustomDetectorsApi* | [**customDetectorsControllerListTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollerlisttrainingexamples) | **GET** /custom-detectors/{id}/training-examples | List stored training examples for a detector
 *CustomDetectorsApi* | [**customDetectorsControllerParseTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollerparsetrainingexamples) | **POST** /custom-detectors/training-examples/parse | Parse uploaded training examples file
+*CustomDetectorsApi* | [**customDetectorsControllerSaveTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollersavetrainingexamples) | **POST** /custom-detectors/{id}/training-examples | Save training examples for a detector
 *CustomDetectorsApi* | [**customDetectorsControllerTrain**](docs/CustomDetectorsApi.md#customdetectorscontrollertrain) | **POST** /custom-detectors/{id}/train | Trigger custom detector training
+*CustomDetectorsApi* | [**customDetectorsControllerTrainingExamplesStats**](docs/CustomDetectorsApi.md#customdetectorscontrollertrainingexamplesstats) | **GET** /custom-detectors/{id}/training-examples/stats | Get training example counts grouped by label
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingHistory**](docs/CustomDetectorsApi.md#customdetectorscontrollertraininghistory) | **GET** /custom-detectors/{id}/training-history | List training history for custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerUpdate**](docs/CustomDetectorsApi.md#customdetectorscontrollerupdate) | **PATCH** /custom-detectors/{id} | Update custom detector
 *FindingsApi* | [**findingsControllerBulkUpdate**](docs/FindingsApi.md#findingscontrollerbulkupdate) | **POST** /findings/bulk-update | Bulk update findings
@@ -104,12 +109,16 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**cliRunnerControllerCreateExternalRunner**](docs/RunnersApi.md#clirunnercontrollercreateexternalrunner) | **POST** /sources/{sourceId}/runners/external | Create runner record for external CLI REST ingestion
 *RunnersApi* | [**cliRunnerControllerDeleteRunner**](docs/RunnersApi.md#clirunnercontrollerdeleterunner) | **DELETE** /runners/{runnerId} | Delete runner metadata and cleanup filesystem logs for this runner
 *RunnersApi* | [**cliRunnerControllerGetRunner**](docs/RunnersApi.md#clirunnercontrollergetrunner) | **GET** /runners/{runnerId} | Get runner status and details
-*RunnersApi* | [**cliRunnerControllerGetRunnerLogs**](docs/RunnersApi.md#clirunnercontrollergetrunnerlogs) | **GET** /runners/{runnerId}/logs | Get paginated runner logs from filesystem storage (ordered oldest to newest)
+*RunnersApi* | [**cliRunnerControllerGetRunnerAssetProgress**](docs/RunnersApi.md#clirunnercontrollergetrunnerassetprogress) | **GET** /runners/{runnerId}/assets/progress | Get runner asset processing progress
 *RunnersApi* | [**cliRunnerControllerListRunners**](docs/RunnersApi.md#clirunnercontrollerlistrunners) | **GET** /runners | List all runners
 *RunnersApi* | [**cliRunnerControllerListSourceRunners**](docs/RunnersApi.md#clirunnercontrollerlistsourcerunners) | **GET** /sources/{sourceId}/runners | List runners for source
+*RunnersApi* | [**cliRunnerControllerRegisterDiscoveredAssets**](docs/RunnersApi.md#clirunnercontrollerregisterdiscoveredassets) | **POST** /runners/{runnerId}/assets/discover | Register discovered asset hashes for a runner
+*RunnersApi* | [**cliRunnerControllerSearchRunnerLogs**](docs/RunnersApi.md#clirunnercontrollersearchrunnerlogs) | **POST** /runners/{runnerId}/logs | Search runner logs with server-side filtering, full-text search, and sort
 *RunnersApi* | [**cliRunnerControllerStartRunner**](docs/RunnersApi.md#clirunnercontrollerstartrunner) | **POST** /sources/{sourceId}/run | Start CLI runner for source
 *RunnersApi* | [**cliRunnerControllerStopRunner**](docs/RunnersApi.md#clirunnercontrollerstoprunner) | **PATCH** /runners/{runnerId}/stop | Stop running CLI process
+*RunnersApi* | [**cliRunnerControllerUpdateRunnerAssetStatuses**](docs/RunnersApi.md#clirunnercontrollerupdaterunnerassetstatuses) | **PATCH** /runners/{runnerId}/assets/status | Update processing status of runner assets
 *RunnersApi* | [**cliRunnerControllerUpdateRunnerStatus**](docs/RunnersApi.md#clirunnercontrollerupdaterunnerstatusoperation) | **PATCH** /runners/{runnerId}/status | Update runner status
+*RunnersApi* | [**searchRunnersControllerSearchRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerassets) | **POST** /search/runner-assets | Search runner assets
 *RunnersApi* | [**searchRunnersControllerSearchRunners**](docs/RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners
 *RunnersApi* | [**searchRunnersControllerSearchRunnersCharts**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview
 *SandboxApi* | [**sandboxControllerCreateRun**](docs/SandboxApi.md#sandboxcontrollercreaterun) | **POST** /sandbox/runs | Upload a file and run detectors on it
@@ -187,6 +196,7 @@ All URIs are relative to *http://localhost*
 - [FindingHistoryEntryDto](docs/FindingHistoryEntryDto.md)
 - [FindingLocationDto](docs/FindingLocationDto.md)
 - [FindingResponseDto](docs/FindingResponseDto.md)
+- [FindingsBySeverityDto](docs/FindingsBySeverityDto.md)
 - [FindingsChartsTimelineBucketDto](docs/FindingsChartsTimelineBucketDto.md)
 - [FindingsChartsTopAssetDto](docs/FindingsChartsTopAssetDto.md)
 - [FindingsChartsTotalsDto](docs/FindingsChartsTotalsDto.md)
@@ -213,10 +223,16 @@ All URIs are relative to *http://localhost*
 - [NotificationsControllerDeleteNotification200Response](docs/NotificationsControllerDeleteNotification200Response.md)
 - [NotificationsControllerMarkAllRead200Response](docs/NotificationsControllerMarkAllRead200Response.md)
 - [ParseTrainingExamplesResponseDto](docs/ParseTrainingExamplesResponseDto.md)
+- [ParseTrainingExamplesSkippedReasonsDto](docs/ParseTrainingExamplesSkippedReasonsDto.md)
 - [ParsedTrainingExampleDto](docs/ParsedTrainingExampleDto.md)
 - [QueryDashboardMetricsDto](docs/QueryDashboardMetricsDto.md)
 - [QueryMetricDto](docs/QueryMetricDto.md)
 - [QueryMetricTimeSeriesDto](docs/QueryMetricTimeSeriesDto.md)
+- [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)
+- [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
+- [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
+- [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
+- [RunnerAssetStatusUpdateItem](docs/RunnerAssetStatusUpdateItem.md)
 - [RunnerDto](docs/RunnerDto.md)
 - [RunnerLogEntryDto](docs/RunnerLogEntryDto.md)
 - [RunnerLogsResponseDto](docs/RunnerLogsResponseDto.md)
@@ -225,6 +241,7 @@ All URIs are relative to *http://localhost*
 - [RunnersChartsTotalsDto](docs/RunnersChartsTotalsDto.md)
 - [SandboxRunDto](docs/SandboxRunDto.md)
 - [SandboxRunListResponseDto](docs/SandboxRunListResponseDto.md)
+- [SaveTrainingExamplesDto](docs/SaveTrainingExamplesDto.md)
 - [SearchAssetFindingDto](docs/SearchAssetFindingDto.md)
 - [SearchAssetItemDto](docs/SearchAssetItemDto.md)
 - [SearchAssetsChartsOptionsDto](docs/SearchAssetsChartsOptionsDto.md)
@@ -248,6 +265,11 @@ All URIs are relative to *http://localhost*
 - [SearchFindingsRequestDto](docs/SearchFindingsRequestDto.md)
 - [SearchFindingsResponseDto](docs/SearchFindingsResponseDto.md)
 - [SearchRunnerItemDto](docs/SearchRunnerItemDto.md)
+- [SearchRunnerLogsBodyDto](docs/SearchRunnerLogsBodyDto.md)
+- [SearchRunnersAssetsFiltersInputDto](docs/SearchRunnersAssetsFiltersInputDto.md)
+- [SearchRunnersAssetsPageDto](docs/SearchRunnersAssetsPageDto.md)
+- [SearchRunnersAssetsRequestDto](docs/SearchRunnersAssetsRequestDto.md)
+- [SearchRunnersAssetsResponseDto](docs/SearchRunnersAssetsResponseDto.md)
 - [SearchRunnersChartsOptionsDto](docs/SearchRunnersChartsOptionsDto.md)
 - [SearchRunnersChartsRequestDto](docs/SearchRunnersChartsRequestDto.md)
 - [SearchRunnersChartsResponseDto](docs/SearchRunnersChartsResponseDto.md)
@@ -270,6 +292,10 @@ All URIs are relative to *http://localhost*
 - [StopRunnerResponseDto](docs/StopRunnerResponseDto.md)
 - [TestConnectionResponseDto](docs/TestConnectionResponseDto.md)
 - [TrainCustomDetectorDto](docs/TrainCustomDetectorDto.md)
+- [TrainingExampleDto](docs/TrainingExampleDto.md)
+- [TrainingExampleItemDto](docs/TrainingExampleItemDto.md)
+- [TrainingExamplesStatsDto](docs/TrainingExamplesStatsDto.md)
+- [TrainingExamplesStatsDtoByLabelValue](docs/TrainingExamplesStatsDtoByLabelValue.md)
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
 - [UpdateFindingDto](docs/UpdateFindingDto.md)
@@ -278,6 +304,7 @@ All URIs are relative to *http://localhost*
 - [UpdateMcpTokenDto](docs/UpdateMcpTokenDto.md)
 - [UpdateMetricDefinitionDto](docs/UpdateMetricDefinitionDto.md)
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)
+- [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)
 
 ### Authorization

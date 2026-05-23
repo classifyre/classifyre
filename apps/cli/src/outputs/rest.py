@@ -26,6 +26,7 @@ class BulkIngestAssetsRequest(BaseModel):
     runner_id: str = Field(serialization_alias="runnerId")
     assets: list[dict[str, Any]]
     finalize_run: bool = Field(False, serialization_alias="finalizeRun")
+    skip_findings: bool = Field(False, serialization_alias="skipFindings")
 
 
 class FinalizeIngestRunRequest(BaseModel):
@@ -36,7 +37,10 @@ class FinalizeIngestRunRequest(BaseModel):
 
 
 class UpdateRunnerStatusRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     status: Literal["COMPLETED", "ERROR"]
+    error_message: str | None = Field(None, serialization_alias="errorMessage")
 
 
 class ExternalRunnerResponse(BaseModel):
@@ -83,7 +87,9 @@ class RestOutputSink:
     # Keep each bulk request well under Fastify's 50 MB bodyLimit
     _MAX_BATCH_BYTES = 20 * 1024 * 1024  # 20 MB
 
-    async def emit_batch(self, assets: list[dict[str, Any]]) -> None:
+    async def emit_batch(
+        self, assets: list[dict[str, Any]], *, skip_findings: bool = False
+    ) -> None:
         if not assets:
             return
 
@@ -101,6 +107,7 @@ class RestOutputSink:
                 runner_id=runner_id,
                 assets=cleaned_chunk,
                 finalize_run=False,
+                skip_findings=skip_findings,
             )
             self._request_json(
                 "POST",
@@ -155,12 +162,13 @@ class RestOutputSink:
         if not self._runner_id:
             return
 
+        error_message = f"{type(error).__name__}: {error}"
         try:
-            payload = UpdateRunnerStatusRequest(status="ERROR")
+            payload = UpdateRunnerStatusRequest(status="ERROR", error_message=error_message)
             self._request_json(
                 "PATCH",
                 f"/runners/{self._runner_id}/status",
-                payload.model_dump(mode="json"),
+                payload.model_dump(mode="json", by_alias=True, exclude_none=True),
             )
         except Exception as update_error:
             logger.warning(
@@ -168,6 +176,41 @@ class RestOutputSink:
                 error,
                 update_error,
             )
+
+    async def register_discovered_assets(self, hashes: list[str]) -> None:
+        runner_id = self._require_runner_id()
+        for i in range(0, len(hashes), 500):
+            chunk = hashes[i : i + 500]
+            self._request_json(
+                "POST",
+                f"/runners/{runner_id}/assets/discover",
+                {"assetHashes": chunk},
+            )
+
+    async def update_asset_status(
+        self,
+        asset_hash: str,
+        status: str,
+        error_message: str | None = None,
+        findings_total: int | None = None,
+        findings_by_severity: dict[str, int] | None = None,
+        findings_by_detector: dict[str, dict[str, int]] | None = None,
+    ) -> None:
+        runner_id = self._require_runner_id()
+        item: dict[str, Any] = {"assetHash": asset_hash, "status": status}
+        if error_message is not None:
+            item["errorMessage"] = error_message[:2000]
+        if findings_total is not None:
+            item["findingsTotal"] = findings_total
+        if findings_by_severity is not None:
+            item["findingsBySeverity"] = findings_by_severity
+        if findings_by_detector is not None:
+            item["findingsByDetector"] = findings_by_detector
+        self._request_json(
+            "PATCH",
+            f"/runners/{runner_id}/assets/status",
+            {"assets": [item]},
+        )
 
     def _require_source_id(self) -> str:
         source_id = self.context.source_id

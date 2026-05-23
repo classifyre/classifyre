@@ -30,10 +30,22 @@ import {
   CustomDetectorEditor,
   type CustomDetectorEditorSubmit,
 } from "@/components/custom-detector-editor";
+import { PipelineDetectorEditor } from "@/components/pipeline-detector-editor";
+import { RegexDetectorEditor } from "@/components/regex-detector-editor";
+import {
+  TransformerDetectorEditor,
+  type TransformerPipelineType,
+} from "@/components/transformer-detector-editor";
 import { CustomDetectorTrainingHistoryTable } from "@/components/custom-detector-training-history-table";
 import { CustomDetectorExtractionCoverage } from "@/components/custom-detector-extraction-coverage";
 import { formatDate } from "@/lib/date";
 import { useTranslation } from "@/hooks/use-translation";
+
+// The generated DTO is out-of-sync with the server — pipeline detectors carry
+// pipelineSchema rather than config/method. Extend locally until codegen is refreshed.
+type DetectorWithPipeline = CustomDetectorResponseDto & {
+  pipelineSchema?: Record<string, unknown>;
+};
 
 export default function CustomDetectorDetailsPage() {
   const router = useRouter();
@@ -46,7 +58,7 @@ export default function CustomDetectorDetailsPage() {
   const [isTraining, setIsTraining] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [detector, setDetector] = useState<CustomDetectorResponseDto | null>(
+  const [detector, setDetector] = useState<DetectorWithPipeline | null>(
     null,
   );
   const [history, setHistory] = useState<CustomDetectorTrainingRunDto[]>([]);
@@ -54,10 +66,15 @@ export default function CustomDetectorDetailsPage() {
   const load = useCallback(async () => {
     try {
       setIsLoading(true);
-      const detectorPayload = await api.getCustomDetector(detectorId);
+      const detectorPayload = await api.getCustomDetector(detectorId) as DetectorWithPipeline;
       setDetector(detectorPayload);
 
-      if (detectorPayload.method !== "RULESET") {
+      // Pipeline detectors get training history (except REGEX/transformer which have no training); legacy detectors skip it for RULESET.
+      const isPipeline = Boolean(detectorPayload.pipelineSchema && Object.keys(detectorPayload.pipelineSchema).length > 0);
+      const loadedType = (detectorPayload.pipelineSchema as Record<string, unknown>)?.type as string | undefined;
+      const isRegex = isPipeline && loadedType === "REGEX";
+      const isTransformer = isPipeline && !!loadedType && ["TEXT_CLASSIFICATION", "IMAGE_CLASSIFICATION", "FEATURE_EXTRACTION", "OBJECT_DETECTION"].includes(loadedType);
+      if (!isRegex && !isTransformer && (isPipeline || detectorPayload.method !== "RULESET")) {
         const historyPayload = await api.listCustomDetectorTrainingHistory(
           detectorId,
           50,
@@ -142,7 +159,19 @@ export default function CustomDetectorDetailsPage() {
     );
   }
 
+  const TRANSFORMER_PIPELINE_TYPES = new Set<string>([
+    "TEXT_CLASSIFICATION",
+    "IMAGE_CLASSIFICATION",
+    "FEATURE_EXTRACTION",
+    "OBJECT_DETECTION",
+  ]);
+
   const sourcesUsing = detector.sourcesUsing ?? [];
+  // Pipeline detectors (GLiNER2 / REGEX / LLM / transformer) carry pipelineSchema instead of config.
+  const isPipelineDetector = Boolean(detector.pipelineSchema && Object.keys(detector.pipelineSchema).length > 0);
+  const pipelineSchemaType = (detector.pipelineSchema as Record<string, unknown>)?.type as string | undefined;
+  const isRegexPipeline = isPipelineDetector && pipelineSchemaType === "REGEX";
+  const isTransformerPipeline = isPipelineDetector && !!pipelineSchemaType && TRANSFORMER_PIPELINE_TYPES.has(pipelineSchemaType);
 
   return (
     <div className="space-y-6">
@@ -156,12 +185,13 @@ export default function CustomDetectorDetailsPage() {
           {t("detectors.backToCustom")}
         </Button>
         <div className="flex items-center gap-2">
-          {detector.method !== "RULESET" && (
+          {!isRegexPipeline && !isTransformerPipeline && (isPipelineDetector || detector.method !== "RULESET") && (
             <Button
               variant="outline"
               size="sm"
               onClick={handleTrain}
               disabled={isTraining}
+              data-testid="btn-train-detector"
             >
               <Play className="h-4 w-4" />
               {isTraining ? t("common.training") : t("detectors.trainNow")}
@@ -169,8 +199,9 @@ export default function CustomDetectorDetailsPage() {
           )}
           <Button
             size="sm"
-            className="rounded-[4px] border-2 border-black bg-[#ff2b2b] text-white shadow-[3px_3px_0_#000] hover:bg-[#e62626]"
+            className="rounded-[4px] border-2 border-border bg-destructive text-white shadow-[3px_3px_0_var(--color-border)] hover:bg-destructive/90"
             onClick={() => setShowDeleteDialog(true)}
+            data-testid="btn-delete-detector"
           >
             <Trash2 className="h-4 w-4" />
             {t("common.delete")}
@@ -178,7 +209,7 @@ export default function CustomDetectorDetailsPage() {
         </div>
       </div>
 
-      <Card className="border-2 border-black rounded-[6px] shadow-[6px_6px_0_#000]">
+      <Card className="border-2 border-border rounded-[6px] shadow-[6px_6px_0_var(--color-border)]">
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -190,9 +221,9 @@ export default function CustomDetectorDetailsPage() {
           </div>
         </CardHeader>
         <CardContent
-          className={`grid gap-3 ${detector.method !== "RULESET" ? "md:grid-cols-3" : "md:grid-cols-2"}`}
+          className={`grid gap-3 ${(!isRegexPipeline && !isTransformerPipeline && (isPipelineDetector || detector.method !== "RULESET")) ? "md:grid-cols-3" : "md:grid-cols-2"}`}
         >
-          <div className="rounded-[4px] border border-black/20 p-3">
+          <div className="rounded-[4px] border border-border/20 p-3">
             <p className="text-xs text-muted-foreground mb-1">
               {t("detectors.sourcesUsing")}
             </p>
@@ -215,7 +246,7 @@ export default function CustomDetectorDetailsPage() {
               </ul>
             )}
           </div>
-          <div className="rounded-[4px] border border-black/20 p-3">
+          <div className="rounded-[4px] border border-border/20 p-3">
             <p className="text-xs text-muted-foreground">
               {t("detectors.sourcesWithFindings")}
             </p>
@@ -223,8 +254,8 @@ export default function CustomDetectorDetailsPage() {
               {detector.sourcesWithFindingsCount}
             </p>
           </div>
-          {detector.method !== "RULESET" && (
-            <div className="rounded-[4px] border border-black/20 p-3">
+          {!isRegexPipeline && !isTransformerPipeline && (isPipelineDetector || detector.method !== "RULESET") && (
+            <div className="rounded-[4px] border border-border/20 p-3">
               <p className="text-xs text-muted-foreground">
                 {t("detectors.lastTrained")}
               </p>
@@ -238,23 +269,116 @@ export default function CustomDetectorDetailsPage() {
         </CardContent>
       </Card>
 
-      <CustomDetectorEditor
-        mode="edit"
-        initialValue={{
-          id: detector.id,
-          name: detector.name,
-          key: detector.key,
-          description: detector.description ?? "",
-          method: detector.method,
-          isActive: detector.isActive,
-          config: detector.config,
-        }}
-        submitLabel={t("common.save")}
-        isSubmitting={isSaving}
-        onSubmit={handleSave}
-      />
+      {isPipelineDetector ? (
+        isTransformerPipeline ? (
+          <TransformerDetectorEditor
+            pipelineType={pipelineSchemaType as TransformerPipelineType}
+            mode="edit"
+            detectorId={detectorId}
+            submitLabel={t("common.save")}
+            isSubmitting={isSaving}
+            initialPipelineSchema={detector.pipelineSchema}
+            initialName={detector.name}
+            initialKey={detector.key}
+            initialDescription={detector.description ?? ""}
+            initialIsActive={detector.isActive}
+            onSubmit={async (payload) => {
+              try {
+                setIsSaving(true);
+                await api.updateCustomDetector(detectorId, {
+                  name: payload.name,
+                  key: payload.key,
+                  description: payload.description,
+                  isActive: payload.isActive,
+                  pipelineSchema: payload.pipelineSchema,
+                } as any);
+                toast.success(t("detectors.saved"));
+                await load();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : t("detectors.failedToSave"));
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+          />
+        ) : isRegexPipeline ? (
+          <RegexDetectorEditor
+            mode="edit"
+            detectorId={detectorId}
+            submitLabel={t("common.save")}
+            isSubmitting={isSaving}
+            initialPipelineSchema={detector.pipelineSchema}
+            initialName={detector.name}
+            initialKey={detector.key}
+            initialDescription={detector.description ?? ""}
+            onSubmit={async (payload) => {
+              try {
+                setIsSaving(true);
+                await api.updateCustomDetector(detectorId, {
+                  name: payload.name,
+                  key: payload.key,
+                  description: payload.description,
+                  isActive: payload.isActive,
+                  pipelineSchema: payload.pipelineSchema,
+                } as any);
+                toast.success(t("detectors.saved"));
+                await load();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : t("detectors.failedToSave"));
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+          />
+        ) : (
+          <PipelineDetectorEditor
+            mode="edit"
+            detectorId={detectorId}
+            submitLabel={t("common.save")}
+            isSubmitting={isSaving}
+            initialPipelineSchema={detector.pipelineSchema}
+            initialName={detector.name}
+            initialKey={detector.key}
+            initialDescription={detector.description ?? ""}
+            onSubmit={async (payload) => {
+              try {
+                setIsSaving(true);
+                await api.updateCustomDetector(detectorId, {
+                  name: payload.name,
+                  key: payload.key,
+                  description: payload.description,
+                  isActive: payload.isActive,
+                  pipelineSchema: payload.pipelineSchema,
+                } as any);
+                toast.success(t("detectors.saved"));
+                await load();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : t("detectors.failedToSave"));
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+          />
+        )
+      ) : (
+        <CustomDetectorEditor
+          mode="edit"
+          initialValue={{
+            id: detector.id,
+            name: detector.name,
+            key: detector.key,
+            description: detector.description ?? "",
+            method: detector.method,
+            isActive: detector.isActive,
+            config: detector.config,
+          }}
+          submitLabel={t("common.save")}
+          isSubmitting={isSaving}
+          onSubmit={handleSave}
+        />
+      )}
 
-      {Boolean(detector.config.extractor) && (
+      {Boolean(detector.config?.extractor) && (
         <section className="space-y-4">
           <h2 className="font-serif text-2xl font-black uppercase tracking-[0.06em]">
             {t("detectors.extractionTab")}
@@ -263,8 +387,8 @@ export default function CustomDetectorDetailsPage() {
         </section>
       )}
 
-      {detector.method !== "RULESET" && (
-        <section className="space-y-4">
+      {!isRegexPipeline && !isTransformerPipeline && (isPipelineDetector || detector.method !== "RULESET") && (
+        <section data-testid="training-history-section" className="space-y-4">
           <div>
             <h2 className="font-serif text-2xl font-black uppercase tracking-[0.06em]">
               {t("detectors.trainingHistoryTab")}
@@ -326,6 +450,7 @@ export default function CustomDetectorDetailsPage() {
               variant="destructive"
               onClick={handleDelete}
               disabled={isDeleting}
+              data-testid="btn-delete-detector-confirm"
             >
               {isDeleting
                 ? t("detectors.deleting")

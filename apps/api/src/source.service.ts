@@ -6,7 +6,11 @@ import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import { stableStringify } from './utils/masked-config.utils';
 import { normalizeSourceConfig } from './utils/source-config-normalizer';
 import { RunnerLogStorageService } from './cli-runner/runner-log-storage.service';
-import { SearchSourcesRequestDto } from './dto/search-sources-request.dto';
+import {
+  SearchSourcesRequestDto,
+  SearchSourcesSortBy,
+  SearchSourcesSortOrder,
+} from './dto/search-sources-request.dto';
 import {
   LatestRunnerSummaryDto,
   SearchSourceItemDto,
@@ -190,6 +194,10 @@ export class SourceService {
     const { filters, page } = request;
     const skip = page?.skip ?? 0;
     const limit = page?.limit ?? 25;
+    const sortBy = page?.sortBy ?? SearchSourcesSortBy.CREATED_AT;
+    const sortOrder = (
+      page?.sortOrder ?? SearchSourcesSortOrder.DESC
+    ).toLowerCase() as Prisma.SortOrder;
 
     const where: Prisma.SourceWhereInput = {};
 
@@ -205,12 +213,36 @@ export class SourceService {
       where.runnerStatus = { in: filters.status as any };
     }
 
+    const orderBy: Prisma.SourceOrderByWithRelationInput = {};
+    switch (sortBy) {
+      case SearchSourcesSortBy.NAME:
+        orderBy.name = sortOrder;
+        break;
+      case SearchSourcesSortBy.TYPE:
+        orderBy.type = sortOrder;
+        break;
+      case SearchSourcesSortBy.STATUS:
+        orderBy.runnerStatus = sortOrder;
+        break;
+      case SearchSourcesSortBy.CREATED_AT:
+        orderBy.createdAt = sortOrder;
+        break;
+      case SearchSourcesSortBy.UPDATED_AT:
+        orderBy.updatedAt = sortOrder;
+        break;
+      case SearchSourcesSortBy.LAST_RUN_AT:
+        orderBy.lastRunAt = sortOrder;
+        break;
+      default:
+        orderBy.createdAt = 'desc';
+    }
+
     const [sources, filteredTotal, allStatusGroups] = await Promise.all([
       this.prisma.source.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { updatedAt: 'desc' },
+        orderBy,
         include: {
           runners: {
             orderBy: { triggeredAt: 'desc' },

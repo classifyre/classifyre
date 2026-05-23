@@ -16,6 +16,7 @@ model Source {
   consecutiveFailures Int            @default(0) @map("consecutive_failures")
   lastRunStatus       RunnerStatus?  @map("last_run_status")
   lastRunAt           DateTime?      @map("last_run_at")
+  lastErrorMessage    String?        @map("last_error_message")
   createdAt           DateTime       @default(now()) @map("created_at")
   updatedAt           DateTime       @updatedAt @map("updated_at")
   currentRunnerId     String?        @map("current_runner_id")
@@ -85,6 +86,7 @@ model Finding {
   contextBefore     String?       @map("context_before") @db.Text
   contextAfter      String?       @map("context_after") @db.Text
   location          Json?         @db.JsonB
+  metadata          Json?         @db.JsonB
   customDetectorId  String?       @map("custom_detector_id")
   customDetectorKey String?       @map("custom_detector_key")
   customDetectorName String?      @map("custom_detector_name")
@@ -137,11 +139,8 @@ model CustomDetectorExtraction {
   assetId           String   @map("asset_id")
   runnerId          String?  @map("runner_id")
 
-  extractionMethod  String   @map("extraction_method")
   detectorVersion   Int      @default(1) @map("detector_version")
-  fieldCount        Int      @default(0) @map("field_count")
-  populatedFields   String[] @default([]) @map("populated_fields")
-  extractedData     Json     @db.JsonB @map("extracted_data")
+  pipelineResult    Json     @db.JsonB @map("pipeline_result")
 
   extractedAt       DateTime @map("extracted_at")
   createdAt         DateTime @default(now()) @map("created_at")
@@ -189,8 +188,7 @@ model CustomDetector {
   key                 String                      @unique
   name                String
   description         String?                     @db.Text
-  method              CustomDetectorMethod
-  config              Json                        @db.JsonB
+  pipelineSchema      Json                        @map("pipeline_schema") @db.JsonB
   isActive            Boolean                     @default(true) @map("is_active")
   version             Int                         @default(1)
   lastTrainedAt       DateTime?                   @map("last_trained_at")
@@ -201,12 +199,28 @@ model CustomDetector {
   findings            Finding[]
   feedback            CustomDetectorFeedback[]
   trainingRuns        CustomDetectorTrainingRun[]
+  trainingExamples    CustomDetectorTrainingExample[]
   extractions         CustomDetectorExtraction[]
   testScenarios       CustomDetectorTestScenario[]
 
-  @@index([method])
   @@index([isActive])
   @@map("custom_detectors")
+}
+
+model CustomDetectorTrainingExample {
+  id               String   @id @default(uuid())
+  customDetectorId String   @map("custom_detector_id")
+  label            String
+  text             String   @db.Text
+  value            String?  @db.Text
+  accepted         Boolean  @default(true)
+  source           String?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  customDetector CustomDetector @relation(fields: [customDetectorId], references: [id], onDelete: Cascade)
+
+  @@index([customDetectorId, label])
+  @@map("custom_detector_training_examples")
 }
 
 model CustomDetectorTrainingRun {
@@ -292,6 +306,7 @@ model Runner {
   assetsUnchanged Int          @default(0) @map("assets_unchanged")
   assetsDeleted   Int          @default(0) @map("assets_deleted")
   assets          Asset[]
+  runnerAssets    RunnerAsset[]
   source          Source       @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   notifications   Notification[]
 
@@ -300,6 +315,25 @@ model Runner {
   @@index([status])
   @@index([triggeredAt])
   @@map("runners")
+}
+
+model RunnerAsset {
+  runnerId         String            @map("runner_id")
+  assetHash        String            @map("asset_hash")
+  status           RunnerAssetStatus @default(PENDING)
+  startedAt        DateTime?         @map("started_at")
+  completedAt      DateTime?         @map("completed_at")
+  errorMessage     String?           @map("error_message") @db.Text
+  findingsTotal      Int?  @map("findings_total")
+  findingsBySeverity Json? @map("findings_by_severity")
+  findingsByDetector Json? @map("findings_by_detector")
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
+
+  @@id([runnerId, assetHash])
+  @@index([runnerId, status])
+  @@map("runner_assets")
 }
 
 model Notification {
@@ -412,6 +446,8 @@ enum AssetType {
   DATABRICKS
   SNOWFLAKE
   MONGODB
+  NEO4J
+  SQLITE
   POWERBI
   TABLEAU
   CUSTOM
@@ -421,6 +457,7 @@ enum RunnerStatus {
   PENDING
   RUNNING
   COMPLETED
+  WARNING
   ERROR
 }
 
@@ -457,35 +494,10 @@ enum InstanceTimeFormat {
 enum DetectorType {
   SECRETS
   PII
-  TOXIC
-  NSFW
   YARA
   BROKEN_LINKS
-  PROMPT_INJECTION
-  PHISHING_URL
-  SPAM
-  LANGUAGE
   CODE_SECURITY
-  PLAGIARISM
-  IMAGE_VIOLENCE
-  OCR_PII
-  DEID_SCORE
-  HATE_SPEECH
-  AI_GENERATED
-  CONTENT_QUALITY
-  BIAS
-  DUPLICATE
-  DOMAIN_CLASS
-  CONTENT_TYPE
-  SENSITIVITY_TIER
-  JURISDICTION_TAG
   CUSTOM
-}
-
-enum CustomDetectorMethod {
-  RULESET
-  CLASSIFIER
-  ENTITY
 }
 
 enum CustomDetectorTrainingStatus {
@@ -527,6 +539,13 @@ enum AssetStatus {
   UPDATED
   UNCHANGED
   DELETED
+}
+
+enum RunnerAssetStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  ERROR
 }
 
 enum AssetContentType {

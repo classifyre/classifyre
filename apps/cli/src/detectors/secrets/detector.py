@@ -1,185 +1,396 @@
-"""Secrets detector using detect-secrets library."""
+"""Secrets detector powered by the detect-secrets library.
 
+Operates entirely in-memory: splits text into lines and invokes each enabled
+plugin's ``analyze_line`` directly.  No temp files, no global Settings state,
+and no ``SecretsCollection`` needed.
+"""
+
+import asyncio
+import importlib
 import logging
+import pkgutil
+from typing import Any
 
-from ...models.generated_detectors import DetectorConfig, Severity
+from ...models.generated_detectors import DetectorConfig, SecretsDetectorConfig, Severity
 from ...models.generated_single_asset_scan_results import DetectionResult, DetectorType, Location
 from ..base import BaseDetector
 from ..dependencies import MissingDependencyError, require_module
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Lazy plugin discovery
+# ---------------------------------------------------------------------------
+# detect-secrets is an optional dependency (security group).  We must NOT
+# touch the package at module-import time because the CLI auto-installs it
+# lazily when the detector is instantiated.  _discover_plugins() is therefore
+# deferred until the first call to _build_plugins().
+# ---------------------------------------------------------------------------
+
+# Mutable container avoids the need for the ``global`` keyword.
+_plugin_cache: dict[str, Any] = {"_loaded": False}
+
+
+def _discover_plugins() -> dict[str, tuple[str, str]]:
+    """Return {pattern_key: (module_path, class_name)} by scanning detect_secrets.plugins."""
+    import detect_secrets.plugins
+
+    # Build {class_name -> module_path} from the installed package
+    class_to_mod: dict[str, str] = {}
+    for _, mod_name, is_pkg in pkgutil.iter_modules(detect_secrets.plugins.__path__):
+        if is_pkg or mod_name == "base":
+            continue
+        full_mod = f"detect_secrets.plugins.{mod_name}"
+        try:
+            mod = importlib.import_module(full_mod)
+            for name in dir(mod):
+                obj = getattr(mod, name)
+                if isinstance(obj, type) and obj.__module__ == full_mod:
+                    class_to_mod[name] = full_mod
+        except Exception:
+            continue
+
+    _pattern_to_class: dict[str, str] = {
+        "artifactory": "ArtifactoryDetector",
+        "aws": "AWSKeyDetector",
+        "azure_storage": "AzureStorageKeyDetector",
+        "basic_auth": "BasicAuthDetector",
+        "cloudant": "CloudantDetector",
+        "discord": "DiscordBotTokenDetector",
+        "github": "GitHubTokenDetector",
+        "gitlab": "GitLabTokenDetector",
+        "high_entropy_base64": "Base64HighEntropyString",
+        "high_entropy_hex": "HexHighEntropyString",
+        "ibm_cloud_iam": "IbmCloudIamDetector",
+        "ibm_cos_hmac": "IbmCosHmacDetector",
+        "ip_public": "IPPublicDetector",
+        "jwt": "JwtTokenDetector",
+        "keyword": "KeywordDetector",
+        "mailchimp": "MailchimpDetector",
+        "npm": "NpmDetector",
+        "openai": "OpenAIDetector",
+        "private_key": "PrivateKeyDetector",
+        "pypi": "PypiTokenDetector",
+        "sendgrid": "SendGridDetector",
+        "slack": "SlackDetector",
+        "softlayer": "SoftlayerDetector",
+        "square_oauth": "SquareOAuthDetector",
+        "stripe": "StripeDetector",
+        "telegram": "TelegramBotTokenDetector",
+        "twilio": "TwilioKeyDetector",
+    }
+
+    specs: dict[str, tuple[str, str]] = {}
+    for key, cls_name in _pattern_to_class.items():
+        mod = class_to_mod.get(cls_name)
+        if mod:
+            specs[key] = (mod, cls_name)
+        else:
+            logger.warning(
+                "Plugin class '%s' not found in installed detect-secrets; "
+                "pattern '%s' will be skipped",
+                cls_name,
+                key,
+            )
+    return specs
+
+
+def _get_plugin_specs() -> dict[str, tuple[str, str]]:
+    """Lazy accessor for plugin specs (populated on first call)."""
+    if not _plugin_cache["_loaded"]:
+        _plugin_cache["specs"] = _discover_plugins()
+        _plugin_cache["defaults"] = list(_plugin_cache["specs"].keys())
+        _plugin_cache["_loaded"] = True
+    return _plugin_cache["specs"]
+
+
+# Severity classification by keywords in detect-secrets finding type (lowercased).
+_SEVERITY_RULES: list[tuple[Severity, list[str]]] = [
+    (
+        Severity.critical,
+        [
+            "aws",
+            "private key",
+            "github",
+            "gitlab",
+            "slack",
+            "stripe",
+            "azure storage",
+            "google oauth",
+            "openai",
+        ],
+    ),
+    (
+        Severity.high,
+        [
+            "artifactory",
+            "basic auth",
+            "cloudant",
+            "discord",
+            "ibm",
+            "json web token",
+            "mailchimp",
+            "npm",
+            "pypi",
+            "sendgrid",
+            "softlayer",
+            "square",
+            "telegram",
+            "twilio",
+        ],
+    ),
+    (Severity.medium, ["entropy", "keyword", "ip public"]),
+]
+
+_SEVERITY_RANK: dict[Severity, int] = {
+    Severity.info: 0,
+    Severity.low: 1,
+    Severity.medium: 2,
+    Severity.high: 3,
+    Severity.critical: 4,
+}
+
+# Confidence by keywords in detect-secrets finding type (lowercased).
+_CONFIDENCE_RULES: list[tuple[float, list[str]]] = [
+    (
+        0.95,
+        [
+            "aws",
+            "github",
+            "gitlab",
+            "private key",
+            "slack",
+            "stripe",
+            "azure storage",
+            "openai",
+            "pypi",
+        ],
+    ),
+    (
+        0.85,
+        [
+            "artifactory",
+            "basic auth",
+            "cloudant",
+            "discord",
+            "ibm",
+            "mailchimp",
+            "npm",
+            "sendgrid",
+            "softlayer",
+            "square",
+            "telegram",
+            "twilio",
+        ],
+    ),
+    (0.80, ["json web token"]),
+    (0.75, ["entropy"]),
+    (0.70, ["keyword", "ip public"]),
+]
+
 
 class SecretsDetector(BaseDetector):
-    """
-    Detector for secrets and credentials using detect-secrets.
+    """Secrets detector backed by the detect-secrets library.
 
-    Detects various types of secrets including:
-    - AWS credentials
-    - GitHub tokens
-    - Private keys
-    - Slack tokens
-    - Stripe API keys
-    - Generic API keys and passwords
+    Each enabled plugin is imported and instantiated directly.  Text is scanned
+    line-by-line in memory via ``analyze_line`` -- no temp files, no global
+    Settings state, and no async locking required.
     """
 
     detector_type = "secrets"
     detector_name = "secrets"
 
     def __init__(self, config: DetectorConfig | None = None):
-        """Initialize secrets detector with detect-secrets."""
         super().__init__(config)
-
+        self._cfg: SecretsDetectorConfig = (
+            config if isinstance(config, SecretsDetectorConfig) else SecretsDetectorConfig()
+        )
+        # Fail fast at construction time if detect-secrets is not installed.
         try:
-            util_module = require_module(
-                "detect_secrets.core.plugins.util",
-                "secrets",
-                ["security", "detectors"],
-            )
-            get_mapping_from_secret_type_to_class = (
-                util_module.get_mapping_from_secret_type_to_class
-            )
-
-            # Initialize plugins
-            all_plugins = get_mapping_from_secret_type_to_class()
+            require_module("detect_secrets", "secrets", ["security", "detectors"])
         except MissingDependencyError:
             raise
 
-        # Only enable high-confidence, specific plugins (not generic entropy-based ones)
-        # This reduces false positives significantly
-        preferred_plugins = [
-            "AWSKeyDetector",
-            "PrivateKeyDetector",
-            "SlackDetector",
-            "StripeDetector",
-            "GitHubTokenDetector",
-            "ArtifactoryDetector",
-            "AzureStorageKeyDetector",
-            "BasicAuthDetector",
-            "CloudantDetector",
-            "DiscordBotTokenDetector",
-            "GitLabTokenDetector",
-            "GoogleApiKeyDetector",
-            "IBMCloudIamDetector",
-            "IBMCosHmacDetector",
-            "IPPublicDetector",
-            "JwtTokenDetector",
-            "MailchimpDetector",
-            "NpmDetector",
-            "SendGridDetector",
-            "SoftlayerDetector",
-            "SquareOAuthDetector",
-            "TwilioKeyDetector",
-        ]
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
 
-        # Create enabled plugins list
-        self._enabled_plugins = []
-        for plugin_class in all_plugins.values():
-            # Only enable specific, high-confidence plugins
-            if plugin_class.__name__ in preferred_plugins:
-                try:
-                    self._enabled_plugins.append(plugin_class())  # type: ignore[misc]
-                    logger.debug(f"Enabled plugin: {plugin_class.__name__}")
-                except Exception as e:
-                    logger.warning(f"Failed to initialize plugin {plugin_class.__name__}: {e}")
+    def _enabled_pattern_names(self) -> list[str]:
+        """Return the list of pattern string keys to activate."""
+        specs = _get_plugin_specs()
+        defaults = list(specs.keys())
 
-    async def detect(self, content: str, content_type: str = "text/plain") -> list[DetectionResult]:
-        """
-        Detect secrets in content using detect-secrets.
+        raw = self._cfg.enabled_patterns
+        if raw is None:
+            return defaults
 
-        Args:
-            content: Text content to scan
-            content_type: MIME type (must be text-based)
+        # Unwrap Pydantic RootModel
+        items = raw.root if hasattr(raw, "root") else raw
+        if not items:
+            return defaults
 
-        Returns:
-            List of detection results for found secrets
-        """
+        names: list[str] = []
+        for item in items:
+            # item may be a str or a SecretsEnabledPattern enum member
+            name = item.value if hasattr(item, "value") else str(item)
+            if name in specs:
+                names.append(name)
+            else:
+                logger.warning("Unknown secrets pattern '%s' ignored", name)
+        return names
+
+    def _build_plugins(self) -> list[Any]:
+        """Import and instantiate each enabled detect-secrets plugin."""
+        specs = _get_plugin_specs()
+        names = self._enabled_pattern_names()
+        plugins: list[Any] = []
+
+        for name in names:
+            mod_path, cls_name = specs[name]
+            try:
+                mod = importlib.import_module(mod_path)
+                cls = getattr(mod, cls_name)
+            except Exception as exc:
+                logger.warning("Failed to import plugin '%s' from %s: %s", cls_name, mod_path, exc)
+                continue
+
+            kwargs: dict[str, Any] = {}
+            if name == "high_entropy_base64":
+                limit = self._cfg.entropy_limit_base64
+                if limit is not None:
+                    kwargs["limit"] = float(limit.root if hasattr(limit, "root") else limit)
+            elif name == "high_entropy_hex":
+                limit = self._cfg.entropy_limit_hex
+                if limit is not None:
+                    kwargs["limit"] = float(limit.root if hasattr(limit, "root") else limit)
+
+            try:
+                plugin = cls(**kwargs)
+                plugins.append(plugin)
+                logger.debug("Initialized secrets plugin: %s", cls_name)
+            except Exception as exc:
+                logger.warning("Failed to instantiate plugin '%s': %s", cls_name, exc)
+
+        return plugins
+
+    @classmethod
+    def _get_severity(cls, secret_type: str) -> Severity:
+        t = secret_type.lower()
+        for severity, keywords in _SEVERITY_RULES:
+            if any(kw in t for kw in keywords):
+                return severity
+        return Severity.high
+
+    @classmethod
+    def _get_confidence(cls, secret_type: str) -> float:
+        t = secret_type.lower()
+        for confidence, keywords in _CONFIDENCE_RULES:
+            if any(kw in t for kw in keywords):
+                return confidence
+        return 0.85
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
+        if isinstance(content, bytes):
+            try:
+                content = content.decode("utf-8", errors="replace")
+            except Exception:
+                logger.warning(
+                    "Secrets detector received non-decodable binary content (%d bytes) and cannot scan it",
+                    len(content),
+                )
+                return []
+        return await asyncio.to_thread(self._detect_sync, content)
+
+    def _detect_sync(self, content: str) -> list[DetectionResult]:
+        plugins = self._build_plugins()
+        if not plugins:
+            return []
+
+        lines = content.splitlines()
+        confidence_threshold: float = self._cfg.confidence_threshold or 0.7
+        severity_threshold = self._cfg.severity_threshold
+        min_severity_rank = _SEVERITY_RANK.get(severity_threshold, 0) if severity_threshold else 0
         results: list[DetectionResult] = []
 
-        try:
-            # Scan content line by line with all plugins
-            lines = content.split("\n")
-
-            for line_num, line in enumerate(lines, 1):
-                # Skip empty lines
-                if not line.strip():
+        for line_number, line_text in enumerate(lines, start=1):
+            for plugin in plugins:
+                try:
+                    secrets = plugin.analyze_line(
+                        filename="<inline>",
+                        line=line_text,
+                        line_number=line_number,
+                    )
+                except Exception as exc:
+                    logger.debug(
+                        "Plugin %s failed on line %d: %s",
+                        plugin.__class__.__name__,
+                        line_number,
+                        exc,
+                    )
                     continue
 
-                # Scan with each plugin
-                for plugin in self._enabled_plugins:
+                for secret in secrets:
                     try:
-                        # Analyze the line with the plugin
-                        plugin_results = plugin.analyze_line(
-                            filename="<string>",
-                            line=line,
-                            line_number=line_num,
+                        secret_type = str(secret.type) if secret.type else ""
+                        secret_value = (
+                            str(secret.secret_value) if secret.secret_value is not None else ""
                         )
-
-                        # Process results from this plugin
-                        for secret in plugin_results:
-                            # Calculate character offset in the full content
-                            offset = sum(len(lines[i]) + 1 for i in range(line_num - 1))
-
-                            # Extract the matched content
-                            # Try to get the actual secret value
-                            matched_content = line.strip()
-
-                            # Try to extract just the secret value if there's an = sign
-                            if "=" in line:
-                                parts = line.split("=", 1)
-                                if len(parts) == 2:
-                                    matched_content = parts[1].strip().strip('"').strip("'")
-
-                            # Calculate start/end positions
-                            start = offset
-                            if matched_content in line:
-                                start = offset + line.find(matched_content)
-                            end = start + len(matched_content)
-
-                            # Determine severity based on secret type
-                            severity = self._get_severity_for_type(secret.type)
-
-                            # Create detection result
-                            result = DetectionResult(
-                                detector_type=DetectorType.SECRETS,
-                                finding_type=secret.type,
-                                category="SECRETS",
-                                severity=severity,
-                                confidence=self._calculate_confidence(secret.type),
-                                matched_content=matched_content,
-                                location=Location(
-                                    path=f"line {line_num}",
-                                    description=f"character range {start}-{end}",
-                                ),
-                                metadata={
-                                    "detector": secret.type,
-                                    "plugin": plugin.__class__.__name__,
-                                },
-                            )
-
-                            # Apply confidence threshold
-                            if result.confidence >= (self.config.confidence_threshold or 0.7):
-                                results.append(result)
-
-                    except Exception as e:
-                        # Log but continue with other plugins
-                        logger.debug(
-                            f"Plugin {plugin.__class__.__name__} failed on line {line_num}: {e}"
-                        )
+                        is_verified = bool(secret.is_verified)
+                    except Exception:
                         continue
 
-        except Exception as e:
-            logger.error(f"Error scanning for secrets: {e}")
-            logger.exception(e)
+                    if not secret_type:
+                        continue
 
-        # Apply max_findings limit if configured
-        if self.config.max_findings and len(results) > self.config.max_findings:
-            results = results[: self.config.max_findings]
+                    confidence = self._get_confidence(secret_type)
+                    if confidence < confidence_threshold:
+                        continue
+
+                    severity = self._get_severity(secret_type)
+                    if _SEVERITY_RANK.get(severity, 0) < min_severity_rank:
+                        continue
+
+                    if not secret_value:
+                        continue
+
+                    col_offset = line_text.find(secret_value) if secret_value in line_text else 0
+                    start = col_offset
+                    end = start + len(secret_value)
+
+                    results.append(
+                        DetectionResult(
+                            detector_type=DetectorType.SECRETS,
+                            finding_type=secret_type,
+                            category="SECRETS",
+                            severity=severity,
+                            confidence=confidence,
+                            matched_content=secret_value,
+                            location=Location(
+                                start=start,
+                                end=end,
+                                line=line_number,
+                                path=f"line {line_number}",
+                            ),
+                            metadata={
+                                "detector": "secrets",
+                                "plugin": secret_type,
+                                "is_verified": is_verified,
+                            },
+                        )
+                    )
+
+        if self._cfg.max_findings and len(results) > self._cfg.max_findings:
+            results = results[: self._cfg.max_findings]
 
         return results
 
     def get_supported_content_types(self) -> list[str]:
-        """Return supported content types for secrets detection."""
         return [
             "text/plain",
             "application/json",
@@ -189,81 +400,3 @@ class SecretsDetector(BaseDetector):
             "application/xml",
             "text/xml",
         ]
-
-    def _get_severity_for_type(self, secret_type: str) -> Severity:
-        """
-        Determine severity level based on secret type.
-
-        Args:
-            secret_type: Type of secret detected
-
-        Returns:
-            Severity level
-        """
-        secret_type_lower = secret_type.lower()
-
-        # Critical secrets - immediate risk
-        if any(
-            keyword in secret_type_lower
-            for keyword in [
-                "aws",
-                "github",
-                "private_key",
-                "private key",
-                "rsa",
-                "ssh",
-                "slack",
-                "stripe",
-                "google",
-                "azure",
-                "secret",
-            ]
-        ):
-            return Severity.critical
-
-        # High severity - API keys and tokens
-        if any(
-            keyword in secret_type_lower
-            for keyword in ["api", "token", "password", "credential", "key"]
-        ):
-            return Severity.high
-
-        # Medium severity - potential secrets
-        if any(keyword in secret_type_lower for keyword in ["auth", "base64"]):
-            return Severity.medium
-
-        # Default to high for any detected secret
-        return Severity.high
-
-    def _calculate_confidence(self, secret_type: str) -> float:
-        """
-        Calculate confidence score for a detected secret.
-
-        Args:
-            secret_type: Type of secret detected
-
-        Returns:
-            Confidence score between 0 and 1
-        """
-        secret_type_lower = secret_type.lower()
-
-        # High confidence for well-known patterns
-        if any(
-            keyword in secret_type_lower
-            for keyword in [
-                "aws",
-                "github",
-                "slack",
-                "stripe",
-                "private_key",
-                "private key",
-            ]
-        ):
-            return 0.95
-
-        # Medium-high confidence for generic patterns
-        if any(keyword in secret_type_lower for keyword in ["api", "token", "secret"]):
-            return 0.85
-
-        # Medium confidence for others
-        return 0.75

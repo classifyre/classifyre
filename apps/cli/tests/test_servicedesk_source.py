@@ -23,7 +23,7 @@ def _servicedesk_recipe(
             "account_email": "user@example.com",
         },
         "masked": {"api_token": "token"},
-        "sampling": {"strategy": strategy, "limit": 100},
+        "sampling": {"strategy": strategy},
     }
     if optional is not None:
         recipe["optional"] = optional
@@ -237,7 +237,8 @@ async def test_servicedesk_fetch_content_for_attachment(monkeypatch: pytest.Monk
         lambda _url: (b"servicedesk attachment payload", "text/plain"),
     )
     monkeypatch.setattr(
-        "src.sources.servicedesk.source.parse_bytes",
+        source,
+        "parse_asset_bytes",
         lambda _file_bytes, **_kwargs: ParsedBytes(
             mime_type="text/plain",
             raw_content="servicedesk attachment payload",
@@ -254,6 +255,30 @@ async def test_servicedesk_fetch_content_for_attachment(monkeypatch: pytest.Monk
     raw, text = content
     assert "servicedesk attachment payload" in raw
     assert "servicedesk attachment payload" in text
+
+
+@pytest.mark.asyncio
+async def test_servicedesk_fetch_content_bytes_resolves_mime_from_stored_filename(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = ServiceDeskSource(_servicedesk_recipe())
+    attachment_url = (
+        "https://your-domain.atlassian.net/rest/servicedeskapi/request/HELP-9/attachment/att-9"
+    )
+    attachment_hash = source.generate_hash_id(attachment_url)
+    source._attachment_url_by_hash[attachment_hash] = attachment_url
+    source._attachment_name_by_hash[attachment_hash] = "vpn-screenshot.png"
+
+    monkeypatch.setattr(
+        source.client,
+        "get_bytes",
+        lambda _url: (b"\x89PNG\r\n\x1a\nservicedesk-image", "application/octet-stream"),
+    )
+
+    assert await source.fetch_content_bytes(attachment_hash) == (
+        b"\x89PNG\r\n\x1a\nservicedesk-image",
+        "image/png",
+    )
 
 
 def test_servicedesk_resolve_link_for_detection_maps_hash_to_url():

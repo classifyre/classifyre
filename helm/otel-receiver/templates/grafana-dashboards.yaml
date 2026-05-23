@@ -1,0 +1,523 @@
+{{- if and .Values.grafana.enabled (index .Values.grafana "sidecar") }}
+{{- if index .Values.grafana.sidecar "dashboards" }}
+{{- if .Values.grafana.sidecar.dashboards.enabled }}
+# ─────────────────────────────────────────────────────────────────────────────
+# Dashboard 1 — Overview
+#   Loki: log volume, error rate, error count stat
+#   Tempo: recent traces table, error traces table
+# ─────────────────────────────────────────────────────────────────────────────
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "otel-receiver.fullname" . }}-grafana-dashboard-overview
+  labels:
+    {{- include "otel-receiver.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Classifyre"
+data:
+  classifyre-overview.json: |
+    {
+      "title": "Classifyre — Overview",
+      "uid": "classifyre-overview",
+      "schemaVersion": 38,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "timezone": "browser",
+      "tags": ["classifyre"],
+      "graphTooltip": 1,
+      "templating": {
+        "list": [
+          {
+            "name": "namespace",
+            "type": "custom",
+            "label": "Namespace",
+            "query": "classifyre-develop,classifyre",
+            "current": { "text": "classifyre-develop", "value": "classifyre-develop" },
+            "options": [
+              { "text": "classifyre-develop", "value": "classifyre-develop", "selected": true },
+              { "text": "classifyre", "value": "classifyre", "selected": false }
+            ],
+            "includeAll": false,
+            "multi": false
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Errors (1 h)",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": { "mode": "absolute", "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 1 },
+                { "color": "red", "value": 10 }
+              ]},
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "textMode": "auto"
+          },
+          "targets": [{
+            "datasource": { "type": "loki", "uid": "loki" },
+            "expr": "sum(count_over_time({namespace=\"$namespace\"} |~ \"(?i)(error|exception)\" [1h]))",
+            "queryType": "instant",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Log Lines (1 h)",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center"
+          },
+          "targets": [{
+            "datasource": { "type": "loki", "uid": "loki" },
+            "expr": "sum(count_over_time({namespace=\"$namespace\"} [1h]))",
+            "queryType": "instant",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Active Pods",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center"
+          },
+          "targets": [{
+            "datasource": { "type": "loki", "uid": "loki" },
+            "expr": "count(count by (pod) (rate({namespace=\"$namespace\"}[5m])))",
+            "queryType": "instant",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "Log Volume by Pod",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": {
+            "defaults": {
+              "custom": { "lineWidth": 1, "fillOpacity": 8 },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": { "mode": "multi" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["max", "mean"] }
+          },
+          "targets": [{
+            "datasource": { "type": "loki", "uid": "loki" },
+            "expr": "sum by (pod) (rate({namespace=\"$namespace\"}[2m]))",
+            "queryType": "range",
+            "refId": "A",
+            "legendFormat": "{{`{{pod}}`}}"
+          }]
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Error Rate",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "fixedColor": "red", "mode": "fixed" },
+              "custom": { "lineWidth": 2, "fillOpacity": 15 },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": { "mode": "single" },
+            "legend": { "displayMode": "list", "placement": "bottom" }
+          },
+          "targets": [{
+            "datasource": { "type": "loki", "uid": "loki" },
+            "expr": "sum(rate({namespace=\"$namespace\"} |~ \"(?i)(error|exception)\" [2m]))",
+            "queryType": "range",
+            "refId": "A",
+            "legendFormat": "errors/s"
+          }]
+        },
+        {
+          "id": 6,
+          "type": "traces",
+          "title": "Recent Traces",
+          "description": "Latest traces from all Classifyre services",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 12 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "options": { "dedupStrategy": "none" },
+          "targets": [{
+            "datasource": { "type": "tempo", "uid": "tempo" },
+            "queryType": "traceql",
+            "query": "{resource.service.name=~\"classifyre.*\"}",
+            "limit": 20,
+            "tableType": "traces",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 7,
+          "type": "traces",
+          "title": "Error Traces",
+          "description": "Traces with error status — click to drill into the root cause",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 22 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "options": { "dedupStrategy": "none" },
+          "targets": [{
+            "datasource": { "type": "tempo", "uid": "tempo" },
+            "queryType": "traceql",
+            "query": "{resource.service.name=~\"classifyre.*\" && status=error}",
+            "limit": 20,
+            "tableType": "traces",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 8,
+          "type": "logs",
+          "title": "Recent Logs",
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 32 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": false
+          },
+          "targets": [{
+            "datasource": { "type": "loki", "uid": "loki" },
+            "expr": "{namespace=\"$namespace\"}",
+            "queryType": "range",
+            "refId": "A"
+          }]
+        }
+      ]
+    }
+# ─────────────────────────────────────────────────────────────────────────────
+# Dashboard 2 — Logs Explorer
+#   Variables: namespace, pod, search term
+#   Panels: log rate by pod/container, error breakdown, full log stream
+# ─────────────────────────────────────────────────────────────────────────────
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "otel-receiver.fullname" . }}-grafana-dashboard-logs
+  labels:
+    {{- include "otel-receiver.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Classifyre"
+data:
+  classifyre-logs.json: |
+    {
+      "title": "Classifyre — Logs",
+      "uid": "classifyre-logs",
+      "schemaVersion": 38,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "timezone": "browser",
+      "tags": ["classifyre"],
+      "graphTooltip": 0,
+      "templating": {
+        "list": [
+          {
+            "name": "namespace",
+            "type": "custom",
+            "label": "Namespace",
+            "query": "classifyre-develop,classifyre",
+            "current": { "text": "classifyre-develop", "value": "classifyre-develop" },
+            "options": [
+              { "text": "classifyre-develop", "value": "classifyre-develop", "selected": true },
+              { "text": "classifyre", "value": "classifyre", "selected": false }
+            ],
+            "includeAll": false,
+            "multi": false
+          },
+          {
+            "name": "search",
+            "type": "textbox",
+            "label": "Search",
+            "query": "",
+            "current": { "text": "", "value": "" }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "Log Rate by Container",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": {
+            "defaults": {
+              "custom": { "lineWidth": 1, "fillOpacity": 8 },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": { "mode": "multi" },
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["max", "mean"] }
+          },
+          "targets": [{
+            "datasource": { "type": "loki", "uid": "loki" },
+            "expr": "sum by (container) (rate({namespace=\"$namespace\"}[2m]))",
+            "queryType": "range",
+            "refId": "A",
+            "legendFormat": "{{`{{container}}`}}"
+          }]
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "Errors vs Warnings",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": {
+            "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 }, "unit": "short" },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "errors/s" },
+                "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+              },
+              {
+                "matcher": { "id": "byName", "options": "warnings/s" },
+                "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+              }
+            ]
+          },
+          "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "expr": "sum(rate({namespace=\"$namespace\"} |~ \"(?i)error\" [2m]))",
+              "queryType": "range",
+              "refId": "A",
+              "legendFormat": "errors/s"
+            },
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "expr": "sum(rate({namespace=\"$namespace\"} |~ \"(?i)warn\" [2m]))",
+              "queryType": "range",
+              "refId": "B",
+              "legendFormat": "warnings/s"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "type": "logs",
+          "title": "Log Stream",
+          "gridPos": { "h": 20, "w": 24, "x": 0, "y": 8 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": true,
+            "showLabels": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [{
+            "datasource": { "type": "loki", "uid": "loki" },
+            "expr": "{namespace=\"$namespace\"} |~ \"(?i)$search\"",
+            "queryType": "range",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 4,
+          "type": "logs",
+          "title": "Errors Only",
+          "gridPos": { "h": 15, "w": 24, "x": 0, "y": 28 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "options": {
+            "dedupStrategy": "signature",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showLabels": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": false
+          },
+          "targets": [{
+            "datasource": { "type": "loki", "uid": "loki" },
+            "expr": "{namespace=\"$namespace\"} |~ \"(?i)(error|exception|fatal)\"",
+            "queryType": "range",
+            "refId": "A"
+          }]
+        }
+      ]
+    }
+# ─────────────────────────────────────────────────────────────────────────────
+# Dashboard 3 — Traces Explorer
+#   Variables: service (tempo), status filter
+#   Panels: all traces, error traces, slow traces (>500ms)
+# ─────────────────────────────────────────────────────────────────────────────
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "otel-receiver.fullname" . }}-grafana-dashboard-traces
+  labels:
+    {{- include "otel-receiver.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Classifyre"
+data:
+  classifyre-traces.json: |
+    {
+      "title": "Classifyre — Traces",
+      "uid": "classifyre-traces",
+      "schemaVersion": 38,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "timezone": "browser",
+      "tags": ["classifyre"],
+      "graphTooltip": 1,
+      "templating": {
+        "list": [
+          {
+            "name": "service",
+            "type": "custom",
+            "label": "Service",
+            "query": "classifyre-api,classifyre-web",
+            "current": { "text": "All", "value": "classifyre.*" },
+            "options": [
+              { "text": "All",           "value": "classifyre.*",    "selected": true },
+              { "text": "API",           "value": "classifyre-api",  "selected": false },
+              { "text": "Web",           "value": "classifyre-web",  "selected": false }
+            ],
+            "includeAll": false,
+            "multi": false
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "traces",
+          "title": "All Traces — $service",
+          "description": "Click any row to open the full trace waterfall",
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 0 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "options": { "dedupStrategy": "none" },
+          "targets": [{
+            "datasource": { "type": "tempo", "uid": "tempo" },
+            "queryType": "traceql",
+            "query": "{resource.service.name=~\"$service\"}",
+            "limit": 25,
+            "tableType": "traces",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 2,
+          "type": "traces",
+          "title": "Error Traces — $service",
+          "description": "Traces with span status=error. Click to inspect the failing span.",
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 12 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "options": { "dedupStrategy": "none" },
+          "targets": [{
+            "datasource": { "type": "tempo", "uid": "tempo" },
+            "queryType": "traceql",
+            "query": "{resource.service.name=~\"$service\" && status=error}",
+            "limit": 25,
+            "tableType": "traces",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 3,
+          "type": "traces",
+          "title": "Slow Traces (>500 ms) — $service",
+          "description": "Traces whose total duration exceeds 500 ms",
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 24 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "options": { "dedupStrategy": "none" },
+          "targets": [{
+            "datasource": { "type": "tempo", "uid": "tempo" },
+            "queryType": "traceql",
+            "query": "{resource.service.name=~\"$service\" && duration>500ms}",
+            "limit": 25,
+            "tableType": "traces",
+            "refId": "A"
+          }]
+        },
+        {
+          "id": 4,
+          "type": "traces",
+          "title": "DB Spans — postgres calls",
+          "description": "Spans targeting the database — useful to spot slow queries",
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 36 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "options": { "dedupStrategy": "none" },
+          "targets": [{
+            "datasource": { "type": "tempo", "uid": "tempo" },
+            "queryType": "traceql",
+            "query": "{span.db.system=\"postgresql\"}",
+            "limit": 25,
+            "tableType": "spans",
+            "refId": "A"
+          }]
+        }
+      ]
+    }
+{{- end }}
+{{- end }}
+{{- end }}

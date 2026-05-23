@@ -36,7 +36,7 @@ interface Props {
 function StatusBadge({ status }: { status: TestResultStatus | undefined }) {
   if (!status) {
     return (
-      <Badge className="rounded-[4px] border border-stone-400 bg-transparent text-[10px] uppercase tracking-wide text-stone-500">
+      <Badge className="rounded-[4px] border border-stone-400 bg-transparent text-[10px] uppercase tracking-wide text-muted-foreground">
         Not run
       </Badge>
     );
@@ -206,7 +206,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
       onSubmit={(e) => {
         void handleSubmit(e);
       }}
-      className="rounded-[4px] border-2 border-black p-4 shadow-[3px_3px_0_#000] space-y-4 bg-background"
+      className="rounded-[4px] border-2 border-border p-4 shadow-[3px_3px_0_var(--color-border)] space-y-4 bg-background"
     >
       <p className="font-serif font-black uppercase tracking-wide text-sm">
         New Test Scenario
@@ -215,22 +215,24 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
       <div className="space-y-1">
         <label className="text-xs font-medium">Name *</label>
         <input
-          className="w-full rounded-[4px] border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:border-black"
+          className="w-full rounded-[4px] border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:border-border"
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
           placeholder="e.g. Should match IBAN"
           required
+          data-testid="input-test-name"
         />
       </div>
 
       <div className="space-y-1">
         <label className="text-xs font-medium">Input Text *</label>
         <textarea
-          className="w-full rounded-[4px] border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:border-black min-h-[80px] resize-y font-mono"
+          className="w-full rounded-[4px] border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:border-border min-h-[80px] resize-y font-mono"
           value={form.inputText}
           onChange={(e) => set("inputText", e.target.value)}
           placeholder="Paste text to test against the detector..."
           required
+          data-testid="textarea-test-input"
         />
       </div>
 
@@ -244,6 +246,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
                 type="radio"
                 checked={form.shouldMatch}
                 onChange={() => set("shouldMatch", true)}
+                data-testid="radio-test-match-true"
               />
               Should match
             </label>
@@ -252,6 +255,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
                 type="radio"
                 checked={!form.shouldMatch}
                 onChange={() => set("shouldMatch", false)}
+                data-testid="radio-test-match-false"
               />
               Should not match
             </label>
@@ -263,11 +267,12 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
             <div className="flex-1 space-y-1">
               <label className="text-xs text-muted-foreground">Label *</label>
               <input
-                className="w-full rounded-[4px] border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:border-black"
+                className="w-full rounded-[4px] border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:border-border"
                 value={form.label}
                 onChange={(e) => set("label", e.target.value)}
                 placeholder="e.g. advice"
                 required
+                data-testid="input-test-label"
               />
             </div>
             <div className="w-40 space-y-1">
@@ -275,7 +280,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
                 Min confidence
               </label>
               <input
-                className="w-full rounded-[4px] border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:border-black"
+                className="w-full rounded-[4px] border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:border-border"
                 value={form.minConfidence}
                 onChange={(e) => set("minConfidence", e.target.value)}
                 placeholder="0.6"
@@ -283,6 +288,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
                 min="0"
                 max="1"
                 step="0.05"
+                data-testid="input-test-confidence"
               />
             </div>
           </div>
@@ -293,13 +299,13 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
             {form.entities.map((ent, idx) => (
               <div key={idx} className="flex items-center gap-2">
                 <input
-                  className="flex-1 rounded-[4px] border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:border-black"
+                  className="flex-1 rounded-[4px] border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:border-border"
                   value={ent.label}
                   onChange={(e) => updateEntity(idx, "label", e.target.value)}
                   placeholder="Entity label (e.g. PersonName)"
                 />
                 <input
-                  className="flex-1 rounded-[4px] border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:border-black"
+                  className="flex-1 rounded-[4px] border border-stone-300 px-3 py-1.5 text-sm focus:outline-none focus:border-border"
                   value={ent.text}
                   onChange={(e) => updateEntity(idx, "text", e.target.value)}
                   placeholder="Expected text (optional)"
@@ -308,7 +314,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
                   <button
                     type="button"
                     onClick={() => removeEntity(idx)}
-                    className="text-stone-400 hover:text-red-600 transition-colors"
+                    className="text-muted-foreground/70 hover:text-red-600 transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -318,7 +324,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
             <button
               type="button"
               onClick={addEntity}
-              className="text-xs text-stone-500 hover:text-black transition-colors flex items-center gap-1"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
             >
               <Plus className="h-3 w-3" />
               Add entity
@@ -331,7 +337,7 @@ function AddScenarioForm({ method, onAdd, onCancel }: AddFormProps) {
         <Button type="button" variant="outline" size="sm" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" disabled={saving}>
+        <Button type="submit" size="sm" disabled={saving} data-testid="btn-save-test-scenario">
           {saving && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
           Add Scenario
         </Button>
@@ -369,7 +375,7 @@ function ScenarioRow({
         {displayResult && (
           <button
             onClick={() => setExpanded((v) => !v)}
-            className="text-stone-400 hover:text-black transition-colors"
+            className="text-muted-foreground/70 hover:text-foreground transition-colors"
             aria-label="Toggle details"
           >
             {expanded ? (
@@ -381,8 +387,9 @@ function ScenarioRow({
         )}
         <button
           onClick={onDelete}
-          className="text-stone-400 hover:text-red-600 transition-colors"
+          className="text-muted-foreground/70 hover:text-red-600 transition-colors"
           aria-label="Delete scenario"
+          data-testid="btn-delete-test-scenario"
         >
           <Trash2 className="h-4 w-4" />
         </button>
@@ -520,17 +527,17 @@ export function CustomDetectorTests({ detectorId, method }: Props) {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {runResults.size > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-green-600 font-medium">
+            <div className="flex items-center gap-2 text-sm" data-testid="test-run-summary" data-passed={passCount} data-failed={failCount} data-errored={errorCount}>
+              <span className="text-green-600 font-medium" data-testid="test-run-passed">
                 {passCount} passed
               </span>
               {failCount > 0 && (
-                <span className="text-red-600 font-medium">
+                <span className="text-red-600 font-medium" data-testid="test-run-failed">
                   {failCount} failed
                 </span>
               )}
               {errorCount > 0 && (
-                <span className="text-orange-500 font-medium">
+                <span className="text-orange-500 font-medium" data-testid="test-run-errored">
                   {errorCount} errored
                 </span>
               )}
@@ -542,6 +549,7 @@ export function CustomDetectorTests({ detectorId, method }: Props) {
             variant="outline"
             size="sm"
             onClick={() => setShowAddForm((v) => !v)}
+            data-testid="btn-show-add-test"
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Test
@@ -553,6 +561,7 @@ export function CustomDetectorTests({ detectorId, method }: Props) {
               void handleRunAll();
             }}
             disabled={running || scenarios.length === 0}
+            data-testid="btn-run-all-tests"
           >
             {running ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

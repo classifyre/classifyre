@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.
+ * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -37,6 +37,12 @@ export interface BulkIngestAssetsDto {
      * @memberof BulkIngestAssetsDto
      */
     finalizeRun?: boolean;
+    /**
+     * When true, skip all findings processing (create, update, resolve) for this batch. Useful for streaming ingestion where assets are pushed before detector results.
+     * @type {boolean}
+     * @memberof BulkIngestAssetsDto
+     */
+    skipFindings?: boolean;
 }
 
 /**
@@ -61,6 +67,7 @@ export function BulkIngestAssetsDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'runnerId': json['runnerId'],
         'assets': json['assets'],
         'finalizeRun': json['finalizeRun'] == null ? undefined : json['finalizeRun'],
+        'skipFindings': json['skipFindings'] == null ? undefined : json['skipFindings'],
     };
 }
 
@@ -78,6 +85,7 @@ export function BulkIngestAssetsDtoToJSONTyped(value?: BulkIngestAssetsDto | nul
         'runnerId': value['runnerId'],
         'assets': value['assets'],
         'finalizeRun': value['finalizeRun'],
+        'skipFindings': value['skipFindings'],
     };
 }
 

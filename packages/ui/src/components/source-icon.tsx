@@ -12,6 +12,7 @@ import {
   siJira,
   siMongodb,
   siMysql,
+  siNeo4j,
   siPostgresql,
   siSnowflake,
   siWordpress,
@@ -112,11 +113,13 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.Databricks]: siDatabricks,
   [CreateSourceDtoTypeEnum.Snowflake]: siSnowflake,
   [CreateSourceDtoTypeEnum.Mongodb]: siMongodb,
+  [CreateSourceDtoTypeEnum.Neo4J]: siNeo4j,
   [CreateSourceDtoTypeEnum.Powerbi]: null,
   [CreateSourceDtoTypeEnum.Tableau]: null,
   [CreateSourceDtoTypeEnum.Confluence]: siConfluence,
   [CreateSourceDtoTypeEnum.Jira]: siJira,
   [CreateSourceDtoTypeEnum.Servicedesk]: null,
+  [CreateSourceDtoTypeEnum.Sqlite]: null,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -149,11 +152,13 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Databricks]: createSimpleIconComponent(siDatabricks),
   [CreateSourceDtoTypeEnum.Snowflake]: createSimpleIconComponent(siSnowflake),
   [CreateSourceDtoTypeEnum.Mongodb]: createSimpleIconComponent(siMongodb),
+  [CreateSourceDtoTypeEnum.Neo4J]: createSimpleIconComponent(siNeo4j),
   [CreateSourceDtoTypeEnum.Powerbi]: FALLBACK_SOURCE_ICON,
   [CreateSourceDtoTypeEnum.Tableau]: TableauIcon,
   [CreateSourceDtoTypeEnum.Confluence]: createSimpleIconComponent(siConfluence),
   [CreateSourceDtoTypeEnum.Jira]: createSimpleIconComponent(siJira),
   [CreateSourceDtoTypeEnum.Servicedesk]: Monitor,
+  [CreateSourceDtoTypeEnum.Sqlite]: FALLBACK_SOURCE_ICON,
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =

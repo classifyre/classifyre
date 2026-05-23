@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.
+ * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -423,28 +423,9 @@ export type FindingsControllerGetDiscoveryOverviewWindowDaysEnum = typeof Findin
 export const FindingsControllerListAssetSummariesDetectorTypeEnum = {
     Secrets: 'SECRETS',
     Pii: 'PII',
-    Toxic: 'TOXIC',
-    Nsfw: 'NSFW',
     Yara: 'YARA',
     BrokenLinks: 'BROKEN_LINKS',
-    PromptInjection: 'PROMPT_INJECTION',
-    PhishingUrl: 'PHISHING_URL',
-    Spam: 'SPAM',
-    Language: 'LANGUAGE',
     CodeSecurity: 'CODE_SECURITY',
-    Plagiarism: 'PLAGIARISM',
-    ImageViolence: 'IMAGE_VIOLENCE',
-    OcrPii: 'OCR_PII',
-    DeidScore: 'DEID_SCORE',
-    HateSpeech: 'HATE_SPEECH',
-    AiGenerated: 'AI_GENERATED',
-    ContentQuality: 'CONTENT_QUALITY',
-    Bias: 'BIAS',
-    Duplicate: 'DUPLICATE',
-    DomainClass: 'DOMAIN_CLASS',
-    ContentType: 'CONTENT_TYPE',
-    SensitivityTier: 'SENSITIVITY_TIER',
-    JurisdictionTag: 'JURISDICTION_TAG',
     Custom: 'CUSTOM'
 } as const;
 export type FindingsControllerListAssetSummariesDetectorTypeEnum = typeof FindingsControllerListAssetSummariesDetectorTypeEnum[keyof typeof FindingsControllerListAssetSummariesDetectorTypeEnum];

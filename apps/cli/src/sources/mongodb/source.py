@@ -40,14 +40,6 @@ class CollectionRef:
     collection: str
 
 
-def _truncate_text(value: str, max_chars: int) -> str:
-    if len(value) <= max_chars:
-        return value
-    if max_chars <= 3:
-        return value[:max_chars]
-    return f"{value[: max_chars - 3]}..."
-
-
 class MongoDBSource(BaseSource):
     source_type = "mongodb"
 
@@ -125,7 +117,7 @@ class MongoDBSource(BaseSource):
         username, password = self._username_password()
 
         kwargs: dict[str, Any] = {
-            "connectTimeoutMS": int(options.connect_timeout_ms or 10000),
+            "connectTimeoutMS": int(options.connect_timeout_ms or 30000),
         }
         if username:
             kwargs["username"] = username
@@ -298,7 +290,6 @@ class MongoDBSource(BaseSource):
             "deployment": "ATLAS" if self._is_atlas() else "ON_PREM",
             "sampling": {
                 "strategy": str(self._sampling().strategy),
-                "limit": int(self._sampling().limit or 100),
             },
         }
         now = datetime.now(UTC)
@@ -329,15 +320,11 @@ class MongoDBSource(BaseSource):
             f"{collection_ref.database}/{collection_ref.collection}"
         )
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    STREAM_DETECTIONS = True
+
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
-
-        pipeline = None
-        if self.config.detectors and any(detector.enabled for detector in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
         batch: list[SingleAssetScanResults] = []
         for collection_ref in self._iter_collections():
@@ -349,14 +336,10 @@ class MongoDBSource(BaseSource):
             batch.append(asset)
 
             if len(batch) >= self.BATCH_SIZE:
-                if pipeline:
-                    batch = await pipeline.process(batch)
                 yield batch
                 batch = []
 
         if batch:
-            if pipeline:
-                batch = await pipeline.process(batch)
             yield batch
 
     def generate_hash_id(self, asset_id: str) -> str:
@@ -390,17 +373,24 @@ class MongoDBSource(BaseSource):
         pipeline = [{"$sample": {"size": limit}}]
         return list(collection.aggregate(pipeline, allowDiskUse=True))
 
+    def _count_collection_documents(self, collection_ref: CollectionRef) -> int | None:
+        try:
+            collection = self._client()[collection_ref.database][collection_ref.collection]
+            return int(collection.count_documents({}))
+        except Exception:
+            return None
+
     def _sample_collection_documents(self, collection_ref: CollectionRef) -> list[dict[str, Any]]:
         collection = self._client()[collection_ref.database][collection_ref.collection]
         sampling = self._sampling()
         strategy = sampling.strategy
+        rows_per_page = int(sampling.rows_per_page or 100)
 
         if strategy == SamplingStrategy.ALL:
-            return list(collection.find({}))
+            return list(collection.find({}).limit(rows_per_page))
 
-        limit = int(sampling.limit or 100)
         if strategy == SamplingStrategy.RANDOM:
-            return self._sample_random_documents(collection, limit)
+            return self._sample_random_documents(collection, rows_per_page)
 
         order_field = self._latest_order_field()
         if order_field != "_id":
@@ -411,9 +401,11 @@ class MongoDBSource(BaseSource):
             except Exception:
                 has_field = True
             if not has_field and sampling.fallback_to_random is not False:
-                return self._sample_random_documents(collection, limit)
+                return self._sample_random_documents(collection, rows_per_page)
 
-        return list(collection.find({}).sort(order_field, self._pymongo.DESCENDING).limit(limit))
+        return list(
+            collection.find({}).sort(order_field, self._pymongo.DESCENDING).limit(rows_per_page)
+        )
 
     def _serialize_document(self, document: dict[str, Any]) -> str:
         return json.dumps(document, ensure_ascii=False, default=str, sort_keys=True)
@@ -422,10 +414,9 @@ class MongoDBSource(BaseSource):
         self,
         collection_ref: CollectionRef,
         documents: list[dict[str, Any]],
+        doc_offset: int = 0,
     ) -> tuple[str, str]:
         sampling = self._sampling()
-        max_total_chars = int(sampling.max_total_chars or 20000)
-        max_document_chars = int((sampling.max_cell_chars or 512) * 4)
 
         strategy = sampling.strategy
         lines = [
@@ -436,18 +427,19 @@ class MongoDBSource(BaseSource):
         ]
 
         serialized_documents: list[str] = []
-        for index, document in enumerate(documents, start=1):
+        for index, document in enumerate(documents, start=1 + doc_offset):
             serialized = self._serialize_document(document)
             serialized_documents.append(serialized)
-            lines.append(f"doc_{index}: {_truncate_text(serialized, max_document_chars)}")
+            lines.append(f"doc_{index}: {serialized}")
 
-        text_content = _truncate_text("\n".join(lines), max_total_chars)
+        text_content = "\n".join(lines)
         raw_content = json.dumps(
             {
                 "database": collection_ref.database,
                 "collection": collection_ref.collection,
                 "strategy": str(strategy),
                 "documents": serialized_documents,
+                "doc_offset": doc_offset,
             },
             ensure_ascii=False,
         )
@@ -462,20 +454,62 @@ class MongoDBSource(BaseSource):
         if not collection_ref:
             return None
 
-        try:
-            documents = self._sample_collection_documents(collection_ref)
-            content = self._format_collection_content(collection_ref, documents)
-        except Exception as exc:
-            logger.error(
-                "Failed to sample MongoDB content for %s.%s: %s",
-                collection_ref.database,
-                collection_ref.collection,
-                exc,
-            )
-            return None
+        documents = self._sample_collection_documents(collection_ref)
+        content = self._format_collection_content(collection_ref, documents)
 
         self._content_cache[asset_id] = content
         return content
+
+    async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
+        sampling = self._sampling()
+        collection_ref = self._parse_collection_ref(asset_id)
+        if not collection_ref:
+            return
+
+        if sampling.strategy != SamplingStrategy.ALL:
+            documents = self._sample_collection_documents(collection_ref)
+            for i, document in enumerate(documents):
+                content = self._format_collection_content(collection_ref, [document], doc_offset=i)
+                yield content
+            return
+
+        rows_per_page = int(sampling.rows_per_page or 100)
+        collection_label = f"{collection_ref.database}.{collection_ref.collection}"
+
+        total_docs = self._count_collection_documents(collection_ref)
+        total_batches = ((total_docs + rows_per_page - 1) // rows_per_page) if total_docs else None
+        if total_docs is not None and total_batches is not None:
+            logger.info(
+                "Full scan %s: %d documents, %d batches of %d",
+                collection_label,
+                total_docs,
+                total_batches,
+                rows_per_page,
+            )
+
+        collection = self._client()[collection_ref.database][collection_ref.collection]
+        offset = 0
+        page_num = 1
+
+        while not self._aborted:
+            if total_batches is not None:
+                logger.info("%s batch %d/%d", collection_label, page_num, total_batches)
+
+            documents = list(collection.find({}).skip(offset).limit(rows_per_page))
+            if not documents:
+                break
+
+            for i, document in enumerate(documents):
+                content = self._format_collection_content(
+                    collection_ref, [document], doc_offset=offset + i
+                )
+                self._content_cache[asset_id] = content
+                yield content
+
+            offset += len(documents)
+            page_num += 1
+            if len(documents) < rows_per_page:
+                break
 
     def enrich_finding_location(
         self,

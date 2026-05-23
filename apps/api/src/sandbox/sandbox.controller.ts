@@ -48,10 +48,9 @@ Each object has the shape:
 |------|---------------|
 | \`SECRETS\` | API keys, tokens, private keys |
 | \`PII\` | Emails, SSNs, credit cards, phone numbers |
-| \`TOXIC\` | Toxic / hateful text (Detoxify model) |
-| \`NSFW\` | Sexually explicit content |
 | \`YARA\` | Custom YARA rule matches |
 | \`BROKEN_LINKS\` | Unreachable URLs in text |
+| \`CUSTOM\` | User-defined pipelines (REGEX, GLiNER2, HuggingFace transformers) |
 
 **Minimal — secrets only (all patterns):**
 \`\`\`json
@@ -71,17 +70,11 @@ Each object has the shape:
 ]
 \`\`\`
 
-**Toxic content (multilingual model):**
-\`\`\`json
-[{"type":"TOXIC","enabled":true,"config":{"enabled_patterns":["toxicity","severe_toxicity","insult"],"model_name":"multilingual"}}]
-\`\`\`
-
 **Full scan — all detectors:**
 \`\`\`json
 [
   {"type":"SECRETS","enabled":true,"config":{}},
   {"type":"PII","enabled":true,"config":{"confidence_threshold":0.7}},
-  {"type":"TOXIC","enabled":true,"config":{}},
   {"type":"BROKEN_LINKS","enabled":true,"config":{}}
 ]
 \`\`\``,

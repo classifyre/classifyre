@@ -72,6 +72,10 @@ import {
 type SandboxRunStatus = SandboxControllerListRunsStatusEnum;
 type AssetContentType = SandboxControllerListRunsContentTypeEnum;
 
+type SandboxRunsTableProps = {
+  onPollingChange?: (hasActiveRuns: boolean) => void;
+};
+
 type SandboxFinding = {
   finding_type?: string;
   category?: string;
@@ -92,10 +96,6 @@ type SortBy =
 type SortOrder = "ASC" | "DESC";
 
 type HasFindingsFilter = "ALL" | "WITH" | "WITHOUT";
-
-type SandboxRunsTableProps = {
-  onPollingChange?: (isPolling: boolean) => void;
-};
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 20;
@@ -244,7 +244,7 @@ function FindingsRow({ findings }: { findings: SandboxFinding[] }) {
   }
 
   return (
-    <div className="border-t bg-muted/10">
+    <div className="border-t bg-muted/10" data-testid="findings-detail">
       <Table>
         <TableHeader className="bg-white/95 dark:bg-card/95">
           <TableRow>
@@ -286,6 +286,9 @@ function FindingsRow({ findings }: { findings: SandboxFinding[] }) {
             return (
               <TableRow
                 key={`${String(finding.finding_type ?? "finding")}-${index}`}
+                data-testid="finding-row"
+                data-detector-type={finding.detector_type}
+                data-finding-type={finding.finding_type}
               >
                 <TableCell className="py-2 text-xs font-medium">
                   {detectorLabel}
@@ -360,6 +363,9 @@ function RunRow({
       <TableRow
         className={canExpand ? "cursor-pointer hover:bg-muted/40" : undefined}
         onClick={canExpand ? () => setExpanded((value) => !value) : undefined}
+        data-testid="sandbox-run-row"
+        data-run-id={run.id}
+        data-status={run.status}
       >
         <TableCell className="w-8 py-2">
           {canExpand ? (
@@ -375,7 +381,7 @@ function RunRow({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <p className="truncate text-sm font-medium">{run.fileName}</p>
+              <p className="truncate text-sm font-medium" data-testid="run-filename">{run.fileName}</p>
             </div>
           </div>
         </TableCell>
@@ -388,6 +394,8 @@ function RunRow({
             <Badge
               variant={statusConfig.badge}
               className="rounded-[4px] text-[10px] uppercase tracking-[0.1em]"
+              data-testid="run-status-badge"
+              data-status={run.status}
             >
               {statusConfig.label}
             </Badge>
@@ -398,6 +406,8 @@ function RunRow({
           <Badge
             variant="outline"
             className="gap-1.5 rounded-[4px] text-[11px]"
+            data-testid="run-content-type"
+            data-content-type={run.contentType}
           >
             <ContentIcon className="h-3 w-3 text-muted-foreground" />
             {formatEnumLabel(run.contentType)}
@@ -435,6 +445,8 @@ function RunRow({
             <Badge
               variant={findingsCount > 0 ? "secondary" : "outline"}
               className="rounded-[4px] text-[11px]"
+              data-testid="run-findings-count"
+              data-count={findingsCount}
             >
               {findingsCount}
             </Badge>
@@ -462,6 +474,7 @@ function RunRow({
             disabled={isDeleting}
             onClick={(event) => void handleDelete(event)}
             title={t("sandbox.runs.deleteRun")}
+            data-testid="btn-delete-run"
           >
             {isDeleting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -649,7 +662,7 @@ export function SandboxRunsTable({
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder={t("sandbox.runs.search")}
-            className="h-9 rounded-[4px] border-2 border-black pl-9"
+            className="h-9 rounded-[4px] border-2 border-border pl-9"
           />
         </div>
 
@@ -659,7 +672,7 @@ export function SandboxRunsTable({
             setStatusFilters(values as SandboxRunStatus[])
           }
         >
-          <MultiSelectTrigger className="h-9 w-[170px] rounded-[4px] border-2 border-black">
+          <MultiSelectTrigger className="h-9 w-[170px] rounded-[4px] border-2 border-border">
             <MultiSelectValue placeholder={t("common.status")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -684,7 +697,7 @@ export function SandboxRunsTable({
             setContentTypeFilters(values as AssetContentType[])
           }
         >
-          <MultiSelectTrigger className="h-9 w-[180px] rounded-[4px] border-2 border-black">
+          <MultiSelectTrigger className="h-9 w-[180px] rounded-[4px] border-2 border-border">
             <MultiSelectValue placeholder={t("sandbox.runs.contentType")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -711,7 +724,7 @@ export function SandboxRunsTable({
             )
           }
         >
-          <MultiSelectTrigger className="h-9 w-[200px] rounded-[4px] border-2 border-black">
+          <MultiSelectTrigger className="h-9 w-[200px] rounded-[4px] border-2 border-border">
             <MultiSelectValue placeholder={t("sandbox.runs.detectors")} />
           </MultiSelectTrigger>
           <MultiSelectContent
@@ -736,13 +749,13 @@ export function SandboxRunsTable({
             setHasFindingsFilter(value as HasFindingsFilter)
           }
         >
-          <SelectTrigger className="h-9 w-[150px] rounded-[4px] border-2 border-black">
+          <SelectTrigger className="h-9 w-[150px] rounded-[4px] border-2 border-border">
             <SelectValue placeholder={t("sandbox.runs.findings")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">All runs</SelectItem>
-            <SelectItem value="WITH">With findings</SelectItem>
-            <SelectItem value="WITHOUT">No findings</SelectItem>
+            <SelectItem value="ALL">{t("sandbox.runs.allRuns")}</SelectItem>
+            <SelectItem value="WITH">{t("sandbox.runs.withFindings")}</SelectItem>
+            <SelectItem value="WITHOUT">{t("sandbox.runs.noFindings")}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -754,22 +767,22 @@ export function SandboxRunsTable({
             setSortOrder(nextOrder);
           }}
         >
-          <SelectTrigger className="h-9 w-[190px] rounded-[4px] border-2 border-black">
-            <SelectValue placeholder="Sort" />
+          <SelectTrigger className="h-9 w-[190px] rounded-[4px] border-2 border-border">
+            <SelectValue placeholder={t("common.sort")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="CREATED_AT:DESC">Newest first</SelectItem>
-            <SelectItem value="CREATED_AT:ASC">Oldest first</SelectItem>
-            <SelectItem value="FINDINGS_COUNT:DESC">Most findings</SelectItem>
-            <SelectItem value="FILE_NAME:ASC">File name A-Z</SelectItem>
-            <SelectItem value="FILE_SIZE_BYTES:DESC">Largest file</SelectItem>
+            <SelectItem value="CREATED_AT:DESC">{t("sandbox.runs.newestFirst")}</SelectItem>
+            <SelectItem value="CREATED_AT:ASC">{t("sandbox.runs.oldestFirst")}</SelectItem>
+            <SelectItem value="FINDINGS_COUNT:DESC">{t("sandbox.runs.mostFindings")}</SelectItem>
+            <SelectItem value="FILE_NAME:ASC">{t("sandbox.runs.fileNameAZ")}</SelectItem>
+            <SelectItem value="FILE_SIZE_BYTES:DESC">{t("sandbox.runs.largestFile")}</SelectItem>
           </SelectContent>
         </Select>
 
         {isFilterLoading ? (
           <div className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Updating
+            {t("sandbox.runs.updating")}
           </div>
         ) : null}
       </div>
@@ -800,7 +813,7 @@ export function SandboxRunsTable({
                   <TableHead className="w-8 bg-white/95 dark:bg-card/95" />
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      File
+                      {t("sandbox.runs.file")}
                     </span>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
@@ -810,22 +823,22 @@ export function SandboxRunsTable({
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Content
+                      {t("sandbox.runs.content")}
                     </span>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      MIME Type
+                      {t("sandbox.runs.mimeType")}
                     </span>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Size
+                      {t("sandbox.runs.size")}
                     </span>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Duration
+                      {t("sandbox.runs.duration")}
                     </span>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
@@ -835,7 +848,7 @@ export function SandboxRunsTable({
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Top Findings
+                      {t("sandbox.runs.topFindings")}
                     </span>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
@@ -845,7 +858,7 @@ export function SandboxRunsTable({
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      When
+                      {t("sandbox.runs.when")}
                     </span>
                   </TableHead>
                   <TableHead className="w-10 bg-white/95 dark:bg-card/95" />
@@ -864,7 +877,7 @@ export function SandboxRunsTable({
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[4px] bg-background/45 backdrop-blur-[1px]">
             <div className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Refreshing runs
+              {t("sandbox.runs.refreshingRuns")}
             </div>
           </div>
         ) : null}
@@ -876,8 +889,8 @@ export function SandboxRunsTable({
             {t("common.rowsPerPage")}
           </span>
           <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] rounded-[4px] border-2 border-black">
-              <SelectValue placeholder="Rows" />
+            <SelectTrigger className="h-8 w-[130px] rounded-[4px] border-2 border-border">
+              <SelectValue placeholder={t("common.rowsPerPage")} />
             </SelectTrigger>
             <SelectContent>
               {PAGE_SIZE_OPTIONS.map((size) => (

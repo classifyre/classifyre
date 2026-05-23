@@ -18,7 +18,7 @@ from ...models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
 )
-from ...utils.file_parser import parse_bytes
+from ...utils.file_parser import resolve_mime_type
 from ...utils.hashing import hash_url, normalize_http_url
 from ..atlassian_common import (
     AtlassianCloudClient,
@@ -64,7 +64,6 @@ class JiraSource(BaseSource):
         content_options = self._content_options()
         self.include_comments = content_options.include_comments is not False
         self.include_attachments = content_options.include_attachments is not False
-        self.attachment_max_bytes = int(content_options.attachment_max_bytes or 5_242_880)
 
         self._seen_asset_hashes: set[str] = set()
         self._hash_to_url: dict[str, str] = {}
@@ -102,17 +101,11 @@ class JiraSource(BaseSource):
             result["message"] = f"Failed to connect to Jira Cloud API: {exc}"
         return result
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
 
         self._reset_runtime_state()
-
-        pipeline = None
-        if self.config.detectors and any(detector.enabled for detector in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
         fields = [
             "summary",
@@ -147,23 +140,18 @@ class JiraSource(BaseSource):
                 while len(pending_batch) >= self.BATCH_SIZE:
                     to_emit = pending_batch[: self.BATCH_SIZE]
                     pending_batch = pending_batch[self.BATCH_SIZE :]
-                    if pipeline is not None:
-                        to_emit = await pipeline.process(to_emit)
                     if to_emit:
                         yield to_emit
 
         if pending_batch:
-            to_emit = pending_batch
-            if pipeline is not None:
-                to_emit = await pipeline.process(to_emit)
-            if to_emit:
-                yield to_emit
+            yield pending_batch
 
     def _reset_runtime_state(self) -> None:
         self._seen_asset_hashes = set()
         self._hash_to_url = {}
         self._asset_content_cache = {}
         self._attachment_url_by_hash = {}
+        self._attachment_name_by_hash = {}
 
     def _effective_jql(self) -> str:
         scope = self._optional().scope
@@ -210,7 +198,7 @@ class JiraSource(BaseSource):
         if sampling.strategy == SamplingStrategy.ALL:
             return issues
 
-        limit = int(sampling.limit or 100)
+        limit = int(sampling.rows_per_page or 100)
         if limit >= len(issues):
             return issues
 
@@ -417,6 +405,7 @@ class JiraSource(BaseSource):
             self._attachment_url_by_hash[attachment_hash] = normalized_url
             mime = str(attachment.get("mimeType") or "").lower()
             filename = str(attachment.get("filename") or f"attachment-{attachment.get('id')}")
+            self._attachment_name_by_hash[attachment_hash] = filename
             metadata = {
                 "issue_hash": issue_hash,
                 "attachment_id": attachment.get("id"),
@@ -516,6 +505,31 @@ class JiraSource(BaseSource):
         assets.append(asset)
         return True
 
+    async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
+        normalized = normalize_http_url(asset_id, base_url=self.base_url)
+        if normalized:
+            asset_hash = self.generate_hash_id(normalized)
+            asset_id = asset_hash
+
+        attachment_url = self._attachment_url_by_hash.get(asset_id) or self._hash_to_url.get(
+            asset_id
+        )
+        if not attachment_url:
+            return None
+
+        try:
+            file_bytes, declared_mime = self.client.get_bytes(attachment_url)
+        except Exception as exc:
+            logger.warning("Failed to fetch Jira attachment bytes for %s: %s", attachment_url, exc)
+            return None
+
+        mime_type = resolve_mime_type(
+            file_bytes,
+            declared_mime_type=declared_mime,
+            file_name=self._attachment_file_name(asset_id, attachment_url),
+        )
+        return file_bytes, mime_type
+
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
         cached = self._asset_content_cache.get(asset_id)
         if cached:
@@ -541,13 +555,10 @@ class JiraSource(BaseSource):
             logger.warning("Failed to fetch Jira attachment %s: %s", attachment_url, exc)
             return None
 
-        if self.attachment_max_bytes > 0 and len(file_bytes) > self.attachment_max_bytes:
-            file_bytes = file_bytes[: self.attachment_max_bytes]
-
-        parsed = parse_bytes(
+        parsed = self.parse_asset_bytes(
             file_bytes,
             declared_mime_type=declared_mime,
-            file_name=attachment_url,
+            file_name=self._attachment_file_name(asset_id, attachment_url),
         )
 
         if parsed.text_content:

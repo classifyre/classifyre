@@ -96,9 +96,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          current_version="$(node -p "require('./package.json').version")"
+          raw_version="$(node -p "require('./package.json').version")"
+          current_version="${raw_version%%-*}"
           if ! [[ "${current_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::package.json version must be major.minor.patch"
+            echo "::error::package.json version (${raw_version}) must start with major.minor.patch"
             exit 1
           fi
 
@@ -108,9 +109,9 @@ jobs:
           fi
 
           version="$(
-            node -e "
+            CURRENT="${current_version}" node -e "
               const type = process.env.RELEASE_TYPE;
-              const [major, minor, patch] = require('./package.json').version.split('.').map(Number);
+              const [major, minor, patch] = process.env.CURRENT.split('.').map(Number);
               const next =
                 type === 'major' ? [major + 1, 0, 0] :
                 type === 'minor' ? [major, minor + 1, 0] :
@@ -119,7 +120,6 @@ jobs:
             "
           )"
           tag="v${version}"
-          next_version="$(VERSION="${version}" node -e "const [major, minor, patch] = process.env.VERSION.split('.').map(Number); process.stdout.write([major, minor, patch + 1].join('.'))")"
 
           if git rev-parse "${tag}" >/dev/null 2>&1; then
             echo "::error::Tag ${tag} already exists locally"
@@ -132,7 +132,6 @@ jobs:
 
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
-          echo "next_version=${next_version}" >> "${GITHUB_OUTPUT}"
 
       - name: Configure git
         run: |
@@ -140,7 +139,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -221,7 +220,7 @@ jobs:
           df -h
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64,amd64
 
@@ -229,7 +228,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -300,8 +299,10 @@ jobs:
           uv build
           uv publish
 
-      - name: Push release tag
-        run: git push origin "${{ steps.versions.outputs.tag }}"
+      - name: Push release commit and tag to main
+        run: |
+          git push origin HEAD:main
+          git push origin "${{ steps.versions.outputs.tag }}"
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -311,8 +312,19 @@ jobs:
           draft: false
           prerelease: false
 
+      - name: Merge release back to develop
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          set -euo pipefail
+          git fetch origin develop
+          git checkout develop
+          git merge origin/main --no-edit \
+            -m "chore: merge release v${VERSION} back to develop"
+          git push origin develop
+
       - name: Setup kubectl
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
 
       - name: Configure kubeconfig
         run: |
@@ -320,6 +332,32 @@ jobs:
           mkdir -p ~/.kube
           printf '%s' "${{ secrets.KUBECONFIG }}" > ~/.kube/config
           chmod 600 ~/.kube/config
+
+      - name: Clear pending Helm operation
+        run: |
+          set -euo pipefail
+
+          history_json="$(helm history "${HELM_RELEASE_NAME}" -n "${HELM_NAMESPACE}" -o json 2>/dev/null || true)"
+          if [[ -z "${history_json}" || "${history_json}" == "[]" ]]; then
+            echo "No existing Helm release state to clear."
+            exit 0
+          fi
+
+          last_status="$(jq -r '.[-1].status // empty' <<< "${history_json}")"
+          last_revision="$(jq -r '.[-1].revision // empty' <<< "${history_json}")"
+
+          if [[ "${last_status}" != pending-* ]]; then
+            echo "Helm release is not pending (${last_status:-unknown})."
+            exit 0
+          fi
+
+          if [[ -z "${last_revision}" ]]; then
+            echo "::error::Pending Helm release detected but revision could not be resolved."
+            exit 1
+          fi
+
+          echo "Deleting stale Helm release secret for pending revision ${last_revision}."
+          kubectl -n "${HELM_NAMESPACE}" delete secret "sh.helm.release.v1.${HELM_RELEASE_NAME}.v${last_revision}" --ignore-not-found=true
 
       - name: Deploy release with Helm
         env:
@@ -345,31 +383,3 @@ jobs:
           kubectl -n "${HELM_NAMESPACE}" rollout status deployment/${HELM_RELEASE_NAME}-web --timeout=300s
           kubectl -n "${HELM_NAMESPACE}" get deploy,pods,svc
           helm status "${HELM_RELEASE_NAME}" -n "${HELM_NAMESPACE}"
-
-      - name: Bump main to next patch version
-        env:
-          NEXT_VERSION: ${{ steps.versions.outputs.next_version }}
-        run: |
-          set -euo pipefail
-          node scripts/set-release-version.mjs "${NEXT_VERSION}"
-          (cd apps/cli && uv lock)
-          (cd packages/schemas && uv lock)
-
-          git add \
-            package.json \
-            apps/api/package.json \
-            apps/blog/package.json \
-            apps/docs/package.json \
-            apps/web/package.json \
-            apps/cli/package.json \
-            apps/cli/pyproject.toml \
-            apps/cli/uv.lock \
-            packages/api-client/package.json \
-            packages/devops/package.json \
-            packages/schemas/package.json \
-            packages/schemas/pyproject.toml \
-            packages/schemas/uv.lock \
-            helm/classifyre/Chart.yaml
-
-          git commit -m "chore(release): prepare v${NEXT_VERSION}"
-          git push origin HEAD:main

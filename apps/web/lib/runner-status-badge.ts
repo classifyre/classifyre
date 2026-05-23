@@ -1,13 +1,17 @@
+import { type TranslationKey } from "@/i18n";
+
 const RUNNER_STATUS_BADGE_LABELS = {
-  COMPLETED: "Completed",
-  RUNNING: "Running",
-  PENDING: "Pending",
-  ERROR: "Error",
+  COMPLETED: "runners.status.completed",
+  WARNING: "runners.status.warning",
+  RUNNING: "runners.status.running",
+  PENDING: "runners.status.pending",
+  ERROR: "runners.status.error",
 } as const;
 
 const RUNNER_STATUS_BADGE_TONE = {
-  COMPLETED: "border-black bg-[#b7ff00] text-black",
-  RUNNING: "border-[#b7ff00]/30 bg-[#0b0f0a] text-[#b7ff00]",
+  COMPLETED: "border-border bg-accent text-accent-foreground",
+  WARNING: "border-orange-500/30 bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-400",
+  RUNNING: "border-accent/30 bg-background text-accent",
   PENDING: "border-border bg-muted text-foreground",
   ERROR: "border-destructive/30 bg-destructive/5 text-destructive",
 } as const;
@@ -18,10 +22,11 @@ function isRunnerStatusBadgeKey(value: string): value is RunnerStatusBadgeKey {
   return value in RUNNER_STATUS_BADGE_LABELS;
 }
 
-export function getRunnerStatusBadgeLabel(status?: string | null) {
+export function getRunnerStatusBadgeLabel(status?: string | null): TranslationKey {
   if (!status) return RUNNER_STATUS_BADGE_LABELS.PENDING;
-  if (isRunnerStatusBadgeKey(status)) return RUNNER_STATUS_BADGE_LABELS[status];
-  return status;
+  const upper = status.toUpperCase();
+  if (isRunnerStatusBadgeKey(upper)) return RUNNER_STATUS_BADGE_LABELS[upper];
+  return RUNNER_STATUS_BADGE_LABELS.PENDING;
 }
 
 export function getRunnerStatusBadgeTone(status?: string | null) {

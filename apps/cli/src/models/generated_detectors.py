@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
@@ -15,28 +16,9 @@ class DetectorType(StrEnum):
 
     SECRETS = 'SECRETS'
     PII = 'PII'
-    TOXIC = 'TOXIC'
-    NSFW = 'NSFW'
     YARA = 'YARA'
     BROKEN_LINKS = 'BROKEN_LINKS'
-    PROMPT_INJECTION = 'PROMPT_INJECTION'
-    PHISHING_URL = 'PHISHING_URL'
-    SPAM = 'SPAM'
-    LANGUAGE = 'LANGUAGE'
     CODE_SECURITY = 'CODE_SECURITY'
-    PLAGIARISM = 'PLAGIARISM'
-    IMAGE_VIOLENCE = 'IMAGE_VIOLENCE'
-    OCR_PII = 'OCR_PII'
-    DEID_SCORE = 'DEID_SCORE'
-    HATE_SPEECH = 'HATE_SPEECH'
-    AI_GENERATED = 'AI_GENERATED'
-    CONTENT_QUALITY = 'CONTENT_QUALITY'
-    BIAS = 'BIAS'
-    DUPLICATE = 'DUPLICATE'
-    DOMAIN_CLASS = 'DOMAIN_CLASS'
-    CONTENT_TYPE = 'CONTENT_TYPE'
-    SENSITIVITY_TIER = 'SENSITIVITY_TIER'
-    JURISDICTION_TAG = 'JURISDICTION_TAG'
     CUSTOM = 'CUSTOM'
 
 
@@ -154,8 +136,64 @@ class DetectorCatalog(RootModel[list[DetectorCatalogEntry]]):
     """
 
     root: list[DetectorCatalogEntry] = Field(
-        ...,
+        [
+            {
+                'detector_type': 'SECRETS',
+                'lifecycle_status': 'active',
+                'priority': 'P0',
+                'categories': ['SECURITY', 'COMPLIANCE'],
+                'supported_asset_types': ['TXT', 'TABLE', 'URL'],
+                'recommended_model': 'detect-secrets',
+                'notes': 'Detects confidential credentials like API keys, tokens, or passwords that could lead to security breaches.',
+            },
+            {
+                'detector_type': 'PII',
+                'lifecycle_status': 'active',
+                'priority': 'P0',
+                'categories': ['PRIVACY', 'COMPLIANCE'],
+                'supported_asset_types': ['TXT', 'TABLE', 'URL'],
+                'recommended_model': 'presidio-analyzer',
+                'notes': 'Identifies personal data (e.g., names, emails, IDs) that must be protected for privacy and compliance.',
+            },
+            {
+                'detector_type': 'YARA',
+                'lifecycle_status': 'active',
+                'priority': 'P1',
+                'categories': ['THREAT', 'SECURITY'],
+                'supported_asset_types': ['TXT', 'TABLE', 'URL', 'BINARY'],
+                'recommended_model': 'yara-python',
+                'notes': 'Uses security rules to identify known malware patterns or suspicious file content.',
+            },
+            {
+                'detector_type': 'BROKEN_LINKS',
+                'lifecycle_status': 'active',
+                'priority': 'P2',
+                'categories': ['QUALITY'],
+                'supported_asset_types': ['TXT', 'TABLE', 'URL'],
+                'recommended_model': 'HTTP validation engine',
+                'notes': 'Finds non-working or invalid links that reduce content quality and user trust.',
+            },
+            {
+                'detector_type': 'CODE_SECURITY',
+                'lifecycle_status': 'active',
+                'priority': 'P3',
+                'categories': ['SECURITY', 'THREAT'],
+                'supported_asset_types': ['TXT', 'TABLE', 'OTHER'],
+                'recommended_model': 'bandit',
+                'notes': 'Identifies vulnerabilities or insecure patterns in source code (e.g., hardcoded secrets).',
+            },
+            {
+                'detector_type': 'CUSTOM',
+                'lifecycle_status': 'active',
+                'priority': 'P0',
+                'categories': ['CLASSIFICATION', 'COMPLIANCE'],
+                'supported_asset_types': ['TXT', 'TABLE', 'URL', 'IMAGE'],
+                'recommended_model': 'mDeBERTa-v3 + SetFit + GLiNER + HuggingFace transformers',
+                'notes': 'User-defined rules and pipelines tailored to specific business needs. Supports regex, GLiNER2, LLM, text classification, image classification, feature extraction, and object detection pipelines.',
+            },
+        ],
         description='Detector capability catalog used for planning and runtime routing',
+        validate_default=True,
     )
 
 
@@ -183,217 +221,349 @@ class Location(BaseModel):
     path: str | None = Field(None, description='File path or identifier')
 
 
-class ContentEnabledPattern(StrEnum):
-    """
-    Content detector pattern types
-    """
-
-    toxicity = 'toxicity'
-    severe_toxicity = 'severe_toxicity'
-    obscene = 'obscene'
-    threat = 'threat'
-    insult = 'insult'
-    identity_attack = 'identity_attack'
-    nsfw = 'nsfw'
-    nsfw_explicit = 'nsfw_explicit'
-
-
 class SecretsEnabledPattern(StrEnum):
     """
-    Secrets detector pattern types
+    Secrets detector pattern types. Each value maps to a detect-secrets plugin: artifactory=ArtifactoryDetector, aws=AWSKeyDetector, azure_storage=AzureStorageKeyDetector, basic_auth=BasicAuthDetector, cloudant=CloudantDetector, discord=DiscordBotTokenDetector, github=GitHubTokenDetector, gitlab=GitLabTokenDetector, high_entropy_base64=Base64HighEntropyString, high_entropy_hex=HexHighEntropyString, ibm_cloud_iam=IbmCloudIamDetector, ibm_cos_hmac=IbmCosHmacDetector, ip_public=IPPublicDetector, jwt=JwtTokenDetector, keyword=KeywordDetector, mailchimp=MailchimpDetector, npm=NpmDetector, openai=OpenAIDetector, private_key=PrivateKeyDetector, pypi=PypiTokenDetector, sendgrid=SendGridDetector, slack=SlackDetector, softlayer=SoftlayerDetector, square_oauth=SquareOAuthDetector, stripe=StripeDetector, telegram=TelegramBotTokenDetector, twilio=TwilioKeyDetector.
     """
 
+    artifactory = 'artifactory'
     aws = 'aws'
+    azure_storage = 'azure_storage'
+    basic_auth = 'basic_auth'
+    cloudant = 'cloudant'
+    discord = 'discord'
     github = 'github'
-    slack = 'slack'
-    stripe = 'stripe'
-    google = 'google'
-    azure = 'azure'
+    gitlab = 'gitlab'
+    high_entropy_base64 = 'high_entropy_base64'
+    high_entropy_hex = 'high_entropy_hex'
+    ibm_cloud_iam = 'ibm_cloud_iam'
+    ibm_cos_hmac = 'ibm_cos_hmac'
+    ip_public = 'ip_public'
+    jwt = 'jwt'
+    keyword = 'keyword'
+    mailchimp = 'mailchimp'
+    npm = 'npm'
+    openai = 'openai'
     private_key = 'private_key'
-    generic_api_key = 'generic_api_key'
-    generic_secret = 'generic_secret'
+    pypi = 'pypi'
+    sendgrid = 'sendgrid'
+    slack = 'slack'
+    softlayer = 'softlayer'
+    square_oauth = 'square_oauth'
+    stripe = 'stripe'
+    telegram = 'telegram'
+    twilio = 'twilio'
 
 
 class PIIEnabledPattern(StrEnum):
     """
-    PII detector pattern types
+    Presidio entity types for PII detection. Global: CREDIT_CARD, CRYPTO, DATE_TIME, EMAIL_ADDRESS, IBAN_CODE, IP_ADDRESS, NRP, LOCATION, PERSON, PHONE_NUMBER, MEDICAL_LICENSE, URL. USA: US_BANK_NUMBER, US_DRIVER_LICENSE, US_ITIN, US_PASSPORT, US_SSN. UK: UK_NHS. Spain: ES_NIF, ES_NIE. Italy: IT_FISCAL_CODE, IT_DRIVER_LICENSE, IT_VAR_CODE, IT_PASSPORT, IT_IDENTITY_CARD. Singapore: SG_NRIC_FIN, SG_UEN. Australia: AU_ABN, AU_ACN, AU_TFN, AU_MEDICARE. India: IN_PAN, IN_AADHAAR, IN_VEHICLE_REGISTRATION, IN_VOTER. Finland: FI_PERSONAL_IDENTITY_CODE. Poland: PL_PESEL. DACH: AT_SVNR, CH_AHV, DE_TAX_ID, EU_NATIONAL_ID.
     """
 
-    credit_card = 'credit_card'
-    ssn = 'ssn'
-    email = 'email'
-    phone_number = 'phone_number'
-    person = 'person'
-    location = 'location'
-    ip_address = 'ip_address'
-    iban_code = 'iban_code'
-    us_passport = 'us_passport'
-    us_driver_license = 'us_driver_license'
-    austrian_svnr = 'austrian_svnr'
-    swiss_ahv = 'swiss_ahv'
-    german_tax_id = 'german_tax_id'
-    eu_national_id = 'eu_national_id'
-    date_of_birth = 'date_of_birth'
+    CREDIT_CARD = 'CREDIT_CARD'
+    CRYPTO = 'CRYPTO'
+    DATE_TIME = 'DATE_TIME'
+    EMAIL_ADDRESS = 'EMAIL_ADDRESS'
+    IBAN_CODE = 'IBAN_CODE'
+    IP_ADDRESS = 'IP_ADDRESS'
+    NRP = 'NRP'
+    LOCATION = 'LOCATION'
+    PERSON = 'PERSON'
+    PHONE_NUMBER = 'PHONE_NUMBER'
+    MEDICAL_LICENSE = 'MEDICAL_LICENSE'
+    URL = 'URL'
+    US_BANK_NUMBER = 'US_BANK_NUMBER'
+    US_DRIVER_LICENSE = 'US_DRIVER_LICENSE'
+    US_ITIN = 'US_ITIN'
+    US_PASSPORT = 'US_PASSPORT'
+    US_SSN = 'US_SSN'
+    UK_NHS = 'UK_NHS'
+    ES_NIF = 'ES_NIF'
+    ES_NIE = 'ES_NIE'
+    IT_FISCAL_CODE = 'IT_FISCAL_CODE'
+    IT_DRIVER_LICENSE = 'IT_DRIVER_LICENSE'
+    IT_VAR_CODE = 'IT_VAR_CODE'
+    IT_PASSPORT = 'IT_PASSPORT'
+    IT_IDENTITY_CARD = 'IT_IDENTITY_CARD'
+    SG_NRIC_FIN = 'SG_NRIC_FIN'
+    SG_UEN = 'SG_UEN'
+    AU_ABN = 'AU_ABN'
+    AU_ACN = 'AU_ACN'
+    AU_TFN = 'AU_TFN'
+    AU_MEDICARE = 'AU_MEDICARE'
+    IN_PAN = 'IN_PAN'
+    IN_AADHAAR = 'IN_AADHAAR'
+    IN_VEHICLE_REGISTRATION = 'IN_VEHICLE_REGISTRATION'
+    IN_VOTER = 'IN_VOTER'
+    FI_PERSONAL_IDENTITY_CODE = 'FI_PERSONAL_IDENTITY_CODE'
+    PL_PESEL = 'PL_PESEL'
+    AT_SVNR = 'AT_SVNR'
+    CH_AHV = 'CH_AHV'
+    DE_TAX_ID = 'DE_TAX_ID'
+    EU_NATIONAL_ID = 'EU_NATIONAL_ID'
+
+
+class PIIRecognizerPattern(BaseModel):
+    """
+    Regex pattern entry for a custom Presidio recognizer
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str = Field(..., description='Human-readable name for this pattern')
+    regex: str = Field(..., description='Regular expression to match the entity')
+    score: float = Field(
+        ...,
+        description='Confidence score assigned when this pattern matches (0-1)',
+        ge=0.0,
+        le=1.0,
+    )
+
+
+class Patterns(RootModel[list[PIIRecognizerPattern]]):
+    root: list[PIIRecognizerPattern] = Field(
+        None, description='Regex patterns for this recognizer', min_length=1
+    )
+
+
+class DenyList(RootModel[list[str]]):
+    root: list[str] = Field(
+        None,
+        description='Exact-match deny-list terms for this recognizer',
+        min_length=1,
+    )
+
+
+class PIICustomRecognizer(BaseModel):
+    """
+    Ad-hoc Presidio recognizer added at runtime. Supports regex patterns, deny-list terms, or both. The recognizer is registered in the analyzer engine and applies to all scans with this config.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str = Field(..., description='Unique name for this recognizer')
+    supported_entity: str = Field(
+        ...,
+        description='Entity label produced when this recognizer fires (e.g. MY_EMPLOYEE_ID)',
+    )
+    supported_language: str | None = Field(
+        'en', description='BCP-47 language code this recognizer applies to'
+    )
+    patterns: Patterns | None = Field(
+        None, description='Regex patterns for this recognizer'
+    )
+    deny_list: DenyList | None = Field(
+        None, description='Exact-match deny-list terms for this recognizer'
+    )
+    context: list[str] | None = Field(
+        None,
+        description="Context words that boost the score when found near a match (e.g. ['zip', 'code'])",
+    )
 
 
 class DetectorConfig(BaseModel):
     """
-    Configuration for detector
+    Base configuration for detector
     """
 
-    enabled_patterns: list[str] | None = Field(
-        None, description='List of enabled pattern names'
-    )
-    severity_threshold: Severity | None = Field(
-        None, description='Minimum severity to report'
-    )
-    confidence_threshold: float | None = Field(
-        0.7, description='Minimum confidence to report (0-1)', ge=0.0, le=1.0
-    )
-    max_findings: int | None = Field(
-        None, description='Maximum number of findings to return'
+
+class EnabledPatterns(RootModel[list[SecretsEnabledPattern]]):
+    root: list[SecretsEnabledPattern] = Field(
+        None,
+        description='Subset of detect-secrets plugins to enable. When null all supported plugins are active.',
+        min_length=1,
     )
 
 
-class ContentModelName(StrEnum):
-    """
-    Detoxify model variant
-    """
-
-    original = 'original'
-    unbiased = 'unbiased'
-    multilingual = 'multilingual'
-
-
-class ContentDetectorConfig(DetectorConfig):
-    """
-    Configuration for content safety detectors
-    """
-
-    enabled_patterns: list[ContentEnabledPattern] | None = Field(
-        None, description='Specific content types to detect'
+class EntropyLimitBase64(RootModel[float]):
+    root: float = Field(
+        None,
+        description='Entropy threshold for Base64HighEntropyString (0-8). Defaults to detect-secrets built-in of 4.5 when null. Lower values catch more secrets but increase false positives.',
+        ge=0.0,
+        le=8.0,
     )
-    model_name: ContentModelName | None = Field(
-        'original', description='Detoxify model variant', title='ContentModelName'
+
+
+class EntropyLimitHex(RootModel[float]):
+    root: float = Field(
+        None,
+        description='Entropy threshold for HexHighEntropyString (0-8). Defaults to detect-secrets built-in of 3.0 when null. Lower values catch more secrets but increase false positives.',
+        ge=0.0,
+        le=8.0,
     )
 
 
 class SecretsDetectorConfig(DetectorConfig):
     """
-    Configuration for secrets detector
+    Configuration for secrets detector powered by detect-secrets
     """
 
-    enabled_patterns: list[SecretsEnabledPattern] | None = Field(
-        None, description='Specific secret types to detect'
+    enabled_patterns: EnabledPatterns | None = Field(
+        None,
+        description='Subset of detect-secrets plugins to enable. When null all supported plugins are active.',
+    )
+    entropy_limit_base64: EntropyLimitBase64 | None = Field(
+        None,
+        description='Entropy threshold for Base64HighEntropyString (0-8). Defaults to detect-secrets built-in of 4.5 when null. Lower values catch more secrets but increase false positives.',
+    )
+    entropy_limit_hex: EntropyLimitHex | None = Field(
+        None,
+        description='Entropy threshold for HexHighEntropyString (0-8). Defaults to detect-secrets built-in of 3.0 when null. Lower values catch more secrets but increase false positives.',
+    )
+    confidence_threshold: float | None = Field(
+        0.7,
+        description='Minimum confidence score to report a finding (0-1)',
+        ge=0.0,
+        le=1.0,
+    )
+    max_findings: int | None = Field(
+        None, description='Maximum number of findings to return per asset'
+    )
+    severity_threshold: Severity | None = Field(
+        None,
+        description='Minimum severity level to include in results. Findings below this threshold are suppressed.',
+    )
+
+
+class MaxLength(RootModel[int]):
+    root: int = Field(
+        None,
+        description="Override spaCy's nlp.max_length (default 1,000,000 chars). Set higher than your longest expected input to avoid the E088 error. Prefer chunk_size for very large texts.",
+        ge=1,
+    )
+
+
+class ChunkSize(RootModel[int]):
+    root: int = Field(
+        None,
+        description='Split text into chunks of this many characters before analysis. Findings from all chunks are merged with corrected offsets. When null the full text is passed as-is (subject to max_length).',
+        ge=1,
+    )
+
+
+class ChunkOverlap(RootModel[int]):
+    root: int = Field(
+        0,
+        description='Character overlap between consecutive chunks. Helps detect entities that span a chunk boundary.',
+        ge=0,
     )
 
 
 class PIIDetectorConfig(DetectorConfig):
     """
-    Configuration for PII detector
+    Configuration for PII detector powered by Microsoft Presidio
     """
 
     enabled_patterns: list[PIIEnabledPattern] | None = Field(
-        None, description='Specific PII types to detect'
+        None,
+        description='Presidio entity types to detect. When null, all supported entities are enabled. Use PIIEnabledPattern values (e.g. EMAIL_ADDRESS, US_SSN, CREDIT_CARD).',
     )
-    language: str | None = Field('en', description='Language code for NER models')
+    language: str | None = Field(
+        'en', description='BCP-47 language code for NER models (e.g. en, de, es)'
+    )
+    spacy_model: str | None = Field(
+        None,
+        description='spaCy model to load (e.g. en_core_web_sm, en_core_web_lg). Defaults to en_core_web_sm when null.',
+    )
+    spacy_model_url: str | None = Field(
+        None,
+        description='Wheel URL for the spaCy model. When set and the model is not installed, the CLI installs it at runtime.',
+    )
+    custom_recognizers: list[PIICustomRecognizer] | None = Field(
+        None,
+        description='Ad-hoc recognizers added to the Presidio registry at runtime. Each entry defines a regex-pattern or deny-list recognizer for a custom entity type.',
+    )
+    max_length: MaxLength | None = Field(
+        None,
+        description="Override spaCy's nlp.max_length (default 1,000,000 chars). Set higher than your longest expected input to avoid the E088 error. Prefer chunk_size for very large texts.",
+    )
+    chunk_size: ChunkSize | None = Field(
+        None,
+        description='Split text into chunks of this many characters before analysis. Findings from all chunks are merged with corrected offsets. When null the full text is passed as-is (subject to max_length).',
+    )
+    chunk_overlap: ChunkOverlap | None = Field(
+        0,
+        description='Character overlap between consecutive chunks. Helps detect entities that span a chunk boundary.',
+        validate_default=True,
+    )
+    confidence_threshold: float | None = Field(
+        0.7,
+        description='Minimum Presidio confidence score to report a finding (0-1)',
+        ge=0.0,
+        le=1.0,
+    )
+    max_findings: int | None = Field(
+        None, description='Maximum number of findings to return per asset'
+    )
+
+
+class YaraRuleConfig(BaseModel):
+    """
+    A single YARA rule definition. Strings are assigned identifiers $s0, $s1, … in order and can be referenced in the condition by index or via 'any of them' / 'N of ($s*)'.
+    """
+
+    name: str = Field(
+        ...,
+        description='Rule identifier — letters, digits, and underscores only. Must be unique within a config.',
+        pattern='^[A-Za-z][A-Za-z0-9_]*$',
+    )
+    description: str | None = Field(
+        None, description='Human-readable description of what the rule detects.'
+    )
+    severity: Severity = Field(
+        ..., description='Severity level emitted when the rule fires.'
+    )
+    category: str | None = Field(
+        None,
+        description="Free-form tag for grouping findings, e.g. 'secrets', 'malware', 'supply_chain'.",
+    )
+    strings: list[str] = Field(
+        ...,
+        description='YARA string patterns with optional modifiers. Assigned identifiers $s0, $s1, … in declaration order. Supported formats: regex (/pattern/ [ascii|wide|nocase|fullword]), literal ("text" [modifiers]), hex ({ HH HH … }).',
+    )
+    condition: str = Field(
+        ...,
+        description="YARA condition expression, e.g. 'any of them', '2 of ($s*)', '$s0 and $s1'.",
+    )
 
 
 class ThreatDetectorConfig(DetectorConfig):
     """
-    Configuration for threat detector
+    YARA-based threat detector. Compile one or more structured rule objects into a live YARA ruleset that is scanned against extracted asset content. Use the bundled examples as starting points and compose additional rules as needed.
     """
 
-    enabled_patterns: list[str] | None = Field(
-        None, description='YARA rule names to enable'
+    rules: list[YaraRuleConfig] | None = Field(
+        None,
+        description='Rules to compile and run. When null or empty no scan is performed.',
     )
-    rules_path: str | None = Field(
-        None, description='Path to custom YARA rules directory'
+    timeout: int | None = Field(
+        60,
+        description='Maximum seconds to spend scanning a single asset before aborting.',
     )
-    timeout: int | None = Field(60, description='Timeout for YARA scanning in seconds')
+    confidence_threshold: float | None = Field(
+        0.7,
+        description='Minimum confidence score to report a finding (0-1). YARA confidence is computed from match count.',
+        ge=0.0,
+        le=1.0,
+    )
+    max_findings: int | None = Field(
+        None, description='Maximum number of findings to return per asset'
+    )
+    severity_threshold: Severity | None = Field(
+        None,
+        description='Minimum severity level to include in results. Findings below this threshold are suppressed.',
+    )
 
 
-class BrokenLinksDetectorConfig(BaseModel):
+class BrokenLinksDetectorConfig(DetectorConfig):
     """
     Configuration for broken links detector
     """
 
-
-class ContentQualityDetectorConfig(DetectorConfig):
-    """
-    Configuration for content quality scoring detectors
-    """
-
-    readability_weight: float | None = Field(
-        0.4,
-        description='Weight applied to readability signal in composite score',
-        ge=0.0,
-        le=1.0,
-    )
-    coherence_weight: float | None = Field(
-        0.35,
-        description='Weight applied to coherence signal in composite score',
-        ge=0.0,
-        le=1.0,
-    )
-    density_weight: float | None = Field(
-        0.25,
-        description='Weight applied to information-density signal in composite score',
-        ge=0.0,
-        le=1.0,
-    )
-    min_score_threshold: float | None = Field(
-        40, description='Minimum quality score threshold to report', ge=0.0, le=100.0
-    )
-
-
-class ClassificationDetectorConfig(DetectorConfig):
-    """
-    Configuration for classification and tagging detectors
-    """
-
-    enabled_patterns: list[str] | None = Field(
-        None,
-        description='Optional subset of labels/tags to include for this classifier',
-    )
-
-
-class DeidScoreDetectorConfig(PIIDetectorConfig):
-    """
-    Configuration for de-identification completeness scoring detector
-    """
-
-    min_k_anonymity: int | None = Field(
-        5, description='Minimum target k-anonymity threshold for risk evaluation', ge=1
-    )
-    min_l_diversity: int | None = Field(
-        2, description='Minimum target l-diversity threshold for risk evaluation', ge=1
-    )
-    quasi_identifiers: list[PIIEnabledPattern] | None = Field(
-        None,
-        description='Quasi-identifiers used for re-identification risk calculations',
-    )
-
-
-class BiasEnabledPattern(StrEnum):
-    """
-    Bias detector pattern types
-    """
-
-    gender_bias = 'gender_bias'
-    racial_bias = 'racial_bias'
-    age_bias = 'age_bias'
-    religious_bias = 'religious_bias'
-    political_bias = 'political_bias'
-
-
-class BiasDetectorConfig(DetectorConfig):
-    """
-    Configuration for fairness and bias detector
-    """
-
-    enabled_patterns: list[BiasEnabledPattern] | None = Field(
-        None, description='Specific bias signals to detect'
+    max_findings: int | None = Field(
+        None, description='Maximum number of broken link findings to return per asset'
     )
 
 
@@ -405,6 +575,7 @@ class CustomDetectorMethod(StrEnum):
     RULESET = 'RULESET'
     CLASSIFIER = 'CLASSIFIER'
     ENTITY = 'ENTITY'
+    PIPELINE = 'PIPELINE'
 
 
 class CustomRegexRule(BaseModel):
@@ -447,8 +618,8 @@ class Aggregate(StrEnum):
     first = 'first'
     last = 'last'
     list = 'list'
-    join_ = 'join'
-    count_ = 'count'
+    join = 'join'
+    count = 'count'
 
 
 class CustomExtractorField(BaseModel):
@@ -467,7 +638,8 @@ class CustomExtractorField(BaseModel):
     )
     type: Type | None = 'string'
     entity_label: str | None = Field(
-        None, description='GLiNER entity label (ENTITY and CLASSIFIER methods)'
+        None,
+        description='GLiNER2 schema label used for extraction (ENTITY and CLASSIFIER methods)',
     )
     regex_pattern: str | None = Field(
         None,
@@ -498,7 +670,7 @@ class CustomExtractorConfig(BaseModel):
     )
     enabled: bool | None = True
     fields: list[CustomExtractorField] = Field(..., min_length=1)
-    gliner_model: str | None = 'urchade/gliner_multi-v2.1'
+    gliner_model: str | None = 'fastino/gliner2-base-v1'
     content_limit: int | None = Field(
         4000,
         description='Chars of content to pass to extractor (classifier matched_content is only 320 chars)',
@@ -511,8 +683,8 @@ class CustomRulesetConfig(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    regex_rules: list[CustomRegexRule] | None = Field(default_factory=list)
-    keyword_rules: list[CustomKeywordRule] | None = Field(default_factory=list)
+    regex_rules: list[CustomRegexRule] | None = Field([], validate_default=True)
+    keyword_rules: list[CustomKeywordRule] | None = Field([], validate_default=True)
 
 
 class CustomClassifierLabel(BaseModel):
@@ -540,11 +712,11 @@ class CustomClassifierConfig(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    labels: list[CustomClassifierLabel] | None = Field(default_factory=list)
+    labels: list[CustomClassifierLabel] | None = Field([], validate_default=True)
     zero_shot_model: str | None = 'MoritzLaurer/mDeBERTa-v3-base-mnli-xnli'
     hypothesis_template: str | None = 'This text contains {}.'
     training_examples: list[CustomClassifierTrainingExample] | None = Field(
-        default_factory=list
+        [], validate_default=True
     )
     min_examples_per_label: int | None = Field(8, ge=1)
     setfit_model: str | None = (
@@ -557,7 +729,512 @@ class CustomEntityConfig(BaseModel):
         extra='forbid',
     )
     entity_labels: list[str] | None = []
-    model: str | None = 'urchade/gliner_multi-v2.1'
+    entity_descriptions: dict[str, str] | None = Field(
+        {}, description='Optional GLiNER2 schema descriptions keyed by entity label'
+    )
+    model: str | None = 'fastino/gliner2-base-v1'
+
+
+class Skip(RootModel[str]):
+    root: str = Field(..., pattern='^B[0-9]+$')
+
+
+class Skips(RootModel[list[Skip]]):
+    root: list[Skip] = Field(
+        None,
+        description="Bandit test IDs to skip (e.g. ['B101', 'B105']). When null all tests run. Takes precedence over tests when both are set.",
+        min_length=1,
+    )
+
+
+class Test(RootModel[str]):
+    root: str = Field(..., pattern='^B[0-9]+$')
+
+
+class Tests(RootModel[list[Test]]):
+    root: list[Test] = Field(
+        None,
+        description="Explicit list of Bandit test IDs to run (e.g. ['B102', 'B301']). When null all tests (minus skips) run.",
+        min_length=1,
+    )
+
+
+class CodeSecurityDetectorConfig(DetectorConfig):
+    """
+    Configuration for the code security detector powered by Bandit static analysis. Use skips/tests to control which Bandit checks run.
+    """
+
+    skips: Skips | None = Field(
+        None,
+        description="Bandit test IDs to skip (e.g. ['B101', 'B105']). When null all tests run. Takes precedence over tests when both are set.",
+    )
+    tests: Tests | None = Field(
+        None,
+        description="Explicit list of Bandit test IDs to run (e.g. ['B102', 'B301']). When null all tests (minus skips) run.",
+    )
+    severity_threshold: Severity | None = Field(
+        None,
+        description='Minimum Bandit issue severity to report. Findings below this threshold are suppressed.',
+    )
+    confidence_threshold: float | None = Field(
+        0.7,
+        description='Minimum confidence score to report a finding (0-1)',
+        ge=0.0,
+        le=1.0,
+    )
+    max_findings: int | None = Field(
+        None, description='Maximum number of findings to return per asset'
+    )
+
+
+class GenericDetectorConfig(DetectorConfig):
+    """
+    Generic config for detectors without specialised parameters.
+    """
+
+    confidence_threshold: float | None = Field(
+        0.7,
+        description='Minimum confidence score to report a finding (0-1)',
+        ge=0.0,
+        le=1.0,
+    )
+    max_findings: int | None = Field(
+        None, description='Maximum number of findings to return per asset'
+    )
+
+
+class PipelineEntityDefinition(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    description: str | None = ''
+    required: bool | None = False
+
+
+class PipelineModelConfig(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    path: str | None = None
+    name: str | None = None
+
+
+class PipelineClassificationDefinition(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    labels: list[str] | None = []
+    multi_label: bool | None = False
+
+
+class PipelineValidationRule(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    field: str | None = ''
+    type: str | None = 'regex'
+    pattern: str | None = None
+
+
+class PipelineValidationConfig(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    confidence_threshold: float | None = 0.7
+    rules: list[PipelineValidationRule] | None = None
+
+
+class PipelineResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    entities: dict[str, list[dict[str, Any]]] | None = None
+    classification: dict[str, dict[str, Any]] | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class Severity1(StrEnum):
+    """
+    Severity level assigned to findings from this pattern. When omitted, defaults to high (confidence is always 1.0 for regex).
+    """
+
+    critical = 'critical'
+    high = 'high'
+    medium = 'medium'
+    low = 'low'
+    info = 'info'
+
+
+class RegexPatternDefinition(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    pattern: str = Field(
+        ..., description='Regular expression pattern (RE2 syntax recommended)'
+    )
+    flags: Any | None = Field(
+        None,
+        description='Legacy integer flags (e.g. re.IGNORECASE). Prefer the boolean fields below instead.',
+    )
+    description: str | None = Field(
+        None, description='Human-readable description of the pattern'
+    )
+    severity: Severity1 | None = Field(
+        None,
+        description='Severity level assigned to findings from this pattern. When omitted, defaults to high (confidence is always 1.0 for regex).',
+    )
+    case_sensitive: bool | None = Field(
+        True,
+        description='Whether matching is case-sensitive. Set to false for case-insensitive matching.',
+    )
+    dot_nl: bool | None = Field(
+        False,
+        description='Whether the dot (.) metacharacter matches newline characters.',
+    )
+    literal: bool | None = Field(
+        False,
+        description='Treat the pattern as a literal string instead of a regular expression.',
+    )
+    longest_match: bool | None = Field(
+        False,
+        description='Prefer the longest possible match instead of the first match (RE2 only).',
+    )
+    max_mem: int | None = Field(
+        None,
+        description='Maximum memory (bytes) for the RE2 automaton. RE2 only; ignored with stdlib fallback.',
+        ge=1,
+    )
+    group: int | None = Field(
+        0,
+        description='Capture group index to extract as matched content. 0 = entire match (default).',
+        ge=0,
+    )
+
+
+class PipelineSeverityRule(BaseModel):
+    """
+    Maps a predicted label to a severity level. Pattern is matched case-insensitively as a substring of the label.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    pattern: str = Field(
+        ...,
+        description="Case-insensitive substring matched against the predicted label (e.g. 'spam', 'nsfw', 'person').",
+    )
+    severity: Severity
+
+
+class Type1(StrEnum):
+    GLINER2 = 'GLINER2'
+
+
+class GLiNER2PipelineSchema(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['GLINER2'] = 'GLINER2'
+    entities: dict[str, PipelineEntityDefinition] | None = None
+    classification: dict[str, PipelineClassificationDefinition] | None = None
+    model: PipelineModelConfig | None = None
+    validation: PipelineValidationConfig | None = None
+
+
+class Type2(StrEnum):
+    REGEX = 'REGEX'
+
+
+class RegexPipelineSchema(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['REGEX'] = 'REGEX'
+    patterns: dict[str, RegexPatternDefinition] | None = None
+    validation: PipelineValidationConfig | None = None
+
+
+class Type3(StrEnum):
+    LLM = 'LLM'
+
+
+class LLMPipelineSchema(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['LLM'] = 'LLM'
+
+
+class Type4(StrEnum):
+    TEXT_CLASSIFICATION = 'TEXT_CLASSIFICATION'
+
+
+class FunctionToApply(StrEnum):
+    """
+    Score normalization: 'softmax' for single-label, 'sigmoid' for multi-label, 'none' for raw logits.
+    """
+
+    sigmoid = 'sigmoid'
+    softmax = 'softmax'
+    none = 'none'
+
+
+class MaxLength1(RootModel[int]):
+    root: int = Field(
+        None, description="Override the tokenizer's maximum sequence length.", ge=1
+    )
+
+
+class ChunkSize1(RootModel[int]):
+    root: int = Field(
+        None,
+        description='Split text into chunks of this many characters before classification.',
+        ge=1,
+    )
+
+
+class ChunkOverlap1(RootModel[int]):
+    root: int = Field(
+        0, description='Character overlap between consecutive chunks.', ge=0
+    )
+
+
+class TextClassificationPipelineSchema(BaseModel):
+    """
+    Text classification pipeline using a HuggingFace fine-tuned model. Runs a single model; create multiple custom detectors to run multiple classifiers.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['TEXT_CLASSIFICATION']
+    model: str = Field(
+        ...,
+        description="HuggingFace hub ID (e.g. 'mrm8488/bert-tiny-finetuned-sms-spam-detection') or absolute local directory path.",
+    )
+    model_revision: str | None = Field(
+        None,
+        description='Git branch, tag, or commit hash when fetching from the HuggingFace hub.',
+    )
+    device: str | None = Field(
+        'cpu',
+        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
+    )
+    top_k: int | None = Field(
+        None,
+        description='Maximum number of top predictions to return. When null all labels above confidence_threshold are returned.',
+    )
+    function_to_apply: FunctionToApply | None = Field(
+        None,
+        description="Score normalization: 'softmax' for single-label, 'sigmoid' for multi-label, 'none' for raw logits.",
+    )
+    confidence_threshold: float | None = Field(
+        0.7,
+        description='Minimum prediction confidence to report a label as a finding (0-1).',
+        ge=0.0,
+        le=1.0,
+    )
+    severity: Severity | None = Field(
+        'info', description='Default severity when no severity_map rule matches.'
+    )
+    severity_map: list[PipelineSeverityRule] | None = Field(
+        None,
+        description='Ordered rules mapping predicted labels to severity levels. First matching rule wins.',
+    )
+    max_length: MaxLength1 | None = Field(
+        None, description="Override the tokenizer's maximum sequence length."
+    )
+    chunk_size: ChunkSize1 | None = Field(
+        None,
+        description='Split text into chunks of this many characters before classification.',
+    )
+    chunk_overlap: ChunkOverlap1 | None = Field(
+        0,
+        description='Character overlap between consecutive chunks.',
+        validate_default=True,
+    )
+
+
+class Type5(StrEnum):
+    IMAGE_CLASSIFICATION = 'IMAGE_CLASSIFICATION'
+
+
+class FunctionToApply1(StrEnum):
+    """
+    Score normalization applied after the model forward pass.
+    """
+
+    sigmoid = 'sigmoid'
+    softmax = 'softmax'
+    none = 'none'
+
+
+class ImageClassificationPipelineSchema(BaseModel):
+    """
+    Image classification pipeline using a HuggingFace vision model. Runs a single model; create multiple custom detectors to run multiple classifiers.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['IMAGE_CLASSIFICATION']
+    model: str | None = Field(
+        None,
+        description="HuggingFace hub ID or local path. Defaults to 'google/vit-base-patch16-224' when null.",
+    )
+    model_revision: str | None = Field(
+        None,
+        description='Git branch, tag, or commit hash when fetching from the HuggingFace hub.',
+    )
+    device: str | None = Field(
+        'cpu',
+        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
+    )
+    top_k: int | None = Field(
+        None, description='Maximum number of top predictions to return per image.'
+    )
+    function_to_apply: FunctionToApply1 | None = Field(
+        None, description='Score normalization applied after the model forward pass.'
+    )
+    confidence_threshold: float | None = Field(
+        0.0,
+        description='Minimum prediction confidence to report a label as a finding (0-1). Defaults to 0 so all top_k predictions are reported.',
+        ge=0.0,
+        le=1.0,
+    )
+    severity_map: list[PipelineSeverityRule] | None = Field(
+        None,
+        description="Ordered rules mapping predicted labels to severity levels. Labels with no matching rule receive 'info' severity.",
+    )
+
+
+class Type6(StrEnum):
+    FEATURE_EXTRACTION = 'FEATURE_EXTRACTION'
+
+
+class PoolingStrategy(StrEnum):
+    """
+    How to aggregate per-token hidden states into a single embedding vector.
+    """
+
+    mean = 'mean'
+    cls = 'cls'
+    max = 'max'
+    none = 'none'
+
+
+class ChunkSize2(RootModel[int]):
+    root: int = Field(
+        None,
+        description='Split text into chunks of this many characters before embedding. Each chunk produces its own finding.',
+        ge=1,
+    )
+
+
+class FeatureExtractionPipelineSchema(BaseModel):
+    """
+    Feature extraction (embedding) pipeline using a HuggingFace model. Runs a single encoder; create multiple custom detectors to run multiple embedding models.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['FEATURE_EXTRACTION']
+    model: str = Field(
+        ...,
+        description="HuggingFace hub ID (e.g. 'BAAI/bge-base-en-v1.5', 'sentence-transformers/all-MiniLM-L6-v2') or absolute local directory path.",
+    )
+    model_revision: str | None = Field(
+        None,
+        description='Git branch, tag, or commit hash when fetching from the HuggingFace hub.',
+    )
+    device: str | None = Field(
+        'cpu',
+        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
+    )
+    pooling_strategy: PoolingStrategy | None = Field(
+        'mean',
+        description='How to aggregate per-token hidden states into a single embedding vector.',
+    )
+    normalize_embeddings: bool | None = Field(
+        True,
+        description='L2-normalise the final embedding vector. Recommended for cosine-similarity workloads.',
+    )
+    truncation: bool | None = Field(
+        True, description="Truncate input to the model's maximum sequence length."
+    )
+    max_length: int | None = Field(
+        None, description="Override the tokenizer's default maximum sequence length."
+    )
+    batch_size: int | None = Field(
+        8, description='Number of texts to encode in a single forward pass.'
+    )
+    chunk_size: ChunkSize2 | None = Field(
+        None,
+        description='Split text into chunks of this many characters before embedding. Each chunk produces its own finding.',
+    )
+    chunk_overlap: ChunkOverlap1 | None = Field(
+        0,
+        description='Character overlap between consecutive chunks.',
+        validate_default=True,
+    )
+
+
+class Type7(StrEnum):
+    OBJECT_DETECTION = 'OBJECT_DETECTION'
+
+
+class NmsThreshold(RootModel[float]):
+    root: float = Field(
+        None,
+        description="IoU threshold for non-maximum suppression. When null the model's default post-processing is used.",
+        ge=0.0,
+        le=1.0,
+    )
+
+
+class ObjectDetectionPipelineSchema(BaseModel):
+    """
+    Object detection pipeline using a HuggingFace model. Runs a single detector; create multiple custom detectors to run multiple detection models.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['OBJECT_DETECTION']
+    model: str = Field(
+        ...,
+        description="HuggingFace hub ID (e.g. 'facebook/detr-resnet-50', 'hustvl/yolos-small') or absolute local directory path.",
+    )
+    model_revision: str | None = Field(
+        None,
+        description='Git branch, tag, or commit hash when fetching from the HuggingFace hub.',
+    )
+    device: str | None = Field(
+        'cpu',
+        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
+    )
+    confidence_threshold: float | None = Field(
+        0.5,
+        description='Minimum detection confidence to report an object as a finding (0-1).',
+        ge=0.0,
+        le=1.0,
+    )
+    top_k: int | None = Field(
+        None, description='Keep only the top-k highest-confidence detections per image.'
+    )
+    nms_threshold: NmsThreshold | None = Field(
+        None,
+        description="IoU threshold for non-maximum suppression. When null the model's default post-processing is used.",
+    )
+    min_box_area: int | None = Field(
+        None,
+        description='Minimum bounding-box area in pixels (width × height). Smaller detections are suppressed.',
+    )
+    severity_map: list[PipelineSeverityRule] | None = Field(
+        None,
+        description="Ordered rules mapping detected object labels to severity levels. Labels with no matching rule receive 'info' severity.",
+    )
 
 
 class CustomDetectorConfig(DetectorConfig):
@@ -570,7 +1247,7 @@ class CustomDetectorConfig(DetectorConfig):
     )
     name: str = Field(..., description='User-facing name of custom detector')
     description: str | None = None
-    method: CustomDetectorMethod
+    method: CustomDetectorMethod | None = None
     languages: list[str] | None = ['de', 'en']
     ruleset: CustomRulesetConfig | None = None
     classifier: CustomClassifierConfig | None = None
@@ -578,40 +1255,39 @@ class CustomDetectorConfig(DetectorConfig):
     extractor: CustomExtractorConfig | None = Field(
         None, description='Optional structured extraction — runs when detector fires'
     )
-
-
-class GenericDetectorConfig(DetectorConfig):
-    """
-    Generic config for detectors without specialised parameters
-    """
+    pipeline_schema: (
+        GLiNER2PipelineSchema
+        | RegexPipelineSchema
+        | LLMPipelineSchema
+        | TextClassificationPipelineSchema
+        | ImageClassificationPipelineSchema
+        | FeatureExtractionPipelineSchema
+        | ObjectDetectionPipelineSchema
+        | None
+    ) = Field(None, discriminator='type', title='AnyPipelineSchema')
+    max_findings: int | None = Field(
+        None, description='Maximum number of findings to return per asset'
+    )
 
 
 class DetectorsRefactored(
     RootModel[
-        ContentDetectorConfig
-        | SecretsDetectorConfig
+        SecretsDetectorConfig
         | PIIDetectorConfig
         | ThreatDetectorConfig
         | BrokenLinksDetectorConfig
-        | ContentQualityDetectorConfig
-        | ClassificationDetectorConfig
-        | DeidScoreDetectorConfig
-        | BiasDetectorConfig
         | CustomDetectorConfig
+        | CodeSecurityDetectorConfig
         | GenericDetectorConfig
     ]
 ):
     root: (
-        ContentDetectorConfig
-        | SecretsDetectorConfig
+        SecretsDetectorConfig
         | PIIDetectorConfig
         | ThreatDetectorConfig
         | BrokenLinksDetectorConfig
-        | ContentQualityDetectorConfig
-        | ClassificationDetectorConfig
-        | DeidScoreDetectorConfig
-        | BiasDetectorConfig
         | CustomDetectorConfig
+        | CodeSecurityDetectorConfig
         | GenericDetectorConfig
     ) = Field(
         ...,

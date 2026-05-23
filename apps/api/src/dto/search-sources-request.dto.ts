@@ -61,6 +61,20 @@ export class SearchSourcesFiltersDto {
   status?: RunnerStatus[];
 }
 
+export enum SearchSourcesSortBy {
+  NAME = 'NAME',
+  TYPE = 'TYPE',
+  STATUS = 'STATUS',
+  CREATED_AT = 'CREATED_AT',
+  UPDATED_AT = 'UPDATED_AT',
+  LAST_RUN_AT = 'LAST_RUN_AT',
+}
+
+export enum SearchSourcesSortOrder {
+  ASC = 'ASC',
+  DESC = 'DESC',
+}
+
 export class SearchSourcesPageDto {
   @ApiPropertyOptional({ default: 0 })
   @IsOptional()
@@ -76,6 +90,22 @@ export class SearchSourcesPageDto {
   @Min(1)
   @Max(200)
   limit?: number = 25;
+
+  @ApiPropertyOptional({
+    enum: SearchSourcesSortBy,
+    default: SearchSourcesSortBy.CREATED_AT,
+  })
+  @IsOptional()
+  @IsEnum(SearchSourcesSortBy)
+  sortBy?: SearchSourcesSortBy = SearchSourcesSortBy.CREATED_AT;
+
+  @ApiPropertyOptional({
+    enum: SearchSourcesSortOrder,
+    default: SearchSourcesSortOrder.DESC,
+  })
+  @IsOptional()
+  @IsEnum(SearchSourcesSortOrder)
+  sortOrder?: SearchSourcesSortOrder = SearchSourcesSortOrder.DESC;
 }
 
 export class SearchSourcesRequestDto {

@@ -23,7 +23,7 @@ def _confluence_recipe(
         },
         "masked": {"api_token": "token"},
         "optional": optional or {},
-        "sampling": {"strategy": strategy, "limit": 100},
+        "sampling": {"strategy": strategy},
     }
 
 
@@ -241,7 +241,8 @@ async def test_confluence_fetch_content_for_attachment(monkeypatch: pytest.Monke
         lambda _url: (b"hello from confluence attachment", "text/plain"),
     )
     monkeypatch.setattr(
-        "src.sources.confluence.source.parse_bytes",
+        source,
+        "parse_asset_bytes",
         lambda _file_bytes, **_kwargs: ParsedBytes(
             mime_type="text/plain",
             raw_content="hello from confluence attachment",
@@ -258,6 +259,28 @@ async def test_confluence_fetch_content_for_attachment(monkeypatch: pytest.Monke
     raw, text = content
     assert "hello from confluence attachment" in raw
     assert "hello from confluence attachment" in text
+
+
+@pytest.mark.asyncio
+async def test_confluence_fetch_content_bytes_resolves_mime_from_stored_filename(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = ConfluenceSource(_confluence_recipe())
+    attachment_url = "https://your-domain.atlassian.net/wiki/attachment/att-7"
+    attachment_hash = source.generate_hash_id(attachment_url)
+    source._attachment_download_url_by_hash[attachment_hash] = attachment_url
+    source._attachment_name_by_hash[attachment_hash] = "spec.pdf"
+
+    monkeypatch.setattr(
+        source.client,
+        "get_bytes",
+        lambda _url: (b"%PDF-1.4 confluence-pdf", "application/octet-stream"),
+    )
+
+    assert await source.fetch_content_bytes(attachment_hash) == (
+        b"%PDF-1.4 confluence-pdf",
+        "application/pdf",
+    )
 
 
 @pytest.mark.parametrize(

@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.
+ * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -56,7 +56,7 @@ export interface SandboxControllerListRunsRequest {
 export class SandboxApi extends runtime.BaseAPI {
 
     /**
-     * Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, …) and run one or more detectors against its extracted text.  **`detectors`** is a JSON string containing an array of detector config objects. Each object has the shape: ```json { \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } } ```  ### Detector types & sample configs  | Type | What it finds | |------|---------------| | `SECRETS` | API keys, tokens, private keys | | `PII` | Emails, SSNs, credit cards, phone numbers | | `TOXIC` | Toxic / hateful text (Detoxify model) | | `NSFW` | Sexually explicit content | | `YARA` | Custom YARA rule matches | | `BROKEN_LINKS` | Unreachable URLs in text |  **Minimal — secrets only (all patterns):** ```json [{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}] ```  **PII with specific patterns:** ```json [{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}] ```  **Secrets + PII combined:** ```json [   {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},   {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}} ] ```  **Toxic content (multilingual model):** ```json [{\"type\":\"TOXIC\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"toxicity\",\"severe_toxicity\",\"insult\"],\"model_name\":\"multilingual\"}}] ```  **Full scan — all detectors:** ```json [   {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},   {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},   {\"type\":\"TOXIC\",\"enabled\":true,\"config\":{}},   {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}} ] ```
+     * Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, …) and run one or more detectors against its extracted text.  **`detectors`** is a JSON string containing an array of detector config objects. Each object has the shape: ```json { \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } } ```  ### Detector types & sample configs  | Type | What it finds | |------|---------------| | `SECRETS` | API keys, tokens, private keys | | `PII` | Emails, SSNs, credit cards, phone numbers | | `YARA` | Custom YARA rule matches | | `BROKEN_LINKS` | Unreachable URLs in text | | `CUSTOM` | User-defined pipelines (REGEX, GLiNER2, HuggingFace transformers) |  **Minimal — secrets only (all patterns):** ```json [{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}] ```  **PII with specific patterns:** ```json [{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}] ```  **Secrets + PII combined:** ```json [   {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},   {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}} ] ```  **Full scan — all detectors:** ```json [   {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},   {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},   {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}} ] ```
      * Upload a file and run detectors on it
      */
     async sandboxControllerCreateRunRaw(requestParameters: SandboxControllerCreateRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SandboxRunDto>> {
@@ -117,7 +117,7 @@ export class SandboxApi extends runtime.BaseAPI {
     }
 
     /**
-     * Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, …) and run one or more detectors against its extracted text.  **`detectors`** is a JSON string containing an array of detector config objects. Each object has the shape: ```json { \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } } ```  ### Detector types & sample configs  | Type | What it finds | |------|---------------| | `SECRETS` | API keys, tokens, private keys | | `PII` | Emails, SSNs, credit cards, phone numbers | | `TOXIC` | Toxic / hateful text (Detoxify model) | | `NSFW` | Sexually explicit content | | `YARA` | Custom YARA rule matches | | `BROKEN_LINKS` | Unreachable URLs in text |  **Minimal — secrets only (all patterns):** ```json [{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}] ```  **PII with specific patterns:** ```json [{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}] ```  **Secrets + PII combined:** ```json [   {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},   {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}} ] ```  **Toxic content (multilingual model):** ```json [{\"type\":\"TOXIC\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"toxicity\",\"severe_toxicity\",\"insult\"],\"model_name\":\"multilingual\"}}] ```  **Full scan — all detectors:** ```json [   {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},   {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},   {\"type\":\"TOXIC\",\"enabled\":true,\"config\":{}},   {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}} ] ```
+     * Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, …) and run one or more detectors against its extracted text.  **`detectors`** is a JSON string containing an array of detector config objects. Each object has the shape: ```json { \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } } ```  ### Detector types & sample configs  | Type | What it finds | |------|---------------| | `SECRETS` | API keys, tokens, private keys | | `PII` | Emails, SSNs, credit cards, phone numbers | | `YARA` | Custom YARA rule matches | | `BROKEN_LINKS` | Unreachable URLs in text | | `CUSTOM` | User-defined pipelines (REGEX, GLiNER2, HuggingFace transformers) |  **Minimal — secrets only (all patterns):** ```json [{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}] ```  **PII with specific patterns:** ```json [{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}] ```  **Secrets + PII combined:** ```json [   {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},   {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}} ] ```  **Full scan — all detectors:** ```json [   {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},   {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},   {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}} ] ```
      * Upload a file and run detectors on it
      */
     async sandboxControllerCreateRun(requestParameters: SandboxControllerCreateRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SandboxRunDto> {
@@ -297,28 +297,9 @@ export type SandboxControllerListRunsContentTypeEnum = typeof SandboxControllerL
 export const SandboxControllerListRunsDetectorTypeEnum = {
     Secrets: 'SECRETS',
     Pii: 'PII',
-    Toxic: 'TOXIC',
-    Nsfw: 'NSFW',
     Yara: 'YARA',
     BrokenLinks: 'BROKEN_LINKS',
-    PromptInjection: 'PROMPT_INJECTION',
-    PhishingUrl: 'PHISHING_URL',
-    Spam: 'SPAM',
-    Language: 'LANGUAGE',
     CodeSecurity: 'CODE_SECURITY',
-    Plagiarism: 'PLAGIARISM',
-    ImageViolence: 'IMAGE_VIOLENCE',
-    OcrPii: 'OCR_PII',
-    DeidScore: 'DEID_SCORE',
-    HateSpeech: 'HATE_SPEECH',
-    AiGenerated: 'AI_GENERATED',
-    ContentQuality: 'CONTENT_QUALITY',
-    Bias: 'BIAS',
-    Duplicate: 'DUPLICATE',
-    DomainClass: 'DOMAIN_CLASS',
-    ContentType: 'CONTENT_TYPE',
-    SensitivityTier: 'SENSITIVITY_TIER',
-    JurisdictionTag: 'JURISDICTION_TAG',
     Custom: 'CUSTOM'
 } as const;
 export type SandboxControllerListRunsDetectorTypeEnum = typeof SandboxControllerListRunsDetectorTypeEnum[keyof typeof SandboxControllerListRunsDetectorTypeEnum];

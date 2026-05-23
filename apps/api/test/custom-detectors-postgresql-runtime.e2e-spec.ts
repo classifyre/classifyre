@@ -232,7 +232,7 @@ describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
           max_findings: 20,
           entity: {
             entity_labels: ['person', 'organization', 'company name'],
-            model: 'urchade/gliner_multi-v2.1',
+            model: 'fastino/gliner2-base-v1',
           },
         },
       })
@@ -279,10 +279,6 @@ describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
           },
           sampling: {
             strategy: 'RANDOM',
-            limit: 100,
-            max_columns: 25,
-            max_cell_chars: 1024,
-            max_total_chars: 100000,
             fallback_to_random: true,
             include_column_names: true,
           },

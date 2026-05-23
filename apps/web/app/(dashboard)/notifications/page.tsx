@@ -459,7 +459,7 @@ export default function NotificationsPage() {
             }
           >
             <SelectTrigger className="h-9 w-[180px] rounded-[4px] border-2 border-border">
-              <SelectValue placeholder="Type" />
+              <SelectValue placeholder={t("common.type")} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>All types</SelectItem>
@@ -480,7 +480,7 @@ export default function NotificationsPage() {
             }
           >
             <SelectTrigger className="h-9 w-[180px] rounded-[4px] border-2 border-border">
-              <SelectValue placeholder="Severity" />
+              <SelectValue placeholder={t("common.severity")} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>All severities</SelectItem>
@@ -787,7 +787,7 @@ function QuickFilterCard({
         className={cn(
           "rounded-[6px] border-2",
           active
-            ? "overflow-hidden border-[#b7ff00]/30 bg-[#0b0f0a] text-[#b7ff00]"
+            ? "overflow-hidden border-accent/30 bg-background text-accent"
             : "border-border bg-card transition-all group-hover:bg-secondary/40",
         )}
       >
@@ -796,7 +796,7 @@ function QuickFilterCard({
             <p
               className={cn(
                 "text-[11px] font-mono uppercase tracking-[0.16em]",
-                active ? "text-[#b7ff00]/80" : "text-muted-foreground",
+                active ? "text-accent/80" : "text-muted-foreground",
               )}
             >
               {label}
@@ -804,7 +804,7 @@ function QuickFilterCard({
             <Icon
               className={cn(
                 "h-3.5 w-3.5",
-                active ? "text-[#b7ff00]/80" : "text-muted-foreground",
+                active ? "text-accent/80" : "text-muted-foreground",
               )}
             />
           </div>

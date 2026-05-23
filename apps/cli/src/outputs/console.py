@@ -24,7 +24,9 @@ class ConsoleOutputSink:
     async def start(self) -> None:
         return None
 
-    async def emit_batch(self, assets: list[dict[str, Any]]) -> None:
+    async def emit_batch(
+        self, assets: list[dict[str, Any]], *, skip_findings: bool = False
+    ) -> None:
         if not assets:
             return
 

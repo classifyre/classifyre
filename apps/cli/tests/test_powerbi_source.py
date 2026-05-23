@@ -30,7 +30,6 @@ def _service_principal_recipe(**overrides: Any) -> dict[str, Any]:
         },
         "sampling": {
             "strategy": "RANDOM",
-            "limit": 10,
         },
     }
     base.update(overrides)
@@ -48,7 +47,6 @@ def _access_token_recipe(**overrides: Any) -> dict[str, Any]:
         },
         "sampling": {
             "strategy": "RANDOM",
-            "limit": 10,
         },
     }
     base.update(overrides)
@@ -182,12 +180,11 @@ def test_powerbi_access_token_mode_uses_masked_access_token_without_token_exchan
     assert fake_session.request_calls[0]["headers"]["Authorization"].startswith("Bearer ")
 
 
-def test_powerbi_sampling_random_respects_limit() -> None:
+def test_powerbi_sampling_random_returns_all_when_below_limit() -> None:
     source = PowerBISource(
         _service_principal_recipe(
             sampling={
                 "strategy": "RANDOM",
-                "limit": 2,
             }
         )
     )
@@ -207,16 +204,15 @@ def test_powerbi_sampling_random_respects_limit() -> None:
 
     sampled = source._sample_refs(refs)
 
-    assert len(sampled) == 2
+    assert len(sampled) == 5
     assert all(sample in refs for sample in sampled)
 
 
-def test_powerbi_sampling_latest_uses_order_by_column_and_limit() -> None:
+def test_powerbi_sampling_latest_uses_order_by_column() -> None:
     source = PowerBISource(
         _service_principal_recipe(
             sampling={
                 "strategy": "LATEST",
-                "limit": 2,
                 "order_by_column": "modifiedDateTime",
             }
         )
@@ -242,7 +238,7 @@ def test_powerbi_sampling_latest_uses_order_by_column_and_limit() -> None:
 
     sampled = source._sample_refs(refs)
 
-    assert [ref.asset_id for ref in sampled] == ["2", "1"]
+    assert [ref.asset_id for ref in sampled] == ["2", "1", "0"]
 
 
 def test_powerbi_sampling_all_keeps_everything() -> None:

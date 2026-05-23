@@ -19,23 +19,12 @@ const DETECTORS_WITH_USEFUL_METADATA = new Set<string>([
   FindingResponseDtoDetectorTypeEnum.Secrets,
   FindingResponseDtoDetectorTypeEnum.CodeSecurity,
   FindingResponseDtoDetectorTypeEnum.Yara,
-  FindingResponseDtoDetectorTypeEnum.Toxic,
-  FindingResponseDtoDetectorTypeEnum.Language,
-  FindingResponseDtoDetectorTypeEnum.Spam,
-  FindingResponseDtoDetectorTypeEnum.PromptInjection,
-  FindingResponseDtoDetectorTypeEnum.PhishingUrl,
   FindingResponseDtoDetectorTypeEnum.BrokenLinks,
-  FindingResponseDtoDetectorTypeEnum.OcrPii,
-  FindingResponseDtoDetectorTypeEnum.DeidScore,
-  FindingResponseDtoDetectorTypeEnum.ContentQuality,
-  FindingResponseDtoDetectorTypeEnum.DomainClass,
-  FindingResponseDtoDetectorTypeEnum.ContentType,
-  FindingResponseDtoDetectorTypeEnum.SensitivityTier,
-  FindingResponseDtoDetectorTypeEnum.JurisdictionTag,
+  FindingResponseDtoDetectorTypeEnum.Custom,
 ]);
 
 // Keys to always omit from the display (too internal / redundant with finding fields).
-const OMIT_KEYS = new Set(["scores", "raw", "error"]);
+const OMIT_KEYS = new Set(["scores", "raw", "error", "embedding"]);
 
 // Maps raw metadata keys to their i18n translation keys under findings.metadata.*
 const METADATA_KEY_TO_I18N: Record<string, TranslationKey> = {
@@ -126,7 +115,7 @@ export function FindingMetadataCard({ detectorType, metadata }: Props) {
           {entries.map(([key, value]) => (
             <div
               key={key}
-              className="grid grid-cols-[200px_1fr] items-start gap-3 rounded-[4px] border border-black/10 px-3 py-2"
+              className="grid grid-cols-[200px_1fr] items-start gap-3 rounded-[4px] border border-border/10 px-3 py-2"
             >
               <dt className="text-xs font-medium text-muted-foreground pt-0.5">
                 {formatKey(key)}

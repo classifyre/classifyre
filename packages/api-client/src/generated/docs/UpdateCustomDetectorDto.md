@@ -9,9 +9,8 @@ Name | Type
 `name` | string
 `key` | string
 `description` | string
-`method` | string
 `isActive` | boolean
-`config` | { [key: string]: any; }
+`pipelineSchema` | object
 
 ## Example
 
@@ -20,12 +19,11 @@ import type { UpdateCustomDetectorDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "name": DACH Contract Risk Terms,
-  "key": cust_dach_contract_risk,
-  "description": Detect legal/compliance risk language in contracts,
-  "method": CLASSIFIER,
+  "name": Support Ticket Extractor,
+  "key": cust_support_ticket_extractor,
+  "description": Extracts order IDs, amounts, and intent from support tickets,
   "isActive": null,
-  "config": null,
+  "pipelineSchema": null,
 } satisfies UpdateCustomDetectorDto
 
 console.log(example)

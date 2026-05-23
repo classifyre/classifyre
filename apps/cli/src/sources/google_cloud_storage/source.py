@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from typing import Any
 
 from ...models.generated_input import GoogleCloudStorageInput
@@ -62,14 +63,13 @@ class GoogleCloudStorageSource(ObjectStorageSourceBase):
             self._cached_client = self._build_client()
         return self._cached_client
 
-    def _list_objects(self) -> list[ObjectRef]:
+    def _list_objects(self) -> Iterator[ObjectRef]:
         client = self._client()
         bucket = self._required_bucket()
         prefix = self._prefix()
         max_keys = self._max_keys_per_page()
         timeout = self._request_timeout_seconds()
 
-        object_refs: list[ObjectRef] = []
         blobs = client.list_blobs(
             bucket_or_name=bucket,
             prefix=prefix or None,
@@ -87,32 +87,22 @@ class GoogleCloudStorageSource(ObjectStorageSourceBase):
             if not self._object_matches_extension_filters(key):
                 continue
 
-            object_refs.append(
-                ObjectRef(
-                    key=key,
-                    size=size,
-                    last_modified=self._parse_datetime(getattr(blob, "updated", None)),
-                    etag=str(getattr(blob, "etag", "") or "") or None,
-                    content_type_hint=str(getattr(blob, "content_type", "") or "") or None,
-                )
+            yield ObjectRef(
+                key=key,
+                size=size,
+                last_modified=self._parse_datetime(getattr(blob, "updated", None)),
+                etag=str(getattr(blob, "etag", "") or "") or None,
+                content_type_hint=str(getattr(blob, "content_type", "") or "") or None,
             )
 
-        return object_refs
-
-    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None, bool]:
+    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         client = self._client()
         bucket = client.bucket(self._required_bucket())
         blob = bucket.blob(ref.key)
 
-        max_bytes = self._max_object_bytes()
         timeout = self._request_timeout_seconds()
-
-        if ref.size > max_bytes:
-            file_bytes = blob.download_as_bytes(start=0, end=max_bytes - 1, timeout=timeout)
-            return file_bytes, ref.content_type_hint, True
-
         file_bytes = blob.download_as_bytes(timeout=timeout)
-        return file_bytes, ref.content_type_hint, False
+        return file_bytes, ref.content_type_hint
 
     def _external_url(self, key: str) -> str:
         return f"gs://{self._required_bucket()}/{key}"

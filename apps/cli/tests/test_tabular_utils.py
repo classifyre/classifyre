@@ -13,7 +13,6 @@ def test_format_tabular_sample_content_uses_cell_lines_without_equals_prefixes()
         rows=[("Patrick Clark", "patrick.clark@example.com", "Acme")],
         column_names=["name", "email", "company"],
         serialize_cell=str,
-        max_total_chars=5_000,
         include_column_names=True,
         raw_metadata={
             "database": "postgres",
@@ -41,7 +40,6 @@ def test_format_tabular_sample_content_indents_multiline_cell_continuations() ->
         rows=[("460 Hannah Vista Suite 923\nHardinburgh, MP 62832",)],
         column_names=["address"],
         serialize_cell=str,
-        max_total_chars=5_000,
         include_column_names=True,
     )
 

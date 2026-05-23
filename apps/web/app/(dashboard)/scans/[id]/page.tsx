@@ -1,11 +1,10 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   formatDate,
   formatRelative,
-  formatDateUTC,
   formatShortUTC,
 } from "@/lib/date";
 import {
@@ -25,12 +24,13 @@ import {
   type SearchFindingsChartsResponseDto,
   type StartRunnerDto,
 } from "@workspace/api-client";
+import type { LogFetchParams } from "@/components/runner-log-viewer";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
-import { AssetsTable } from "@/components/assets-table";
+import { RunnerAssetsTable } from "@/components/runner-assets-table";
 import { DetailBackButton } from "@/components/detail-back-button";
-import { FindingsTable } from "@/components/findings-table";
 import { RunnerLogViewer } from "@/components/runner-log-viewer";
+import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import {
   getRunnerStatusBadgeLabel,
   getRunnerStatusBadgeTone,
@@ -117,10 +117,11 @@ export default function RunnerDetailPage() {
 
   const [logEntries, setLogEntries] = useState<RunnerLogEntryDto[]>([]);
   const [logsCursor, setLogsCursor] = useState("0");
+  const [logsNextCursor, setLogsNextCursor] = useState<string | null>(null);
   const [logsHasMore, setLogsHasMore] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsLoadingMore, setLogsLoadingMore] = useState(false);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [logsAutoRefresh, setLogsAutoRefresh] = useState(true);
 
   const fetchOverview = useCallback(async (currentRunner: RunnerDto) => {
     try {
@@ -187,7 +188,11 @@ export default function RunnerDetailPage() {
   );
 
   const fetchLogsPage = useCallback(
-    async (scanRunnerId: string, cursor?: string, append = false) => {
+    async (
+      scanRunnerId: string,
+      params: LogFetchParams,
+      append = false,
+    ) => {
       try {
         if (append) {
           setLogsLoadingMore(true);
@@ -195,14 +200,21 @@ export default function RunnerDetailPage() {
           setLogsLoading(true);
         }
 
-        const response = await api.runners.cliRunnerControllerGetRunnerLogs({
-          runnerId: scanRunnerId,
-          cursor,
-          take: 200,
-        });
+        const response =
+          await api.runners.cliRunnerControllerSearchRunnerLogs({
+            runnerId: scanRunnerId,
+            searchRunnerLogsBodyDto: {
+              cursor: params.cursor,
+              take: params.take ?? 200,
+              search: params.search,
+              levels: params.levels as any,
+              sortOrder: params.sortOrder,
+            },
+          });
 
         const entries = response.entries ?? [];
-        setLogsCursor(response.cursor || cursor || "0");
+        setLogsCursor(response.cursor || params.cursor || "0");
+        setLogsNextCursor(response.nextCursor ?? null);
         setLogsHasMore(Boolean(response.hasMore));
         setLogEntries((prev) => (append ? [...prev, ...entries] : entries));
       } catch (err) {
@@ -211,6 +223,7 @@ export default function RunnerDetailPage() {
           setLogEntries([]);
           setLogsHasMore(false);
           setLogsCursor("0");
+          setLogsNextCursor(null);
         }
       } finally {
         if (append) {
@@ -231,14 +244,14 @@ export default function RunnerDetailPage() {
       }
       await Promise.all([
         fetchOverview(currentRunner),
-        fetchLogsPage(currentRunner.id),
+        fetchLogsPage(currentRunner.id, { cursor: "0" }),
       ]);
     };
 
     if (runnerId) {
       void load();
     }
-  }, [runnerId, fetchRunner, fetchOverview, fetchLogsPage]);
+  }, [runnerId, fetchRunner, fetchOverview, fetchLogsPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshRunnerState = useCallback(async () => {
     const nextRunner = await fetchRunner(false);
@@ -248,33 +261,49 @@ export default function RunnerDetailPage() {
     await fetchOverview(nextRunner);
   }, [fetchOverview, fetchRunner]);
 
+  const hasActiveRun =
+    runner?.status === "RUNNING" || runner?.status === "PENDING";
+
+  // Use the stable fetchOverview ref so the WS callback doesn't close over stale state
+  const fetchOverviewRef = useRef(fetchOverview);
+  fetchOverviewRef.current = fetchOverview;
+
+  const { subscribeToRunner, unsubscribeFromRunner, isConnected } =
+    useRunnerWebSocket({
+      enabled: true,
+      trackRunnersList: false,
+      onRunnerUpdate: (updatedRunner) => {
+        if (updatedRunner.id !== runnerId) return;
+        setRunner(updatedRunner);
+        void fetchOverviewRef.current(updatedRunner);
+      },
+    });
+
+  // Subscribe to the specific runner room once connected
   useEffect(() => {
-    if (!autoRefreshEnabled || !runnerId) {
-      return;
-    }
-    if (
-      !runner ||
-      (runner.status !== "RUNNING" && runner.status !== "PENDING")
-    ) {
-      return;
-    }
+    if (!isConnected || !runnerId) return;
+    subscribeToRunner(runnerId);
+    return () => unsubscribeFromRunner(runnerId);
+  }, [isConnected, runnerId, subscribeToRunner, unsubscribeFromRunner]);
+
+  // Keep log tailing while the run is active and auto-refresh is on
+  useEffect(() => {
+    if (!logsAutoRefresh || !runnerId || !hasActiveRun) return;
 
     const interval = setInterval(() => {
-      void refreshRunnerState();
       if (!logsLoading && !logsLoadingMore) {
-        void fetchLogsPage(runnerId, logsCursor, true);
+        void fetchLogsPage(runnerId, { cursor: logsCursor }, true);
       }
     }, 2500);
 
     return () => clearInterval(interval);
   }, [
-    autoRefreshEnabled,
+    logsAutoRefresh,
+    hasActiveRun,
     fetchLogsPage,
     logsCursor,
     logsLoading,
     logsLoadingMore,
-    refreshRunnerState,
-    runner,
     runnerId,
   ]);
 
@@ -320,30 +349,6 @@ export default function RunnerDetailPage() {
     }
   };
 
-  const handleLoadMoreLogs = async () => {
-    if (!runnerId || !logsHasMore || logsLoadingMore) {
-      return;
-    }
-    await fetchLogsPage(runnerId, logsCursor, true);
-  };
-
-  const handleRefreshLogs = useCallback(async () => {
-    if (!runnerId) {
-      return;
-    }
-    await refreshRunnerState();
-    if (!logsLoading && !logsLoadingMore) {
-      await fetchLogsPage(runnerId, logsCursor, true);
-    }
-  }, [
-    fetchLogsPage,
-    logsCursor,
-    logsLoading,
-    logsLoadingMore,
-    refreshRunnerState,
-    runnerId,
-  ]);
-
   const handleDownloadAllLogs = useCallback(async (): Promise<
     RunnerLogEntryDto[]
   > => {
@@ -358,11 +363,11 @@ export default function RunnerDetailPage() {
     let pageCount = 0;
 
     while (hasMore && pageCount < 1000) {
-      const response = await api.runners.cliRunnerControllerGetRunnerLogs({
-        runnerId,
-        cursor,
-        take: 1000,
-      });
+      const response =
+        await api.runners.cliRunnerControllerSearchRunnerLogs({
+          runnerId,
+          searchRunnerLogsBodyDto: { cursor, take: 1000 },
+        });
 
       for (const entry of response.entries ?? []) {
         if (seen.has(entry.cursor)) {
@@ -379,6 +384,17 @@ export default function RunnerDetailPage() {
 
     return aggregated;
   }, [runnerId]);
+
+  const sourceName = runner?.source?.name || "Unknown source";
+  const sourceType = runner?.source?.type || "CUSTOM";
+  const SourceTypeIcon = getSourceIcon(sourceType);
+  const sourceDetailsId = runner?.sourceId || runner?.source?.id;
+
+  useEffect(() => {
+    if (sourceName && runner) {
+      document.title = `${t("scans.sourceRun", { source: sourceName })} | ${t("app.name")}`;
+    }
+  }, [sourceName, runner, t]);
 
   if (loading && !runner) {
     return (
@@ -398,14 +414,14 @@ export default function RunnerDetailPage() {
         <Card className="border-2 border-border rounded-[6px]">
           <CardContent className="py-12 text-center">
             <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Run Not Found</h3>
+            <h3 className="text-lg font-semibold mb-2">{t("scans.runNotFound")}</h3>
             <p className="text-muted-foreground mb-4">{error}</p>
             <Button
               variant="outline"
-              className="rounded-[4px] border-2 border-black shadow-[3px_3px_0_#000]"
+              className="rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
               onClick={() => router.push("/scans")}
             >
-              View All Scans
+              {t("scans.viewAllScans")}
             </Button>
           </CardContent>
         </Card>
@@ -417,14 +433,6 @@ export default function RunnerDetailPage() {
     return null;
   }
 
-  const sourceName = runner.source?.name || "Unknown source";
-  const sourceType = runner.source?.type || "CUSTOM";
-  const SourceTypeIcon = getSourceIcon(sourceType);
-  const sourceDetailsId = runner.sourceId || runner.source?.id;
-  const hasActiveRun =
-    runner.status === "RUNNING" || runner.status === "PENDING";
-
-  const findingsTotal = findingsCharts.totals.total;
   const assetsTotal = assetsCharts.totals.totalAssets;
   const progress = calculateProgress(runner);
 
@@ -439,12 +447,13 @@ export default function RunnerDetailPage() {
                 <SourceTypeIcon className="h-5 w-5 text-muted-foreground" />
               </div>
               <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em] truncate">
-                {sourceName} Run
+                {t("scans.sourceRun", { source: sourceName })}
               </h1>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <Badge
                 className={`rounded-[4px] border ${getRunnerStatusBadgeTone(runner.status)}`}
+                data-testid="scan-status-badge"
               >
                 {isRunnerStatusRunning(runner.status) && (
                   <Spinner
@@ -453,12 +462,12 @@ export default function RunnerDetailPage() {
                     data-icon="inline-start"
                   />
                 )}
-                {getRunnerStatusBadgeLabel(runner.status)}
+                {t(getRunnerStatusBadgeLabel(runner.status))}
               </Badge>
               <Badge variant="outline" className="rounded-[4px]">
-                {runner.triggerType}
+                {t(`triggerTypes.${runner.triggerType}`)}
               </Badge>
-              <span>Triggered {formatRelative(runner.triggeredAt)}</span>
+              <span>{t("scans.runTimeline.triggered")} {formatRelative(runner.triggeredAt)}</span>
             </div>
           </div>
         </div>
@@ -467,27 +476,27 @@ export default function RunnerDetailPage() {
           <Button
             variant="outline"
             size="sm"
-            className="rounded-[4px] border-2 border-black"
+            className="rounded-[4px] border-2 border-border"
             onClick={() => router.push(`/sources/${sourceDetailsId}`)}
             disabled={!sourceDetailsId}
           >
             <FileText className="h-4 w-4" />
-            Source Details
+            {t("sources.detail.sourceDetails")}
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="rounded-[4px] border-2 border-black"
+            className="rounded-[4px] border-2 border-border"
             onClick={() => router.push(`/sources/${sourceDetailsId}/edit`)}
             disabled={!sourceDetailsId}
           >
             <Pencil className="h-4 w-4" />
-            Edit Source
+            {t("sources.editSource")}
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="rounded-[4px] border-2 border-black"
+            className="rounded-[4px] border-2 border-border"
             onClick={handleRunAgain}
             disabled={isRunningAgain || !runner.sourceId || hasActiveRun}
           >
@@ -506,7 +515,7 @@ export default function RunnerDetailPage() {
             <Button
               variant="destructive"
               size="sm"
-              className="rounded-[4px] border-2 border-black"
+              className="rounded-[4px] border-2 border-border"
               onClick={handleStop}
               disabled={isStopping}
             >
@@ -522,28 +531,20 @@ export default function RunnerDetailPage() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="h-auto rounded-[4px] border-2 border-black bg-background p-1">
-          <TabsTrigger value="overview" className="rounded-[3px]">
-            Overview
+        <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">
+          <TabsTrigger value="overview" className="rounded-[3px]" data-testid="tab-overview">
+            {t("scans.tabOverview")}
           </TabsTrigger>
-          <TabsTrigger value="findings" className="rounded-[3px]">
-            Findings
-            {findingsTotal > 0 && (
-              <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold">
-                {findingsTotal}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="assets" className="rounded-[3px]">
-            Assets
+          <TabsTrigger value="assets" className="rounded-[3px]" data-testid="tab-assets">
+            {t("scans.tabAssets")}
             {assetsTotal > 0 && (
               <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold">
                 {assetsTotal}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="logs" className="rounded-[3px]">
-            Logs
+          <TabsTrigger value="logs" className="rounded-[3px]" data-testid="tab-logs">
+            {t("scans.tabLogs")}
           </TabsTrigger>
         </TabsList>
 
@@ -556,41 +557,79 @@ export default function RunnerDetailPage() {
             </Card>
           )}
 
-          {runner.status === "ERROR" && runner.errorMessage && (
+          {runner.status === "ERROR" && (
             <Card className="border-destructive/30 bg-destructive/5 rounded-[6px]">
               <CardHeader className="pb-2">
                 <CardTitle className="text-destructive text-base">
-                  Run failed
+                  {t("scans.runFailed")}
                 </CardTitle>
-                <CardDescription className="text-destructive/80">
-                  {runner.errorMessage}
-                </CardDescription>
+                {runner.errorMessage && (
+                  <CardDescription className="text-destructive/80">
+                    {runner.errorMessage}
+                  </CardDescription>
+                )}
+                {runner.errorDetails &&
+                  typeof runner.errorDetails === "object" && (
+                    <div className="flex flex-wrap gap-3 mt-2 text-xs text-destructive/70">
+                      {typeof (runner.errorDetails as Record<string, unknown>)
+                        .exitCode === "number" && (
+                        <span className="font-mono bg-destructive/10 px-1.5 py-0.5 rounded">
+                          exit&nbsp;
+                          {String(
+                            (runner.errorDetails as Record<string, unknown>)
+                              .exitCode
+                          )}
+                        </span>
+                      )}
+                      {typeof (runner.errorDetails as Record<string, unknown>)
+                        .jobName === "string" && (
+                        <span className="font-mono bg-destructive/10 px-1.5 py-0.5 rounded truncate max-w-xs">
+                          {String(
+                            (runner.errorDetails as Record<string, unknown>)
+                              .jobName
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  )}
               </CardHeader>
-              {runner.errorDetails && (
-                <CardContent>
-                  <pre className="text-xs text-destructive/80 bg-destructive/5 p-2 rounded max-h-64 overflow-auto break-all whitespace-pre-wrap">
-                    {JSON.stringify(runner.errorDetails, null, 2)}
-                  </pre>
-                </CardContent>
-              )}
+              {runner.errorDetails &&
+                typeof runner.errorDetails === "object" &&
+                typeof (runner.errorDetails as Record<string, unknown>)
+                  .output === "string" && (
+                  <CardContent>
+                    <details className="group">
+                      <summary className="cursor-pointer text-xs text-destructive/60 hover:text-destructive/80 mb-1 select-none">
+                        {t("scans.showJobOutput")}
+                      </summary>
+                      <pre className="text-xs text-destructive/80 bg-destructive/5 p-2 rounded max-h-64 overflow-auto break-all whitespace-pre-wrap">
+                        {String(
+                          (runner.errorDetails as Record<string, unknown>)
+                            .output
+                        )}
+                      </pre>
+                    </details>
+                  </CardContent>
+                )}
             </Card>
           )}
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {[
-              { label: "Findings", value: findingsCharts.totals.total },
+              { label: t("scans.stats.findings"), value: findingsCharts.totals.total },
               {
-                label: "Critical + High",
+                label: t("scans.stats.criticalHigh"),
                 value:
                   findingsCharts.totals.critical + findingsCharts.totals.high,
               },
-              { label: "Assets", value: assetsCharts.totals.totalAssets },
-              { label: "Open", value: findingsCharts.totals.open },
-              { label: "Resolved", value: findingsCharts.totals.resolved },
+              { label: t("scans.stats.assets"), value: assetsCharts.totals.totalAssets },
+              { label: t("scans.stats.open"), value: findingsCharts.totals.open },
+              { label: t("scans.stats.resolved"), value: findingsCharts.totals.resolved },
             ].map((item) => (
               <Card
                 key={item.label}
                 className="border-2 border-border rounded-[6px]"
+                data-testid={`stats-card-${item.label.toLowerCase().replace(/ \+ /g, "-")}`}
               >
                 <CardContent className="p-4">
                   <p className="text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
@@ -599,6 +638,7 @@ export default function RunnerDetailPage() {
                   <p
                     className="mt-1 text-3xl font-black"
                     style={{ fontFamily: "var(--font-hero)" }}
+                    data-testid="stats-value"
                   >
                     {item.value.toLocaleString()}
                   </p>
@@ -608,22 +648,22 @@ export default function RunnerDetailPage() {
           </div>
 
           {runner.status === "RUNNING" && (
-            <Card className="border-2 border-black rounded-[6px]">
+            <Card className="border-2 border-border rounded-[6px]">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Run Progress</CardTitle>
+                <CardTitle className="text-base">{t("scans.runProgress.title")}</CardTitle>
                 <CardDescription>
-                  Estimated from processed assets
+                  {t("scans.runProgress.description")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Progress</span>
+                  <span className="text-muted-foreground">{t("scans.runProgress.progress")}</span>
                   <span className="font-medium">{progress}%</span>
                 </div>
                 <Progress value={progress} />
                 {runner.durationMs != null && (
                   <p className="text-xs text-muted-foreground">
-                    Duration so far: {formatDuration(runner.durationMs)}
+                    {t("scans.runProgress.durationSoFar", { duration: formatDuration(runner.durationMs) })}
                   </p>
                 )}
               </CardContent>
@@ -633,40 +673,40 @@ export default function RunnerDetailPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card className="border-2 border-border rounded-[6px]">
               <CardHeader>
-                <CardTitle>Run Timeline</CardTitle>
-                <CardDescription>Execution timestamps</CardDescription>
+                <CardTitle>{t("scans.runTimeline.title")}</CardTitle>
+                <CardDescription>{t("scans.runTimeline.description")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Triggered</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.triggered")}</span>
                   <span className="text-right">
                     {formatDate(runner.triggeredAt)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Started</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.started")}</span>
                   <span className="text-right">
                     {formatDate(runner.startedAt)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Completed</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.completed")}</span>
                   <span className="text-right">
                     {formatDate(runner.completedAt)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Duration</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.duration")}</span>
                   <span className="text-right">
                     {formatDuration(runner.durationMs)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Triggered By</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.triggeredBy")}</span>
                   <span className="text-right">
                     {runner.triggeredBy === "pg-boss"
-                      ? "Scheduler"
-                      : runner.triggeredBy || "System"}
+                      ? t("runners.scheduler")
+                      : runner.triggeredBy || t("scans.runTimeline.na")}
                   </span>
                 </div>
               </CardContent>
@@ -674,30 +714,30 @@ export default function RunnerDetailPage() {
 
             <Card className="border-2 border-border rounded-[6px]">
               <CardHeader>
-                <CardTitle>Asset Delta</CardTitle>
-                <CardDescription>Changes produced by this run</CardDescription>
+                <CardTitle>{t("scans.assetDelta.title")}</CardTitle>
+                <CardDescription>{t("scans.assetDelta.description")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Created</span>
+                  <span className="text-muted-foreground">{t("scans.assetDelta.created")}</span>
                   <span className="font-semibold">
                     +{assetsCharts.totals.newAssets.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Updated</span>
+                  <span className="text-muted-foreground">{t("scans.assetDelta.updated")}</span>
                   <span className="font-semibold">
                     ~{assetsCharts.totals.updatedAssets.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Unchanged</span>
+                  <span className="text-muted-foreground">{t("scans.assetDelta.unchanged")}</span>
                   <span className="font-semibold">
                     {assetsCharts.totals.unchangedAssets.toLocaleString()}
                   </span>
                 </div>
                 <div className="pt-1 flex items-center justify-between border-t">
-                  <span className="text-muted-foreground">Total Assets</span>
+                  <span className="text-muted-foreground">{t("sources.totalAssets")}</span>
                   <span className="font-semibold">
                     {assetsCharts.totals.totalAssets.toLocaleString()}
                   </span>
@@ -708,7 +748,7 @@ export default function RunnerDetailPage() {
 
           <Card className="border-2 border-border rounded-[6px]">
             <CardHeader>
-              <CardTitle>Source Context</CardTitle>
+              <CardTitle>{t("scans.sourceContext.title")}</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -722,7 +762,7 @@ export default function RunnerDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-[4px] border-2 border-black"
+                  className="rounded-[4px] border-2 border-border"
                   onClick={() =>
                     router.push(
                       `/sources/${runner.sourceId || runner.source?.id}`,
@@ -730,7 +770,7 @@ export default function RunnerDetailPage() {
                   }
                 >
                   <ArrowUpRight className="h-4 w-4" />
-                  Open Source
+                  {t("scans.sourceContext.openSource")}
                 </Button>
               )}
             </CardContent>
@@ -739,28 +779,13 @@ export default function RunnerDetailPage() {
           {isOverviewRefreshing && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Updating overview...
+              {t("scans.updatingOverview")}
             </div>
           )}
         </TabsContent>
 
-        <TabsContent value="findings" className="space-y-4">
-          <Suspense>
-            <FindingsTable
-              lockedFilters={{
-                runnerId: [runner.id],
-                includeResolved: true,
-              }}
-            />
-          </Suspense>
-        </TabsContent>
-
         <TabsContent value="assets" className="space-y-4">
-          <Suspense>
-            <AssetsTable
-              scope={{ sourceId: runner.sourceId, runnerId: runner.id }}
-            />
-          </Suspense>
+          <RunnerAssetsTable runnerId={runner.id} runnerStatus={runner.status} />
         </TabsContent>
 
         <TabsContent value="logs" className="space-y-4">
@@ -768,15 +793,15 @@ export default function RunnerDetailPage() {
             runnerId={runnerId}
             entries={logEntries}
             hasMore={logsHasMore}
+            nextCursor={logsNextCursor}
             loading={logsLoading}
             loadingMore={logsLoadingMore}
-            isRunning={
-              runner.status === "RUNNING" || runner.status === "PENDING"
+            isRunning={hasActiveRun}
+            autoRefreshEnabled={logsAutoRefresh}
+            onAutoRefreshChange={setLogsAutoRefresh}
+            onFetch={(params, append) =>
+              fetchLogsPage(runnerId, params, append)
             }
-            autoRefreshEnabled={autoRefreshEnabled}
-            onAutoRefreshChange={setAutoRefreshEnabled}
-            onLoadMore={handleLoadMoreLogs}
-            onRefreshNow={handleRefreshLogs}
             onDownloadAll={handleDownloadAllLogs}
           />
         </TabsContent>

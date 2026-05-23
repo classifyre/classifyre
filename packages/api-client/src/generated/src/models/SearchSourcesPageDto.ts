@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Classifyre API
- * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, NSFW images, broken links, and security threats.
+ * Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@example.com
@@ -31,7 +31,43 @@ export interface SearchSourcesPageDto {
      * @memberof SearchSourcesPageDto
      */
     limit?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof SearchSourcesPageDto
+     */
+    sortBy?: SearchSourcesPageDtoSortByEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof SearchSourcesPageDto
+     */
+    sortOrder?: SearchSourcesPageDtoSortOrderEnum;
 }
+
+
+/**
+ * @export
+ */
+export const SearchSourcesPageDtoSortByEnum = {
+    Name: 'NAME',
+    Type: 'TYPE',
+    Status: 'STATUS',
+    CreatedAt: 'CREATED_AT',
+    UpdatedAt: 'UPDATED_AT',
+    LastRunAt: 'LAST_RUN_AT'
+} as const;
+export type SearchSourcesPageDtoSortByEnum = typeof SearchSourcesPageDtoSortByEnum[keyof typeof SearchSourcesPageDtoSortByEnum];
+
+/**
+ * @export
+ */
+export const SearchSourcesPageDtoSortOrderEnum = {
+    Asc: 'ASC',
+    Desc: 'DESC'
+} as const;
+export type SearchSourcesPageDtoSortOrderEnum = typeof SearchSourcesPageDtoSortOrderEnum[keyof typeof SearchSourcesPageDtoSortOrderEnum];
+
 
 /**
  * Check if a given object implements the SearchSourcesPageDto interface.
@@ -52,6 +88,8 @@ export function SearchSourcesPageDtoFromJSONTyped(json: any, ignoreDiscriminator
         
         'skip': json['skip'] == null ? undefined : json['skip'],
         'limit': json['limit'] == null ? undefined : json['limit'],
+        'sortBy': json['sortBy'] == null ? undefined : json['sortBy'],
+        'sortOrder': json['sortOrder'] == null ? undefined : json['sortOrder'],
     };
 }
 
@@ -68,6 +106,8 @@ export function SearchSourcesPageDtoToJSONTyped(value?: SearchSourcesPageDto | n
         
         'skip': value['skip'],
         'limit': value['limit'],
+        'sortBy': value['sortBy'],
+        'sortOrder': value['sortOrder'],
     };
 }
 

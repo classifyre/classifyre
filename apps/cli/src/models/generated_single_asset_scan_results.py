@@ -31,28 +31,9 @@ class DetectorType(StrEnum):
 
     SECRETS = 'SECRETS'
     PII = 'PII'
-    TOXIC = 'TOXIC'
-    NSFW = 'NSFW'
     YARA = 'YARA'
     BROKEN_LINKS = 'BROKEN_LINKS'
-    PROMPT_INJECTION = 'PROMPT_INJECTION'
-    PHISHING_URL = 'PHISHING_URL'
-    SPAM = 'SPAM'
-    LANGUAGE = 'LANGUAGE'
     CODE_SECURITY = 'CODE_SECURITY'
-    PLAGIARISM = 'PLAGIARISM'
-    IMAGE_VIOLENCE = 'IMAGE_VIOLENCE'
-    OCR_PII = 'OCR_PII'
-    DEID_SCORE = 'DEID_SCORE'
-    HATE_SPEECH = 'HATE_SPEECH'
-    AI_GENERATED = 'AI_GENERATED'
-    CONTENT_QUALITY = 'CONTENT_QUALITY'
-    BIAS = 'BIAS'
-    DUPLICATE = 'DUPLICATE'
-    DOMAIN_CLASS = 'DOMAIN_CLASS'
-    CONTENT_TYPE = 'CONTENT_TYPE'
-    SENSITIVITY_TIER = 'SENSITIVITY_TIER'
-    JURISDICTION_TAG = 'JURISDICTION_TAG'
     CUSTOM = 'CUSTOM'
 
 
@@ -124,6 +105,11 @@ class ScanStats(BaseModel):
     findings_count: int | None = Field(
         None, description='Total number of findings detected'
     )
+    warnings: list[str] | None = Field(
+        None,
+        description='Non-fatal issues during scan (e.g. content truncation, empty content)',
+    )
+    errors: list[str] | None = Field(None, description='Detector errors during scan')
 
 
 class DetectionResult(BaseModel):

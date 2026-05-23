@@ -8,12 +8,40 @@ from typing import Any
 from ..models.generated_single_asset_scan_results import Location
 
 
-def _truncate_text(value: str, max_chars: int) -> str:
-    if len(value) <= max_chars:
-        return value
-    if max_chars <= 3:
-        return value[:max_chars]
-    return f"{value[: max_chars - 3]}..."
+@dataclass(frozen=True)
+class TableRef:
+    """Universal table reference supporting 2-level and 3-level hierarchies.
+
+    * 3-level: PostgreSQL (db.schema.table), MSSQL, Oracle, Snowflake, Databricks (catalog.schema.table)
+    * 2-level: MySQL (db.table), Hive (db.table) — ``schema`` is ``None``
+    """
+
+    database: str
+    schema: str | None
+    table: str
+    object_type: str = "TABLE"
+
+    @property
+    def fqn_parts(self) -> tuple[str, ...]:
+        """Return the name components in order (database[, schema], table)."""
+        if self.schema is not None:
+            return (self.database, self.schema, self.table)
+        return (self.database, self.table)
+
+    @property
+    def raw_id(self) -> str:
+        """``_#_``-separated identity string used for hashing."""
+        return "_#_".join(self.fqn_parts)
+
+    @property
+    def display_name(self) -> str:
+        """Dot-separated display name."""
+        return ".".join(self.fqn_parts)
+
+    @property
+    def table_key(self) -> tuple[str, ...]:
+        """Key for FK link maps and caches."""
+        return self.fqn_parts
 
 
 @dataclass(frozen=True)
@@ -31,10 +59,10 @@ def format_tabular_sample_content(
     rows: list[tuple[Any, ...]],
     column_names: list[str],
     serialize_cell: Any,
-    max_total_chars: int,
     include_column_names: bool,
     object_type: str | None = None,
     raw_metadata: dict[str, Any] | None = None,
+    row_offset: int = 0,
 ) -> tuple[str, str]:
     lines = [
         f"{scope_label}={scope_value}",
@@ -50,7 +78,7 @@ def format_tabular_sample_content(
     )
 
     serialized_rows: list[dict[str, str]] = []
-    for index, row in enumerate(rows, start=1):
+    for index, row in enumerate(rows, start=1 + row_offset):
         serialized_row: dict[str, str] = {}
         lines.append(f"row_{index}:")
         for column_name, cell in zip(column_names, row, strict=False):
@@ -70,10 +98,11 @@ def format_tabular_sample_content(
     raw_payload = dict(raw_metadata or {})
     raw_payload["strategy"] = str(strategy)
     raw_payload["rows"] = serialized_rows
+    raw_payload["row_offset"] = row_offset
     if object_type:
         raw_payload["object_type"] = object_type
 
-    text_content = _truncate_text("\n".join(lines).rstrip(), max_total_chars)
+    text_content = "\n".join(lines).rstrip()
     return json.dumps(raw_payload, ensure_ascii=False), text_content
 
 
@@ -125,10 +154,11 @@ def _find_tabular_cell_match(
     if not isinstance(rows, list):
         return None
 
+    row_offset = payload.get("row_offset", 0)
     normalized_match = _normalize_for_match(matched_content)
     substring_match: TabularCellMatch | None = None
     normalized_substring_match: TabularCellMatch | None = None
-    for current_row_index, raw_row in enumerate(rows, start=1):
+    for current_row_index, raw_row in enumerate(rows, start=1 + row_offset):
         if row_index is not None and current_row_index != row_index:
             continue
         if not isinstance(raw_row, dict):

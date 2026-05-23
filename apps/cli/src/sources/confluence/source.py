@@ -23,7 +23,7 @@ from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ...utils.content_extraction import html_to_text
-from ...utils.file_parser import parse_bytes
+from ...utils.file_parser import resolve_mime_type
 from ...utils.hashing import hash_url, normalize_http_url
 from ..atlassian_common import (
     AtlassianCloudClient,
@@ -114,7 +114,6 @@ class ConfluenceSource(BaseSource):
         self.include_inline_comments = content_options.include_inline_comments is not False
         self.include_attachments = content_options.include_attachments is not False
         self.include_linked_file_assets = content_options.include_linked_file_assets is not False
-        self.attachment_max_bytes = int(content_options.attachment_max_bytes or 5_242_880)
 
         self._seen_asset_hashes: set[str] = set()
         self._hash_to_url: dict[str, str] = {}
@@ -159,17 +158,11 @@ class ConfluenceSource(BaseSource):
             result["message"] = f"Failed to connect to Confluence Cloud API: {exc}"
         return result
 
-    async def extract(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
 
         self._reset_runtime_state()
-
-        pipeline = None
-        if self.config.detectors and any(detector.enabled for detector in self.config.detectors):
-            from ...pipeline.detector_pipeline import DetectorPipeline
-
-            pipeline = DetectorPipeline.from_recipe(self.recipe, self, self.runner_id)
 
         page_refs = self._discover_page_refs()
         sampled_refs = self._sample_page_refs(page_refs)
@@ -186,17 +179,11 @@ class ConfluenceSource(BaseSource):
                 while len(pending_batch) >= self.BATCH_SIZE:
                     to_emit = pending_batch[: self.BATCH_SIZE]
                     pending_batch = pending_batch[self.BATCH_SIZE :]
-                    if pipeline is not None:
-                        to_emit = await pipeline.process(to_emit)
                     if to_emit:
                         yield to_emit
 
         if pending_batch:
-            to_emit = pending_batch
-            if pipeline is not None:
-                to_emit = await pipeline.process(to_emit)
-            if to_emit:
-                yield to_emit
+            yield pending_batch
 
     def _reset_runtime_state(self) -> None:
         self._seen_asset_hashes = set()
@@ -204,6 +191,7 @@ class ConfluenceSource(BaseSource):
         self._page_content_cache = {}
         self._asset_content_cache = {}
         self._attachment_download_url_by_hash = {}
+        self._attachment_name_by_hash = {}
 
     def _discover_page_refs(self) -> list[dict[str, Any]]:
         refs: list[dict[str, Any]] = []
@@ -259,7 +247,7 @@ class ConfluenceSource(BaseSource):
         if sampling.strategy == SamplingStrategy.ALL:
             return refs
 
-        limit = int(sampling.limit or 100)
+        limit = int(sampling.rows_per_page or 100)
         if limit >= len(refs):
             return refs
 
@@ -365,6 +353,7 @@ class ConfluenceSource(BaseSource):
 
             attachment_hash = self.generate_hash_id(attachment_url)
             attachment_name = str(attachment.get("title") or f"Attachment {attachment.get('id')}")
+            self._attachment_name_by_hash[attachment_hash] = attachment_name
             mime = str(attachment.get("mediaType") or "").lower()
             asset_type = self._asset_type_from_mime_or_url(mime, attachment_url)
             metadata = {
@@ -637,6 +626,32 @@ class ConfluenceSource(BaseSource):
         assets.append(asset)
         return True
 
+    async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
+        normalized = normalize_http_url(asset_id, base_url=self.base_url)
+        if normalized:
+            asset_id = self.generate_hash_id(normalized)
+
+        download_url = self._attachment_download_url_by_hash.get(asset_id)
+        if not download_url:
+            mapped = self._hash_to_url.get(asset_id)
+            if mapped:
+                download_url = mapped
+        if not download_url:
+            return None
+
+        try:
+            file_bytes, declared_mime = self.client.get_bytes(download_url)
+        except Exception as exc:
+            logger.warning("Failed to fetch attachment bytes for %s: %s", download_url, exc)
+            return None
+
+        mime_type = resolve_mime_type(
+            file_bytes,
+            declared_mime_type=declared_mime,
+            file_name=self._attachment_file_name(asset_id, download_url),
+        )
+        return file_bytes, mime_type
+
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
         direct = self._asset_content_cache.get(asset_id)
         if direct:
@@ -668,13 +683,10 @@ class ConfluenceSource(BaseSource):
             logger.warning("Failed to fetch attachment content for %s: %s", download_url, exc)
             return None
 
-        if self.attachment_max_bytes > 0 and len(file_bytes) > self.attachment_max_bytes:
-            file_bytes = file_bytes[: self.attachment_max_bytes]
-
-        parsed = parse_bytes(
+        parsed = self.parse_asset_bytes(
             file_bytes,
             declared_mime_type=declared_mime,
-            file_name=download_url,
+            file_name=self._attachment_file_name(asset_id, download_url),
         )
 
         if parsed.text_content:
