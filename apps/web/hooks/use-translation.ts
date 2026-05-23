@@ -9,11 +9,11 @@ import {
 } from "@/i18n";
 
 export function useTranslation() {
-  const { settings } = useInstanceSettings();
+  const { resolvedLanguage } = useInstanceSettings();
 
   const translations = React.useMemo(
-    () => getTranslationsForLanguage(settings.language),
-    [settings.language],
+    () => getTranslationsForLanguage(resolvedLanguage),
+    [resolvedLanguage],
   );
 
   const t = React.useCallback(

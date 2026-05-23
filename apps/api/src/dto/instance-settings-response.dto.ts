@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export const INSTANCE_LANGUAGE_VALUES = ['ENGLISH', 'GERMAN'] as const;
+export const INSTANCE_LANGUAGE_VALUES = ['AUTOMATIC', 'ENGLISH', 'GERMAN'] as const;
 export type InstanceLanguageValue = (typeof INSTANCE_LANGUAGE_VALUES)[number];
 
 export const INSTANCE_TIME_FORMAT_VALUES = [
