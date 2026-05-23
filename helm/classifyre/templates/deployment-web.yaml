@@ -77,6 +77,16 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            {{- if .Values.frontend.posthog.enabled }}
+            - name: NEXT_PUBLIC_POSTHOG_TOKEN
+              value: {{ .Values.frontend.posthog.token | quote }}
+            - name: NEXT_PUBLIC_POSTHOG_HOST
+              value: {{ .Values.frontend.posthog.host | quote }}
+            - name: NEXT_PUBLIC_POSTHOG_UI_HOST
+              value: {{ .Values.frontend.posthog.uiHost | quote }}
+            - name: POSTHOG_INGEST_HOST
+              value: {{ .Values.frontend.posthog.ingestHost | quote }}
+            {{- end }}
             {{- include "classifyre.telemetryEnv" . | nindent 12 }}
             {{- with .Values.frontend.extraEnv }}
             {{- toYaml . | nindent 12 }}

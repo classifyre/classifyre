@@ -382,6 +382,24 @@ frontend:
     # -- Browser-side API base path.
     NEXT_PUBLIC_API_URL: /api
 
+  posthog:
+    # -- Enable PostHog analytics. When false, no env vars are injected.
+    enabled: false
+    # -- PostHog project token (phc_...). Required when enabled=true.
+    token: ""
+    # -- Client-side ingest host sent to the browser SDK (NEXT_PUBLIC_POSTHOG_HOST).
+    # -- Defaults to /classifyre-usr so requests are proxied through the web
+    # -- container, bypassing ad-blockers. Override with a managed reverse proxy
+    # -- subdomain (e.g. https://e.yourcompany.com) for extra reliability.
+    host: "/classifyre-usr"
+    # -- PostHog UI host for toolbar links etc. (NEXT_PUBLIC_POSTHOG_UI_HOST).
+    # -- Use https://eu.posthog.com for EU Cloud.
+    uiHost: "https://us.posthog.com"
+    # -- Upstream PostHog ingest endpoint used server-side by the proxy route
+    # -- (POSTHOG_INGEST_HOST). Never exposed to the browser.
+    # -- Use https://eu.i.posthog.com for EU Cloud, or your managed proxy CNAME.
+    ingestHost: "https://us.i.posthog.com"
+
   # -- Extra environment variables for web container.
   extraEnv: []
   # -- Extra envFrom sources for web container.
