@@ -9,31 +9,21 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
-import { InstanceSettingsResponseDtoLanguageEnum } from "@workspace/api-client";
 import { useInstanceSettings } from "./instance-settings-provider";
 import { useTranslation } from "@/hooks/use-translation";
+import type { ResolvedLanguage } from "@/lib/locale-detection";
 import type { TranslationKey } from "@/i18n";
 
 const LANGUAGE_OPTIONS: {
-  value: InstanceSettingsResponseDtoLanguageEnum;
+  value: ResolvedLanguage;
   labelKey: TranslationKey;
 }[] = [
-  {
-    value: InstanceSettingsResponseDtoLanguageEnum.Automatic,
-    labelKey: "settings.languages.AUTOMATIC",
-  },
-  {
-    value: InstanceSettingsResponseDtoLanguageEnum.English,
-    labelKey: "settings.languages.ENGLISH",
-  },
-  {
-    value: InstanceSettingsResponseDtoLanguageEnum.German,
-    labelKey: "settings.languages.GERMAN",
-  },
+  { value: "ENGLISH", labelKey: "settings.languages.ENGLISH" },
+  { value: "GERMAN", labelKey: "settings.languages.GERMAN" },
 ];
 
 export function LanguageSwitcher() {
-  const { settings, updateSettings } = useInstanceSettings();
+  const { resolvedLanguage, setLanguageOverride } = useInstanceSettings();
   const { t } = useTranslation();
 
   return (
@@ -50,11 +40,9 @@ export function LanguageSwitcher() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuRadioGroup
-          value={settings.language}
+          value={resolvedLanguage}
           onValueChange={(value) => {
-            void updateSettings({
-              language: value as InstanceSettingsResponseDtoLanguageEnum,
-            });
+            setLanguageOverride(value as ResolvedLanguage);
           }}
         >
           {LANGUAGE_OPTIONS.map((opt) => (

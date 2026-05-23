@@ -9,10 +9,17 @@ import {
 import { setDateFormattingPreferences } from "@/lib/date";
 import {
   resolveLanguage,
+  resolveTimeFormat,
+  resolveTimezone,
   type LanguageSetting,
   type ResolvedLanguage,
+  type ResolvedTimeFormat,
+  type TimeFormatSetting,
 } from "@/lib/locale-detection";
-import { setLanguageCookie } from "@/lib/language-cookie";
+import {
+  getLanguageOverride,
+  setLanguageOverride as persistOverride,
+} from "@/lib/language-cookie";
 
 type InstanceSettingsResponse = Awaited<
   ReturnType<typeof api.instanceSettings.instanceSettingsControllerGetSettings>
@@ -26,14 +33,24 @@ type UpdateInstanceSettingsPayload = NonNullable<
 
 type InstanceSettingsContextValue = {
   settings: InstanceSettingsResponse;
+  /** The language actually used for rendering (never AUTOMATIC). */
   resolvedLanguage: ResolvedLanguage;
+  /** The effective language setting (cookie override or instance default). */
+  effectiveLanguageSetting: LanguageSetting;
+  /** The resolved time format (never AUTOMATIC). */
+  resolvedTimeFormat: ResolvedTimeFormat;
+  /** The resolved IANA timezone string (never AUTOMATIC). */
+  resolvedTimezone: string;
   loading: boolean;
   saving: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  /** Update instance-wide settings via API (used by Settings page). */
   updateSettings: (
     payload: UpdateInstanceSettingsPayload,
   ) => Promise<InstanceSettingsResponse>;
+  /** Set per-user language override cookie (used by header switcher). No API call. */
+  setLanguageOverride: (setting: LanguageSetting) => void;
 };
 
 const DEFAULT_SETTINGS: InstanceSettingsResponse = {
@@ -42,25 +59,14 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   mcpEnabled: true,
   demoMode: false,
   language: InstanceSettingsResponseDtoLanguageEnum.Automatic,
-  timezone: "UTC",
-  timeFormat: InstanceSettingsResponseDtoTimeFormatEnum.TwelveHour,
+  timezone: "AUTOMATIC",
+  timeFormat: InstanceSettingsResponseDtoTimeFormatEnum.Automatic,
   createdAt: new Date(0),
   updatedAt: new Date(0),
 };
 
 const InstanceSettingsContext =
   React.createContext<InstanceSettingsContextValue | null>(null);
-
-function applyDatePreferences(
-  settings: InstanceSettingsResponse,
-  language: ResolvedLanguage,
-) {
-  setDateFormattingPreferences({
-    language,
-    timezone: settings.timezone,
-    timeFormat: settings.timeFormat,
-  });
-}
 
 export function InstanceSettingsProvider({
   children,
@@ -73,6 +79,10 @@ export function InstanceSettingsProvider({
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  // Per-user cookie override. null = no override, use instance default.
+  const [languageOverride, setLanguageOverrideState] =
+    React.useState<LanguageSetting | null>(() => getLanguageOverride());
+
   const refresh = React.useCallback(async () => {
     try {
       setLoading(true);
@@ -80,17 +90,12 @@ export function InstanceSettingsProvider({
       const response =
         await api.instanceSettings.instanceSettingsControllerGetSettings();
       setSettings(response);
-      applyDatePreferences(
-        response,
-        resolveLanguage(response.language as LanguageSetting),
-      );
     } catch (loadError) {
       const message =
         loadError instanceof Error
           ? loadError.message
           : "Failed to load instance settings";
       setError(message);
-      applyDatePreferences(DEFAULT_SETTINGS, "ENGLISH");
     } finally {
       setLoading(false);
     }
@@ -108,10 +113,6 @@ export function InstanceSettingsProvider({
           });
 
         setSettings(response);
-        applyDatePreferences(
-          response,
-          resolveLanguage(response.language as LanguageSetting),
-        );
         return response;
       } catch (updateError) {
         const message =
@@ -127,11 +128,43 @@ export function InstanceSettingsProvider({
     [],
   );
 
-  const resolvedLanguage = React.useMemo<ResolvedLanguage>(() => {
-    const resolved = resolveLanguage(settings.language as LanguageSetting);
-    setLanguageCookie(resolved);
-    return resolved;
-  }, [settings.language]);
+  // Header switcher: save to cookie, no API call
+  const setLanguageOverride = React.useCallback(
+    (setting: LanguageSetting) => {
+      persistOverride(setting);
+      setLanguageOverrideState(setting);
+    },
+    [],
+  );
+
+  // ─── Resolution ──────────────────────────────────────────────────
+
+  const effectiveLanguageSetting: LanguageSetting =
+    languageOverride ?? (settings.language as LanguageSetting);
+
+  const resolvedLanguage = React.useMemo<ResolvedLanguage>(
+    () => resolveLanguage(effectiveLanguageSetting),
+    [effectiveLanguageSetting],
+  );
+
+  const resolvedTimeFormat = React.useMemo<ResolvedTimeFormat>(
+    () => resolveTimeFormat(settings.timeFormat as TimeFormatSetting),
+    [settings.timeFormat],
+  );
+
+  const resolvedTimezone = React.useMemo<string>(
+    () => resolveTimezone(settings.timezone),
+    [settings.timezone],
+  );
+
+  // Apply date preferences whenever any resolved value changes
+  React.useEffect(() => {
+    setDateFormattingPreferences({
+      language: resolvedLanguage,
+      timezone: resolvedTimezone,
+      timeFormat: resolvedTimeFormat,
+    });
+  }, [resolvedLanguage, resolvedTimezone, resolvedTimeFormat]);
 
   React.useEffect(() => {
     void refresh();
@@ -141,13 +174,29 @@ export function InstanceSettingsProvider({
     () => ({
       settings,
       resolvedLanguage,
+      effectiveLanguageSetting,
+      resolvedTimeFormat,
+      resolvedTimezone,
       loading,
       saving,
       error,
       refresh,
       updateSettings,
+      setLanguageOverride,
     }),
-    [settings, resolvedLanguage, loading, saving, error, refresh, updateSettings],
+    [
+      settings,
+      resolvedLanguage,
+      effectiveLanguageSetting,
+      resolvedTimeFormat,
+      resolvedTimezone,
+      loading,
+      saving,
+      error,
+      refresh,
+      updateSettings,
+      setLanguageOverride,
+    ],
   );
 
   return (

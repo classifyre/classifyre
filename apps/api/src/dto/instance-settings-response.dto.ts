@@ -4,6 +4,7 @@ export const INSTANCE_LANGUAGE_VALUES = ['AUTOMATIC', 'ENGLISH', 'GERMAN'] as co
 export type InstanceLanguageValue = (typeof INSTANCE_LANGUAGE_VALUES)[number];
 
 export const INSTANCE_TIME_FORMAT_VALUES = [
+  'AUTOMATIC',
   'TWELVE_HOUR',
   'TWENTY_FOUR_HOUR',
 ] as const;
@@ -31,8 +32,9 @@ export class InstanceSettingsResponseDto {
   language: InstanceLanguageValue;
 
   @ApiProperty({
-    description: 'Default IANA timezone used for date/time rendering.',
-    example: 'UTC',
+    description:
+      'Default IANA timezone used for date/time rendering. Use "AUTOMATIC" to detect from browser.',
+    example: 'AUTOMATIC',
   })
   timezone: string;
 
