@@ -1574,5 +1574,56 @@
         ]
       }
     }
+  ],
+  "SQLITE": [
+    {
+      "name": "Local file scan",
+      "description": "Scan all tables in a local SQLite database file with random sampling",
+      "schedule": {
+        "enabled": false,
+        "preset": "weekly",
+        "cron": "0 3 * * 0",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SQLITE",
+        "required": {
+          "database_path": "/data/app.db"
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Full table export",
+      "description": "Read every row from selected tables in a SQLite database",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "0 9 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SQLITE",
+        "required": {
+          "database_path": "/data/analytics.sqlite3"
+        },
+        "optional": {
+          "scope": {
+            "include_tables": [
+              "users",
+              "events"
+            ],
+            "table_limit": 50
+          }
+        },
+        "sampling": {
+          "strategy": "ALL",
+          "rows_per_page": 100
+        }
+      }
+    }
   ]
 }

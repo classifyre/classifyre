@@ -160,7 +160,7 @@ async def test_mssql_extract_streams_assets_in_batches(
     monkeypatch.setattr(source, "_iter_tables", lambda: tables)
     monkeypatch.setattr(
         source,
-        "_collect_dependency_links",
+        "_collect_foreign_key_links",
         lambda _tables: {
             ("some_db", "some_schema", "sysjobsteps"): {("some_db", "some_schema", "sysjobs")},
         },
@@ -269,7 +269,7 @@ async def test_mssql_extract_runs_detector_pipeline_when_enabled(
             TableRef(database="some_db", schema="some_schema", table="sysjobs", object_type="TABLE")
         ],
     )
-    monkeypatch.setattr(source, "_collect_dependency_links", lambda _tables: {})
+    monkeypatch.setattr(source, "_collect_foreign_key_links", lambda _tables: {})
 
     processed_batches: list[int] = []
 
@@ -319,7 +319,7 @@ def test_mssql_is_aws_rds_explicit_override() -> None:
     assert source._is_aws_rds() is True
 
 
-def test_mssql_collect_dependency_links_respects_table_lineage_toggle(
+def test_mssql_collect_foreign_key_links_respects_table_lineage_toggle(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = MSSQLSource(
@@ -334,7 +334,7 @@ def test_mssql_collect_dependency_links_respects_table_lineage_toggle(
         )
     )
     monkeypatch.setattr(
-        source, "_collect_foreign_key_links", lambda _tables: {("a", "b", "c"): {("x", "y", "z")}}
+        source, "_collect_fk_links", lambda _tables: {("a", "b", "c"): {("x", "y", "z")}}
     )
     monkeypatch.setattr(
         source,
@@ -342,7 +342,7 @@ def test_mssql_collect_dependency_links_respects_table_lineage_toggle(
         lambda _tables: {("v", "s", "w"): {("x", "y", "z")}},
     )
 
-    links = source._collect_dependency_links([])
+    links = source._collect_foreign_key_links([])
 
     assert links == {}
 

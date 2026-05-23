@@ -385,6 +385,17 @@ export default function RunnerDetailPage() {
     return aggregated;
   }, [runnerId]);
 
+  const sourceName = runner?.source?.name || "Unknown source";
+  const sourceType = runner?.source?.type || "CUSTOM";
+  const SourceTypeIcon = getSourceIcon(sourceType);
+  const sourceDetailsId = runner?.sourceId || runner?.source?.id;
+
+  useEffect(() => {
+    if (sourceName && runner) {
+      document.title = `${t("scans.sourceRun", { source: sourceName })} | ${t("app.name")}`;
+    }
+  }, [sourceName, runner, t]);
+
   if (loading && !runner) {
     return (
       <div className="space-y-6">
@@ -422,11 +433,6 @@ export default function RunnerDetailPage() {
     return null;
   }
 
-  const sourceName = runner.source?.name || "Unknown source";
-  const sourceType = runner.source?.type || "CUSTOM";
-  const SourceTypeIcon = getSourceIcon(sourceType);
-  const sourceDetailsId = runner.sourceId || runner.source?.id;
-
   const assetsTotal = assetsCharts.totals.totalAssets;
   const progress = calculateProgress(runner);
 
@@ -441,7 +447,7 @@ export default function RunnerDetailPage() {
                 <SourceTypeIcon className="h-5 w-5 text-muted-foreground" />
               </div>
               <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em] truncate">
-                {sourceName} Run
+                {t("scans.sourceRun", { source: sourceName })}
               </h1>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -459,9 +465,9 @@ export default function RunnerDetailPage() {
                 {t(getRunnerStatusBadgeLabel(runner.status))}
               </Badge>
               <Badge variant="outline" className="rounded-[4px]">
-                {runner.triggerType}
+                {t(`triggerTypes.${runner.triggerType}`)}
               </Badge>
-              <span>Triggered {formatRelative(runner.triggeredAt)}</span>
+              <span>{t("scans.runTimeline.triggered")} {formatRelative(runner.triggeredAt)}</span>
             </div>
           </div>
         </div>
@@ -610,15 +616,15 @@ export default function RunnerDetailPage() {
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {[
-              { label: "Findings", value: findingsCharts.totals.total },
+              { label: t("scans.stats.findings"), value: findingsCharts.totals.total },
               {
-                label: "Critical + High",
+                label: t("scans.stats.criticalHigh"),
                 value:
                   findingsCharts.totals.critical + findingsCharts.totals.high,
               },
-              { label: "Assets", value: assetsCharts.totals.totalAssets },
-              { label: "Open", value: findingsCharts.totals.open },
-              { label: "Resolved", value: findingsCharts.totals.resolved },
+              { label: t("scans.stats.assets"), value: assetsCharts.totals.totalAssets },
+              { label: t("scans.stats.open"), value: findingsCharts.totals.open },
+              { label: t("scans.stats.resolved"), value: findingsCharts.totals.resolved },
             ].map((item) => (
               <Card
                 key={item.label}
@@ -644,20 +650,20 @@ export default function RunnerDetailPage() {
           {runner.status === "RUNNING" && (
             <Card className="border-2 border-border rounded-[6px]">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Run Progress</CardTitle>
+                <CardTitle className="text-base">{t("scans.runProgress.title")}</CardTitle>
                 <CardDescription>
-                  Estimated from processed assets
+                  {t("scans.runProgress.description")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Progress</span>
+                  <span className="text-muted-foreground">{t("scans.runProgress.progress")}</span>
                   <span className="font-medium">{progress}%</span>
                 </div>
                 <Progress value={progress} />
                 {runner.durationMs != null && (
                   <p className="text-xs text-muted-foreground">
-                    Duration so far: {formatDuration(runner.durationMs)}
+                    {t("scans.runProgress.durationSoFar", { duration: formatDuration(runner.durationMs) })}
                   </p>
                 )}
               </CardContent>
@@ -667,40 +673,40 @@ export default function RunnerDetailPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card className="border-2 border-border rounded-[6px]">
               <CardHeader>
-                <CardTitle>Run Timeline</CardTitle>
-                <CardDescription>Execution timestamps</CardDescription>
+                <CardTitle>{t("scans.runTimeline.title")}</CardTitle>
+                <CardDescription>{t("scans.runTimeline.description")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Triggered</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.triggered")}</span>
                   <span className="text-right">
                     {formatDate(runner.triggeredAt)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Started</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.started")}</span>
                   <span className="text-right">
                     {formatDate(runner.startedAt)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Completed</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.completed")}</span>
                   <span className="text-right">
                     {formatDate(runner.completedAt)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Duration</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.duration")}</span>
                   <span className="text-right">
                     {formatDuration(runner.durationMs)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Triggered By</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.triggeredBy")}</span>
                   <span className="text-right">
                     {runner.triggeredBy === "pg-boss"
-                      ? "Scheduler"
-                      : runner.triggeredBy || "System"}
+                      ? t("runners.scheduler")
+                      : runner.triggeredBy || t("scans.runTimeline.na")}
                   </span>
                 </div>
               </CardContent>
@@ -708,24 +714,24 @@ export default function RunnerDetailPage() {
 
             <Card className="border-2 border-border rounded-[6px]">
               <CardHeader>
-                <CardTitle>Asset Delta</CardTitle>
-                <CardDescription>Changes produced by this run</CardDescription>
+                <CardTitle>{t("scans.assetDelta.title")}</CardTitle>
+                <CardDescription>{t("scans.assetDelta.description")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Created</span>
+                  <span className="text-muted-foreground">{t("scans.assetDelta.created")}</span>
                   <span className="font-semibold">
                     +{assetsCharts.totals.newAssets.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Updated</span>
+                  <span className="text-muted-foreground">{t("scans.assetDelta.updated")}</span>
                   <span className="font-semibold">
                     ~{assetsCharts.totals.updatedAssets.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Unchanged</span>
+                  <span className="text-muted-foreground">{t("scans.assetDelta.unchanged")}</span>
                   <span className="font-semibold">
                     {assetsCharts.totals.unchangedAssets.toLocaleString()}
                   </span>
@@ -742,7 +748,7 @@ export default function RunnerDetailPage() {
 
           <Card className="border-2 border-border rounded-[6px]">
             <CardHeader>
-              <CardTitle>Source Context</CardTitle>
+              <CardTitle>{t("scans.sourceContext.title")}</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -764,7 +770,7 @@ export default function RunnerDetailPage() {
                   }
                 >
                   <ArrowUpRight className="h-4 w-4" />
-                  Open Source
+                  {t("scans.sourceContext.openSource")}
                 </Button>
               )}
             </CardContent>

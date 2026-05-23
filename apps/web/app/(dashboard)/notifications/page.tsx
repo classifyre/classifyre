@@ -459,7 +459,7 @@ export default function NotificationsPage() {
             }
           >
             <SelectTrigger className="h-9 w-[180px] rounded-[4px] border-2 border-border">
-              <SelectValue placeholder="Type" />
+              <SelectValue placeholder={t("common.type")} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>All types</SelectItem>
@@ -480,7 +480,7 @@ export default function NotificationsPage() {
             }
           >
             <SelectTrigger className="h-9 w-[180px] rounded-[4px] border-2 border-border">
-              <SelectValue placeholder="Severity" />
+              <SelectValue placeholder={t("common.severity")} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>All severities</SelectItem>

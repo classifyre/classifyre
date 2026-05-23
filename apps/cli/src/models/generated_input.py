@@ -41,6 +41,7 @@ class AssetType(StrEnum):
     CONFLUENCE = 'CONFLUENCE'
     JIRA = 'JIRA'
     SERVICEDESK = 'SERVICEDESK'
+    SQLITE = 'SQLITE'
 
 
 class SourceCategory(StrEnum):
@@ -168,6 +169,12 @@ class ResourceOverrides(BaseModel):
         description='Max OS processes in the detector pool. Auto-sized from CPU/memory limits when omitted.',
         ge=1,
         le=16,
+    )
+    max_concurrent_assets: int | None = Field(
+        None,
+        description='Max assets processed concurrently. Controls parallel DB connections. Defaults to pool_workers * 2 when omitted.',
+        ge=1,
+        le=50,
     )
 
 
@@ -1836,6 +1843,7 @@ class Type(StrEnum):
     CONFLUENCE = 'CONFLUENCE'
     JIRA = 'JIRA'
     SERVICEDESK = 'SERVICEDESK'
+    SQLITE = 'SQLITE'
 
 
 class SlackInput(CoreInput):
@@ -2622,6 +2630,7 @@ class Type17(StrEnum):
     CONFLUENCE = 'CONFLUENCE'
     JIRA = 'JIRA'
     SERVICEDESK = 'SERVICEDESK'
+    SQLITE = 'SQLITE'
 
 
 class ConfluenceInput(CoreInput):
@@ -2676,6 +2685,59 @@ class ServiceDeskInput(CoreInput):
     resources: ResourceOverrides | None = None
 
 
+class SQLiteRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    database_path: str = Field(
+        ...,
+        description='Absolute or relative path to the SQLite database file (e.g. /data/app.db)',
+    )
+
+
+class SQLiteOptionalScope(BaseModel):
+    """
+    Table selection scope.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_tables: list[str] | None = Field(
+        None,
+        description='Optional table allowlist. Only tables in this list will be scanned.',
+    )
+    table_limit: int | None = Field(
+        None, description='Optional cap on number of table assets extracted', ge=1
+    )
+
+
+class SQLiteOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    scope: SQLiteOptionalScope | None = None
+
+
+class SQLiteInput(CoreInput):
+    type: Literal['SQLITE'] = Field('SQLITE', description='Type of the asset or source')
+    required: SQLiteRequired
+    masked: dict[str, Any] | None = Field(
+        None,
+        description='SQLite has no credentials; this section is intentionally empty.',
+    )
+    optional: SQLiteOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
 class SourceInput(
     RootModel[
         SlackInput
@@ -2697,6 +2759,7 @@ class SourceInput(
         | ConfluenceInput
         | JiraInput
         | ServiceDeskInput
+        | SQLiteInput
     ]
 ):
     root: (
@@ -2719,6 +2782,7 @@ class SourceInput(
         | ConfluenceInput
         | JiraInput
         | ServiceDeskInput
+        | SQLiteInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

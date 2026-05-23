@@ -481,7 +481,7 @@ export function RunnerAssetsTable({
             </span>
             <Select value={pageSize} onValueChange={setPageSize}>
               <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
-                <SelectValue placeholder="Rows" />
+                <SelectValue placeholder={t("common.rowsPerPage")} />
               </SelectTrigger>
               <SelectContent>
                 {PAGE_SIZE_OPTIONS.map((size) => (

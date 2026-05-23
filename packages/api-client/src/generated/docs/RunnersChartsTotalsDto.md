@@ -10,6 +10,7 @@ Name | Type
 `running` | number
 `queued` | number
 `completed` | number
+`warning` | number
 `failed` | number
 
 ## Example
@@ -23,6 +24,7 @@ const example = {
   "running": null,
   "queued": null,
   "completed": null,
+  "warning": null,
   "failed": null,
 } satisfies RunnersChartsTotalsDto
 

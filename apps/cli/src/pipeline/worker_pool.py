@@ -37,9 +37,7 @@ class _WorkerResult:
 
     __slots__ = ("elapsed_ms", "findings", "worker_pid")
 
-    def __init__(
-        self, findings: list[dict[str, Any]], worker_pid: int, elapsed_ms: int
-    ) -> None:
+    def __init__(self, findings: list[dict[str, Any]], worker_pid: int, elapsed_ms: int) -> None:
         self.findings = findings
         self.worker_pid = worker_pid
         self.elapsed_ms = elapsed_ms
@@ -80,9 +78,7 @@ def _detect_in_worker(
             from ..detectors import get_detector
             from ..detectors.config import parse_detector_config
 
-            name, typed_config = parse_detector_config(
-                detector_type, json.loads(config_json)
-            )
+            name, typed_config = parse_detector_config(detector_type, json.loads(config_json))
             detector = get_detector(name, typed_config)
             _worker_detector_cache[cache_key] = detector
             logging.getLogger(__name__).info(
@@ -103,7 +99,9 @@ def _detect_in_worker(
         elif detector_name == "custom":
             results = detector._detect_sync(content, content_type)
         else:
-            text = content if isinstance(content, str) else content.decode("utf-8", errors="replace")
+            text = (
+                content if isinstance(content, str) else content.decode("utf-8", errors="replace")
+            )
             results = detector._detect_sync(text)
     else:
         results = asyncio.run(detector.detect(content, content_type))
@@ -111,7 +109,10 @@ def _detect_in_worker(
     elapsed_ms = int((time.monotonic() - t0) * 1000)
     logging.getLogger(__name__).info(
         "Worker %d ran %s: %d findings in %dms",
-        pid, detector_name, len(results), elapsed_ms,
+        pid,
+        detector_name,
+        len(results),
+        elapsed_ms,
     )
 
     findings = [
@@ -209,7 +210,11 @@ def compute_pool_workers(override: int | None = None) -> int:
 
     logger.info(
         "Pool sizing: cpu_budget=%d (cpus=%d), mem_budget=%d (%dMB), effective=%d",
-        cpu_budget, cpus, mem_budget, mem_mb, effective,
+        cpu_budget,
+        cpus,
+        mem_budget,
+        mem_mb,
+        effective,
     )
     return effective
 
@@ -238,7 +243,9 @@ class DetectorWorkerPool:
         self._shutdown = False
         logger.info(
             "Detector pool started: %d workers (method=%s, pid=%d)",
-            effective_workers, mp_start_method, os.getpid(),
+            effective_workers,
+            mp_start_method,
+            os.getpid(),
         )
 
     @property

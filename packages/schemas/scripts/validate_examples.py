@@ -28,6 +28,7 @@ TYPE_TO_DEFINITION = {
     "CONFLUENCE": "ConfluenceInput",
     "JIRA": "JiraInput",
     "SERVICEDESK": "ServiceDeskInput",
+    "SQLITE": "SQLiteInput",
 }
 
 SCHEMAS_DIR = Path(__file__).parent.parent / "src" / "schemas"

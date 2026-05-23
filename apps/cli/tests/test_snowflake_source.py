@@ -113,7 +113,7 @@ class _DummyConnection:
 def test_snowflake_test_connection_success(monkeypatch: pytest.MonkeyPatch) -> None:
     source = SnowflakeSource(_default_recipe())
     monkeypatch.setattr(source, "_resolve_databases", lambda: ["ANALYTICS"])
-    monkeypatch.setattr(source, "_connect", _DummyConnection)
+    monkeypatch.setattr(source, "_connect", lambda _db=None: _DummyConnection())
 
     result = source.test_connection()
 
@@ -149,7 +149,7 @@ async def test_snowflake_extract_streams_assets_in_batches(
     monkeypatch.setattr(source, "_iter_tables", lambda: tables)
     monkeypatch.setattr(
         source,
-        "_collect_dependency_links",
+        "_collect_foreign_key_links",
         lambda _tables: {
             ("ANALYTICS", "PUBLIC", "PAYMENTS"): {("ANALYTICS", "PUBLIC", "ORDERS")},
             ("ANALYTICS", "PUBLIC", "V_ORDERS"): {("ANALYTICS", "PUBLIC", "ORDERS")},

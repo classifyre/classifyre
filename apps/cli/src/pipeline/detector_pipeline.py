@@ -66,9 +66,7 @@ class DetectorPipeline:
             self.content_provider = ParsedContentProvider(source)
         self.init_warnings: list[str] = []
 
-    def _register_detector_info(
-        self, detector: BaseDetector, info: _DetectorInfo
-    ) -> None:
+    def _register_detector_info(self, detector: BaseDetector, info: _DetectorInfo) -> None:
         self._detector_info[id(detector)] = info
 
     def _get_detector_info(self, detector: BaseDetector) -> _DetectorInfo | None:
@@ -156,9 +154,7 @@ class DetectorPipeline:
         all_active = text_detectors + binary_detectors + link_detectors
         detector_names = [self._detector_log_label(d) for d in all_active]
         pool_tag = "[pool]" if self._worker_pool else "[in-process]"
-        logger.info(
-            "%s Scanning %s [%s]", pool_tag, asset.name, ", ".join(detector_names)
-        )
+        logger.info("%s Scanning %s [%s]", pool_tag, asset.name, ", ".join(detector_names))
 
         findings: list[DetectionResult] = []
         detector_types_run: list[DetectorType] = []
@@ -241,12 +237,13 @@ class DetectorPipeline:
         if findings:
             logger.info(
                 "%s Scanned %s: %d finding(s) in %dms",
-                pool_tag, asset.name, len(findings), scan_duration,
+                pool_tag,
+                asset.name,
+                len(findings),
+                scan_duration,
             )
         else:
-            logger.info(
-                "%s Scanned %s: no findings (%dms)", pool_tag, asset.name, scan_duration
-            )
+            logger.info("%s Scanned %s: no findings (%dms)", pool_tag, asset.name, scan_duration)
 
         return asset
 
@@ -299,7 +296,10 @@ class DetectorPipeline:
             elapsed = int((time.monotonic() - t0) * 1000)
             logger.info(
                 "  %s page %d done: %d findings (%dms)",
-                asset.name, page_num, len(page_findings), elapsed,
+                asset.name,
+                page_num,
+                len(page_findings),
+                elapsed,
             )
             return page_findings, page_types, page_errors, page_content, page_num
 
@@ -322,9 +322,7 @@ class DetectorPipeline:
                         page_content,
                     )
 
-        max_pending = max(
-            2, self._worker_pool.max_workers * 2 if self._worker_pool else 4
-        )
+        max_pending = max(2, self._worker_pool.max_workers * 2 if self._worker_pool else 4)
 
         async for text_content in self._iter_text_content_pages(asset):
             page_index += 1
@@ -335,18 +333,22 @@ class DetectorPipeline:
 
             while len(pending_tasks) >= max_pending:
                 done, pending_tasks = await asyncio.wait(
-                    pending_tasks, return_when=asyncio.FIRST_COMPLETED,
+                    pending_tasks,
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
                 for task in done:
                     page_findings, page_types, page_errors, page_content, _pn = task.result()
                     findings.extend(page_findings)
                     errors.extend(page_errors)
                     detector_types_run = self._merge_detector_types(
-                        detector_types_run, page_types,
+                        detector_types_run,
+                        page_types,
                     )
                     for finding in page_findings:
                         self.content_provider.enrich_finding_location(
-                            finding, asset, page_content,
+                            finding,
+                            asset,
+                            page_content,
                         )
 
             task = asyncio.create_task(_detect_page(text_content, page_index))
@@ -401,7 +403,10 @@ class DetectorPipeline:
             elapsed = int((time.monotonic() - t0) * 1000)
             logger.info(
                 "  %s page %d done: %d findings (%dms)",
-                asset.name, page_num, len(page_findings), elapsed,
+                asset.name,
+                page_num,
+                len(page_findings),
+                elapsed,
             )
             return page_findings, page_types, page_errors, page_content, page_num
 
@@ -413,26 +418,29 @@ class DetectorPipeline:
                 page_findings, page_types, page_errors, page_content, _pn = task.result()
                 for finding in page_findings:
                     self.content_provider.enrich_finding_location(
-                        finding, asset, page_content,
+                        finding,
+                        asset,
+                        page_content,
                     )
                 findings.extend(page_findings)
                 errors.extend(page_errors)
                 detector_types_run = self._merge_detector_types(
-                    detector_types_run, page_types,
+                    detector_types_run,
+                    page_types,
                 )
                 unflushed_count += len(page_findings)
 
             if unflushed_count >= findings_flush_size and unflushed_count > 0:
                 logger.debug(
                     "  %s flushing %d findings (%d total)",
-                    asset.name, unflushed_count, len(findings),
+                    asset.name,
+                    unflushed_count,
+                    len(findings),
                 )
                 await on_findings_flushed(list(findings))
                 unflushed_count = 0
 
-        max_pending = max(
-            2, self._worker_pool.max_workers * 2 if self._worker_pool else 4
-        )
+        max_pending = max(2, self._worker_pool.max_workers * 2 if self._worker_pool else 4)
 
         async for text_content in self._iter_text_content_pages(asset):
             page_index += 1
@@ -443,25 +451,31 @@ class DetectorPipeline:
 
             while len(pending_tasks) >= max_pending:
                 done, pending_tasks_set = await asyncio.wait(
-                    pending_tasks, return_when=asyncio.FIRST_COMPLETED,
+                    pending_tasks,
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
                 pending_tasks = pending_tasks_set
                 for task in done:
                     page_findings, page_types, page_errors, page_content, _pn = task.result()
                     for finding in page_findings:
                         self.content_provider.enrich_finding_location(
-                            finding, asset, page_content,
+                            finding,
+                            asset,
+                            page_content,
                         )
                     findings.extend(page_findings)
                     errors.extend(page_errors)
                     detector_types_run = self._merge_detector_types(
-                        detector_types_run, page_types,
+                        detector_types_run,
+                        page_types,
                     )
                     unflushed_count += len(page_findings)
                 if unflushed_count >= findings_flush_size and unflushed_count > 0:
                     logger.info(
                         "  %s flushing %d findings (%d total)",
-                        asset.name, unflushed_count, len(findings),
+                        asset.name,
+                        unflushed_count,
+                        len(findings),
                     )
                     await on_findings_flushed(list(findings))
                     unflushed_count = 0
@@ -637,9 +651,7 @@ class DetectorPipeline:
         errors: list[str] = []
         detected_at = datetime.now(UTC)
 
-        for i, (detector, result) in enumerate(
-            zip(runnable_detectors, results, strict=False)
-        ):
+        for i, (detector, result) in enumerate(zip(runnable_detectors, results, strict=False)):
             detector_name = detector.__class__.__name__
             via = task_via[i]
             loc = f"{asset_name}:{page_tag}" if page_tag else asset_name
@@ -648,7 +660,11 @@ class DetectorPipeline:
                 wall_ms = int((time.monotonic() - task_start_times[i]) * 1000)
                 logger.error(
                     "  [%s] %s on %s: FAILED in %dms — %s",
-                    via, detector_name, loc, wall_ms, result,
+                    via,
+                    detector_name,
+                    loc,
+                    wall_ms,
+                    result,
                 )
                 errors.append(f"{detector_name}: {result}")
                 continue
@@ -677,12 +693,19 @@ class DetectorPipeline:
             if detector_findings:
                 logger.info(
                     "  [%s] %s on %s: %d finding(s) in %dms",
-                    pid_tag, detector_name, loc, len(detector_findings), worker_elapsed,
+                    pid_tag,
+                    detector_name,
+                    loc,
+                    len(detector_findings),
+                    worker_elapsed,
                 )
             else:
                 logger.info(
                     "  [%s] %s on %s: clean (%dms)",
-                    pid_tag, detector_name, loc, worker_elapsed,
+                    pid_tag,
+                    detector_name,
+                    loc,
+                    worker_elapsed,
                 )
 
             all_findings.extend(detector_findings)
@@ -835,7 +858,9 @@ class DetectorPipeline:
 
         if not detector_configs:
             return cls(
-                detectors=[], source=source, runner_id=runner_id,
+                detectors=[],
+                source=source,
+                runner_id=runner_id,
                 worker_pool=worker_pool,
             )
 

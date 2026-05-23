@@ -9,6 +9,42 @@ from ..models.generated_single_asset_scan_results import Location
 
 
 @dataclass(frozen=True)
+class TableRef:
+    """Universal table reference supporting 2-level and 3-level hierarchies.
+
+    * 3-level: PostgreSQL (db.schema.table), MSSQL, Oracle, Snowflake, Databricks (catalog.schema.table)
+    * 2-level: MySQL (db.table), Hive (db.table) — ``schema`` is ``None``
+    """
+
+    database: str
+    schema: str | None
+    table: str
+    object_type: str = "TABLE"
+
+    @property
+    def fqn_parts(self) -> tuple[str, ...]:
+        """Return the name components in order (database[, schema], table)."""
+        if self.schema is not None:
+            return (self.database, self.schema, self.table)
+        return (self.database, self.table)
+
+    @property
+    def raw_id(self) -> str:
+        """``_#_``-separated identity string used for hashing."""
+        return "_#_".join(self.fqn_parts)
+
+    @property
+    def display_name(self) -> str:
+        """Dot-separated display name."""
+        return ".".join(self.fqn_parts)
+
+    @property
+    def table_key(self) -> tuple[str, ...]:
+        """Key for FK link maps and caches."""
+        return self.fqn_parts
+
+
+@dataclass(frozen=True)
 class TabularCellMatch:
     row_index: int
     column_name: str
