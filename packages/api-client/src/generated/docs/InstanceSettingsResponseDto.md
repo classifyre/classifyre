@@ -27,7 +27,7 @@ const example = {
   "aiEnabled": true,
   "mcpEnabled": true,
   "language": ENGLISH,
-  "timezone": UTC,
+  "timezone": AUTOMATIC,
   "timeFormat": TWELVE_HOUR,
   "demoMode": false,
   "createdAt": null,
