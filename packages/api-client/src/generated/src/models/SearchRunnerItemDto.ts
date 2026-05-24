@@ -168,6 +168,7 @@ export const SearchRunnerItemDtoStatusEnum = {
     Pending: 'PENDING',
     Running: 'RUNNING',
     Completed: 'COMPLETED',
+    Warning: 'WARNING',
     Error: 'ERROR'
 } as const;
 export type SearchRunnerItemDtoStatusEnum = typeof SearchRunnerItemDtoStatusEnum[keyof typeof SearchRunnerItemDtoStatusEnum];

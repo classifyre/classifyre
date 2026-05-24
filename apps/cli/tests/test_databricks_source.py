@@ -142,8 +142,7 @@ class _FakeSession:
 def test_databricks_test_connection_success(monkeypatch: pytest.MonkeyPatch) -> None:
     source = DatabricksSource(_pat_recipe())
     monkeypatch.setattr(source, "_list_catalogs", lambda: ["main"])
-    monkeypatch.setattr(source, "_connect_sql", _DummyConnection)
-    monkeypatch.setattr(source, "_connect_sql_with_tz", lambda: _DummyConnection())
+    monkeypatch.setattr(source, "_connect", _DummyConnection)
 
     result = source.test_connection()
 
@@ -171,8 +170,8 @@ async def test_databricks_extract_streams_assets_in_batches(
     source = DatabricksSource(_pat_recipe())
 
     tables = [
-        TableRef(catalog="main", schema="finance", table="orders", object_type="TABLE"),
-        TableRef(catalog="main", schema="finance", table="payments", object_type="TABLE"),
+        TableRef(database="main", schema="finance", table="orders", object_type="TABLE"),
+        TableRef(database="main", schema="finance", table="payments", object_type="TABLE"),
     ]
 
     monkeypatch.setattr(source, "_iter_tables", lambda: tables)
@@ -239,7 +238,7 @@ async def test_databricks_fetch_content_uses_cache(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = DatabricksSource(_pat_recipe())
-    table_ref = TableRef(catalog="main", schema="finance", table="orders", object_type="TABLE")
+    table_ref = TableRef(database="main", schema="finance", table="orders", object_type="TABLE")
     asset = source._table_to_asset(table_ref)
     source._table_lookup[asset.hash] = table_ref
 
@@ -271,7 +270,7 @@ def test_databricks_latest_sampling_falls_back_to_random() -> None:
             }
         )
     )
-    table_ref = TableRef(catalog="main", schema="finance", table="orders", object_type="TABLE")
+    table_ref = TableRef(database="main", schema="finance", table="orders", object_type="TABLE")
 
     query, params = source._build_sampling_query(table_ref, ["id", "name"])
 
@@ -282,7 +281,7 @@ def test_databricks_latest_sampling_falls_back_to_random() -> None:
 
 def test_databricks_all_strategy_omits_limit() -> None:
     source = DatabricksSource(_pat_recipe(sampling={"strategy": "ALL"}))
-    table_ref = TableRef(catalog="main", schema="finance", table="orders", object_type="TABLE")
+    table_ref = TableRef(database="main", schema="finance", table="orders", object_type="TABLE")
 
     query, params = source._build_sampling_query(table_ref, ["id", "name"])
 
@@ -310,7 +309,7 @@ async def test_databricks_extract_runs_detector_pipeline_when_enabled(
     monkeypatch.setattr(
         source,
         "_iter_tables",
-        lambda: [TableRef(catalog="main", schema="finance", table="orders", object_type="TABLE")],
+        lambda: [TableRef(database="main", schema="finance", table="orders", object_type="TABLE")],
     )
     monkeypatch.setattr(source, "_lineage_refs_for_table", lambda _tr: set())
     monkeypatch.setattr(source, "_iter_notebooks", lambda: iter([]))
@@ -341,6 +340,7 @@ async def test_databricks_extract_runs_detector_pipeline_when_enabled(
     assert processed_batches == [1]
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_databricks_fetch_content_pages_batches_for_all_strategy(
     monkeypatch: pytest.MonkeyPatch,
@@ -354,7 +354,7 @@ async def test_databricks_fetch_content_pages_batches_for_all_strategy(
             }
         )
     )
-    table_ref = TableRef(catalog="main", schema="finance", table="orders", object_type="TABLE")
+    table_ref = TableRef(database="main", schema="finance", table="orders", object_type="TABLE")
     asset = source._table_to_asset(table_ref)
 
     all_rows: list[tuple[Any, ...]] = [(i, f"item{i}") for i in range(1, 13)]
@@ -382,6 +382,9 @@ async def test_databricks_fetch_content_pages_batches_for_all_strategy(
         def fetchall(self) -> list[tuple[Any, ...]]:
             return list(self._rows)
 
+        def fetchmany(self, size: int) -> list[tuple[Any, ...]]:
+            return list(self._rows[:size])
+
         def __enter__(self) -> _BatchCursor:
             return self
 
@@ -402,8 +405,7 @@ async def test_databricks_fetch_content_pages_batches_for_all_strategy(
             return None
 
     monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
-    monkeypatch.setattr(source, "_connect_sql", lambda: _BatchConnection())
-    monkeypatch.setattr(source, "_connect_sql_with_tz", lambda: _BatchConnection())
+    monkeypatch.setattr(source, "_connect", _BatchConnection)
 
     pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
 

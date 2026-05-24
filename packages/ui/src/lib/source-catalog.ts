@@ -3,6 +3,7 @@ import type { SourceType as IconSourceType } from "../components/source-icon";
 
 export type SourceCatalogCategory =
   | "DATABASES"
+  | "GRAPH_DATABASES"
   | "WAREHOUSE_LAKEHOUSE"
   | "WEB_AND_UGC"
   | "COLLABORATION"
@@ -31,6 +32,10 @@ export const SOURCE_CATEGORY_META: Record<
     description:
       "Operational and document stores for row and collection scans.",
   },
+  GRAPH_DATABASES: {
+    label: "Graph Databases",
+    description: "Graph-native stores with node and relationship traversal.",
+  },
   WAREHOUSE_LAKEHOUSE: {
     label: "Warehouse & Lakehouse",
     description: "Analytical compute platforms and catalog-first ingestion.",
@@ -56,6 +61,7 @@ export const SOURCE_CATEGORY_META: Record<
 
 export const SOURCE_CATEGORY_ORDER: SourceCatalogCategory[] = [
   "DATABASES",
+  "GRAPH_DATABASES",
   "WAREHOUSE_LAKEHOUSE",
   "WEB_AND_UGC",
   "COLLABORATION",
@@ -159,6 +165,14 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMeta> = {
     category: "DATABASES",
     keywords: ["document", "nosql", "collections"],
   },
+  NEO4J: {
+    label: "Neo4j",
+    description:
+      "Scan Neo4j node labels and relationship structure for graph data.",
+    icon: CreateSourceDtoTypeEnum.Neo4J,
+    category: "GRAPH_DATABASES",
+    keywords: ["graph", "cypher", "nodes", "relationships", "bolt"],
+  },
   POWERBI: {
     label: "Power BI",
     description: "Scan Power BI workspaces, datasets, reports, and dashboards.",
@@ -194,6 +208,14 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMeta> = {
     icon: CreateSourceDtoTypeEnum.Servicedesk,
     category: "COLLABORATION",
     keywords: ["support", "requests", "tickets", "queues"],
+  },
+  SQLITE: {
+    label: "SQLite",
+    description:
+      "Scan tables in a local SQLite database file with no server required.",
+    icon: CreateSourceDtoTypeEnum.Sqlite,
+    category: "DATABASES",
+    keywords: ["sql", "file", "embedded", "local", "rdbms"],
   },
 };
 

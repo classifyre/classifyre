@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   formatDate,
@@ -9,11 +8,8 @@ import {
   formatShortUTC,
   formatDateUTC,
 } from "@/lib/date";
-import { MatchedContentBlock } from "@/components/matched-content-block";
 import {
   ArrowUpRight,
-  ChevronDown,
-  ChevronRight,
   Filter,
   Loader2,
   Search,
@@ -67,11 +63,9 @@ import {
 } from "@workspace/ui/components";
 import { getSourceIcon } from "../lib/source-type-icon";
 import { useUrlParams } from "../lib/url-filters";
-import {
-  formatFindingStatusLabel,
-  toFindingStatusBadgeValue,
-} from "../lib/finding-status-badge";
+import { toFindingStatusBadgeValue } from "../lib/finding-status-badge";
 import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -244,75 +238,6 @@ function ConfidenceBar({ value }: { value: number }) {
   );
 }
 
-// ─── Expanded row ─────────────────────────────────────────────────────────────
-
-function FindingExpandedRow({ finding }: { finding: FindingResponseDto }) {
-  const severityKey = (finding.severity || "INFO").toLowerCase() as
-    | "critical"
-    | "high"
-    | "medium"
-    | "low"
-    | "info";
-  const runnerHref = finding.runnerId ? `/scans/${finding.runnerId}` : null;
-
-  return (
-    <div className="space-y-4 p-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            Scanned
-          </p>
-          {runnerHref ? (
-            <Link
-              href={runnerHref}
-              className="font-mono text-xs underline-offset-4 hover:underline"
-            >
-              {formatRelative(finding.lastDetectedAt || finding.detectedAt)}
-            </Link>
-          ) : (
-            <p className="text-xs text-muted-foreground">Manual</p>
-          )}
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            Location
-          </p>
-          <p className="font-mono text-xs">
-            {finding.location?.path || "-"}
-            {typeof finding.location?.line === "number"
-              ? `:${finding.location.line}`
-              : ""}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            Source
-          </p>
-          <p className="text-xs">{finding.source?.name || finding.sourceId}</p>
-          <p className="font-mono text-[11px] text-muted-foreground">
-            {finding.source?.type || "UNKNOWN"}
-          </p>
-        </div>
-        {finding.comment && (
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-              Notes
-            </p>
-            <p className="text-xs">{finding.comment}</p>
-          </div>
-        )}
-      </div>
-      <MatchedContentBlock
-        severity={severityKey}
-        matchedContent={finding.matchedContent}
-        redactedContent={finding.redactedContent}
-        contextBefore={finding.contextBefore}
-        contextAfter={finding.contextAfter}
-      />
-    </div>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const CHECKBOX_CLASS =
@@ -353,9 +278,6 @@ export function FindingsTable({
   }, [severities]);
   const [pageSize, setPageSize] = useState(String(PAGE_SIZE_OPTIONS[0]));
   const [page, setPage] = useState(1);
-  const [expandedFindingId, setExpandedFindingId] = useState<string | null>(
-    null,
-  );
 
   const [sources, setSources] = useState<SourceListItem[]>([]);
   const [customDetectorOptions, setCustomDetectorOptions] = useState<
@@ -497,7 +419,6 @@ export function FindingsTable({
 
   useEffect(() => {
     setPage(1);
-    setExpandedFindingId(null);
   }, [draft, pageSize]);
 
   // ── Fetch findings ────────────────────────────────────────────────────────
@@ -697,8 +618,8 @@ export function FindingsTable({
             onSeveritiesChange?.(sevValues);
           }}
         >
-          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-black rounded-[4px]">
-            <MultiSelectValue placeholder="Severity" />
+          <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
+            <MultiSelectValue placeholder={t("common.severity")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
@@ -794,8 +715,8 @@ export function FindingsTable({
             }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[170px] border-2 border-black rounded-[4px]">
-            <MultiSelectValue placeholder="Status" />
+          <MultiSelectTrigger className="h-9 w-[170px] border-2 border-border rounded-[4px]">
+            <MultiSelectValue placeholder={t("common.status")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
@@ -819,8 +740,8 @@ export function FindingsTable({
             setDraft((prev) => ({ ...prev, sourceIds: values }))
           }
         >
-          <MultiSelectTrigger className="h-9 w-[200px] border-2 border-black rounded-[4px]">
-            <MultiSelectValue placeholder="Sources" />
+          <MultiSelectTrigger className="h-9 w-[200px] border-2 border-border rounded-[4px]">
+            <MultiSelectValue placeholder={t("common.sources")} />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
@@ -851,8 +772,10 @@ export function FindingsTable({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[4px] border-2 border-[#b7ff00]/30 bg-[#0b0f0a] px-4 py-2.5">
           <span className="font-mono text-xs text-[#b7ff00]">
             {isAllSelected
-              ? `All ${selectionCount.toLocaleString()} findings selected`
-              : `${selectionCount.toLocaleString()} finding${selectionCount !== 1 ? "s" : ""} selected`}
+              ? t("findings.selection.allSelected", { count: selectionCount.toLocaleString() })
+              : selectionCount !== 1
+                ? t("findings.selection.selectedPlural", { count: selectionCount.toLocaleString() })
+                : t("findings.selection.selected", { count: selectionCount.toLocaleString() })}
           </span>
 
           {onBulkUpdate && (
@@ -861,8 +784,9 @@ export function FindingsTable({
               onClick={onBulkUpdate}
               className="ml-auto bg-[#b7ff00] text-black hover:bg-[#b7ff00]/85 font-mono text-xs uppercase tracking-[0.08em] font-bold rounded-[4px] border-0"
             >
-              Update {selectionCount.toLocaleString()} finding
-              {selectionCount !== 1 ? "s" : ""}
+              {selectionCount !== 1
+                ? t("findings.bulkUpdate.updateFindings", { count: selectionCount.toLocaleString() })
+                : t("findings.bulkUpdate.updateFinding", { count: selectionCount.toLocaleString() })}
             </Button>
           )}
         </div>
@@ -915,7 +839,6 @@ export function FindingsTable({
                       </TooltipContent>
                     </Tooltip>
                   </TableHead>
-                  <TableHead className="w-8 bg-white/95 dark:bg-card/95" />
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -961,6 +884,18 @@ export function FindingsTable({
                       </TooltipTrigger>
                       <TooltipContent>
                         The data source this finding originates from
+                      </TooltipContent>
+                    </Tooltip>
+                  </TableHead>
+                  <TableHead className="bg-white/95 dark:bg-card/95">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                          {t("findings.columns.matchedContent")}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Detected content that triggered this finding
                       </TooltipContent>
                     </Tooltip>
                   </TableHead>
@@ -1014,14 +949,13 @@ export function FindingsTable({
                   </TableHead>
                   <TableHead className="bg-white/95 text-right dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Action
+                      {t("findings.columns.action")}
                     </span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {findings.map((finding) => {
-                  const isExpanded = expandedFindingId === finding.id;
                   const isSelected = selectionMap.has(finding.id);
                   const SourceTypeIcon = getSourceIcon(finding.source?.type);
                   const assetLabel =
@@ -1044,25 +978,6 @@ export function FindingsTable({
                               className={CHECKBOX_CLASS}
                             />
                           </div>
-                        </TableCell>
-
-                        <TableCell className="py-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() =>
-                              setExpandedFindingId((prev) =>
-                                prev === finding.id ? null : finding.id,
-                              )
-                            }
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="h-3.5 w-3.5" />
-                            ) : (
-                              <ChevronRight className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
                         </TableCell>
 
                         <TableCell>
@@ -1161,6 +1076,23 @@ export function FindingsTable({
                           </Button>
                         </TableCell>
 
+                        <TableCell className="max-w-[220px]">
+                          {finding.matchedContent ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block truncate max-w-[200px] font-mono text-[11px] text-muted-foreground cursor-default">
+                                  {finding.matchedContent}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" sideOffset={6} className="max-w-[360px] break-all font-mono">
+                                {finding.matchedContent}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+
                         <TableCell>
                           <SeverityBadge
                             severity={
@@ -1172,7 +1104,7 @@ export function FindingsTable({
                                 | "info"
                             }
                           >
-                            {formatEnumLabel(finding.severity)}
+                            {t(`findings.severityLabels.${finding.severity.toUpperCase()}` as TranslationKey)}
                           </SeverityBadge>
                         </TableCell>
 
@@ -1180,7 +1112,7 @@ export function FindingsTable({
                           <StatusBadge
                             status={toFindingStatusBadgeValue(finding.status)}
                           >
-                            {formatFindingStatusLabel(finding.status)}
+                            {t(`findings.statusLabels.${finding.status}` as TranslationKey)}
                           </StatusBadge>
                         </TableCell>
 
@@ -1267,18 +1199,10 @@ export function FindingsTable({
                             }
                           >
                             <ArrowUpRight className="h-3.5 w-3.5" />
-                            Details
+                            {t("findings.detail.details")}
                           </Button>
                         </TableCell>
                       </TableRow>
-
-                      {isExpanded && (
-                        <TableRow>
-                          <TableCell colSpan={11} className="p-0 bg-muted/15">
-                            <FindingExpandedRow finding={finding} />
-                          </TableCell>
-                        </TableRow>
-                      )}
                     </Fragment>
                   );
                 })}
@@ -1291,7 +1215,7 @@ export function FindingsTable({
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[4px] bg-background/45 backdrop-blur-[1px]">
             <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Updating findings…
+              {t("findings.selection.updating")}
             </div>
           </div>
         )}
@@ -1304,8 +1228,8 @@ export function FindingsTable({
             {t("common.rowsPerPage")}
           </span>
           <Select value={pageSize} onValueChange={setPageSize}>
-            <SelectTrigger className="h-8 w-[130px] border-2 border-black rounded-[4px]">
-              <SelectValue placeholder="Rows" />
+            <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
+              <SelectValue placeholder={t("common.rowsPerPage")} />
             </SelectTrigger>
             <SelectContent>
               {PAGE_SIZE_OPTIONS.map((size) => (

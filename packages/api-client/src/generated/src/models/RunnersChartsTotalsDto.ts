@@ -48,6 +48,12 @@ export interface RunnersChartsTotalsDto {
      * @type {number}
      * @memberof RunnersChartsTotalsDto
      */
+    warning: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof RunnersChartsTotalsDto
+     */
     failed: number;
 }
 
@@ -59,6 +65,7 @@ export function instanceOfRunnersChartsTotalsDto(value: object): value is Runner
     if (!('running' in value) || value['running'] === undefined) return false;
     if (!('queued' in value) || value['queued'] === undefined) return false;
     if (!('completed' in value) || value['completed'] === undefined) return false;
+    if (!('warning' in value) || value['warning'] === undefined) return false;
     if (!('failed' in value) || value['failed'] === undefined) return false;
     return true;
 }
@@ -77,6 +84,7 @@ export function RunnersChartsTotalsDtoFromJSONTyped(json: any, ignoreDiscriminat
         'running': json['running'],
         'queued': json['queued'],
         'completed': json['completed'],
+        'warning': json['warning'],
         'failed': json['failed'],
     };
 }
@@ -96,6 +104,7 @@ export function RunnersChartsTotalsDtoToJSONTyped(value?: RunnersChartsTotalsDto
         'running': value['running'],
         'queued': value['queued'],
         'completed': value['completed'],
+        'warning': value['warning'],
         'failed': value['failed'],
     };
 }

@@ -17,7 +17,6 @@ import { useTranslation } from "@/hooks/use-translation";
 
 export default function SandboxPage() {
   const { t } = useTranslation();
-  const [isPolling, setIsPolling] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -27,12 +26,6 @@ export default function SandboxPage() {
             <h1 className="text-3xl font-semibold tracking-tight">
               {t("sandbox.title")}
             </h1>
-            <Badge
-              variant={isPolling ? "default" : "outline"}
-              className="text-[10px] uppercase tracking-[0.12em]"
-            >
-              {isPolling ? t("sandbox.livePolling") : t("sandbox.idle")}
-            </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
             {t("sandbox.monitorDesc")}
@@ -53,7 +46,7 @@ export default function SandboxPage() {
           <CardDescription>{t("sandbox.autoRefresh")}</CardDescription>
         </CardHeader>
         <CardContent className="p-5">
-          <SandboxRunsTable onPollingChange={setIsPolling} />
+          <SandboxRunsTable />
         </CardContent>
       </Card>
     </div>

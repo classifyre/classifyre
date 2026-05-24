@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any
 
 from ...models.generated_input import (
@@ -11,37 +8,21 @@ from ...models.generated_input import (
     PostgreSQLOptionalConnection,
     PostgreSQLOptionalScope,
     SamplingConfig,
-    SamplingStrategy,
 )
-from ...models.generated_single_asset_scan_results import (
-    AssetType as OutputAssetType,
-)
-from ...models.generated_single_asset_scan_results import (
-    DetectionResult,
-    SingleAssetScanResults,
-)
-from ...utils.hashing import hash_id, unhash_id
-from ..base import BaseSource
 from ..dependencies import require_module
-from ..tabular_utils import build_tabular_location, format_tabular_sample_content
+from ..tabular_base import BaseTabularSource
+from ..tabular_utils import TableRef
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_EXCLUDED_SCHEMAS = {"information_schema", "pg_catalog", "pg_toast"}
 
 
-@dataclass(frozen=True)
-class TableRef:
-    database: str
-    schema: str
-    table: str
-
-
 def _quote_identifier(identifier: str) -> str:
     return '"' + identifier.replace('"', '""') + '"'
 
 
-class PostgreSQLSource(BaseSource):
+class PostgreSQLSource(BaseTabularSource):
     source_type = "postgresql"
 
     def __init__(
@@ -59,9 +40,12 @@ class PostgreSQLSource(BaseSource):
             uv_groups=["postgresql"],
             detail="The PostgreSQL connector is optional.",
         )
-        self._table_lookup: dict[str, TableRef] = {}
-        self._content_cache: dict[str, tuple[str, str]] = {}
-        self._pk_columns_cache: dict[tuple[str, str, str], list[str]] = {}
+
+    # ── Identity ─────────────────────────────────────────────────────────
+
+    @property
+    def _source_label(self) -> str:
+        return "PostgreSQL"
 
     def _asset_type_value(self) -> str:
         type_value = self.config.type
@@ -69,6 +53,8 @@ class PostgreSQLSource(BaseSource):
 
     def _sampling(self) -> SamplingConfig:
         return self.config.sampling
+
+    # ── Connection ───────────────────────────────────────────────────────
 
     def _connection_options(self) -> PostgreSQLOptionalConnection:
         if self.config.optional and self.config.optional.connection:
@@ -80,20 +66,14 @@ class PostgreSQLSource(BaseSource):
             return self.config.optional.scope
         return PostgreSQLOptionalScope()
 
-    def _username(self) -> str:
-        return self.config.masked.username
-
-    def _password(self) -> str:
-        return self.config.masked.password
-
-    def _connect(self, database: str):
+    def _connect(self, database: str | None = None) -> Any:
         connection_options = self._connection_options()
-        connect_kwargs = {
+        connect_kwargs: dict[str, Any] = {
             "host": self.config.required.host,
             "port": int(self.config.required.port),
-            "user": self._username(),
-            "password": self._password(),
-            "dbname": database,
+            "user": self.config.masked.username,
+            "password": self.config.masked.password,
+            "dbname": database or "postgres",
             "connect_timeout": int(connection_options.connect_timeout_seconds or 30),
             "sslmode": str(connection_options.ssl_mode or "prefer"),
         }
@@ -101,213 +81,111 @@ class PostgreSQLSource(BaseSource):
         connection.autocommit = True
         return connection
 
-    def _resolve_databases(self) -> list[str]:
-        scope_options = self._scope_options()
-        include_all = bool(scope_options.include_all_databases)
-        configured_database = scope_options.database
+    def _is_connection_alive(self, conn: Any) -> bool:
+        try:
+            return conn.closed == 0  # type: ignore[no-any-return]
+        except Exception:
+            return False
 
-        if not include_all:
-            # Default to "postgres" maintenance database when no explicit database is configured,
-            # so that connection tests can proceed and report actual auth/connectivity errors.
-            return [configured_database or "postgres"]
+    # ── Dialect hooks ────────────────────────────────────────────────────
 
-        maintenance_database = scope_options.maintenance_database or "postgres"
-        databases: list[str] = []
-        with self._connect(maintenance_database) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT datname
-                    FROM pg_database
-                    WHERE datistemplate = false
-                      AND datallowconn = true
-                      AND datname <> 'rdsadmin'
-                    ORDER BY datname
-                    """
-                )
-                for (database_name,) in cursor.fetchall():
-                    if isinstance(database_name, str) and database_name:
-                        databases.append(database_name)
+    def _quote_identifier(self, identifier: str) -> str:
+        return _quote_identifier(identifier)
 
-        if configured_database and configured_database not in databases:
-            databases.insert(0, configured_database)
+    def _random_order_expr(self) -> str:
+        return "RANDOM()"
 
-        if not databases:
-            return [maintenance_database]
-        return databases
+    def _supports_nulls_last(self) -> bool:
+        return True
 
-    def _table_allowlist(self) -> set[str]:
-        allowlist: set[str] = set()
-        include_tables = self._scope_options().include_tables or []
-        for item in include_tables:
-            normalized = item.strip().lower()
-            if normalized:
-                allowlist.add(normalized)
-        return allowlist
+    # ── Database / table discovery ───────────────────────────────────────
+
+    def _default_excluded_schemas(self) -> set[str]:
+        return set(_DEFAULT_EXCLUDED_SCHEMAS)
 
     def _schema_allowlist(self) -> set[str] | None:
         include_schemas = self._scope_options().include_schemas
         if not include_schemas:
             return None
-        return {schema.strip() for schema in include_schemas if schema.strip()}
+        return {s.strip() for s in include_schemas if s.strip()}
 
     def _schema_denylist(self) -> set[str]:
         configured = self._scope_options().exclude_schemas or []
-        denylist = {schema.strip() for schema in configured if schema.strip()}
-        if not denylist:
-            denylist = set(_DEFAULT_EXCLUDED_SCHEMAS)
-        return denylist
+        denylist = {s.strip() for s in configured if s.strip()}
+        return denylist if denylist else set(_DEFAULT_EXCLUDED_SCHEMAS)
 
-    def _get_primary_key_columns(self, table_ref: TableRef) -> list[str]:
-        cache_key = (table_ref.database, table_ref.schema, table_ref.table)
-        if cache_key in self._pk_columns_cache:
-            return self._pk_columns_cache[cache_key]
-        try:
-            with self._connect(table_ref.database) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT kcu.column_name
-                        FROM information_schema.table_constraints tc
-                        JOIN information_schema.key_column_usage kcu
-                          ON tc.constraint_name = kcu.constraint_name
-                         AND tc.table_schema = kcu.table_schema
-                         AND tc.table_name = kcu.table_name
-                        WHERE tc.constraint_type = 'PRIMARY KEY'
-                          AND tc.table_schema = %s
-                          AND tc.table_name = %s
-                        ORDER BY kcu.ordinal_position
-                        """,
-                        (table_ref.schema, table_ref.table),
-                    )
-                    cols = [row[0] for row in cursor.fetchall() if isinstance(row[0], str)]
-        except Exception:
-            cols = []
-        self._pk_columns_cache[cache_key] = cols
-        return cols
+    def _table_allowlist(self) -> set[str]:
+        include_tables = self._scope_options().include_tables or []
+        return {item.strip().lower() for item in include_tables if item.strip()}
 
-    def _list_tables_for_database(self, database: str) -> list[TableRef]:
-        schema_allowlist = self._schema_allowlist()
-        schema_denylist = self._schema_denylist()
-        table_allowlist = self._table_allowlist()
-        table_limit = self._scope_options().table_limit
-        limit = int(table_limit) if table_limit else None
+    def _table_limit(self) -> int | None:
+        limit = self._scope_options().table_limit
+        return int(limit) if limit else None
 
-        tables: list[TableRef] = []
-        with self._connect(database) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT table_schema, table_name
-                    FROM information_schema.tables
-                    WHERE table_type = 'BASE TABLE'
-                    ORDER BY table_schema, table_name
-                    """
-                )
-                for schema_name, table_name in cursor.fetchall():
-                    if not isinstance(schema_name, str) or not isinstance(table_name, str):
-                        continue
-                    if schema_name in schema_denylist:
-                        continue
-                    if schema_allowlist and schema_name not in schema_allowlist:
-                        continue
+    def _resolve_databases(self) -> list[str]:
+        scope = self._scope_options()
+        include_all = bool(scope.include_all_databases)
+        configured_database = scope.database
 
-                    schema_table = f"{schema_name}.{table_name}".lower()
-                    db_schema_table = f"{database}.{schema_name}.{table_name}".lower()
-                    if (
-                        table_allowlist
-                        and schema_table not in table_allowlist
-                        and db_schema_table not in table_allowlist
-                    ):
-                        continue
+        if not include_all:
+            return [configured_database or "postgres"]
 
-                    tables.append(TableRef(database=database, schema=schema_name, table=table_name))
-                    if limit is not None and len(tables) >= limit:
-                        break
-        return tables
-
-    def _iter_tables(self) -> list[TableRef]:
-        tables: list[TableRef] = []
-        for database in self._resolve_databases():
-            if self._aborted:
-                break
-            try:
-                tables.extend(self._list_tables_for_database(database))
-            except Exception as exc:
-                logger.warning("Skipping database %s due to listing error: %s", database, exc)
-        return tables
-
-    def test_connection(self) -> dict[str, Any]:
-        logger.info("Testing connection to PostgreSQL...")
-        result = {
-            "timestamp": datetime.now(UTC).isoformat(),
-            "source_type": self.recipe.get("type"),
-        }
-
-        try:
-            databases = self._resolve_databases()
-            with self._connect(databases[0]) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("SELECT 1")
-                    cursor.fetchone()
-            result["status"] = "SUCCESS"
-            result["message"] = (
-                f"Successfully connected to PostgreSQL. Reachable databases: {len(databases)}."
+        maintenance_database = scope.maintenance_database or "postgres"
+        databases: list[str] = []
+        conn = self._get_cached_connection(maintenance_database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT datname
+                FROM pg_database
+                WHERE datistemplate = false
+                  AND datallowconn = true
+                  AND datname <> 'rdsadmin'
+                ORDER BY datname
+                """
             )
-        except Exception as exc:
-            result["status"] = "FAILURE"
-            result["message"] = f"Failed to connect to PostgreSQL: {exc}"
+            for (database_name,) in cursor.fetchall():
+                if isinstance(database_name, str) and database_name:
+                    databases.append(database_name)
 
-        return result
+        if configured_database and configured_database not in databases:
+            databases.insert(0, configured_database)
+        return databases if databases else [maintenance_database]
 
-    def _table_key(self, table_ref: TableRef) -> tuple[str, str, str]:
-        return (table_ref.database, table_ref.schema, table_ref.table)
-
-    def _table_raw_id(self, table_ref: TableRef) -> str:
-        return f"{table_ref.database}_#_{table_ref.schema}_#_{table_ref.table}"
+    # ── Foreign key links (PostgreSQL uses pg_constraint) ────────────────
 
     def _collect_foreign_key_links(
         self,
         tables: list[TableRef],
-    ) -> dict[tuple[str, str, str], set[tuple[str, str, str]]]:
-        by_database: dict[str, set[tuple[str, str, str]]] = {}
-        for table_ref in tables:
-            by_database.setdefault(table_ref.database, set()).add(self._table_key(table_ref))
+    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
+        by_database: dict[str, set[tuple[str, ...]]] = {}
+        for t in tables:
+            by_database.setdefault(t.database, set()).add(t.table_key)
 
-        links: dict[tuple[str, str, str], set[tuple[str, str, str]]] = {}
+        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
         for database, scoped_keys in by_database.items():
             try:
-                with self._connect(database) as conn:
-                    with conn.cursor() as cursor:
-                        cursor.execute(
-                            """
-                            SELECT
-                                source_ns.nspname AS source_schema,
-                                source_tbl.relname AS source_table,
-                                target_ns.nspname AS target_schema,
-                                target_tbl.relname AS target_table
-                            FROM pg_constraint AS fk
-                            JOIN pg_class AS source_tbl
-                              ON source_tbl.oid = fk.conrelid
-                            JOIN pg_namespace AS source_ns
-                              ON source_ns.oid = source_tbl.relnamespace
-                            JOIN pg_class AS target_tbl
-                              ON target_tbl.oid = fk.confrelid
-                            JOIN pg_namespace AS target_ns
-                              ON target_ns.oid = target_tbl.relnamespace
-                            WHERE fk.contype = 'f'
-                            """
-                        )
-                        for (
-                            source_schema,
-                            source_table,
-                            target_schema,
-                            target_table,
-                        ) in cursor.fetchall():
-                            source_key = (database, source_schema, source_table)
-                            target_key = (database, target_schema, target_table)
-                            if source_key not in scoped_keys or target_key not in scoped_keys:
-                                continue
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            source_ns.nspname  AS source_schema,
+                            source_tbl.relname AS source_table,
+                            target_ns.nspname  AS target_schema,
+                            target_tbl.relname AS target_table
+                        FROM pg_constraint AS fk
+                        JOIN pg_class     AS source_tbl ON source_tbl.oid = fk.conrelid
+                        JOIN pg_namespace AS source_ns  ON source_ns.oid  = source_tbl.relnamespace
+                        JOIN pg_class     AS target_tbl ON target_tbl.oid = fk.confrelid
+                        JOIN pg_namespace AS target_ns  ON target_ns.oid  = target_tbl.relnamespace
+                        WHERE fk.contype = 'f'
+                        """
+                    )
+                    for src_schema, src_table, tgt_schema, tgt_table in cursor.fetchall():
+                        source_key = (database, src_schema, src_table)
+                        target_key = (database, tgt_schema, tgt_table)
+                        if source_key in scoped_keys and target_key in scoped_keys:
                             links.setdefault(source_key, set()).add(target_key)
             except Exception as exc:
                 logger.warning(
@@ -315,354 +193,22 @@ class PostgreSQLSource(BaseSource):
                     database,
                     exc,
                 )
-
         return links
 
-    def _table_to_asset(
-        self, table_ref: TableRef, *, links: list[str] | None = None
-    ) -> SingleAssetScanResults:
-        asset_name = f"{table_ref.database}.{table_ref.schema}.{table_ref.table}"
-        raw_id = self._table_raw_id(table_ref)
-        asset_hash = self.generate_hash_id(raw_id)
-        external_url = (
+    # ── External URL ─────────────────────────────────────────────────────
+
+    def _build_external_url(self, table_ref: TableRef) -> str:
+        return (
             f"postgresql://{self.config.required.host}:{self.config.required.port}/"
             f"{table_ref.database}/{table_ref.schema}.{table_ref.table}"
         )
 
-        metadata = {
-            "database": table_ref.database,
-            "schema": table_ref.schema,
-            "table": table_ref.table,
-            "sampling": {
-                "strategy": str(self._sampling().strategy),
-            },
-        }
+    # ── Parse table ref from asset ID ────────────────────────────────────
 
-        now = datetime.now(UTC)
-        return SingleAssetScanResults(
-            hash=asset_hash,
-            checksum=self.calculate_checksum(metadata),
-            name=asset_name,
-            external_url=external_url,
-            links=links or [],
-            asset_type=OutputAssetType.TABLE,
-            source_id=self.source_id,
-            created_at=now,
-            updated_at=now,
-            runner_id=self.runner_id,
-        )
-
-    STREAM_DETECTIONS = True
-
-    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
-        if self._aborted:
-            return
-
-        tables = self._iter_tables()
-        table_hash_by_key: dict[tuple[str, str, str], str] = {
-            self._table_key(table_ref): self.generate_hash_id(self._table_raw_id(table_ref))
-            for table_ref in tables
-        }
-        table_fk_links = self._collect_foreign_key_links(tables)
-
-        batch: list[SingleAssetScanResults] = []
-        for table_ref in tables:
-            if self._aborted:
-                return
-
-            key = self._table_key(table_ref)
-            linked_hashes = [
-                table_hash_by_key[target]
-                for target in sorted(table_fk_links.get(key, set()))
-                if target in table_hash_by_key
-            ]
-
-            asset = self._table_to_asset(table_ref, links=linked_hashes)
-            self._table_lookup[asset.hash] = table_ref
-            batch.append(asset)
-
-            if len(batch) >= self.BATCH_SIZE:
-                yield batch
-                batch = []
-
-        if batch:
-            yield batch
-
-    def generate_hash_id(self, asset_id: str) -> str:
-        return hash_id(self._asset_type_value(), asset_id)
-
-    def _parse_table_ref_from_asset_id(self, asset_id: str) -> TableRef | None:
-        if asset_id in self._table_lookup:
-            return self._table_lookup[asset_id]
-
-        decoded = asset_id
-        if "_#_" not in decoded:
-            try:
-                decoded = unhash_id(asset_id)
-            except Exception:
-                decoded = asset_id
-
-        parts = decoded.split("_#_")
+    def _table_ref_from_parts(self, parts: list[str]) -> TableRef | None:
+        # Handles: ["POSTGRESQL", db, schema, table] or [db, schema, table]
         if len(parts) >= 4 and parts[0].upper() == "POSTGRESQL":
             return TableRef(database=parts[-3], schema=parts[-2], table=parts[-1])
         if len(parts) >= 3:
             return TableRef(database=parts[-3], schema=parts[-2], table=parts[-1])
         return None
-
-    def _available_columns(self, table_ref: TableRef) -> list[str]:
-        with self._connect(table_ref.database) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT column_name
-                    FROM information_schema.columns
-                    WHERE table_schema = %s AND table_name = %s
-                    ORDER BY ordinal_position
-                    """,
-                    (table_ref.schema, table_ref.table),
-                )
-                columns = [column for (column,) in cursor.fetchall() if isinstance(column, str)]
-                return columns
-
-    def _resolve_latest_order_column(self, columns: list[str]) -> str | None:
-        sampling = self._sampling()
-        configured = sampling.order_by_column
-        if configured and configured in columns:
-            return configured
-
-        priority_candidates = (
-            "updated_at",
-            "modified_at",
-            "created_at",
-            "inserted_at",
-            "timestamp",
-            "ts",
-            "date",
-        )
-        for candidate in priority_candidates:
-            if candidate in columns:
-                return candidate
-        return None
-
-    def _build_sampling_query(
-        self, table_ref: TableRef, columns: list[str]
-    ) -> tuple[str, list[Any]]:
-        sampling = self._sampling()
-        if not columns:
-            raise ValueError(
-                f"Table {table_ref.database}.{table_ref.schema}.{table_ref.table} has no readable columns"
-            )
-
-        quoted_columns = ", ".join(_quote_identifier(column) for column in columns)
-        query = (
-            f"SELECT {quoted_columns} FROM "
-            f"{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
-        )
-
-        strategy = sampling.strategy
-        if strategy == SamplingStrategy.LATEST:
-            order_column = self._resolve_latest_order_column(columns)
-            if order_column:
-                query += f" ORDER BY {_quote_identifier(order_column)} DESC NULLS LAST"
-            elif sampling.fallback_to_random is not False:
-                query += " ORDER BY RANDOM()"
-        elif strategy == SamplingStrategy.RANDOM:
-            query += " ORDER BY RANDOM()"
-        # SamplingStrategy.ALL: no ORDER BY, no LIMIT — paginated by fetch_content_pages
-
-        if strategy != SamplingStrategy.ALL:
-            query += " LIMIT %s"
-            return query, [int(sampling.rows_per_page or 100)]
-
-        return query, []
-
-    def _count_table_rows(self, table_ref: TableRef) -> int | None:
-        try:
-            with self._connect(table_ref.database) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
-                    )
-                    row = cursor.fetchone()
-                    return int(row[0]) if row else None
-        except Exception:
-            return None
-
-    def _serialize_cell(self, value: Any) -> str:
-        if value is None:
-            return "null"
-        if isinstance(value, memoryview):
-            value = value.tobytes()
-        if isinstance(value, (bytes, bytearray)):
-            return f"<{len(value)} bytes>"
-        if isinstance(value, datetime):
-            return value.isoformat()
-        return str(value)
-
-    def _format_sample_content(
-        self,
-        table_ref: TableRef,
-        column_names: list[str],
-        rows: list[tuple[Any, ...]],
-        row_offset: int = 0,
-    ) -> tuple[str, str]:
-        sampling = self._sampling()
-        return format_tabular_sample_content(
-            scope_label="table",
-            scope_value=f"{table_ref.database}.{table_ref.schema}.{table_ref.table}",
-            strategy=sampling.strategy,
-            rows=rows,
-            column_names=column_names,
-            serialize_cell=self._serialize_cell,
-            include_column_names=sampling.include_column_names is not False,
-            raw_metadata={
-                "database": table_ref.database,
-                "schema": table_ref.schema,
-                "table": table_ref.table,
-            },
-            row_offset=row_offset,
-        )
-
-    def _fetch_one_page(
-        self, table_ref: TableRef, base_query: str, page_size: int, offset: int
-    ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        with self._connect(table_ref.database) as conn:
-            paginated_query = f"{base_query} LIMIT %s OFFSET %s"
-            with conn.cursor() as cursor:
-                cursor.execute(paginated_query, [page_size, offset])
-                rows = list(cursor.fetchall())
-                column_names = (
-                    [desc[0] for desc in cursor.description] if cursor.description else []
-                )
-        return rows, column_names
-
-    def _fetch_sample_rows(
-        self, table_ref: TableRef
-    ) -> tuple[list[tuple[Any, ...]], list[str]] | None:
-        columns = self._available_columns(table_ref)
-        sampling = self._sampling()
-        query, params = self._build_sampling_query(table_ref, columns)
-
-        if sampling.strategy == SamplingStrategy.ALL:
-            rows_per_page = int(sampling.rows_per_page or 100)
-            rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
-        else:
-            with self._connect(table_ref.database) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(query, params if params else None)
-                    rows = cursor.fetchall()
-                    column_names = [desc[0] for desc in cursor.description or []]
-
-        if not column_names:
-            return None
-        return rows, column_names
-
-    def _sample_table_rows(self, table_ref: TableRef) -> tuple[str, str] | None:
-        result = self._fetch_sample_rows(table_ref)
-        if result is None:
-            return None
-        rows, column_names = result
-        return self._format_sample_content(table_ref, column_names, rows)
-
-    async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
-        cached = self._content_cache.get(asset_id)
-        if cached:
-            return cached
-
-        table_ref = self._parse_table_ref_from_asset_id(asset_id)
-        if not table_ref:
-            return None
-
-        sampled = self._sample_table_rows(table_ref)
-
-        if sampled is None:
-            return None
-
-        self._content_cache[asset_id] = sampled
-        return sampled
-
-    async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
-        sampling = self._sampling()
-        table_ref = self._parse_table_ref_from_asset_id(asset_id)
-        if not table_ref:
-            return
-
-        if sampling.strategy != SamplingStrategy.ALL:
-            result = self._fetch_sample_rows(table_ref)
-            if result is None:
-                return
-            rows, column_names = result
-            for i, row in enumerate(rows):
-                formatted = self._format_sample_content(
-                    table_ref, column_names, [row], row_offset=i
-                )
-                if formatted:
-                    yield formatted
-            return
-
-        columns = self._available_columns(table_ref)
-        query, _ = self._build_sampling_query(table_ref, columns)
-        rows_per_page = int(sampling.rows_per_page or 100)
-        table_label = f"{table_ref.database}.{table_ref.schema}.{table_ref.table}"
-
-        total_rows = self._count_table_rows(table_ref)
-        total_batches = ((total_rows + rows_per_page - 1) // rows_per_page) if total_rows else None
-        if total_rows is not None and total_batches is not None:
-            logger.info(
-                "Full scan %s: %d rows, %d batches of %d",
-                table_label,
-                total_rows,
-                total_batches,
-                rows_per_page,
-            )
-
-        offset = 0
-        page_num = 1
-
-        while not self._aborted:
-            if total_batches is not None:
-                logger.info("%s batch %d/%d", table_label, page_num, total_batches)
-            rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, offset)
-            if not rows or not column_names:
-                break
-
-            for i, row in enumerate(rows):
-                formatted = self._format_sample_content(
-                    table_ref, column_names, [row], row_offset=offset + i
-                )
-                if formatted:
-                    self._content_cache[asset_id] = formatted
-                    yield formatted
-
-            offset += len(rows)
-            page_num += 1
-            if len(rows) < rows_per_page:
-                break
-
-    def enrich_finding_location(
-        self,
-        finding: DetectionResult,
-        asset: SingleAssetScanResults,
-        text_content: str,
-    ) -> None:
-        del text_content
-        table_ref = self._table_lookup.get(asset.hash)
-        if not table_ref:
-            return
-
-        path = f"{table_ref.schema}.{table_ref.table}"
-        cached = self._content_cache.get(asset.hash)
-        raw_content = cached[0] if cached else None
-        metadata = finding.metadata or {}
-        finding.location = build_tabular_location(
-            raw_content=raw_content,
-            matched_content=finding.matched_content,
-            base_path=path,
-            primary_key_columns=self._get_primary_key_columns(table_ref),
-            row_index=metadata.get("tabular_row_index"),
-            column_name=metadata.get("tabular_column_name"),
-        )
-
-    def abort(self) -> None:
-        logger.info("Aborting PostgreSQL extraction...")
-        super().abort()

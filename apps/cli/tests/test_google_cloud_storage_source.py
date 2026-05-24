@@ -61,7 +61,6 @@ async def test_google_cloud_storage_extract_uses_all_sampling(monkeypatch):
             text_content="hello" if ref.key.endswith(".txt") else "",
             parse_error=None,
             downloaded_bytes=5,
-            truncated=False,
         ),
     )
 

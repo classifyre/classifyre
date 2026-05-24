@@ -7,12 +7,16 @@ All URIs are relative to *http://localhost*
 | [**cliRunnerControllerCreateExternalRunner**](RunnersApi.md#clirunnercontrollercreateexternalrunner) | **POST** /sources/{sourceId}/runners/external | Create runner record for external CLI REST ingestion |
 | [**cliRunnerControllerDeleteRunner**](RunnersApi.md#clirunnercontrollerdeleterunner) | **DELETE** /runners/{runnerId} | Delete runner metadata and cleanup filesystem logs for this runner |
 | [**cliRunnerControllerGetRunner**](RunnersApi.md#clirunnercontrollergetrunner) | **GET** /runners/{runnerId} | Get runner status and details |
+| [**cliRunnerControllerGetRunnerAssetProgress**](RunnersApi.md#clirunnercontrollergetrunnerassetprogress) | **GET** /runners/{runnerId}/assets/progress | Get runner asset processing progress |
 | [**cliRunnerControllerListRunners**](RunnersApi.md#clirunnercontrollerlistrunners) | **GET** /runners | List all runners |
 | [**cliRunnerControllerListSourceRunners**](RunnersApi.md#clirunnercontrollerlistsourcerunners) | **GET** /sources/{sourceId}/runners | List runners for source |
+| [**cliRunnerControllerRegisterDiscoveredAssets**](RunnersApi.md#clirunnercontrollerregisterdiscoveredassets) | **POST** /runners/{runnerId}/assets/discover | Register discovered asset hashes for a runner |
 | [**cliRunnerControllerSearchRunnerLogs**](RunnersApi.md#clirunnercontrollersearchrunnerlogs) | **POST** /runners/{runnerId}/logs | Search runner logs with server-side filtering, full-text search, and sort |
 | [**cliRunnerControllerStartRunner**](RunnersApi.md#clirunnercontrollerstartrunner) | **POST** /sources/{sourceId}/run | Start CLI runner for source |
 | [**cliRunnerControllerStopRunner**](RunnersApi.md#clirunnercontrollerstoprunner) | **PATCH** /runners/{runnerId}/stop | Stop running CLI process |
+| [**cliRunnerControllerUpdateRunnerAssetStatuses**](RunnersApi.md#clirunnercontrollerupdaterunnerassetstatuses) | **PATCH** /runners/{runnerId}/assets/status | Update processing status of runner assets |
 | [**cliRunnerControllerUpdateRunnerStatus**](RunnersApi.md#clirunnercontrollerupdaterunnerstatusoperation) | **PATCH** /runners/{runnerId}/status | Update runner status |
+| [**searchRunnersControllerSearchRunnerAssets**](RunnersApi.md#searchrunnerscontrollersearchrunnerassets) | **POST** /search/runner-assets | Search runner assets |
 | [**searchRunnersControllerSearchRunners**](RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners |
 | [**searchRunnersControllerSearchRunnersCharts**](RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview |
 
@@ -216,6 +220,71 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## cliRunnerControllerGetRunnerAssetProgress
+
+> RunnerAssetProgressDto cliRunnerControllerGetRunnerAssetProgress(runnerId)
+
+Get runner asset processing progress
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerGetRunnerAssetProgressRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string
+    runnerId: runnerId_example,
+  } satisfies CliRunnerControllerGetRunnerAssetProgressRequest;
+
+  try {
+    const data = await api.cliRunnerControllerGetRunnerAssetProgress(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**RunnerAssetProgressDto**](RunnerAssetProgressDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## cliRunnerControllerListRunners
 
 > ListRunnersResponseDto cliRunnerControllerListRunners(sourceId, status, skip, take)
@@ -238,7 +307,7 @@ async function example() {
   const body = {
     // string (optional)
     sourceId: sourceId_example,
-    // 'PENDING' | 'RUNNING' | 'COMPLETED' | 'ERROR' (optional)
+    // 'PENDING' | 'RUNNING' | 'COMPLETED' | 'WARNING' | 'ERROR' (optional)
     status: status_example,
     // number (optional)
     skip: 8.14,
@@ -264,7 +333,7 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **sourceId** | `string` |  | [Optional] [Defaults to `undefined`] |
-| **status** | `PENDING`, `RUNNING`, `COMPLETED`, `ERROR` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, ERROR] |
+| **status** | `PENDING`, `RUNNING`, `COMPLETED`, `WARNING`, `ERROR` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, WARNING, ERROR] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **take** | `number` |  | [Optional] [Defaults to `20`] |
 
@@ -314,7 +383,7 @@ async function example() {
     sourceId: sourceId_example,
     // string (optional)
     sourceId2: sourceId_example,
-    // 'PENDING' | 'RUNNING' | 'COMPLETED' | 'ERROR' (optional)
+    // 'PENDING' | 'RUNNING' | 'COMPLETED' | 'WARNING' | 'ERROR' (optional)
     status: status_example,
     // number (optional)
     skip: 8.14,
@@ -341,7 +410,7 @@ example().catch(console.error);
 |------------- | ------------- | ------------- | -------------|
 | **sourceId** | `string` |  | [Defaults to `undefined`] |
 | **sourceId2** | `string` |  | [Optional] [Defaults to `undefined`] |
-| **status** | `PENDING`, `RUNNING`, `COMPLETED`, `ERROR` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, ERROR] |
+| **status** | `PENDING`, `RUNNING`, `COMPLETED`, `WARNING`, `ERROR` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, WARNING, ERROR] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **take** | `number` |  | [Optional] [Defaults to `20`] |
 
@@ -363,6 +432,74 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## cliRunnerControllerRegisterDiscoveredAssets
+
+> RegisterDiscoveredAssetsResponseDto cliRunnerControllerRegisterDiscoveredAssets(runnerId, registerDiscoveredAssetsDto)
+
+Register discovered asset hashes for a runner
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerRegisterDiscoveredAssetsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string
+    runnerId: runnerId_example,
+    // RegisterDiscoveredAssetsDto
+    registerDiscoveredAssetsDto: ...,
+  } satisfies CliRunnerControllerRegisterDiscoveredAssetsRequest;
+
+  try {
+    const data = await api.cliRunnerControllerRegisterDiscoveredAssets(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Defaults to `undefined`] |
+| **registerDiscoveredAssetsDto** | [RegisterDiscoveredAssetsDto](RegisterDiscoveredAssetsDto.md) |  | |
+
+### Return type
+
+[**RegisterDiscoveredAssetsResponseDto**](RegisterDiscoveredAssetsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **201** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -568,6 +705,74 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## cliRunnerControllerUpdateRunnerAssetStatuses
+
+> cliRunnerControllerUpdateRunnerAssetStatuses(runnerId, updateRunnerAssetStatusDto)
+
+Update processing status of runner assets
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { CliRunnerControllerUpdateRunnerAssetStatusesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string
+    runnerId: runnerId_example,
+    // UpdateRunnerAssetStatusDto
+    updateRunnerAssetStatusDto: ...,
+  } satisfies CliRunnerControllerUpdateRunnerAssetStatusesRequest;
+
+  try {
+    const data = await api.cliRunnerControllerUpdateRunnerAssetStatuses(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Defaults to `undefined`] |
+| **updateRunnerAssetStatusDto** | [UpdateRunnerAssetStatusDto](UpdateRunnerAssetStatusDto.md) |  | |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## cliRunnerControllerUpdateRunnerStatus
 
 > cliRunnerControllerUpdateRunnerStatus(runnerId, cliRunnerControllerUpdateRunnerStatusRequest)
@@ -632,6 +837,73 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## searchRunnersControllerSearchRunnerAssets
+
+> SearchRunnersAssetsResponseDto searchRunnersControllerSearchRunnerAssets(searchRunnersAssetsRequestDto)
+
+Search runner assets
+
+Returns paginated runner_assets rows for a specific runner, joined with the resolved asset record and its findings.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { SearchRunnersControllerSearchRunnerAssetsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // SearchRunnersAssetsRequestDto
+    searchRunnersAssetsRequestDto: ...,
+  } satisfies SearchRunnersControllerSearchRunnerAssetsRequest;
+
+  try {
+    const data = await api.searchRunnersControllerSearchRunnerAssets(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **searchRunnersAssetsRequestDto** | [SearchRunnersAssetsRequestDto](SearchRunnersAssetsRequestDto.md) |  | |
+
+### Return type
+
+[**SearchRunnersAssetsResponseDto**](SearchRunnersAssetsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Paginated runner assets with joined asset and findings data |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

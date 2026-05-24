@@ -1,27 +1,17 @@
 """PII detector test configuration and shared fixtures."""
 
-import importlib
+from importlib.util import find_spec
 
 import pytest
 
-_presidio_available = False
-try:
-    importlib.import_module("presidio_analyzer")
-    _presidio_available = True
-except Exception:
-    pass
+_presidio_available = find_spec("presidio_analyzer") is not None
 
 requires_presidio = pytest.mark.skipif(
     not _presidio_available,
     reason="presidio_analyzer not available in this environment",
 )
 
-_pdfplumber_available = False
-try:
-    importlib.import_module("pdfplumber")
-    _pdfplumber_available = True
-except Exception:
-    pass
+_pdfplumber_available = find_spec("pdfplumber") is not None
 
 requires_pdfplumber = pytest.mark.skipif(
     not _pdfplumber_available,

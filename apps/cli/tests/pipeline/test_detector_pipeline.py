@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -119,6 +120,10 @@ class LinkRecordingDetector(BaseDetector):
         return ["application/x.asset-links"]
 
 
+class NamedDetectorConfig(DetectorConfig):
+    name: str | None = None
+
+
 def make_asset(asset_id: str = "1") -> SingleAssetScanResults:
     now = datetime.now(UTC)
     return SingleAssetScanResults(
@@ -191,7 +196,26 @@ async def test_pipeline_runs_text_detectors_only() -> None:
 
 
 @pytest.mark.asyncio
-async def test_pipeline_truncates_content_and_sets_scan_stats() -> None:
+async def test_pipeline_logs_configured_detector_name(caplog: pytest.LogCaptureFixture) -> None:
+    source = DummySource({"type": "DUMMY"}, content="hello world")
+    detector = RecordingDetector(
+        ["text/plain"], config=NamedDetectorConfig(name="Invoice Classifier")
+    )
+
+    pipeline = DetectorPipeline(
+        detectors=[detector],
+        source=source,
+        runner_id="runner-log-name",
+    )
+
+    with caplog.at_level("INFO", logger="src.pipeline.detector_pipeline"):
+        await pipeline.process([make_asset("log-name")])
+
+    assert "Scanning asset-log-name [Invoice Classifier]" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_pipeline_passes_full_content_and_sets_scan_stats() -> None:
     content = "x" * 25
     source = DummySource({"type": "DUMMY"}, content=content)
     detector = RecordingDetector(["text/plain"])
@@ -200,15 +224,14 @@ async def test_pipeline_truncates_content_and_sets_scan_stats() -> None:
         detectors=[detector],
         source=source,
         runner_id="runner-2",
-        content_size_limit=10,
     )
 
     [asset] = await pipeline.process([make_asset("2")])
     assert asset.findings is not None
     assert len(asset.findings) == 1
 
-    # Content should be truncated before detection
-    assert asset.findings[0].matched_content == "x" * 10
+    # Full content should be passed to detectors
+    assert asset.findings[0].matched_content == content
 
     # Scan stats should reflect original content size and detectors run
     assert asset.scan_stats is not None
@@ -402,6 +425,32 @@ class BinarySource(DummySource):
         return self._binary_data, self._binary_mime
 
 
+class OcrBinarySource(BinarySource):
+    def __init__(
+        self,
+        recipe: dict[str, Any],
+        content: str,
+        binary_data: bytes,
+        binary_mime: str,
+        ocr_pages: list[str],
+    ) -> None:
+        super().__init__(recipe, content, binary_data, binary_mime)
+        self._ocr_pages = ocr_pages
+        self.config = SimpleNamespace(sampling=SimpleNamespace(enable_ocr=True))
+
+    def iter_asset_pages(
+        self,
+        file_bytes: bytes,
+        mime_type: str,
+        batch_size: int = 100,
+        include_column_names: bool = True,
+        *,
+        file_name: str = "",
+    ):
+        _ = (file_bytes, mime_type, batch_size, include_column_names, file_name)
+        yield from self._ocr_pages
+
+
 def make_image_asset(asset_id: str = "img-1") -> SingleAssetScanResults:
     now = datetime.now(UTC)
     return SingleAssetScanResults(
@@ -439,6 +488,82 @@ async def test_pipeline_routes_binary_content_to_image_detectors() -> None:
     assert len(image_detector.seen) == 1
     assert image_detector.seen[0] == image_bytes
     assert image_detector.seen_content_types == ["image/png"]
+    assert asset.findings is not None
+    assert len(asset.findings) == 1
+
+
+@pytest.mark.asyncio
+async def test_pipeline_routes_ocr_text_to_text_detectors_for_image_assets() -> None:
+    image_bytes = b"\x89PNG\r\n\x1a\nfake-image-data"
+    source = OcrBinarySource(
+        {"type": "DUMMY"},
+        content="",
+        binary_data=image_bytes,
+        binary_mime="image/png",
+        ocr_pages=["detected words"],
+    )
+    text_detector = RecordingDetector(["text/plain"])
+    image_detector = RecordingDetector(["image/png"])
+
+    pipeline = DetectorPipeline(
+        detectors=[text_detector, image_detector],
+        source=source,
+        runner_id="runner-ocr-image",
+    )
+
+    [_asset] = await pipeline.process([make_image_asset("ocr-image")])
+
+    assert text_detector.seen == ["detected words"]
+    assert text_detector.seen_content_types == ["text/plain"]
+    assert image_detector.seen == [image_bytes]
+    assert image_detector.seen_content_types == ["image/png"]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_runs_mixed_detector_on_ocr_text_and_binary_payloads() -> None:
+    image_bytes = b"\x89PNG\r\n\x1a\nfake-image-data"
+    source = OcrBinarySource(
+        {"type": "DUMMY"},
+        content="",
+        binary_data=image_bytes,
+        binary_mime="image/png",
+        ocr_pages=["detected words"],
+    )
+    mixed_detector = RecordingDetector(["text/plain", "image/png"])
+
+    pipeline = DetectorPipeline(
+        detectors=[mixed_detector],
+        source=source,
+        runner_id="runner-ocr-mixed",
+    )
+
+    [_asset] = await pipeline.process([make_image_asset("ocr-mixed")])
+
+    assert mixed_detector.seen == ["detected words", image_bytes]
+    assert mixed_detector.seen_content_types == ["text/plain", "image/png"]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_resolves_effective_binary_mime_from_bytes_and_filename() -> None:
+    image_bytes = b"\xff\xd8\xffjpeg-data"
+    source = BinarySource(
+        {"type": "DUMMY"},
+        content="",
+        binary_data=image_bytes,
+        binary_mime="application/octet-stream",
+    )
+    image_detector = RecordingDetector(["image/jpeg"])
+
+    pipeline = DetectorPipeline(
+        detectors=[image_detector],
+        source=source,
+        runner_id="runner-binary-mime-fallback",
+    )
+
+    [asset] = await pipeline.process([make_image_asset("photo.jpg")])
+
+    assert image_detector.seen == [image_bytes]
+    assert image_detector.seen_content_types == ["image/jpeg"]
     assert asset.findings is not None
     assert len(asset.findings) == 1
 
@@ -482,7 +607,7 @@ async def test_pipeline_runs_text_and_binary_detectors_together() -> None:
 
 
 @pytest.mark.asyncio
-async def test_pipeline_truncation_warning_in_scan_stats() -> None:
+async def test_pipeline_no_truncation_warning_in_scan_stats() -> None:
     content = "x" * 50
     source = DummySource({"type": "DUMMY"}, content=content)
     detector = RecordingDetector(["text/plain"])
@@ -491,13 +616,11 @@ async def test_pipeline_truncation_warning_in_scan_stats() -> None:
         detectors=[detector],
         source=source,
         runner_id="runner-trunc",
-        content_size_limit=10,
     )
 
     [asset] = await pipeline.process([make_asset("trunc")])
     assert asset.scan_stats is not None
-    assert asset.scan_stats.warnings is not None
-    assert any("truncated" in w.lower() for w in asset.scan_stats.warnings)
+    assert not any("truncated" in w.lower() for w in (asset.scan_stats.warnings or []))
 
 
 class FailingDetector(BaseDetector):

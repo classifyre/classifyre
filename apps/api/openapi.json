@@ -1134,6 +1134,8 @@
                   "DATABRICKS",
                   "SNOWFLAKE",
                   "MONGODB",
+                  "NEO4J",
+                  "SQLITE",
                   "POWERBI",
                   "TABLEAU",
                   "CUSTOM"
@@ -3331,6 +3333,112 @@
         ]
       }
     },
+    "/runners/{runnerId}/assets/discover": {
+      "post": {
+        "operationId": "CliRunnerController_registerDiscoveredAssets",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDiscoveredAssetsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterDiscoveredAssetsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Register discovered asset hashes for a runner",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/runners/{runnerId}/assets/status": {
+      "patch": {
+        "operationId": "CliRunnerController_updateRunnerAssetStatuses",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRunnerAssetStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update processing status of runner assets",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/runners/{runnerId}/assets/progress": {
+      "get": {
+        "operationId": "CliRunnerController_getRunnerAssetProgress",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunnerAssetProgressDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get runner asset processing progress",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
     "/runners/{runnerId}/logs": {
       "post": {
         "operationId": "CliRunnerController_searchRunnerLogs",
@@ -3401,6 +3509,7 @@
                 "PENDING",
                 "RUNNING",
                 "COMPLETED",
+                "WARNING",
                 "ERROR"
               ],
               "type": "string"
@@ -3464,6 +3573,7 @@
                 "PENDING",
                 "RUNNING",
                 "COMPLETED",
+                "WARNING",
                 "ERROR"
               ],
               "type": "string"
@@ -3567,6 +3677,39 @@
           }
         },
         "summary": "Runners charts overview",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/search/runner-assets": {
+      "post": {
+        "description": "Returns paginated runner_assets rows for a specific runner, joined with the resolved asset record and its findings.",
+        "operationId": "SearchRunnersController_searchRunnerAssets",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRunnersAssetsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Paginated runner assets with joined asset and findings data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchRunnersAssetsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search runner assets",
         "tags": [
           "Runners"
         ]
@@ -4299,11 +4442,13 @@
               "DATABRICKS",
               "SNOWFLAKE",
               "MONGODB",
+              "NEO4J",
               "POWERBI",
               "TABLEAU",
               "CONFLUENCE",
               "JIRA",
-              "SERVICEDESK"
+              "SERVICEDESK",
+              "SQLITE"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -4382,6 +4527,27 @@
             "type": "string",
             "example": "PENDING"
           },
+          "lastRunStatus": {
+            "type": "string",
+            "nullable": true,
+            "example": "COMPLETED"
+          },
+          "lastRunAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "example": "2026-01-31T10:00:00.000Z"
+          },
+          "lastErrorMessage": {
+            "type": "string",
+            "nullable": true,
+            "example": null,
+            "description": "Human-readable error message from the most recent failed run. Cleared on success."
+          },
+          "consecutiveFailures": {
+            "type": "number",
+            "example": 0
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string",
@@ -4420,6 +4586,7 @@
           "config",
           "currentRunnerId",
           "runnerStatus",
+          "consecutiveFailures",
           "createdAt",
           "updatedAt",
           "scheduleEnabled",
@@ -4447,11 +4614,13 @@
               "DATABRICKS",
               "SNOWFLAKE",
               "MONGODB",
+              "NEO4J",
               "POWERBI",
               "TABLEAU",
               "CONFLUENCE",
               "JIRA",
-              "SERVICEDESK"
+              "SERVICEDESK",
+              "SQLITE"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -4566,6 +4735,8 @@
                 "DATABRICKS",
                 "SNOWFLAKE",
                 "MONGODB",
+                "NEO4J",
+                "SQLITE",
                 "POWERBI",
                 "TABLEAU",
                 "CUSTOM"
@@ -4581,6 +4752,7 @@
                 "PENDING",
                 "RUNNING",
                 "COMPLETED",
+                "WARNING",
                 "ERROR"
               ]
             }
@@ -4872,6 +5044,8 @@
               "DATABRICKS",
               "SNOWFLAKE",
               "MONGODB",
+              "NEO4J",
+              "SQLITE",
               "POWERBI",
               "TABLEAU",
               "CUSTOM"
@@ -4977,6 +5151,8 @@
                 "DATABRICKS",
                 "SNOWFLAKE",
                 "MONGODB",
+                "NEO4J",
+                "SQLITE",
                 "POWERBI",
                 "TABLEAU",
                 "CUSTOM"
@@ -5740,6 +5916,8 @@
               "DATABRICKS",
               "SNOWFLAKE",
               "MONGODB",
+              "NEO4J",
+              "SQLITE",
               "POWERBI",
               "TABLEAU",
               "CUSTOM"
@@ -7229,6 +7407,7 @@
               "PENDING",
               "RUNNING",
               "COMPLETED",
+              "WARNING",
               "ERROR"
             ]
           },
@@ -8103,6 +8282,7 @@
               "PENDING",
               "RUNNING",
               "COMPLETED",
+              "WARNING",
               "ERROR"
             ]
           },
@@ -8218,6 +8398,139 @@
         },
         "required": [
           "message"
+        ]
+      },
+      "RegisterDiscoveredAssetsDto": {
+        "type": "object",
+        "properties": {
+          "assetHashes": {
+            "description": "Asset hashes to register as PENDING",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "assetHashes"
+        ]
+      },
+      "RegisterDiscoveredAssetsResponseDto": {
+        "type": "object",
+        "properties": {
+          "registered": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "registered"
+        ]
+      },
+      "FindingsBySeverityDto": {
+        "type": "object",
+        "properties": {
+          "critical": {
+            "type": "number",
+            "minimum": 0
+          },
+          "high": {
+            "type": "number",
+            "minimum": 0
+          },
+          "medium": {
+            "type": "number",
+            "minimum": 0
+          },
+          "low": {
+            "type": "number",
+            "minimum": 0
+          },
+          "info": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "RunnerAssetStatusUpdateItem": {
+        "type": "object",
+        "properties": {
+          "assetHash": {
+            "type": "string",
+            "description": "Asset hash"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROCESSING",
+              "PROCESSED",
+              "ERROR"
+            ]
+          },
+          "errorMessage": {
+            "type": "string"
+          },
+          "findingsTotal": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Total findings count"
+          },
+          "findingsBySeverity": {
+            "description": "Finding counts per severity level",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FindingsBySeverityDto"
+              }
+            ]
+          },
+          "findingsByDetector": {
+            "type": "object",
+            "description": "Finding counts per detector: { [detectorType]: { total, critical?, high?, … } }"
+          }
+        },
+        "required": [
+          "assetHash",
+          "status"
+        ]
+      },
+      "UpdateRunnerAssetStatusDto": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunnerAssetStatusUpdateItem"
+            }
+          }
+        },
+        "required": [
+          "assets"
+        ]
+      },
+      "RunnerAssetProgressDto": {
+        "type": "object",
+        "properties": {
+          "pending": {
+            "type": "number"
+          },
+          "processing": {
+            "type": "number"
+          },
+          "processed": {
+            "type": "number"
+          },
+          "error": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "pending",
+          "processing",
+          "processed",
+          "error",
+          "total"
         ]
       },
       "SearchRunnerLogsBodyDto": {
@@ -8426,6 +8739,8 @@
                 "DATABRICKS",
                 "SNOWFLAKE",
                 "MONGODB",
+                "NEO4J",
+                "SQLITE",
                 "POWERBI",
                 "TABLEAU",
                 "CUSTOM"
@@ -8440,6 +8755,7 @@
                 "PENDING",
                 "RUNNING",
                 "COMPLETED",
+                "WARNING",
                 "ERROR"
               ]
             }
@@ -8547,6 +8863,7 @@
               "PENDING",
               "RUNNING",
               "COMPLETED",
+              "WARNING",
               "ERROR"
             ]
           },
@@ -8700,6 +9017,9 @@
           "completed": {
             "type": "number"
           },
+          "warning": {
+            "type": "number"
+          },
           "failed": {
             "type": "number"
           }
@@ -8709,6 +9029,7 @@
           "running",
           "queued",
           "completed",
+          "warning",
           "failed"
         ]
       },
@@ -8731,6 +9052,9 @@
           "completed": {
             "type": "number"
           },
+          "warning": {
+            "type": "number"
+          },
           "failed": {
             "type": "number"
           }
@@ -8741,6 +9065,7 @@
           "running",
           "queued",
           "completed",
+          "warning",
           "failed"
         ]
       },
@@ -8794,6 +9119,165 @@
           "totals",
           "timeline",
           "topSources"
+        ]
+      },
+      "SearchRunnersAssetsFiltersInputDto": {
+        "type": "object",
+        "properties": {
+          "runnerId": {
+            "type": "string"
+          },
+          "search": {
+            "type": "string",
+            "description": "Case-insensitive text search across asset filename, hash, or error message",
+            "maxLength": 200
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "PROCESSING",
+                "PROCESSED",
+                "ERROR"
+              ]
+            }
+          }
+        }
+      },
+      "SearchRunnersAssetsPageDto": {
+        "type": "object",
+        "properties": {
+          "skip": {
+            "type": "number",
+            "default": 0
+          },
+          "limit": {
+            "type": "number",
+            "default": 50
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "CREATED_AT",
+              "COMPLETED_AT",
+              "STATUS",
+              "STATUS_PRIORITY",
+              "ASSET_HASH",
+              "FINDINGS_TOTAL"
+            ],
+            "default": "STATUS_PRIORITY"
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "default": "DESC"
+          }
+        }
+      },
+      "SearchRunnersAssetsRequestDto": {
+        "type": "object",
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/SearchRunnersAssetsFiltersInputDto"
+          },
+          "page": {
+            "$ref": "#/components/schemas/SearchRunnersAssetsPageDto"
+          }
+        }
+      },
+      "RunnerAssetItemDto": {
+        "type": "object",
+        "properties": {
+          "runnerId": {
+            "type": "string"
+          },
+          "assetHash": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PROCESSING",
+              "PROCESSED",
+              "ERROR"
+            ]
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "completedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "findingsTotal": {
+            "type": "number",
+            "nullable": true
+          },
+          "findingsBySeverity": {
+            "type": "object",
+            "nullable": true
+          },
+          "findingsByDetector": {
+            "type": "object",
+            "nullable": true
+          },
+          "asset": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssetListItemDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "runnerId",
+          "assetHash",
+          "status",
+          "createdAt"
+        ]
+      },
+      "SearchRunnersAssetsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunnerAssetItemDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
         ]
       },
       "SandboxRunDto": {

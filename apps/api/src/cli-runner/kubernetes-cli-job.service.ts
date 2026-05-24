@@ -503,6 +503,56 @@ export class KubernetesCliJobService {
     container.command = ['/bin/sh', '-lc'];
     container.args = [this.buildJobCommand(params.mode, workDir)];
 
+    // Apply per-source resource overrides from recipe
+    const recipeResources = (params.recipe as any)?.resources;
+    if (recipeResources && typeof recipeResources === 'object') {
+      container.resources = container.resources || {};
+      if (recipeResources.requests) {
+        container.resources.requests = {
+          ...(container.resources.requests || {}),
+          ...recipeResources.requests,
+        };
+      }
+      if (recipeResources.limits) {
+        container.resources.limits = {
+          ...(container.resources.limits || {}),
+          ...recipeResources.limits,
+        };
+      }
+      if (
+        typeof recipeResources.timeout_seconds === 'number' &&
+        recipeResources.timeout_seconds > 0
+      ) {
+        jobAny.spec.activeDeadlineSeconds = recipeResources.timeout_seconds;
+      }
+      const envOverrides: Array<{ name: string; value: string }> = [];
+      if (
+        typeof recipeResources.max_pool_workers === 'number' &&
+        recipeResources.max_pool_workers > 0
+      ) {
+        envOverrides.push({
+          name: 'CLASSIFYRE_MAX_POOL_WORKERS',
+          value: String(recipeResources.max_pool_workers),
+        });
+      }
+      if (
+        typeof recipeResources.max_concurrent_assets === 'number' &&
+        recipeResources.max_concurrent_assets > 0
+      ) {
+        envOverrides.push({
+          name: 'CLASSIFYRE_MAX_CONCURRENT_ASSETS',
+          value: String(recipeResources.max_concurrent_assets),
+        });
+      }
+      for (const entry of envOverrides) {
+        const existing = container.env || [];
+        const idx = existing.findIndex((e: any) => e.name === entry.name);
+        if (idx >= 0) existing[idx] = entry;
+        else existing.push(entry);
+        container.env = existing;
+      }
+    }
+
     return job;
   }
 
@@ -583,6 +633,22 @@ export class KubernetesCliJobService {
           );
           await new Promise((resolve) => setTimeout(resolve, pollMs));
           continue;
+        }
+        const statusCode =
+          error?.code ?? error?.statusCode ?? error?.body?.code;
+        if (statusCode === 404) {
+          latestOutput = await this.syncJobLogs(
+            namespace,
+            jobName,
+            latestOutput,
+            onLogChunk,
+          );
+          return {
+            succeeded: false,
+            exitCode: undefined,
+            output: latestOutput,
+            failureContext: `Kubernetes Job ${namespace}/${jobName} was not found. It may have been deleted by TTL, evicted, or cleaned up before the status could be read.`,
+          };
         }
         throw error;
       }
@@ -927,8 +993,27 @@ export class KubernetesCliJobService {
     if (status === 404) {
       return true;
     }
-    const reason = error?.body?.reason || error?.response?.body?.reason;
-    return reason === 'NotFound';
+    // ApiException from @kubernetes/client-node formats the message as
+    // "HTTP-Code: 404\nBody: ..." and stores body as a JSON string, not
+    // a parsed object, so we must handle both shapes.
+    if (
+      typeof error?.message === 'string' &&
+      /HTTP-Code:\s*404\b/.test(error.message)
+    ) {
+      return true;
+    }
+    const rawBody = error?.body ?? error?.response?.body;
+    let body: Record<string, unknown> | null = null;
+    if (rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)) {
+      body = rawBody as Record<string, unknown>;
+    } else if (typeof rawBody === 'string') {
+      try {
+        body = JSON.parse(rawBody) as Record<string, unknown>;
+      } catch {
+        /* ignore */
+      }
+    }
+    return body?.['reason'] === 'NotFound';
   }
 
   private isLogUnavailable(error: any): boolean {

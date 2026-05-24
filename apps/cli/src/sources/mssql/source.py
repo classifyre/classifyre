@@ -1,10 +1,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator
-from contextlib import closing
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any
 
 from ...models.generated_input import (
@@ -18,14 +14,9 @@ from ...models.generated_input import (
 from ...models.generated_single_asset_scan_results import (
     AssetType as OutputAssetType,
 )
-from ...models.generated_single_asset_scan_results import (
-    DetectionResult,
-    SingleAssetScanResults,
-)
-from ...utils.hashing import hash_id, unhash_id
-from ..base import BaseSource
 from ..dependencies import require_module
-from ..tabular_utils import build_tabular_location, format_tabular_sample_content
+from ..tabular_base import BaseTabularSource
+from ..tabular_utils import TableRef
 
 logger = logging.getLogger(__name__)
 
@@ -33,19 +24,11 @@ _DEFAULT_EXCLUDED_DATABASES = {"master", "tempdb", "model"}
 _DEFAULT_EXCLUDED_SCHEMAS = {"INFORMATION_SCHEMA", "sys"}
 
 
-@dataclass(frozen=True)
-class TableRef:
-    database: str
-    schema: str
-    table: str
-    object_type: str
-
-
 def _quote_identifier(identifier: str) -> str:
     return f"[{identifier.replace(']', ']]')}]"
 
 
-class MSSQLSource(BaseSource):
+class MSSQLSource(BaseTabularSource):
     source_type = "mssql"
 
     def __init__(
@@ -65,10 +48,13 @@ class MSSQLSource(BaseSource):
         )
         self._host = self.config.required.host
         self._port = int(self.config.required.port)
-        self._table_lookup: dict[str, TableRef] = {}
-        self._content_cache: dict[str, tuple[str, str]] = {}
-        self._pk_columns_cache: dict[tuple[str, str, str], list[str]] = {}
         self._unsupported_feature_warning_logged = False
+
+    # ── Identity ─────────────────────────────────────────────────────────
+
+    @property
+    def _source_label(self) -> str:
+        return "MSSQL"
 
     def _asset_type_value(self) -> str:
         type_value = self.config.type
@@ -76,6 +62,8 @@ class MSSQLSource(BaseSource):
 
     def _sampling(self) -> SamplingConfig:
         return self.config.sampling
+
+    # ── Connection ───────────────────────────────────────────────────────
 
     def _connection_options(self) -> MSSQLOptionalConnection:
         if self.config.optional and self.config.optional.connection:
@@ -113,10 +101,8 @@ class MSSQLSource(BaseSource):
         username = self.config.masked.username
         if self._auth_mode() != "LDAP":
             return username
-
         if "\\" in username or "@" in username:
             return username
-
         domain = self._ldap_domain()
         if domain:
             return f"{domain}\\{username}"
@@ -132,7 +118,7 @@ class MSSQLSource(BaseSource):
         hostname = self._host.strip().lower()
         return hostname.endswith(".rds.amazonaws.com") or ".rds." in hostname
 
-    def _connect(self, database: str | None = None):
+    def _connect(self, database: str | None = None) -> Any:
         connection_options = self._connection_options()
         connect_kwargs: dict[str, Any] = {
             "server": self._host,
@@ -152,12 +138,168 @@ class MSSQLSource(BaseSource):
             pass
         return connection
 
+    # ── Dialect hooks ────────────────────────────────────────────────────
+
+    def _quote_identifier(self, identifier: str) -> str:
+        return _quote_identifier(identifier)
+
+    def _random_order_expr(self) -> str:
+        return "NEWID()"
+
+    def _limit_clause(self, placeholder: str) -> str:
+        # MSSQL uses TOP N for non-ALL sampling, but for keyset/offset pagination
+        # it uses OFFSET/FETCH. The base class calls _limit_clause for keyset pages.
+        return f"OFFSET 0 ROWS FETCH NEXT {placeholder} ROWS ONLY"
+
+    def _offset_clause(self, limit_ph: str, offset_ph: str) -> str:
+        return f"OFFSET {offset_ph} ROWS FETCH NEXT {limit_ph} ROWS ONLY"
+
+    def _output_asset_type(self, table_ref: TableRef) -> OutputAssetType:
+        return OutputAssetType.TABLE
+
+    # ── MSSQL uses SELECT TOP N for sampling ─────────────────────────────
+
+    def _build_sampling_query(
+        self, table_ref: TableRef, columns: list[str]
+    ) -> tuple[str, list[Any]]:
+        sampling = self._sampling()
+        if not columns:
+            raise ValueError(f"Table {table_ref.display_name} has no readable columns")
+
+        quoted_columns = ", ".join(self._quote_identifier(c) for c in columns)
+        from_expr = self._table_select_fqn(table_ref)
+
+        strategy = sampling.strategy
+        if strategy == SamplingStrategy.ALL:
+            return f"SELECT {quoted_columns} FROM {from_expr}", []
+
+        rows_per_page = int(sampling.rows_per_page or 100)
+        query = f"SELECT TOP {rows_per_page} {quoted_columns} FROM {from_expr}"
+
+        if strategy == SamplingStrategy.LATEST:
+            order_column = self._resolve_latest_order_column(columns)
+            if order_column:
+                query += f" ORDER BY {self._quote_identifier(order_column)} DESC"
+            elif sampling.fallback_to_random is not False:
+                query += f" ORDER BY {self._random_order_expr()}"
+        elif strategy == SamplingStrategy.RANDOM:
+            query += f" ORDER BY {self._random_order_expr()}"
+
+        return query, []
+
+    # ── MSSQL OFFSET/FETCH pagination ────────────────────────────────────
+
+    def _fetch_one_page(
+        self, table_ref: TableRef, base_query: str, page_size: int, offset: int
+    ) -> tuple[list[tuple[Any, ...]], list[str]]:
+        conn = self._get_cached_connection(table_ref.database)
+        paginated_query = (
+            f"{base_query} ORDER BY (SELECT NULL) "
+            f"OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute(paginated_query)
+            rows = list(cursor.fetchall())
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
+        return rows, column_names
+
+    # ── MSSQL expanded-OR keyset pagination ──────────────────────────────
+
+    def _fetch_page_keyset(
+        self,
+        conn: Any,
+        base_query: str,
+        page_size: int,
+        pk_columns: list[str],
+        pk_order: str,
+        last_pk_values: list[Any] | None,
+    ) -> tuple[list[tuple[Any, ...]], list[str]]:
+        if last_pk_values is None:
+            paginated_query = (
+                f"{base_query} ORDER BY {pk_order} OFFSET 0 ROWS FETCH NEXT {page_size} ROWS ONLY"
+            )
+            params: list[Any] = []
+        elif len(pk_columns) == 1:
+            where = f"WHERE {self._quote_identifier(pk_columns[0])} > %s"
+            paginated_query = (
+                f"{base_query} {where} ORDER BY {pk_order} "
+                f"OFFSET 0 ROWS FETCH NEXT {page_size} ROWS ONLY"
+            )
+            params = [last_pk_values[0]]
+        else:
+            # Composite PK: expanded OR form for broad MSSQL compatibility
+            conditions = []
+            params = []
+            for i in range(len(pk_columns)):
+                eq_parts = " AND ".join(
+                    f"{self._quote_identifier(pk_columns[j])} = %s" for j in range(i)
+                )
+                gt_part = f"{self._quote_identifier(pk_columns[i])} > %s"
+                if eq_parts:
+                    conditions.append(f"({eq_parts} AND {gt_part})")
+                    params.extend(last_pk_values[:i])
+                    params.append(last_pk_values[i])
+                else:
+                    conditions.append(f"({gt_part})")
+                    params.append(last_pk_values[i])
+            where = "WHERE " + " OR ".join(conditions)
+            paginated_query = (
+                f"{base_query} {where} ORDER BY {pk_order} "
+                f"OFFSET 0 ROWS FETCH NEXT {page_size} ROWS ONLY"
+            )
+
+        with conn.cursor() as cursor:
+            cursor.execute(paginated_query, params if params else None)
+            rows = list(cursor.fetchall())
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
+        return rows, column_names
+
+    # ── Database / table discovery ───────────────────────────────────────
+
+    def _resolve_databases(self) -> list[str]:
+        scope_options = self._scope_options()
+        include_all = bool(scope_options.include_all_databases)
+        configured_database = scope_options.database
+
+        if not include_all:
+            if configured_database:
+                return [configured_database]
+            raise ValueError(
+                "MSSQL source requires optional.scope.database when include_all_databases is false. "
+                "Set optional.scope.database (e.g. 'msdb') or enable include_all_databases."
+            )
+
+        excluded = self._excluded_databases()
+        databases: list[str] = []
+        conn = self._get_cached_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT name
+                FROM sys.databases
+                WHERE state_desc = 'ONLINE'
+                ORDER BY name
+                """
+            )
+            for row in cursor.fetchall():
+                database_name = row[0] if isinstance(row, tuple) else None
+                if not isinstance(database_name, str) or not database_name:
+                    continue
+                if database_name in excluded:
+                    continue
+                databases.append(database_name)
+
+        if configured_database and configured_database not in databases:
+            databases.insert(0, configured_database)
+        return databases
+
     def _excluded_databases(self) -> set[str]:
         configured = self._scope_options().exclude_databases or []
         excluded = {name.strip() for name in configured if name.strip()}
-        if not excluded:
-            excluded = set(_DEFAULT_EXCLUDED_DATABASES)
-        return excluded
+        return excluded if excluded else set(_DEFAULT_EXCLUDED_DATABASES)
+
+    def _default_excluded_schemas(self) -> set[str]:
+        return set(_DEFAULT_EXCLUDED_SCHEMAS)
 
     def _schema_allowlist(self) -> set[str] | None:
         configured = self._scope_options().include_schemas
@@ -168,13 +310,7 @@ class MSSQLSource(BaseSource):
     def _schema_denylist(self) -> set[str]:
         configured = self._scope_options().exclude_schemas or []
         denylist = {schema.strip() for schema in configured if schema.strip()}
-        if not denylist:
-            denylist = set(_DEFAULT_EXCLUDED_SCHEMAS)
-        return denylist
-
-    def _object_allowlist(self) -> set[str]:
-        include_objects = self._scope_options().include_objects or []
-        return {entry.strip().lower() for entry in include_objects if entry.strip()}
+        return denylist if denylist else set(_DEFAULT_EXCLUDED_SCHEMAS)
 
     def _include_tables_enabled(self) -> bool:
         return self._scope_options().include_tables is not False
@@ -187,6 +323,239 @@ class MSSQLSource(BaseSource):
 
     def _include_view_lineage_enabled(self) -> bool:
         return self._extraction_options().include_view_lineage is not False
+
+    def _object_allowlist(self) -> set[str]:
+        include_objects = self._scope_options().include_objects or []
+        return {entry.strip().lower() for entry in include_objects if entry.strip()}
+
+    def _table_limit(self) -> int | None:
+        table_limit = self._scope_options().table_limit
+        return int(table_limit) if table_limit else None
+
+    def _list_tables_for_database(self, database: str) -> list[TableRef]:
+        include_tables = self._include_tables_enabled()
+        include_views = self._include_views_enabled()
+        if not include_tables and not include_views:
+            return []
+
+        schema_allowlist = self._schema_allowlist()
+        schema_denylist = self._schema_denylist()
+        object_allowlist = self._object_allowlist()
+        limit = self._table_limit()
+
+        tables: list[TableRef] = []
+        conn = self._get_cached_connection(database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_CATALOG = %s
+                ORDER BY TABLE_SCHEMA, TABLE_NAME
+                """,
+                (database,),
+            )
+            for row in cursor.fetchall():
+                if not isinstance(row, tuple) or len(row) < 3:
+                    continue
+
+                schema_name = row[0]
+                table_name = row[1]
+                table_type = row[2]
+                if not isinstance(schema_name, str) or not isinstance(table_name, str):
+                    continue
+                if schema_name in schema_denylist:
+                    continue
+                if schema_allowlist and schema_name not in schema_allowlist:
+                    continue
+
+                is_view = str(table_type).upper() == "VIEW"
+                if is_view and not include_views:
+                    continue
+                if not is_view and not include_tables:
+                    continue
+
+                scoped_name = f"{schema_name}.{table_name}".lower()
+                db_scoped_name = f"{database}.{schema_name}.{table_name}".lower()
+                if (
+                    object_allowlist
+                    and scoped_name not in object_allowlist
+                    and db_scoped_name not in object_allowlist
+                ):
+                    continue
+
+                tables.append(
+                    TableRef(
+                        database=database,
+                        schema=schema_name,
+                        table=table_name,
+                        object_type="VIEW" if is_view else "TABLE",
+                    )
+                )
+                if limit is not None and len(tables) >= limit:
+                    break
+
+        return tables
+
+    # ── Primary keys (MSSQL-specific: TABLE_CATALOG) ─────────────────────
+
+    def _query_primary_key_columns(self, table_ref: TableRef) -> list[str]:
+        if table_ref.object_type == "VIEW":
+            return []
+        conn = self._get_cached_connection(table_ref.database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT kcu.COLUMN_NAME
+                FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+                JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+                  ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+                 AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
+                 AND tc.TABLE_NAME = kcu.TABLE_NAME
+                WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
+                  AND tc.TABLE_CATALOG = %s
+                  AND tc.TABLE_SCHEMA = %s
+                  AND tc.TABLE_NAME = %s
+                ORDER BY kcu.ORDINAL_POSITION
+                """,
+                (table_ref.database, table_ref.schema, table_ref.table),
+            )
+            return [
+                row[0]
+                for row in cursor.fetchall()
+                if isinstance(row, tuple) and row and isinstance(row[0], str)
+            ]
+
+    # ── Column metadata (MSSQL uses TABLE_CATALOG) ───────────────────────
+
+    def _available_columns(self, table_ref: TableRef) -> list[str]:
+        conn = self._get_cached_connection(table_ref.database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COLUMN_NAME
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_CATALOG = %s
+                  AND TABLE_SCHEMA = %s
+                  AND TABLE_NAME = %s
+                ORDER BY ORDINAL_POSITION
+                """,
+                (table_ref.database, table_ref.schema, table_ref.table),
+            )
+            return [
+                row[0]
+                for row in cursor.fetchall()
+                if isinstance(row, tuple) and row and isinstance(row[0], str)
+            ]
+
+    # ── Foreign key + view dependency links (merged) ─────────────────────
+
+    def _collect_foreign_key_links(
+        self,
+        tables: list[TableRef],
+    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
+        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+
+        if self._include_table_lineage_enabled():
+            fk_links = self._collect_fk_links(tables)
+            for source, targets in fk_links.items():
+                links.setdefault(source, set()).update(targets)
+
+        if self._include_view_lineage_enabled():
+            view_links = self._collect_view_dependency_links(tables)
+            for source, targets in view_links.items():
+                links.setdefault(source, set()).update(targets)
+
+        return links
+
+    def _collect_fk_links(
+        self,
+        tables: list[TableRef],
+    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
+        table_keys = {t.table_key for t in tables if t.object_type == "TABLE"}
+        by_database: dict[str, set[tuple[str, ...]]] = {}
+        for t in tables:
+            if t.object_type != "TABLE":
+                continue
+            by_database.setdefault(t.database, set()).add(t.table_key)
+
+        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+        for database, scoped_keys in by_database.items():
+            try:
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            OBJECT_SCHEMA_NAME(fk.parent_object_id) AS source_schema,
+                            OBJECT_NAME(fk.parent_object_id) AS source_table,
+                            OBJECT_SCHEMA_NAME(fk.referenced_object_id) AS target_schema,
+                            OBJECT_NAME(fk.referenced_object_id) AS target_table
+                        FROM sys.foreign_keys fk
+                        """
+                    )
+                    for row in cursor.fetchall():
+                        if not isinstance(row, tuple) or len(row) < 4:
+                            continue
+                        source_schema, source_table, target_schema, target_table = row
+                        source_key = (database, str(source_schema), str(source_table))
+                        target_key = (database, str(target_schema), str(target_table))
+                        if source_key not in scoped_keys or target_key not in table_keys:
+                            continue
+                        links.setdefault(source_key, set()).add(target_key)
+            except Exception as exc:
+                logger.warning(
+                    "Could not resolve foreign key links for database %s: %s", database, exc
+                )
+        return links
+
+    def _collect_view_dependency_links(
+        self,
+        tables: list[TableRef],
+    ) -> dict[tuple[str, ...], set[tuple[str, ...]]]:
+        table_keys = {t.table_key for t in tables}
+        view_keys = {t.table_key for t in tables if t.object_type == "VIEW"}
+        by_database: dict[str, set[tuple[str, ...]]] = {}
+        for t in tables:
+            if t.object_type != "VIEW":
+                continue
+            by_database.setdefault(t.database, set()).add(t.table_key)
+
+        links: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+        for database, scoped_views in by_database.items():
+            try:
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                          OBJECT_SCHEMA_NAME(dep.referencing_id) AS source_schema,
+                          OBJECT_NAME(dep.referencing_id) AS source_name,
+                          OBJECT_SCHEMA_NAME(dep.referenced_id) AS target_schema,
+                          OBJECT_NAME(dep.referenced_id) AS target_name
+                        FROM sys.sql_expression_dependencies dep
+                        JOIN sys.views v ON dep.referencing_id = v.object_id
+                        WHERE dep.referenced_id IS NOT NULL
+                        """
+                    )
+                    for row in cursor.fetchall():
+                        if not isinstance(row, tuple) or len(row) < 4:
+                            continue
+                        source_schema, source_name, target_schema, target_name = row
+                        source_key = (database, str(source_schema), str(source_name))
+                        target_key = (database, str(target_schema), str(target_name))
+                        if source_key not in scoped_views or source_key not in view_keys:
+                            continue
+                        if target_key not in table_keys:
+                            continue
+                        links.setdefault(source_key, set()).add(target_key)
+            except Exception as exc:
+                logger.warning(
+                    "Could not resolve view lineage links for database %s: %s", database, exc
+                )
+        return links
+
+    # ── Unsupported extraction feature warnings ──────────────────────────
 
     def _log_unsupported_extraction_features(self) -> None:
         if self._unsupported_feature_warning_logged:
@@ -214,692 +583,39 @@ class MSSQLSource(BaseSource):
                 ", ".join(sorted(unsupported)),
             )
 
-    def _resolve_databases(self) -> list[str]:
-        scope_options = self._scope_options()
-        include_all = bool(scope_options.include_all_databases)
-        configured_database = scope_options.database
+    # ── External URL ─────────────────────────────────────────────────────
 
-        if not include_all:
-            if configured_database:
-                return [configured_database]
-            raise ValueError(
-                "MSSQL source requires optional.scope.database when include_all_databases is false. "
-                "Set optional.scope.database (e.g. 'msdb') or enable include_all_databases."
-            )
-
-        excluded = self._excluded_databases()
-        databases: list[str] = []
-        with closing(self._connect()) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT name
-                    FROM sys.databases
-                    WHERE state_desc = 'ONLINE'
-                    ORDER BY name
-                    """
-                )
-                for row in cursor.fetchall():
-                    database_name = row[0] if isinstance(row, tuple) else None
-                    if not isinstance(database_name, str) or not database_name:
-                        continue
-                    if database_name in excluded:
-                        continue
-                    databases.append(database_name)
-
-        if configured_database and configured_database not in databases:
-            databases.insert(0, configured_database)
-
-        return databases
-
-    def _get_primary_key_columns(self, table_ref: TableRef) -> list[str]:
-        cache_key = (table_ref.database, table_ref.schema, table_ref.table)
-        if cache_key in self._pk_columns_cache:
-            return self._pk_columns_cache[cache_key]
-
-        if table_ref.object_type == "VIEW":
-            self._pk_columns_cache[cache_key] = []
-            return []
-
-        try:
-            with closing(self._connect(table_ref.database)) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        SELECT kcu.COLUMN_NAME
-                        FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
-                        JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-                          ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
-                         AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
-                         AND tc.TABLE_NAME = kcu.TABLE_NAME
-                        WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
-                          AND tc.TABLE_CATALOG = %s
-                          AND tc.TABLE_SCHEMA = %s
-                          AND tc.TABLE_NAME = %s
-                        ORDER BY kcu.ORDINAL_POSITION
-                        """,
-                        (table_ref.database, table_ref.schema, table_ref.table),
-                    )
-                    columns = [
-                        row[0]
-                        for row in cursor.fetchall()
-                        if isinstance(row, tuple) and row and isinstance(row[0], str)
-                    ]
-        except Exception:
-            columns = []
-
-        self._pk_columns_cache[cache_key] = columns
-        return columns
-
-    def _list_tables_for_database(self, database: str) -> list[TableRef]:
-        include_tables = self._include_tables_enabled()
-        include_views = self._include_views_enabled()
-        if not include_tables and not include_views:
-            return []
-
-        schema_allowlist = self._schema_allowlist()
-        schema_denylist = self._schema_denylist()
-        object_allowlist = self._object_allowlist()
-        table_limit = self._scope_options().table_limit
-        limit = int(table_limit) if table_limit else None
-
-        tables: list[TableRef] = []
-        with closing(self._connect(database)) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
-                    FROM INFORMATION_SCHEMA.TABLES
-                    WHERE TABLE_CATALOG = %s
-                    ORDER BY TABLE_SCHEMA, TABLE_NAME
-                    """,
-                    (database,),
-                )
-                for row in cursor.fetchall():
-                    if not isinstance(row, tuple) or len(row) < 3:
-                        continue
-
-                    schema_name = row[0]
-                    table_name = row[1]
-                    table_type = row[2]
-                    if not isinstance(schema_name, str) or not isinstance(table_name, str):
-                        continue
-                    if schema_name in schema_denylist:
-                        continue
-                    if schema_allowlist and schema_name not in schema_allowlist:
-                        continue
-
-                    is_view = str(table_type).upper() == "VIEW"
-                    if is_view and not include_views:
-                        continue
-                    if not is_view and not include_tables:
-                        continue
-
-                    scoped_name = f"{schema_name}.{table_name}".lower()
-                    db_scoped_name = f"{database}.{schema_name}.{table_name}".lower()
-                    if (
-                        object_allowlist
-                        and scoped_name not in object_allowlist
-                        and db_scoped_name not in object_allowlist
-                    ):
-                        continue
-
-                    tables.append(
-                        TableRef(
-                            database=database,
-                            schema=schema_name,
-                            table=table_name,
-                            object_type="VIEW" if is_view else "TABLE",
-                        )
-                    )
-                    if limit is not None and len(tables) >= limit:
-                        break
-
-        return tables
-
-    def _iter_tables(self) -> list[TableRef]:
-        tables: list[TableRef] = []
-        for database in self._resolve_databases():
-            if self._aborted:
-                break
-            try:
-                tables.extend(self._list_tables_for_database(database))
-            except Exception as exc:
-                logger.warning("Skipping database %s due to listing error: %s", database, exc)
-        return tables
-
-    def test_connection(self) -> dict[str, Any]:
-        logger.info("Testing connection to MSSQL...")
-        result = {
-            "timestamp": datetime.now(UTC).isoformat(),
-            "source_type": self.recipe.get("type"),
-        }
-
-        try:
-            databases = self._resolve_databases()
-            if not databases:
-                raise ValueError("No databases available for scanning")
-
-            with closing(self._connect(databases[0])) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("SELECT 1")
-                    cursor.fetchone()
-
-            result["status"] = "SUCCESS"
-            result["message"] = (
-                f"Successfully connected to MSSQL. Reachable databases: {len(databases)}."
-            )
-        except Exception as exc:
-            result["status"] = "FAILURE"
-            result["message"] = f"Failed to connect to MSSQL: {exc}"
-
-        return result
-
-    def _table_key(self, table_ref: TableRef) -> tuple[str, str, str]:
-        return (table_ref.database, table_ref.schema, table_ref.table)
-
-    def _table_raw_id(self, table_ref: TableRef) -> str:
-        return f"{table_ref.database}_#_{table_ref.schema}_#_{table_ref.table}"
-
-    def _collect_foreign_key_links(
-        self,
-        tables: list[TableRef],
-    ) -> dict[tuple[str, str, str], set[tuple[str, str, str]]]:
-        table_keys = {
-            self._table_key(table_ref) for table_ref in tables if table_ref.object_type == "TABLE"
-        }
-        by_database: dict[str, set[tuple[str, str, str]]] = {}
-        for table_ref in tables:
-            if table_ref.object_type != "TABLE":
-                continue
-            by_database.setdefault(table_ref.database, set()).add(self._table_key(table_ref))
-
-        links: dict[tuple[str, str, str], set[tuple[str, str, str]]] = {}
-        for database, scoped_keys in by_database.items():
-            try:
-                with closing(self._connect(database)) as conn:
-                    with conn.cursor() as cursor:
-                        cursor.execute(
-                            """
-                            SELECT
-                                OBJECT_SCHEMA_NAME(fk.parent_object_id) AS source_schema,
-                                OBJECT_NAME(fk.parent_object_id) AS source_table,
-                                OBJECT_SCHEMA_NAME(fk.referenced_object_id) AS target_schema,
-                                OBJECT_NAME(fk.referenced_object_id) AS target_table
-                            FROM sys.foreign_keys fk
-                            """
-                        )
-                        for row in cursor.fetchall():
-                            if not isinstance(row, tuple) or len(row) < 4:
-                                continue
-                            source_schema, source_table, target_schema, target_table = row
-                            source_key = (database, str(source_schema), str(source_table))
-                            target_key = (database, str(target_schema), str(target_table))
-                            if source_key not in scoped_keys or target_key not in table_keys:
-                                continue
-                            links.setdefault(source_key, set()).add(target_key)
-            except Exception as exc:
-                logger.warning(
-                    "Could not resolve foreign key links for database %s: %s",
-                    database,
-                    exc,
-                )
-
-        return links
-
-    def _collect_view_dependency_links(
-        self,
-        tables: list[TableRef],
-    ) -> dict[tuple[str, str, str], set[tuple[str, str, str]]]:
-        table_keys = {self._table_key(table_ref) for table_ref in tables}
-        view_keys = {
-            self._table_key(table_ref) for table_ref in tables if table_ref.object_type == "VIEW"
-        }
-
-        by_database: dict[str, set[tuple[str, str, str]]] = {}
-        for table_ref in tables:
-            if table_ref.object_type != "VIEW":
-                continue
-            by_database.setdefault(table_ref.database, set()).add(self._table_key(table_ref))
-
-        links: dict[tuple[str, str, str], set[tuple[str, str, str]]] = {}
-        for database, scoped_views in by_database.items():
-            try:
-                with closing(self._connect(database)) as conn:
-                    with conn.cursor() as cursor:
-                        cursor.execute(
-                            """
-                            SELECT
-                              OBJECT_SCHEMA_NAME(dep.referencing_id) AS source_schema,
-                              OBJECT_NAME(dep.referencing_id) AS source_name,
-                              OBJECT_SCHEMA_NAME(dep.referenced_id) AS target_schema,
-                              OBJECT_NAME(dep.referenced_id) AS target_name
-                            FROM sys.sql_expression_dependencies dep
-                            JOIN sys.views v ON dep.referencing_id = v.object_id
-                            WHERE dep.referenced_id IS NOT NULL
-                            """
-                        )
-                        for row in cursor.fetchall():
-                            if not isinstance(row, tuple) or len(row) < 4:
-                                continue
-
-                            source_schema, source_name, target_schema, target_name = row
-                            source_key = (database, str(source_schema), str(source_name))
-                            target_key = (database, str(target_schema), str(target_name))
-
-                            if source_key not in scoped_views:
-                                continue
-                            if target_key not in table_keys:
-                                continue
-                            if source_key not in view_keys:
-                                continue
-
-                            links.setdefault(source_key, set()).add(target_key)
-            except Exception as exc:
-                logger.warning(
-                    "Could not resolve view lineage links for database %s: %s",
-                    database,
-                    exc,
-                )
-
-        return links
-
-    def _collect_dependency_links(
-        self,
-        tables: list[TableRef],
-    ) -> dict[tuple[str, str, str], set[tuple[str, str, str]]]:
-        links: dict[tuple[str, str, str], set[tuple[str, str, str]]] = {}
-
-        if self._include_table_lineage_enabled():
-            fk_links = self._collect_foreign_key_links(tables)
-            for source, targets in fk_links.items():
-                links.setdefault(source, set()).update(targets)
-
-        if self._include_view_lineage_enabled():
-            view_links = self._collect_view_dependency_links(tables)
-            for source, targets in view_links.items():
-                links.setdefault(source, set()).update(targets)
-
-        return links
-
-    def _table_to_asset(
-        self,
-        table_ref: TableRef,
-        *,
-        links: list[str] | None = None,
-    ) -> SingleAssetScanResults:
-        asset_name = f"{table_ref.database}.{table_ref.schema}.{table_ref.table}"
-        raw_id = self._table_raw_id(table_ref)
-        asset_hash = self.generate_hash_id(raw_id)
-        external_url = (
+    def _build_external_url(self, table_ref: TableRef) -> str:
+        return (
             f"mssql://{self._host}:{self._port}/"
             f"{table_ref.database}/{table_ref.schema}.{table_ref.table}"
         )
 
-        metadata = {
-            "database": table_ref.database,
-            "schema": table_ref.schema,
-            "table": table_ref.table,
+    def _extra_asset_metadata(self, table_ref: TableRef) -> dict[str, Any]:
+        return {
             "object_type": table_ref.object_type,
             "is_aws_rds": self._is_aws_rds(),
-            "sampling": {
-                "strategy": str(self._sampling().strategy),
-            },
         }
 
-        now = datetime.now(UTC)
-        return SingleAssetScanResults(
-            hash=asset_hash,
-            checksum=self.calculate_checksum(metadata),
-            name=asset_name,
-            external_url=external_url,
-            links=links or [],
-            asset_type=OutputAssetType.TABLE,
-            source_id=self.source_id,
-            created_at=now,
-            updated_at=now,
-            runner_id=self.runner_id,
-        )
+    def _finding_base_path(self, table_ref: TableRef) -> str:
+        return f"{table_ref.database}.{table_ref.schema}.{table_ref.table}"
 
-    STREAM_DETECTIONS = True
+    # ── Override extract_raw to log unsupported features ──────────────────
 
-    async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
-        if self._aborted:
-            return
-
+    async def extract_raw(self, *args: Any, **kwargs: Any) -> Any:
         self._log_unsupported_extraction_features()
-
-        tables = self._iter_tables()
-        table_hash_by_key: dict[tuple[str, str, str], str] = {
-            self._table_key(table_ref): self.generate_hash_id(self._table_raw_id(table_ref))
-            for table_ref in tables
-        }
-        table_fk_links = self._collect_dependency_links(tables)
-
-        batch: list[SingleAssetScanResults] = []
-        for table_ref in tables:
-            if self._aborted:
-                return
-
-            key = self._table_key(table_ref)
-            linked_hashes = [
-                table_hash_by_key[target]
-                for target in sorted(table_fk_links.get(key, set()))
-                if target in table_hash_by_key
-            ]
-
-            asset = self._table_to_asset(table_ref, links=linked_hashes)
-            self._table_lookup[asset.hash] = table_ref
-            batch.append(asset)
-
-            if len(batch) >= self.BATCH_SIZE:
-                yield batch
-                batch = []
-
-        if batch:
+        async for batch in super().extract_raw():
             yield batch
 
-    def generate_hash_id(self, asset_id: str) -> str:
-        return hash_id(self._asset_type_value(), asset_id)
+    # ── Parse table ref from asset ID ────────────────────────────────────
 
-    def _parse_table_ref_from_asset_id(self, asset_id: str) -> TableRef | None:
-        if asset_id in self._table_lookup:
-            return self._table_lookup[asset_id]
-
-        decoded = asset_id
-        if "_#_" not in decoded:
-            try:
-                decoded = unhash_id(asset_id)
-            except Exception:
-                decoded = asset_id
-
-        parts = decoded.split("_#_")
+    def _table_ref_from_parts(self, parts: list[str]) -> TableRef | None:
         if len(parts) >= 4 and parts[0].upper() == "MSSQL":
             return TableRef(
-                database=parts[-3],
-                schema=parts[-2],
-                table=parts[-1],
-                object_type="TABLE",
+                database=parts[-3], schema=parts[-2], table=parts[-1], object_type="TABLE"
             )
         if len(parts) >= 3:
             return TableRef(
-                database=parts[-3],
-                schema=parts[-2],
-                table=parts[-1],
-                object_type="TABLE",
+                database=parts[-3], schema=parts[-2], table=parts[-1], object_type="TABLE"
             )
         return None
-
-    def _available_columns(self, table_ref: TableRef) -> list[str]:
-        with closing(self._connect(table_ref.database)) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT COLUMN_NAME
-                    FROM INFORMATION_SCHEMA.COLUMNS
-                    WHERE TABLE_CATALOG = %s
-                      AND TABLE_SCHEMA = %s
-                      AND TABLE_NAME = %s
-                    ORDER BY ORDINAL_POSITION
-                    """,
-                    (table_ref.database, table_ref.schema, table_ref.table),
-                )
-                return [
-                    row[0]
-                    for row in cursor.fetchall()
-                    if isinstance(row, tuple) and row and isinstance(row[0], str)
-                ]
-
-    def _resolve_latest_order_column(self, columns: list[str]) -> str | None:
-        sampling = self._sampling()
-        configured = sampling.order_by_column
-        if configured and configured in columns:
-            return configured
-
-        priority_candidates = (
-            "updated_at",
-            "modified_at",
-            "created_at",
-            "inserted_at",
-            "timestamp",
-            "ts",
-            "date",
-        )
-        for candidate in priority_candidates:
-            if candidate in columns:
-                return candidate
-        return None
-
-    def _build_sampling_query(
-        self, table_ref: TableRef, columns: list[str]
-    ) -> tuple[str, list[Any]]:
-        sampling = self._sampling()
-        if not columns:
-            raise ValueError(
-                f"Table {table_ref.database}.{table_ref.schema}.{table_ref.table} has no readable columns"
-            )
-
-        quoted_columns = ", ".join(_quote_identifier(column) for column in columns)
-
-        strategy = sampling.strategy
-        if strategy == SamplingStrategy.ALL:
-            query = (
-                f"SELECT {quoted_columns} FROM "
-                f"{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
-            )
-            return query, []
-
-        rows_per_page = int(sampling.rows_per_page or 100)
-        query = (
-            f"SELECT TOP {rows_per_page} {quoted_columns} FROM "
-            f"{_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
-        )
-
-        if strategy == SamplingStrategy.LATEST:
-            order_column = self._resolve_latest_order_column(columns)
-            if order_column:
-                query += f" ORDER BY {_quote_identifier(order_column)} DESC"
-            elif sampling.fallback_to_random is not False:
-                query += " ORDER BY NEWID()"
-        elif strategy == SamplingStrategy.RANDOM:
-            query += " ORDER BY NEWID()"
-
-        return query, []
-
-    def _count_table_rows(self, table_ref: TableRef) -> int | None:
-        try:
-            with closing(self._connect(table_ref.database)) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        f"SELECT COUNT(*) FROM {_quote_identifier(table_ref.schema)}.{_quote_identifier(table_ref.table)}"
-                    )
-                    row = cursor.fetchone()
-                    return int(row[0]) if row else None
-        except Exception:
-            return None
-
-    def _serialize_cell(self, value: Any) -> str:
-        if value is None:
-            return "null"
-        if isinstance(value, memoryview):
-            value = value.tobytes()
-        if isinstance(value, (bytes, bytearray)):
-            return f"<{len(value)} bytes>"
-        if isinstance(value, datetime):
-            return value.isoformat()
-        return str(value)
-
-    def _format_sample_content(
-        self,
-        table_ref: TableRef,
-        column_names: list[str],
-        rows: list[tuple[Any, ...]],
-        row_offset: int = 0,
-    ) -> tuple[str, str]:
-        sampling = self._sampling()
-        return format_tabular_sample_content(
-            scope_label="table",
-            scope_value=f"{table_ref.database}.{table_ref.schema}.{table_ref.table}",
-            strategy=sampling.strategy,
-            rows=rows,
-            column_names=column_names,
-            serialize_cell=self._serialize_cell,
-            include_column_names=sampling.include_column_names is not False,
-            object_type=table_ref.object_type,
-            row_offset=row_offset,
-            raw_metadata={
-                "database": table_ref.database,
-                "schema": table_ref.schema,
-                "table": table_ref.table,
-            },
-        )
-
-    def _fetch_one_page(
-        self, table_ref: TableRef, base_query: str, page_size: int, offset: int
-    ) -> tuple[list[tuple[Any, ...]], list[str]]:
-        with closing(self._connect(table_ref.database)) as conn:
-            paginated_query = (
-                f"{base_query} ORDER BY (SELECT NULL) "
-                f"OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
-            )
-            with conn.cursor() as cursor:
-                cursor.execute(paginated_query)
-                rows = list(cursor.fetchall())
-                column_names = (
-                    [desc[0] for desc in cursor.description] if cursor.description else []
-                )
-        return rows, column_names
-
-    def _fetch_sample_rows(
-        self, table_ref: TableRef
-    ) -> tuple[list[tuple[Any, ...]], list[str]] | None:
-        columns = self._available_columns(table_ref)
-        sampling = self._sampling()
-        query, _params = self._build_sampling_query(table_ref, columns)
-
-        if sampling.strategy == SamplingStrategy.ALL:
-            rows_per_page = int(sampling.rows_per_page or 100)
-            rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, 0)
-        else:
-            with closing(self._connect(table_ref.database)) as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(query)
-                    rows = cursor.fetchall()
-                    column_names = [desc[0] for desc in cursor.description or []]
-
-        if not column_names:
-            return None
-        return rows, column_names
-
-    def _sample_table_rows(self, table_ref: TableRef) -> tuple[str, str] | None:
-        result = self._fetch_sample_rows(table_ref)
-        if result is None:
-            return None
-        rows, column_names = result
-        return self._format_sample_content(table_ref, column_names, rows)
-
-    async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
-        cached = self._content_cache.get(asset_id)
-        if cached:
-            return cached
-
-        table_ref = self._parse_table_ref_from_asset_id(asset_id)
-        if not table_ref:
-            return None
-
-        sampled = self._sample_table_rows(table_ref)
-
-        if sampled is None:
-            return None
-
-        self._content_cache[asset_id] = sampled
-        return sampled
-
-    async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
-        sampling = self._sampling()
-        table_ref = self._parse_table_ref_from_asset_id(asset_id)
-        if not table_ref:
-            return
-
-        if sampling.strategy != SamplingStrategy.ALL:
-            result = self._fetch_sample_rows(table_ref)
-            if result is None:
-                return
-            rows, column_names = result
-            for i, row in enumerate(rows):
-                formatted = self._format_sample_content(
-                    table_ref, column_names, [row], row_offset=i
-                )
-                if formatted:
-                    self._content_cache[asset_id] = formatted
-                    yield formatted
-            return
-
-        columns = self._available_columns(table_ref)
-        query, _ = self._build_sampling_query(table_ref, columns)
-        rows_per_page = int(sampling.rows_per_page or 100)
-        table_label = f"{table_ref.database}.{table_ref.schema}.{table_ref.table}"
-
-        total_rows = self._count_table_rows(table_ref)
-        total_batches = ((total_rows + rows_per_page - 1) // rows_per_page) if total_rows else None
-        if total_rows is not None and total_batches is not None:
-            logger.info(
-                "Full scan %s: %d rows, %d batches of %d",
-                table_label,
-                total_rows,
-                total_batches,
-                rows_per_page,
-            )
-
-        offset = 0
-        page_num = 1
-
-        while not self._aborted:
-            if total_batches is not None:
-                logger.info("%s batch %d/%d", table_label, page_num, total_batches)
-            rows, column_names = self._fetch_one_page(table_ref, query, rows_per_page, offset)
-            if not rows or not column_names:
-                break
-
-            for i, row in enumerate(rows):
-                formatted = self._format_sample_content(
-                    table_ref, column_names, [row], row_offset=offset + i
-                )
-                if formatted:
-                    self._content_cache[asset_id] = formatted
-                    yield formatted
-
-            offset += len(rows)
-            page_num += 1
-            if len(rows) < rows_per_page:
-                break
-
-    def enrich_finding_location(
-        self,
-        finding: DetectionResult,
-        asset: SingleAssetScanResults,
-        text_content: str,
-    ) -> None:
-        del text_content
-        table_ref = self._table_lookup.get(asset.hash)
-        if not table_ref:
-            return
-
-        path = f"{table_ref.database}.{table_ref.schema}.{table_ref.table}"
-        cached = self._content_cache.get(asset.hash)
-        raw_content = cached[0] if cached else None
-        metadata = finding.metadata or {}
-        finding.location = build_tabular_location(
-            raw_content=raw_content,
-            matched_content=finding.matched_content,
-            base_path=path,
-            primary_key_columns=(
-                self._get_primary_key_columns(table_ref) if table_ref.object_type == "TABLE" else []
-            ),
-            row_index=metadata.get("tabular_row_index"),
-            column_name=metadata.get("tabular_column_name"),
-        )
-
-    def abort(self) -> None:
-        logger.info("Aborting MSSQL extraction...")
-        super().abort()
