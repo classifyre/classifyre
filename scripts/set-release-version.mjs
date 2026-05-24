@@ -26,10 +26,14 @@ const pyprojectTomlPaths = [
 
 const version = process.argv[2]?.trim();
 
-if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
-  console.error("Usage: node scripts/set-release-version.mjs <major.minor.patch>");
+if (!version || !/^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/.test(version)) {
+  console.error("Usage: node scripts/set-release-version.mjs <major.minor.patch[-prerelease]>");
   process.exit(1);
 }
+
+const baseVersion = version.replace(/-.*$/, "");
+const prerelease = version.includes("-") ? version.replace(/^[^-]+-/, "") : null;
+const pythonVersion = prerelease === "SNAPSHOT" ? `${baseVersion}.dev0` : version;
 
 for (const relativePath of packageJsonPaths) {
   const packageJsonPath = path.join(repoRoot, relativePath);
@@ -52,8 +56,8 @@ await fs.writeFile(chartYamlPath, updatedChartYaml, "utf8");
 for (const relativePath of pyprojectTomlPaths) {
   const tomlPath = path.join(repoRoot, relativePath);
   const toml = await fs.readFile(tomlPath, "utf8");
-  const updated = toml.replace(/^version\s*=\s*".+?"$/m, `version = "${version}"`);
+  const updated = toml.replace(/^version\s*=\s*".+?"$/m, `version = "${pythonVersion}"`);
   await fs.writeFile(tomlPath, updated, "utf8");
 }
 
-console.log(`Updated release version to ${version}`);
+console.log(`Updated release version to ${version}${pythonVersion !== version ? ` (Python: ${pythonVersion})` : ""}`);

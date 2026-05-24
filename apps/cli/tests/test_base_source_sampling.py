@@ -29,32 +29,20 @@ def _recipe() -> dict[str, Any]:
         "sampling": {
             "strategy": "LATEST",
             "rows_per_page": 10,
-            "fetch_all_until_first_success": True,
         },
     }
 
 
-def test_sampling_forces_all_when_source_has_no_successful_runs(
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv("CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN", "0")
+def test_sampling_keeps_configured_strategy() -> None:
     source = _DummySource(_recipe())
+
+    assert source.recipe["sampling"]["strategy"] == "LATEST"
+    assert source.recipe["sampling"]["rows_per_page"] == 10
+
+
+def test_sampling_all_strategy_preserved() -> None:
+    recipe = _recipe()
+    recipe["sampling"]["strategy"] = "ALL"
+    source = _DummySource(recipe)
 
     assert source.recipe["sampling"]["strategy"] == "ALL"
-    assert "limit" not in source.recipe["sampling"]
-
-
-def test_sampling_keeps_configured_strategy_after_first_success(monkeypatch) -> None:
-    monkeypatch.setenv("CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN", "1")
-    source = _DummySource(_recipe())
-
-    assert source.recipe["sampling"]["strategy"] == "LATEST"
-    assert source.recipe["sampling"]["rows_per_page"] == 10
-
-
-def test_sampling_keeps_configured_strategy_without_run_context(monkeypatch) -> None:
-    monkeypatch.delenv("CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN", raising=False)
-    source = _DummySource(_recipe())
-
-    assert source.recipe["sampling"]["strategy"] == "LATEST"
-    assert source.recipe["sampling"]["rows_per_page"] == 10

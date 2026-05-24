@@ -719,6 +719,41 @@ export default function FindingDetailPage() {
         }}
         onSave={handleSave}
         isSaving={isUpdating}
+        strings={{
+          title: t("findings.drawer.title"),
+          description: t("findings.drawer.description"),
+          closeAriaLabel: t("findings.drawer.closeAriaLabel"),
+          statusSectionLabel: t("findings.drawer.statusSectionLabel"),
+          severitySectionLabel: t("findings.drawer.severitySectionLabel"),
+          commentSectionLabel: t("findings.drawer.commentSectionLabel"),
+          commentPlaceholder: t("findings.drawer.commentPlaceholder"),
+          confidenceSectionLabel: t("findings.drawer.confidenceSectionLabel"),
+          saveChanges: t("findings.drawer.saveChanges"),
+          saving: t("findings.drawer.saving"),
+          firstDetected: t("findings.drawer.firstDetected"),
+          lastDetected: t("findings.drawer.lastDetected"),
+          openFor: t("findings.drawer.openFor"),
+          resolvedAt: t("findings.drawer.resolvedAt"),
+          setBy: t("findings.drawer.setBy"),
+          manual: t("findings.drawer.manual"),
+          confidenceHigh: t("findings.drawer.confidenceHigh"),
+          confidenceMedium: t("findings.drawer.confidenceMedium"),
+          confidenceLow: t("findings.drawer.confidenceLow"),
+          confidenceVeryLow: t("findings.drawer.confidenceVeryLow"),
+          statusLabels: {
+            OPEN: t("findings.statusLabels.OPEN"),
+            FALSE_POSITIVE: t("findings.statusLabels.FALSE_POSITIVE"),
+            RESOLVED: t("findings.statusLabels.RESOLVED"),
+            IGNORED: t("findings.statusLabels.IGNORED"),
+          },
+          severityLabels: {
+            CRITICAL: t("findings.severityLabels.CRITICAL"),
+            HIGH: t("findings.severityLabels.HIGH"),
+            MEDIUM: t("findings.severityLabels.MEDIUM"),
+            LOW: t("findings.severityLabels.LOW"),
+            INFO: t("findings.severityLabels.INFO"),
+          },
+        }}
       />
     </div>
   );

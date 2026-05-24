@@ -21,7 +21,7 @@ export type SamplingStrategy = "RANDOM" | "LATEST" | "ALL";
 
 export type SamplingValue = {
   strategy: SamplingStrategy;
-  fetch_all_until_first_success?: boolean | undefined;
+  enable_ocr?: boolean | undefined;
   order_by_column?: string | undefined;
   fallback_to_random?: boolean | undefined;
   rows_per_page?: number | undefined;
@@ -79,8 +79,8 @@ export function SamplingCard({
     onChange({ ...value, strategy });
   };
 
-  const handleFetchAllUntilFirstSuccessChange = (checked: boolean) => {
-    onChange({ ...value, fetch_all_until_first_success: checked });
+  const handleEnableOcrChange = (checked: boolean) => {
+    onChange({ ...value, enable_ocr: checked });
   };
 
   const handleOrderByColumnChange = (raw: string) => {
@@ -167,28 +167,28 @@ export function SamplingCard({
           </div>
         </div>
 
-        {/* ── Limit ──────────────────────────────────────────────────────────── */}
+        {/* ── OCR ────────────────────────────────────────────────────────────── */}
         <Separator className="bg-border/10" />
         <div className="space-y-2">
           <div className="flex items-start gap-2 rounded-[4px] border border-border/25 bg-muted/20 px-3 py-2">
             <Checkbox
-              id="sampling-fetch-all-first-success"
-              checked={value.fetch_all_until_first_success === true}
+              id="sampling-enable-ocr"
+              checked={value.enable_ocr === true}
               onCheckedChange={(checked) =>
-                handleFetchAllUntilFirstSuccessChange(checked === true)
+                handleEnableOcrChange(checked === true)
               }
               disabled={disabled}
               className="mt-0.5"
             />
             <div className="space-y-0.5">
               <Label
-                htmlFor="sampling-fetch-all-first-success"
+                htmlFor="sampling-enable-ocr"
                 className="text-[10px] font-mono uppercase tracking-[0.14em] text-foreground"
               >
-                {t("sources.sampling.fetchAll")}
+                {t("sources.sampling.enableOcr")}
               </Label>
               <p className="text-[10px] text-muted-foreground font-mono">
-                {t("sources.sampling.fetchAllDesc")}
+                {t("sources.sampling.enableOcrDesc")}
               </p>
             </div>
           </div>
@@ -258,7 +258,7 @@ export function SamplingCard({
 
 export function defaultSamplingValue(sampling?: {
   strategy?: string;
-  fetch_all_until_first_success?: boolean;
+  enable_ocr?: boolean;
   order_by_column?: string;
   fallback_to_random?: boolean;
   rows_per_page?: number;
@@ -266,8 +266,7 @@ export function defaultSamplingValue(sampling?: {
 }): SamplingValue {
   return {
     strategy: (sampling?.strategy as SamplingStrategy) ?? "RANDOM",
-    fetch_all_until_first_success:
-      sampling?.fetch_all_until_first_success ?? false,
+    enable_ocr: sampling?.enable_ocr ?? false,
     order_by_column: sampling?.order_by_column,
     fallback_to_random: sampling?.fallback_to_random,
     rows_per_page: sampling?.rows_per_page,

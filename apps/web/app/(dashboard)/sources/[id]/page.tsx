@@ -42,6 +42,8 @@ import { AssetsTable } from "@/components/assets-table";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { DeleteSourceAction } from "@/components/delete-source-action";
 import { FindingsTable } from "@/components/findings-table";
+import type { FindingSelection } from "@/components/findings-table";
+import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
 import { getSourceSchema } from "@/lib/schema-loader";
 import { getSourceIcon } from "@/lib/source-type-icon";
 import {
@@ -72,12 +74,12 @@ const detectorDotClass: Partial<Record<DetectorType, string>> = {
   CUSTOM: "bg-indigo-600",
 };
 
-const detectorLabels: Partial<Record<DetectorType, string>> = {
-  SECRETS: "Secrets",
-  PII: "PII",
-  YARA: "YARA",
-  BROKEN_LINKS: "Broken Links",
-  CUSTOM: "Custom Detector",
+const detectorLabelKeys: Partial<Record<DetectorType, string>> = {
+  SECRETS: "findings.categories.secrets",
+  PII: "findings.categories.pii",
+  YARA: "findings.categories.yara",
+  BROKEN_LINKS: "findings.categories.brokenLinks",
+  CUSTOM: "findings.categories.custom",
 };
 
 const getApiBase = () =>
@@ -104,6 +106,16 @@ export default function SourceViewPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isStartingScan, setIsStartingScan] = useState(false);
+
+  // Findings tab bulk update
+  const [findingsSelection, setFindingsSelection] = useState<FindingSelection | null>(null);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [findingsTableKey, setFindingsTableKey] = useState(0);
+
+  const handleFindingsBulkSuccess = useCallback(() => {
+    setFindingsSelection(null);
+    setFindingsTableKey((k) => k + 1);
+  }, []);
 
   const fetchSourceData = useCallback(
     async (showLoading = true) => {
@@ -260,10 +272,11 @@ export default function SourceViewPage() {
           (d as { type?: unknown }).type !== "CUSTOM",
       )
       .map((d) => {
+        const labelKey = detectorLabelKeys[d.type];
         return {
           id: d.type,
           type: d.type,
-          label: detectorLabels[d.type] ?? d.type,
+          label: labelKey ? t(labelKey as Parameters<typeof t>[0]) : d.type,
         };
       });
 
@@ -272,12 +285,12 @@ export default function SourceViewPage() {
       return {
         id: `CUSTOM:${id}`,
         type: "CUSTOM" as DetectorType,
-        label: mapped?.name ?? "Custom Detector",
+        label: mapped?.name ?? t("findings.categories.custom"),
       };
     });
 
     return [...builtIn, ...custom];
-  }, [customDetectorsById, source?.config]);
+  }, [customDetectorsById, source?.config, t]);
 
   const formatFieldValue = (value: unknown): string => {
     if (value === null || value === undefined) return "—";
@@ -327,10 +340,16 @@ export default function SourceViewPage() {
   const { totals } = assetCharts;
   const assetPanels = [
     { key: "total", label: t("sources.totalAssets"), value: totals.totalAssets },
-    { key: "new", label: "New", value: totals.newAssets },
-    { key: "updated", label: "Updated", value: totals.updatedAssets },
-    { key: "unchanged", label: "Unchanged", value: totals.unchangedAssets },
+    { key: "new", label: t("sources.assetNew"), value: totals.newAssets },
+    { key: "updated", label: t("sources.assetUpdated"), value: totals.updatedAssets },
+    { key: "unchanged", label: t("sources.assetUnchanged"), value: totals.unchangedAssets },
   ];
+
+  useEffect(() => {
+    if (source?.name) {
+      document.title = `${source.name} | ${t("app.name")}`;
+    }
+  }, [source?.name, t]);
 
   if (isLoading) {
     return (
@@ -339,7 +358,7 @@ export default function SourceViewPage() {
           <DetailBackButton fallbackHref="/sources" />
           <div>
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
-              Loading source...
+              {t("sources.loadingSource")}
             </h1>
           </div>
         </div>
@@ -354,16 +373,22 @@ export default function SourceViewPage() {
           <DetailBackButton fallbackHref="/sources" />
           <div>
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
-              Source not available
+              {t("sources.notAvailable")}
             </h1>
             <p className="text-muted-foreground">
-              {error || "We couldn't load this source."}
+              {error || t("sources.couldntLoad")}
             </p>
           </div>
         </div>
       </div>
     );
   }
+
+  const latestRunHref = source.currentRunnerId
+    ? `/scans/${source.currentRunnerId}`
+    : lastRunner?.id
+      ? `/scans/${lastRunner.id}`
+      : null;
 
   return (
     <div className="space-y-6">
@@ -404,7 +429,7 @@ export default function SourceViewPage() {
               onClick={() => router.push(`/sources/${sourceId}/edit`)}
             >
               <Pencil className="h-4 w-4" />
-              Edit Source
+              {t("sources.editSource")}
             </Button>
             <DeleteSourceAction sourceId={sourceId} />
             <Button
@@ -414,10 +439,10 @@ export default function SourceViewPage() {
             >
               <Play className="h-4 w-4" />
               {isStartingScan
-                ? "Starting..."
+                ? t("common.starting")
                 : isSourceRunning
-                  ? "Running..."
-                  : "Run Scan"}
+                  ? t("common.runningLabel")
+                  : t("sources.runScan")}
             </Button>
           </div>
           {actionError && (
@@ -429,13 +454,13 @@ export default function SourceViewPage() {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">
           <TabsTrigger value="overview" className="rounded-[3px]">
-            Overview
+            {t("sources.detail.tabOverview")}
           </TabsTrigger>
           <TabsTrigger value="findings" className="rounded-[3px]">
-            Findings
+            {t("sources.detail.tabFindings")}
           </TabsTrigger>
           <TabsTrigger value="assets" className="rounded-[3px]">
-            Assets
+            {t("sources.detail.tabAssets")}
           </TabsTrigger>
         </TabsList>
 
@@ -477,18 +502,39 @@ export default function SourceViewPage() {
                     <p className="text-xs uppercase text-muted-foreground">
                       {t("common.status")}
                     </p>
-                    <Badge
-                      className={`rounded-[4px] border ${getRunnerStatusBadgeTone(source.runnerStatus)}`}
-                    >
-                      {isRunnerStatusRunning(source.runnerStatus) && (
-                        <Spinner
-                          size="sm"
-                          className="gap-0 [&_svg]:size-3"
-                          data-icon="inline-start"
-                        />
-                      )}
-                      {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
-                    </Badge>
+                    {latestRunHref ? (
+                      <button
+                        type="button"
+                        onClick={() => router.push(latestRunHref)}
+                        className="inline-flex cursor-pointer"
+                      >
+                        <Badge
+                          className={`rounded-[4px] border ${getRunnerStatusBadgeTone(source.runnerStatus)} hover:opacity-80 transition-opacity`}
+                        >
+                          {isRunnerStatusRunning(source.runnerStatus) && (
+                            <Spinner
+                              size="sm"
+                              className="gap-0 [&_svg]:size-3"
+                              data-icon="inline-start"
+                            />
+                          )}
+                          {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
+                        </Badge>
+                      </button>
+                    ) : (
+                      <Badge
+                        className={`rounded-[4px] border ${getRunnerStatusBadgeTone(source.runnerStatus)}`}
+                      >
+                        {isRunnerStatusRunning(source.runnerStatus) && (
+                          <Spinner
+                            size="sm"
+                            className="gap-0 [&_svg]:size-3"
+                            data-icon="inline-start"
+                          />
+                        )}
+                        {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
+                      </Badge>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs uppercase text-muted-foreground">{t("common.type")}</p>
@@ -556,28 +602,34 @@ export default function SourceViewPage() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs uppercase text-muted-foreground">
-                      Last Scan Status
+                      {t("sources.detail.lastScanStatus")}
                     </p>
                     {lastRunner ? (
-                      <Badge
-                        className={`rounded-[4px] border ${getRunnerStatusBadgeTone(lastRunner.status)}`}
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/scans/${lastRunner.id}`)}
+                        className="inline-flex cursor-pointer"
                       >
-                        {isRunnerStatusRunning(lastRunner.status) && (
-                          <Spinner
-                            size="sm"
-                            className="gap-0 [&_svg]:size-3"
-                            data-icon="inline-start"
-                          />
-                        )}
-                        {t(getRunnerStatusBadgeLabel(lastRunner.status))}
-                      </Badge>
+                        <Badge
+                          className={`rounded-[4px] border ${getRunnerStatusBadgeTone(lastRunner.status)} hover:opacity-80 transition-opacity`}
+                        >
+                          {isRunnerStatusRunning(lastRunner.status) && (
+                            <Spinner
+                              size="sm"
+                              className="gap-0 [&_svg]:size-3"
+                              data-icon="inline-start"
+                            />
+                          )}
+                          {t(getRunnerStatusBadgeLabel(lastRunner.status))}
+                        </Badge>
+                      </button>
                     ) : (
                       <p className="text-sm">—</p>
                     )}
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs uppercase text-muted-foreground">
-                      Current Run
+                      {t("sources.detail.currentRun")}
                     </p>
                     {source.currentRunnerId ? (
                       <Button
@@ -588,26 +640,27 @@ export default function SourceViewPage() {
                           router.push(`/scans/${source.currentRunnerId}`)
                         }
                       >
-                        View Run
+                        {t("sources.detail.viewRun")}
                         <ArrowUpRight className="h-3 w-3" />
                       </Button>
                     ) : (
-                      <p className="text-sm">None</p>
+                      <p className="text-sm">{t("common.none")}</p>
                     )}
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs uppercase text-muted-foreground">
-                      Last Run Summary
+                      {t("sources.detail.lastRunSummary")}
                     </p>
                     {lastRunner ? (
                       <p className="text-sm">
-                        {lastRunner.totalFindings.toLocaleString()} findings ·{" "}
-                        {(
-                          lastRunner.assetsCreated +
-                          lastRunner.assetsUpdated +
-                          lastRunner.assetsUnchanged
-                        ).toLocaleString()}{" "}
-                        assets scanned
+                        {t("sources.detail.runSummaryLine", {
+                          findings: lastRunner.totalFindings.toLocaleString(),
+                          assets: (
+                            lastRunner.assetsCreated +
+                            lastRunner.assetsUpdated +
+                            lastRunner.assetsUnchanged
+                          ).toLocaleString(),
+                        })}
                       </p>
                     ) : (
                       <p className="text-sm">—</p>
@@ -632,7 +685,7 @@ export default function SourceViewPage() {
                     ) : (
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         <CalendarOff className="h-4 w-4 shrink-0" />
-                        <span>Manual only</span>
+                        <span>{t("sources.detail.manualOnly")}</span>
                       </div>
                     )}
                   </div>
@@ -670,14 +723,14 @@ export default function SourceViewPage() {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      No required details available.
+                      {t("sources.detail.noRequiredDetails")}
                     </p>
                   )}
 
                   {enabledDetectors.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-xs uppercase text-muted-foreground">
-                        Active Detectors
+                        {t("sources.detail.activeDetectors")}
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {enabledDetectors.map((detector) => (
@@ -736,13 +789,14 @@ export default function SourceViewPage() {
                               </span>
                             </div>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              {runner.totalFindings.toLocaleString()} findings ·{" "}
-                              {(
-                                runner.assetsCreated +
-                                runner.assetsUpdated +
-                                runner.assetsUnchanged
-                              ).toLocaleString()}{" "}
-                              assets
+                              {t("sources.detail.runSummaryLine", {
+                                findings: runner.totalFindings.toLocaleString(),
+                                assets: (
+                                  runner.assetsCreated +
+                                  runner.assetsUpdated +
+                                  runner.assetsUnchanged
+                                ).toLocaleString(),
+                              })}
                             </p>
                           </div>
                           <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -759,10 +813,13 @@ export default function SourceViewPage() {
         <TabsContent value="findings" className="space-y-4">
           <Suspense>
             <FindingsTable
+              key={findingsTableKey}
               lockedFilters={{
                 sourceId: [sourceId],
                 includeResolved: true,
               }}
+              onSelectionChange={setFindingsSelection}
+              onBulkUpdate={() => setBulkDialogOpen(true)}
             />
           </Suspense>
         </TabsContent>
@@ -773,6 +830,13 @@ export default function SourceViewPage() {
           </Suspense>
         </TabsContent>
       </Tabs>
+
+      <BulkUpdateDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        selection={findingsSelection}
+        onSuccess={handleFindingsBulkSuccess}
+      />
     </div>
   );
 }

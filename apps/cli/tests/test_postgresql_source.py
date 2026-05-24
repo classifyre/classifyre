@@ -72,6 +72,9 @@ class _DummyConnection:
     def cursor(self) -> _DummyCursor:
         return _DummyCursor()
 
+    def close(self) -> None:
+        return None
+
     def __enter__(self) -> _DummyConnection:
         return self
 
@@ -444,6 +447,7 @@ async def test_postgresql_extract_runs_detector_pipeline_when_enabled(
     assert processed_batches == [1]
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_postgresql_fetch_content_pages_batches_for_all_strategy(
     monkeypatch: pytest.MonkeyPatch,
@@ -483,6 +487,9 @@ async def test_postgresql_fetch_content_pages_batches_for_all_strategy(
         def fetchall(self) -> list[tuple[Any, ...]]:
             return list(self._rows)
 
+        def fetchmany(self, size: int) -> list[tuple[Any, ...]]:
+            return list(self._rows[:size])
+
         def __enter__(self) -> _BatchCursor:
             return self
 
@@ -492,6 +499,9 @@ async def test_postgresql_fetch_content_pages_batches_for_all_strategy(
     class _BatchConnection:
         def cursor(self) -> _BatchCursor:
             return _BatchCursor()
+
+        def close(self) -> None:
+            return None
 
         def __enter__(self) -> _BatchConnection:
             return self

@@ -1,5 +1,6 @@
 """YARA-based threat detector — compiles structured rule objects into a live ruleset."""
 
+import asyncio
 import logging
 import re
 
@@ -88,6 +89,13 @@ class YaraDetector(BaseDetector):
             return None
 
     async def detect(
+        self, content: str | bytes, content_type: str = "text/plain"
+    ) -> list[DetectionResult]:
+        if self._rules is None:
+            return []
+        return await asyncio.to_thread(self._detect_sync, content, content_type)
+
+    def _detect_sync(
         self, content: str | bytes, content_type: str = "text/plain"
     ) -> list[DetectionResult]:
         if self._rules is None:

@@ -1,4 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
+import { de } from "date-fns/locale";
 
 export type DateLanguage = "ENGLISH" | "GERMAN";
 export type DateTimeFormatPreference = "TWELVE_HOUR" | "TWENTY_FOUR_HOUR";
@@ -32,6 +33,8 @@ export function getUserTimezone(): string {
 
 function getLocaleForLanguage(language: DateLanguage): string {
   switch (language) {
+    case "GERMAN":
+      return "de-DE";
     case "ENGLISH":
     default:
       return "en-US";
@@ -158,12 +161,15 @@ export function formatShortUTC(value?: Date | string | null): string {
 }
 
 /**
- * Relative time string (e.g. "2 hours ago").
+ * Relative time string (e.g. "2 hours ago" / "vor 2 Stunden").
  */
 export function formatRelative(value?: Date | string | null): string {
   const d = toDate(value);
   if (!d) return "—";
-  return formatDistanceToNow(d, { addSuffix: true });
+  return formatDistanceToNow(d, {
+    addSuffix: true,
+    locale: datePreferences.language === "GERMAN" ? de : undefined,
+  });
 }
 
 // ─── Cron description ──────────────────────────────────────────────────────────

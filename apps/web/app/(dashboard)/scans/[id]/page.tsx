@@ -1,11 +1,10 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   formatDate,
   formatRelative,
-  formatDateUTC,
   formatShortUTC,
 } from "@/lib/date";
 import {
@@ -28,10 +27,10 @@ import {
 } from "@workspace/api-client";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
-import { AssetsTable } from "@/components/assets-table";
+import { RunnerAssetsTable } from "@/components/runner-assets-table";
 import { DetailBackButton } from "@/components/detail-back-button";
-import { FindingsTable } from "@/components/findings-table";
 import { RunnerLogViewer } from "@/components/runner-log-viewer";
+import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import {
   getRunnerStatusBadgeLabel,
   getRunnerStatusBadgeTone,
@@ -121,7 +120,7 @@ export default function RunnerDetailPage() {
   const [logsHasMore, setLogsHasMore] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsLoadingMore, setLogsLoadingMore] = useState(false);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [logsAutoRefresh, setLogsAutoRefresh] = useState(true);
 
   const fetchOverview = useCallback(async (currentRunner: RunnerDto) => {
     try {
@@ -254,19 +253,36 @@ export default function RunnerDetailPage() {
     await fetchOverview(nextRunner);
   }, [fetchOverview, fetchRunner]);
 
+  const hasActiveRun =
+    runner?.status === "RUNNING" || runner?.status === "PENDING";
+
+  // Use the stable fetchOverview ref so the WS callback doesn't close over stale state
+  const fetchOverviewRef = useRef(fetchOverview);
+  fetchOverviewRef.current = fetchOverview;
+
+  const { subscribeToRunner, unsubscribeFromRunner, isConnected } =
+    useRunnerWebSocket({
+      enabled: true,
+      trackRunnersList: false,
+      onRunnerUpdate: (updatedRunner) => {
+        if (updatedRunner.id !== runnerId) return;
+        setRunner(updatedRunner);
+        void fetchOverviewRef.current(updatedRunner);
+      },
+    });
+
+  // Subscribe to the specific runner room once connected
   useEffect(() => {
-    if (!autoRefreshEnabled || !runnerId) {
-      return;
-    }
-    if (
-      !runner ||
-      (runner.status !== "RUNNING" && runner.status !== "PENDING")
-    ) {
-      return;
-    }
+    if (!isConnected || !runnerId) return;
+    subscribeToRunner(runnerId);
+    return () => unsubscribeFromRunner(runnerId);
+  }, [isConnected, runnerId, subscribeToRunner, unsubscribeFromRunner]);
+
+  // Keep log tailing while the run is active and auto-refresh is on
+  useEffect(() => {
+    if (!logsAutoRefresh || !runnerId || !hasActiveRun) return;
 
     const interval = setInterval(() => {
-      void refreshRunnerState();
       if (!logsLoading && !logsLoadingMore) {
         void fetchLogsPage({ cursor: logsCursor }, true);
       }
@@ -274,13 +290,12 @@ export default function RunnerDetailPage() {
 
     return () => clearInterval(interval);
   }, [
-    autoRefreshEnabled,
+    logsAutoRefresh,
+    hasActiveRun,
     fetchLogsPage,
     logsCursor,
     logsLoading,
     logsLoadingMore,
-    refreshRunnerState,
-    runner,
     runnerId,
   ]);
 
@@ -326,13 +341,6 @@ export default function RunnerDetailPage() {
     }
   };
 
-  const handleFetchLogs = useCallback(
-    async (params: { cursor?: string; take?: number; search?: string; levels?: string[]; sortOrder?: "asc" | "desc" }, append = false) => {
-      await fetchLogsPage(params, append);
-    },
-    [fetchLogsPage],
-  );
-
   const handleDownloadAllLogs = useCallback(async (): Promise<
     RunnerLogEntryDto[]
   > => {
@@ -371,6 +379,17 @@ export default function RunnerDetailPage() {
     return aggregated;
   }, [runnerId]);
 
+  const sourceName = runner?.source?.name || "Unknown source";
+  const sourceType = runner?.source?.type || "CUSTOM";
+  const SourceTypeIcon = getSourceIcon(sourceType);
+  const sourceDetailsId = runner?.sourceId || runner?.source?.id;
+
+  useEffect(() => {
+    if (sourceName && runner) {
+      document.title = `${t("scans.sourceRun", { source: sourceName })} | ${t("app.name")}`;
+    }
+  }, [sourceName, runner, t]);
+
   if (loading && !runner) {
     return (
       <div className="space-y-6">
@@ -408,14 +427,6 @@ export default function RunnerDetailPage() {
     return null;
   }
 
-  const sourceName = runner.source?.name || "Unknown source";
-  const sourceType = runner.source?.type || "CUSTOM";
-  const SourceTypeIcon = getSourceIcon(sourceType);
-  const sourceDetailsId = runner.sourceId || runner.source?.id;
-  const hasActiveRun =
-    runner.status === "RUNNING" || runner.status === "PENDING";
-
-  const findingsTotal = findingsCharts.totals.total;
   const assetsTotal = assetsCharts.totals.totalAssets;
   const progress = calculateProgress(runner);
 
@@ -430,7 +441,7 @@ export default function RunnerDetailPage() {
                 <SourceTypeIcon className="h-5 w-5 text-muted-foreground" />
               </div>
               <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em] truncate">
-                {sourceName} Run
+                {t("scans.sourceRun", { source: sourceName })}
               </h1>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -448,9 +459,9 @@ export default function RunnerDetailPage() {
                 {getRunnerStatusBadgeLabel(runner.status)}
               </Badge>
               <Badge variant="outline" className="rounded-[4px]">
-                {runner.triggerType}
+                {t(`triggerTypes.${runner.triggerType}`)}
               </Badge>
-              <span>Triggered {formatRelative(runner.triggeredAt)}</span>
+              <span>{t("scans.runTimeline.triggered")} {formatRelative(runner.triggeredAt)}</span>
             </div>
           </div>
         </div>
@@ -518,14 +529,6 @@ export default function RunnerDetailPage() {
           <TabsTrigger value="overview" className="rounded-[3px]" data-testid="tab-overview">
             Overview
           </TabsTrigger>
-          <TabsTrigger value="findings" className="rounded-[3px]" data-testid="tab-findings">
-            Findings
-            {findingsTotal > 0 && (
-              <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold">
-                {findingsTotal}
-              </span>
-            )}
-          </TabsTrigger>
           <TabsTrigger value="assets" className="rounded-[3px]" data-testid="tab-assets">
             Assets
             {assetsTotal > 0 && (
@@ -570,15 +573,15 @@ export default function RunnerDetailPage() {
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {[
-              { label: "Findings", value: findingsCharts.totals.total },
+              { label: t("scans.stats.findings"), value: findingsCharts.totals.total },
               {
-                label: "Critical + High",
+                label: t("scans.stats.criticalHigh"),
                 value:
                   findingsCharts.totals.critical + findingsCharts.totals.high,
               },
-              { label: "Assets", value: assetsCharts.totals.totalAssets },
-              { label: "Open", value: findingsCharts.totals.open },
-              { label: "Resolved", value: findingsCharts.totals.resolved },
+              { label: t("scans.stats.assets"), value: assetsCharts.totals.totalAssets },
+              { label: t("scans.stats.open"), value: findingsCharts.totals.open },
+              { label: t("scans.stats.resolved"), value: findingsCharts.totals.resolved },
             ].map((item) => (
               <Card
                 key={item.label}
@@ -604,20 +607,20 @@ export default function RunnerDetailPage() {
           {runner.status === "RUNNING" && (
             <Card className="border-2 border-black rounded-[6px]">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Run Progress</CardTitle>
+                <CardTitle className="text-base">{t("scans.runProgress.title")}</CardTitle>
                 <CardDescription>
-                  Estimated from processed assets
+                  {t("scans.runProgress.description")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Progress</span>
+                  <span className="text-muted-foreground">{t("scans.runProgress.progress")}</span>
                   <span className="font-medium">{progress}%</span>
                 </div>
                 <Progress value={progress} />
                 {runner.durationMs != null && (
                   <p className="text-xs text-muted-foreground">
-                    Duration so far: {formatDuration(runner.durationMs)}
+                    {t("scans.runProgress.durationSoFar", { duration: formatDuration(runner.durationMs) })}
                   </p>
                 )}
               </CardContent>
@@ -627,40 +630,40 @@ export default function RunnerDetailPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card className="border-2 border-border rounded-[6px]">
               <CardHeader>
-                <CardTitle>Run Timeline</CardTitle>
-                <CardDescription>Execution timestamps</CardDescription>
+                <CardTitle>{t("scans.runTimeline.title")}</CardTitle>
+                <CardDescription>{t("scans.runTimeline.description")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Triggered</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.triggered")}</span>
                   <span className="text-right">
                     {formatDate(runner.triggeredAt)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Started</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.started")}</span>
                   <span className="text-right">
                     {formatDate(runner.startedAt)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Completed</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.completed")}</span>
                   <span className="text-right">
                     {formatDate(runner.completedAt)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Duration</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.duration")}</span>
                   <span className="text-right">
                     {formatDuration(runner.durationMs)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">Triggered By</span>
+                  <span className="text-muted-foreground">{t("scans.runTimeline.triggeredBy")}</span>
                   <span className="text-right">
                     {runner.triggeredBy === "pg-boss"
-                      ? "Scheduler"
-                      : runner.triggeredBy || "System"}
+                      ? t("runners.scheduler")
+                      : runner.triggeredBy || t("scans.runTimeline.na")}
                   </span>
                 </div>
               </CardContent>
@@ -668,24 +671,24 @@ export default function RunnerDetailPage() {
 
             <Card className="border-2 border-border rounded-[6px]">
               <CardHeader>
-                <CardTitle>Asset Delta</CardTitle>
-                <CardDescription>Changes produced by this run</CardDescription>
+                <CardTitle>{t("scans.assetDelta.title")}</CardTitle>
+                <CardDescription>{t("scans.assetDelta.description")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Created</span>
+                  <span className="text-muted-foreground">{t("scans.assetDelta.created")}</span>
                   <span className="font-semibold">
                     +{assetsCharts.totals.newAssets.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Updated</span>
+                  <span className="text-muted-foreground">{t("scans.assetDelta.updated")}</span>
                   <span className="font-semibold">
                     ~{assetsCharts.totals.updatedAssets.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Unchanged</span>
+                  <span className="text-muted-foreground">{t("scans.assetDelta.unchanged")}</span>
                   <span className="font-semibold">
                     {assetsCharts.totals.unchangedAssets.toLocaleString()}
                   </span>
@@ -702,7 +705,7 @@ export default function RunnerDetailPage() {
 
           <Card className="border-2 border-border rounded-[6px]">
             <CardHeader>
-              <CardTitle>Source Context</CardTitle>
+              <CardTitle>{t("scans.sourceContext.title")}</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -724,7 +727,7 @@ export default function RunnerDetailPage() {
                   }
                 >
                   <ArrowUpRight className="h-4 w-4" />
-                  Open Source
+                  {t("scans.sourceContext.openSource")}
                 </Button>
               )}
             </CardContent>
@@ -738,23 +741,8 @@ export default function RunnerDetailPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="findings" className="space-y-4">
-          <Suspense>
-            <FindingsTable
-              lockedFilters={{
-                runnerId: [runner.id],
-                includeResolved: true,
-              }}
-            />
-          </Suspense>
-        </TabsContent>
-
         <TabsContent value="assets" className="space-y-4">
-          <Suspense>
-            <AssetsTable
-              scope={{ sourceId: runner.sourceId, runnerId: runner.id }}
-            />
-          </Suspense>
+          <RunnerAssetsTable runnerId={runner.id} runnerStatus={runner.status} />
         </TabsContent>
 
         <TabsContent value="logs" className="space-y-4">
@@ -764,13 +752,12 @@ export default function RunnerDetailPage() {
             hasMore={logsHasMore}
             loading={logsLoading}
             loadingMore={logsLoadingMore}
-            isRunning={
-              runner.status === "RUNNING" || runner.status === "PENDING"
+            isRunning={hasActiveRun}
+            autoRefreshEnabled={logsAutoRefresh}
+            onAutoRefreshChange={setLogsAutoRefresh}
+            onFetch={(params, append) =>
+              fetchLogsPage(params, append)
             }
-            autoRefreshEnabled={autoRefreshEnabled}
-            onAutoRefreshChange={setAutoRefreshEnabled}
-            onFetch={handleFetchLogs}
-            nextCursor={logsHasMore ? logsCursor : null}
             onDownloadAll={handleDownloadAllLogs}
           />
         </TabsContent>

@@ -7,7 +7,6 @@ from collections.abc import AsyncGenerator
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
 from ..sources.base import BaseSource
-from ..utils.file_parser import iter_file_pages
 
 
 class ParsedContentProvider:
@@ -38,7 +37,10 @@ class ParsedContentProvider:
             return
 
         raw_bytes, mime = result
-        pages: list[str] = await asyncio.to_thread(list, iter_file_pages(raw_bytes, mime))
+        pages: list[str] = await asyncio.to_thread(
+            list,
+            self._source.iter_asset_pages(raw_bytes, mime),
+        )
         for page in pages:
             yield page
 

@@ -30,11 +30,17 @@ import {
   DeleteRunnerResponseDto,
   SearchRunnerLogsBodyDto,
   RunnerLogsResponseDto,
+  RegisterDiscoveredAssetsDto,
+  RegisterDiscoveredAssetsResponseDto,
+  UpdateRunnerAssetStatusDto,
+  RunnerAssetProgressDto,
 } from './dto';
 import { SearchRunnersRequestDto } from '../dto/search-runners-request.dto';
 import { SearchRunnersResponseDto } from '../dto/search-runners-response.dto';
 import { SearchRunnersChartsRequestDto } from '../dto/search-runners-charts-request.dto';
 import { SearchRunnersChartsResponseDto } from '../dto/search-runners-charts-response.dto';
+import { SearchRunnersAssetsRequestDto } from '../dto/search-runners-assets-request.dto';
+import { SearchRunnersAssetsResponseDto } from '../dto/search-runners-assets-response.dto';
 
 @ApiTags('Runners')
 @Controller()
@@ -117,6 +123,40 @@ export class CliRunnerController {
       body.status,
       body.errorMessage,
     );
+  }
+
+  @Post('runners/:runnerId/assets/discover')
+  @ApiOperation({ summary: 'Register discovered asset hashes for a runner' })
+  @ApiBody({ type: RegisterDiscoveredAssetsDto })
+  @ApiResponse({ status: 201, type: RegisterDiscoveredAssetsResponseDto })
+  async registerDiscoveredAssets(
+    @Param('runnerId') runnerId: string,
+    @Body() dto: RegisterDiscoveredAssetsDto,
+  ) {
+    return this.cliRunnerService.registerDiscoveredAssets(
+      runnerId,
+      dto.assetHashes,
+    );
+  }
+
+  @Patch('runners/:runnerId/assets/status')
+  @ApiOperation({ summary: 'Update processing status of runner assets' })
+  @ApiBody({ type: UpdateRunnerAssetStatusDto })
+  @ApiResponse({ status: 200 })
+  async updateRunnerAssetStatuses(
+    @Param('runnerId') runnerId: string,
+    @Body() dto: UpdateRunnerAssetStatusDto,
+  ) {
+    await this.cliRunnerService.updateRunnerAssetStatuses(runnerId, dto.assets);
+    return { updated: dto.assets.length };
+  }
+
+  @AllowInDemoMode()
+  @Get('runners/:runnerId/assets/progress')
+  @ApiOperation({ summary: 'Get runner asset processing progress' })
+  @ApiResponse({ status: 200, type: RunnerAssetProgressDto })
+  async getRunnerAssetProgress(@Param('runnerId') runnerId: string) {
+    return this.cliRunnerService.getRunnerAssetProgress(runnerId);
   }
 
   @Get('runners/:runnerId')
@@ -218,5 +258,24 @@ export class SearchRunnersController {
     @Body() request: SearchRunnersChartsRequestDto,
   ): Promise<SearchRunnersChartsResponseDto> {
     return this.cliRunnerService.searchRunnersCharts(request);
+  }
+
+  @Post('runner-assets')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Search runner assets',
+    description:
+      'Returns paginated runner_assets rows for a specific runner, joined with the resolved asset record and its findings.',
+  })
+  @ApiBody({ type: SearchRunnersAssetsRequestDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated runner assets with joined asset and findings data',
+    type: SearchRunnersAssetsResponseDto,
+  })
+  async searchRunnerAssets(
+    @Body() request: SearchRunnersAssetsRequestDto,
+  ): Promise<SearchRunnersAssetsResponseDto> {
+    return this.cliRunnerService.searchRunnerAssets(request);
   }
 }

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import logging
 import random
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
@@ -19,7 +20,7 @@ from ...models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
 )
-from ...utils.file_parser import infer_mime_type_from_file_name, iter_file_pages, resolve_mime_type
+from ...utils.file_parser import infer_mime_type_from_file_name, resolve_mime_type
 from ...utils.hashing import hash_id, unhash_id
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -102,7 +103,6 @@ class ContentSnapshot:
     text_content: str
     parse_error: str | None
     downloaded_bytes: int
-    truncated: bool
     # Raw bytes retained for batchable tabular files so fetch_content_pages() can
     # iterate rows in configurable-sized pages instead of one monolithic text blob.
     raw_bytes: bytes | None = None
@@ -193,14 +193,6 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         value = self._connection_option("verify_ssl", True)
         return bool(value) if isinstance(value, bool) else True
 
-    def _max_object_bytes(self) -> int:
-        value = self._connection_option("max_object_bytes", 5_242_880)
-        try:
-            parsed = int(value)
-        except (TypeError, ValueError):
-            return 5_242_880
-        return min(max(parsed, 1_024), 52_428_800)
-
     def _include_empty_objects(self) -> bool:
         return bool(self._scope_option("include_empty_objects", False))
 
@@ -261,22 +253,24 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
         return datetime.now(UTC)
 
-    def _apply_sampling(self, refs: list[ObjectRef]) -> list[ObjectRef]:
+    def _apply_sampling(self, refs: Iterator[ObjectRef]) -> list[ObjectRef]:
         strategy = self.config.sampling.strategy
-        if strategy == SamplingStrategy.ALL:
-            return refs
-
         limit = int(self.config.sampling.rows_per_page or 100)
 
-        if strategy == SamplingStrategy.RANDOM:
-            if limit >= len(refs):
-                return refs
-            generator = random.Random(0)
-            indexes = sorted(generator.sample(range(len(refs)), k=limit))
-            return [refs[index] for index in indexes]
+        if strategy == SamplingStrategy.ALL:
+            return list(refs)
 
-        refs_sorted = sorted(refs, key=lambda ref: ref.last_modified, reverse=True)
-        return refs_sorted[:limit]
+        materialized = list(refs)
+
+        if strategy == SamplingStrategy.RANDOM:
+            if limit >= len(materialized):
+                return materialized
+            generator = random.Random(0)
+            indexes = sorted(generator.sample(range(len(materialized)), k=limit))
+            return [materialized[index] for index in indexes]
+
+        materialized.sort(key=lambda ref: ref.last_modified, reverse=True)
+        return materialized[:limit]
 
     def _file_extension(self, key: str) -> str:
         return PurePosixPath(key).suffix.lower()
@@ -330,7 +324,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 )
 
     def _build_snapshot(self, ref: ObjectRef) -> ContentSnapshot:
-        if not self._include_content_preview():
+        if self._discovery_only or not self._include_content_preview():
             mime = (ref.content_type_hint or "").split(";", maxsplit=1)[0].strip().lower()
             if not mime:
                 mime = infer_mime_type_from_file_name(ref.key)
@@ -340,11 +334,10 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 text_content="",
                 parse_error=None,
                 downloaded_bytes=0,
-                truncated=False,
             )
 
         try:
-            file_bytes, content_type_hint, truncated = self._download_object(ref)
+            file_bytes, content_type_hint = self._download_object(ref)
         except Exception as exc:
             logger.warning("Failed to download object %s: %s", ref.key, exc)
             return ContentSnapshot(
@@ -353,7 +346,6 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 text_content="",
                 parse_error=str(exc),
                 downloaded_bytes=0,
-                truncated=False,
             )
 
         self._ensure_file_processing_dependencies()
@@ -380,7 +372,6 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             text_content="",
             parse_error=None,
             downloaded_bytes=len(file_bytes),
-            truncated=truncated,
             raw_bytes=None if is_non_extractable else file_bytes,
         )
 
@@ -414,7 +405,6 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                     "last_modified": ref.last_modified.isoformat(),
                     "mime_type": snapshot.mime_type,
                     "downloaded_bytes": snapshot.downloaded_bytes,
-                    "truncated_download": snapshot.truncated,
                     "parse_error": snapshot.parse_error,
                 }
             )
@@ -441,11 +431,11 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             "source_type": self.recipe.get("type"),
         }
         try:
-            object_refs = self._list_objects()
+            count = sum(1 for _ in itertools.islice(self._list_objects(), 100))
             result["status"] = "SUCCESS"
             result["message"] = (
                 f"Connected to {self.provider_label}. "
-                f"Listed {len(object_refs)} object(s) in current scope."
+                f"Found {'100+' if count >= 100 else count} object(s) in current scope."
             )
         except Exception as exc:
             result["status"] = "FAILURE"
@@ -495,7 +485,43 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         mime = self._mime_cache.get(asset_id, "")
         if raw_bytes is not None and mime:
             return raw_bytes, mime
-        return None
+
+        external_url = self._hash_to_uri.get(asset_id)
+        asset_hash = asset_id
+        if external_url is None:
+            decoded = asset_id
+            if "_#_" not in decoded:
+                try:
+                    decoded = unhash_id(asset_id)
+                except Exception:
+                    decoded = asset_id
+            if "_#_" in decoded:
+                _, candidate = decoded.split("_#_", maxsplit=1)
+                external_url = candidate
+                asset_hash = self.generate_hash_id(candidate)
+            else:
+                external_url = asset_id
+                asset_hash = self.generate_hash_id(asset_id)
+
+        ref = self._object_ref_by_hash.get(asset_hash)
+        if ref is None:
+            return None
+
+        try:
+            file_bytes, content_type_hint = self._download_object(ref)
+        except Exception as exc:
+            logger.warning("Failed to download object %s for binary fetch: %s", ref.key, exc)
+            return None
+
+        mime_type = resolve_mime_type(
+            file_bytes,
+            declared_mime_type=content_type_hint or ref.content_type_hint or "",
+            file_name=ref.key,
+        )
+        self._mime_cache[asset_hash] = mime_type
+        if external_url:
+            self._mime_cache[external_url] = mime_type
+        return file_bytes, mime_type
 
     async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
         raw_bytes = self._bytes_cache.get(asset_id)
@@ -511,7 +537,13 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             # pdfplumber can't freeze the event loop during large file iteration.
             pages: list[str] = await asyncio.to_thread(
                 list,
-                iter_file_pages(raw_bytes, mime, batch_size, include_col_names),
+                self.iter_asset_pages(
+                    raw_bytes,
+                    mime,
+                    batch_size,
+                    include_col_names,
+                    file_name=self._file_name_for_asset_id(asset_id),
+                ),
             )
             for batch_text in pages:
                 yield "", batch_text
@@ -520,6 +552,27 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         result = await self.fetch_content(asset_id)
         if result:
             yield result
+
+    def _file_name_for_asset_id(self, asset_id: str) -> str:
+        external_url = self._hash_to_uri.get(asset_id)
+        if external_url is None:
+            decoded = asset_id
+            if "_#_" not in decoded:
+                try:
+                    decoded = unhash_id(asset_id)
+                except Exception:
+                    decoded = asset_id
+            if "_#_" in decoded:
+                _, candidate = decoded.split("_#_", maxsplit=1)
+                external_url = candidate
+            else:
+                external_url = asset_id
+
+        ref_hash = self.generate_hash_id(external_url)
+        ref = self._object_ref_by_hash.get(ref_hash)
+        if ref is not None:
+            return ref.key
+        return external_url
 
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
         if asset_id in self._content_cache:
@@ -574,6 +627,17 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         _ = text_content
         finding.location = Location(path=asset.external_url)
 
+    def evict_asset_cache(self, asset_hash: str) -> None:
+        external_url = self._hash_to_uri.get(asset_hash)
+        self._content_cache.pop(asset_hash, None)
+        self._bytes_cache.pop(asset_hash, None)
+        self._mime_cache.pop(asset_hash, None)
+        self._object_ref_by_hash.pop(asset_hash, None)
+        if external_url:
+            self._content_cache.pop(external_url, None)
+            self._bytes_cache.pop(external_url, None)
+            self._mime_cache.pop(external_url, None)
+
     def abort(self) -> None:
         logger.info("Aborting object storage extraction...")
         super().abort()
@@ -590,11 +654,11 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 logger.debug("Failed to close object storage client cleanly")
 
     @abstractmethod
-    def _list_objects(self) -> list[ObjectRef]:
+    def _list_objects(self) -> Iterator[ObjectRef]:
         raise NotImplementedError
 
     @abstractmethod
-    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None, bool]:
+    def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         raise NotImplementedError
 
     @abstractmethod

@@ -167,6 +167,8 @@ ENV UV_LINK_MODE=copy \
     UV_CACHE_DIR=/cache/uv \
     CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1 \
     PATH="/app/apps/cli/.venv/bin:${PATH}"
+# libgl1 + libglib2.0-0 required by opencv-python (pulled in by rapidocr-onnxruntime for docling OCR)
+RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
 # Match uid 10001 from helm podSecurityContext so uv sync can modify the venv at runtime
 RUN groupadd -g 10001 classifyre && useradd -u 10001 -g 10001 -r classifyre \
     && chown -R 10001:10001 /app

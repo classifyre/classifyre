@@ -244,13 +244,14 @@ function normalizeSampling(config: JsonRecord) {
     sampling.include_column_names = includeColumnNames;
   }
 
-  const fetchAllUntilFirstSuccess =
-    asBoolean(sampling.fetch_all_until_first_success) ??
-    asBoolean(optionalSampling?.fetch_all_until_first_success);
-  if (typeof fetchAllUntilFirstSuccess === 'boolean') {
-    sampling.fetch_all_until_first_success = fetchAllUntilFirstSuccess;
+  delete sampling.fetch_all_until_first_success;
+
+  const enableOcr =
+    asBoolean(sampling.enable_ocr) ?? asBoolean(optionalSampling?.enable_ocr);
+  if (typeof enableOcr === 'boolean') {
+    sampling.enable_ocr = enableOcr;
   } else {
-    delete sampling.fetch_all_until_first_success;
+    delete sampling.enable_ocr;
   }
 
   removeUndefinedKeys(sampling);

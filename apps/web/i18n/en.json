@@ -84,6 +84,7 @@
     "findings": "findings",
     "statusError": "Error",
     "statusPending": "Pending",
+    "statusWarning": "Warning",
     "notSet": "Not set"
   },
   "settings": {
@@ -148,6 +149,7 @@
     "noStatusesFound": "No statuses found",
     "statusPending": "Pending",
     "statusCompleted": "Completed",
+    "statusWarning": "Warning",
     "statusError": "Error",
     "scheduleEnabled": "Schedule enabled",
     "findingsLatestRun": "Findings from latest run",
@@ -161,13 +163,17 @@
     "scheduleLabel": "Scheduled",
     "notAvailable": "Source not available",
     "couldntLoad": "We couldn't load this source.",
+    "loadingSource": "Loading source...",
     "editSource": "Edit Source",
+    "deleteSource": "Delete Source",
+    "runScan": "Run Scan",
     "assetNew": "New",
     "assetUpdated": "Updated",
     "assetUnchanged": "Unchanged",
     "totalAssets": "Total Assets",
     "detail": {
       "sourceDetails": "Source Details",
+      "title": "Source Details",
       "sourceDetailsDesc": "Operational and activity overview for this source.",
       "lastUpdated": "Last Updated",
       "lastScan": "Last Scan",
@@ -187,7 +193,11 @@
       "notScannedMessage": "This source has not been scanned yet.",
       "assetsLabel": "assets",
       "lastScanTime": "Last scan: {{relative}}",
-      "overview": "{{type}} source overview"
+      "overview": "{{type}} source overview",
+      "tabOverview": "Overview",
+      "tabFindings": "Findings",
+      "tabAssets": "Assets",
+      "runSummaryLine": "{{findings}} findings · {{assets}} assets scanned"
     },
     "edit": {
       "loading": "Loading source configuration...",
@@ -287,8 +297,8 @@
       "strategyAll": "All",
       "hintAll": "no limit",
       "strategy": "Strategy",
-      "fetchAll": "Fetch all until first success",
-      "fetchAllDesc": "First successful run scans all items, then regular sampling applies.",
+      "enableOcr": "Enable OCR",
+      "enableOcrDesc": "Extract text from images and scanned PDFs using optical character recognition (slower, requires OCR dependencies).",
       "advanced": "Advanced",
       "orderByColumn": "Order by column",
       "orderByPlaceholder": "e.g. updated_at",
@@ -337,12 +347,31 @@
       "finding": "Finding",
       "asset": "Asset",
       "source": "Source",
+      "matchedContent": "Matched Content",
       "severity": "Severity",
       "status": "Status",
       "confidence": "Confidence",
-      "detected": "Detected"
+      "detected": "Detected",
+      "action": "Action"
+    },
+    "selection": {
+      "allSelected": "All {{count}} findings selected",
+      "selected": "{{count}} finding selected",
+      "selectedPlural": "{{count}} findings selected",
+      "updating": "Updating findings…"
     },
     "bulkUpdate": {
+      "title": "Bulk Update Findings",
+      "applyChanges": "Apply changes to {{count}} finding",
+      "applyChangesPlural": "Apply changes to {{count}} findings",
+      "matchingFilters": "matching current filters",
+      "onlyFilledFields": ". Only filled fields will be updated.",
+      "willApply": "Changes will be applied to all {{count}} findings.",
+      "selectAtLeastOne": "Select at least one field to update.",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "updateFinding": "Update {{count}} finding",
+      "updateFindings": "Update {{count}} findings",
       "status": "Status",
       "severity": "Severity",
       "comment": "Comment",
@@ -390,6 +419,8 @@
       "manual": "Manual",
       "closeDetails": "Close details drawer",
       "openDetails": "Open details drawer",
+      "details": "Details",
+      "scanned": "Scanned",
       "notAvailable": "Finding not available",
       "couldntLoad": "We couldn't load this finding.",
       "couldntFetch": "We couldn't fetch this finding",
@@ -397,6 +428,41 @@
       "backToDiscovery": "Back to Discovery",
       "goBack": "Go back",
       "loading": "Loading finding details..."
+    },
+    "statusLabels": {
+      "OPEN": "Open",
+      "FALSE_POSITIVE": "False Positive",
+      "RESOLVED": "Resolved",
+      "IGNORED": "Ignored"
+    },
+    "severityLabels": {
+      "CRITICAL": "Critical",
+      "HIGH": "High",
+      "MEDIUM": "Medium",
+      "LOW": "Low",
+      "INFO": "Info"
+    },
+    "drawer": {
+      "title": "Details",
+      "description": "Review and adjust finding status, severity, and notes.",
+      "closeAriaLabel": "Close details",
+      "statusSectionLabel": "Status",
+      "severitySectionLabel": "Severity",
+      "commentSectionLabel": "Comment",
+      "commentPlaceholder": "Add a note to this finding…",
+      "confidenceSectionLabel": "Confidence",
+      "saveChanges": "Save changes",
+      "saving": "Saving…",
+      "firstDetected": "First detected",
+      "lastDetected": "Last detected",
+      "openFor": "Open for",
+      "resolvedAt": "Resolved",
+      "setBy": "Set by",
+      "manual": "Manual",
+      "confidenceHigh": "High",
+      "confidenceMedium": "Medium",
+      "confidenceLow": "Low",
+      "confidenceVeryLow": "Very Low"
     },
     "signals": {
       "title": "Detection Signals",
@@ -485,10 +551,36 @@
     "noAssetsHint": "Adjust the filters and run the search again.",
     "loading": "Loading assets...",
     "columns": {
+      "asset": "Asset",
+      "assetType": "Asset Type",
       "sourceType": "Source Type",
+      "lastScanned": "Last Scanned",
       "detectors": "Detectors",
       "topFindings": "Top Findings",
-      "statusMix": "Status Mix"
+      "statusMix": "Status Mix",
+      "updating": "Updating assets...",
+      "sourceTypeDesc": "The type of data source this asset belongs to",
+      "detectorsDesc": "Active detectors that fired on this asset and their finding counts",
+      "topFindingsDesc": "Most frequent finding types on this asset",
+      "severityDesc": "Highest severity finding and total findings count",
+      "statusMixDesc": "Breakdown of finding statuses on this asset"
+    },
+    "searchSeverity": "Search severities...",
+    "noSeveritiesFound": "No severities found",
+    "searchDetectorTypes": "Search detector types...",
+    "noDetectorTypesFound": "No detector types found",
+    "searchStatuses": "Search statuses...",
+    "noStatusesFound": "No statuses found",
+    "subTable": {
+      "noFindings": "No findings returned for this asset",
+      "detector": "Detector",
+      "type": "Type",
+      "detected": "Detected",
+      "matchedContent": "Matched Content"
+    },
+    "charts": {
+      "topAssets": "Top assets by findings",
+      "topSources": "Top sources by asset volume"
     },
     "graph": {
       "noData": "No relationship data",
@@ -519,6 +611,12 @@
   },
   "detectors": {
     "title": "Custom Detectors",
+    "detail": {
+      "title": "Detector Details"
+    },
+    "new": {
+      "title": "New Detector"
+    },
     "search": "Search detector name, key, description, sources",
     "allMethods": "All methods",
     "loadError": "Could not load detector catalog",
@@ -814,12 +912,56 @@
   },
   "scans": {
     "title": "Scans",
+    "detail": {
+      "title": "Scan Details"
+    },
+    "subtitle": "Search run history and filter by operational status from one surface.",
+    "runTrend": "Run Trend",
+    "runTrendDescription": "Status distribution over the selected timeline.",
+    "topSourcesByVolume": "Top Sources by Run Volume",
+    "createScan": "Create Scan",
     "runNotFound": "Run Not Found",
     "viewAllScans": "View All Scans",
     "tabOverview": "Overview",
     "tabFindings": "Findings",
     "tabAssets": "Assets",
     "tabLogs": "Logs",
+    "runnerAssets": {
+      "searchPlaceholder": "Search by asset name or hash…",
+      "processingStatus": "Processing status",
+      "searchStatus": "Search status…",
+      "noStatusesFound": "No statuses found",
+      "findingSeverity": "Finding severity",
+      "findingStatus": "Finding status",
+      "findingDetectorType": "Detector type",
+      "searchSeverity": "Search severity…",
+      "noSeveritiesFound": "No severities found",
+      "searchFindingStatus": "Search status…",
+      "noFindingStatusesFound": "No statuses found",
+      "searchDetectorType": "Search detector type…",
+      "noDetectorTypesFound": "No detector types found",
+      "noAssets": "No assets processed in this run",
+      "noAssetsHint": "Adjust the filters or wait for processing to begin.",
+      "loading": "Loading assets…",
+      "updating": "Updating…",
+      "assetPending": "Asset pending",
+      "errorDetails": "Error details",
+      "status": {
+        "pending": "Pending",
+        "processing": "Processing",
+        "processed": "Processed",
+        "error": "Error"
+      },
+      "columns": {
+        "asset": "Asset",
+        "type": "Type",
+        "processingStatus": "Processing Status",
+        "findingsTotal": "Total",
+        "findings": "Findings by Severity",
+        "byDetector": "By Detector",
+        "completed": "Completed"
+      }
+    },
     "runFailed": "Run failed",
     "showJobOutput": "Show job output",
     "updatingOverview": "Updating overview...",
@@ -841,7 +983,48 @@
     "sourceUnavailable": "Source is not available for this run",
     "newRunStarted": "New run started",
     "failedToStop": "Failed to stop run",
-    "failedToStart": "Failed to start new run"
+    "failedToStart": "Failed to start new run",
+    "updatingCharts": "Updating charts...",
+    "windowDays": {
+      "7days": "7 days",
+      "30days": "30 days",
+      "90days": "90 days"
+    },
+    "stats": {
+      "findings": "Findings",
+      "criticalHigh": "Critical + High",
+      "assets": "Assets",
+      "open": "Open",
+      "resolved": "Resolved"
+    },
+    "runProgress": {
+      "title": "Run Progress",
+      "description": "Estimated from processed assets",
+      "progress": "Progress",
+      "durationSoFar": "Duration so far: {{duration}}"
+    },
+    "runTimeline": {
+      "title": "Run Timeline",
+      "description": "Execution timestamps",
+      "triggered": "Triggered",
+      "started": "Started",
+      "completed": "Completed",
+      "duration": "Duration",
+      "triggeredBy": "Triggered By",
+      "na": "N/A"
+    },
+    "assetDelta": {
+      "title": "Asset Delta",
+      "description": "Changes produced by this run",
+      "created": "Created",
+      "updated": "Updated",
+      "unchanged": "Unchanged"
+    },
+    "sourceContext": {
+      "title": "Source Context",
+      "openSource": "Open Source"
+    },
+    "sourceRun": "{{source}} Run"
   },
   "sandbox": {
     "title": "Sandbox",
@@ -860,10 +1043,25 @@
       "findings": "Findings",
       "noRuns": "No sandbox runs found",
       "noRunsHint": "Adjust filters to broaden the run search.",
-      "loading": "Loading runs..."
+      "loading": "Loading runs...",
+      "file": "File",
+      "content": "Content",
+      "mimeType": "MIME Type",
+      "size": "Size",
+      "duration": "Duration",
+      "topFindings": "Top Findings",
+      "when": "When",
+      "allRuns": "All runs",
+      "withFindings": "With findings",
+      "noFindings": "No findings",
+      "newestFirst": "Newest first",
+      "oldestFirst": "Oldest first",
+      "mostFindings": "Most findings",
+      "fileNameAZ": "File name A-Z",
+      "largestFile": "Largest file",
+      "updating": "Updating",
+      "refreshingRuns": "Refreshing runs"
     },
-    "livePolling": "Live polling",
-    "idle": "Idle",
     "monitorDesc": "Monitor sandbox runs and inspect detector findings",
     "newScan": "New sandbox scan",
     "runResults": "Run results",
@@ -889,7 +1087,26 @@
     "searchNote": "Search is applied to the current page",
     "loading": "Loading notifications…",
     "openAction": "Open notification action",
-    "dismiss": "Dismiss notification"
+    "dismiss": "Dismiss notification",
+    "markAll": "Mark all",
+    "read": "Read",
+    "removeImportant": "Remove important",
+    "markImportant": "Mark important",
+    "allCaughtUp": "You are fully caught up.",
+    "goToNotifications": "Go to notifications center",
+    "showing": "Showing {{count}} of {{total}}",
+    "types": {
+      "SCAN": "Scan",
+      "FINDING": "Finding",
+      "SOURCE": "Source",
+      "SYSTEM": "System"
+    }
+  },
+  "triggerTypes": {
+    "MANUAL": "Manual",
+    "SCHEDULED": "Scheduled",
+    "WEBHOOK": "Webhook",
+    "API": "API"
   },
   "runners": {
     "search": "Search runs, sources, trigger, status",
@@ -897,8 +1114,24 @@
     "noRuns": "No runs found",
     "noRunsHint": "Adjust filters to broaden the run search.",
     "loading": "Loading runs...",
+    "scheduler": "Scheduler",
+    "columns": {
+      "triggered": "Triggered",
+      "source": "Source",
+      "status": "Status",
+      "trigger": "Trigger",
+      "duration": "Duration",
+      "assets": "Assets",
+      "findings": "Findings"
+    },
+    "searchSources": "Search sources...",
+    "noSourcesFound": "No sources found",
+    "searchTriggerTypes": "Search trigger types...",
+    "noTriggerTypesFound": "No trigger types found",
+    "updating": "Updating",
     "status": {
       "completed": "Completed",
+      "warning": "Warning",
       "running": "Running",
       "pending": "Pending",
       "error": "Error"
@@ -983,7 +1216,58 @@
     "tokenDeleted": "Token deleted",
     "tokenUpdated": "Token updated",
     "tokenNameRequired": "Token name is required",
-    "failedToUpdate": "Failed to update MCP setting"
+    "failedToUpdate": "Failed to update MCP setting",
+    "token": "Token",
+    "title": "MCP Server",
+    "exposeDesc": "Expose Classifyre to MCP clients",
+    "exposeDescLong": "Create one-time bearer tokens for IDEs, agents, and workspace-specific MCP clients. Tokens are generated by the API, stored only as hashes, and the plaintext value is returned once at creation time.",
+    "refresh": "Refresh",
+    "createToken": "Create Token",
+    "loading": "Loading MCP settings…",
+    "failedToLoad": "Failed to load MCP settings",
+    "disabledNotice": "MCP is disabled. The /mcp endpoint returns 503 until you re-enable it above.",
+    "tokenReady": "{{name}} is ready. This token is shown only once.",
+    "tokenReadyDesc": "Copy it into your MCP client or secret manager now. After you dismiss this message, only the masked preview remains.",
+    "copyToken": "Copy Token",
+    "dismiss": "Dismiss",
+    "storedPreview": "Stored preview: {{preview}}",
+    "connection": "Connection",
+    "endpoint": "Endpoint",
+    "transport": "Transport",
+    "authorization": "Authorization",
+    "requestPattern": "Request pattern",
+    "bestPractice": "Best Practice",
+    "tokens": "Tokens",
+    "noTokens": "No MCP tokens yet. Create one per client or workspace so you can rotate and revoke access cleanly.",
+    "active": "Active",
+    "revoked": "Revoked",
+    "lastUsed": "Last used {{relative}}",
+    "neverUsed": "Never used",
+    "created": "Created {{date}}",
+    "updated": "Updated {{date}}",
+    "revokedAt": "Revoked {{date}}",
+    "usedAt": "Used {{date}}",
+    "noAuthYet": "No successful authorization yet",
+    "edit": "Edit",
+    "revoke": "Revoke",
+    "reactivate": "Reactivate",
+    "delete": "Delete",
+    "createTitle": "Create MCP token",
+    "createDesc": "The API generates the raw token, returns it once for copying, and stores only a hash plus masked preview.",
+    "tokenName": "Token name",
+    "bestPracticeTip": "Best practice: issue one token per MCP client, workspace, or environment so you can rotate and revoke them independently.",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "editTitle": "Edit MCP token",
+    "editDesc": "Update the display name or access state. Raw token material is not stored and cannot be recovered.",
+    "allowAuth": "Allow MCP authentication",
+    "allowAuthDesc": "Disable this token to revoke access without deleting the record.",
+    "saving": "Saving…",
+    "saveChanges": "Save changes",
+    "deleteTitle": "Delete MCP token?",
+    "deleteDesc": "Delete {{name}} and permanently invalidate its bearer token.",
+    "deleteDescGeneral": "Delete this token and permanently invalidate its bearer token.",
+    "deleteWarning": "Deleted tokens cannot be recovered. Any MCP client using this token will stop authenticating immediately."
   },
   "schedule": {
     "cronPlaceholder": "e.g. 30 6 * * 1-5",
@@ -1004,10 +1288,37 @@
     }
   },
   "aiProvider": {
-    "saved": "AI provider settings saved"
+    "saved": "AI provider settings saved",
+    "title": "AI Provider",
+    "configuration": "AI provider configuration",
+    "configurationDesc": "Configure which AI provider and model the API uses for assistant features. The API key is stored encrypted and never returned in plaintext.",
+    "loading": "Loading AI provider settings…",
+    "failedToLoad": "Failed to load AI provider settings",
+    "provider": "Provider",
+    "model": "Model",
+    "baseUrl": "Base URL",
+    "baseUrlDesc": "Endpoint used for OpenAI-compatible requests (e.g. OpenRouter, Ollama, Azure OpenAI).",
+    "apiKey": "API Key",
+    "keyStored": "Key stored. Click the field to replace it.",
+    "keyNotStored": "The key is encrypted at rest and never returned.",
+    "enterNewKey": "Enter new key to replace…",
+    "enterApiKey": "Enter API key…",
+    "testConnection": "Test connection",
+    "save": "Save",
+    "testing": "Testing…",
+    "saving": "Saving…",
+    "connectionOk": "Connection OK",
+    "connectionFailed": "Connection failed",
+    "needApiKey": "Enter or keep an API key to test the provider",
+    "testDescription": "Send a test code task to the configured AI provider",
+    "providers": {
+      "OPENAI_COMPATIBLE": "OpenAI-Compatible",
+      "CLAUDE": "Claude (Anthropic)",
+      "GEMINI": "Gemini (Google)"
+    }
   },
   "clipboard": {
-    "copied": "Copied {{label}}",
+    "copied": "{{label}} copied",
     "failedToCopy": "Failed to copy {{label}}"
   },
   "upload": {
@@ -1022,6 +1333,7 @@
     "configValidationFailed": "Configuration failed schema validation"
   },
   "discovery": {
+    "title": "Overview",
     "securityBrief": "Security Brief",
     "allFindings": "All findings · last {{days}} days",
     "findingsToReview": "Findings to review",
@@ -1110,6 +1422,9 @@
     "createFirstMetric": "Create First Metric",
     "glossary": {
       "backToSemantic": "Back to Semantic Layer",
+      "detail": {
+        "title": "Glossary Term"
+      },
       "newTitle": "New Business Term",
       "newDescription": "Define a business concept and map it to detection filters",
       "termDetails": "Term Details",
@@ -1158,6 +1473,9 @@
     },
     "metrics": {
       "backToSemantic": "Back to Semantic Layer",
+      "detail": {
+        "title": "Metric Details"
+      },
       "newTitle": "New Metric",
       "newDescription": "Define a governed metric to measure what matters to your business",
       "metricDetails": "Metric Details",

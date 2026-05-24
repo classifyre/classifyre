@@ -15,6 +15,23 @@ logger = logging.getLogger(__name__)
 _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
 
 
+_TIMEOUT_PHRASES = ("timed out", "timeout", "connection reset", "errno 110", "connection refused")
+_TIMEOUT_MYSQL_CODES = {2003, 2006, 2013}
+
+
+def _is_timeout_error(exc: BaseException) -> bool:
+    """Return True when exc represents a connection/read timeout or unreachable host."""
+    exc_str = str(exc).lower()
+    if any(phrase in exc_str for phrase in _TIMEOUT_PHRASES):
+        return True
+    if "timeout" in type(exc).__name__.lower():
+        return True
+    args = getattr(exc, "args", ())
+    if args and isinstance(args[0], int) and args[0] in _TIMEOUT_MYSQL_CODES:
+        return True
+    return False
+
+
 def _sanitize_for_json(value: Any) -> Any:
     """Recursively replace isolated surrogate code points before JSON encoding."""
     if isinstance(value, str):
@@ -77,6 +94,26 @@ def load_recipe(recipe_path: str) -> dict[str, Any]:
             sys.exit(1)
 
 
+def _compute_findings_counts(
+    findings: list[Any],
+) -> tuple[int, dict[str, int], dict[str, dict[str, int]]]:
+    """Return (total, by_severity, by_detector) counts from a findings list."""
+    by_severity: dict[str, int] = {}
+    by_detector: dict[str, dict[str, int]] = {}
+
+    for f in findings:
+        severity = str(getattr(f, "severity", None) or "UNKNOWN")
+        detector = str(getattr(f, "detector_type", None) or "UNKNOWN")
+
+        by_severity[severity] = by_severity.get(severity, 0) + 1
+
+        entry = by_detector.setdefault(detector, {"total": 0})
+        entry["total"] += 1
+        entry[severity] = entry.get(severity, 0) + 1
+
+    return len(findings), by_severity, by_detector
+
+
 def _asset_to_payload(asset: Any) -> dict[str, Any]:
     if hasattr(asset, "model_dump"):
         payload = asset.model_dump(mode="json", exclude_none=True)
@@ -129,7 +166,8 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
             elif args.command == "extract":
                 result = source.test_connection()
                 if result.get("status") == "FAILURE":
-                    logger.error("Aborting: Connection test failed: %s", result.get("message"))
+                    msg = result.get("message", "")
+                    logger.error("Aborting: Connection test failed: %s", msg)
                     sys.exit(1)
 
                 logger.info("Starting extraction...")
@@ -140,47 +178,187 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     await sink.start()
                     sink_started = True
 
-                    extract_result = source.extract()
-                    if not hasattr(extract_result, "__aiter__"):
-                        raise TypeError(
-                            "Source extract() must return an async generator of batches"
+                    from .pipeline.detector_pipeline import DetectorPipeline
+                    from .pipeline.worker_pool import (
+                        DetectorWorkerPool,
+                        compute_pool_workers,
+                    )
+
+                    pool_workers = compute_pool_workers(
+                        override=args.max_pool_workers,
+                    )
+                    worker_pool: DetectorWorkerPool | None = None
+
+                    pipeline = DetectorPipeline.from_recipe(
+                        recipe,
+                        source,
+                        runner_id,
+                    )
+                    has_detectors = bool(pipeline.detectors)
+
+                    if has_detectors:
+                        worker_pool = DetectorWorkerPool(max_workers=pool_workers)
+                        pipeline = DetectorPipeline.from_recipe(
+                            recipe,
+                            source,
+                            runner_id,
+                            worker_pool=worker_pool,
                         )
 
-                    output_batch_count = 0
+                    # --- Phase 1: Discovery ---
+                    source.set_discovery_only(True)
+                    all_stubs: list[Any] = []
                     total_assets = 0
-                    buffer: list[dict[str, Any]] = []
+                    output_batch_count = 0
 
-                    async for source_batch in extract_result:
-                        if not source_batch:
+                    async for raw_batch in source.extract_raw():
+                        if not raw_batch:
                             continue
-                        payload_batch = [_asset_to_payload(asset) for asset in source_batch]
-                        buffer.extend(payload_batch)
 
-                        while len(buffer) >= sink.batch_size:
-                            to_emit = buffer[: sink.batch_size]
-                            buffer = buffer[sink.batch_size :]
-                            await sink.emit_batch(to_emit)
-                            output_batch_count += 1
-                            total_assets += len(to_emit)
-                            logger.info(
-                                "Emitted output batch %s with %s assets (total: %s)",
-                                output_batch_count,
-                                len(to_emit),
-                                total_assets,
+                        batch_size = len(raw_batch)
+                        total_assets += batch_size
+
+                        stub_batch = [_asset_to_payload(asset) for asset in raw_batch]
+                        for stub in stub_batch:
+                            stub["findings"] = []
+                        await sink.emit_batch(stub_batch, skip_findings=True)
+                        output_batch_count += 1
+
+                        hashes = [s["hash"] for s in stub_batch if s.get("hash")]
+                        if hasattr(sink, "register_discovered_assets") and hashes:
+                            await sink.register_discovered_assets(hashes)
+
+                        all_stubs.extend(raw_batch)
+                        logger.info(
+                            "Discovered %s assets (total: %s)",
+                            batch_size,
+                            total_assets,
+                        )
+
+                    source.set_discovery_only(False)
+                    logger.info("Phase 1 complete: %d assets discovered", total_assets)
+
+                    # --- Phase 2: Processing ---
+                    if has_detectors and all_stubs:
+                        import asyncio as _asyncio
+
+                        processed_count = 0
+                        _pw = worker_pool.max_workers if worker_pool else 4
+                        max_concurrent = args.max_concurrent_assets or (_pw * 2)
+                        max_concurrent = max(1, max_concurrent)
+                        _asset_semaphore = _asyncio.Semaphore(max_concurrent)
+                        logger.info(
+                            "Phase 2 starting: %d assets, pool_workers=%s, max_concurrent_assets=%d",
+                            len(all_stubs),
+                            worker_pool.max_workers if worker_pool else "none",
+                            max_concurrent,
+                        )
+                        error_count = 0
+
+                        async def _process_one(asset: Any) -> None:
+                            async with _asset_semaphore:
+                                await _process_one_inner(asset)
+
+                        async def _process_one_inner(asset: Any) -> None:
+                            nonlocal processed_count, error_count
+                            asset_hash = getattr(asset, "hash", None) or ""
+                            try:
+                                if hasattr(sink, "update_asset_status"):
+                                    await sink.update_asset_status(asset_hash, "PROCESSING")
+
+                                async def _on_findings_flushed(partial: list[Any]) -> None:
+                                    stub_payload = _asset_to_payload(asset)
+                                    stub_payload["findings"] = [
+                                        f.model_dump(mode="json", exclude_none=True)
+                                        if hasattr(f, "model_dump")
+                                        else f
+                                        for f in partial
+                                    ]
+                                    await sink.emit_batch([stub_payload], skip_findings=False)
+                                    if hasattr(sink, "update_asset_status"):
+                                        f_total, f_by_sev, f_by_det = _compute_findings_counts(
+                                            partial
+                                        )
+                                        await sink.update_asset_status(
+                                            asset_hash,
+                                            "PROCESSING",
+                                            findings_total=f_total,
+                                            findings_by_severity=f_by_sev,
+                                            findings_by_detector=f_by_det,
+                                        )
+
+                                result = await pipeline.process_single_asset(
+                                    asset,
+                                    on_findings_flushed=_on_findings_flushed,
+                                    findings_flush_size=args.detector_flush_batch_size,
+                                )
+                                payload = _asset_to_payload(result)
+                                await sink.emit_batch([payload], skip_findings=False)
+
+                                if hasattr(sink, "update_asset_status"):
+                                    f_total, f_by_sev, f_by_det = _compute_findings_counts(
+                                        result.findings or []
+                                    )
+                                    await sink.update_asset_status(
+                                        asset_hash,
+                                        "PROCESSED",
+                                        findings_total=f_total,
+                                        findings_by_severity=f_by_sev,
+                                        findings_by_detector=f_by_det,
+                                    )
+
+                                source.evict_asset_cache(asset_hash)
+                                processed_count += 1
+                            except Exception as exc:
+                                error_count += 1
+                                logger.error("Asset %s failed: %s", asset_hash, exc)
+                                if hasattr(sink, "update_asset_status"):
+                                    try:
+                                        error_msg = str(exc) or type(exc).__name__
+                                        await sink.update_asset_status(
+                                            asset_hash, "ERROR", error_msg
+                                        )
+                                    except Exception:
+                                        pass
+
+                        tasks = [_asyncio.create_task(_process_one(a)) for a in all_stubs]
+                        await _asyncio.gather(*tasks, return_exceptions=True)
+                        logger.info(
+                            "Phase 2 complete: %d processed, %d errors",
+                            processed_count,
+                            error_count,
+                        )
+                    elif all_stubs and hasattr(sink, "update_asset_status"):
+                        # No detectors configured: mark discovered assets as PROCESSED
+                        import asyncio as _asyncio
+
+                        async def _mark_processed(asset: Any) -> None:
+                            asset_hash = getattr(asset, "hash", None) or ""
+                            await sink.update_asset_status(
+                                asset_hash, "PROCESSED", findings_total=0
                             )
 
-                    if buffer:
-                        await sink.emit_batch(buffer)
-                        output_batch_count += 1
-                        total_assets += len(buffer)
+                        tasks = [_asyncio.create_task(_mark_processed(a)) for a in all_stubs]
+                        await _asyncio.gather(*tasks, return_exceptions=True)
+                        logger.info(
+                            "Phase 2 skipped (no detectors): %d assets marked processed",
+                            len(all_stubs),
+                        )
 
                     await sink.finish()
                     logger.info(
-                        "Extraction completed: emitted %s assets in %s output batches",
+                        "Extraction completed: %s assets in %s batches",
                         total_assets,
                         output_batch_count,
                     )
                 except Exception as extraction_error:
+                    if _is_timeout_error(extraction_error):
+                        logger.warning(
+                            "Source timed out during extraction, partial results flushed: %s",
+                            extraction_error,
+                        )
+                        await sink.finish()
+                        return
                     if sink_started:
                         try:
                             await sink.fail(extraction_error)
@@ -189,14 +367,22 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                 "Failed to mark sink failure: %s", sink_error, exc_info=True
                             )
                     raise
+                finally:
+                    if worker_pool is not None:
+                        worker_pool.shutdown(wait=True)
 
         except Exception as e:
-            logger.error("An error occurred during %s: %s", args.command, e, exc_info=True)
+            logger.debug("Traceback for %s failure:", args.command, exc_info=True)
+            if _is_timeout_error(e):
+                logger.warning("SCAN TIMED OUT (source unreachable): %s", e)
+                return
+            logger.error("SCAN FAILED: %s", e)
             sys.exit(1)
         finally:
             source.cleanup()
     except Exception as e:
-        logger.error("Fatal error: %s", e, exc_info=True)
+        logger.debug("Traceback for fatal error:", exc_info=True)
+        logger.error("FATAL: %s", e)
         sys.exit(1)
 
 
@@ -205,6 +391,41 @@ def run_command(args: argparse.Namespace, recipe: dict[str, Any]) -> None:
     import asyncio
 
     asyncio.run(run_command_async(args, recipe))
+
+
+def run_train_command(args: argparse.Namespace) -> None:
+    """Fine-tune detector models on labeled training examples.
+
+    Reads pipeline_schema and examples from JSON files, runs GLiNER2 NER
+    fine-tuning and/or SetFit classification training, saves artifacts to
+    output_dir, and prints a JSON result to stdout for the API to consume.
+    """
+    import json
+    from pathlib import Path
+
+    from .detectors.custom.trainer import GLiNER2Trainer
+
+    schema_path = Path(args.pipeline_schema)
+    examples_path = Path(args.examples)
+    output_dir = Path(args.output_dir)
+
+    if not schema_path.exists():
+        logger.error("Pipeline schema file not found: %s", schema_path)
+        sys.exit(1)
+    if not examples_path.exists():
+        logger.error("Examples file not found: %s", examples_path)
+        sys.exit(1)
+
+    try:
+        pipeline_schema: dict[str, Any] = json.loads(schema_path.read_text())
+        examples_raw: list[dict[str, Any]] = json.loads(examples_path.read_text())
+    except json.JSONDecodeError as e:
+        logger.error("Invalid JSON in input files: %s", e)
+        sys.exit(1)
+
+    trainer = GLiNER2Trainer(pipeline_schema, examples_raw, output_dir)
+    result = trainer.train()
+    print(json.dumps(result.to_dict()))
 
 
 def run_sandbox_command(args: argparse.Namespace) -> None:
@@ -240,10 +461,14 @@ def run_sandbox_command(args: argparse.Namespace) -> None:
     try:
         runner = SandboxRunner(detectors)
         parsed, findings = runner.run(file_path)
-        output = {
+        if parsed.parse_error:
+            logger.warning("File parse warning: %s", parsed.parse_error)
+        output: dict[str, Any] = {
             "mime_type": parsed.mime_type,
             "findings": [f.model_dump(mode="json") for f in findings],
         }
+        if parsed.parse_error:
+            output["parse_error"] = parsed.parse_error
         print(json.dumps(_sanitize_for_json(output), ensure_ascii=False))
     except Exception as e:
         logger.error("Sandbox run failed: %s", e, exc_info=True)
@@ -262,7 +487,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Classifyre Metadata Extraction CLI")
     parser.add_argument(
         "command",
-        choices=["test", "extract", "discover", "sandbox"],
+        choices=["test", "extract", "discover", "sandbox", "train"],
         help="Command to run",
     )
     parser.add_argument(
@@ -309,8 +534,64 @@ def main() -> None:
         default=None,
         help="Path to JSON file with detector configs (sandbox command only)",
     )
+    # train-command arguments
+    parser.add_argument(
+        "--pipeline-schema",
+        default=None,
+        help="Path to pipeline schema JSON file (train command only)",
+    )
+    parser.add_argument(
+        "--examples",
+        default=None,
+        help="Path to training examples JSON file (train command only)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory to write trained model artifacts (train command only)",
+    )
+    parser.add_argument(
+        "--detector-flush-batch-size",
+        type=int,
+        default=None,
+        help="How many detector-processed assets to accumulate before pushing findings to the API (default: 5, env: CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE)",
+    )
+    parser.add_argument(
+        "--max-pool-workers",
+        type=int,
+        default=None,
+        help="Max OS processes in the detector pool. Auto-sized from CPU/memory when omitted (env: CLASSIFYRE_MAX_POOL_WORKERS)",
+    )
+    parser.add_argument(
+        "--max-concurrent-assets",
+        type=int,
+        default=None,
+        help="Max assets processed concurrently in Phase 2. Controls DB connection usage. Defaults to pool_workers*2 (env: CLASSIFYRE_MAX_CONCURRENT_ASSETS)",
+    )
 
     args = parser.parse_args()
+
+    if args.detector_flush_batch_size is None:
+        env_val = os.environ.get("CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE")
+        try:
+            args.detector_flush_batch_size = int(env_val) if env_val else 5
+        except ValueError:
+            args.detector_flush_batch_size = 5
+    args.detector_flush_batch_size = max(args.detector_flush_batch_size, 1)
+
+    if args.max_pool_workers is None:
+        env_val = os.environ.get("CLASSIFYRE_MAX_POOL_WORKERS")
+        try:
+            args.max_pool_workers = int(env_val) if env_val else None
+        except ValueError:
+            args.max_pool_workers = None
+
+    if args.max_concurrent_assets is None:
+        env_val = os.environ.get("CLASSIFYRE_MAX_CONCURRENT_ASSETS")
+        try:
+            args.max_concurrent_assets = int(env_val) if env_val else None
+        except ValueError:
+            args.max_concurrent_assets = None
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -319,11 +600,27 @@ def main() -> None:
         run_sandbox_command(args)
         return
 
+    if args.command == "train":
+        if not args.pipeline_schema or not args.examples or not args.output_dir:
+            logger.error("train requires --pipeline-schema, --examples, and --output-dir")
+            sys.exit(1)
+        run_train_command(args)
+        return
+
     if not args.recipe:
         logger.error("recipe argument is required for this command")
         sys.exit(1)
 
     recipe = load_recipe(args.recipe)
+
+    # Resolve resource overrides from recipe when CLI args / env vars are not set
+    recipe_resources = recipe.get("resources") or {}
+    if args.max_pool_workers is None and isinstance(recipe_resources.get("max_pool_workers"), int):
+        args.max_pool_workers = recipe_resources["max_pool_workers"]
+    if args.max_concurrent_assets is None and isinstance(
+        recipe_resources.get("max_concurrent_assets"), int
+    ):
+        args.max_concurrent_assets = recipe_resources["max_concurrent_assets"]
 
     source_type = recipe.get("type", "").lower()
     if not source_type:

@@ -113,7 +113,7 @@ class _DummyConnection:
 def test_snowflake_test_connection_success(monkeypatch: pytest.MonkeyPatch) -> None:
     source = SnowflakeSource(_default_recipe())
     monkeypatch.setattr(source, "_resolve_databases", lambda: ["ANALYTICS"])
-    monkeypatch.setattr(source, "_connect", _DummyConnection)
+    monkeypatch.setattr(source, "_connect", lambda _db=None: _DummyConnection())
 
     result = source.test_connection()
 
@@ -149,7 +149,7 @@ async def test_snowflake_extract_streams_assets_in_batches(
     monkeypatch.setattr(source, "_iter_tables", lambda: tables)
     monkeypatch.setattr(
         source,
-        "_collect_dependency_links",
+        "_collect_foreign_key_links",
         lambda _tables: {
             ("ANALYTICS", "PUBLIC", "PAYMENTS"): {("ANALYTICS", "PUBLIC", "ORDERS")},
             ("ANALYTICS", "PUBLIC", "V_ORDERS"): {("ANALYTICS", "PUBLIC", "ORDERS")},
@@ -252,6 +252,7 @@ def test_snowflake_key_pair_connect_uses_private_key_bytes(
     assert captured_kwargs["user"] == "SOME_USER"
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_snowflake_fetch_content_pages_batches_for_all_strategy(
     monkeypatch: pytest.MonkeyPatch,
@@ -293,6 +294,9 @@ async def test_snowflake_fetch_content_pages_batches_for_all_strategy(
         def fetchall(self) -> list[tuple[Any, ...]]:
             return list(self._rows)
 
+        def fetchmany(self, size: int) -> list[tuple[Any, ...]]:
+            return list(self._rows[:size])
+
         def __enter__(self) -> _BatchCursor:
             return self
 
@@ -313,7 +317,7 @@ async def test_snowflake_fetch_content_pages_batches_for_all_strategy(
             return None
 
     monkeypatch.setattr(source, "_available_columns", lambda _ref: ["id", "name"])
-    monkeypatch.setattr(source, "_connect", lambda: _BatchConnection())
+    monkeypatch.setattr(source, "_connect", _BatchConnection)
 
     pages = [text async for _raw, text in source.fetch_content_pages(asset.hash)]
 

@@ -57,6 +57,30 @@ export interface SourceResponseDto {
     runnerStatus: string;
     /**
      * 
+     * @type {string}
+     * @memberof SourceResponseDto
+     */
+    lastRunStatus?: string | null;
+    /**
+     * 
+     * @type {Date}
+     * @memberof SourceResponseDto
+     */
+    lastRunAt?: Date | null;
+    /**
+     * Human-readable error message from the most recent failed run. Cleared on success.
+     * @type {string}
+     * @memberof SourceResponseDto
+     */
+    lastErrorMessage?: string | null;
+    /**
+     * 
+     * @type {number}
+     * @memberof SourceResponseDto
+     */
+    consecutiveFailures: number;
+    /**
+     * 
      * @type {Date}
      * @memberof SourceResponseDto
      */
@@ -103,6 +127,7 @@ export function instanceOfSourceResponseDto(value: object): value is SourceRespo
     if (!('config' in value) || value['config'] === undefined) return false;
     if (!('currentRunnerId' in value) || value['currentRunnerId'] === undefined) return false;
     if (!('runnerStatus' in value) || value['runnerStatus'] === undefined) return false;
+    if (!('consecutiveFailures' in value) || value['consecutiveFailures'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     if (!('scheduleEnabled' in value) || value['scheduleEnabled'] === undefined) return false;
@@ -128,6 +153,10 @@ export function SourceResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'config': json['config'],
         'currentRunnerId': json['currentRunnerId'],
         'runnerStatus': json['runnerStatus'],
+        'lastRunStatus': json['lastRunStatus'] == null ? undefined : json['lastRunStatus'],
+        'lastRunAt': json['lastRunAt'] == null ? undefined : (new Date(json['lastRunAt'])),
+        'lastErrorMessage': json['lastErrorMessage'] == null ? undefined : json['lastErrorMessage'],
+        'consecutiveFailures': json['consecutiveFailures'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
         'scheduleEnabled': json['scheduleEnabled'],
@@ -154,6 +183,10 @@ export function SourceResponseDtoToJSONTyped(value?: SourceResponseDto | null, i
         'config': value['config'],
         'currentRunnerId': value['currentRunnerId'],
         'runnerStatus': value['runnerStatus'],
+        'lastRunStatus': value['lastRunStatus'],
+        'lastRunAt': value['lastRunAt'] == null ? value['lastRunAt'] : value['lastRunAt'].toISOString(),
+        'lastErrorMessage': value['lastErrorMessage'],
+        'consecutiveFailures': value['consecutiveFailures'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
         'scheduleEnabled': value['scheduleEnabled'],

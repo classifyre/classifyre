@@ -109,12 +109,16 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**cliRunnerControllerCreateExternalRunner**](docs/RunnersApi.md#clirunnercontrollercreateexternalrunner) | **POST** /sources/{sourceId}/runners/external | Create runner record for external CLI REST ingestion
 *RunnersApi* | [**cliRunnerControllerDeleteRunner**](docs/RunnersApi.md#clirunnercontrollerdeleterunner) | **DELETE** /runners/{runnerId} | Delete runner metadata and cleanup filesystem logs for this runner
 *RunnersApi* | [**cliRunnerControllerGetRunner**](docs/RunnersApi.md#clirunnercontrollergetrunner) | **GET** /runners/{runnerId} | Get runner status and details
+*RunnersApi* | [**cliRunnerControllerGetRunnerAssetProgress**](docs/RunnersApi.md#clirunnercontrollergetrunnerassetprogress) | **GET** /runners/{runnerId}/assets/progress | Get runner asset processing progress
 *RunnersApi* | [**cliRunnerControllerListRunners**](docs/RunnersApi.md#clirunnercontrollerlistrunners) | **GET** /runners | List all runners
 *RunnersApi* | [**cliRunnerControllerListSourceRunners**](docs/RunnersApi.md#clirunnercontrollerlistsourcerunners) | **GET** /sources/{sourceId}/runners | List runners for source
+*RunnersApi* | [**cliRunnerControllerRegisterDiscoveredAssets**](docs/RunnersApi.md#clirunnercontrollerregisterdiscoveredassets) | **POST** /runners/{runnerId}/assets/discover | Register discovered asset hashes for a runner
 *RunnersApi* | [**cliRunnerControllerSearchRunnerLogs**](docs/RunnersApi.md#clirunnercontrollersearchrunnerlogs) | **POST** /runners/{runnerId}/logs | Search runner logs with server-side filtering, full-text search, and sort
 *RunnersApi* | [**cliRunnerControllerStartRunner**](docs/RunnersApi.md#clirunnercontrollerstartrunner) | **POST** /sources/{sourceId}/run | Start CLI runner for source
 *RunnersApi* | [**cliRunnerControllerStopRunner**](docs/RunnersApi.md#clirunnercontrollerstoprunner) | **PATCH** /runners/{runnerId}/stop | Stop running CLI process
+*RunnersApi* | [**cliRunnerControllerUpdateRunnerAssetStatuses**](docs/RunnersApi.md#clirunnercontrollerupdaterunnerassetstatuses) | **PATCH** /runners/{runnerId}/assets/status | Update processing status of runner assets
 *RunnersApi* | [**cliRunnerControllerUpdateRunnerStatus**](docs/RunnersApi.md#clirunnercontrollerupdaterunnerstatusoperation) | **PATCH** /runners/{runnerId}/status | Update runner status
+*RunnersApi* | [**searchRunnersControllerSearchRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerassets) | **POST** /search/runner-assets | Search runner assets
 *RunnersApi* | [**searchRunnersControllerSearchRunners**](docs/RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners
 *RunnersApi* | [**searchRunnersControllerSearchRunnersCharts**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview
 *SandboxApi* | [**sandboxControllerCreateRun**](docs/SandboxApi.md#sandboxcontrollercreaterun) | **POST** /sandbox/runs | Upload a file and run detectors on it
@@ -192,6 +196,7 @@ All URIs are relative to *http://localhost*
 - [FindingHistoryEntryDto](docs/FindingHistoryEntryDto.md)
 - [FindingLocationDto](docs/FindingLocationDto.md)
 - [FindingResponseDto](docs/FindingResponseDto.md)
+- [FindingsBySeverityDto](docs/FindingsBySeverityDto.md)
 - [FindingsChartsTimelineBucketDto](docs/FindingsChartsTimelineBucketDto.md)
 - [FindingsChartsTopAssetDto](docs/FindingsChartsTopAssetDto.md)
 - [FindingsChartsTotalsDto](docs/FindingsChartsTotalsDto.md)
@@ -223,6 +228,11 @@ All URIs are relative to *http://localhost*
 - [QueryDashboardMetricsDto](docs/QueryDashboardMetricsDto.md)
 - [QueryMetricDto](docs/QueryMetricDto.md)
 - [QueryMetricTimeSeriesDto](docs/QueryMetricTimeSeriesDto.md)
+- [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)
+- [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
+- [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
+- [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
+- [RunnerAssetStatusUpdateItem](docs/RunnerAssetStatusUpdateItem.md)
 - [RunnerDto](docs/RunnerDto.md)
 - [RunnerLogEntryDto](docs/RunnerLogEntryDto.md)
 - [RunnerLogsResponseDto](docs/RunnerLogsResponseDto.md)
@@ -256,6 +266,10 @@ All URIs are relative to *http://localhost*
 - [SearchFindingsResponseDto](docs/SearchFindingsResponseDto.md)
 - [SearchRunnerItemDto](docs/SearchRunnerItemDto.md)
 - [SearchRunnerLogsBodyDto](docs/SearchRunnerLogsBodyDto.md)
+- [SearchRunnersAssetsFiltersInputDto](docs/SearchRunnersAssetsFiltersInputDto.md)
+- [SearchRunnersAssetsPageDto](docs/SearchRunnersAssetsPageDto.md)
+- [SearchRunnersAssetsRequestDto](docs/SearchRunnersAssetsRequestDto.md)
+- [SearchRunnersAssetsResponseDto](docs/SearchRunnersAssetsResponseDto.md)
 - [SearchRunnersChartsOptionsDto](docs/SearchRunnersChartsOptionsDto.md)
 - [SearchRunnersChartsRequestDto](docs/SearchRunnersChartsRequestDto.md)
 - [SearchRunnersChartsResponseDto](docs/SearchRunnersChartsResponseDto.md)
@@ -290,6 +304,7 @@ All URIs are relative to *http://localhost*
 - [UpdateMcpTokenDto](docs/UpdateMcpTokenDto.md)
 - [UpdateMetricDefinitionDto](docs/UpdateMetricDefinitionDto.md)
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)
+- [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)
 
 ### Authorization
