@@ -7727,6 +7727,7 @@
           "language": {
             "type": "string",
             "enum": [
+              "AUTOMATIC",
               "ENGLISH",
               "GERMAN"
             ],
@@ -7734,12 +7735,13 @@
           },
           "timezone": {
             "type": "string",
-            "description": "Default IANA timezone used for date/time rendering.",
-            "example": "UTC"
+            "description": "Default IANA timezone used for date/time rendering. Use \"AUTOMATIC\" to detect from browser.",
+            "example": "AUTOMATIC"
           },
           "timeFormat": {
             "type": "string",
             "enum": [
+              "AUTOMATIC",
               "TWELVE_HOUR",
               "TWENTY_FOUR_HOUR"
             ],
@@ -7787,6 +7789,7 @@
           "language": {
             "type": "string",
             "enum": [
+              "AUTOMATIC",
               "ENGLISH",
               "GERMAN"
             ],
@@ -7800,6 +7803,7 @@
           "timeFormat": {
             "type": "string",
             "enum": [
+              "AUTOMATIC",
               "TWELVE_HOUR",
               "TWENTY_FOUR_HOUR"
             ],

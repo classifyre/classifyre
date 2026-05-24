@@ -56,6 +56,7 @@ export interface UpdateInstanceSettingsDto {
  * @export
  */
 export const UpdateInstanceSettingsDtoLanguageEnum = {
+    Automatic: 'AUTOMATIC',
     English: 'ENGLISH',
     German: 'GERMAN'
 } as const;
@@ -65,6 +66,7 @@ export type UpdateInstanceSettingsDtoLanguageEnum = typeof UpdateInstanceSetting
  * @export
  */
 export const UpdateInstanceSettingsDtoTimeFormatEnum = {
+    Automatic: 'AUTOMATIC',
     TwelveHour: 'TWELVE_HOUR',
     TwentyFourHour: 'TWENTY_FOUR_HOUR'
 } as const;
