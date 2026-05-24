@@ -44,7 +44,7 @@ export interface InstanceSettingsResponseDto {
      */
     language: InstanceSettingsResponseDtoLanguageEnum;
     /**
-     * Default IANA timezone used for date/time rendering.
+     * Default IANA timezone used for date/time rendering. Use "AUTOMATIC" to detect from browser.
      * @type {string}
      * @memberof InstanceSettingsResponseDto
      */
@@ -80,6 +80,7 @@ export interface InstanceSettingsResponseDto {
  * @export
  */
 export const InstanceSettingsResponseDtoLanguageEnum = {
+    Automatic: 'AUTOMATIC',
     English: 'ENGLISH',
     German: 'GERMAN'
 } as const;
@@ -89,6 +90,7 @@ export type InstanceSettingsResponseDtoLanguageEnum = typeof InstanceSettingsRes
  * @export
  */
 export const InstanceSettingsResponseDtoTimeFormatEnum = {
+    Automatic: 'AUTOMATIC',
     TwelveHour: 'TWELVE_HOUR',
     TwentyFourHour: 'TWENTY_FOUR_HOUR'
 } as const;
