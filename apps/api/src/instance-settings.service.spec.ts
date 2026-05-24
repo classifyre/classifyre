@@ -104,6 +104,44 @@ describe('InstanceSettingsService', () => {
     expect(result.aiEnabled).toBe(false);
   });
 
+  it('persists AUTOMATIC language setting', async () => {
+    const now = new Date('2026-03-05T12:00:00.000Z');
+    mockPrismaService.instanceSettings.upsert.mockResolvedValue({
+      id: 1,
+      aiEnabled: true,
+      mcpEnabled: true,
+      language: InstanceLanguage.ENGLISH,
+      timezone: 'UTC',
+      timeFormat: InstanceTimeFormat.TWELVE_HOUR,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    mockPrismaService.instanceSettings.update.mockResolvedValue({
+      id: 1,
+      aiEnabled: true,
+      mcpEnabled: true,
+      language: 'AUTOMATIC' as InstanceLanguage,
+      timezone: 'UTC',
+      timeFormat: InstanceTimeFormat.TWELVE_HOUR,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const result = await service.updateSettings({
+      language: 'AUTOMATIC',
+    });
+
+    expect(mockPrismaService.instanceSettings.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          language: 'AUTOMATIC',
+        }),
+      }),
+    );
+    expect(result.language).toBe('AUTOMATIC');
+  });
+
   it('rejects empty timezone values', async () => {
     mockPrismaService.instanceSettings.upsert.mockResolvedValue({
       id: 1,

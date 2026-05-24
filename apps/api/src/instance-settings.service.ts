@@ -35,9 +35,9 @@ export class InstanceSettingsService {
         id: INSTANCE_SETTINGS_ID,
         aiEnabled: true,
         mcpEnabled: true,
-        language: 'ENGLISH',
-        timezone: 'UTC',
-        timeFormat: 'TWELVE_HOUR',
+        language: 'AUTOMATIC',
+        timezone: 'AUTOMATIC',
+        timeFormat: 'AUTOMATIC',
       },
       update: {},
     });
@@ -53,10 +53,12 @@ export class InstanceSettingsService {
   ): Promise<InstanceSettingsResponseDto> {
     await this.ensureSingleton();
 
-    const timezone = updateDto.timezone?.trim();
-    if (updateDto.timezone !== undefined && !timezone) {
+    const rawTimezone = updateDto.timezone?.trim();
+    if (updateDto.timezone !== undefined && !rawTimezone) {
       throw new BadRequestException('timezone cannot be empty');
     }
+    // Allow "AUTOMATIC" as a special value (resolved client-side)
+    const timezone = rawTimezone;
 
     const data: Prisma.InstanceSettingsUpdateInput = {
       ...(updateDto.aiEnabled !== undefined

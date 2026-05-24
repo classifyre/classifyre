@@ -7,6 +7,7 @@ type TranslationObject = { [key: string]: string | TranslationObject };
 type Translations = typeof en;
 
 const translationMap: Record<string, Translations> = {
+  AUTOMATIC: en,
   ENGLISH: en,
   GERMAN: de,
 };
