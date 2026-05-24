@@ -85,7 +85,8 @@
     "statusError": "Fehler",
     "statusPending": "Ausstehend",
     "statusWarning": "Warnung",
-    "notSet": "Nicht festgelegt"
+    "notSet": "Nicht festgelegt",
+    "language": "Sprache"
   },
   "settings": {
     "title": "Einstellungen",
@@ -104,6 +105,7 @@
     "timeFormat12": "12-Stunden (08:45 PM)",
     "timeFormat24": "24-Stunden (20:45)",
     "languages": {
+      "AUTOMATIC": "Automatisch",
       "ENGLISH": "English",
       "GERMAN": "Deutsch"
     }
