@@ -45,7 +45,7 @@ type SortOrder = "asc" | "desc";
 const DEFAULT_TAKE = 100;
 
 export interface LogFetchParams {
-  skip?: number;
+  cursor?: string;
   take?: number;
   search?: string;
   levels?: string[];
@@ -157,9 +157,7 @@ export function RunnerLogViewer({
 
   // ── data state ────────────────────────────────────────────────────────────
   const [entries, setEntries] = useState<RunnerLogEntryDto[]>([]);
-  // How many entries we've loaded from the server (not counting WS-prepended ones).
-  // Used as the skip offset for "Load More".
-  const [serverFetchedCount, setServerFetchedCount] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -186,7 +184,7 @@ export function RunnerLogViewer({
     setLoading(true);
     try {
       const resp = await fetchFnRef.current({
-        skip: 0,
+        cursor: "0",
         take: DEFAULT_TAKE,
         sortOrder: sortOrderRef.current,
         search: searchRef.current,
@@ -194,7 +192,7 @@ export function RunnerLogViewer({
         ...params,
       });
       setEntries(resp.entries ?? []);
-      setServerFetchedCount(resp.entries?.length ?? 0);
+      setNextCursor(resp.nextCursor ?? undefined);
       setHasMore(resp.hasMore ?? false);
     } catch (err) {
       console.error("Failed to fetch logs:", err);
@@ -208,21 +206,21 @@ export function RunnerLogViewer({
     setIsLoadingMore(true);
     try {
       const resp = await fetchFnRef.current({
-        skip: serverFetchedCount,
+        cursor: nextCursor,
         take: DEFAULT_TAKE,
         sortOrder: sortOrderRef.current,
         search: searchRef.current,
         levels: levelFilterRef.current,
       });
       setEntries((prev) => [...prev, ...(resp.entries ?? [])]);
-      setServerFetchedCount((prev) => prev + (resp.entries?.length ?? 0));
+      setNextCursor(resp.nextCursor ?? undefined);
       setHasMore(resp.hasMore ?? false);
     } catch (err) {
       console.error("Failed to load more logs:", err);
     } finally {
       setIsLoadingMore(false);
     }
-  }, [serverFetchedCount]);
+  }, [nextCursor]);
 
   // ── initial load ──────────────────────────────────────────────────────────
   const initialMount = useRef(true);

@@ -180,11 +180,11 @@ export default function RunnerDetailPage() {
   );
 
   const fetchLogsFn = useCallback(
-    (params: { skip?: number; take?: number; search?: string; levels?: string[]; sortOrder?: "asc" | "desc" }) =>
+    (params: { cursor?: string; take?: number; search?: string; levels?: string[]; sortOrder?: "asc" | "desc" }) =>
       api.runners.cliRunnerControllerSearchRunnerLogs({
         runnerId,
         searchRunnerLogsBodyDto: {
-          skip: params.skip,
+          cursor: params.cursor,
           take: params.take ?? 200,
           search: params.search,
           levels: params.levels as never[],
@@ -295,14 +295,14 @@ export default function RunnerDetailPage() {
 
     const PAGE = 1000;
     const aggregated: RunnerLogEntryDto[] = [];
-    let skip = 0;
+    let cursor: string | undefined = "0";
     let hasMore = true;
 
-    while (hasMore && skip < 1_000_000) {
-      const response = await fetchLogsFn({ skip, take: PAGE, sortOrder: "asc" });
+    while (hasMore) {
+      const response = await fetchLogsFn({ cursor, take: PAGE, sortOrder: "asc" });
       aggregated.push(...(response.entries ?? []));
-      hasMore = Boolean(response.hasMore);
-      skip += PAGE;
+      hasMore = Boolean(response.hasMore && response.nextCursor);
+      cursor = response.nextCursor ?? undefined;
     }
 
     return aggregated;
