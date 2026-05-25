@@ -2,23 +2,19 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
   CustomDetector,
   CustomDetectorTrainingRun,
   CustomDetectorTrainingStatus,
-  FindingStatus,
   Prisma,
 } from '@prisma/client';
-
-export enum CustomDetectorMethod {
-  RULESET = 'RULESET',
-  CLASSIFIER = 'CLASSIFIER',
-  ENTITY = 'ENTITY',
-}
 import { createHash, randomUUID } from 'crypto';
+import { spawn } from 'child_process';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import * as XLSX from 'xlsx';
 import { PrismaService } from './prisma.service';
@@ -36,6 +32,11 @@ import {
   ParsedTrainingExampleDto,
   ParseTrainingExamplesSkippedReasonsDto,
 } from './dto/parse-training-examples-response.dto';
+import {
+  SaveTrainingExamplesDto,
+  TrainingExampleDto,
+  TrainingExamplesStatsDto,
+} from './dto/training-example.dto';
 
 type JsonRecord = Record<string, unknown>;
 type DetectorUsageStats = {
@@ -100,26 +101,6 @@ function asString(value: unknown): string | null {
     : null;
 }
 
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map((entry) => asString(entry))
-    .filter((entry): entry is string => Boolean(entry));
-}
-
-function resolveMethod(config: JsonRecord): CustomDetectorMethod {
-  const method = asString(config.method)?.toUpperCase();
-  if (method === CustomDetectorMethod.RULESET)
-    return CustomDetectorMethod.RULESET;
-  if (method === CustomDetectorMethod.CLASSIFIER)
-    return CustomDetectorMethod.CLASSIFIER;
-  if (method === CustomDetectorMethod.ENTITY)
-    return CustomDetectorMethod.ENTITY;
-  return CustomDetectorMethod.RULESET;
-}
-
 function normalizeHeaderCell(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, '_');
 }
@@ -137,11 +118,13 @@ function stringifySpreadsheetCell(value: unknown): string {
   if (value instanceof Date) {
     return value.toISOString();
   }
-  return JSON.stringify(value).trim();
+  return JSON.stringify(value);
 }
 
 @Injectable()
 export class CustomDetectorsService {
+  private readonly logger = new Logger(CustomDetectorsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   private parseDelimitedLine(line: string, delimiter: string): string[] {
@@ -715,206 +698,61 @@ export class CustomDetectorsService {
       : `cust_${randomUUID().slice(0, 8)}`;
   }
 
-  private buildDefaultConfig(params: {
+  private buildDefaultPipelineSchema(params: {
     key: string;
     name: string;
     description?: string | null;
-    method: CustomDetectorMethod;
   }): JsonRecord {
-    const { key, name, description, method } = params;
+    const { key, name, description } = params;
     return {
       custom_detector_key: key,
       name,
       description: description ?? undefined,
-      method,
       languages: ['de', 'en'],
       confidence_threshold: 0.7,
       max_findings: 100,
-      ruleset: {
-        regex_rules: [],
-        keyword_rules: [],
-      },
-      classifier: {
-        labels: [],
-        zero_shot_model: 'MoritzLaurer/mDeBERTa-v3-base-mnli-xnli',
-        hypothesis_template: 'This text contains {}.',
-        training_examples: [],
-        min_examples_per_label: 8,
-        setfit_model:
-          'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2',
-      },
-      entity: {
-        entity_labels: [],
-        entity_descriptions: {},
-        model: 'fastino/gliner2-base-v1',
+      pipeline_schema: {
+        model: { name: 'fastino/gliner2-base-v1', path: null },
+        entities: {},
+        classification: {},
+        validation: { confidence_threshold: 0.7, rules: [] },
       },
     };
   }
 
-  private normalizeClassifierSection(classifierInput: JsonRecord): JsonRecord {
-    const rawLabels = Array.isArray(classifierInput.labels)
-      ? classifierInput.labels
-      : [];
-
-    // Normalize labels to {id, name} objects — plain strings are auto-converted.
-    const normalizedLabels = rawLabels
-      .map((label) => {
-        if (typeof label === 'string' && label.trim()) {
-          const name = label.trim();
-          return { id: this.normalizeKey(name), name };
-        }
-        const obj = asRecord(label);
-        const name = asString(obj.name);
-        const id = asString(obj.id) ?? (name ? this.normalizeKey(name) : null);
-        if (!id || !name) return null;
-        const entry: JsonRecord = { id, name };
-        const desc = asString(obj.description);
-        if (desc) entry.description = desc;
-        return entry;
-      })
-      .filter((l): l is JsonRecord => l !== null);
-
-    // Build name→id map so training example labels can be remapped from
-    // human-readable names (legacy) to stable IDs (canonical).
-    const labelNameToId = new Map<string, string>(
-      normalizedLabels.map((l) => [String(l.name), String(l.id)]),
-    );
-
-    const rawExamples = Array.isArray(classifierInput.training_examples)
-      ? classifierInput.training_examples
-      : [];
-
-    const normalizedExamples = rawExamples.map((example) => {
-      const obj = asRecord(example);
-      const rawLabel = asString(obj.label);
-      if (!rawLabel) return obj;
-      // Remap label from name → id when they differ (legacy plain-string labels).
-      const mappedId = labelNameToId.get(rawLabel);
-      if (mappedId && mappedId !== rawLabel) {
-        return { ...obj, label: mappedId };
-      }
-      return obj;
-    });
-
-    return {
-      ...classifierInput,
-      labels: normalizedLabels,
-      training_examples: normalizedExamples,
-    };
-  }
-
-  /**
-   * Normalize the ruleset section so regex_rules and keyword_rules match the
-   * CLI's Pydantic schema (CustomRegexRule / CustomKeywordRule).
-   *
-   * Legacy detectors stored rules with { label, case_sensitive } fields (old
-   * assistant-generated format) but the CLI model requires { id, name, flags }
-   * and has extra='forbid', so those extra fields cause 169 validation errors.
-   *
-   * This shim converts on the fly without touching the DB records.
-   */
-  private normalizeRulesetSection(
-    raw: Record<string, unknown>,
-  ): Record<string, unknown> {
-    const regexRules = Array.isArray(raw.regex_rules)
-      ? (raw.regex_rules as Array<Record<string, unknown>>).map((rule, i) => {
-          const out: Record<string, unknown> = { ...rule };
-          // label → id + name
-          const label = typeof out.label === 'string' ? out.label : `rule_${i}`;
-          if (!out.id) out.id = label;
-          if (!out.name) out.name = label;
-          // case_sensitive → flags  (regex rules use flags, not case_sensitive)
-          if (out.flags === undefined || out.flags === null) {
-            out.flags = out.case_sensitive ? '' : 'i';
-          }
-          // Remove fields that are extra-forbidden in CLI's CustomRegexRule
-          delete out.label;
-          delete out.case_sensitive;
-          return out;
-        })
-      : raw.regex_rules;
-
-    const keywordRules = Array.isArray(raw.keyword_rules)
-      ? (raw.keyword_rules as Array<Record<string, unknown>>).map((rule, i) => {
-          const out: Record<string, unknown> = { ...rule };
-          // keywords: old format stored singular `keyword` (string) instead of
-          // `keywords` (list). Normalise to list if needed.
-          if (!Array.isArray(out.keywords)) {
-            const single = typeof out.keyword === 'string' ? out.keyword : null;
-            out.keywords = single ? [single] : [];
-          }
-          // id + name: derive from label or keyword value or index
-          const derived =
-            (typeof out.label === 'string' ? out.label : null) ??
-            (Array.isArray(out.keywords) && typeof out.keywords[0] === 'string'
-              ? out.keywords[0]
-              : null) ??
-            `rule_${i}`;
-          if (!out.id) out.id = derived;
-          if (!out.name) out.name = derived;
-          // Remove extra-forbidden fields
-          delete out.label;
-          delete out.keyword; // singular → replaced by keywords[]
-          delete out.weight; // not in CLI schema
-          return out;
-        })
-      : raw.keyword_rules;
-
-    return {
-      ...raw,
-      ...(regexRules !== undefined ? { regex_rules: regexRules } : {}),
-      ...(keywordRules !== undefined ? { keyword_rules: keywordRules } : {}),
-    };
-  }
-
-  private canonicalizeConfig(input: {
+  private canonicalizePipelineSchema(input: {
     key: string;
     name: string;
     description?: string | null;
-    method: CustomDetectorMethod;
-    config?: Record<string, unknown>;
+    pipelineSchema: Record<string, unknown>;
   }): JsonRecord {
-    const defaults = this.buildDefaultConfig(input);
-    const incoming = asRecord(input.config);
+    const incoming = input.pipelineSchema;
+    const schemaType = (incoming.type as string | undefined) ?? 'GLINER2';
 
-    const ruleset = this.normalizeRulesetSection({
-      ...asRecord(defaults.ruleset),
-      ...asRecord(incoming.ruleset),
-    });
-    const classifierMerged = {
-      ...asRecord(defaults.classifier),
-      ...asRecord(incoming.classifier),
-    };
-    const classifier = this.normalizeClassifierSection(classifierMerged);
-    const entity = {
-      ...asRecord(defaults.entity),
-      ...asRecord(incoming.entity),
-    };
+    // Transformer pipeline types store config directly in pipeline_schema —
+    // don't merge GLINER2 defaults (entities/classification/validation) on top.
+    if (CustomDetectorsService.TRANSFORMER_PIPELINE_TYPES.has(schemaType)) {
+      const config: JsonRecord = {
+        custom_detector_key: input.key,
+        name: input.name,
+        pipeline_schema: incoming,
+      };
+      if (input.description) config.description = input.description;
+      return config;
+    }
 
-    const languages = asStringArray(incoming.languages);
-
-    // Pass extractor through as-is (no normalization needed)
-    const extractor =
-      incoming.extractor !== undefined ? incoming.extractor : undefined;
+    const defaults = this.buildDefaultPipelineSchema(input);
 
     const config: JsonRecord = {
       ...defaults,
-      ...incoming,
       custom_detector_key: input.key,
       name: input.name,
-      description: input.description ?? incoming.description,
-      method: input.method,
-      languages: languages.length > 0 ? languages : defaults.languages,
-      ruleset,
-      classifier,
-      entity,
+      description: input.description ?? undefined,
+      pipeline_schema: {
+        ...asRecord(defaults.pipeline_schema),
+        ...asRecord(incoming),
+      },
     };
-
-    if (extractor !== undefined) {
-      config.extractor = extractor;
-    } else if ('extractor' in config) {
-      delete config.extractor;
-    }
 
     for (const [entryKey, entryValue] of Object.entries(config)) {
       if (entryValue === undefined) {
@@ -925,45 +763,79 @@ export class CustomDetectorsService {
     return config;
   }
 
-  private validateCustomConfig(config: JsonRecord): void {
-    const key = asString(config.custom_detector_key);
-    if (!key) {
+  private static readonly TRANSFORMER_PIPELINE_TYPES = new Set([
+    'TEXT_CLASSIFICATION',
+    'IMAGE_CLASSIFICATION',
+    'FEATURE_EXTRACTION',
+    'OBJECT_DETECTION',
+  ]);
+
+  private validatePipelineSchema(schema: Record<string, unknown>): void {
+    const schemaType = (schema.type as string | undefined) ?? 'GLINER2';
+    const validTypes = [
+      'GLINER2',
+      'REGEX',
+      'LLM',
+      'TEXT_CLASSIFICATION',
+      'IMAGE_CLASSIFICATION',
+      'FEATURE_EXTRACTION',
+      'OBJECT_DETECTION',
+    ];
+    if (!validTypes.includes(schemaType)) {
       throw new BadRequestException(
-        'custom_detector_key is required for custom detector config',
+        `Unknown pipeline schema type '${schemaType}'. Must be one of: ${validTypes.join(', ')}`,
       );
     }
 
-    const name = asString(config.name);
-    if (!name) {
-      throw new BadRequestException(
-        'name is required for custom detector config',
-      );
+    if (schemaType === 'REGEX') {
+      const hasPatterns =
+        schema.patterns &&
+        typeof schema.patterns === 'object' &&
+        Object.keys(schema.patterns).length > 0;
+      if (!hasPatterns) {
+        throw new BadRequestException(
+          'REGEX pipeline schema must define at least one pattern',
+        );
+      }
+      return;
     }
 
-    const method = asString(config.method)?.toUpperCase();
-    if (
-      method !== CustomDetectorMethod.RULESET &&
-      method !== CustomDetectorMethod.CLASSIFIER &&
-      method !== CustomDetectorMethod.ENTITY
-    ) {
-      throw new BadRequestException(
-        'method must be one of RULESET, CLASSIFIER, ENTITY',
-      );
+    if (schemaType === 'LLM') {
+      if (!schema.prompt || typeof schema.prompt !== 'string') {
+        throw new BadRequestException(
+          'LLM pipeline schema must define a prompt string',
+        );
+      }
+      return;
     }
 
-    if (method === CustomDetectorMethod.RULESET && !asRecord(config.ruleset)) {
-      throw new BadRequestException('ruleset config is required for RULESET');
+    // Transformer pipeline types — require a model (except IMAGE_CLASSIFICATION which has a default)
+    if (CustomDetectorsService.TRANSFORMER_PIPELINE_TYPES.has(schemaType)) {
+      if (
+        schemaType !== 'IMAGE_CLASSIFICATION' &&
+        (!schema.model || typeof schema.model !== 'string')
+      ) {
+        throw new BadRequestException(
+          `${schemaType} pipeline schema must define a model`,
+        );
+      }
+      return;
     }
-    if (
-      method === CustomDetectorMethod.CLASSIFIER &&
-      !asRecord(config.classifier)
-    ) {
+
+    // GLINER2 — default
+    const hasEntities =
+      schema.entities &&
+      typeof schema.entities === 'object' &&
+      Object.keys(schema.entities).length > 0;
+    const hasClassification =
+      schema.classification &&
+      typeof schema.classification === 'object' &&
+      Object.keys(schema.classification).length > 0;
+
+    if (!hasEntities && !hasClassification) {
       throw new BadRequestException(
-        'classifier config is required for CLASSIFIER',
+        'Pipeline schema must define at least one entity or one classification task',
       );
-    }
-    if (method === CustomDetectorMethod.ENTITY && !asRecord(config.entity)) {
-      throw new BadRequestException('entity config is required for ENTITY');
     }
   }
 
@@ -1004,7 +876,7 @@ export class CustomDetectorsService {
       key: detector.key,
       name: detector.name,
       description: detector.description,
-      pipelineSchema: asRecord(detector.pipelineSchema),
+      pipelineSchema: asRecord((detector as any).pipelineSchema),
       isActive: detector.isActive,
       version: detector.version,
       lastTrainedAt: detector.lastTrainedAt,
@@ -1157,16 +1029,7 @@ export class CustomDetectorsService {
     dto: CreateCustomDetectorDto,
   ): Promise<CustomDetectorResponseDto> {
     const key = this.normalizeKey(dto.key ?? `cust_${dto.name}`);
-    const pipelineSchema = asRecord(dto.pipelineSchema);
-    const method = resolveMethod(pipelineSchema);
-    const config = this.canonicalizeConfig({
-      key,
-      name: dto.name,
-      description: dto.description,
-      method,
-      config: pipelineSchema,
-    });
-    this.validateCustomConfig(config);
+    this.validatePipelineSchema(dto.pipelineSchema);
 
     let detector;
     try {
@@ -1175,9 +1038,9 @@ export class CustomDetectorsService {
           key,
           name: dto.name,
           description: dto.description,
-          pipelineSchema: config as Prisma.InputJsonValue,
+          pipelineSchema: dto.pipelineSchema as Prisma.InputJsonValue,
           isActive: dto.isActive ?? true,
-        },
+        } as any,
         include: {
           trainingRuns: { orderBy: { createdAt: 'desc' }, take: 1 },
           _count: { select: { findings: true } },
@@ -1210,24 +1073,21 @@ export class CustomDetectorsService {
     const nextName = dto.name ?? existing.name;
     const nextDescription =
       dto.description !== undefined ? dto.description : existing.description;
-
-    const existingConfig = asRecord(existing.pipelineSchema);
-    const incomingConfig =
+    const nextPipelineSchema =
       dto.pipelineSchema !== undefined
-        ? asRecord(dto.pipelineSchema)
-        : existingConfig;
-    const nextMethod = resolveMethod(incomingConfig);
-    const nextConfig = this.canonicalizeConfig({
-      key: nextKey,
-      name: nextName,
-      description: nextDescription,
-      method: nextMethod,
-      config: incomingConfig,
-    });
-    this.validateCustomConfig(nextConfig);
+        ? dto.pipelineSchema
+        : (asRecord((existing as any).pipelineSchema) as Record<
+            string,
+            unknown
+          >);
+
+    if (dto.pipelineSchema !== undefined) {
+      this.validatePipelineSchema(nextPipelineSchema);
+    }
 
     const nextVersion =
-      stableStringify(nextConfig) !== stableStringify(existingConfig)
+      stableStringify(nextPipelineSchema) !==
+      stableStringify((existing as any).pipelineSchema)
         ? existing.version + 1
         : existing.version;
 
@@ -1239,10 +1099,10 @@ export class CustomDetectorsService {
           key: nextKey,
           name: nextName,
           description: nextDescription,
-          pipelineSchema: nextConfig as Prisma.InputJsonValue,
           isActive: dto.isActive ?? existing.isActive,
+          pipelineSchema: nextPipelineSchema as Prisma.InputJsonValue,
           version: nextVersion,
-        },
+        } as any,
         include: {
           trainingRuns: { orderBy: { createdAt: 'desc' }, take: 1 },
           _count: { select: { findings: true } },
@@ -1310,17 +1170,11 @@ export class CustomDetectorsService {
 
     return customExamples
       .map((raw) => asRecord(raw))
-      .map((example) => {
-        const pipelineSchema = asRecord(
-          example.pipelineSchema ?? example.config,
-        );
-        return {
-          name: asString(example.name) ?? 'Custom Detector Example',
-          description:
-            asString(example.description) ?? 'Custom detector example',
-          pipelineSchema,
-        };
-      });
+      .map((example) => ({
+        name: asString(example.name) ?? 'Custom Detector Example',
+        description: asString(example.description) ?? 'Custom detector example',
+        pipelineSchema: asRecord(example.pipelineSchema ?? example.config),
+      }));
   }
 
   async assertActiveDetectorIds(ids: unknown): Promise<string[]> {
@@ -1393,27 +1247,24 @@ export class CustomDetectorsService {
     return normalizedIds
       .map((id) => byId.get(id))
       .filter((row): row is CustomDetector => Boolean(row))
-      .map((row) => {
-        const pipelineSchema = asRecord(row.pipelineSchema);
-        const method = resolveMethod(pipelineSchema);
-        const config = this.canonicalizeConfig({
-          key: row.key,
-          name: row.name,
-          description: row.description,
-          method,
-          config: pipelineSchema,
-        });
-        return {
-          id: row.id,
-          key: row.key,
-          name: row.name,
-          detector: {
-            type: 'CUSTOM' as const,
-            enabled: true,
-            config,
+      .map((row) => ({
+        id: row.id,
+        key: row.key,
+        name: row.name,
+        detector: {
+          type: 'CUSTOM' as const,
+          enabled: true,
+          config: {
+            custom_detector_key: row.key,
+            name: row.name,
+            description: row.description,
+            languages: ['de', 'en'],
+            confidence_threshold: 0.7,
+            max_findings: 100,
+            pipeline_schema: asRecord((row as any).pipelineSchema),
           },
-        };
-      });
+        },
+      }));
   }
 
   /**
@@ -1451,37 +1302,122 @@ export class CustomDetectorsService {
     return normalizedKeys
       .map((key) => byKey.get(key))
       .filter((row): row is CustomDetector => Boolean(row))
-      .map((row) => {
-        const pipelineSchema = asRecord(row.pipelineSchema);
-        const method = resolveMethod(pipelineSchema);
-        const config = this.canonicalizeConfig({
-          key: row.key,
-          name: row.name,
-          description: row.description,
-          method,
-          config: pipelineSchema,
-        });
-        return {
-          id: row.id,
-          key: row.key,
-          name: row.name,
-          detector: {
-            type: 'CUSTOM' as const,
-            enabled: true,
-            config,
+      .map((row) => ({
+        id: row.id,
+        key: row.key,
+        name: row.name,
+        detector: {
+          type: 'CUSTOM' as const,
+          enabled: true,
+          config: {
+            custom_detector_key: row.key,
+            name: row.name,
+            description: row.description,
+            languages: ['de', 'en'],
+            confidence_threshold: 0.7,
+            max_findings: 100,
+            pipeline_schema: asRecord((row as any).pipelineSchema),
           },
-        };
-      });
+        },
+      }));
   }
 
-  private labelFromFindingType(value: string | null): string | null {
-    const raw = asString(value);
-    if (!raw || !raw.toLowerCase().startsWith('class:')) {
-      return null;
+  // ── Training examples CRUD ─────────────────────────────────────────────────
+
+  async saveTrainingExamples(
+    detectorId: string,
+    dto: SaveTrainingExamplesDto,
+  ): Promise<{ saved: number }> {
+    const detector = await this.prisma.customDetector.findUnique({
+      where: { id: detectorId },
+      select: { id: true },
+    });
+    if (!detector) {
+      throw new NotFoundException(`Custom detector ${detectorId} not found`);
     }
-    const label = raw.slice('class:'.length).trim();
-    return label.length > 0 ? label : null;
+
+    if (dto.clearExisting) {
+      await this.prisma.customDetectorTrainingExample.deleteMany({
+        where: { customDetectorId: detectorId },
+      });
+    }
+
+    if (dto.examples.length === 0) return { saved: 0 };
+
+    await this.prisma.customDetectorTrainingExample.createMany({
+      data: dto.examples.map((ex) => ({
+        customDetectorId: detectorId,
+        label: ex.label,
+        text: ex.text,
+        value: ex.value ?? null,
+        accepted: ex.accepted,
+        source: ex.source ?? null,
+      })),
+    });
+
+    return { saved: dto.examples.length };
   }
+
+  async listTrainingExamples(
+    detectorId: string,
+  ): Promise<TrainingExampleDto[]> {
+    const detector = await this.prisma.customDetector.findUnique({
+      where: { id: detectorId },
+      select: { id: true },
+    });
+    if (!detector) {
+      throw new NotFoundException(`Custom detector ${detectorId} not found`);
+    }
+
+    return this.prisma.customDetectorTrainingExample.findMany({
+      where: { customDetectorId: detectorId },
+      orderBy: [{ label: 'asc' }, { createdAt: 'asc' }],
+    });
+  }
+
+  async getTrainingExamplesStats(
+    detectorId: string,
+  ): Promise<TrainingExamplesStatsDto> {
+    const examples = await this.prisma.customDetectorTrainingExample.findMany({
+      where: { customDetectorId: detectorId },
+      select: { label: true, accepted: true },
+    });
+
+    const byLabel: Record<string, { positive: number; negative: number }> = {};
+    for (const ex of examples) {
+      if (!byLabel[ex.label]) byLabel[ex.label] = { positive: 0, negative: 0 };
+      if (ex.accepted) byLabel[ex.label].positive++;
+      else byLabel[ex.label].negative++;
+    }
+
+    return { total: examples.length, byLabel };
+  }
+
+  async deleteTrainingExample(
+    detectorId: string,
+    exampleId: string,
+  ): Promise<void> {
+    const example = await this.prisma.customDetectorTrainingExample.findFirst({
+      where: { id: exampleId, customDetectorId: detectorId },
+    });
+    if (!example) {
+      throw new NotFoundException(`Training example ${exampleId} not found`);
+    }
+    await this.prisma.customDetectorTrainingExample.delete({
+      where: { id: exampleId },
+    });
+  }
+
+  async clearTrainingExamples(
+    detectorId: string,
+  ): Promise<{ deleted: number }> {
+    const result = await this.prisma.customDetectorTrainingExample.deleteMany({
+      where: { customDetectorId: detectorId },
+    });
+    return { deleted: result.count };
+  }
+
+  // ── Training ───────────────────────────────────────────────────────────────
 
   async train(
     id: string,
@@ -1490,10 +1426,8 @@ export class CustomDetectorsService {
     const detector = await this.prisma.customDetector.findUnique({
       where: { id },
     });
-
-    if (!detector) {
-      throw new NotFoundException(`Custom detector with ID ${id} not found`);
-    }
+    if (!detector)
+      throw new NotFoundException(`Custom detector ${id} not found`);
 
     if (dto.sourceId) {
       const source = await this.prisma.source.findUnique({
@@ -1501,154 +1435,237 @@ export class CustomDetectorsService {
         select: { id: true },
       });
       if (!source) {
-        throw new BadRequestException(
-          `Source ${dto.sourceId} does not exist for training scope`,
-        );
+        throw new BadRequestException(`Source ${dto.sourceId} not found`);
       }
     }
+
+    const examples = await this.prisma.customDetectorTrainingExample.findMany({
+      where: { customDetectorId: id },
+      orderBy: [{ label: 'asc' }, { createdAt: 'asc' }],
+    });
 
     const startedAt = Date.now();
     const run = await this.prisma.customDetectorTrainingRun.create({
       data: {
         customDetectorId: detector.id,
-        sourceId: dto.sourceId,
+        sourceId: dto.sourceId ?? null,
         status: CustomDetectorTrainingStatus.RUNNING,
       },
     });
 
+    // Fire training in the background — return RUNNING immediately so the API
+    // response is not blocked by a potentially long fine-tuning job.
+    void this._runTrainingBackground(detector, run.id, examples, startedAt);
+
+    return this.toTrainingRunDto(run);
+  }
+
+  private async _runTrainingBackground(
+    detector: CustomDetector,
+    runId: string,
+    examples: Array<{
+      label: string;
+      text: string | null;
+      value: string | null | undefined;
+      accepted: boolean;
+      source: string | null | undefined;
+    }>,
+    startedAt: number,
+  ): Promise<void> {
     try {
-      const config = asRecord(detector.pipelineSchema);
-      const method = resolveMethod(config);
-      const classifier = asRecord(config.classifier);
-      const labels = asStringArray(
-        Array.isArray(classifier.labels)
-          ? classifier.labels.map((entry) => asRecord(entry).id)
-          : [],
-      );
-
-      const feedbackRows = await this.prisma.customDetectorFeedback.findMany({
-        where: {
-          AND: [
-            dto.sourceId ? { sourceId: dto.sourceId } : {},
-            {
-              OR: [
-                { customDetectorId: detector.id },
-                { customDetectorKey: detector.key },
-              ],
-            },
-          ],
-        },
-      });
-
-      const editorExamples = Array.isArray(classifier.training_examples)
-        ? classifier.training_examples.map((entry) => asRecord(entry))
-        : [];
-
-      const positiveCounts = new Map<string, number>();
-      let positiveExamples = 0;
-      let negativeExamples = 0;
-
-      for (const example of editorExamples) {
-        const accepted = example.accepted !== false;
-        if (accepted) {
-          positiveExamples += 1;
-        } else {
-          negativeExamples += 1;
-        }
-        const label = asString(example.label);
-        if (accepted && label) {
-          positiveCounts.set(label, (positiveCounts.get(label) ?? 0) + 1);
-        }
-      }
-
-      for (const row of feedbackRows) {
-        if (row.status === FindingStatus.RESOLVED) {
-          positiveExamples += 1;
-          const label =
-            asString(row.label) ?? this.labelFromFindingType(row.findingType);
-          if (label) {
-            positiveCounts.set(label, (positiveCounts.get(label) ?? 0) + 1);
-          }
-        } else if (
-          row.status === FindingStatus.FALSE_POSITIVE ||
-          row.status === FindingStatus.IGNORED
-        ) {
-          negativeExamples += 1;
-        }
-      }
-
-      const minExamples =
-        typeof classifier.min_examples_per_label === 'number' &&
-        classifier.min_examples_per_label > 0
-          ? classifier.min_examples_per_label
-          : 8;
-
-      const readyForSetFit =
-        method === CustomDetectorMethod.CLASSIFIER &&
-        labels.length > 0 &&
-        labels.every(
-          (label) => (positiveCounts.get(label) ?? 0) >= minExamples,
-        );
-
-      const strategy =
-        method === CustomDetectorMethod.CLASSIFIER
-          ? readyForSetFit
-            ? 'SETFIT'
-            : 'ZERO_SHOT'
-          : method;
-
+      const pipelineSchema = asRecord((detector as any).pipelineSchema);
       const configHash = createHash('sha256')
-        .update(stableStringify(config))
+        .update(stableStringify(pipelineSchema))
         .digest('hex');
 
-      const durationMs = Date.now() - startedAt;
+      const cacheRoot =
+        process.env.CLASSIFYRE_MODEL_CACHE_DIR ??
+        path.join(os.homedir(), '.cache', 'classifyre');
+      const artifactDir = path.join(
+        cacheRoot,
+        'custom-detectors',
+        detector.key,
+        configHash,
+      );
+
+      const cliResult = await this.invokeCliTrain({
+        pipelineSchema,
+        examples: examples.map((e) => ({
+          label: e.label,
+          text: e.text ?? '',
+          value: e.value,
+          accepted: e.accepted,
+          source: e.source,
+        })),
+        outputDir: artifactDir,
+      });
+
+      const strategy = 'GLINER2_PIPELINE';
       const summary = {
         strategy,
-        trained_examples: positiveExamples + negativeExamples,
-        positive_examples: positiveExamples,
-        negative_examples: negativeExamples,
-        min_examples_per_label: minExamples,
-        label_coverage: Object.fromEntries(positiveCounts.entries()),
+        config_hash: configHash,
+        entity_count: Object.keys(asRecord(pipelineSchema.entities ?? {}))
+          .length,
+        classification_task_count: Object.keys(
+          asRecord(pipelineSchema.classification ?? {}),
+        ).length,
+        trained_examples: cliResult.trained_examples,
       };
 
-      const completed = await this.prisma.customDetectorTrainingRun.update({
-        where: { id: run.id },
+      await this.prisma.customDetectorTrainingRun.update({
+        where: { id: runId },
         data: {
           status: CustomDetectorTrainingStatus.SUCCEEDED,
           strategy,
           completedAt: new Date(),
-          durationMs,
-          trainedExamples: positiveExamples + negativeExamples,
-          positiveExamples,
-          negativeExamples,
-          metrics: summary as Prisma.InputJsonValue,
+          durationMs: Date.now() - startedAt,
+          trainedExamples: cliResult.trained_examples,
+          positiveExamples: cliResult.positive_examples,
+          negativeExamples: cliResult.negative_examples,
+          metrics: {
+            ...summary,
+            ...(cliResult.metrics ?? {}),
+          } as Prisma.InputJsonValue,
           configHash,
-          modelArtifactPath: `${process.env.CLASSIFYRE_MODEL_CACHE_DIR ?? '~/.cache/classifyre'}/custom-detectors/${detector.key}/${configHash}`,
+          modelArtifactPath: cliResult.model_artifact_path,
         },
       });
+
+      // Wire trained model path back into pipeline schema so runner uses it
+      const updatedSchema = {
+        ...pipelineSchema,
+        model: {
+          ...asRecord(pipelineSchema.model ?? {}),
+          path: cliResult.model_artifact_path,
+        },
+      };
 
       await this.prisma.customDetector.update({
         where: { id: detector.id },
         data: {
           lastTrainedAt: new Date(),
           lastTrainingSummary: summary as Prisma.InputJsonValue,
+          pipelineSchema: updatedSchema as Prisma.InputJsonValue,
         },
       });
-
-      return this.toTrainingRunDto(completed);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const failed = await this.prisma.customDetectorTrainingRun.update({
-        where: { id: run.id },
-        data: {
-          status: CustomDetectorTrainingStatus.FAILED,
-          completedAt: new Date(),
-          durationMs: Date.now() - startedAt,
-          errorMessage: message,
-        },
-      });
-      return this.toTrainingRunDto(failed);
+      this.logger.error(`Training run ${runId} failed: ${message}`);
+      await this.prisma.customDetectorTrainingRun
+        .update({
+          where: { id: runId },
+          data: {
+            status: CustomDetectorTrainingStatus.FAILED,
+            completedAt: new Date(),
+            durationMs: Date.now() - startedAt,
+            errorMessage: message,
+          },
+        })
+        .catch((dbErr: unknown) => {
+          this.logger.error(
+            `Failed to mark training run ${runId} as FAILED: ${String(dbErr)}`,
+          );
+        });
     }
+  }
+
+  private invokeCliTrain(params: {
+    pipelineSchema: Record<string, unknown>;
+    examples: Array<{
+      label: string;
+      text: string;
+      value?: string | null;
+      accepted: boolean;
+      source?: string | null;
+    }>;
+    outputDir: string;
+  }): Promise<{
+    status: string;
+    trained_examples: number;
+    positive_examples: number;
+    negative_examples: number;
+    model_artifact_path: string;
+    metrics?: Record<string, unknown>;
+  }> {
+    const tmpDir = os.tmpdir();
+    const uid = randomUUID();
+    const schemaPath = path.join(tmpDir, `cdet-schema-${uid}.json`);
+    const examplesPath = path.join(tmpDir, `cdet-examples-${uid}.json`);
+
+    fs.writeFileSync(schemaPath, JSON.stringify(params.pipelineSchema));
+    fs.writeFileSync(examplesPath, JSON.stringify(params.examples));
+
+    return new Promise((resolve, reject) => {
+      // Prefer explicit override, then fall back to the CLI venv python so that
+      // the full custom-detector dependency group (gliner2, setfit, etc.) is available.
+      const defaultCliPath = path.resolve(__dirname, '../../../cli');
+      const cliPath = process.env.CLI_PATH
+        ? path.isAbsolute(process.env.CLI_PATH)
+          ? process.env.CLI_PATH
+          : path.resolve(__dirname, '../..', process.env.CLI_PATH)
+        : defaultCliPath;
+      const venvPython = path.join(cliPath, '.venv', 'bin', 'python');
+      const pythonBin = process.env.CLASSIFYRE_PYTHON_BIN ?? venvPython;
+      const child = spawn(
+        pythonBin,
+        [
+          '-m',
+          'src.main',
+          'train',
+          '--pipeline-schema',
+          schemaPath,
+          '--examples',
+          examplesPath,
+          '--output-dir',
+          params.outputDir,
+        ],
+        { stdio: ['ignore', 'pipe', 'pipe'], cwd: cliPath },
+      );
+
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (d: Buffer) => {
+        stdout += d.toString();
+      });
+      child.stderr.on('data', (d: Buffer) => {
+        stderr += d.toString();
+      });
+
+      const cleanup = () => {
+        try {
+          fs.unlinkSync(schemaPath);
+        } catch {
+          /* ignore */
+        }
+        try {
+          fs.unlinkSync(examplesPath);
+        } catch {
+          /* ignore */
+        }
+      };
+
+      child.on('close', (code) => {
+        cleanup();
+        if (code !== 0) {
+          reject(new Error(`CLI train exited ${code}: ${stderr.slice(-2000)}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(stdout.trim()));
+        } catch {
+          reject(
+            new Error(
+              `CLI train produced invalid JSON output: ${stdout.slice(-500)}`,
+            ),
+          );
+        }
+      });
+
+      child.on('error', (err) => {
+        cleanup();
+        reject(new Error(`Failed to spawn CLI trainer: ${err.message}`));
+      });
+    });
   }
 
   async getTrainingHistory(
@@ -1659,9 +1676,8 @@ export class CustomDetectorsService {
       where: { id },
       select: { id: true },
     });
-    if (!detector) {
-      throw new NotFoundException(`Custom detector with ID ${id} not found`);
-    }
+    if (!detector)
+      throw new NotFoundException(`Custom detector ${id} not found`);
 
     const runs = await this.prisma.customDetectorTrainingRun.findMany({
       where: { customDetectorId: id },

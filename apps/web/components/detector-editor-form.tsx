@@ -226,6 +226,7 @@ export const DetectorEditorForm = React.forwardRef<
       }}
       submitLabel={t("common.save")}
       isSubmitting={isSaving}
+      embedded={embedded}
       onSubmit={async (payload: CustomDetectorEditorSubmit) => {
         await handleSave({
           name: payload.name,
