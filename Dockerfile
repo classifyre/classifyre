@@ -102,12 +102,11 @@ RUN curl -fsSL https://bun.sh/install | bash -s -- bun-v${BUN_VERSION}
 ENV PATH="/root/.bun/bin:${PATH}" \
     HUSKY=0
 COPY . .
-# Remove frontend workspaces before installing — the web/blog/docs are injected
-# as pre-built artifacts (--build-context web-dist=...) so bun never needs to
-# resolve next, @next/swc-linux-arm64-gnu, or other large optional native binaries
-# that caused integrity check failures under QEMU on Apple M-series.
+RUN bun install --frozen-lockfile
+# Remove frontend workspace source after installing — web/blog/docs are injected
+# as pre-built artifacts (--build-context web-dist=…) and their source isn't
+# needed here. Installed packages in node_modules are kept.
 RUN rm -rf apps/web apps/blog apps/docs
-RUN bun install
 RUN cd apps/api && bun run prisma:generate
 COPY --from=api-source / /repo/apps/api/dist/
 
