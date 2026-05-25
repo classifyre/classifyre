@@ -6,12 +6,12 @@ ARG S6_OVERLAY_VERSION=3.2.2.0
 ARG PG_MAJOR=18
 ARG UV_VERSION=0.10.2
 ARG BUN_VERSION=1.3.4
-ARG SEAWEEDFS_VERSION=3.80
+ARG SEAWEEDFS_VERSION=4.28
 
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-bin
 
 # ── seaweedfs-bin: download the weed binary for the target architecture ───────
-FROM busybox AS seaweedfs-bin
+FROM alpine:3 AS seaweedfs-bin
 ARG TARGETARCH
 ARG SEAWEEDFS_VERSION
 RUN set -eux; \
