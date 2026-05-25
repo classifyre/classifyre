@@ -151,12 +151,6 @@ jobs:
             kubectl -n "${HELM_NAMESPACE}" rollout status deployment/"${HELM_RELEASE_NAME}-${deployment}" --timeout=10m
           done
 
-      - name: Force api rollout
-        run: |
-          set -euo pipefail
-          kubectl -n "${HELM_NAMESPACE}" rollout restart deployment/"${HELM_RELEASE_NAME}-api"
-          kubectl -n "${HELM_NAMESPACE}" rollout status deployment/"${HELM_RELEASE_NAME}-api" --timeout=10m
-
       - name: Show rollout status
         env:
           HELM_RELEASE_NAME: ${{ steps.env.outputs.release_name }}
