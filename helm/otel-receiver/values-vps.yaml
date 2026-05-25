@@ -46,6 +46,12 @@ opentelemetry-collector:
           processors: [memory_limiter, batch]
           exporters: [debug, loki]
 
+promtail:
+  enabled: true
+  config:
+    clients:
+      - url: http://otel-receiver-loki-gateway/loki/api/v1/push
+
 grafana:
   service:
     type: NodePort
