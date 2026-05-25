@@ -176,7 +176,7 @@ export class SourceService {
 
     for (const { id } of sourceRunners) {
       try {
-        await this.runnerLogStorage.deleteRunnerLogs(sourceId, id);
+        await this.runnerLogStorage.deleteRunnerLogs(id);
       } catch (error) {
         this.logger.error(
           `Failed to delete runner logs for runner ${id} before deleting source ${sourceId}: ${String(error)}`,
