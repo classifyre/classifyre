@@ -107,7 +107,7 @@ COPY . .
 # resolve next, @next/swc-linux-arm64-gnu, or other large optional native binaries
 # that caused integrity check failures under QEMU on Apple M-series.
 RUN rm -rf apps/web apps/blog apps/docs
-RUN bun install --frozen-lockfile
+RUN bun install
 RUN cd apps/api && bun run prisma:generate
 COPY --from=api-source / /repo/apps/api/dist/
 
