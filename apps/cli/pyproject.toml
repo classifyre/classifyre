@@ -145,7 +145,7 @@ mongodb = [
     "pymongo>=4.17.0,<5.0.0",
 ]
 neo4j = [
-    "neo4j>=5.0.0,<6.0.0",
+    "neo4j>=5.0.0,<7.0.0",
 ]
 tableau = [
     "tableauserverclient>=0.38,<1.0.0",
