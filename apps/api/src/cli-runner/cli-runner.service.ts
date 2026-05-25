@@ -339,9 +339,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
     sourceId: string,
     errorMessage: string,
   ): Promise<void> {
-    await Promise.resolve(
-      this.runnerLogStorage.finalizeRunner(sourceId, runnerId),
-    ).catch(() => undefined);
+    await Promise.resolve(this.runnerLogStorage.finalizeRunner(runnerId)).catch(
+      () => undefined,
+    );
 
     await this.prisma.$transaction(async (tx) => {
       await tx.runner.update({
@@ -496,7 +496,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         ...source,
         config: recipeWithFeedback,
       };
-      await this.runnerLogStorage.initializeRunner(sourceId, runner.id);
+      await this.runnerLogStorage.initializeRunner(runner.id);
     } catch (error) {
       this.logger.error(
         `Failed to initialize run setup for runner ${runner.id}: ${String(error)}`,
@@ -877,7 +877,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
     );
 
     try {
-      await this.runnerLogStorage.initializeRunner(sourceId, runner.id);
+      await this.runnerLogStorage.initializeRunner(runner.id);
     } catch (error) {
       this.logger.error(
         `Failed to initialize logs for external runner ${runner.id}: ${String(error)}`,
@@ -1544,16 +1544,13 @@ export class CliRunnerService implements OnApplicationBootstrap {
     killTimer.unref?.();
   }
 
-  private appendLog(
+  private async appendLog(
     runnerId: string,
     chunk: string,
     stream: 'stderr' | 'stdout' | 'combined' = 'stderr',
-  ): void {
+  ) {
     try {
-      const entries = this.runnerLogStorage.appendChunk(runnerId, chunk, stream);
-      if (entries.length && this.runnerEventsGateway) {
-        this.runnerEventsGateway.emitRunnerLogs(runnerId, entries);
-      }
+      await this.runnerLogStorage.appendChunk(runnerId, chunk, stream);
     } catch (error) {
       this.logger.error(`Failed to append log for runner ${runnerId}:`, error);
     }
@@ -1656,6 +1653,8 @@ export class CliRunnerService implements OnApplicationBootstrap {
   }
 
   private async completeRunner(runnerId: string) {
+    await this.runnerLogStorage.finalizeRunner(runnerId);
+
     const completedAt = new Date();
     const runner = await this.prisma.runner.findUnique({
       where: { id: runnerId },
@@ -1665,14 +1664,6 @@ export class CliRunnerService implements OnApplicationBootstrap {
         },
       },
     });
-
-    await this.runnerLogStorage
-      .finalizeRunner(runner?.source?.id ?? runner?.sourceId ?? '', runnerId)
-      .catch((err) => {
-        this.logger.warn(
-          `Failed to finalize logs for runner ${runnerId}: ${String(err)}`,
-        );
-      });
 
     if (!runner?.startedAt) {
       this.logger.warn(`Runner ${runnerId} has no startedAt`);
@@ -1883,6 +1874,8 @@ export class CliRunnerService implements OnApplicationBootstrap {
     errorMessage: string,
     errorDetails: any,
   ) {
+    await this.runnerLogStorage.finalizeRunner(runnerId);
+
     const normalizedMessage =
       typeof errorMessage === 'string' && errorMessage.trim().length > 0
         ? errorMessage.slice(0, 4000)
@@ -1904,14 +1897,6 @@ export class CliRunnerService implements OnApplicationBootstrap {
       this.logger.warn(`Runner ${runnerId} disappeared before it could fail`);
       return;
     }
-
-    await this.runnerLogStorage
-      .finalizeRunner(runnerRef.sourceId, runnerId)
-      .catch((err) => {
-        this.logger.warn(
-          `Failed to finalize logs for runner ${runnerId}: ${String(err)}`,
-        );
-      });
 
     try {
       await this.transitionRunnerToTerminalState({
@@ -2082,7 +2067,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
     for (const { id } of toDelete) {
       try {
-        await this.runnerLogStorage.deleteRunnerLogs(sourceId, id);
+        await this.runnerLogStorage.deleteRunnerLogs(id);
         await this.prisma.runner.delete({ where: { id } });
       } catch (error) {
         this.logger.warn(
@@ -2405,13 +2390,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       }
     }
 
-    await this.runnerLogStorage
-      .finalizeRunner(runner.sourceId, runnerId)
-      .catch((err) => {
-        this.logger.warn(
-          `Failed to finalize logs for runner ${runnerId}: ${String(err)}`,
-        );
-      });
+    await this.runnerLogStorage.finalizeRunner(runnerId);
     await this.transitionRunnerToTerminalState({
       runnerId,
       sourceId: runner.sourceId,
@@ -2448,7 +2427,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       );
     }
 
-    await this.runnerLogStorage.deleteRunnerLogs(runner.sourceId, runnerId);
+    await this.runnerLogStorage.deleteRunnerLogs(runnerId);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.runner.delete({ where: { id: runnerId } });
@@ -2494,7 +2473,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
   }) {
     const runner = await this.prisma.runner.findUnique({
       where: { id: params.runnerId },
-      select: { id: true, sourceId: true },
+      select: { id: true },
     });
 
     if (!runner) {
@@ -2503,10 +2482,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       );
     }
 
-    return this.runnerLogStorage.listLogs({
-      ...params,
-      sourceId: runner.sourceId,
-    });
+    return this.runnerLogStorage.listLogs(params);
   }
 
   private normalizeStringArray(value: unknown): string[] | undefined {
@@ -3120,7 +3096,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         ...source,
         config: recipeWithFeedback,
       };
-      await this.runnerLogStorage.initializeRunner(source.id, pending.id);
+      await this.runnerLogStorage.initializeRunner(pending.id);
 
       const hasSuccessfulRuns = !!(await this.prisma.runner.findFirst({
         where: { sourceId: source.id, status: RunnerStatus.COMPLETED },
