@@ -98,7 +98,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.cliJobs.serviceAccountName | string | `""` | Service account for CLI jobs. Empty uses API service account. |
 | api.cliJobs.tolerations | list | `[]` | CLI job scheduling: tolerations. |
 | api.cliJobs.ttlSecondsAfterFinished | int | `1800` | TTL for completed CLI jobs (seconds). Ignored when cleanup policy deletes jobs immediately. |
-| api.cliJobs.uvCache.accessModes | list | `["ReadWriteMany"]` | Access modes for uv cache PVC. |
+| api.cliJobs.uvCache.accessModes | list | `["ReadWriteOnce"]` | Access modes for uv cache PVC. |
 | api.cliJobs.uvCache.enabled | bool | `true` | Enable shared PVC for uv cache. |
 | api.cliJobs.uvCache.existingClaim | string | `""` | Existing PVC name for uv cache. Empty creates a new PVC. |
 | api.cliJobs.uvCache.mountPath | string | `"/cache/uv"` | Mount path for uv cache in CLI job container. |
@@ -156,7 +156,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.replicaCount | int | `2` | Number of API replicas when autoscaling is disabled. |
 | api.resources.limits | object | `{"cpu":"1","memory":"1Gi"}` | API resource limits. |
 | api.resources.requests | object | `{"cpu":"250m","memory":"512Mi"}` | API resource requests. |
-| api.runnerLogs.accessModes | list | `["ReadWriteMany"]` | Access modes for runner logs PVC. |
+| api.runnerLogs.accessModes | list | `["ReadWriteOnce"]` | Access modes for runner logs PVC. |
 | api.runnerLogs.enabled | bool | `true` | Enable PVC-backed storage for runner logs. |
 | api.runnerLogs.existingClaim | string | `""` | Existing PVC name for runner logs. Empty creates a new PVC. |
 | api.runnerLogs.mountPath | string | `"/var/lib/classifyre/runner-logs"` | Mount path for runner logs directory. |

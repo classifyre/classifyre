@@ -234,7 +234,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 20Gi
@@ -251,7 +251,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 20Gi
