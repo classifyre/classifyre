@@ -1667,7 +1667,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
     });
 
     await this.runnerLogStorage
-      .finalizeRunner(runner?.source?.id ?? runner?.sourceId ?? '', runnerId)
+      .finalizeRunner(
+        runner?.source?.id ?? runner?.sourceId ?? this.runnerLogStorage.getRunnerSourceId(runnerId) ?? '',
+        runnerId,
+      )
       .catch((err) => {
         this.logger.warn(
           `Failed to finalize logs for runner ${runnerId}: ${String(err)}`,
