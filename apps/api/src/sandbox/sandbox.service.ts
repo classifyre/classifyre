@@ -766,19 +766,19 @@ export class SandboxService {
       .rm(this.getSandboxSharedDir(id), { recursive: true, force: true })
       .catch(() => undefined);
 
-    // Count references BEFORE deleting so we know whether this is the last
-    // run sharing this content. This avoids a race where a concurrent create
-    // could sneak in between delete and count, causing us to delete an S3
-    // object that the new run still references.
+    // Count and delete inside a transaction so the refcount is taken under
+    // the same row lock as the delete, preventing a concurrent rerunRun from
+    // sneaking in between count and delete and losing its S3 object reference.
     let isLastReference = false;
-    if (run.s3Key && run.contentHash && this.sandboxFileStorage.isEnabled) {
-      const refCount = await this.prisma.sandboxRun.count({
-        where: { contentHash: run.contentHash },
-      });
-      isLastReference = refCount === 1; // only this run references it
-    }
-
-    await this.prisma.sandboxRun.delete({ where: { id } });
+    await this.prisma.$transaction(async (tx) => {
+      if (run.s3Key && run.contentHash && this.sandboxFileStorage.isEnabled) {
+        const refCount = await tx.sandboxRun.count({
+          where: { contentHash: run.contentHash },
+        });
+        isLastReference = refCount === 1;
+      }
+      await tx.sandboxRun.delete({ where: { id } });
+    });
 
     if (isLastReference && run.s3Key) {
       await this.sandboxFileStorage.deleteFile(run.s3Key, 0);

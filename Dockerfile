@@ -16,12 +16,11 @@ ARG TARGETARCH
 ARG SEAWEEDFS_VERSION
 RUN set -eux; \
     case "${TARGETARCH}" in \
-      amd64) weed_arch="linux_amd64" ;; \
-      arm64) weed_arch="linux_arm64" ;; \
+      amd64|arm64) : ;; \
       *) echo "Unsupported TARGETARCH: ${TARGETARCH}" && exit 1 ;; \
     esac; \
     wget -q -O /tmp/weed.tar.gz \
-      "https://github.com/seaweedfs/seaweedfs/releases/download/${SEAWEEDFS_VERSION}/linux_${TARGETARCH##*/}.tar.gz"; \
+      "https://github.com/seaweedfs/seaweedfs/releases/download/${SEAWEEDFS_VERSION}/linux_${TARGETARCH}.tar.gz"; \
     mkdir -p /out; \
     tar -C /out -xzf /tmp/weed.tar.gz weed; \
     chmod +x /out/weed; \

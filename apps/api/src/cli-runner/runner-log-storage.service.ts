@@ -41,6 +41,7 @@ interface ResolvedListParams {
   sortOrder: 'asc' | 'desc';
   searchLower: string;
   levelFilter: Set<string>;
+  streamFilter: Set<string>;
 }
 
 @Injectable()
@@ -145,6 +146,11 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
+
+  /** Returns the sourceId recorded at initializeRunner time, or undefined if unknown. */
+  getRunnerSourceId(runnerId: string): string | undefined {
+    return this.runnerSourceIds.get(runnerId);
+  }
 
   async initializeRunner(sourceId: string, runnerId: string): Promise<void> {
     this.inMemoryLogs.set(runnerId, []);
@@ -285,10 +291,10 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     allEntries: RunnerLogEntryDto[],
     params: ResolvedListParams,
   ): RunnerLogsResponseDto {
-    const { take, skip, sortOrder, searchLower, levelFilter } = params;
+    const { take, skip, sortOrder, searchLower, levelFilter, streamFilter } = params;
 
     const filtered = allEntries.filter((e) =>
-      this.matchesFilter(e, searchLower, levelFilter, new Set()),
+      this.matchesFilter(e, searchLower, levelFilter, streamFilter),
     );
     const total = filtered.length;
 
@@ -588,12 +594,14 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     take?: number | string;
     search?: string;
     levels?: string[];
+    streams?: string[];
     sortOrder?: 'asc' | 'desc';
   }): ResolvedListParams {
     const take = this.resolveTake(params.take);
     const sortOrder = params.sortOrder === 'desc' ? 'desc' : 'asc';
     const searchLower = params.search?.trim().toLowerCase() ?? '';
     const levelFilter = new Set((params.levels ?? []).map((l) => l.toUpperCase()));
+    const streamFilter = new Set((params.streams ?? []).map((s) => s.toLowerCase()));
 
     // `skip` takes precedence over cursor
     let skip = 0;
@@ -603,7 +611,7 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
       skip = this.parseIndexCursor(params.cursor);
     }
 
-    return { take, skip, sortOrder, searchLower, levelFilter };
+    return { take, skip, sortOrder, searchLower, levelFilter, streamFilter };
   }
 
   private parseIndexCursor(cursor?: string): number {
