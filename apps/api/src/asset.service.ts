@@ -881,7 +881,7 @@ export class AssetService {
           finding.metadata != null &&
           typeof finding.metadata === 'object' &&
           !Array.isArray(finding.metadata)
-            ? (finding.metadata as Record<string, unknown>)
+            ? finding.metadata
             : undefined,
         resolutionReason: finding.resolutionReason ?? undefined,
         firstDetectedAt: finding.firstDetectedAt ?? undefined,

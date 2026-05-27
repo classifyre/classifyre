@@ -63,13 +63,10 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components";
 import { getSourceIcon } from "../lib/source-type-icon";
+import { RunnerStatusBadge } from "./runner-status-badge";
+import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
 import { mergeRunnerIntoSearchSourceItem } from "@/lib/runner-ws-merge";
 import { DeleteSourceAction } from "./delete-source-action";
-import {
-  getRunnerStatusBadgeLabel,
-  getRunnerStatusBadgeTone,
-  isRunnerStatusRunning,
-} from "../lib/runner-status-badge";
 import { useUrlParams } from "../lib/url-filters";
 import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import { useTranslation } from "@/hooks/use-translation";
@@ -145,10 +142,6 @@ function getPageItems(current: number, total: number) {
   if (current > 2) pages.add(current - 1);
   if (current < total - 1) pages.add(current + 1);
   return Array.from(pages).sort((a, b) => a - b);
-}
-
-function isSourceRunning(status?: string | null) {
-  return status?.toUpperCase() === "RUNNING";
 }
 
 function formatCronSchedule(
@@ -592,7 +585,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
               <TableBody>
                 {items.map((source) => {
                   const runner = source.latestRunner;
-                  const isRunning = isSourceRunning(source.runnerStatus);
+                  const isRunning = isRunnerStatusRunning(source.runnerStatus);
                   const isRowActionPending =
                     activeAction?.sourceId === source.id;
                   const isStopping =
@@ -662,32 +655,10 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                             className="h-auto justify-start p-0 hover:bg-transparent"
                             onClick={() => router.push(`/scans/${runner.id}`)}
                           >
-                            <Badge
-                              className={`rounded-[4px] border ${getRunnerStatusBadgeTone(source.runnerStatus)}`}
-                            >
-                              {isRunnerStatusRunning(source.runnerStatus) && (
-                                <Spinner
-                                  size="sm"
-                                  className="gap-0 [&_svg]:size-3"
-                                  data-icon="inline-start"
-                                />
-                              )}
-                              {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
-                            </Badge>
+                            <RunnerStatusBadge status={source.runnerStatus} />
                           </Button>
                         ) : (
-                          <Badge
-                            className={`rounded-[4px] border ${getRunnerStatusBadgeTone(source.runnerStatus)}`}
-                          >
-                            {isRunnerStatusRunning(source.runnerStatus) && (
-                              <Spinner
-                                size="sm"
-                                className="gap-0 [&_svg]:size-3"
-                                data-icon="inline-start"
-                              />
-                            )}
-                            {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
-                          </Badge>
+                          <RunnerStatusBadge status={source.runnerStatus} />
                         )}
                         {runner?.durationMs != null && (
                           <p className="mt-1 text-[10px] text-muted-foreground">

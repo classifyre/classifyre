@@ -14,7 +14,8 @@ import {
 import { PageTitle } from "@/components/page-title";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { semanticApi, type GlossaryTerm } from "@/lib/semantic-api";
-import { ArrowRight, BarChart3 } from "lucide-react";
+import { api, type CustomDetectorResponseDto } from "@workspace/api-client";
+import { ArrowRight, BarChart3, Sparkles } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 
 export default function GlossaryTermDetailPage() {
@@ -25,6 +26,9 @@ export default function GlossaryTermDetailPage() {
 
   const [term, setTerm] = useState<GlossaryTerm | null>(null);
   const [findingCount, setFindingCount] = useState<number | null>(null);
+  const [linkedDetectors, setLinkedDetectors] = useState<
+    CustomDetectorResponseDto[]
+  >([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,6 +40,16 @@ export default function GlossaryTermDetailPage() {
         ]);
         setTerm(termData);
         setFindingCount(preview.findingCount);
+
+        // Load custom detectors linked via filterMapping.customDetectorKeys
+        const keys: string[] =
+          termData.filterMapping?.customDetectorKeys ?? [];
+        if (keys.length > 0) {
+          const all = await api.listCustomDetectors({ includeInactive: true });
+          setLinkedDetectors(
+            (all ?? []).filter((d) => keys.includes(d.key)),
+          );
+        }
       } catch (err) {
         console.error("Failed to load glossary term:", err);
       } finally {
@@ -160,6 +174,46 @@ export default function GlossaryTermDetailPage() {
             ))}
           </div>
         </section>
+      )}
+
+      {/* Linked Detectors */}
+      {linkedDetectors.length > 0 && (
+        <Card className="rounded-[6px] border-2 border-black shadow-[6px_6px_0_#000]">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm uppercase tracking-[0.06em]">
+                Auto-Detection
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {linkedDetectors.map((det) => (
+              <button
+                key={det.id}
+                type="button"
+                onClick={() => router.push(`/detectors/${det.id}`)}
+                className="group flex w-full items-center justify-between rounded-[4px] border-2 border-border bg-background px-3 py-2.5 text-left transition-all hover:-translate-y-px hover:bg-secondary/30"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">{det.name}</p>
+                  <p className="font-mono text-[10px] text-muted-foreground">
+                    {det.key} · {det.method}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant={det.isActive ? "default" : "outline"}
+                    className="text-[9px]"
+                  >
+                    {det.isActive ? "active" : "inactive"}
+                  </Badge>
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5" />
+                </div>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
       )}
 
       {/* Metadata */}

@@ -87,7 +87,7 @@ describe('search', () => {
     const { controller, service } = createController();
     service.search.mockResolvedValue({ items: [], total: 0 });
 
-    await controller.search('det-1', { sourceId: 'src-1' } as any);
+    await controller.search('det-1', { sourceId: 'src-1' });
 
     expect(service.search).toHaveBeenCalledWith(
       expect.objectContaining({ customDetectorId: 'det-1', sourceId: 'src-1' }),

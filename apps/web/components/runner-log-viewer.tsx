@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RunnerLogEntryDto, RunnerLogEntryDtoLevelEnum } from "@workspace/api-client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { RunnerLogEntryDto, RunnerLogEntryDtoLevelEnum, RunnerLogsResponseDto } from "@workspace/api-client";
 import { RunnerLogEntryDtoLevelEnum as LevelEnum } from "@workspace/api-client";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -16,12 +16,6 @@ import { EmptyState } from "@workspace/ui/components/empty-state";
 import { Input } from "@workspace/ui/components/input";
 import { Toggle } from "@workspace/ui/components/toggle";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   MultiSelect,
   MultiSelectContent,
   MultiSelectGroup,
@@ -48,6 +42,8 @@ import { useTranslation } from "@/hooks/use-translation";
 type LogLevel = RunnerLogEntryDtoLevelEnum;
 type SortOrder = "asc" | "desc";
 
+const DEFAULT_TAKE = 100;
+
 export interface LogFetchParams {
   cursor?: string;
   take?: number;
@@ -58,15 +54,16 @@ export interface LogFetchParams {
 
 export interface RunnerLogViewerProps {
   runnerId: string;
-  entries: RunnerLogEntryDto[];
-  hasMore: boolean;
-  loading: boolean;
-  loadingMore: boolean;
   isRunning: boolean;
-  autoRefreshEnabled: boolean;
-  onAutoRefreshChange: (enabled: boolean) => void;
-  onFetch: (params: LogFetchParams, append: boolean) => Promise<void>;
-  nextCursor: string | null;
+  /** Pass the WebSocket connection state so the viewer can skip polling when live. */
+  isWsConnected?: boolean;
+  /**
+   * Stable fetch function — called by the viewer for initial load, filter
+   * changes, Load More, and polling fallback. Must NOT change identity on every render.
+   */
+  fetchFn: (params: LogFetchParams) => Promise<RunnerLogsResponseDto>;
+  /** Live entries pushed via WebSocket; prepended when desc + no active filters. */
+  wsEntries?: RunnerLogEntryDto[];
   onDownloadAll?: () => Promise<RunnerLogEntryDto[]>;
 }
 
@@ -81,12 +78,12 @@ const ALL_LEVELS: LogLevel[] = [
 ];
 
 const LEVEL_CLASS: Record<LogLevel, string> = {
-  TRACE: "border-muted-foreground/30 text-muted-foreground",
-  DEBUG: "border-cyan-500/40 text-cyan-600 dark:text-cyan-400",
-  INFO: "border-blue-500/40 text-blue-600 dark:text-blue-400",
-  WARN: "border-amber-500/40 text-amber-600 dark:text-amber-400",
-  ERROR: "border-red-500/40 text-red-600 dark:text-red-400",
-  FATAL: "border-red-700/50 text-red-700 dark:text-red-300",
+  TRACE:   "border-muted-foreground/30 text-muted-foreground",
+  DEBUG:   "border-cyan-500/40 text-cyan-600 dark:text-cyan-400",
+  INFO:    "border-blue-500/40 text-blue-600 dark:text-blue-400",
+  WARN:    "border-amber-500/40 text-amber-600 dark:text-amber-400",
+  ERROR:   "border-red-500/40 text-red-600 dark:text-red-400",
+  FATAL:   "border-red-700/50 text-red-700 dark:text-red-300",
   UNKNOWN: "border-muted-foreground/30 text-muted-foreground",
 };
 
@@ -97,12 +94,12 @@ function formatExportTimestamp(iso?: string | null): string {
 function downloadTextFile(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
   URL.revokeObjectURL(url);
 }
 
@@ -123,131 +120,189 @@ async function copyText(content: string): Promise<void> {
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const { t } = useTranslation();
-
-  const handleClick = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    copyText(text)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      })
-      .catch(() => undefined);
-  };
-
   return (
     <Button
       variant="ghost"
       size="sm"
       className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
       title={t("runners.logs.copyRow")}
-      onClick={handleClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        copyText(text)
+          .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })
+          .catch(() => undefined);
+      }}
     >
-      {copied ? (
-        <Check className="h-3 w-3 text-green-500" />
-      ) : (
-        <Copy className="h-3 w-3" />
-      )}
+      {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
     </Button>
   );
 }
 
 export function RunnerLogViewer({
   runnerId,
-  entries,
-  hasMore,
-  loading,
-  loadingMore,
   isRunning,
-  autoRefreshEnabled,
-  onAutoRefreshChange,
-  onFetch,
-  nextCursor,
+  isWsConnected,
+  fetchFn,
+  wsEntries,
   onDownloadAll,
 }: RunnerLogViewerProps) {
   const { t } = useTranslation();
 
-  const [search, setSearch] = useState("");
+  // ── filter state ──────────────────────────────────────────────────────────
   const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [wrapLines, setWrapLines] = useState(true);
-  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
-  const [following, setFollowing] = useState(true);
-  const listRef = useRef<HTMLDivElement | null>(null);
 
-  // Debounce search input
+  // ── data state ────────────────────────────────────────────────────────────
+  const [entries, setEntries] = useState<RunnerLogEntryDto[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
+  // ── stable refs (avoid stale closures in effects) ─────────────────────────
+  const fetchFnRef = useRef(fetchFn);
+  fetchFnRef.current = fetchFn;
+  const sortOrderRef = useRef(sortOrder);
+  sortOrderRef.current = sortOrder;
+  const searchRef = useRef(search);
+  searchRef.current = search;
+  const levelFilterRef = useRef(levelFilter);
+  levelFilterRef.current = levelFilter;
+
+  // ── debounce search input ─────────────────────────────────────────────────
   useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchInput), 300);
-    return () => clearTimeout(timer);
+    const id = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(id);
   }, [searchInput]);
 
-  // Re-fetch when filters/sort change (always reset to first page)
-  const initialMount = useRef(true);
-  useEffect(() => {
-    if (initialMount.current) {
-      initialMount.current = false;
-      return;
+  // ── initial / filter-change fetch (resets list) ───────────────────────────
+  const fetchFresh = useCallback(async (params?: Partial<LogFetchParams>) => {
+    setLoading(true);
+    try {
+      const resp = await fetchFnRef.current({
+        cursor: "0",
+        take: DEFAULT_TAKE,
+        sortOrder: sortOrderRef.current,
+        search: searchRef.current,
+        levels: levelFilterRef.current,
+        ...params,
+      });
+      setEntries(resp.entries ?? []);
+      setNextCursor(resp.nextCursor ?? undefined);
+      setHasMore(resp.hasMore ?? false);
+    } catch (err) {
+      console.error("Failed to fetch logs:", err);
+    } finally {
+      setLoading(false);
     }
-    void onFetch({ cursor: "0", search, levels: levelFilter, sortOrder }, false);
-  }, [search, levelFilter, sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleScroll = useCallback(() => {
-    const el = listRef.current;
-    if (!el) return;
-    if (sortOrder === "asc") {
-      const nearBottom =
-        el.scrollHeight - el.scrollTop - el.clientHeight < 36;
-      setFollowing(nearBottom);
-    } else {
-      setFollowing(el.scrollTop < 36);
-    }
-  }, [sortOrder]);
-
-  const jumpToLatest = useCallback(() => {
-    const el = listRef.current;
-    if (!el) return;
-    el.scrollTop = sortOrder === "asc" ? el.scrollHeight : 0;
-    setFollowing(true);
-  }, [sortOrder]);
-
-  useEffect(() => {
-    if (!following) return;
-    const el = listRef.current;
-    if (!el) return;
-    el.scrollTop = sortOrder === "asc" ? el.scrollHeight : 0;
-  }, [following, entries.length, sortOrder]);
-
-  useEffect(() => {
-    setFollowing(true);
-  }, [sortOrder]);
-
-  const exportEntries = useCallback((rows: RunnerLogEntryDto[]) => {
-    return rows
-      .map((e) => `${formatExportTimestamp(e.timestamp)} [${e.level}] ${e.message}`)
-      .join("\n");
   }, []);
 
-  const handleDownloadVisible = useCallback(() => {
-    if (entries.length === 0) {
-      toast.error(t("runners.logs.noLogsDownload"));
-      return;
+  // ── load more (appends older entries) ─────────────────────────────────────
+  const handleLoadMore = useCallback(async () => {
+    setIsLoadingMore(true);
+    try {
+      const resp = await fetchFnRef.current({
+        cursor: nextCursor,
+        take: DEFAULT_TAKE,
+        sortOrder: sortOrderRef.current,
+        search: searchRef.current,
+        levels: levelFilterRef.current,
+      });
+      setEntries((prev) => [...prev, ...(resp.entries ?? [])]);
+      setNextCursor(resp.nextCursor ?? undefined);
+      setHasMore(resp.hasMore ?? false);
+    } catch (err) {
+      console.error("Failed to load more logs:", err);
+    } finally {
+      setIsLoadingMore(false);
     }
+  }, [nextCursor]);
+
+  // ── initial load ──────────────────────────────────────────────────────────
+  const initialMount = useRef(true);
+  useEffect(() => {
+    void fetchFresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runnerId]);
+
+  // ── re-fetch on filter / sort changes ────────────────────────────────────
+  useEffect(() => {
+    if (initialMount.current) { initialMount.current = false; return; }
+    void fetchFresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, levelFilter, sortOrder]);
+
+  // ── WS live push ──────────────────────────────────────────────────────────
+  // New WS entries are prepended at the top (desc: newest first) when no
+  // filters are active. We deduplicate against what's already in the list.
+  const wsEntriesPrev = useRef<RunnerLogEntryDto[] | undefined>(undefined);
+  useEffect(() => {
+    if (!wsEntries?.length || wsEntries === wsEntriesPrev.current) return;
+    wsEntriesPrev.current = wsEntries;
+
+    // Only touch the visible list when we're in desc order with no active filters.
+    // Otherwise the current view is already filtered/sorted differently.
+    if (
+      sortOrderRef.current !== "desc" ||
+      searchRef.current ||
+      levelFilterRef.current.length
+    ) return;
+
+    setEntries((prev) => {
+      const existingKeys = new Set(prev.map((e) => `${e.timestamp}|${e.message}`));
+      const newOnes = wsEntries.filter((e) => !existingKeys.has(`${e.timestamp}|${e.message}`));
+      return newOnes.length ? [...newOnes, ...prev] : prev;
+    });
+  }, [wsEntries]);
+
+  // ── polling fallback (only when WS is not connected) ─────────────────────
+  // When the WebSocket is live we rely entirely on push. If the WS is down
+  // and the run is still active, fall back to polling so the user still sees
+  // updates. We re-fetch from scratch to keep the "newest first" view fresh.
+  useEffect(() => {
+    const wsUp = isWsConnected !== false; // undefined = no WS prop → always poll
+    if (!isRunning || wsUp) return;
+
+    const id = setInterval(() => void fetchFresh(), 2500);
+    return () => clearInterval(id);
+  }, [isRunning, isWsConnected, fetchFresh]);
+
+  // ── final fetch when run completes ───────────────────────────────────────
+  // After a run finishes the backend flushes remaining buffer to S3. We wait
+  // a short moment then do one final refresh so nothing is missed.
+  const prevIsRunningRef = useRef(isRunning);
+  useEffect(() => {
+    const wasRunning = prevIsRunningRef.current;
+    prevIsRunningRef.current = isRunning;
+    if (wasRunning && !isRunning) {
+      const id = setTimeout(() => void fetchFresh(), 800);
+      return () => clearTimeout(id);
+    }
+  }, [isRunning, fetchFresh]);
+
+  // ── export helpers ────────────────────────────────────────────────────────
+  const exportEntries = useCallback(
+    (rows: RunnerLogEntryDto[]) =>
+      rows.map((e) => `${formatExportTimestamp(e.timestamp)} [${e.level}] ${e.message}`).join("\n"),
+    [],
+  );
+
+  const handleDownloadVisible = useCallback(() => {
+    if (!entries.length) { toast.error(t("runners.logs.noLogsDownload")); return; }
     downloadTextFile(`runner-${runnerId}-logs-visible.log`, exportEntries(entries));
     toast.success(t("runners.logs.downloaded"));
   }, [entries, exportEntries, runnerId, t]);
 
   const handleDownloadAll = useCallback(async () => {
-    if (!onDownloadAll) {
-      handleDownloadVisible();
-      return;
-    }
+    if (!onDownloadAll) { handleDownloadVisible(); return; }
     try {
       setIsDownloadingAll(true);
       const all = await onDownloadAll();
-      if (!all.length) {
-        toast.error(t("runners.logs.noLogsDownload"));
-        return;
-      }
+      if (!all.length) { toast.error(t("runners.logs.noLogsDownload")); return; }
       downloadTextFile(`runner-${runnerId}-logs-all.log`, exportEntries(all));
       toast.success(t("runners.logs.downloadedCount", { count: String(all.length.toLocaleString()) }));
     } catch (error) {
@@ -257,14 +312,11 @@ export function RunnerLogViewer({
     }
   }, [exportEntries, handleDownloadVisible, onDownloadAll, runnerId, t]);
 
-  const handleLoadMore = useCallback(() => {
-    void onFetch(
-      { cursor: nextCursor ?? undefined, search, levels: levelFilter, sortOrder },
-      true,
-    );
-  }, [onFetch, nextCursor, search, levelFilter, sortOrder]);
-
   const showInitialLoading = loading && entries.length === 0;
+
+  const liveStatus = isRunning
+    ? (isWsConnected ? t("runners.logs.streamingLive") : t("runners.logs.autoRefreshEnabled"))
+    : t("runners.logs.runnerCompleted");
 
   return (
     <Card>
@@ -275,38 +327,11 @@ export function RunnerLogViewer({
             <CardDescription>{t("runners.logs.description")}</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isRunning && (
-              <>
-                <span className="text-xs text-muted-foreground">
-                  {t("runners.logs.autoRefresh")}
-                </span>
-                <Toggle
-                  variant="outline"
-                  size="sm"
-                  pressed={autoRefreshEnabled}
-                  onPressedChange={onAutoRefreshChange}
-                >
-                  {autoRefreshEnabled ? t("common.on") : t("common.off")}
-                </Toggle>
-              </>
-            )}
-            <span className="text-xs text-muted-foreground">
-              {t("runners.logs.wrapLines")}
-            </span>
-            <Toggle
-              variant="outline"
-              size="sm"
-              pressed={wrapLines}
-              onPressedChange={setWrapLines}
-            >
+            <span className="text-xs text-muted-foreground">{t("runners.logs.wrapLines")}</span>
+            <Toggle variant="outline" size="sm" pressed={wrapLines} onPressedChange={setWrapLines}>
               {wrapLines ? t("common.on") : t("common.off")}
             </Toggle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void onFetch({ cursor: "0", search, levels: levelFilter, sortOrder }, false)}
-              disabled={loading}
-            >
+            <Button variant="outline" size="sm" onClick={() => void fetchFresh()} disabled={loading}>
               <RotateCcw className="mr-2 h-4 w-4" />
               {t("runners.logs.refresh")}
             </Button>
@@ -314,25 +339,18 @@ export function RunnerLogViewer({
               <Download className="mr-2 h-4 w-4" />
               {t("runners.logs.downloadVisible")}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void handleDownloadAll()}
-              disabled={isDownloadingAll}
-            >
-              {isDownloadingAll ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="mr-2 h-4 w-4" />
-              )}
+            <Button variant="outline" size="sm" onClick={() => void handleDownloadAll()} disabled={isDownloadingAll}>
+              {isDownloadingAll
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <Download className="mr-2 h-4 w-4" />}
               {t("runners.logs.downloadAll")}
             </Button>
           </div>
         </div>
 
-        {/* Filter bar — mirrors assets-table pattern */}
+        {/* Filter bar */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[240px] flex-[1.6]">
+          <div className="relative min-w-[200px] flex-[1.6]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchInput}
@@ -342,28 +360,15 @@ export function RunnerLogViewer({
             />
           </div>
 
-          <MultiSelect
-            values={levelFilter}
-            onValuesChange={(values) => setLevelFilter(values as string[])}
-          >
-            <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
+          <MultiSelect values={levelFilter} onValuesChange={(v) => setLevelFilter(v as string[])}>
+            <MultiSelectTrigger className="h-9 w-[160px] border-2 border-border rounded-[4px]">
               <MultiSelectValue placeholder={t("runners.logs.allLevels")} />
             </MultiSelectTrigger>
-            <MultiSelectContent
-              search={{
-                placeholder: t("runners.logs.searchLevels"),
-                emptyMessage: t("runners.logs.noLevelsFound"),
-              }}
-            >
+            <MultiSelectContent search={{ placeholder: t("runners.logs.searchLevels"), emptyMessage: t("runners.logs.noLevelsFound") }}>
               <MultiSelectGroup>
                 {ALL_LEVELS.map((level) => (
                   <MultiSelectItem key={level} value={level}>
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1.5 font-mono text-xs",
-                        LEVEL_CLASS[level],
-                      )}
-                    >
+                    <span className={cn("inline-flex items-center gap-1.5 font-mono text-xs", LEVEL_CLASS[level])}>
                       {level}
                     </span>
                   </MultiSelectItem>
@@ -376,21 +381,11 @@ export function RunnerLogViewer({
             variant="outline"
             size="sm"
             className="h-9 gap-1.5 border-2 border-border rounded-[4px]"
-            onClick={() =>
-              setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))
-            }
+            onClick={() => setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))}
           >
-            {sortOrder === "desc" ? (
-              <>
-                <ArrowDown className="h-3.5 w-3.5" />
-                {t("runners.logs.newestFirst")}
-              </>
-            ) : (
-              <>
-                <ArrowUp className="h-3.5 w-3.5" />
-                {t("runners.logs.oldestFirst")}
-              </>
-            )}
+            {sortOrder === "desc"
+              ? <><ArrowDown className="h-3.5 w-3.5" />{t("runners.logs.newestFirst")}</>
+              : <><ArrowUp className="h-3.5 w-3.5" />{t("runners.logs.oldestFirst")}</>}
           </Button>
         </div>
       </CardHeader>
@@ -401,15 +396,14 @@ export function RunnerLogViewer({
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : entries.length === 0 ? (
-          <EmptyState
-            icon={FileText}
-            title={t("runners.logs.noLogs")}
-            description={t("runners.logs.noLogsHint")}
-          />
+          <EmptyState icon={FileText} title={t("runners.logs.noLogs")} description={t("runners.logs.noLogsHint")} />
         ) : (
           <div className="relative overflow-hidden rounded-[4px] border bg-background">
             {/* Header row */}
-            <div className="hidden border-b bg-muted/40 px-3 py-2 md:grid md:grid-cols-[120px_84px_1fr_32px] md:gap-3">
+            <div
+              className="hidden border-b bg-muted/40 px-3 py-2 md:grid md:gap-3"
+              style={{ gridTemplateColumns: "140px 84px 1fr 32px" }}
+            >
               <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 {t("runners.logs.columns.time")}
               </span>
@@ -422,118 +416,80 @@ export function RunnerLogViewer({
               <span />
             </div>
 
-            <div
-              ref={listRef}
-              onScroll={handleScroll}
-              className="max-h-[520px] overflow-y-auto"
-            >
-              {entries.map((entry) => (
-                <div
-                  key={entry.cursor}
-                  className="group w-full border-b px-3 py-2"
-                >
-                  {/* Mobile */}
-                  <div className="flex flex-col gap-1 md:hidden">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-muted-foreground">
+            <div className="max-h-[520px] overflow-y-auto">
+              {entries.map((entry, index) => {
+                const stableKey = `${entry.timestamp ?? ""}-${index}`;
+                return (
+                  <div key={stableKey} className="group w-full border-b px-3 py-1.5 last:border-b-0">
+                    {/* Mobile */}
+                    <div className="flex flex-col gap-1 md:hidden">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {formatLogTimestamp(entry.timestamp)}
+                        </span>
+                        <Badge variant="outline" className={cn("text-[10px] uppercase", LEVEL_CLASS[entry.level as LogLevel])}>
+                          {entry.level}
+                        </Badge>
+                      </div>
+                      <p className={cn("font-mono text-xs break-all", wrapLines ? "whitespace-pre-wrap" : "line-clamp-2")}>
+                        {entry.message}
+                      </p>
+                    </div>
+
+                    {/* Desktop */}
+                    <div
+                      className="hidden items-start gap-3 font-mono text-xs md:grid"
+                      style={{ gridTemplateColumns: "140px 84px 1fr 32px" }}
+                    >
+                      <span className="text-muted-foreground truncate">
                         {formatLogTimestamp(entry.timestamp)}
                       </span>
                       <Badge
                         variant="outline"
-                        className={cn(
-                          "text-[10px] uppercase",
-                          LEVEL_CLASS[entry.level as LogLevel],
-                        )}
+                        className={cn("justify-center text-[10px] uppercase", LEVEL_CLASS[entry.level as LogLevel])}
                       >
                         {entry.level}
                       </Badge>
-                    </div>
-                    <p
-                      className={cn(
-                        "font-mono text-xs break-all",
-                        wrapLines ? "whitespace-pre-wrap" : "line-clamp-2",
-                      )}
-                    >
-                      {entry.message}
-                    </p>
-                  </div>
-
-                  {/* Desktop */}
-                  <div className="hidden items-start gap-3 font-mono text-xs md:grid md:grid-cols-[120px_84px_1fr_32px]">
-                    <span className="text-muted-foreground">
-                      {formatLogTimestamp(entry.timestamp)}
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "justify-center text-[10px] uppercase",
-                        LEVEL_CLASS[entry.level as LogLevel],
-                      )}
-                    >
-                      {entry.level}
-                    </Badge>
-                    <span
-                      className={cn(
-                        "break-all",
-                        wrapLines ? "whitespace-pre-wrap" : "truncate",
-                      )}
-                    >
-                      {entry.message}
-                    </span>
-                    <div className="flex items-start justify-end pt-0.5">
-                      <CopyButton
-                        text={`${formatExportTimestamp(entry.timestamp)} [${entry.level}] ${entry.message}`}
-                      />
+                      <span className={cn("break-all", wrapLines ? "whitespace-pre-wrap" : "truncate")}>
+                        {entry.message}
+                      </span>
+                      <div className="flex items-start justify-end pt-0.5">
+                        <CopyButton text={`${formatExportTimestamp(entry.timestamp)} [${entry.level}] ${entry.message}`} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-
-            {!following && (
-              <div className="pointer-events-none absolute bottom-3 right-3">
-                <Button
-                  size="sm"
-                  className="pointer-events-auto"
-                  onClick={jumpToLatest}
-                >
-                  {t("runners.logs.jumpToLatest")}
-                </Button>
-              </div>
-            )}
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs text-muted-foreground">
-            {isRunning
-              ? autoRefreshEnabled
-                ? t("runners.logs.autoRefreshEnabled")
-                : t("runners.logs.autoRefreshPaused")
-              : t("runners.logs.runnerCompleted")}
-          </span>
+        {/* Footer */}
+        <div className="flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            {loading && entries.length > 0 && (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-            )}
-            <span className="text-xs text-muted-foreground">
-              {entries.length.toLocaleString()}{" "}
-              {t("runners.logs.loadedEntries")}
-            </span>
-            {hasMore && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-              >
-                {loadingMore ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                {t("runners.logs.loadMore")}
-              </Button>
+            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            <span className="text-xs text-muted-foreground">{liveStatus}</span>
+            {entries.length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                · {entries.length.toLocaleString()} {t("runners.logs.loadedEntries")}
+              </span>
             )}
           </div>
+
+          {hasMore && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-[4px] border-2 border-border"
+              onClick={() => void handleLoadMore()}
+              disabled={isLoadingMore}
+            >
+              {isLoadingMore
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : null}
+              {t("runners.logs.loadMore")}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

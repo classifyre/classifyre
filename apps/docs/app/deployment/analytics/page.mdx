@@ -1,0 +1,127 @@
+---
+sidebarTitle: Analytics (PostHog)
+title: Analytics with PostHog
+description: Enable PostHog product analytics for the Classifyre web app and docs site via the Helm chart.
+---
+
+import { Callout, Steps, Tabs } from "nextra/components"
+
+# Analytics with PostHog
+
+Classifyre ships optional [PostHog](https://posthog.com) integration for product analytics. When enabled, the **web app**, **docs site**, and **blog** all report page views and events to your PostHog project.
+
+<Callout type="info">
+Analytics are **off by default**. No data is sent unless you explicitly set `frontend.posthog.enabled: true` and supply a project token.
+</Callout>
+
+## How it works
+
+All PostHog traffic is **proxied through the web container** at `/classifyre-usr`. This path name is intentionally neutral — words like `analytics`, `tracking`, `ingest`, or `posthog` are commonly targeted by ad-blocker filter lists, so using an unrelated path keeps the proxy effective.
+
+```
+Browser → /classifyre-usr/* → web container → us.i.posthog.com
+```
+
+- Requests from the browser go to your own domain first, never directly to `posthog.com`.
+- Ad-blockers that block known analytics domains are bypassed.
+- No extra ingress rules or firewall exceptions are needed.
+- The docs site and blog are served by the same ingress, so they use the same proxy automatically.
+
+The server-side proxy route reads `POSTHOG_INGEST_HOST` to determine the upstream endpoint. This env var is **never exposed to the browser**, so you can safely set it to your PostHog region or a managed reverse proxy CNAME.
+
+## Getting a PostHog project token
+
+<Steps>
+
+### Create a PostHog account
+
+Sign up at [posthog.com](https://posthog.com) (cloud) or self-host PostHog on your own infrastructure.
+
+### Create a project
+
+In the PostHog dashboard, go to **Settings → Projects → New project** and give it a name (e.g. `classifyre-production`).
+
+### Copy the project token
+
+Navigate to **Settings → Project → Project API key**. The token looks like `phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxx`.
+
+</Steps>
+
+## Enabling via Helm
+
+<Tabs items={['values.yaml', 'helm upgrade']}>
+
+<Tabs.Tab>
+
+```yaml
+frontend:
+  posthog:
+    enabled: true
+    token: "phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"   # your PostHog project token
+    # host defaults to /classifyre-usr (built-in proxy) — no change needed
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```bash
+helm upgrade classifyre oci://ghcr.io/your-org/classifyre \
+  --set frontend.posthog.enabled=true \
+  --set frontend.posthog.token="phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+## Configuration reference
+
+| Value | Default | Description |
+|---|---|---|
+| `frontend.posthog.enabled` | `false` | Set to `true` to inject PostHog env vars into the web container. |
+| `frontend.posthog.token` | `""` | PostHog project token (`phc_...`). Required when `enabled=true`. |
+| `frontend.posthog.host` | `"/classifyre-usr"` | Browser-facing ingest path (`NEXT_PUBLIC_POSTHOG_HOST`). Keep the default to route through the built-in proxy. |
+| `frontend.posthog.uiHost` | `"https://us.posthog.com"` | PostHog UI host for toolbar links (`NEXT_PUBLIC_POSTHOG_UI_HOST`). Use `https://eu.posthog.com` for EU Cloud. |
+| `frontend.posthog.ingestHost` | `"https://us.i.posthog.com"` | Server-side upstream endpoint (`POSTHOG_INGEST_HOST`). Never exposed to the browser. Use `https://eu.i.posthog.com` for EU Cloud, or your managed reverse proxy CNAME. |
+
+## EU Cloud
+
+Set both the UI host and the server-side ingest host for EU Cloud:
+
+```yaml
+frontend:
+  posthog:
+    enabled: true
+    token: "phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    uiHost: "https://eu.posthog.com"
+    ingestHost: "https://eu.i.posthog.com"
+```
+
+## Managed reverse proxy (recommended for production)
+
+For even higher event capture rates, set up a [PostHog managed reverse proxy](https://posthog.com/docs/advanced/proxy) on your own subdomain (e.g. `e.yourcompany.com`). Point `ingestHost` at the CNAME PostHog provisions for you, and set `host` to the same subdomain so the browser sends events there directly — bypassing the Next.js proxy hop entirely.
+
+```yaml
+frontend:
+  posthog:
+    enabled: true
+    token: "phc_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    host: "https://e.yourcompany.com"
+    uiHost: "https://us.posthog.com"
+    ingestHost: "https://e.yourcompany.com"   # same: proxy handles its own upstream
+```
+
+<Callout type="warning">
+Choose a subdomain that does not contain words like `analytics`, `tracking`, `telemetry`, or `posthog` — ad-blockers target these terms.
+</Callout>
+
+## Disabling analytics
+
+Set `enabled: false` (the default). No PostHog env vars are injected and the SDK will not initialise — no requests are made to any analytics endpoint.
+
+```yaml
+frontend:
+  posthog:
+    enabled: false
+```

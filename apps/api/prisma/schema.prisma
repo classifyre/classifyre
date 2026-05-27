@@ -375,9 +375,9 @@ model InstanceSettings {
   id         Int              @id @default(1)
   aiEnabled  Boolean          @default(true) @map("ai_enabled")
   mcpEnabled Boolean          @default(true) @map("mcp_enabled")
-  language   InstanceLanguage @default(ENGLISH)
-  timezone   String           @default("UTC")
-  timeFormat InstanceTimeFormat @default(TWELVE_HOUR) @map("time_format")
+  language   InstanceLanguage @default(AUTOMATIC)
+  timezone   String           @default("AUTOMATIC")
+  timeFormat InstanceTimeFormat @default(AUTOMATIC) @map("time_format")
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
 
@@ -482,11 +482,13 @@ enum NotificationType {
 }
 
 enum InstanceLanguage {
+  AUTOMATIC
   ENGLISH
   GERMAN
 }
 
 enum InstanceTimeFormat {
+  AUTOMATIC
   TWELVE_HOUR
   TWENTY_FOUR_HOUR
 }
@@ -579,9 +581,13 @@ model SandboxRun {
   status        SandboxRunStatus @default(PENDING)
   errorMessage  String?          @map("error_message")
   durationMs    Int?             @map("duration_ms")
+  // S3-backed file storage: key in the sandbox bucket and SHA-256 content hash
+  s3Key         String?          @map("s3_key")
+  contentHash   String?          @map("content_hash")
 
   @@index([status])
   @@index([createdAt])
+  @@index([contentHash])
   @@map("sandbox_runs")
 }
 

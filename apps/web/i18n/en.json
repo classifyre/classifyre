@@ -85,7 +85,8 @@
     "statusError": "Error",
     "statusPending": "Pending",
     "statusWarning": "Warning",
-    "notSet": "Not set"
+    "notSet": "Not set",
+    "language": "Language"
   },
   "settings": {
     "title": "Settings",
@@ -104,6 +105,7 @@
     "timeFormat12": "12-hour (08:45 PM)",
     "timeFormat24": "24-hour (20:45)",
     "languages": {
+      "AUTOMATIC": "Automatic",
       "ENGLISH": "English",
       "GERMAN": "Deutsch"
     }
@@ -1155,7 +1157,8 @@
       "loadMore": "Load More",
       "jumpToLatest": "Jump To Latest",
       "showing": "Showing {{filtered}} / {{total}} loaded",
-      "autoRefreshEnabled": "Auto refresh enabled (every 2s)",
+      "streamingLive": "Streaming live…",
+      "autoRefreshEnabled": "Polling for new logs…",
       "autoRefreshPaused": "Auto refresh paused",
       "runnerCompleted": "Runner completed",
       "copyRow": "Copy row",

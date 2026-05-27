@@ -7,7 +7,6 @@ import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RunnerStatus } from '@prisma/client';
-import { SOURCE_TYPE_ENUM } from '../dto/source-type-schema';
 
 jest.mock('@kubernetes/client-node', () => ({
   KubeConfig: class {
@@ -206,7 +205,7 @@ describe('SourcesController', () => {
 
       await expect(
         controller.createSource({
-          type: 'WORDPRESS' as (typeof SOURCE_TYPE_ENUM)[number],
+          type: 'WORDPRESS',
           name: 'Test Source',
           config: {},
           scheduleEnabled: true,

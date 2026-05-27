@@ -9,7 +9,7 @@ function getAjv(): Ajv {
   if (!_ajv) {
     _ajv = new Ajv({ allErrors: true, strict: false });
 
-    addFormats(_ajv as any);
+    addFormats(_ajv);
   }
   return _ajv;
 }

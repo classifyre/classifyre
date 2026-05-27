@@ -188,10 +188,24 @@ export class DeleteRunnerResponseDto {
 }
 
 export class SearchRunnerLogsBodyDto {
-  @ApiProperty({ required: false, description: 'Opaque pagination cursor' })
+  @ApiProperty({
+    required: false,
+    description: 'Opaque pagination cursor (i:N = skip N entries)',
+  })
   @IsOptional()
   @IsString()
   cursor?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Index-based skip (takes precedence over cursor)',
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number;
 
   @ApiProperty({ required: false, default: 200, minimum: 1, maximum: 1000 })
   @IsOptional()
@@ -276,7 +290,7 @@ export class RunnerLogsResponseDto {
   @ApiProperty({ required: false, nullable: true })
   nextCursor: string | null;
 
-  @ApiProperty({ description: 'Cursor to continue reading from (byte offset)' })
+  @ApiProperty({ description: 'Cursor for the next page (i:N format)' })
   cursor: string;
 
   @ApiProperty()
@@ -284,6 +298,9 @@ export class RunnerLogsResponseDto {
 
   @ApiProperty({ minimum: 1, maximum: 1000 })
   take: number;
+
+  @ApiProperty({ description: 'Total filtered entry count (for pagination)' })
+  total: number;
 }
 
 export class RegisterDiscoveredAssetsDto {

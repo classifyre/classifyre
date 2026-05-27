@@ -43,7 +43,7 @@ export class CustomDetectorExtractionsService {
     const row = await this.prisma.customDetectorExtraction.findUnique({
       where: { findingId },
     });
-    return row ? this.toDto(row as any) : null;
+    return row ? this.toDto(row) : null;
   }
 
   async search(
