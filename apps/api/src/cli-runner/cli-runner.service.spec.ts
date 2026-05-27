@@ -76,10 +76,10 @@ describe('CliRunnerService', () => {
       buildRuntimeCustomDetectors: jest.fn().mockResolvedValue([]),
     };
     const runnerLogStorage = {
-      initializeRunner: jest.fn(),
+      initializeRunner: jest.fn().mockResolvedValue(undefined),
       appendChunk: jest.fn(),
-      finalizeRunner: jest.fn(),
-      deleteRunnerLogs: jest.fn(),
+      finalizeRunner: jest.fn().mockResolvedValue(undefined),
+      deleteRunnerLogs: jest.fn().mockResolvedValue(undefined),
       listLogs: jest.fn().mockResolvedValue({
         runnerId: 'runner-1',
         entries: [],
@@ -264,7 +264,10 @@ describe('CliRunnerService', () => {
 
     await service.startRun('source-1');
 
-    expect(runnerLogStorage.initializeRunner).toHaveBeenCalledWith('runner-1');
+    expect(runnerLogStorage.initializeRunner).toHaveBeenCalledWith(
+      'source-1',
+      'runner-1',
+    );
     expect(executeCliAsyncSpy).toHaveBeenCalledWith(
       'runner-1',
       expect.objectContaining({
@@ -373,7 +376,10 @@ describe('CliRunnerService', () => {
 
   it('returns paginated runner logs for existing runner', async () => {
     const { service, prisma, runnerLogStorage } = createService();
-    prisma.runner.findUnique.mockResolvedValue({ id: 'runner-1' });
+    prisma.runner.findUnique.mockResolvedValue({
+      id: 'runner-1',
+      sourceId: 'source-1',
+    });
     runnerLogStorage.listLogs.mockResolvedValue({
       runnerId: 'runner-1',
       entries: [
@@ -397,9 +403,10 @@ describe('CliRunnerService', () => {
 
     expect(prisma.runner.findUnique).toHaveBeenCalledWith({
       where: { id: 'runner-1' },
-      select: { id: true },
+      select: { id: true, sourceId: true },
     });
     expect(runnerLogStorage.listLogs).toHaveBeenCalledWith({
+      sourceId: 'source-1',
       runnerId: 'runner-1',
       take: 1,
     });
@@ -435,7 +442,10 @@ describe('CliRunnerService', () => {
       where: { id: 'runner-1' },
       select: { id: true, sourceId: true, status: true },
     });
-    expect(runnerLogStorage.deleteRunnerLogs).toHaveBeenCalledWith('runner-1');
+    expect(runnerLogStorage.deleteRunnerLogs).toHaveBeenCalledWith(
+      'source-1',
+      'runner-1',
+    );
     expect(result).toEqual({ message: 'Runner deleted' });
   });
 
@@ -481,6 +491,7 @@ describe('CliRunnerService', () => {
       }),
     );
     expect(runnerLogStorage.initializeRunner).toHaveBeenCalledWith(
+      'source-1',
       'runner-ext-1',
     );
     expect(prisma.source.updateMany).toHaveBeenCalledWith({
@@ -620,7 +631,10 @@ describe('CliRunnerService', () => {
         status: RunnerStatus.PENDING,
       }),
     });
-    expect(runnerLogStorage.initializeRunner).toHaveBeenCalledWith('runner-2');
+    expect(runnerLogStorage.initializeRunner).toHaveBeenCalledWith(
+      'source-1',
+      'runner-2',
+    );
     expect((service as any).executeCliAsync).toHaveBeenCalledWith(
       'runner-2',
       expect.objectContaining({ id: 'source-1' }),
@@ -646,7 +660,10 @@ describe('CliRunnerService', () => {
 
     await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
 
-    expect(runnerLogStorage.finalizeRunner).toHaveBeenCalledWith('runner-1');
+    expect(runnerLogStorage.finalizeRunner).toHaveBeenCalledWith(
+      'source-1',
+      'runner-1',
+    );
     expect(prisma.runner.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'runner-1' },
@@ -699,7 +716,10 @@ describe('CliRunnerService', () => {
       message: 'Runner stopped',
     });
 
-    expect(runnerLogStorage.finalizeRunner).toHaveBeenCalledWith('runner-1');
+    expect(runnerLogStorage.finalizeRunner).toHaveBeenCalledWith(
+      'source-1',
+      'runner-1',
+    );
     expect(tx.runner.update).toHaveBeenCalledWith({
       where: { id: 'runner-1' },
       data: expect.objectContaining({

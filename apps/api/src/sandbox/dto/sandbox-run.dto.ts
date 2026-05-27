@@ -42,4 +42,16 @@ export class SandboxRunDto {
 
   @ApiPropertyOptional()
   durationMs: number | null;
+
+  @ApiPropertyOptional({
+    description:
+      'S3 object key for the uploaded file (null when S3 is not configured)',
+  })
+  s3Key: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'SHA-256 content hash of the uploaded file (used for duplicate detection)',
+  })
+  contentHash: string | null;
 }

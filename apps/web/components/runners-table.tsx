@@ -55,11 +55,7 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components";
-import {
-  getRunnerStatusBadgeLabel,
-  getRunnerStatusBadgeTone,
-  isRunnerStatusRunning,
-} from "../lib/runner-status-badge";
+import { RunnerStatusBadge } from "./runner-status-badge";
 import {
   mergeRunnerWsIntoRow,
   runnerMatchesRunnersListFilters,
@@ -601,19 +597,10 @@ export function RunnersTable({
                         </div>
                       </TableCell>
                       <TableCell className="py-2">
-                        <Badge
-                          className={`rounded-[4px] border font-medium ${getRunnerStatusBadgeTone(runner.status)}`}
-                        >
-                          {isRunnerStatusRunning(runner.status) && (
-                            <Spinner
-                              size="sm"
-                              className="gap-0 [&_svg]:size-3"
-                              data-icon="inline-start"
-                            />
-                          )}
-                          {t(getRunnerStatusBadgeLabel(runner.status))}
-                        </Badge>
-                      </TableCell>
+                        <RunnerStatusBadge
+                          status={runner.status}
+                          className="font-medium"
+                        />                      </TableCell>
                       <TableCell className="py-2">
                         <div className="flex items-center gap-1.5 text-sm">
                           {runner.triggerType === "SCHEDULED" && (

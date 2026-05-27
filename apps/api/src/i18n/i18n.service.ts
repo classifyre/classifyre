@@ -7,6 +7,7 @@ type TranslationObject = { [key: string]: string | TranslationObject };
 type Translations = typeof en;
 
 const translationMap: Record<string, Translations> = {
+  AUTOMATIC: en,
   ENGLISH: en,
   GERMAN: de,
 };
@@ -29,11 +30,7 @@ export class I18nService {
   ): Promise<string> {
     const settings = await this.instanceSettingsService.getSettings();
     const translations: Translations = translationMap[settings.language] ?? en;
-    return I18nService.resolve(
-      translations as unknown as TranslationObject,
-      key,
-      params,
-    );
+    return I18nService.resolve(translations, key, params);
   }
 
   private static resolve(

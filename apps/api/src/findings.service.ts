@@ -1150,8 +1150,7 @@ export class FindingsService {
       Record<(typeof severityOrder)[number], number>
     >();
     assetSeverityCounts.forEach((entry) => {
-      const severity = (entry.severity ??
-        'INFO') as (typeof severityOrder)[number];
+      const severity = entry.severity ?? 'INFO';
       const bucket = severityCountsByAsset.get(entry.assetId) ?? {
         CRITICAL: 0,
         HIGH: 0,
