@@ -210,8 +210,14 @@ describe('SourceService', () => {
       where: { sourceId: 'source-1' },
       select: { id: true },
     });
-    expect(runnerLogStorage.deleteRunnerLogs).toHaveBeenCalledWith('source-1', 'runner-1');
-    expect(runnerLogStorage.deleteRunnerLogs).toHaveBeenCalledWith('source-1', 'runner-2');
+    expect(runnerLogStorage.deleteRunnerLogs).toHaveBeenCalledWith(
+      'source-1',
+      'runner-1',
+    );
+    expect(runnerLogStorage.deleteRunnerLogs).toHaveBeenCalledWith(
+      'source-1',
+      'runner-2',
+    );
   });
 
   it('does not delete source when runner log cleanup fails', async () => {

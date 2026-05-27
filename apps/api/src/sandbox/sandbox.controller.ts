@@ -159,11 +159,7 @@ Each object has the shape:
       throw new BadRequestException(`Invalid detectors JSON: ${msg}`);
     }
 
-    return this.sandboxService.createRun(
-      fileBuffer,
-      fileName,
-      detectors,
-    ) as Promise<SandboxRunDto>;
+    return this.sandboxService.createRun(fileBuffer, fileName, detectors);
   }
 
   @Get('runs')
@@ -172,16 +168,14 @@ Each object has the shape:
   listRuns(
     @Query() query: QuerySandboxRunsDto,
   ): Promise<SandboxRunListResponseDto> {
-    return this.sandboxService.listRuns(
-      query,
-    ) as Promise<SandboxRunListResponseDto>;
+    return this.sandboxService.listRuns(query);
   }
 
   @Get('runs/:id')
   @ApiOperation({ summary: 'Get a sandbox run by ID' })
   @ApiResponse({ status: 200, type: SandboxRunDto })
   getRun(@Param('id') id: string): Promise<SandboxRunDto> {
-    return this.sandboxService.getRun(id) as Promise<SandboxRunDto>;
+    return this.sandboxService.getRun(id);
   }
 
   @Post('runs/:id/rerun')
@@ -207,10 +201,7 @@ the original file can be retrieved. The original run is not modified.`,
     @Param('id') id: string,
     @Body() dto: RerunSandboxRunDto,
   ): Promise<SandboxRunDto> {
-    return this.sandboxService.rerunRun(
-      id,
-      dto.detectors ?? [],
-    ) as Promise<SandboxRunDto>;
+    return this.sandboxService.rerunRun(id, dto.detectors ?? []);
   }
 
   @Delete('runs/:id')

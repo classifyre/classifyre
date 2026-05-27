@@ -188,12 +188,19 @@ export class DeleteRunnerResponseDto {
 }
 
 export class SearchRunnerLogsBodyDto {
-  @ApiProperty({ required: false, description: 'Opaque pagination cursor (i:N = skip N entries)' })
+  @ApiProperty({
+    required: false,
+    description: 'Opaque pagination cursor (i:N = skip N entries)',
+  })
   @IsOptional()
   @IsString()
   cursor?: string;
 
-  @ApiProperty({ required: false, description: 'Index-based skip (takes precedence over cursor)', minimum: 0 })
+  @ApiProperty({
+    required: false,
+    description: 'Index-based skip (takes precedence over cursor)',
+    minimum: 0,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

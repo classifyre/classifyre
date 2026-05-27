@@ -3,7 +3,7 @@ import {
   McpServer,
   ResourceTemplate,
 } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { RunnerStatus } from '@prisma/client';
+
 import * as z from 'zod';
 import { AssetService } from './asset.service';
 import { CliRunnerService } from './cli-runner/cli-runner.service';
@@ -768,7 +768,7 @@ export class McpServerFactoryService {
         jsonResult(
           await this.cliRunnerService.listRunners({
             sourceId,
-            status: status as RunnerStatus | undefined,
+            status: status,
             skip,
             take,
           }),
@@ -1324,7 +1324,7 @@ export class McpServerFactoryService {
             const result = await this.metricEngineService.evaluateMetric(id, {
               glossaryTermId,
               ...options,
-            } as any);
+            });
             return { metricId: id, ...result };
           }),
         );

@@ -1550,7 +1550,11 @@ export class CliRunnerService implements OnApplicationBootstrap {
     stream: 'stderr' | 'stdout' | 'combined' = 'stderr',
   ): void {
     try {
-      const entries = this.runnerLogStorage.appendChunk(runnerId, chunk, stream);
+      const entries = this.runnerLogStorage.appendChunk(
+        runnerId,
+        chunk,
+        stream,
+      );
       if (entries.length && this.runnerEventsGateway) {
         this.runnerEventsGateway.emitRunnerLogs(runnerId, entries);
       }
@@ -1668,7 +1672,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
     await this.runnerLogStorage
       .finalizeRunner(
-        runner?.source?.id ?? runner?.sourceId ?? this.runnerLogStorage.getRunnerSourceId(runnerId) ?? '',
+        runner?.source?.id ??
+          runner?.sourceId ??
+          this.runnerLogStorage.getRunnerSourceId(runnerId) ??
+          '',
         runnerId,
       )
       .catch((err) => {

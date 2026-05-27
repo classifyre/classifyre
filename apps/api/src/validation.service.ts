@@ -22,7 +22,7 @@ export class ValidationService {
       allErrors: true,
       strict: false,
     });
-    addFormats(this.ajv as any);
+    addFormats(this.ajv);
 
     // Resolve schema path so it works from both src and dist runtimes.
     this.schemaPath = resolveSchemasDir(__dirname);

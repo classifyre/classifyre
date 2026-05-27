@@ -32,7 +32,7 @@ export class MetricsService {
         displayName: dto.displayName,
         description: dto.description,
         type: dto.type,
-        definition: dto.definition as unknown as Prisma.InputJsonValue,
+        definition: dto.definition,
         allowedDimensions: dto.allowedDimensions ?? [],
         glossaryTermId,
         format: dto.format,
@@ -110,7 +110,7 @@ export class MetricsService {
           description: dto.description,
         }),
         ...(dto.definition !== undefined && {
-          definition: dto.definition as unknown as Prisma.InputJsonValue,
+          definition: dto.definition,
         }),
         ...(dto.allowedDimensions !== undefined && {
           allowedDimensions: dto.allowedDimensions,
@@ -182,7 +182,7 @@ export class MetricsService {
         position: data.position ?? 0,
         size: data.size ?? 'md',
         chartType: data.chartType,
-        pinnedFilters: data.pinnedFilters as unknown as Prisma.InputJsonValue,
+        pinnedFilters: data.pinnedFilters,
         isVisible: data.isVisible ?? true,
       },
       update: {
@@ -190,7 +190,7 @@ export class MetricsService {
         ...(data.size !== undefined && { size: data.size }),
         ...(data.chartType !== undefined && { chartType: data.chartType }),
         ...(data.pinnedFilters !== undefined && {
-          pinnedFilters: data.pinnedFilters as unknown as Prisma.InputJsonValue,
+          pinnedFilters: data.pinnedFilters,
         }),
         ...(data.isVisible !== undefined && { isVisible: data.isVisible }),
       },

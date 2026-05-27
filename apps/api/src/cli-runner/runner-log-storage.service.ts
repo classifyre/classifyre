@@ -131,7 +131,9 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
           try {
             await this.syncToS3Serialized(sourceId, runnerId);
           } catch (err: any) {
-            this.logger.warn(`Final S3 sync failed for ${runnerId}: ${err?.message}`);
+            this.logger.warn(
+              `Final S3 sync failed for ${runnerId}: ${err?.message}`,
+            );
           }
         }),
       );
@@ -206,7 +208,11 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
 
   async finalizeRunner(sourceId: string, runnerId: string): Promise<void> {
     // Flush any incomplete last line held in the line buffers
-    for (const stream of ['stderr', 'stdout', 'combined'] as RunnerLogStream[]) {
+    for (const stream of [
+      'stderr',
+      'stdout',
+      'combined',
+    ] as RunnerLogStream[]) {
       const bufferKey = this.getBufferKey(runnerId, stream);
       const remainder = this.lineBuffers.get(bufferKey);
       if (remainder?.trim().length) {
@@ -241,10 +247,15 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
       this.stopSyncTimer(runnerId);
       this.s3SyncChains.delete(runnerId);
       await this.s3DeleteObject(sourceId, runnerId).catch((err) => {
-        this.logger.warn(`Could not delete S3 log for ${runnerId}: ${err?.message}`);
+        this.logger.warn(
+          `Could not delete S3 log for ${runnerId}: ${err?.message}`,
+        );
       });
     } else {
-      await fs.rm(this.getRunnerDir(runnerId), { recursive: true, force: true });
+      await fs.rm(this.getRunnerDir(runnerId), {
+        recursive: true,
+        force: true,
+      });
     }
   }
 
@@ -291,7 +302,8 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     allEntries: RunnerLogEntryDto[],
     params: ResolvedListParams,
   ): RunnerLogsResponseDto {
-    const { take, skip, sortOrder, searchLower, levelFilter, streamFilter } = params;
+    const { take, skip, sortOrder, searchLower, levelFilter, streamFilter } =
+      params;
 
     const filtered = allEntries.filter((e) =>
       this.matchesFilter(e, searchLower, levelFilter, streamFilter),
@@ -327,7 +339,10 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     let obj: GetObjectCommandOutput;
     try {
       obj = await this.s3!.client.send(
-        new GetObjectCommand({ Bucket: this.s3!.bucket, Key: this.s3Key(sourceId, runnerId) }),
+        new GetObjectCommand({
+          Bucket: this.s3!.bucket,
+          Key: this.s3Key(sourceId, runnerId),
+        }),
       );
     } catch (err: any) {
       if (
@@ -340,7 +355,9 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
       throw err;
     }
 
-    const allEntries = await this.readAllEntriesFromStream(obj.Body as Readable);
+    const allEntries = await this.readAllEntriesFromStream(
+      obj.Body as Readable,
+    );
     return this.paginateEntries(runnerId, allEntries, params);
   }
 
@@ -350,7 +367,10 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
    * Schedule an S3 upload that is chained after the previous one for this
    * runner.  This prevents concurrent PutObject calls from racing.
    */
-  private syncToS3Serialized(sourceId: string, runnerId: string): Promise<void> {
+  private syncToS3Serialized(
+    sourceId: string,
+    runnerId: string,
+  ): Promise<void> {
     const prev = this.s3SyncChains.get(runnerId) ?? Promise.resolve();
     const next = prev
       .then(() => this.doSyncToS3(sourceId, runnerId))
@@ -388,7 +408,9 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
 
   // ── Stream parser (for S3 / filesystem reads) ─────────────────────────────
 
-  private async readAllEntriesFromStream(readable: Readable): Promise<RunnerLogEntryDto[]> {
+  private async readAllEntriesFromStream(
+    readable: Readable,
+  ): Promise<RunnerLogEntryDto[]> {
     const entries: RunnerLogEntryDto[] = [];
     let remainder = '';
     let index = 0;
@@ -435,7 +457,9 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
         this.logger.log(`Created S3 bucket: ${bucket}`);
       } catch (err: any) {
         if (err?.Code !== 'BucketAlreadyOwnedByYou') {
-          this.logger.error(`Failed to create S3 bucket ${bucket}: ${err?.message}`);
+          this.logger.error(
+            `Failed to create S3 bucket ${bucket}: ${err?.message}`,
+          );
         }
       }
     }
@@ -458,10 +482,16 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private async s3DeleteObject(sourceId: string, runnerId: string): Promise<void> {
+  private async s3DeleteObject(
+    sourceId: string,
+    runnerId: string,
+  ): Promise<void> {
     const { client, bucket } = this.s3!;
     await client.send(
-      new DeleteObjectCommand({ Bucket: bucket, Key: this.s3Key(sourceId, runnerId) }),
+      new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: this.s3Key(sourceId, runnerId),
+      }),
     );
   }
 
@@ -473,7 +503,8 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     levelFilter: Set<string>,
     streamFilter: Set<string>,
   ): boolean {
-    if (searchLower && !entry.message.toLowerCase().includes(searchLower)) return false;
+    if (searchLower && !entry.message.toLowerCase().includes(searchLower))
+      return false;
     if (levelFilter.size > 0 && !levelFilter.has(entry.level)) return false;
     if (streamFilter.size > 0 && !streamFilter.has(entry.stream)) return false;
     return true;
@@ -490,7 +521,9 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
         if (normalized !== 'UNKNOWN') return normalized;
       }
     }
-    const match = message.match(/\b(trace|debug|info|warn(?:ing)?|error|fatal|critical)\b/i);
+    const match = message.match(
+      /\b(trace|debug|info|warn(?:ing)?|error|fatal|critical)\b/i,
+    );
     if (match?.[1]) return this.normalizeLevel(match[1]);
     if (stream === 'stderr') return 'ERROR';
     return 'UNKNOWN';
@@ -498,15 +531,22 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
 
   private normalizeLevel(raw: string): LogLevel {
     switch (raw.toUpperCase()) {
-      case 'TRACE': return 'TRACE';
-      case 'DEBUG': return 'DEBUG';
-      case 'INFO':  return 'INFO';
+      case 'TRACE':
+        return 'TRACE';
+      case 'DEBUG':
+        return 'DEBUG';
+      case 'INFO':
+        return 'INFO';
       case 'WARN':
-      case 'WARNING': return 'WARN';
-      case 'ERROR': return 'ERROR';
+      case 'WARNING':
+        return 'WARN';
+      case 'ERROR':
+        return 'ERROR';
       case 'FATAL':
-      case 'CRITICAL': return 'FATAL';
-      default: return 'UNKNOWN';
+      case 'CRITICAL':
+        return 'FATAL';
+      default:
+        return 'UNKNOWN';
     }
   }
 
@@ -535,7 +575,10 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
 
   // ── Entry encoding / decoding ─────────────────────────────────────────────
 
-  private createEntry(message: string, stream: RunnerLogStream): StoredRunnerLogEntry {
+  private createEntry(
+    message: string,
+    stream: RunnerLogStream,
+  ): StoredRunnerLogEntry {
     return { timestamp: new Date().toISOString(), stream, message };
   }
 
@@ -544,7 +587,10 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Convert a stored entry + its position index to a DTO. */
-  private entryToDto(entry: StoredRunnerLogEntry, index: number): RunnerLogEntryDto {
+  private entryToDto(
+    entry: StoredRunnerLogEntry,
+    index: number,
+  ): RunnerLogEntryDto {
     const structured = this.tryParseJson(entry.message);
     return {
       cursor: String(index),
@@ -555,13 +601,19 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private decodeEntryAtIndex(rawLine: string, index: number): RunnerLogEntryDto {
+  private decodeEntryAtIndex(
+    rawLine: string,
+    index: number,
+  ): RunnerLogEntryDto {
     try {
       const parsed = JSON.parse(rawLine) as Partial<StoredRunnerLogEntry>;
       const stream = this.normalizeStream(parsed.stream);
-      const timestamp = typeof parsed.timestamp === 'string' ? parsed.timestamp : null;
+      const timestamp =
+        typeof parsed.timestamp === 'string' ? parsed.timestamp : null;
       const rawMessage =
-        typeof parsed.message === 'string' ? parsed.message : JSON.stringify(parsed);
+        typeof parsed.message === 'string'
+          ? parsed.message
+          : JSON.stringify(parsed);
       const structured = this.tryParseJson(rawMessage);
       return {
         cursor: String(index),
@@ -582,7 +634,8 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
   }
 
   private normalizeStream(value: unknown): RunnerLogStream {
-    if (value === 'stderr' || value === 'stdout' || value === 'combined') return value;
+    if (value === 'stderr' || value === 'stdout' || value === 'combined')
+      return value;
     return 'combined';
   }
 
@@ -600,8 +653,12 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     const take = this.resolveTake(params.take);
     const sortOrder = params.sortOrder === 'desc' ? 'desc' : 'asc';
     const searchLower = params.search?.trim().toLowerCase() ?? '';
-    const levelFilter = new Set((params.levels ?? []).map((l) => l.toUpperCase()));
-    const streamFilter = new Set((params.streams ?? []).map((s) => s.toLowerCase()));
+    const levelFilter = new Set(
+      (params.levels ?? []).map((l) => l.toUpperCase()),
+    );
+    const streamFilter = new Set(
+      (params.streams ?? []).map((s) => s.toLowerCase()),
+    );
 
     // `skip` takes precedence over cursor
     let skip = 0;

@@ -2,9 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import type { AiProviderConfig } from '@prisma/client';
-import {
+import type {
   AiProviderConfigResponseDto,
-  AiProviderTypeValue,
   UpdateAiProviderConfigDto,
 } from './dto/ai-provider-config.dto';
 
@@ -40,7 +39,7 @@ export class AiProviderConfigService {
     }
 
     return {
-      provider: config.provider as AiProviderTypeValue,
+      provider: config.provider,
       model: config.model,
       hasApiKey,
       apiKeyPreview,

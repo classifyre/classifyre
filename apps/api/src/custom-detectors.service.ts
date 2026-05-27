@@ -1525,7 +1525,7 @@ export class CustomDetectorsService {
           metrics: {
             ...summary,
             ...(cliResult.metrics ?? {}),
-          } as Prisma.InputJsonValue,
+          },
           configHash,
           modelArtifactPath: cliResult.model_artifact_path,
         },
@@ -1544,8 +1544,8 @@ export class CustomDetectorsService {
         where: { id: detector.id },
         data: {
           lastTrainedAt: new Date(),
-          lastTrainingSummary: summary as Prisma.InputJsonValue,
-          pipelineSchema: updatedSchema as Prisma.InputJsonValue,
+          lastTrainingSummary: summary,
+          pipelineSchema: updatedSchema,
         },
       });
     } catch (error) {
