@@ -94,10 +94,6 @@ function runParityChecks(
 
 describe('i18n key parity', () => {
   it('de.json has identical keys and structure to en.json', () => {
-    runParityChecks(
-      en as unknown as JsonObject,
-      de as unknown as JsonObject,
-      'de.json',
-    );
+    runParityChecks(en, de, 'de.json');
   });
 });

@@ -117,8 +117,8 @@ export class CustomDetectorTestsService {
       else errored++;
 
       results.push({
-        scenario: this.toScenarioDto({ ...scenario, results: [result as any] }),
-        result: this.toResultDto(result as any),
+        scenario: this.toScenarioDto({ ...scenario, results: [result] }),
+        result: this.toResultDto(result),
       });
     }
 
