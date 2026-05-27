@@ -317,8 +317,8 @@ jobs:
           VERSION: ${{ steps.versions.outputs.version }}
         run: |
           set -euo pipefail
-          git fetch origin develop
-          git checkout develop
+          git fetch origin
+          git checkout -B develop origin/develop
           git merge origin/main --no-edit \
             -m "chore: merge release v${VERSION} back to develop"
           git push origin develop
