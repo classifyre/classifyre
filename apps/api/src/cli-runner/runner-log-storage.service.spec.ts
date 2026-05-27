@@ -27,7 +27,11 @@ describe('RunnerLogStorageService', () => {
     service.appendChunk(runnerId, 'first\nsecond\nthird\n', 'stderr');
     await service.finalizeRunner(SOURCE_ID, runnerId);
 
-    const firstPage = await service.listLogs({ sourceId: SOURCE_ID, runnerId, take: 2 });
+    const firstPage = await service.listLogs({
+      sourceId: SOURCE_ID,
+      runnerId,
+      take: 2,
+    });
     expect(firstPage.entries.map((entry) => entry.message)).toEqual([
       'first',
       'second',
@@ -55,7 +59,11 @@ describe('RunnerLogStorageService', () => {
     service.appendChunk(runnerId, '-done\nnext-line\n', 'stderr');
     await service.finalizeRunner(SOURCE_ID, runnerId);
 
-    const logs = await service.listLogs({ sourceId: SOURCE_ID, runnerId, take: 20 });
+    const logs = await service.listLogs({
+      sourceId: SOURCE_ID,
+      runnerId,
+      take: 20,
+    });
     expect(logs.entries.map((entry) => entry.message)).toEqual([
       'part-1-done',
       'next-line',
@@ -71,7 +79,11 @@ describe('RunnerLogStorageService', () => {
 
     // An unrecognised cursor (neither a byte-offset number nor 'i:N') is
     // treated as offset 0, so the full log is returned rather than throwing.
-    const result = await service.listLogs({ sourceId: SOURCE_ID, runnerId, cursor: 'abc' });
+    const result = await service.listLogs({
+      sourceId: SOURCE_ID,
+      runnerId,
+      cursor: 'abc',
+    });
     expect(result.entries).toHaveLength(1);
     expect(result.entries[0].message).toBe('line');
   });
@@ -85,7 +97,11 @@ describe('RunnerLogStorageService', () => {
     await service.finalizeRunner(SOURCE_ID, runnerId);
     await service.deleteRunnerLogs(SOURCE_ID, runnerId);
 
-    const logs = await service.listLogs({ sourceId: SOURCE_ID, runnerId, take: 20 });
+    const logs = await service.listLogs({
+      sourceId: SOURCE_ID,
+      runnerId,
+      take: 20,
+    });
     expect(logs.entries).toHaveLength(0);
     expect(logs.hasMore).toBe(false);
   });

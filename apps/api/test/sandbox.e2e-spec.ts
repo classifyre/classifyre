@@ -36,7 +36,7 @@ describe('Sandbox (e2e)', () => {
       new FastifyAdapter(),
     );
 
-    await app.register(multipart as any, {
+    await app.register(multipart, {
       limits: { fileSize: 50 * 1024 * 1024, files: 1 },
     });
 

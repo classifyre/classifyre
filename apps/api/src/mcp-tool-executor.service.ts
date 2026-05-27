@@ -184,7 +184,7 @@ export class McpToolExecutorService {
       displayName: args.displayName,
       description: args.description,
       category: args.category,
-      filterMapping: args.filterMapping as any,
+      filterMapping: args.filterMapping,
       color: args.color,
       icon: args.icon,
     });
@@ -233,7 +233,7 @@ export class McpToolExecutorService {
     },
   ) {
     this.assertNotDemoMode();
-    return this.glossaryService.update(id, args as any);
+    return this.glossaryService.update(id, args);
   }
 
   async deleteGlossaryTerm(id: string) {
@@ -256,7 +256,7 @@ export class McpToolExecutorService {
     },
   ) {
     this.assertNotDemoMode();
-    return this.metricsService.update(id, args as any);
+    return this.metricsService.update(id, args);
   }
 
   async deleteMetricDefinition(id: string) {

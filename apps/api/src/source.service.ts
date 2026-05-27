@@ -206,11 +206,11 @@ export class SourceService {
     }
 
     if (filters?.type?.length) {
-      where.type = { in: filters.type as any };
+      where.type = { in: filters.type };
     }
 
     if (filters?.status?.length) {
-      where.runnerStatus = { in: filters.status as any };
+      where.runnerStatus = { in: filters.status };
     }
 
     const orderBy: Prisma.SourceOrderByWithRelationInput = {};
@@ -345,7 +345,7 @@ export class SourceService {
       let decryptedConfig: Record<string, unknown>;
       try {
         decryptedConfig = this.maskedConfigCryptoService.decryptMaskedConfig(
-          candidate.config as Record<string, unknown>,
+          candidate.config,
         );
       } catch (error: any) {
         this.logger.warn(
