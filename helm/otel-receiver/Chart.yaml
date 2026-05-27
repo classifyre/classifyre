@@ -22,7 +22,7 @@ maintainers:
 dependencies:
   # OTel Collector — the single OTLP ingestion endpoint that fans out to all backends.
   - name: opentelemetry-collector
-    version: 0.156.0
+    version: 0.156.2
     repository: "https://open-telemetry.github.io/opentelemetry-helm-charts"
     condition: opentelemetry-collector.enabled
 
