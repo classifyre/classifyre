@@ -339,10 +339,11 @@
     "updated": "Befund aktualisiert",
     "failedToUpdate": "Befund konnte nicht aktualisiert werden",
     "window": {
-      "label": "Zeitfenster",
+      "label": "Fenster",
       "7days": "7 Tage",
       "30days": "30 Tage",
-      "90days": "90 Tage"
+      "90days": "90 Tage",
+      "1day": "Heute"
     },
     "columns": {
       "category": "Kategorie",
@@ -1369,7 +1370,9 @@
   "discovery": {
     "title": "Übersicht",
     "securityBrief": "Sicherheitsübersicht",
-    "allFindings": "Alle Befunde · letzte {{days}} Tage",
+    "allFindings": "Alle Befunde",
+    "allFindingsWithDays": "Alle Befunde · letzte {{days}} Tage",
+    "allFindingsToday": "Alle Befunde · heute",
     "findingsToReview": "Zu prüfende Befunde",
     "open": "Offen",
     "resolved": "Behoben",
