@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RunnerLogEntryDto, RunnerLogEntryDtoLevelEnum, RunnerLogsResponseDto } from "@workspace/api-client";
 import { RunnerLogEntryDtoLevelEnum as LevelEnum } from "@workspace/api-client";
+import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -34,6 +35,7 @@ import {
   Loader2,
   RotateCcw,
   Search,
+  TriangleAlert,
 } from "lucide-react";
 import { formatLogTimestamp } from "@/lib/date";
 import { toast } from "sonner";
@@ -55,6 +57,7 @@ export interface LogFetchParams {
 export interface RunnerLogViewerProps {
   runnerId: string;
   isRunning: boolean;
+  s3Configured?: boolean;
   /** Pass the WebSocket connection state so the viewer can skip polling when live. */
   isWsConnected?: boolean;
   /**
@@ -141,6 +144,7 @@ function CopyButton({ text }: { text: string }) {
 export function RunnerLogViewer({
   runnerId,
   isRunning,
+  s3Configured = true,
   isWsConnected,
   fetchFn,
   wsEntries,
@@ -391,6 +395,17 @@ export function RunnerLogViewer({
       </CardHeader>
 
       <CardContent className="space-y-3">
+        {!s3Configured && (
+          <Alert className="border-amber-500/40 bg-amber-50/50 dark:bg-amber-950/20">
+            <TriangleAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertTitle className="text-amber-800 dark:text-amber-300">
+              {t("runners.logs.noStorageWarningTitle")}
+            </AlertTitle>
+            <AlertDescription className="text-amber-700 dark:text-amber-400">
+              {t("runners.logs.noStorageWarningBody")}
+            </AlertDescription>
+          </Alert>
+        )}
         {showInitialLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

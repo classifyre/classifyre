@@ -55,6 +55,13 @@ export class InstanceSettingsResponseDto {
   })
   demoMode: boolean;
 
+  @ApiProperty({
+    description:
+      'Read-only. True when S3-compatible object storage is configured. When false, runner logs are streamed live but not persisted after the run completes.',
+    example: false,
+  })
+  s3Configured: boolean;
+
   @ApiProperty()
   createdAt: Date;
 

@@ -58,6 +58,7 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   aiEnabled: true,
   mcpEnabled: true,
   demoMode: false,
+  s3Configured: true,
   language: InstanceSettingsResponseDtoLanguageEnum.Automatic,
   timezone: "AUTOMATIC",
   timeFormat: InstanceSettingsResponseDtoTimeFormatEnum.Automatic,
