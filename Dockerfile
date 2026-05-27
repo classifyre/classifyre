@@ -6,25 +6,7 @@ ARG S6_OVERLAY_VERSION=3.2.2.0
 ARG PG_MAJOR=18
 ARG UV_VERSION=0.10.2
 ARG BUN_VERSION=1.3.10
-ARG SEAWEEDFS_VERSION=4.28
-
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-bin
-
-# ── seaweedfs-bin: download the weed binary for the target architecture ───────
-FROM alpine:3 AS seaweedfs-bin
-ARG TARGETARCH
-ARG SEAWEEDFS_VERSION
-RUN set -eux; \
-    case "${TARGETARCH}" in \
-      amd64|arm64) : ;; \
-      *) echo "Unsupported TARGETARCH: ${TARGETARCH}" && exit 1 ;; \
-    esac; \
-    wget -q -O /tmp/weed.tar.gz \
-      "https://github.com/seaweedfs/seaweedfs/releases/download/${SEAWEEDFS_VERSION}/linux_${TARGETARCH}.tar.gz"; \
-    mkdir -p /out; \
-    tar -C /out -xzf /tmp/weed.tar.gz weed; \
-    chmod +x /out/weed; \
-    rm /tmp/weed.tar.gz
 
 # ── Pre-built artifacts injected from CI via --build-context ──────────────────
 # api-dist:  compiled apps/api/dist  (arch-agnostic TypeScript→JS)
@@ -202,21 +184,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     NEXT_PUBLIC_API_URL=/api \
     UV_LINK_MODE=copy \
     UV_CACHE_DIR=/cache/uv \
-    CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1 \
-    # ── SeaweedFS / S3 object storage ─────────────────────────────────────────
-    # The embedded SeaweedFS instance exposes an S3-compatible API on port 8888.
-    # These env vars are consumed by the API (RunnerLogStorageService) to store
-    # runner logs in S3 instead of a local PVC.  Override with external S3 creds
-    # to point the all-in-one at AWS, Azure, MinIO, etc.
-    SEAWEEDFS_PORT=8888 \
-    S3_BUCKET=classifyre-logs \
-    S3_SANDBOX_BUCKET=classifyre-sandbox \
-    S3_ENDPOINT=http://127.0.0.1:8888 \
-    S3_REGION=us-east-1 \
-    S3_FORCE_PATH_STYLE=true \
-    S3_ACCESS_KEY_ID=classifyre \
-    S3_SECRET_ACCESS_KEY=classifyre-secret \
-    S3_LOG_PREFIX=runner-logs/
+    CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1
 
 RUN set -eux; \
     apt-get update; \
@@ -245,7 +213,6 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=uv-bin /uv /uvx /usr/local/bin/
-COPY --from=seaweedfs-bin /out/weed /usr/local/bin/weed
 
 RUN set -eux; \
     case "${TARGETARCH}" in \
@@ -285,7 +252,7 @@ COPY --from=api-builder /repo/packages/schemas/node_modules /app/packages/schema
 RUN set -eux; \
     ln -sfn /app/node_modules /node_modules; \
     ln -sfn /app/packages /packages; \
-    mkdir -p /var/lib/postgresql/data /var/run/postgresql /cache/uv /tmp /var/lib/seaweedfs; \
+    mkdir -p /var/lib/postgresql/data /var/run/postgresql /cache/uv /tmp; \
     chown -R postgres:postgres /var/lib/postgresql /var/run/postgresql; \
     chown -R 10001:10001 /app/apps/cli /app/packages/schemas /cache/uv; \
     chmod 700 /var/lib/postgresql/data
@@ -295,50 +262,10 @@ set -eux
 
 mkdir -p \
   /etc/s6-overlay/s6-rc.d/postgresql/dependencies.d \
-  /etc/s6-overlay/s6-rc.d/seaweedfs/dependencies.d \
   /etc/s6-overlay/s6-rc.d/api/dependencies.d \
   /etc/s6-overlay/s6-rc.d/web/dependencies.d \
   /etc/s6-overlay/s6-rc.d/caddy/dependencies.d \
   /etc/s6-overlay/s6-rc.d/user/contents.d
-
-echo "longrun" > /etc/s6-overlay/s6-rc.d/seaweedfs/type
-cat > /etc/s6-overlay/s6-rc.d/seaweedfs/run <<'SH'
-#!/command/with-contenv sh
-set -eu
-
-SEAWEEDFS_DIR="${SEAWEEDFS_DATA_DIR:-/var/lib/seaweedfs}"
-S3_PORT="${SEAWEEDFS_PORT:-8888}"
-mkdir -p "${SEAWEEDFS_DIR}"
-
-# Write S3 IAM config so only the configured access key is accepted.
-mkdir -p /etc/seaweedfs
-cat > /etc/seaweedfs/iam.json <<JSON
-{
-  "identities": [
-    {
-      "name": "classifyre",
-      "credentials": [
-        {
-          "accessKey": "${S3_ACCESS_KEY_ID:-classifyre}",
-          "secretKey": "${S3_SECRET_ACCESS_KEY:-classifyre-secret}"
-        }
-      ],
-      "actions": ["Read:*", "Write:*", "List:*", "Tagging:*", "Admin:*"]
-    }
-  ]
-}
-JSON
-
-exec weed server \
-  -dir="${SEAWEEDFS_DIR}" \
-  -master.port=9333 \
-  -volume.port=8080 \
-  -filer.port=18888 \
-  -s3 \
-  -s3.port="${S3_PORT}" \
-  -s3.config=/etc/seaweedfs/iam.json
-SH
-chmod +x /etc/s6-overlay/s6-rc.d/seaweedfs/run
 
 echo "longrun" > /etc/s6-overlay/s6-rc.d/postgresql/type
 cat > /etc/s6-overlay/s6-rc.d/postgresql/run <<'SH'
@@ -377,21 +304,6 @@ for _ in $(seq 1 90); do
   fi
   sleep 1
 done
-
-# Wait for SeaweedFS S3 and create required buckets
-S3_PORT="${SEAWEEDFS_PORT:-8888}"
-LOG_BUCKET="${S3_BUCKET:-classifyre-logs}"
-SANDBOX_BUCKET="${S3_SANDBOX_BUCKET:-classifyre-sandbox}"
-for _ in $(seq 1 60); do
-  if curl -fsS --max-time 2 "http://127.0.0.1:${S3_PORT}/" >/dev/null 2>&1 || \
-     curl -fsS --max-time 2 "http://127.0.0.1:${S3_PORT}/" 2>&1 | grep -q "AccessDenied\|NoSuchBucket\|InvalidAccessKeyId"; then
-    break
-  fi
-  sleep 2
-done
-# Create buckets (409 = already exists — both codes are fine)
-curl -s -o /dev/null -X PUT "http://127.0.0.1:${S3_PORT}/${LOG_BUCKET}" >/dev/null 2>&1 || true
-curl -s -o /dev/null -X PUT "http://127.0.0.1:${S3_PORT}/${SANDBOX_BUCKET}" >/dev/null 2>&1 || true
 
 CLI_DIR="${CLI_PATH:-/app/apps/cli}"
 mkdir -p "${UV_CACHE_DIR:-/cache/uv}"
@@ -443,7 +355,6 @@ exec env \
 SH
 chmod +x /etc/s6-overlay/s6-rc.d/api/run
 touch /etc/s6-overlay/s6-rc.d/api/dependencies.d/postgresql
-touch /etc/s6-overlay/s6-rc.d/api/dependencies.d/seaweedfs
 
 echo "longrun" > /etc/s6-overlay/s6-rc.d/web/type
 cat > /etc/s6-overlay/s6-rc.d/web/run <<'SH'
@@ -471,7 +382,6 @@ chmod +x /etc/s6-overlay/s6-rc.d/caddy/run
 touch /etc/s6-overlay/s6-rc.d/caddy/dependencies.d/web
 
 touch /etc/s6-overlay/s6-rc.d/user/contents.d/postgresql
-touch /etc/s6-overlay/s6-rc.d/user/contents.d/seaweedfs
 touch /etc/s6-overlay/s6-rc.d/user/contents.d/api
 touch /etc/s6-overlay/s6-rc.d/user/contents.d/web
 touch /etc/s6-overlay/s6-rc.d/user/contents.d/caddy
@@ -505,6 +415,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
   CMD curl -fsS http://127.0.0.1:3000/api/ping >/dev/null || exit 1
 
-VOLUME ["/var/lib/postgresql/data", "/cache/uv", "/var/lib/seaweedfs"]
+VOLUME ["/var/lib/postgresql/data", "/cache/uv"]
 
 ENTRYPOINT ["/init"]

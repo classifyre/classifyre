@@ -155,82 +155,29 @@ Name of the instance-ID ConfigMap.
 {{- end -}}
 
 {{/*
-S3 endpoint URL for the API and init jobs.
-  - SeaweedFS: derived from the release name and configured S3 port.
-  - External  : objectStorage.external.endpoint (may be empty for AWS S3).
+S3 endpoint URL injected into the API. Empty string means AWS S3 (SDK auto-resolves).
 */}}
 {{- define "classifyre.s3Endpoint" -}}
-{{- if .Values.objectStorage.seaweedfs.enabled -}}
-  {{- if .Values.objectStorage.seaweedfs.endpointOverride -}}
-    {{- .Values.objectStorage.seaweedfs.endpointOverride -}}
-  {{- else -}}
-    {{- printf "http://%s-seaweedfs-s3.%s.svc.cluster.local:%d" .Release.Name .Release.Namespace (.Values.objectStorage.seaweedfs.s3Port | int) -}}
-  {{- end -}}
-{{- else -}}
-  {{- .Values.objectStorage.external.endpoint -}}
-{{- end -}}
+{{- .Values.objectStorage.endpoint -}}
 {{- end -}}
 
 {{/*
-Compute the SeaweedFS-generated S3 secret name from the subchart logic.
-
-SeaweedFS defines its fullname as:
-  $name := default .Chart.Name .Values.nameOverride
-  if contains $name .Release.Name → .Release.Name
-  else → printf "%s-%s" .Release.Name $name
-
-Because .Chart.Name is "seaweedfs" in the subchart, we hardcode the same
-logic here so the parent chart can reference the subchart secret reliably.
-*/}}
-{{- define "classifyre.seaweedfsS3SecretName" -}}
-{{- $name := "seaweedfs" -}}
-{{- if .Values.seaweedfs.nameOverride -}}
-{{- $name = .Values.seaweedfs.nameOverride -}}
-{{- end -}}
-{{- if contains $name .Release.Name -}}
-{{- printf "%s-s3-secret" (.Release.Name | trunc 63 | trimSuffix "-") -}}
-{{- else -}}
-{{- printf "%s-%s-s3-secret" (.Release.Name | trunc 63 | trimSuffix "-") $name -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Name of the secret that holds S3 access-key-id and secret-access-key.
-
-For SeaweedFS mode we read from the SeaweedFS-generated IAM secret which
-persists credentials across upgrades via lookup + helm.sh/resource-policy: keep.
-Users can override via objectStorage.seaweedfs.existingSecret.
-
-For external S3 we use the external existingSecret or fall back to our secret.
+Name of the Kubernetes Secret holding S3 access-key-id and secret-access-key.
 */}}
 {{- define "classifyre.s3SecretName" -}}
-{{- if .Values.objectStorage.seaweedfs.enabled -}}
-  {{- default (include "classifyre.seaweedfsS3SecretName" .) .Values.objectStorage.seaweedfs.existingSecret -}}
+{{- if .Values.objectStorage.existingSecret -}}
+  {{- .Values.objectStorage.existingSecret -}}
 {{- else -}}
-  {{- default (printf "%s-s3-credentials" (include "classifyre.fullname" .)) .Values.objectStorage.external.existingSecret -}}
+  {{- printf "%s-s3-credentials" (include "classifyre.fullname" .) -}}
 {{- end -}}
 {{- end -}}
 
-{{/*
-Key names inside the S3 credentials secret.
-
-SeaweedFS generates admin_access_key_id / admin_secret_access_key by default.
-Users can override via existingSecret*Key values when using a custom secret.
-*/}}
 {{- define "classifyre.s3SecretAccessKeyIdKey" -}}
-{{- if .Values.objectStorage.seaweedfs.enabled -}}
-  {{- default "admin_access_key_id" .Values.objectStorage.seaweedfs.existingSecretAccessKeyIdKey -}}
-{{- else -}}
-  {{- .Values.objectStorage.external.existingSecretAccessKeyIdKey -}}
-{{- end -}}
+{{- .Values.objectStorage.existingSecretAccessKeyIdKey -}}
 {{- end -}}
 
 {{- define "classifyre.s3SecretSecretAccessKeyKey" -}}
-{{- if .Values.objectStorage.seaweedfs.enabled -}}
-  {{- default "admin_secret_access_key" .Values.objectStorage.seaweedfs.existingSecretSecretAccessKeyKey -}}
-{{- else -}}
-  {{- .Values.objectStorage.external.existingSecretSecretAccessKeyKey -}}
-{{- end -}}
+{{- .Values.objectStorage.existingSecretSecretAccessKeyKey -}}
 {{- end -}}
 
 {{/*
