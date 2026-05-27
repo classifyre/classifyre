@@ -342,7 +342,8 @@
       "label": "Window",
       "7days": "7 days",
       "30days": "30 days",
-      "90days": "90 days"
+      "90days": "90 days",
+      "1day": "Today"
     },
     "columns": {
       "category": "Category",
@@ -1338,7 +1339,9 @@
   "discovery": {
     "title": "Overview",
     "securityBrief": "Security Brief",
-    "allFindings": "All findings · last {{days}} days",
+    "allFindings": "All findings",
+    "allFindingsWithDays": "All findings · last {{days}} days",
+    "allFindingsToday": "All findings · today",
     "findingsToReview": "Findings to review",
     "open": "Open",
     "resolved": "Resolved",
