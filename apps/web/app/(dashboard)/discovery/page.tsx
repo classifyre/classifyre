@@ -30,7 +30,7 @@ import { formatRelative } from "@/lib/date";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 
-type DiscoveryWindowDays = 1 | 7 | 30 | 90;
+type DiscoveryWindowDays = 7 | 30 | 90;
 
 type RecentRun = FindingsDiscoveryResponseDto["recentRuns"][number];
 
@@ -218,7 +218,7 @@ function RunCard({ run, onClick }: { run: RecentRun; onClick: () => void }) {
 export default function DiscoveryPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const [windowDays, setWindowDays] = useState("1");
+  const [windowDays, setWindowDays] = useState("7");
   const [overview, setOverview] = useState<FindingsDiscoveryResponseDto | null>(
     null,
   );
@@ -226,7 +226,7 @@ export default function DiscoveryPage() {
   const [error, setError] = useState<string | null>(null);
 
   const windowDaysValue: DiscoveryWindowDays =
-    windowDays === "7" ? 7 : windowDays === "30" ? 30 : windowDays === "90" ? 90 : 1;
+    windowDays === "30" ? 30 : windowDays === "90" ? 90 : 7;
 
   useEffect(() => {
     const fetchOverview = async () => {
@@ -345,18 +345,13 @@ export default function DiscoveryPage() {
             </div>
             <div className="flex items-center justify-between gap-2">
               <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-mono mt-0.5">
-                {windowDays === "1"
-                  ? t("discovery.allFindingsToday")
-                  : t("discovery.allFindingsWithDays", { days: windowDaysValue })}
+                {t("discovery.allFindingsWithDays", { days: windowDaysValue })}
               </p>
               <Select value={windowDays} onValueChange={setWindowDays}>
                 <SelectTrigger className="h-7 w-[100px] text-[10px] bg-background border-2 border-border text-foreground rounded-[4px] font-mono">
                   <SelectValue placeholder={t("common.window")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">
-                    {t("findings.window.1day")}
-                  </SelectItem>
                   <SelectItem value="7">
                     {t("findings.window.7days")}
                   </SelectItem>
