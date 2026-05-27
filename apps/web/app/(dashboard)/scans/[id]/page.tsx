@@ -30,11 +30,8 @@ import { RunnerAssetsTable } from "@/components/runner-assets-table";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { RunnerLogViewer } from "@/components/runner-log-viewer";
 import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
-import {
-  getRunnerStatusBadgeLabel,
-  getRunnerStatusBadgeTone,
-  isRunnerStatusRunning,
-} from "@/lib/runner-status-badge";
+import { RunnerStatusBadge } from "@/components/runner-status-badge";
+import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
 import { getSourceIcon } from "@/lib/source-type-icon";
 import {
   Badge,
@@ -79,7 +76,7 @@ const EMPTY_FINDINGS_CHARTS: SearchFindingsChartsResponseDto = {
 };
 
 function calculateProgress(runner: RunnerDto): number {
-  if (runner.status !== "RUNNING" || !runner.startedAt) return 0;
+  if (!isRunnerStatusRunning(runner.status) || !runner.startedAt) return 0;
   const processed = runner.assetsCreated + runner.assetsUpdated;
   return processed > 0
     ? Math.min(95, Math.round((processed / Math.max(processed, 100)) * 100))
@@ -217,7 +214,7 @@ export default function RunnerDetailPage() {
   }, [fetchOverview, fetchRunner]);
 
   const hasActiveRun =
-    runner?.status === "RUNNING" || runner?.status === "PENDING";
+    isRunnerStatusRunning(runner?.status) || runner?.status === "PENDING";
 
   // Use the stable fetchOverview ref so the WS callback doesn't close over stale state
   const fetchOverviewRef = useRef(fetchOverview);
@@ -374,19 +371,10 @@ export default function RunnerDetailPage() {
               </h1>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <Badge
-                className={`rounded-[4px] border ${getRunnerStatusBadgeTone(runner.status)}`}
+              <RunnerStatusBadge
+                status={runner.status}
                 data-testid="scan-status-badge"
-              >
-                {isRunnerStatusRunning(runner.status) && (
-                  <Spinner
-                    size="sm"
-                    className="gap-0 [&_svg]:size-3"
-                    data-icon="inline-start"
-                  />
-                )}
-                {getRunnerStatusBadgeLabel(runner.status)}
-              </Badge>
+              />
               <Badge variant="outline" className="rounded-[4px]">
                 {t(`triggerTypes.${runner.triggerType}`)}
               </Badge>
@@ -434,7 +422,7 @@ export default function RunnerDetailPage() {
                 ? t("scans.runningLabel")
                 : t("scans.runAgain")}
           </Button>
-          {runner.status === "RUNNING" && (
+          {isRunnerStatusRunning(runner.status) && (
             <Button
               variant="destructive"
               size="sm"
@@ -533,7 +521,7 @@ export default function RunnerDetailPage() {
             ))}
           </div>
 
-          {runner.status === "RUNNING" && (
+          {isRunnerStatusRunning(runner.status) && (
             <Card className="border-2 border-black rounded-[6px]">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{t("scans.runProgress.title")}</CardTitle>

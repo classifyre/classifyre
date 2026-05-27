@@ -25,14 +25,11 @@ import {
 import { Loader2, Play } from "lucide-react";
 import {
   api,
-  type SourcesControllerListSources200ResponseInner,
   type StartRunnerDto,
+  type SourcesControllerListSources200ResponseInner,
 } from "@workspace/api-client";
-import {
-  getRunnerStatusBadgeLabel,
-  getRunnerStatusBadgeTone,
-  isRunnerStatusRunning,
-} from "../lib/runner-status-badge";
+import { RunnerStatusBadge } from "./runner-status-badge";
+import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
 import { useTranslation } from "@/hooks/use-translation";
 
 interface ScanWizardProps {
@@ -41,8 +38,6 @@ interface ScanWizardProps {
 }
 
 type Source = SourcesControllerListSources200ResponseInner;
-const isSourceRunning = (status?: string | null) =>
-  isRunnerStatusRunning(status);
 
 export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
   const router = useRouter();
@@ -80,7 +75,7 @@ export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
     if (
       !sourceId ||
       submitting ||
-      isSourceRunning(selectedSource?.runnerStatus)
+      isRunnerStatusRunning(selectedSource?.runnerStatus)
     ) {
       return;
     }
@@ -114,7 +109,7 @@ export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
     Boolean(sourceId) &&
     !loading &&
     !submitting &&
-    !isSourceRunning(selectedSource?.runnerStatus);
+    !isRunnerStatusRunning(selectedSource?.runnerStatus);
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} direction="right">
@@ -157,7 +152,7 @@ export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
 
                       const normalizedRunnerStatus =
                         source.runnerStatus?.toUpperCase();
-                      const isRunning = isSourceRunning(normalizedRunnerStatus);
+                      const isRunning = isRunnerStatusRunning(normalizedRunnerStatus);
                       const isSelected = sourceId === id;
                       const isDisabled = submitting || isRunning;
 
@@ -195,20 +190,7 @@ export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
                           </TableCell>
                           <TableCell>{source.type ?? "—"}</TableCell>
                           <TableCell>
-                            <Badge
-                              className={`rounded-[4px] border ${getRunnerStatusBadgeTone(normalizedRunnerStatus)}`}
-                            >
-                              {isRunnerStatusRunning(
-                                normalizedRunnerStatus,
-                              ) && (
-                                <Spinner
-                                  size="sm"
-                                  className="gap-0 [&_svg]:size-3"
-                                  data-icon="inline-start"
-                                />
-                              )}
-                              {t(getRunnerStatusBadgeLabel(normalizedRunnerStatus))}
-                            </Badge>
+                            <RunnerStatusBadge status={normalizedRunnerStatus} />
                           </TableCell>
                         </TableRow>
                       );

@@ -46,11 +46,8 @@ import type { FindingSelection } from "@/components/findings-table";
 import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
 import { getSourceSchema } from "@/lib/schema-loader";
 import { getSourceIcon } from "@/lib/source-type-icon";
-import {
-  getRunnerStatusBadgeLabel,
-  getRunnerStatusBadgeTone,
-  isRunnerStatusRunning,
-} from "@/lib/runner-status-badge";
+import { RunnerStatusBadge } from "@/components/runner-status-badge";
+import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
 import { useTranslation } from "@/hooks/use-translation";
 
 const EMPTY_CHARTS: SearchAssetsChartsResponseDto = {
@@ -335,7 +332,7 @@ export default function SourceViewPage() {
     }
   };
 
-  const isSourceRunning = source?.runnerStatus === "RUNNING";
+  const isRunning = isRunnerStatusRunning(source?.runnerStatus);
 
   const { totals } = assetCharts;
   const assetPanels = [
@@ -405,19 +402,7 @@ export default function SourceViewPage() {
               </h1>
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <span>{source.type} source</span>
-                <Badge
-                  className={`rounded-[4px] border ${getRunnerStatusBadgeTone(source.runnerStatus)}`}
-                >
-                  {isRunnerStatusRunning(source.runnerStatus) && (
-                    <Spinner
-                      size="sm"
-                      className="gap-0 [&_svg]:size-3"
-                      data-icon="inline-start"
-                    />
-                  )}
-                  {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
-                </Badge>
-              </div>
+                <RunnerStatusBadge status={source.runnerStatus} />              </div>
             </div>
           </div>
         </div>
@@ -435,12 +420,12 @@ export default function SourceViewPage() {
             <Button
               size="sm"
               onClick={handleStartScan}
-              disabled={isStartingScan || isSourceRunning}
+              disabled={isStartingScan || isRunning}
             >
               <Play className="h-4 w-4" />
               {isStartingScan
                 ? t("common.starting")
-                : isSourceRunning
+                : isRunning
                   ? t("common.runningLabel")
                   : t("sources.runScan")}
             </Button>
@@ -506,35 +491,12 @@ export default function SourceViewPage() {
                       <button
                         type="button"
                         onClick={() => router.push(latestRunHref)}
-                        className="inline-flex cursor-pointer"
+                        className="inline-flex cursor-pointer transition-opacity hover:opacity-80"
                       >
-                        <Badge
-                          className={`rounded-[4px] border ${getRunnerStatusBadgeTone(source.runnerStatus)} hover:opacity-80 transition-opacity`}
-                        >
-                          {isRunnerStatusRunning(source.runnerStatus) && (
-                            <Spinner
-                              size="sm"
-                              className="gap-0 [&_svg]:size-3"
-                              data-icon="inline-start"
-                            />
-                          )}
-                          {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
-                        </Badge>
+                        <RunnerStatusBadge status={source.runnerStatus} />
                       </button>
                     ) : (
-                      <Badge
-                        className={`rounded-[4px] border ${getRunnerStatusBadgeTone(source.runnerStatus)}`}
-                      >
-                        {isRunnerStatusRunning(source.runnerStatus) && (
-                          <Spinner
-                            size="sm"
-                            className="gap-0 [&_svg]:size-3"
-                            data-icon="inline-start"
-                          />
-                        )}
-                        {t(getRunnerStatusBadgeLabel(source.runnerStatus))}
-                      </Badge>
-                    )}
+                      <RunnerStatusBadge status={source.runnerStatus} />                    )}
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs uppercase text-muted-foreground">{t("common.type")}</p>
@@ -608,20 +570,9 @@ export default function SourceViewPage() {
                       <button
                         type="button"
                         onClick={() => router.push(`/scans/${lastRunner.id}`)}
-                        className="inline-flex cursor-pointer"
+                        className="inline-flex cursor-pointer transition-opacity hover:opacity-80"
                       >
-                        <Badge
-                          className={`rounded-[4px] border ${getRunnerStatusBadgeTone(lastRunner.status)} hover:opacity-80 transition-opacity`}
-                        >
-                          {isRunnerStatusRunning(lastRunner.status) && (
-                            <Spinner
-                              size="sm"
-                              className="gap-0 [&_svg]:size-3"
-                              data-icon="inline-start"
-                            />
-                          )}
-                          {t(getRunnerStatusBadgeLabel(lastRunner.status))}
-                        </Badge>
+                        <RunnerStatusBadge status={lastRunner.status} />
                       </button>
                     ) : (
                       <p className="text-sm">—</p>
@@ -772,20 +723,8 @@ export default function SourceViewPage() {
                         >
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <Badge
-                                className={`rounded-[4px] border ${getRunnerStatusBadgeTone(runner.status)}`}
-                              >
-                                {isRunnerStatusRunning(runner.status) && (
-                                  <Spinner
-                                    size="sm"
-                                    className="gap-0 [&_svg]:size-3"
-                                    data-icon="inline-start"
-                                  />
-                                )}
-                                {t(getRunnerStatusBadgeLabel(runner.status))}
-                              </Badge>
-                              <span className="truncate text-xs text-muted-foreground">
-                                {formatRelative(runner.triggeredAt)}
+                              <RunnerStatusBadge status={runner.status} />
+                              <span className="truncate text-xs text-muted-foreground">                                {formatRelative(runner.triggeredAt)}
                               </span>
                             </div>
                             <p className="mt-1 text-xs text-muted-foreground">
