@@ -81,18 +81,15 @@ postgres:
       accessModes:
         - ReadWriteOnce
 
-# ── Object storage (SeaweedFS, minimal footprint for VPS) ────────────────────
-# local-path StorageClass on K3s only supports ReadWriteOnce; SeaweedFS volume
-# uses a single ReadWriteOnce PVC so it works out of the box.
+# ── Object storage (external S3 / Backblaze B2) ──────────────────────────────
 objectStorage:
-  bucket: classifyre-logs
-  seaweedfs:
-    enabled: true
+  bucket: classifyredemologs
+  sandboxBucket: classifyredemosandbox
+  # forcePathStyle: true is the chart default; explicitly false for AWS-style virtual-hosted URLs.
+  forcePathStyle: false
 
-seaweedfs:
-  volume:
-    dataDirs:
-      - name: data
-        type: "persistentVolumeClaim"
-        size: "10Gi"
-        storageClass: ""
+  seaweedfs:
+    enabled: false
+
+  external:
+    existingSecret: classifyre-s3-credentials
