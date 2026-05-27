@@ -31,7 +31,7 @@
 | api.cliJobs.serviceAccountName | string | `""` | Service account for CLI jobs. Empty uses API service account. |
 | api.cliJobs.tolerations | list | `[]` | CLI job scheduling: tolerations. |
 | api.cliJobs.ttlSecondsAfterFinished | int | `1800` | TTL for completed CLI jobs (seconds). Ignored when cleanup policy deletes jobs immediately. |
-| api.cliJobs.uvCache.accessModes | list | `["ReadWriteMany"]` | Access modes for uv cache PVC. |
+| api.cliJobs.uvCache.accessModes | list | `["ReadWriteOnce"]` | Access modes for uv cache PVC. |
 | api.cliJobs.uvCache.enabled | bool | `true` | Enable shared PVC for uv cache. |
 | api.cliJobs.uvCache.existingClaim | string | `""` | Existing PVC name for uv cache. Empty creates a new PVC. |
 | api.cliJobs.uvCache.mountPath | string | `"/cache/uv"` | Mount path for uv cache in CLI job container. |
@@ -89,7 +89,7 @@
 | api.replicaCount | int | `2` | Number of API replicas when autoscaling is disabled. |
 | api.resources.limits | object | `{"cpu":"1","memory":"1Gi"}` | API resource limits. |
 | api.resources.requests | object | `{"cpu":"250m","memory":"512Mi"}` | API resource requests. |
-| api.runnerLogs.accessModes | list | `["ReadWriteMany"]` | Access modes for runner logs PVC. |
+| api.runnerLogs.accessModes | list | `["ReadWriteOnce"]` | Access modes for runner logs PVC. |
 | api.runnerLogs.enabled | bool | `true` | Enable PVC-backed storage for runner logs. |
 | api.runnerLogs.existingClaim | string | `""` | Existing PVC name for runner logs. Empty creates a new PVC. |
 | api.runnerLogs.mountPath | string | `"/var/lib/classifyre/runner-logs"` | Mount path for runner logs directory. |
@@ -240,3 +240,91 @@
 | serviceAccount.automount | bool | `true` | Mount service account token into API pods (required for Kubernetes CLI jobs). |
 | serviceAccount.create | bool | `true` | Create the API service account. |
 | serviceAccount.name | string | `""` | Existing service account name to use when `create=false`. |
+
+## Object Storage (S3-compatible)
+
+Classifyre stores runner execution logs in S3-compatible object storage. This removes the need for a `ReadWriteMany` PVC and allows API replicas to scale horizontally on any standard `ReadWriteOnce` StorageClass.
+
+### Default: embedded SeaweedFS
+
+By default, the chart deploys [SeaweedFS](https://github.com/seaweedfs/seaweedfs) as an in-cluster S3 provider. No external configuration is required.
+
+```yaml
+objectStorage:
+  seaweedfs:
+    enabled: true   # default
+```
+
+SeaweedFS credentials are auto-generated and stored in a Kubernetes Secret (`<release>-s3-credentials`).
+
+### Switching to AWS S3
+
+```yaml
+objectStorage:
+  bucket: my-classifyre-logs
+  region: us-east-1
+  forcePathStyle: false    # AWS S3 uses virtual-hosted style
+
+  seaweedfs:
+    enabled: false         # disable embedded SeaweedFS
+
+  external:
+    endpoint: ""           # leave empty — AWS SDK resolves from region
+    accessKeyId: AKIA...
+    secretAccessKey: "..."
+
+# Or use an existing Kubernetes Secret:
+# objectStorage:
+#   external:
+#     existingSecret: my-s3-secret   # keys: access-key-id, secret-access-key
+```
+
+### Switching to MinIO (self-hosted)
+
+```yaml
+objectStorage:
+  bucket: classifyre-logs
+  seaweedfs:
+    enabled: false
+  external:
+    endpoint: http://minio.minio-ns.svc.cluster.local:9000
+    accessKeyId: minioadmin
+    secretAccessKey: minioadmin
+```
+
+### Switching to Azure Blob Storage (S3 compatibility layer)
+
+```yaml
+objectStorage:
+  bucket: classifyre-logs
+  forcePathStyle: false
+  seaweedfs:
+    enabled: false
+  external:
+    endpoint: https://<account>.blob.core.windows.net
+    accessKeyId: <storage-account-name>
+    secretAccessKey: <storage-account-key>
+```
+
+### Production SeaweedFS tuning
+
+For durable production data, replace emptyDir volumes with PVCs in the SeaweedFS subchart:
+
+```yaml
+seaweedfs:
+  master:
+    data:
+      type: "persistentVolumeClaim"
+      size: "5Gi"
+  filer:
+    data:
+      type: "persistentVolumeClaim"
+      size: "10Gi"
+  volume:
+    dataDirs:
+      - name: data
+        type: "persistentVolumeClaim"
+        size: "100Gi"
+```
+
+Refer to the [SeaweedFS Helm chart](https://github.com/seaweedfs/seaweedfs/tree/master/k8s/charts/seaweedfs) for the full list of configuration options.

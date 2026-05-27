@@ -114,26 +114,20 @@ data:
                   {{ . | toJson }}
                   {{- end }}
                 ],
+                {{- if .Values.api.cliJobs.uvCache.enabled }}
                 "volumeMounts": [
-                  {{- if .Values.api.cliJobs.uvCache.enabled }}
                   {
                     "name": "uv-cache",
                     "mountPath": "{{ .Values.api.cliJobs.uvCache.mountPath }}"
                   }
-                  {{- end }}
-                  {{- $hasPrev := .Values.api.cliJobs.uvCache.enabled -}}
-                  {{- if .Values.api.runnerLogs.enabled }}
-                  {{- if $hasPrev }},{{- end }}
-                  {
-                    "name": "runner-logs",
-                    "mountPath": "{{ .Values.api.runnerLogs.mountPath }}"
-                  }
-                  {{- end }}
-                ]
+                ],
+                {{- else }}
+                "volumeMounts": [],
+                {{- end }}
+                "workingDir": "{{ .Values.api.cliJobs.workDir }}"
               }
             ],
             "volumes": [
-              {{- $hasPrevVol := false -}}
               {{- if .Values.api.cliJobs.uvCache.enabled }}
               {
                 "name": "uv-cache",
@@ -141,16 +135,7 @@ data:
                   "claimName": "{{ default (printf "%s-cli-uv-cache" (include "classifyre.fullname" .)) .Values.api.cliJobs.uvCache.existingClaim }}"
                 }
               }
-              {{- $hasPrevVol = true -}}
-              {{- end }}
-              {{- if .Values.api.runnerLogs.enabled }}
-              {{- if $hasPrevVol }},{{- end }}
-              {
-                "name": "runner-logs",
-                "persistentVolumeClaim": {
-                  "claimName": "{{ default (printf "%s-runner-logs" (include "classifyre.fullname" .)) .Values.api.runnerLogs.existingClaim }}"
-                }
-              }
+              {{- else }}
               {{- end }}
             ]
           }

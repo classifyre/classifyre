@@ -3,8 +3,8 @@ import {
   McpServer,
   ResourceTemplate,
 } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { RunnerStatus } from '@prisma/client';
-import * as z from 'zod/v4';
+
+import * as z from 'zod';
 import { AssetService } from './asset.service';
 import { CliRunnerService } from './cli-runner/cli-runner.service';
 import { CustomDetectorsService } from './custom-detectors.service';
@@ -20,6 +20,40 @@ import { MetricsService } from './semantic-layer/metrics.service';
 import { SourceService } from './source.service';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
+
+// Zod 4.4.x introduced a type incompatibility with @modelcontextprotocol/sdk's AnySchema.
+// This adapter type uses z.ZodTypeAny (which Zod 4.4.x classic types do extend) so that
+// raw shape objects can be passed to registerTool/registerPrompt without type errors.
+// Tracking issue: https://github.com/modelcontextprotocol/typescript-sdk/issues/1987
+type McpZodShape = Record<string, z.ZodTypeAny>;
+type McpServerCompat = Omit<McpServer, 'registerTool' | 'registerPrompt'> & {
+  registerTool<T extends McpZodShape>(
+    name: string,
+    config: {
+      title?: string;
+      description?: string;
+      inputSchema?: T;
+      outputSchema?: z.ZodTypeAny;
+      annotations?: {
+        readOnlyHint?: boolean;
+        destructiveHint?: boolean;
+        idempotentHint?: boolean;
+        openWorldHint?: boolean;
+      };
+      _meta?: Record<string, unknown>;
+    },
+    cb: (args: { [K in keyof T]: z.infer<T[K]> }, extra: unknown) => unknown,
+  ): unknown;
+  registerPrompt<T extends McpZodShape>(
+    name: string,
+    config: {
+      title?: string;
+      description?: string;
+      argsSchema?: T;
+    },
+    cb: (args: { [K in keyof T]: z.infer<T[K]> }, extra: unknown) => unknown,
+  ): unknown;
+};
 
 function jsonResult(payload: unknown) {
   const structuredContent =
@@ -65,20 +99,21 @@ export class McpServerFactoryService {
       version: '1.0.0',
     });
 
-    this.registerResources(server);
-    this.registerPrompts(server);
-    this.registerSourceTools(server);
-    this.registerCustomDetectorTools(server);
-    this.registerExtractionTools(server);
-    this.registerRunTools(server);
-    this.registerFindingTools(server);
-    this.registerAssetTools(server);
-    this.registerSemanticLayerTools(server);
+    const srv = server as unknown as McpServerCompat;
+    this.registerResources(srv);
+    this.registerPrompts(srv);
+    this.registerSourceTools(srv);
+    this.registerCustomDetectorTools(srv);
+    this.registerExtractionTools(srv);
+    this.registerRunTools(srv);
+    this.registerFindingTools(srv);
+    this.registerAssetTools(srv);
+    this.registerSemanticLayerTools(srv);
 
     return server;
   }
 
-  private registerResources(server: McpServer) {
+  private registerResources(server: McpServerCompat) {
     server.registerResource(
       'classifyre-overview',
       'classifyre://overview',
@@ -139,7 +174,7 @@ export class McpServerFactoryService {
     );
   }
 
-  private registerPrompts(server: McpServer) {
+  private registerPrompts(server: McpServerCompat) {
     server.registerPrompt(
       MCP_PROMPTS[0].name,
       {
@@ -173,7 +208,7 @@ export class McpServerFactoryService {
     );
   }
 
-  private registerSourceTools(server: McpServer) {
+  private registerSourceTools(server: McpServerCompat) {
     server.registerTool(
       'search_sources',
       {
@@ -353,7 +388,7 @@ export class McpServerFactoryService {
     );
   }
 
-  private registerCustomDetectorTools(server: McpServer) {
+  private registerCustomDetectorTools(server: McpServerCompat) {
     server.registerTool(
       'list_custom_detectors',
       {
@@ -583,7 +618,7 @@ export class McpServerFactoryService {
     );
   }
 
-  private registerExtractionTools(server: McpServer) {
+  private registerExtractionTools(server: McpServerCompat) {
     const extractionsService = this.customDetectorExtractionsService;
     const customDetectorsService = this.customDetectorsService;
 
@@ -687,7 +722,7 @@ export class McpServerFactoryService {
     );
   }
 
-  private registerRunTools(server: McpServer) {
+  private registerRunTools(server: McpServerCompat) {
     server.registerTool(
       'search_runs',
       {
@@ -733,7 +768,7 @@ export class McpServerFactoryService {
         jsonResult(
           await this.cliRunnerService.listRunners({
             sourceId,
-            status: status as RunnerStatus | undefined,
+            status: status,
             skip,
             take,
           }),
@@ -799,7 +834,7 @@ export class McpServerFactoryService {
     );
   }
 
-  private registerFindingTools(server: McpServer) {
+  private registerFindingTools(server: McpServerCompat) {
     server.registerTool(
       'search_findings',
       {
@@ -915,7 +950,7 @@ export class McpServerFactoryService {
     );
   }
 
-  private registerAssetTools(server: McpServer) {
+  private registerAssetTools(server: McpServerCompat) {
     server.registerTool(
       'search_assets',
       {
@@ -1028,7 +1063,7 @@ export class McpServerFactoryService {
     );
   }
 
-  private registerSemanticLayerTools(server: McpServer) {
+  private registerSemanticLayerTools(server: McpServerCompat) {
     const filterMappingSchema = z
       .object({
         detectorTypes: z.array(z.string()).optional(),
@@ -1289,7 +1324,7 @@ export class McpServerFactoryService {
             const result = await this.metricEngineService.evaluateMetric(id, {
               glossaryTermId,
               ...options,
-            } as any);
+            });
             return { metricId: id, ...result };
           }),
         );

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
-import { RunnerDto } from '../cli-runner/dto';
+import { RunnerDto, RunnerLogEntryDto } from '../cli-runner/dto';
 
 @WebSocketGateway({
   cors: {
@@ -74,6 +74,14 @@ export class RunnerEventsGateway
   emitSourceRunnerUpdate(sourceId: string, runner: RunnerDto) {
     this.server.to(`source:${sourceId}`).emit('runner:update', runner);
     this.emitRunnerUpdate(runner);
+  }
+
+  // Emit batched log entries for a specific runner
+  emitRunnerLogs(runnerId: string, entries: RunnerLogEntryDto[]) {
+    if (!entries.length) return;
+    this.server
+      .to(`runner:${runnerId}`)
+      .emit('runner:log', { runnerId, entries });
   }
 
   // Emit runner created event

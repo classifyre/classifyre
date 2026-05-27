@@ -27,7 +27,7 @@ async function bootstrap() {
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
   });
 
-  await app.register(multipart as any, {
+  await app.register(multipart, {
     limits: { fileSize: 50 * 1024 * 1024, files: 1 },
   });
 

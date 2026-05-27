@@ -28,12 +28,6 @@ api:
         - ReadWriteOnce
       size: 5Gi
 
-  runnerLogs:
-    enabled: true
-    accessModes:
-      - ReadWriteOnce
-    size: 5Gi
-
 frontend:
   replicaCount: 1
   autoscaling:
@@ -66,3 +60,17 @@ priorityClasses:
 
 networkPolicy:
   enabled: false
+
+objectStorage:
+  bucket: classifyre-logs
+  sandboxBucket: classifyre-sandbox
+  seaweedfs:
+    enabled: true
+
+seaweedfs:
+  volume:
+    dataDirs:
+      - name: data
+        type: "persistentVolumeClaim"
+        size: "5Gi"
+        storageClass: ""

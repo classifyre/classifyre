@@ -194,6 +194,32 @@ spec:
             - name: K8S_CLI_JOB_WORKDIR
               value: {{ .Values.api.cliJobs.workDir | quote }}
             {{- end }}
+            {{- /* ── S3 / object-storage configuration ─────────────────── */}}
+            - name: S3_BUCKET
+              value: {{ .Values.objectStorage.bucket | quote }}
+            - name: S3_SANDBOX_BUCKET
+              value: {{ .Values.objectStorage.sandboxBucket | quote }}
+            - name: S3_LOG_PREFIX
+              value: {{ .Values.objectStorage.logPrefix | quote }}
+            - name: S3_REGION
+              value: {{ .Values.objectStorage.region | quote }}
+            - name: S3_FORCE_PATH_STYLE
+              value: {{ .Values.objectStorage.forcePathStyle | quote }}
+            {{- $s3Endpoint := include "classifyre.s3Endpoint" . }}
+            {{- if $s3Endpoint }}
+            - name: S3_ENDPOINT
+              value: {{ $s3Endpoint | quote }}
+            {{- end }}
+            - name: S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.s3SecretName" . }}
+                  key: {{ include "classifyre.s3SecretAccessKeyIdKey" . }}
+            - name: S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "classifyre.s3SecretName" . }}
+                  key: {{ include "classifyre.s3SecretSecretAccessKeyKey" . }}
             {{- include "classifyre.telemetryEnv" . | nindent 12 }}
             {{- with .Values.api.extraEnv }}
             {{- toYaml . | nindent 12 }}
@@ -202,17 +228,11 @@ spec:
           envFrom:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if or .Values.api.cliJobs.enabled .Values.api.runnerLogs.enabled }}
+          {{- if .Values.api.cliJobs.enabled }}
           volumeMounts:
-            {{- if .Values.api.cliJobs.enabled }}
             - name: cli-job-template
               mountPath: /etc/classifyre/cli-job-template
               readOnly: true
-            {{- end }}
-            {{- if .Values.api.runnerLogs.enabled }}
-            - name: runner-logs
-              mountPath: {{ .Values.api.runnerLogs.mountPath | quote }}
-            {{- end }}
           {{- end }}
           {{- with .Values.api.resources }}
           resources:
@@ -255,18 +275,11 @@ spec:
           lifecycle:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- if or .Values.api.cliJobs.enabled .Values.api.runnerLogs.enabled }}
+      {{- if .Values.api.cliJobs.enabled }}
       volumes:
-        {{- if .Values.api.cliJobs.enabled }}
         - name: cli-job-template
           configMap:
             name: {{ include "classifyre.api.fullname" . }}-cli-job-template
-        {{- end }}
-        {{- if .Values.api.runnerLogs.enabled }}
-        - name: runner-logs
-          persistentVolumeClaim:
-            claimName: {{ default (printf "%s-runner-logs" (include "classifyre.fullname" .)) .Values.api.runnerLogs.existingClaim }}
-        {{- end }}
       {{- end }}
       {{- with .Values.api.nodeSelector }}
       nodeSelector:

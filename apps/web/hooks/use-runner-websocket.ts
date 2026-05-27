@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { io, type Socket } from "socket.io-client";
-import type { RunnerDto } from "@workspace/api-client";
+import type { RunnerDto, RunnerLogEntryDto } from "@workspace/api-client";
 import { parseRunnerSocketPayload } from "@/lib/runner-ws-merge";
 
 const getWebSocketUrl = () => {
@@ -37,6 +37,8 @@ export type UseRunnerWebSocketOptions = {
   trackRunnersList?: boolean;
   onRunnerUpdate?: (runner: RunnerDto) => void;
   onRunnerCreated?: (runner: RunnerDto) => void;
+  /** Called when the server pushes new log entries for a runner in real-time. */
+  onRunnerLog?: (runnerId: string, entries: RunnerLogEntryDto[]) => void;
 };
 
 export function useRunnerWebSocket(options?: UseRunnerWebSocketOptions) {
@@ -128,12 +130,29 @@ export function useRunnerWebSocket(options?: UseRunnerWebSocketOptions) {
       setIsConnected(false);
     });
 
+    const onLog = (payload: unknown) => {
+      if (
+        typeof payload !== "object" ||
+        payload === null ||
+        !("runnerId" in payload) ||
+        !("entries" in payload)
+      )
+        return;
+      const { runnerId, entries } = payload as {
+        runnerId: string;
+        entries: RunnerLogEntryDto[];
+      };
+      optsRef.current?.onRunnerLog?.(runnerId, entries);
+    };
+
     socket.on("runner:update", onUpdate);
     socket.on("runner:created", onCreated);
+    socket.on("runner:log", onLog);
 
     return () => {
       socket.off("runner:update", onUpdate);
       socket.off("runner:created", onCreated);
+      socket.off("runner:log", onLog);
       socket.disconnect();
       socketRef.current = null;
     };

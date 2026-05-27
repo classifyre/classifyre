@@ -26,7 +26,7 @@ export class NotificationsService {
   ) {}
 
   private toPrismaType(type: NotificationType): PrismaNotificationType {
-    return type as unknown as PrismaNotificationType;
+    return type;
   }
 
   private toResponse(notification: any): NotificationResponseDto {

@@ -177,11 +177,10 @@ export class AssistantService {
       const isArray = parsedArray !== null;
       const topLevelKeys = isArray
         ? []
-        : Object.keys(
-            parsed && typeof parsed === 'object'
-              ? (parsed as Record<string, unknown>)
-              : {},
-          ).slice(0, 30);
+        : Object.keys(parsed && typeof parsed === 'object' ? parsed : {}).slice(
+            0,
+            30,
+          );
       const summary = isArray
         ? `Parsed JSON array with ${parsedArray.length} item(s).`
         : `Parsed JSON object with ${topLevelKeys.length} top-level key(s).`;
