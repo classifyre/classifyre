@@ -23,6 +23,7 @@ export class InstanceSettingsService {
       timezone: settings.timezone,
       timeFormat: settings.timeFormat,
       demoMode: this.demoMode.isDemoMode,
+      s3Configured: !!process.env.S3_BUCKET,
       createdAt: settings.createdAt,
       updatedAt: settings.updatedAt,
     };

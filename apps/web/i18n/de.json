@@ -1170,6 +1170,8 @@
       "noLogsDownload": "Keine Protokolle zum Herunterladen verfügbar",
       "noRowsToCopy": "Mindestens eine Zeile zum Kopieren auswählen",
       "loadedEntries": "geladen",
+      "noStorageWarningTitle": "Protokollspeicherung nicht verfügbar",
+      "noStorageWarningBody": "Diese Instanz hat keinen Objektspeicher (S3) konfiguriert. Scan-Protokolle sind während eines Laufs in Echtzeit sichtbar, werden aber nach Abschluss nicht gespeichert — beim Neu-Laden dieser Seite wird ein leeres Protokoll angezeigt. Konfigurieren Sie einen S3-kompatiblen Anbieter, um die Protokollspeicherung zu aktivieren.",
       "columns": {
         "time": "Zeit",
         "level": "Level",
