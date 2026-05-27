@@ -47,3 +47,33 @@ networkPolicy:
   enabled: true
   ingressNamespaceSelector:
     kubernetes.io/metadata.name: ingress-nginx
+
+# ── Object Storage (S3-compatible) ───────────────────────────────────────────
+# Enable to persist runner logs and sandbox uploads. See helm/classifyre/docs/object-storage.md.
+#
+# Option A — AWS S3 with an existing Secret (recommended for production):
+# objectStorage:
+#   enabled: true
+#   bucket: classifyre-logs
+#   sandboxBucket: classifyre-sandbox
+#   region: us-east-1
+#   forcePathStyle: false
+#   existingSecret: classifyre-s3-credentials   # keys: access-key-id, secret-access-key
+#
+# Option B — Backblaze B2:
+# objectStorage:
+#   enabled: true
+#   bucket: classifyre-logs
+#   sandboxBucket: classifyre-sandbox
+#   endpoint: "https://s3.us-west-004.backblazeb2.com"
+#   region: us-west-004
+#   existingSecret: classifyre-s3-credentials
+#
+# Option C — Self-hosted MinIO or Garage:
+# objectStorage:
+#   enabled: true
+#   bucket: classifyre-logs
+#   sandboxBucket: classifyre-sandbox
+#   endpoint: "http://minio.minio-ns.svc.cluster.local:9000"
+#   forcePathStyle: true
+#   existingSecret: classifyre-s3-credentials
