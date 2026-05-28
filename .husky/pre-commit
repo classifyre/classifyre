@@ -9,12 +9,12 @@ CLASSIFYRE="$REPO_ROOT"
 
 echo "Checking i18n key parity (web)..."
 cd "$CLASSIFYRE/apps/web"
-node_modules/.bin/jest lib/i18n-keys.spec.ts --no-coverage --silent
+bun test lib/i18n-keys.spec.ts --silent
 echo "Web i18n OK"
 
 echo "Checking i18n key parity (api)..."
 cd "$CLASSIFYRE/apps/api"
-npx jest src/i18n/i18n-keys.spec.ts --no-coverage --silent
+bun test src/i18n/i18n-keys.spec.ts --silent
 echo "API i18n OK"
 
 echo "Checking generated docs artifacts..."

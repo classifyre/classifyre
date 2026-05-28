@@ -84,11 +84,5 @@ postgres:
       accessModes:
         - ReadWriteOnce
 
-# Use a PVC for SeaweedFS idx so index files survive pod recreation.
-# Without this, EmptyDir wipes idx files on every Helm upgrade, causing CrashLoopBackOff.
-seaweedfs:
-  volume:
-    idx:
-      type: "persistentVolumeClaim"
-      size: "5Gi"
-      storageClass: ""
+objectStorage:
+  enabled: false

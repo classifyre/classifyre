@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   release:
-    name: Release From Main
+    name: Release From Develop
     runs-on: ubuntu-latest
 
     env:
@@ -39,77 +39,97 @@ jobs:
       REPO: ${{ github.repository }}
 
     steps:
-      - name: Require main branch
+      # ── 1. Validate branch ─────────────────────────────────────────────
+      - name: Require develop branch
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_REF_NAME}" != "main" ]]; then
-            echo "::error::Release can only be run from the main branch"
+          if [[ "${GITHUB_REF_NAME}" != "develop" ]]; then
+            echo "::error::Release must be triggered from the develop branch"
             exit 1
           fi
 
-      - name: Checkout main
-        uses: actions/checkout@v5
+      # ── 2. Checkout with FULL history of ALL branches ──────────────────
+      - name: Checkout develop (full history)
+        uses: actions/checkout@v6
         with:
-          ref: main
+          ref: develop
           fetch-depth: 0
+          fetch-tags: true
 
-      - name: Verify checkout matches origin/main
+      - name: Fetch all remote branches
         run: |
           set -euo pipefail
-          git fetch origin main --depth=1
-          local_sha="$(git rev-parse HEAD)"
-          remote_sha="$(git rev-parse origin/main)"
-          if [[ "${local_sha}" != "${remote_sha}" ]]; then
-            echo "::error::Checked out commit is not the current origin/main head"
-            exit 1
-          fi
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*'
 
-      - name: Verify main CI already succeeded
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Configure git
         run: |
-          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          expected_sha="$(git rev-parse HEAD)"
-          run_json="$(
-            gh api "repos/${REPO}/actions/workflows/ci.yml/runs?branch=main&status=completed&per_page=20" \
-              --jq ".workflow_runs | map(select(.head_sha == \"${expected_sha}\")) | sort_by(.created_at) | reverse | .[0]"
-          )"
-
-          if [[ -z "${run_json}" || "${run_json}" == "null" ]]; then
-            echo "::error::No completed CI run found for main@${expected_sha}"
-            exit 1
-          fi
-
-          conclusion="$(jq -r '.conclusion // empty' <<< "${run_json}")"
-          html_url="$(jq -r '.html_url // empty' <<< "${run_json}")"
-
-          if [[ "${conclusion}" != "success" ]]; then
-            echo "::error::Latest CI for main@${expected_sha} is not successful (${conclusion:-unknown}). ${html_url}"
-            exit 1
-          fi
-
-      - name: Resolve release versions
+      # ── 3. Validate versions ───────────────────────────────────────────
+      - name: Validate develop is SNAPSHOT and main version is lower
         id: versions
         env:
           RELEASE_TYPE: ${{ inputs.release_type }}
         run: |
           set -euo pipefail
 
-          raw_version="$(node -p "require('./package.json').version")"
-          current_version="${raw_version%%-*}"
-          if ! [[ "${current_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::package.json version (${raw_version}) must start with major.minor.patch"
+          # ── Read develop version ──
+          develop_version="$(node -p "require('./package.json').version")"
+          echo "Develop version: ${develop_version}"
+
+          if [[ "${develop_version}" != *-SNAPSHOT ]]; then
+            echo "::error::develop must have a SNAPSHOT version (got: ${develop_version})"
             exit 1
           fi
 
+          # Strip -SNAPSHOT to get the base version develop is targeting
+          develop_base="${develop_version%%-*}"
+          if ! [[ "${develop_base}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::develop version (${develop_version}) must be <major.minor.patch>-SNAPSHOT"
+            exit 1
+          fi
+
+          # ── Read main version ──
+          main_version="$(git show origin/main:package.json | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).version")"
+          main_base="${main_version%%-*}"
+          echo "Main version: ${main_version} (base: ${main_base})"
+
+          if [[ "${main_version}" == *-SNAPSHOT ]]; then
+            echo "::error::main must not have a SNAPSHOT version (got: ${main_version})"
+            exit 1
+          fi
+
+          # ── Verify main < develop base ──
+          is_lower="$(
+            MAIN="${main_base}" DEV="${develop_base}" node -e "
+              const cmp = (a, b) => {
+                const [a1,a2,a3] = a.split('.').map(Number);
+                const [b1,b2,b3] = b.split('.').map(Number);
+                return (a1 - b1) || (a2 - b2) || (a3 - b3);
+              };
+              process.stdout.write(cmp(process.env.MAIN, process.env.DEV) < 0 ? 'yes' : 'no');
+            "
+          )"
+          if [[ "${is_lower}" != "yes" ]]; then
+            echo "::error::main version (${main_base}) must be lower than develop SNAPSHOT base (${develop_base})"
+            exit 1
+          fi
+
+          # ── Compute release version ──
+          # The SNAPSHOT base IS the release version (e.g. 0.5.0-SNAPSHOT → release 0.5.0).
+          # release_type controls the NEXT snapshot after release.
           if ! [[ "${RELEASE_TYPE}" =~ ^(patch|minor|major)$ ]]; then
             echo "::error::release_type must be one of: patch, minor, major"
             exit 1
           fi
 
-          version="$(
-            CURRENT="${current_version}" node -e "
+          version="${develop_base}"
+          tag="v${version}"
+
+          # Compute next snapshot version based on release_type
+          next_version="$(
+            CURRENT="${version}" node -e "
               const type = process.env.RELEASE_TYPE;
               const [major, minor, patch] = process.env.CURRENT.split('.').map(Number);
               const next =
@@ -119,8 +139,8 @@ jobs:
               process.stdout.write(next.join('.'));
             "
           )"
-          tag="v${version}"
 
+          # ── Verify tag doesn't exist ──
           if git rev-parse "${tag}" >/dev/null 2>&1; then
             echo "::error::Tag ${tag} already exists locally"
             exit 1
@@ -130,14 +150,43 @@ jobs:
             exit 1
           fi
 
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"
-          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "version=${version}"            >> "${GITHUB_OUTPUT}"
+          echo "tag=${tag}"                    >> "${GITHUB_OUTPUT}"
+          echo "next_version=${next_version}"  >> "${GITHUB_OUTPUT}"
+          echo ""
+          echo "Release plan:"
+          echo "  Current main:     ${main_version}"
+          echo "  Current develop:  ${develop_version}"
+          echo "  Release version:  ${version} (tag: ${tag})"
+          echo "  Next SNAPSHOT:    ${next_version}-SNAPSHOT"
 
-      - name: Configure git
+      # ── 4. Verify CI passed on develop ─────────────────────────────────
+      - name: Verify develop CI already succeeded
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          set -euo pipefail
 
+          expected_sha="$(git rev-parse HEAD)"
+          run_json="$(
+            gh api "repos/${REPO}/actions/workflows/ci.yml/runs?branch=develop&status=completed&per_page=20" \
+              --jq ".workflow_runs | map(select(.head_sha == \"${expected_sha}\")) | sort_by(.created_at) | reverse | .[0]"
+          )"
+
+          if [[ -z "${run_json}" || "${run_json}" == "null" ]]; then
+            echo "::error::No completed CI run found for develop@${expected_sha}"
+            exit 1
+          fi
+
+          conclusion="$(jq -r '.conclusion // empty' <<< "${run_json}")"
+          html_url="$(jq -r '.html_url // empty' <<< "${run_json}")"
+
+          if [[ "${conclusion}" != "success" ]]; then
+            echo "::error::Latest CI for develop@${expected_sha} is not successful (${conclusion:-unknown}). ${html_url}"
+            exit 1
+          fi
+
+      # ── 5. Setup tools ─────────────────────────────────────────────────
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -157,16 +206,18 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Apply release version
+      # ── 6. Set release version on develop, merge to main ───────────────
+      - name: Apply release version on develop
         env:
           VERSION: ${{ steps.versions.outputs.version }}
         run: |
           set -euo pipefail
           node scripts/set-release-version.mjs "${VERSION}"
+          rm -f apps/cli/uv.lock packages/schemas/uv.lock
           (cd apps/cli && uv lock)
           (cd packages/schemas && uv lock)
 
-      - name: Commit release version
+      - name: Commit release version on develop
         env:
           VERSION: ${{ steps.versions.outputs.version }}
         run: |
@@ -189,8 +240,34 @@ jobs:
 
           git commit -m "chore(release): v${VERSION}"
 
-      - name: Create local release tag
-        run: git tag "${{ steps.versions.outputs.tag }}"
+      - name: Merge develop into main
+        run: |
+          set -euo pipefail
+          git checkout -B main origin/main
+          # -X theirs auto-resolves version file conflicts in develop's favor
+          # (develop has the release version we just committed)
+          git merge develop -X theirs --no-edit -m "chore(release): merge develop for v${{ steps.versions.outputs.version }}"
+
+      # ── 7. Build & publish (on main) ───────────────────────────────────
+      # Regenerate uv lock files on CI to avoid local/CI uv version mismatches.
+      # This runs on the merged main state and amends the merge commit.
+      - name: Regenerate lock files and tag release
+        env:
+          TAG: ${{ steps.versions.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Remove existing lock files — they may be incompatible with CI's uv version
+          rm -f apps/cli/uv.lock packages/schemas/uv.lock
+          (cd apps/cli && uv lock)
+          (cd packages/schemas && uv lock)
+
+          # If lock files changed, amend the merge commit to include them
+          if ! git diff --quiet apps/cli/uv.lock packages/schemas/uv.lock; then
+            git add apps/cli/uv.lock packages/schemas/uv.lock
+            git commit --amend --no-edit
+          fi
+
+          git tag "${TAG}"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -299,30 +376,53 @@ jobs:
           uv build
           uv publish
 
-      - name: Push release commit and tag to main
+      # ── 8. Push main + tag, then set next SNAPSHOT on develop ──────────
+      - name: Push main and release tag
         run: |
-          git push origin HEAD:main
+          set -euo pipefail
+          git push origin main
           git push origin "${{ steps.versions.outputs.tag }}"
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.versions.outputs.tag }}
           generate_release_notes: true
           draft: false
           prerelease: false
 
-      - name: Merge release back to develop
+      - name: Set next SNAPSHOT on develop
         env:
-          VERSION: ${{ steps.versions.outputs.version }}
+          NEXT_VERSION: ${{ steps.versions.outputs.next_version }}
         run: |
           set -euo pipefail
-          git fetch origin
-          git checkout -B develop origin/develop
-          git merge origin/main --no-edit \
-            -m "chore: merge release v${VERSION} back to develop"
+          git checkout develop
+
+          node scripts/set-release-version.mjs "${NEXT_VERSION}-SNAPSHOT"
+          rm -f apps/cli/uv.lock packages/schemas/uv.lock
+          (cd apps/cli && uv lock)
+          (cd packages/schemas && uv lock)
+
+          git add \
+            package.json \
+            apps/api/package.json \
+            apps/blog/package.json \
+            apps/docs/package.json \
+            apps/web/package.json \
+            apps/cli/package.json \
+            apps/cli/pyproject.toml \
+            apps/cli/uv.lock \
+            packages/api-client/package.json \
+            packages/devops/package.json \
+            packages/schemas/package.json \
+            packages/schemas/pyproject.toml \
+            packages/schemas/uv.lock \
+            helm/classifyre/Chart.yaml
+
+          git commit -m "chore: set develop to v${NEXT_VERSION}-SNAPSHOT"
           git push origin develop
 
+      # ── 9. Deploy ──────────────────────────────────────────────────────
       - name: Setup kubectl
         uses: azure/setup-kubectl@v5
 
@@ -364,6 +464,10 @@ jobs:
           VERSION: ${{ steps.versions.outputs.version }}
         run: |
           set -euo pipefail
+
+          # Switch back to main so Helm uses the release code
+          git checkout main
+
           helm upgrade --install "${HELM_RELEASE_NAME}" ./helm/classifyre \
             --namespace "${HELM_NAMESPACE}" \
             --create-namespace \

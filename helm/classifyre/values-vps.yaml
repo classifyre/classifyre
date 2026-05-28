@@ -81,15 +81,5 @@ postgres:
       accessModes:
         - ReadWriteOnce
 
-# ── Object storage (external S3 / Backblaze B2) ──────────────────────────────
 objectStorage:
-  bucket: classifyredemologs
-  sandboxBucket: classifyredemosandbox
-  # forcePathStyle: true is the chart default; explicitly false for AWS-style virtual-hosted URLs.
-  forcePathStyle: false
-
-  seaweedfs:
-    enabled: false
-
-  external:
-    existingSecret: classifyre-s3-credentials
+  enabled: false
