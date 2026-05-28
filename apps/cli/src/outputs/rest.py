@@ -28,19 +28,20 @@ logger = logging.getLogger(__name__)
 #                  503 Service Unavail.  - pod not ready
 #                  504 Gateway Timeout   - upstream took too long
 #
-# backoff_factor=2: waits 0 s, 2 s, 4 s between attempts (urllib3 formula:
-# backoff_factor * (2 ** (attempt - 1)), first retry is immediate).
-# Total extra wait before giving up: ~6 s -- small relative to the 120 s read
-# timeout, so worst-case a single call costs 4 * 120 s = 8 min, which is
-# acceptable for a long-running scan job.
+# backoff_factor=2: waits 0 s, 2 s, 4 s, 8 s, 16 s between attempts (urllib3
+# formula: backoff_factor * (2 ** (attempt - 1)), first retry is immediate).
+# Total extra wait before giving up: ~30 s across 5 attempts -- necessary on a
+# single-node VPS where the API may stay under load for 10-20 s during heavy
+# concurrent scan jobs before event-loop pressure drops. Worst-case a single
+# call costs 6 * 120 s = 12 min, acceptable for a long-running scan job.
 #
 # POST and PATCH are explicitly allowed: without this, urllib3 only retries
 # idempotent methods (GET/HEAD) by default.
 _RETRY_POLICY = Retry(
-    total=3,
-    connect=3,
-    read=3,
-    status=3,
+    total=5,
+    connect=5,
+    read=5,
+    status=5,
     backoff_factor=2,
     status_forcelist={408, 429, 502, 503, 504},
     allowed_methods={"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
