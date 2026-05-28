@@ -29,7 +29,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { RunnerAssetsTable } from "@/components/runner-assets-table";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { RunnerLogViewer } from "@/components/runner-log-viewer";
-import { useS3Config } from "@/components/dashboard-layout";
+import { useServerConfig } from "@/components/dashboard-layout";
 import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import { RunnerStatusBadge } from "@/components/runner-status-badge";
 import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
@@ -94,7 +94,7 @@ function formatDuration(ms?: number | null) {
 
 export default function RunnerDetailPage() {
   const { t } = useTranslation();
-  const s3Configured = useS3Config();
+  const { s3Configured } = useServerConfig();
   const params = useParams();
   const router = useRouter();
   const runnerId = params.id as string;
