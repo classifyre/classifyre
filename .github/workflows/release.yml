@@ -247,10 +247,25 @@ jobs:
           # (develop has the release version we just committed)
           git merge develop -X theirs --no-edit -m "chore(release): merge develop for v${{ steps.versions.outputs.version }}"
 
-      - name: Create release tag on main
-        run: git tag "${{ steps.versions.outputs.tag }}"
-
       # ── 7. Build & publish (on main) ───────────────────────────────────
+      # Regenerate uv lock files on CI to avoid local/CI uv version mismatches.
+      # This runs on the merged main state and amends the merge commit.
+      - name: Regenerate lock files and tag release
+        env:
+          TAG: ${{ steps.versions.outputs.tag }}
+        run: |
+          set -euo pipefail
+          (cd apps/cli && uv lock)
+          (cd packages/schemas && uv lock)
+
+          # If lock files changed, amend the merge commit to include them
+          if ! git diff --quiet apps/cli/uv.lock packages/schemas/uv.lock; then
+            git add apps/cli/uv.lock packages/schemas/uv.lock
+            git commit --amend --no-edit
+          fi
+
+          git tag "${TAG}"
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
