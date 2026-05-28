@@ -195,6 +195,8 @@ spec:
               value: {{ .Values.api.cliJobs.workDir | quote }}
             {{- end }}
             {{- /* ── S3 / object-storage configuration ─────────────────── */}}
+            - name: S3_CONFIGURED
+              value: {{ .Values.objectStorage.enabled | quote }}
             {{- if .Values.objectStorage.enabled }}
             - name: S3_BUCKET
               value: {{ .Values.objectStorage.bucket | quote }}

@@ -73,6 +73,8 @@ spec:
           env:
             - name: API_URL
               value: {{ printf "http://%s:%v" (include "classifyre.api.fullname" .) .Values.api.service.port | quote }}
+            - name: S3_CONFIGURED
+              value: {{ .Values.objectStorage.enabled | quote }}
             {{- range $key, $value := .Values.frontend.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}

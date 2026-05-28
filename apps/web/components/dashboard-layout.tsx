@@ -80,7 +80,22 @@ type FindingAssetCrumb = {
   label: string;
 };
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+// ── S3 config context ──────────────────────────────────────────────────────
+// Injected by the server layout from process.env.S3_CONFIGURED (set by Helm).
+// Default true so the warning banner doesn't flash before the value arrives.
+const S3ConfigContext = React.createContext<boolean>(true);
+
+export function useS3Config(): boolean {
+  return React.useContext(S3ConfigContext);
+}
+
+export function DashboardLayout({
+  children,
+  s3Configured = true,
+}: {
+  children: React.ReactNode;
+  s3Configured?: boolean;
+}) {
   const pathname = usePathname();
   const { t } = useTranslation();
   const { settings } = useInstanceSettings();
@@ -250,6 +265,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   }, [findingAssetCrumbs, resolvedDynamicLabels, segments, t]);
 
   return (
+    <S3ConfigContext.Provider value={s3Configured}>
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="min-w-0 overflow-x-clip">
@@ -364,5 +380,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
       </SidebarInset>
     </SidebarProvider>
+    </S3ConfigContext.Provider>
   );
 }
