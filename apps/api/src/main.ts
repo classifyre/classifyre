@@ -41,22 +41,23 @@ async function bootstrap() {
   //
   // UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY  (default: 1000 ms)
   //   Primary signal: event loop blocked above this threshold means Node is
-  //   CPU-starved and cannot schedule new work. Safe to enable everywhere.
-  // UNDER_PRESSURE_MAX_HEAP_USED_BYTES   (default: 0 = disabled)
-  //   Opt-in: set to e.g. 800 MB only after measuring steady-state heap.
-  // UNDER_PRESSURE_MAX_RSS_BYTES         (default: 0 = disabled)
-  //   Opt-in: set to e.g. 1 GB only after measuring steady-state RSS.
+  //   CPU-starved and genuinely cannot schedule new work.
+  // UNDER_PRESSURE_MAX_HEAP_USED_BYTES   (default: 768 MB)
+  //   Only fires near OOM — set well above steady-state (~250 MB for
+  //   NestJS+Prisma). Override lower only after measuring your actual heap.
+  // UNDER_PRESSURE_MAX_RSS_BYTES         (default: 1 GB)
+  //   Total process memory guard. Override lower only after measuring RSS.
   await app.register(underPressure, {
     maxEventLoopDelay: parseInt(
       process.env.UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY ?? '1000',
       10,
     ),
     maxHeapUsedBytes: parseInt(
-      process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES ?? '0',
+      process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES ?? String(768 * 1024 * 1024),
       10,
     ),
     maxRssBytes: parseInt(
-      process.env.UNDER_PRESSURE_MAX_RSS_BYTES ?? '0',
+      process.env.UNDER_PRESSURE_MAX_RSS_BYTES ?? String(1024 * 1024 * 1024),
       10,
     ),
     message: 'Server is under load — please retry in a moment.',
