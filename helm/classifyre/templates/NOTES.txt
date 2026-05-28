@@ -39,3 +39,17 @@ Database mode: {{ .Values.postgres.mode }}
   !! NOTE: ingress has no TLS configured. Add ingress.tls and a cert-manager cluster-issuer
   !! annotation via ingress.annotations for HTTPS.
 {{- end }}
+{{- if not .Values.objectStorage.enabled }}
+  !! NOTE: objectStorage is disabled — runner logs are not persisted and will be lost on pod restart.
+  !! Set objectStorage.enabled=true with an S3-compatible provider for production.
+{{- end }}
+{{- if and .Values.api.autoscaling.enabled }}
+  !! NOTE: HPA is enabled. Ensure metrics-server is installed in your cluster, otherwise the
+  !! HPA will report <unknown> metrics and autoscaling will not function.
+  !! Install: kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+{{- end }}
+{{- if and .Values.telemetry.enabled (eq .Values.telemetry.otlpEndpoint "https://otel.classifyre.com") }}
+  !! NOTE: Telemetry is enabled and reporting to https://otel.classifyre.com (the default).
+  !! For air-gapped or compliance-sensitive deployments set telemetry.enabled=false or
+  !! override telemetry.otlpEndpoint to point at your own OTel Collector.
+{{- end }}

@@ -28,6 +28,7 @@ const S3_KEY_ID = requireEnv("S3_KEY_ID");
 const S3_APP_KEY = requireEnv("S3_APP_KEY");
 const S3_BUCKET_1 = requireEnv("S3_BUCKET_1");
 const S3_BUCKET_2 = requireEnv("S3_BUCKET_2");
+const S3_BUCKET_3 = requireEnv("S3_BUCKET_3");
 const S3_ENDPOINT = requireEnv("S3_ENDPOINT");
 
 // ── Page helpers ───────────────────────────────────────────────────────────────
@@ -37,12 +38,12 @@ class ScanDetailPage {
 
   async waitForCompletion(timeout = 1_500_000) {
     const badge = this.page.locator('[data-testid="scan-status-badge"]');
-    await expect(badge).toHaveText(/Completed|Error/i, { timeout });
+    await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler/i, { timeout });
     const text = await badge.textContent();
-    if (text?.toLowerCase().includes("error")) {
+    if (text?.toLowerCase().includes("error") || text?.toLowerCase().includes("fehler")) {
       throw new Error("Scan finished with ERROR status");
     }
-    expect(text?.toLowerCase()).toContain("completed");
+    expect(text?.toLowerCase()).toMatch(/completed|abgeschlossen/);
   }
 
   async getStatsValue(label: string) {
@@ -149,7 +150,7 @@ async function runS3BucketTest(page: Page, bucket: string): Promise<void> {
 
 test.describe("S3-Compatible Storage Source E2E", () => {
   test(
-    "should create S3 source for bucket 1 (testinertiabucket), run scan and verify assets",
+    "should create S3 source for bucket 1 (testmediabucket), run scan and verify assets",
     async ({ page }) => {
       test.setTimeout(1_800_000);
       await runS3BucketTest(page, S3_BUCKET_1);
@@ -157,10 +158,10 @@ test.describe("S3-Compatible Storage Source E2E", () => {
   );
 
   test(
-    "should create S3 source for bucket 2 (testmediabucket), run scan and verify assets",
+    "should create S3 source for bucket 3 (medidataclassifyre), run scan and verify assets",
     async ({ page }) => {
       test.setTimeout(1_800_000);
-      await runS3BucketTest(page, S3_BUCKET_2);
+      await runS3BucketTest(page, S3_BUCKET_3);
     },
   );
 });

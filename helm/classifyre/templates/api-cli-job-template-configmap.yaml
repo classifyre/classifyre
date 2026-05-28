@@ -47,11 +47,15 @@ data:
                   },
                   {
                     "name": "CLASSIFYRE_OUTPUT_REST_URL",
-                    "value": "http://{{ include "classifyre.api.fullname" . }}:{{ .Values.api.service.port }}"
+                    "value": "http://{{ include "classifyre.api.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.api.service.port }}"
                   },
                   {
                     "name": "CLASSIFYRE_OUTPUT_BATCH_SIZE",
                     "value": "20"
+                  },
+                  {
+                    "name": "CLASSIFYRE_OUTPUT_REST_TIMEOUT_SEC",
+                    "value": "{{ .Values.api.cliJobs.outputRestTimeoutSec }}"
                   },
                   {
                     "name": "CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE",

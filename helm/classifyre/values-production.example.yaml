@@ -1,66 +1,80 @@
 # Production example values
 # Use this as the baseline for real Kubernetes deployments.
 # Demo/test profiles such as values-vps.yaml intentionally keep different tradeoffs.
+#
+# Quick start:
+#   1. Copy this file, fill in all <REQUIRED> placeholders.
+#   2. Create Kubernetes secrets referenced below before installing.
+#   3. helm install classifyre ./helm/classifyre -f your-values.yaml
 
-serviceAccount:
-  create: true
-  automount: true
-
-rbac:
-  create: true
-
+# ── Image tags ────────────────────────────────────────────────────────────────
+# Always pin explicit tags in production. The chart appVersion may be a SNAPSHOT
+# on the develop branch and will not exist on Docker Hub.
 api:
+  image:
+    tag: "0.4.8"  # <REQUIRED> pin to a released tag
+
   maskedConfigEncryption:
-    existingSecret: classifyre-api-secrets
+    # Pre-create: kubectl create secret generic classifyre-api-secrets \
+    #   --from-literal=CLASSIFYRE_MASKED_CONFIG_KEY=$(openssl rand -hex 16) -n <namespace>
+    existingSecret: classifyre-api-secrets  # <REQUIRED>
     secretKey: CLASSIFYRE_MASKED_CONFIG_KEY
 
   cliJobs:
+    image:
+      tag: "0.4.8"  # <REQUIRED> pin to a released tag
     enabled: true
     cleanupPolicy: always
 
 frontend:
+  image:
+    tag: "0.4.8"  # <REQUIRED> pin to a released tag
+
   service:
     type: ClusterIP
 
 ingress:
   enabled: true
   className: nginx
-  host: classifyre.example.com
+  host: classifyre.example.com  # <REQUIRED>
   tls:
     - hosts:
         - classifyre.example.com
       secretName: classifyre-tls
 
+# ── Database ──────────────────────────────────────────────────────────────────
+# Use mode=cnpg (CloudNativePG) or mode=external for production.
+# mode=embedded has no HA, no backups, and data is lost if the pod is rescheduled.
 postgres:
-  mode: external
+  mode: external  # <REQUIRED> cnpg or external for production
   connection:
     sslMode: require
   external:
-    host: postgres.example.internal
+    host: postgres.example.internal  # <REQUIRED>
     port: 5432
     database: classifyre
     username: classifyre
-    existingSecret: classifyre-db
+    # Pre-create: kubectl create secret generic classifyre-db \
+    #   --from-literal=password=<your-password> -n <namespace>
+    existingSecret: classifyre-db  # <REQUIRED>
     existingSecretPasswordKey: password
 
-networkPolicy:
-  enabled: true
-  ingressNamespaceSelector:
-    kubernetes.io/metadata.name: ingress-nginx
-
 # ── Object Storage (S3-compatible) ───────────────────────────────────────────
-# Enable to persist runner logs and sandbox uploads. See helm/classifyre/docs/object-storage.md.
+# REQUIRED for production: without S3, runner logs are not persisted and
+# sandbox uploads are lost on pod restart.
+# Pre-create: kubectl create secret generic classifyre-s3-credentials \
+#   --from-literal=access-key-id=<id> --from-literal=secret-access-key=<secret> -n <namespace>
 #
-# Option A — AWS S3 with an existing Secret (recommended for production):
-# objectStorage:
-#   enabled: true
-#   bucket: classifyre-logs
-#   sandboxBucket: classifyre-sandbox
-#   region: us-east-1
-#   forcePathStyle: false
-#   existingSecret: classifyre-s3-credentials   # keys: access-key-id, secret-access-key
+# Option A — AWS S3:
+objectStorage:
+  enabled: true  # <REQUIRED>
+  bucket: classifyre-logs       # <REQUIRED> create this bucket first
+  sandboxBucket: classifyre-sandbox  # <REQUIRED> create this bucket first
+  region: us-east-1             # <REQUIRED>
+  forcePathStyle: false
+  existingSecret: classifyre-s3-credentials  # <REQUIRED>
 #
-# Option B — Backblaze B2:
+# Option B — Backblaze B2 (uncomment and remove Option A above):
 # objectStorage:
 #   enabled: true
 #   bucket: classifyre-logs
@@ -77,3 +91,18 @@ networkPolicy:
 #   endpoint: "http://minio.minio-ns.svc.cluster.local:9000"
 #   forcePathStyle: true
 #   existingSecret: classifyre-s3-credentials
+
+# ── Networking ────────────────────────────────────────────────────────────────
+networkPolicy:
+  enabled: true
+  ingressNamespaceSelector:
+    kubernetes.io/metadata.name: ingress-nginx
+
+# ── Telemetry ─────────────────────────────────────────────────────────────────
+# Telemetry is ON by default and reports to https://otel.classifyre.com.
+# For air-gapped or compliance-sensitive deployments, disable or redirect:
+# telemetry:
+#   enabled: false
+# — or point at your own OTel Collector:
+# telemetry:
+#   otlpEndpoint: "http://otel-collector.monitoring:4318"
