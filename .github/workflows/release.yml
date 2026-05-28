@@ -213,6 +213,7 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/set-release-version.mjs "${VERSION}"
+          rm -f apps/cli/uv.lock packages/schemas/uv.lock
           (cd apps/cli && uv lock)
           (cd packages/schemas && uv lock)
 
@@ -255,6 +256,8 @@ jobs:
           TAG: ${{ steps.versions.outputs.tag }}
         run: |
           set -euo pipefail
+          # Remove existing lock files — they may be incompatible with CI's uv version
+          rm -f apps/cli/uv.lock packages/schemas/uv.lock
           (cd apps/cli && uv lock)
           (cd packages/schemas && uv lock)
 
@@ -396,6 +399,7 @@ jobs:
           git checkout develop
 
           node scripts/set-release-version.mjs "${NEXT_VERSION}-SNAPSHOT"
+          rm -f apps/cli/uv.lock packages/schemas/uv.lock
           (cd apps/cli && uv lock)
           (cd packages/schemas && uv lock)
 
