@@ -4,9 +4,6 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import * as fs from 'fs/promises';
-import { createReadStream } from 'fs';
-import * as path from 'path';
 import {
   S3Client,
   PutObjectCommand,
@@ -48,12 +45,6 @@ interface ResolvedListParams {
 export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RunnerLogStorageService.name);
 
-  // Filesystem fallback root (used when S3 is not configured)
-  private readonly rootDir = path.resolve(
-    process.env.RUNNER_LOGS_DIR ||
-      path.join(process.cwd(), 'var', 'runner-logs'),
-  );
-
   // ── In-memory log buffers ─────────────────────────────────────────────────
   // Populated for the lifetime of an active run on this API replica.
   // Cleared on finalizeRunner / deleteRunnerLogs.
@@ -83,7 +74,10 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     const bucket = process.env.S3_BUCKET;
     if (!bucket) {
-      return; // filesystem mode
+      this.logger.warn(
+        'S3_BUCKET is not set — runner logs will be streamed in real time but not persisted after the run completes.',
+      );
+      return;
     }
 
     const endpoint = process.env.S3_ENDPOINT;
@@ -164,9 +158,6 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
       this.startSyncTimer(sourceId, runnerId);
       // Immediately create an empty object so the key exists in S3
       await this.doSyncToS3(sourceId, runnerId).catch(() => undefined);
-    } else {
-      await this.ensureRunnerDir(runnerId);
-      await fs.writeFile(this.getRunnerLogPath(runnerId), '', 'utf8');
     }
   }
 
@@ -227,16 +218,11 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
       // is no race between the timer and this final write.
       this.stopSyncTimer(runnerId);
       await this.syncToS3Serialized(sourceId, runnerId);
-      this.inMemoryLogs.delete(runnerId);
       this.s3SyncChains.delete(runnerId);
-    } else {
-      // Filesystem mode: write the full accumulated buffer to disk
-      const entries = this.inMemoryLogs.get(runnerId) ?? [];
-      const ndjson = entries.map((e) => this.encodeEntry(e)).join('');
-      await this.ensureRunnerDir(runnerId);
-      await fs.writeFile(this.getRunnerLogPath(runnerId), ndjson, 'utf8');
-      this.inMemoryLogs.delete(runnerId);
     }
+
+    // Always clear in-memory state; without S3 logs are ephemeral by design.
+    this.inMemoryLogs.delete(runnerId);
   }
 
   async deleteRunnerLogs(sourceId: string, runnerId: string): Promise<void> {
@@ -250,11 +236,6 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn(
           `Could not delete S3 log for ${runnerId}: ${err?.message}`,
         );
-      });
-    } else {
-      await fs.rm(this.getRunnerDir(runnerId), {
-        recursive: true,
-        force: true,
       });
     }
   }
@@ -284,15 +265,8 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
       return this.listLogsFromS3(params.sourceId, params.runnerId, resolved);
     }
 
-    // ── Filesystem mode (completed run) ───────────────────────────────────
-    const logPath = this.getRunnerLogPath(params.runnerId);
-    const stat = await this.safeStat(logPath);
-    if (!stat) {
-      return this.emptyResponse(params.runnerId, resolved.take);
-    }
-    const readable = createReadStream(logPath);
-    const allEntries = await this.readAllEntriesFromStream(readable);
-    return this.paginateEntries(params.runnerId, allEntries, resolved);
+    // No S3 configured and no active in-memory run: logs are not retained.
+    return this.emptyResponse(params.runnerId, resolved.take);
   }
 
   // ── Pagination helper ─────────────────────────────────────────────────────
@@ -406,7 +380,7 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     this.runnerSourceIds.delete(runnerId);
   }
 
-  // ── Stream parser (for S3 / filesystem reads) ─────────────────────────────
+  // ── Stream parser (for S3 reads) ─────────────────────────────────────────
 
   private async readAllEntriesFromStream(
     readable: Readable,
@@ -727,21 +701,6 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  // ── Filesystem helpers ────────────────────────────────────────────────────
-
-  private async ensureRunnerDir(runnerId: string): Promise<void> {
-    await fs.mkdir(this.getRunnerDir(runnerId), { recursive: true });
-  }
-
-  private async safeStat(filePath: string) {
-    try {
-      return await fs.stat(filePath);
-    } catch (error: any) {
-      if (error?.code === 'ENOENT') return null;
-      throw error;
-    }
-  }
-
   private clearRunnerBuffers(runnerId: string) {
     for (const key of this.lineBuffers.keys()) {
       if (key.startsWith(`${runnerId}:`)) this.lineBuffers.delete(key);
@@ -750,13 +709,5 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
 
   private getBufferKey(runnerId: string, stream: RunnerLogStream): string {
     return `${runnerId}:${stream}`;
-  }
-
-  private getRunnerDir(runnerId: string): string {
-    return path.join(this.rootDir, runnerId);
-  }
-
-  private getRunnerLogPath(runnerId: string): string {
-    return path.join(this.getRunnerDir(runnerId), 'events.ndjson');
   }
 }

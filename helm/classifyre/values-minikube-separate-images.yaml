@@ -62,15 +62,4 @@ networkPolicy:
   enabled: false
 
 objectStorage:
-  bucket: classifyre-logs
-  sandboxBucket: classifyre-sandbox
-  seaweedfs:
-    enabled: true
-
-seaweedfs:
-  volume:
-    dataDirs:
-      - name: data
-        type: "persistentVolumeClaim"
-        size: "5Gi"
-        storageClass: ""
+  enabled: false

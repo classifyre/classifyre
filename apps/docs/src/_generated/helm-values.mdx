@@ -243,88 +243,44 @@
 
 ## Object Storage (S3-compatible)
 
-Classifyre stores runner execution logs in S3-compatible object storage. This removes the need for a `ReadWriteMany` PVC and allows API replicas to scale horizontally on any standard `ReadWriteOnce` StorageClass.
+Object storage is **disabled by default**. When disabled, runner logs stream live during a run but are not persisted — the UI shows a warning banner on the Logs tab. Enable and configure any S3-compatible provider to retain logs.
 
-### Default: embedded SeaweedFS
+See [`docs/object-storage.md`](docs/object-storage.md) for the full provider guide.
 
-By default, the chart deploys [SeaweedFS](https://github.com/seaweedfs/seaweedfs) as an in-cluster S3 provider. No external configuration is required.
-
-```yaml
-objectStorage:
-  seaweedfs:
-    enabled: true   # default
-```
-
-SeaweedFS credentials are auto-generated and stored in a Kubernetes Secret (`<release>-s3-credentials`).
-
-### Switching to AWS S3
+### AWS S3
 
 ```yaml
 objectStorage:
+  enabled: true
   bucket: my-classifyre-logs
+  sandboxBucket: my-classifyre-sandbox
   region: us-east-1
-  forcePathStyle: false    # AWS S3 uses virtual-hosted style
-
-  seaweedfs:
-    enabled: false         # disable embedded SeaweedFS
-
-  external:
-    endpoint: ""           # leave empty — AWS SDK resolves from region
-    accessKeyId: AKIA...
-    secretAccessKey: "..."
-
-# Or use an existing Kubernetes Secret:
-# objectStorage:
-#   external:
-#     existingSecret: my-s3-secret   # keys: access-key-id, secret-access-key
-```
-
-### Switching to MinIO (self-hosted)
-
-```yaml
-objectStorage:
-  bucket: classifyre-logs
-  seaweedfs:
-    enabled: false
-  external:
-    endpoint: http://minio.minio-ns.svc.cluster.local:9000
-    accessKeyId: minioadmin
-    secretAccessKey: minioadmin
-```
-
-### Switching to Azure Blob Storage (S3 compatibility layer)
-
-```yaml
-objectStorage:
-  bucket: classifyre-logs
   forcePathStyle: false
-  seaweedfs:
-    enabled: false
-  external:
-    endpoint: https://<account>.blob.core.windows.net
-    accessKeyId: <storage-account-name>
-    secretAccessKey: <storage-account-key>
+  existingSecret: classifyre-s3-credentials   # keys: access-key-id, secret-access-key
 ```
 
-### Production SeaweedFS tuning
-
-For durable production data, replace emptyDir volumes with PVCs in the SeaweedFS subchart:
+### MinIO (self-hosted)
 
 ```yaml
-seaweedfs:
-  master:
-    data:
-      type: "persistentVolumeClaim"
-      size: "5Gi"
-  filer:
-    data:
-      type: "persistentVolumeClaim"
-      size: "10Gi"
-  volume:
-    dataDirs:
-      - name: data
-        type: "persistentVolumeClaim"
-        size: "100Gi"
+objectStorage:
+  enabled: true
+  bucket: classifyre-logs
+  sandboxBucket: classifyre-sandbox
+  endpoint: "http://minio.minio-ns.svc.cluster.local:9000"
+  forcePathStyle: true
+  accessKeyId: minioadmin
+  secretAccessKey: minioadmin
 ```
 
-Refer to the [SeaweedFS Helm chart](https://github.com/seaweedfs/seaweedfs/tree/master/k8s/charts/seaweedfs) for the full list of configuration options.
+### Backblaze B2
+
+```yaml
+objectStorage:
+  enabled: true
+  bucket: my-classifyre-logs
+  sandboxBucket: my-classifyre-sandbox
+  endpoint: "https://s3.us-west-004.backblazeb2.com"
+  region: us-west-004
+  forcePathStyle: false
+  existingSecret: classifyre-s3-credentials
+```
