@@ -125,9 +125,13 @@ COPY --from=api-builder /repo/apps/api/prisma /app/api/prisma
 COPY --from=api-builder /repo/apps/api/prisma.config.ts /app/api/prisma.config.ts
 COPY --from=api-builder /repo/packages/schemas /app/packages/schemas
 COPY --from=api-builder /repo/packages/schemas/node_modules /app/packages/schemas/node_modules
-RUN ln -s /app/node_modules /node_modules && \
-    ln -sfn /app/packages /packages
+# Match uid 10001 from helm podSecurityContext so Prisma engine files are accessible non-root.
+RUN groupadd -g 10001 classifyre && useradd -u 10001 -g 10001 -r classifyre \
+    && ln -s /app/node_modules /node_modules \
+    && ln -sfn /app/packages /packages \
+    && chown -R 10001:10001 /app
 WORKDIR /app/api
+USER 10001
 EXPOSE 8000
 ENV NODE_ENV=production \
     PORT=8000

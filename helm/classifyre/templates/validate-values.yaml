@@ -3,6 +3,10 @@
 {{- fail (printf "postgres.mode must be one of: %s" (join ", " $validPostgresModes)) -}}
 {{- end -}}
 
+{{- if and (eq .Values.postgres.mode "external") (empty .Values.postgres.external.host) -}}
+{{- fail "postgres.external.host is required when postgres.mode=external" -}}
+{{- end -}}
+
 {{- $validCleanupPolicies := list "none" "failed" "always" -}}
 {{- if not (has .Values.api.cliJobs.cleanupPolicy $validCleanupPolicies) -}}
 {{- fail (printf "api.cliJobs.cleanupPolicy must be one of: %s" (join ", " $validCleanupPolicies)) -}}

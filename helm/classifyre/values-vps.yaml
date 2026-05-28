@@ -4,66 +4,41 @@
 # Access: https://demo.classifyre.com
 
 api:
-  replicaCount: 1
-
   image:
     repository: classifyre/api
-    tag: "feat-performance"
-    pullPolicy: Always
-
-  # API image defaults to /app/api, which is required for Prisma config discovery.
-  startCommand: node dist/src/main.js
+    tag: "0.4.8"
+    pullPolicy: IfNotPresent
 
   env:
     DEMO_MODE: "false"
 
+  # Single-node VPS: cap replicas so CLI jobs don't trigger runaway HPA scale-out.
+  # 10 API pods on one node causes memory pressure → liveness probe failures →
+  # RemoteDisconnected errors mid-request → asset failures.
   autoscaling:
-    enabled: false
-
-  pdb:
-    enabled: false
-
-  cliJobs:
-    image:
-      repository: classifyre/cli
-      tag: "feat-performance"
-      pullPolicy: Always
-    # Stamatatos06 / CLASSIFIER+ENTITY combos exhaust default 4Gi limit; bump to 6Gi.
-    resources:
-      requests:
-        cpu: 500m
-        memory: 1Gi
-      limits:
-        cpu: "2"
-        memory: 6Gi
-    # local-path leaves these cache PVCs pending until a job consumes them, which
-    # blocks `helm upgrade --wait` during deploy even though the app is healthy.
-    uvCache:
-      enabled: false
+    minReplicas: 2
+    maxReplicas: 4
 
   migration:
-    # Published API image currently keeps Prisma engine files under root-owned Bun modules.
-    # Run only the migration init container as root; keep the main API container non-root.
+    # TODO: remove once classifyre/api image is rebuilt with chown 10001 (Dockerfile api-final fix).
+    # Prisma engine files in 0.4.8 are root-owned; migration needs write access to extract them.
     containerSecurityContext:
       runAsUser: 0
       runAsGroup: 0
       runAsNonRoot: false
 
-frontend:
-  replicaCount: 1
+  cliJobs:
+    image:
+      repository: classifyre/cli
+      tag: "0.4.8"
+      pullPolicy: IfNotPresent
 
+
+frontend:
   image:
     repository: classifyre/web
-    tag: "feat-performance"
-    pullPolicy: Always
-
-  startCommand: node /app/apps/web/server.js
-
-  autoscaling:
-    enabled: false
-
-  pdb:
-    enabled: false
+    tag: "0.4.8"
+    pullPolicy: IfNotPresent
 
   service:
     type: NodePort
@@ -76,10 +51,16 @@ ingress:
 postgres:
   mode: embedded
   embedded:
-    password: "classifyre-vps-demo"
+    existingSecret: classifyre-postgres-password
     persistence:
       accessModes:
         - ReadWriteOnce
 
 objectStorage:
-  enabled: false
+  enabled: true
+  bucket: classifyredemologs
+  sandboxBucket: classifyredemosandbox
+  endpoint: "https://s3.us-west-002.backblazeb2.com"
+  region: us-west-002
+  forcePathStyle: false
+  existingSecret: classifyre-s3-credentials

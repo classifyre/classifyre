@@ -248,13 +248,13 @@ api:
     # -- Retry attempts for failed CLI jobs.
     backoffLimit: 2
     # -- Max runtime per CLI job (seconds). Increase for large data sources.
-    activeDeadlineSeconds: 14400
+    activeDeadlineSeconds: 86400
     # -- TTL for completed CLI jobs (seconds). Ignored when cleanup policy deletes jobs immediately.
     ttlSecondsAfterFinished: 1800
     # -- Cleanup policy for CLI jobs: none, failed, or always.
     cleanupPolicy: always
     # -- Max time API waits for job completion (seconds). Should exceed activeDeadlineSeconds.
-    waitTimeoutSeconds: 15300
+    waitTimeoutSeconds: 87300
     # -- Poll interval while waiting for job completion (milliseconds).
     pollIntervalMs: 2000
     # -- Working directory inside CLI job container.
@@ -263,6 +263,10 @@ api:
     autoInstallOptionalDeps: true
     # -- Number of detector-processed assets to accumulate before pushing findings to the API.
     detectorFlushBatchSize: 5
+    # -- HTTP read timeout (seconds) for CLI→API REST calls (bulk ingest, finalize, status updates).
+    # The API processes each batch in a Postgres transaction that can take 30-60 s under load;
+    # this must be set higher than the API's transaction timeout to avoid spurious read-timeout failures.
+    outputRestTimeoutSec: 120
     # -- Optional override for the auto-scaled process pool size (1-16).
     # When unset, the pool auto-sizes from cgroup CPU/memory limits.
     # maxPoolWorkers:
@@ -272,10 +276,12 @@ api:
       requests:
         cpu: 500m
         memory: 1Gi
+        ephemeral-storage: 5Gi
       # -- CLI job resource limits.
       limits:
         cpu: "2"
         memory: 4Gi
+        ephemeral-storage: 20Gi
 
     # -- CLI job scheduling: node selector.
     nodeSelector: {}
@@ -322,7 +328,11 @@ api:
       accessModes:
         - ReadWriteOnce
       # -- Requested size for uv cache PVC.
-      size: 20Gi
+      # -- IMPORTANT: ReadWriteOnce (default) only works on single-node clusters or when all CLI
+      # -- jobs are guaranteed to land on the same node. On multi-node clusters with concurrent
+      # -- jobs, set accessModes: [ReadWriteMany] and use a shared StorageClass (EFS, NFS, etc.)
+      # -- to avoid jobs hanging with "Multi-Attach error" when two jobs land on different nodes.
+      size: 30Gi
 
 frontend:
   # -- Number of web replicas when autoscaling is disabled.
@@ -517,7 +527,7 @@ ingress:
 
 postgres:
   # -- PostgreSQL mode: external, cnpg, or embedded.
-  mode: external
+  mode: embedded
 
   connection:
     # -- sslmode used by API when connecting to PostgreSQL (`disable`, `require`, `verify-ca`, `verify-full`).

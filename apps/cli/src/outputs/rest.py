@@ -6,10 +6,46 @@ from urllib.parse import urljoin
 
 import requests  # type: ignore[import-untyped]
 from pydantic import BaseModel, ConfigDict, Field
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry  # type: ignore[import-untyped]
 
 from .base import OutputRuntimeContext, OutputType
 
 logger = logging.getLogger(__name__)
+
+# Retry policy for CLI → API REST calls.
+#
+# What we retry and why:
+#   connect=3  — pod restarted / not yet ready (RemoteDisconnected, ConnectionReset,
+#                ConnectTimeout). Request never reached the application.
+#   read=3     — API is under load and slow to respond (ReadTimeout). Safe to retry
+#                because all endpoints are idempotent (bulk ingest is upsert-based,
+#                status/findings updates are set-operations).
+#   status     -- transient HTTP errors from an overloaded or restarting API:
+#                  408 Request Timeout   - API-level timeout
+#                  429 Too Many Requests - rate-limited / backpressure
+#                  502 Bad Gateway       - proxy has no upstream yet
+#                  503 Service Unavail.  - pod not ready
+#                  504 Gateway Timeout   - upstream took too long
+#
+# backoff_factor=2: waits 0 s, 2 s, 4 s between attempts (urllib3 formula:
+# backoff_factor * (2 ** (attempt - 1)), first retry is immediate).
+# Total extra wait before giving up: ~6 s -- small relative to the 120 s read
+# timeout, so worst-case a single call costs 4 * 120 s = 8 min, which is
+# acceptable for a long-running scan job.
+#
+# POST and PATCH are explicitly allowed: without this, urllib3 only retries
+# idempotent methods (GET/HEAD) by default.
+_RETRY_POLICY = Retry(
+    total=3,
+    connect=3,
+    read=3,
+    status=3,
+    backoff_factor=2,
+    status_forcelist={408, 429, 502, 503, 504},
+    allowed_methods={"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
+    raise_on_status=False,
+)
 
 
 def _drop_none_recursive(value: Any) -> Any:
@@ -63,6 +99,9 @@ class RestOutputSink:
         self.base_url = base_url.rstrip("/")
         self.timeout_sec = timeout_sec
         self.session = requests.Session()
+        adapter = HTTPAdapter(max_retries=_RETRY_POLICY)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
         self._runner_id = context.runner_id
         self._seen_hashes: set[str] = set()
 

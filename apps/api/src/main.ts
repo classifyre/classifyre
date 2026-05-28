@@ -9,10 +9,12 @@ import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Logger } from '@nestjs/common';
 import multipart from '@fastify/multipart';
+import underPressure from '@fastify/under-pressure';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { McpServerFactoryService } from './mcp-server.factory';
 import { McpTokenService } from './mcp-token.service';
 import { InstanceSettingsService } from './instance-settings.service';
+import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -30,6 +32,40 @@ async function bootstrap() {
   await app.register(multipart, {
     limits: { fileSize: 50 * 1024 * 1024, files: 1 },
   });
+
+  // Backpressure guard — returns 503 when the process is overloaded so the CLI
+  // retry policy (urllib3 status_forcelist) backs off instead of piling on.
+  // Thresholds are tunable via env vars; the defaults are conservative for a
+  // single-node VPS where memory pressure is the primary failure mode.
+  //
+  // UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY  (default: 1000 ms)
+  //   Node event loop lag above this → 503. Indicates CPU starvation.
+  // UNDER_PRESSURE_MAX_HEAP_USED_BYTES   (default: 200 MB)
+  //   V8 heap above this → 503. Prevents OOM kills under scan load.
+  // UNDER_PRESSURE_MAX_RSS_BYTES         (default: 400 MB)
+  //   RSS above this → 503. Catches off-heap allocations (Buffers, native).
+  await app.register(underPressure, {
+    maxEventLoopDelay: parseInt(
+      process.env.UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY ?? '1000',
+      10,
+    ),
+    maxHeapUsedBytes: parseInt(
+      process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES ??
+        String(200 * 1024 * 1024),
+      10,
+    ),
+    maxRssBytes: parseInt(
+      process.env.UNDER_PRESSURE_MAX_RSS_BYTES ?? String(400 * 1024 * 1024),
+      10,
+    ),
+    message: 'Server is under load — please retry in a moment.',
+    retryAfter: 5,
+    exposeStatusRoute: '/api/health/pressure',
+  });
+
+  // Map transient Prisma overload errors (P2028, P2034, P2024) to 503 so the
+  // CLI retry policy handles them the same way as under-pressure rejections.
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
   const config = new DocumentBuilder()
     .setTitle('Classifyre API')

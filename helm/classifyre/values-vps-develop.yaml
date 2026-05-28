@@ -4,69 +4,42 @@
 # Access: https://staging.classifyre.com/
 
 api:
-  replicaCount: 1
-
   image:
     repository: classifyre/api
     tag: "develop"
     pullPolicy: Always
 
-  startCommand: node dist/src/main.js
-
   env:
     DEMO_MODE: "false"
 
+  # Single-node VPS: same cap as production namespace.
   autoscaling:
-    enabled: false
+    minReplicas: 2
+    maxReplicas: 4
 
-  pdb:
-    enabled: false
+  migration:
+    # TODO: remove once classifyre/api image is rebuilt with chown 10001 (Dockerfile api-final fix).
+    # Prisma engine files in 0.4.8 are root-owned; migration needs write access to extract them.
+    containerSecurityContext:
+      runAsUser: 0
+      runAsGroup: 0
+      runAsNonRoot: false
 
   cliJobs:
     image:
       repository: classifyre/cli
       tag: "develop"
       pullPolicy: Always
-    resources:
-      requests:
-        cpu: 500m
-        memory: 1Gi
-        ephemeral-storage: 15Gi
-      limits:
-        cpu: "2"
-        memory: 4Gi
-        ephemeral-storage: 20Gi
-    uvCache:
-      enabled: true
-      size: 30Gi
+    runnerLogs:
       accessModes:
         - ReadWriteOnce
-  runnerLogs:
-    accessModes:
-      - ReadWriteOnce
 
-  migration:
-    # Published API image currently keeps Prisma engine files under root-owned Bun modules.
-    containerSecurityContext:
-      runAsUser: 0
-      runAsGroup: 0
-      runAsNonRoot: false
 
 frontend:
-  replicaCount: 1
-
   image:
     repository: classifyre/web
     tag: "develop"
     pullPolicy: Always
-
-  startCommand: node /app/apps/web/server.js
-
-  autoscaling:
-    enabled: false
-
-  pdb:
-    enabled: false
 
   service:
     type: NodePort
@@ -79,7 +52,7 @@ ingress:
 postgres:
   mode: embedded
   embedded:
-    password: "classifyre-vps-develop"
+    existingSecret: classifyre-develop-postgres-credentials
     persistence:
       accessModes:
         - ReadWriteOnce

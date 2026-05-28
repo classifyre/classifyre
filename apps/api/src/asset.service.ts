@@ -1219,9 +1219,10 @@ export class AssetService {
     const skipFindings = options?.skipFindings ?? false;
     const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
 
-    // Process in batches to avoid transaction timeout
-    // Reduced to 25 to handle finding updates efficiently
-    const BATCH_SIZE = 25;
+    // Process in batches to avoid transaction timeout.
+    // Each batch runs its own transaction (timeout: 60 s). Keep batches small
+    // so a single finding-heavy asset group can't exhaust the window.
+    const BATCH_SIZE = 15;
     const batches: Record<string, any>[][] = [];
 
     for (let i = 0; i < assets.length; i += BATCH_SIZE) {
@@ -1295,6 +1296,9 @@ export class AssetService {
       },
       {
         timeout: 15000,
+        // Fail fast (P2028 → 503) rather than queue behind heavy batch
+        // transactions when the connection pool is exhausted.
+        maxWait: 5000,
       },
     );
 
@@ -1444,7 +1448,11 @@ export class AssetService {
           data: { assetsDeleted: missingAssetIds.length },
         });
       },
-      { timeout: 30000 },
+      {
+        timeout: 60000,
+        // Fail fast (P2028 → 503) rather than queue when the pool is full.
+        maxWait: 10000,
+      },
     );
 
     return { deleted: missingAssetIds.length };
@@ -1909,7 +1917,11 @@ export class AssetService {
         };
       },
       {
-        timeout: 30000, // 30 seconds timeout for batch processing with findings updates
+        timeout: 60000, // 60 s — reduced batch size (15) keeps this achievable even under load
+        // Fail fast (P2028 → 503) rather than queue when the pool is exhausted.
+        // The CLI retry policy backs off and retries, so a fast rejection is
+        // preferable to piling more work onto an already-overloaded database.
+        maxWait: 10000,
       },
     );
   }

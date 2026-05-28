@@ -429,7 +429,7 @@ export function RunnerAssetsTable({
             <div className="max-h-[70vh] overflow-auto rounded-[4px] bg-white dark:bg-card">
               <Table>
                 <TableHeader className="sticky top-0 z-20 bg-white/95 dark:bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-                  <TableRow>
+    <TableRow>
                     <TableHead className="bg-white/95 dark:bg-card/95 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                       {t("scans.runnerAssets.columns.asset")}
                     </TableHead>
@@ -571,7 +571,7 @@ function RunnerAssetRow({
   const AssetIcon = item.asset ? getAssetTypeIcon(item.asset.assetType) : null;
 
   return (
-    <TableRow>
+    <TableRow data-testid="asset-row">
       <TableCell className="max-w-[280px]">
         {item.asset ? (
           <div className="min-w-0">
