@@ -81,18 +81,5 @@ postgres:
       accessModes:
         - ReadWriteOnce
 
-# ── Object storage (SeaweedFS, minimal footprint for VPS) ────────────────────
-# local-path StorageClass on K3s only supports ReadWriteOnce; SeaweedFS volume
-# uses a single ReadWriteOnce PVC so it works out of the box.
 objectStorage:
-  bucket: classifyre-logs
-  seaweedfs:
-    enabled: true
-
-seaweedfs:
-  volume:
-    dataDirs:
-      - name: data
-        type: "persistentVolumeClaim"
-        size: "10Gi"
-        storageClass: ""
+  enabled: false
