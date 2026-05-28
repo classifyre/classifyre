@@ -33,6 +33,7 @@ import { LanguageSwitcher } from "./language-switcher";
 import { useInstanceSettings } from "./instance-settings-provider";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
+import type { ServerConfig } from "@/lib/server-config";
 
 function formatSegmentLabel(
   segment: string,
@@ -80,25 +81,28 @@ type FindingAssetCrumb = {
   label: string;
 };
 
-// ── S3 config context ──────────────────────────────────────────────────────
-// Injected by the server layout from process.env.S3_CONFIGURED (set by Helm).
-// Default true so the warning banner doesn't flash before the value arrives.
-const S3ConfigContext = React.createContext<boolean>(true);
+// ── Server config context ─────────────────────────────────────────────────
+// Populated once by the server layout (getServerConfig()) and distributed to
+// all client components via this context. Default to safe values so that UI
+// does not flash incorrect states before the first render.
+const DEFAULT_SERVER_CONFIG: ServerConfig = { s3Configured: true, demoMode: false };
+const ServerConfigContext = React.createContext<ServerConfig>(DEFAULT_SERVER_CONFIG);
 
-export function useS3Config(): boolean {
-  return React.useContext(S3ConfigContext);
+export function useServerConfig(): ServerConfig {
+  return React.useContext(ServerConfigContext);
 }
 
 export function DashboardLayout({
   children,
-  s3Configured = true,
+  serverConfig = DEFAULT_SERVER_CONFIG,
 }: {
   children: React.ReactNode;
-  s3Configured?: boolean;
+  serverConfig?: ServerConfig;
 }) {
   const pathname = usePathname();
   const { t } = useTranslation();
   const { settings } = useInstanceSettings();
+  const { demoMode } = serverConfig;
 
   const segmentLabelMap: Record<string, string> = {
     dashboard: t("breadcrumb.dashboard"),
@@ -265,7 +269,7 @@ export function DashboardLayout({
   }, [findingAssetCrumbs, resolvedDynamicLabels, segments, t]);
 
   return (
-    <S3ConfigContext.Provider value={s3Configured}>
+    <ServerConfigContext.Provider value={serverConfig}>
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="min-w-0 overflow-x-clip">
@@ -341,7 +345,7 @@ export function DashboardLayout({
             </Breadcrumb>
           </div>
           <div className="flex items-center gap-2">
-            {settings.demoMode && (
+            {demoMode && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="flex cursor-default items-center gap-1.5 rounded-[4px] border border-amber-600/40 bg-amber-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-400">
@@ -380,6 +384,6 @@ export function DashboardLayout({
         </div>
       </SidebarInset>
     </SidebarProvider>
-    </S3ConfigContext.Provider>
+    </ServerConfigContext.Provider>
   );
 }
