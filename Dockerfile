@@ -108,9 +108,16 @@ FROM node:${NODE_VERSION}-bookworm-slim AS web-final
 COPY --from=web-builder /repo/apps/web/.next/standalone /app
 COPY --from=web-builder /repo/apps/web/.next/static /app/apps/web/.next/static
 COPY --from=web-builder /repo/apps/web/public /app/apps/web/public
+# Match uid 10001 from helm podSecurityContext so the container runs non-root.
+# Pre-create .next/cache so Next.js image optimisation works even when
+# readOnlyRootFilesystem is later enabled (pair with an emptyDir volume mount).
+RUN groupadd -g 10001 classifyre && useradd -u 10001 -g 10001 -r classifyre \
+    && mkdir -p /app/apps/web/.next/cache \
+    && chown -R 10001:10001 /app
 EXPOSE 3000
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
+USER 10001
 CMD ["node", "/app/apps/web/server.js"]
 
 # ── api-final: NestJS API server ──────────────────────────────────────────────

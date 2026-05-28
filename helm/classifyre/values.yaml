@@ -400,6 +400,10 @@ frontend:
   extraEnv: []
   # -- Extra envFrom sources for web container.
   extraEnvFrom: []
+  # -- Extra volume mounts for the web container.
+  extraVolumeMounts: []
+  # -- Extra volumes for the web pod.
+  extraVolumes: []
 
   resources:
     # -- Web resource requests.
