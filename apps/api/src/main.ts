@@ -33,29 +33,30 @@ async function bootstrap() {
     limits: { fileSize: 50 * 1024 * 1024, files: 1 },
   });
 
-  // Backpressure guard — returns 503 when the process is overloaded so the CLI
-  // retry policy (urllib3 status_forcelist) backs off instead of piling on.
-  // Thresholds are tunable via env vars; the defaults are conservative for a
-  // single-node VPS where memory pressure is the primary failure mode.
+  // Backpressure guard — returns 503 when the process is genuinely overloaded.
+  // All thresholds are opt-in via env vars. Heap/RSS checks default to 0
+  // (disabled) because NestJS+Prisma steady-state memory is deployment-specific
+  // and almost always close to limits on constrained hosts; enabling them without
+  // measurement causes constant false-positive 503s. Enable only after profiling.
   //
   // UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY  (default: 1000 ms)
-  //   Node event loop lag above this → 503. Indicates CPU starvation.
-  // UNDER_PRESSURE_MAX_HEAP_USED_BYTES   (default: 200 MB)
-  //   V8 heap above this → 503. Prevents OOM kills under scan load.
-  // UNDER_PRESSURE_MAX_RSS_BYTES         (default: 400 MB)
-  //   RSS above this → 503. Catches off-heap allocations (Buffers, native).
+  //   Primary signal: event loop blocked above this threshold means Node is
+  //   CPU-starved and cannot schedule new work. Safe to enable everywhere.
+  // UNDER_PRESSURE_MAX_HEAP_USED_BYTES   (default: 0 = disabled)
+  //   Opt-in: set to e.g. 800 MB only after measuring steady-state heap.
+  // UNDER_PRESSURE_MAX_RSS_BYTES         (default: 0 = disabled)
+  //   Opt-in: set to e.g. 1 GB only after measuring steady-state RSS.
   await app.register(underPressure, {
     maxEventLoopDelay: parseInt(
       process.env.UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY ?? '1000',
       10,
     ),
     maxHeapUsedBytes: parseInt(
-      process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES ??
-        String(200 * 1024 * 1024),
+      process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES ?? '0',
       10,
     ),
     maxRssBytes: parseInt(
-      process.env.UNDER_PRESSURE_MAX_RSS_BYTES ?? String(400 * 1024 * 1024),
+      process.env.UNDER_PRESSURE_MAX_RSS_BYTES ?? '0',
       10,
     ),
     message: 'Server is under load — please retry in a moment.',
