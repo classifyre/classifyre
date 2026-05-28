@@ -62,13 +62,7 @@ export interface InstanceSettingsResponseDto {
      */
     demoMode: boolean;
     /**
-     * Read-only. True when S3-compatible object storage is configured. When false, runner logs are streamed live but not persisted after the run completes.
-     * @type {boolean}
-     * @memberof InstanceSettingsResponseDto
-     */
-    s3Configured: boolean;
-    /**
-     *
+     * 
      * @type {Date}
      * @memberof InstanceSettingsResponseDto
      */
@@ -114,7 +108,6 @@ export function instanceOfInstanceSettingsResponseDto(value: object): value is I
     if (!('timezone' in value) || value['timezone'] === undefined) return false;
     if (!('timeFormat' in value) || value['timeFormat'] === undefined) return false;
     if (!('demoMode' in value) || value['demoMode'] === undefined) return false;
-    if (!('s3Configured' in value) || value['s3Configured'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     return true;
@@ -137,7 +130,6 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'timezone': json['timezone'],
         'timeFormat': json['timeFormat'],
         'demoMode': json['demoMode'],
-        's3Configured': json['s3Configured'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
     };
@@ -161,7 +153,6 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
         'timezone': value['timezone'],
         'timeFormat': value['timeFormat'],
         'demoMode': value['demoMode'],
-        's3Configured': value['s3Configured'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
     };
