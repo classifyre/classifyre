@@ -52,6 +52,7 @@ import {
 import { toast } from "sonner";
 import { formatDate, formatRelative } from "@/lib/date";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
+import { useServerConfig } from "@/components/dashboard-layout";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 
@@ -122,6 +123,7 @@ export function McpSettingsCard() {
     saving: savingGlobal,
     updateSettings,
   } = useInstanceSettings();
+  const { demoMode } = useServerConfig();
   const [togglingMcp, setTogglingMcp] = React.useState(false);
 
   const [overview, setOverview] = React.useState<McpOverviewResponseDto | null>(
@@ -398,7 +400,7 @@ export function McpSettingsCard() {
               <Button
                 size="sm"
                 onClick={() => setCreateOpen(true)}
-                disabled={loading || !settings.mcpEnabled || settings.demoMode}
+                disabled={loading || !settings.mcpEnabled || demoMode}
               >
                 <Plus className="h-3.5 w-3.5" />
                 {t("mcp.createToken")}
@@ -408,7 +410,7 @@ export function McpSettingsCard() {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {settings.demoMode ? (
+          {demoMode ? (
             <Alert className="border-amber-500/40 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-950/40">
               <Eye className="h-4 w-4 text-amber-700 dark:text-amber-400" />
               <AlertDescription className="text-amber-800 dark:text-amber-300">
@@ -645,7 +647,7 @@ export function McpSettingsCard() {
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={isBusy || settings.demoMode}
+                              disabled={isBusy || demoMode}
                               onClick={() =>
                                 setEditing({
                                   id: token.id,
@@ -660,7 +662,7 @@ export function McpSettingsCard() {
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={isBusy || settings.demoMode}
+                              disabled={isBusy || demoMode}
                               onClick={() => {
                                 void handleToggleToken(token);
                               }}
@@ -679,7 +681,7 @@ export function McpSettingsCard() {
                             <Button
                               variant="destructive"
                               size="sm"
-                              disabled={isBusy || settings.demoMode}
+                              disabled={isBusy || demoMode}
                               onClick={() => setDeletingToken(token)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />

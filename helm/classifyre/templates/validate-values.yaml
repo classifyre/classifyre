@@ -20,5 +20,9 @@
 {{- fail "ingress.host is required when ingress.enabled=true" -}}
 {{- end -}}
 
+{{- if and .Values.objectStorage.enabled (not .Values.objectStorage.existingSecret) (not .Values.objectStorage.accessKeyId) -}}
+{{- fail "objectStorage.accessKeyId is required when objectStorage.enabled=true and objectStorage.existingSecret is not set" -}}
+{{- end -}}
+
 {{- /* Production reminder: when postgres.mode=external, set postgres.connection.sslMode to
      "require" or "verify-full". The default "disable" is intentional for embedded/local installs. */ -}}

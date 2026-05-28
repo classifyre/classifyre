@@ -1170,6 +1170,8 @@
       "noLogsDownload": "No logs available for download",
       "noRowsToCopy": "Select at least one row to copy",
       "loadedEntries": "loaded",
+      "noStorageWarningTitle": "Log Persistence Unavailable",
+      "noStorageWarningBody": "This instance has no object storage (S3) configured. Scan logs are visible in real time during a run, but are not retained once the run completes — refreshing this page will show an empty log. To enable persistent log storage, configure an S3-compatible provider for your deployment.",
       "columns": {
         "time": "Time",
         "level": "Level",

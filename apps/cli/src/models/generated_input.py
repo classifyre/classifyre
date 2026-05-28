@@ -1446,14 +1446,12 @@ class MongoDBMaskedUsernamePassword(BaseModel):
     password: str = Field(..., description='MongoDB login password')
 
 
-class MongoDBMaskedNone(BaseModel):
+class MongoDBMaskedNone(RootModel[dict[str, Any]]):
     """
     Use when the MongoDB endpoint allows anonymous/no-auth access.
     """
 
-    model_config = ConfigDict(
-        extra='forbid',
-    )
+    root: dict[str, Any] = Field(..., max_length=0)
 
 
 class MongoDBAuthMechanism(StrEnum):
@@ -2725,6 +2723,7 @@ class SQLiteInput(CoreInput):
     masked: dict[str, Any] | None = Field(
         None,
         description='SQLite has no credentials; this section is intentionally empty.',
+        max_length=0,
     )
     optional: SQLiteOptional | None = None
     detectors: list[Detector] | None = Field(

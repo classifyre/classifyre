@@ -195,6 +195,9 @@ spec:
               value: {{ .Values.api.cliJobs.workDir | quote }}
             {{- end }}
             {{- /* ── S3 / object-storage configuration ─────────────────── */}}
+            - name: S3_CONFIGURED
+              value: {{ .Values.objectStorage.enabled | quote }}
+            {{- if .Values.objectStorage.enabled }}
             - name: S3_BUCKET
               value: {{ .Values.objectStorage.bucket | quote }}
             - name: S3_SANDBOX_BUCKET
@@ -220,6 +223,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "classifyre.s3SecretName" . }}
                   key: {{ include "classifyre.s3SecretSecretAccessKeyKey" . }}
+            {{- end }}
             {{- include "classifyre.telemetryEnv" . | nindent 12 }}
             {{- with .Values.api.extraEnv }}
             {{- toYaml . | nindent 12 }}
