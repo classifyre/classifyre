@@ -27,33 +27,11 @@ api:
     minReplicas: 2
     maxReplicas: 4
 
-  # Single-node VPS: mount the host directory that holds sandbox temp files and runner
-  # logs so both the API pod and ephemeral CLI job pods can access the same path.
-  # The directory is pre-created on the K3s node (owned by uid 10001) during initial setup.
-  extraVolumeMounts:
-    - name: classifyre-data
-      mountPath: /var/lib/classifyre
-  extraVolumes:
-    - name: classifyre-data
-      hostPath:
-        path: /var/lib/classifyre
-        type: DirectoryOrCreate
-
   cliJobs:
     image:
       repository: classifyre/cli
       tag: "fix-deployment_cli"
       pullPolicy: Always
-    # Share the same host directory with CLI job pods so sandbox input/detectors
-    # files written by the API pod are readable by the ephemeral job pods.
-    extraVolumeMounts:
-      - name: classifyre-data
-        mountPath: /var/lib/classifyre
-    extraVolumes:
-      - name: classifyre-data
-        hostPath:
-          path: /var/lib/classifyre
-          type: DirectoryOrCreate
 
 
 frontend:

@@ -429,34 +429,83 @@ def run_train_command(args: argparse.Namespace) -> None:
 
 
 def run_sandbox_command(args: argparse.Namespace) -> None:
-    """Execute the sandbox command: parse file + run detectors."""
+    """Execute the sandbox command: parse file + run detectors.
+
+    Two input modes:
+      1. S3 transport (K8s multi-node): set SANDBOX_S3_KEY + S3 credentials as
+         env vars. The CLI downloads the file from S3 and decodes detectors from
+         SANDBOX_DETECTORS_B64. No shared filesystem required — works on any node.
+      2. Filesystem path (local dev or K8s single-node hostPath fallback):
+         pass the file path as the first positional argument and optionally
+         --detectors-file <path>.
+    """
+    import os
+    import shutil
+    import tempfile
+
     from .sandbox import SandboxRunner
 
-    file_path_str: str | None = args.recipe
-    if not file_path_str:
-        logger.error("sandbox command requires a file path as the first argument")
-        sys.exit(1)
+    sandbox_s3_key = os.environ.get("SANDBOX_S3_KEY")
+    tmp_dir: str | None = None
 
-    file_path = Path(file_path_str)
-    if not file_path.exists():
-        logger.error("File not found: %s", file_path)
-        sys.exit(1)
+    if sandbox_s3_key:
+        # ── S3 transport path ────────────────────────────────────────────────
+        import base64
 
-    detectors: list[dict[str, Any]] = []
-    if args.detectors_file:
-        detectors_path = Path(args.detectors_file)
-        if not detectors_path.exists():
-            logger.error("Detectors file not found: %s", detectors_path)
-            sys.exit(1)
+        import boto3  # type: ignore[import-not-found]
+
+        bucket = os.environ.get("SANDBOX_S3_BUCKET", "")
+        file_ext = os.environ.get("SANDBOX_FILE_EXT", "")
+        detectors_b64 = os.environ.get("SANDBOX_DETECTORS_B64", "W10=")  # "[]"
+
         try:
-            with detectors_path.open("r", encoding="utf-8") as f:
-                detectors = json.load(f)
+            tmp_dir = tempfile.mkdtemp(prefix="classifyre-sandbox-")
+            file_path = Path(tmp_dir) / f"input{file_ext}"
+
+            s3 = boto3.client(
+                "s3",
+                endpoint_url=os.environ.get("SANDBOX_S3_ENDPOINT") or None,
+                region_name=os.environ.get("SANDBOX_S3_REGION", "us-east-1"),
+                aws_access_key_id=os.environ.get("SANDBOX_S3_ACCESS_KEY_ID") or None,
+                aws_secret_access_key=os.environ.get("SANDBOX_S3_SECRET_ACCESS_KEY") or None,
+            )
+            s3.download_file(bucket, sandbox_s3_key, str(file_path))
+            logger.debug("Downloaded sandbox input from S3: %s/%s → %s", bucket, sandbox_s3_key, file_path)
+
+            raw_json = base64.b64decode(detectors_b64).decode("utf-8")
+            detectors: list[dict[str, Any]] = json.loads(raw_json)
             if not isinstance(detectors, list):
-                logger.error("Detectors file must contain a JSON array")
-                sys.exit(1)
-        except json.JSONDecodeError as e:
-            logger.error("Invalid JSON in detectors file: %s", e)
+                detectors = []
+        except Exception as e:
+            logger.error("Failed to fetch sandbox inputs from S3: %s", e, exc_info=True)
             sys.exit(1)
+    else:
+        # ── Filesystem path ──────────────────────────────────────────────────
+        file_path_str: str | None = args.recipe
+        if not file_path_str:
+            logger.error("sandbox command requires a file path as the first argument")
+            sys.exit(1)
+
+        file_path = Path(file_path_str)
+        if not file_path.exists():
+            logger.error("File not found: %s", file_path)
+            sys.exit(1)
+
+        detectors = []
+        if args.detectors_file:
+            detectors_path = Path(args.detectors_file)
+            if not detectors_path.exists():
+                logger.error("Detectors file not found: %s", detectors_path)
+                sys.exit(1)
+            try:
+                with detectors_path.open("r", encoding="utf-8") as f:
+                    detectors = json.load(f)
+                if not isinstance(detectors, list):
+                    logger.error("Detectors file must contain a JSON array")
+                    sys.exit(1)
+            except json.JSONDecodeError as e:
+                logger.error("Invalid JSON in detectors file: %s", e)
+                sys.exit(1)
 
     try:
         runner = SandboxRunner(detectors)
@@ -473,6 +522,10 @@ def run_sandbox_command(args: argparse.Namespace) -> None:
     except Exception as e:
         logger.error("Sandbox run failed: %s", e, exc_info=True)
         sys.exit(1)
+    finally:
+        # Clean up the S3-downloaded temp dir if we created one.
+        if tmp_dir:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 def main() -> None:

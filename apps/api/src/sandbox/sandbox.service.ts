@@ -7,6 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { spawn, type ChildProcess } from 'child_process';
+import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
@@ -442,6 +443,7 @@ export class SandboxService {
       fileName,
       fileExtension,
       detectors,
+      s3Key,
     );
 
     return run;
@@ -499,6 +501,7 @@ export class SandboxService {
       original.fileName,
       original.fileExtension,
       detectors,
+      original.s3Key ?? undefined,
     );
 
     return run;
@@ -532,22 +535,35 @@ export class SandboxService {
     fileName: string,
     fileExtension: string,
     detectors: unknown[],
+    s3Key?: string,
   ): Promise<void> {
     const startTime = Date.now();
     const usesKubernetesJobs =
       this.kubernetesCliJobService?.isEnabled() ?? false;
-    const tmpDir = usesKubernetesJobs
-      ? this.getSandboxSharedDir(runId)
-      : process.env.TEMP_DIR || '/tmp';
+
+    // When running a K8s job and the input file is already in S3, the CLI job
+    // downloads it directly — no shared filesystem needed, works on multi-node.
+    // Fallback: when S3 is absent the job reads files via a shared hostPath
+    // volume (single-node only). Local execution always uses /tmp.
+    const useS3Transport = usesKubernetesJobs && !!s3Key;
+
+    const tmpDir = useS3Transport
+      ? path.join(os.tmpdir(), `classifyre-sandbox-${runId}`) // API-local only
+      : usesKubernetesJobs
+        ? this.getSandboxSharedDir(runId) // shared hostPath fallback
+        : process.env.TEMP_DIR || '/tmp';
+
     const tempFilePath = path.join(
       tmpDir,
-      usesKubernetesJobs
+      usesKubernetesJobs && !useS3Transport
         ? `input${fileExtension}`
         : `sandbox-${runId}-${startTime}${fileExtension}`,
     );
     const detectorsFile = path.join(
       tmpDir,
-      usesKubernetesJobs ? 'detectors.json' : `sandbox-detectors-${runId}.json`,
+      usesKubernetesJobs && !useS3Transport
+        ? 'detectors.json'
+        : `sandbox-detectors-${runId}.json`,
     );
 
     try {
@@ -557,19 +573,46 @@ export class SandboxService {
         data: { status: SandboxRunStatus.RUNNING },
       });
 
-      // Write temp files
-      await fs.mkdir(tmpDir, { recursive: true });
-      await fs.writeFile(tempFilePath, fileBuffer);
       const expandedDetectors = await this.expandCustomDetectors(detectors);
-      await fs.writeFile(
-        detectorsFile,
-        JSON.stringify(expandedDetectors, null, 2),
-      );
 
       // Execute CLI
-      const { stdout, exitCode } = usesKubernetesJobs
-        ? await this.executeSandboxJob(runId, tempFilePath, detectorsFile)
-        : await this.executeSandboxLocally(runId, tempFilePath, detectorsFile);
+      let stdout: string;
+      let exitCode: number;
+
+      if (useS3Transport) {
+        // S3 path: CLI job downloads input from S3, detectors via env var.
+        // The API doesn't need to write any files — tmpDir only used for cleanup.
+        const detectorsB64 = Buffer.from(
+          JSON.stringify(expandedDetectors),
+        ).toString('base64');
+
+        const result = await this.executeSandboxJob(runId, {
+          mode: 's3',
+          s3Key: s3Key!,
+          detectorsB64,
+          fileExtension,
+        });
+        stdout = result.stdout;
+        exitCode = result.exitCode;
+      } else {
+        // Shared filesystem path (hostPath for K8s, /tmp for local).
+        await fs.mkdir(tmpDir, { recursive: true });
+        await fs.writeFile(tempFilePath, fileBuffer);
+        await fs.writeFile(
+          detectorsFile,
+          JSON.stringify(expandedDetectors, null, 2),
+        );
+
+        const result = usesKubernetesJobs
+          ? await this.executeSandboxJob(runId, {
+              mode: 'fs',
+              inputFilePath: tempFilePath,
+              detectorsFilePath: detectorsFile,
+            })
+          : await this.executeSandboxLocally(runId, tempFilePath, detectorsFile);
+        stdout = result.stdout;
+        exitCode = result.exitCode;
+      }
 
       if (exitCode !== 0) {
         throw new Error(`CLI exited with code ${exitCode}: ${stdout}`);
@@ -622,7 +665,12 @@ export class SandboxService {
         })
         .catch(() => undefined);
     } finally {
-      if (usesKubernetesJobs) {
+      // Always clean up the local tmpDir.
+      // For the S3 transport path this is the API-local os.tmpdir() subdir.
+      // For the hostPath fallback this is the shared dir (also cleans up
+      // the files the CLI job read, so stale artefacts don't accumulate).
+      // For local execution this only removes the individual temp files.
+      if (usesKubernetesJobs || useS3Transport) {
         await fs
           .rm(tmpDir, { recursive: true, force: true })
           .catch(() => undefined);
@@ -787,8 +835,9 @@ export class SandboxService {
 
   private async executeSandboxJob(
     runId: string,
-    inputFilePath: string,
-    detectorsFilePath: string,
+    params:
+      | { mode: 's3'; s3Key: string; detectorsB64: string; fileExtension: string }
+      | { mode: 'fs'; inputFilePath: string; detectorsFilePath: string },
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     if (!this.kubernetesCliJobService?.isEnabled()) {
       throw new Error('Kubernetes CLI job service is not enabled');
@@ -796,8 +845,16 @@ export class SandboxService {
 
     const result = await this.kubernetesCliJobService.runSandboxJob({
       runId,
-      inputFilePath,
-      detectorsFilePath,
+      ...(params.mode === 's3'
+        ? {
+            sandboxS3Key: params.s3Key,
+            sandboxDetectorsB64: params.detectorsB64,
+            sandboxFileExtension: params.fileExtension,
+          }
+        : {
+            inputFilePath: params.inputFilePath,
+            detectorsFilePath: params.detectorsFilePath,
+          }),
     });
 
     return {

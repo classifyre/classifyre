@@ -90,14 +90,22 @@ export class KubernetesCliJobService {
 
   async runSandboxJob(params: {
     runId: string;
-    inputFilePath: string;
-    detectorsFilePath: string;
+    // Shared-filesystem path (hostPath fallback, single-node only).
+    inputFilePath?: string;
+    detectorsFilePath?: string;
+    // S3 transport (multi-node, preferred when S3 is configured).
+    sandboxS3Key?: string;
+    sandboxDetectorsB64?: string;
+    sandboxFileExtension?: string;
   }): Promise<CliJobResult> {
     return this.runJob({
       sourceId: params.runId,
       mode: 'sandbox',
       sandboxInputPath: params.inputFilePath,
       sandboxDetectorsPath: params.detectorsFilePath,
+      sandboxS3Key: params.sandboxS3Key,
+      sandboxDetectorsB64: params.sandboxDetectorsB64,
+      sandboxFileExtension: params.sandboxFileExtension,
       jobTrackingKey: params.runId,
     });
   }
@@ -214,8 +222,13 @@ export class KubernetesCliJobService {
     recipe?: Record<string, unknown>;
     outputRestUrl?: string;
     hasSuccessfulRuns?: boolean;
+    // Shared-filesystem sandbox params (single-node hostPath fallback)
     sandboxInputPath?: string;
     sandboxDetectorsPath?: string;
+    // S3 sandbox params (multi-node, preferred)
+    sandboxS3Key?: string;
+    sandboxDetectorsB64?: string;
+    sandboxFileExtension?: string;
     jobTrackingKey?: string;
     onLogChunk?: CliJobLogHandler;
     onJobCreated?: CliJobCreatedHandler;
@@ -392,6 +405,9 @@ export class KubernetesCliJobService {
       hasSuccessfulRuns?: boolean;
       sandboxInputPath?: string;
       sandboxDetectorsPath?: string;
+      sandboxS3Key?: string;
+      sandboxDetectorsB64?: string;
+      sandboxFileExtension?: string;
     },
   ): V1Job {
     const job = JSON.parse(JSON.stringify(template)) as V1Job;
@@ -488,6 +504,50 @@ export class KubernetesCliJobService {
         value: params.sandboxDetectorsPath,
       });
     }
+    // S3 transport for sandbox (multi-node, preferred over shared filesystem).
+    // The CLI downloads the input file from S3 instead of reading a shared path.
+    if (params.sandboxS3Key) {
+      envMap.set('SANDBOX_S3_KEY', {
+        name: 'SANDBOX_S3_KEY',
+        value: params.sandboxS3Key,
+      });
+      envMap.set('SANDBOX_S3_BUCKET', {
+        name: 'SANDBOX_S3_BUCKET',
+        value: process.env.S3_SANDBOX_BUCKET ?? '',
+      });
+      envMap.set('SANDBOX_FILE_EXT', {
+        name: 'SANDBOX_FILE_EXT',
+        value: params.sandboxFileExtension ?? '',
+      });
+      if (process.env.S3_ENDPOINT) {
+        envMap.set('SANDBOX_S3_ENDPOINT', {
+          name: 'SANDBOX_S3_ENDPOINT',
+          value: process.env.S3_ENDPOINT,
+        });
+      }
+      envMap.set('SANDBOX_S3_REGION', {
+        name: 'SANDBOX_S3_REGION',
+        value: process.env.S3_REGION ?? 'us-east-1',
+      });
+      if (process.env.S3_ACCESS_KEY_ID) {
+        envMap.set('SANDBOX_S3_ACCESS_KEY_ID', {
+          name: 'SANDBOX_S3_ACCESS_KEY_ID',
+          value: process.env.S3_ACCESS_KEY_ID,
+        });
+      }
+      if (process.env.S3_SECRET_ACCESS_KEY) {
+        envMap.set('SANDBOX_S3_SECRET_ACCESS_KEY', {
+          name: 'SANDBOX_S3_SECRET_ACCESS_KEY',
+          value: process.env.S3_SECRET_ACCESS_KEY,
+        });
+      }
+    }
+    if (params.sandboxDetectorsB64) {
+      envMap.set('SANDBOX_DETECTORS_B64', {
+        name: 'SANDBOX_DETECTORS_B64',
+        value: params.sandboxDetectorsB64,
+      });
+    }
 
     const workDir = process.env.K8S_CLI_JOB_WORKDIR || '/app/apps/cli';
     envMap.set('CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS', {
@@ -570,7 +630,10 @@ export class KubernetesCliJobService {
           ].join(' ')
         : mode === 'test'
           ? '"$PYTHON_BIN" -m src.main test /tmp/recipe.json'
-          : '"$PYTHON_BIN" -m src.main sandbox "$SANDBOX_INPUT_PATH" --detectors-file "$SANDBOX_DETECTORS_PATH"';
+          // Sandbox: check at runtime whether to use S3 transport or shared filesystem.
+          // SANDBOX_S3_KEY is set by the API when S3 is configured; the CLI handles
+          // the download internally. The hostPath fallback uses SANDBOX_INPUT_PATH.
+          : 'if [ -n "${SANDBOX_S3_KEY:-}" ]; then "$PYTHON_BIN" -m src.main sandbox; else "$PYTHON_BIN" -m src.main sandbox "$SANDBOX_INPUT_PATH" --detectors-file "$SANDBOX_DETECTORS_PATH"; fi';
 
     const prelude = ['set -eu'];
     if (mode !== 'sandbox') {
