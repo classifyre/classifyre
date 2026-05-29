@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { CliBackpressureGuard } from './guards/cli-backpressure.guard';
 import { PrismaService } from './prisma.service';
 import { DemoModeService } from './demo-mode.service';
 import { DemoModeGuard } from './demo-mode.guard';
@@ -74,6 +75,7 @@ import {
   ],
   providers: [
     { provide: APP_GUARD, useClass: DemoModeGuard },
+    CliBackpressureGuard,
     DemoModeService,
     PrismaService,
     SourceService,

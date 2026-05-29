@@ -268,7 +268,7 @@ describe('KubernetesCliJobService', () => {
     expect(command).toContain('--managed-runner');
   });
 
-  it('builds sandbox command with shared input paths', () => {
+  it('builds sandbox command decoding file and detectors from base64 env vars', () => {
     const service = new KubernetesCliJobService();
     const command = (service as any).buildJobCommand(
       'sandbox',
@@ -276,13 +276,20 @@ describe('KubernetesCliJobService', () => {
     );
 
     expect(command).toContain('cd /app/apps/cli');
-    expect(command).toContain('src.main sandbox "$SANDBOX_INPUT_PATH"');
-    expect(command).toContain('--detectors-file "$SANDBOX_DETECTORS_PATH"');
+    expect(command).toContain('SANDBOX_FILE_B64');
+    expect(command).toContain('SANDBOX_DETECTORS_B64');
+    expect(command).toContain('base64 -d');
+    expect(command).toContain('src.main sandbox');
+    expect(command).toContain('--detectors-file /tmp/sandbox-detectors.json');
     expect(command).not.toContain('RECIPE_B64');
+    expect(command).not.toContain('SANDBOX_INPUT_PATH');
+    expect(command).not.toContain('SANDBOX_DETECTORS_PATH');
   });
 
   it('injects sandbox file env vars into sandbox jobs', () => {
     const service = new KubernetesCliJobService();
+    const fileBuffer = Buffer.from('hello world', 'utf8');
+    const detectors = [{ type: 'BUILTIN_EMAIL', enabled: true }];
     const job = (service as any).buildJobFromTemplate(
       {
         apiVersion: 'batch/v1',
@@ -298,23 +305,32 @@ describe('KubernetesCliJobService', () => {
       {
         sourceId: 'sandbox-run-1',
         mode: 'sandbox',
-        sandboxInputPath:
-          '/var/lib/classifyre/runner-logs/sandbox-runs/sandbox-run-1/input.txt',
-        sandboxDetectorsPath:
-          '/var/lib/classifyre/runner-logs/sandbox-runs/sandbox-run-1/detectors.json',
+        sandboxFileB64: fileBuffer.toString('base64'),
+        sandboxFileExt: '.txt',
+        sandboxDetectorsB64: Buffer.from(
+          JSON.stringify(detectors),
+          'utf8',
+        ).toString('base64'),
       },
     );
     const env = job.spec?.template?.spec?.containers?.[0]?.env ?? [];
 
-    expect(env.find((item) => item.name === 'SANDBOX_INPUT_PATH')?.value).toBe(
-      '/var/lib/classifyre/runner-logs/sandbox-runs/sandbox-run-1/input.txt',
-    );
     expect(
-      env.find((item) => item.name === 'SANDBOX_DETECTORS_PATH')?.value,
-    ).toBe(
-      '/var/lib/classifyre/runner-logs/sandbox-runs/sandbox-run-1/detectors.json',
-    );
-    expect(env.find((item) => item.name === 'RECIPE_B64')).toBeUndefined();
+      env.find((item: any) => item.name === 'SANDBOX_FILE_B64')?.value,
+    ).toBe(fileBuffer.toString('base64'));
+    expect(
+      env.find((item: any) => item.name === 'SANDBOX_FILE_EXT')?.value,
+    ).toBe('.txt');
+    expect(
+      env.find((item: any) => item.name === 'SANDBOX_DETECTORS_B64')?.value,
+    ).toBe(Buffer.from(JSON.stringify(detectors), 'utf8').toString('base64'));
+    expect(env.find((item: any) => item.name === 'RECIPE_B64')).toBeUndefined();
+    expect(
+      env.find((item: any) => item.name === 'SANDBOX_INPUT_PATH'),
+    ).toBeUndefined();
+    expect(
+      env.find((item: any) => item.name === 'SANDBOX_DETECTORS_PATH'),
+    ).toBeUndefined();
   });
 
   it('injects successful-run state env var into extract jobs', () => {

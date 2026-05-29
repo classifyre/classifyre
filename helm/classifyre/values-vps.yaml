@@ -4,66 +4,41 @@
 # Access: https://demo.classifyre.com
 
 api:
-  replicaCount: 1
-
   image:
     repository: classifyre/api
-    tag: "feat-performance"
+    tag: "fix-deployment_cli"
     pullPolicy: Always
-
-  # API image defaults to /app/api, which is required for Prisma config discovery.
-  startCommand: node dist/src/main.js
 
   env:
     DEMO_MODE: "false"
+    # Single-node VPS: heap/RSS are always close to limits (pods idle at ~300 MB RSS).
+    # Disable heap and RSS checks — they fire constantly and block all requests.
+    # Only use event-loop delay (2 s) as the backpressure signal: it triggers
+    # only when Node is CPU-starved and genuinely cannot process requests.
+    # DB-level backpressure (P2028/P2034 → 503) is handled by PrismaExceptionFilter.
+    UNDER_PRESSURE_MAX_HEAP_USED_BYTES: "0"   # 0 = disabled
+    UNDER_PRESSURE_MAX_RSS_BYTES: "0"         # 0 = disabled
+    UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY: "2000"  # 2 s event-loop lag = genuinely stuck
 
+  # Single-node VPS: cap replicas so CLI jobs don't trigger runaway HPA scale-out.
+  # 10 API pods on one node causes memory pressure → liveness probe failures →
+  # RemoteDisconnected errors mid-request → asset failures.
   autoscaling:
-    enabled: false
-
-  pdb:
-    enabled: false
+    minReplicas: 2
+    maxReplicas: 4
 
   cliJobs:
     image:
       repository: classifyre/cli
-      tag: "feat-performance"
+      tag: "fix-deployment_cli"
       pullPolicy: Always
-    # Stamatatos06 / CLASSIFIER+ENTITY combos exhaust default 4Gi limit; bump to 6Gi.
-    resources:
-      requests:
-        cpu: 500m
-        memory: 1Gi
-      limits:
-        cpu: "2"
-        memory: 6Gi
-    # local-path leaves these cache PVCs pending until a job consumes them, which
-    # blocks `helm upgrade --wait` during deploy even though the app is healthy.
-    uvCache:
-      enabled: false
 
-  migration:
-    # Published API image currently keeps Prisma engine files under root-owned Bun modules.
-    # Run only the migration init container as root; keep the main API container non-root.
-    containerSecurityContext:
-      runAsUser: 0
-      runAsGroup: 0
-      runAsNonRoot: false
 
 frontend:
-  replicaCount: 1
-
   image:
     repository: classifyre/web
-    tag: "feat-performance"
-    pullPolicy: Always
-
-  startCommand: node /app/apps/web/server.js
-
-  autoscaling:
-    enabled: false
-
-  pdb:
-    enabled: false
+    tag: "fix-deployment_cli"
+    pullPolicy: IfNotPresent
 
   service:
     type: NodePort
@@ -76,10 +51,16 @@ ingress:
 postgres:
   mode: embedded
   embedded:
-    password: "classifyre-vps-demo"
+    existingSecret: classifyre-postgres-password
     persistence:
       accessModes:
         - ReadWriteOnce
 
 objectStorage:
-  enabled: false
+  enabled: true
+  bucket: classifyredemologs
+  sandboxBucket: classifyredemosandbox
+  endpoint: "https://s3.us-west-002.backblazeb2.com"
+  region: us-west-002
+  forcePathStyle: false
+  existingSecret: classifyre-s3-credentials

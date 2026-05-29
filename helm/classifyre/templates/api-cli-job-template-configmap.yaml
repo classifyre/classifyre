@@ -47,11 +47,15 @@ data:
                   },
                   {
                     "name": "CLASSIFYRE_OUTPUT_REST_URL",
-                    "value": "http://{{ include "classifyre.api.fullname" . }}:{{ .Values.api.service.port }}"
+                    "value": "http://{{ include "classifyre.api.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.api.service.port }}"
                   },
                   {
                     "name": "CLASSIFYRE_OUTPUT_BATCH_SIZE",
                     "value": "20"
+                  },
+                  {
+                    "name": "CLASSIFYRE_OUTPUT_REST_TIMEOUT_SEC",
+                    "value": "{{ .Values.api.cliJobs.outputRestTimeoutSec }}"
                   },
                   {
                     "name": "CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE",
@@ -114,16 +118,17 @@ data:
                   {{ . | toJson }}
                   {{- end }}
                 ],
-                {{- if .Values.api.cliJobs.uvCache.enabled }}
                 "volumeMounts": [
+                  {{- if .Values.api.cliJobs.uvCache.enabled }}
                   {
                     "name": "uv-cache",
                     "mountPath": "{{ .Values.api.cliJobs.uvCache.mountPath }}"
-                  }
+                  }{{ if .Values.api.cliJobs.extraVolumeMounts }},{{ end }}
+                  {{- end }}
+                  {{- range $i, $vm := .Values.api.cliJobs.extraVolumeMounts }}
+                  {{ $vm | toJson }}{{ if lt (add1 $i) (len $.Values.api.cliJobs.extraVolumeMounts) }},{{ end }}
+                  {{- end }}
                 ],
-                {{- else }}
-                "volumeMounts": [],
-                {{- end }}
                 "workingDir": "{{ .Values.api.cliJobs.workDir }}"
               }
             ],
@@ -134,8 +139,10 @@ data:
                 "persistentVolumeClaim": {
                   "claimName": "{{ default (printf "%s-cli-uv-cache" (include "classifyre.fullname" .)) .Values.api.cliJobs.uvCache.existingClaim }}"
                 }
-              }
-              {{- else }}
+              }{{ if .Values.api.cliJobs.extraVolumes }},{{ end }}
+              {{- end }}
+              {{- range $i, $vol := .Values.api.cliJobs.extraVolumes }}
+              {{ $vol | toJson }}{{ if lt (add1 $i) (len $.Values.api.cliJobs.extraVolumes) }},{{ end }}
               {{- end }}
             ]
           }
