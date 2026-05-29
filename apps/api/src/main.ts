@@ -58,7 +58,8 @@ async function bootstrap() {
       10,
     ),
     maxHeapUsedBytes: parseInt(
-      process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES ?? String(768 * 1024 * 1024),
+      process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES ??
+        String(768 * 1024 * 1024),
       10,
     ),
     maxRssBytes: parseInt(
@@ -66,7 +67,7 @@ async function bootstrap() {
       10,
     ),
     // No-op: guard handles per-route rejection, not this global hook.
-    pressureHandler: (_req, _rep, _type, _value) => undefined,
+    pressureHandler: () => undefined,
     exposeStatusRoute: '/api/health/pressure',
   });
 
