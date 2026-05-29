@@ -1,10 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  api,
-  type AiProviderConfigResponseDto,
-} from "@workspace/api-client";
+import { api, type AiProviderConfigResponseDto } from "@workspace/api-client";
 import {
   Alert,
   AlertDescription,
@@ -28,62 +25,63 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
 } from "@workspace/ui/components";
-import { BrainCircuit, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  BrainCircuit,
+  Loader2,
+  Pencil,
+  Plus,
+  ScanSearch,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { AiProviderForm } from "@/components/ai-provider-form";
+import { useAiProviderConfigs } from "@/hooks/use-ai-provider-configs";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 
-const NONE_VALUE = "__none__";
-
 export function AiProvidersCard() {
   const { t } = useTranslation();
-  const { settings, updateSettings } = useInstanceSettings();
+  const { settings } = useInstanceSettings();
+  const { providers, loading, error, refresh } = useAiProviderConfigs();
 
-  const [providers, setProviders] = React.useState<
-    AiProviderConfigResponseDto[]
-  >([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  // Map of providerId -> detector names that reference it (usage highlight).
+  const [detectorUsage, setDetectorUsage] = React.useState<
+    Record<string, string[]>
+  >({});
 
   const [formOpen, setFormOpen] = React.useState(false);
-  const [editing, setEditing] = React.useState<AiProviderConfigResponseDto | null>(
-    null,
-  );
+  const [editing, setEditing] =
+    React.useState<AiProviderConfigResponseDto | null>(null);
   const [deleteTarget, setDeleteTarget] =
     React.useState<AiProviderConfigResponseDto | null>(null);
   const [deleting, setDeleting] = React.useState(false);
 
-  const defaultId = settings.aiProviderConfigId ?? null;
+  const assistantId = settings.aiProviderConfigId ?? null;
 
-  const load = React.useCallback(async () => {
+  const loadDetectorUsage = React.useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
-      const result =
-        await api.aiProviderConfigs.aiProviderConfigControllerList();
-      setProviders(result);
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : t("aiProvider.failedToLoad"),
-      );
-    } finally {
-      setLoading(false);
+      const detectors = await api.listCustomDetectors({
+        includeInactive: true,
+      });
+      const usage: Record<string, string[]> = {};
+      for (const detector of detectors) {
+        const pid = detector.aiProviderConfigId;
+        if (!pid) continue;
+        (usage[pid] ??= []).push(detector.name);
+      }
+      setDetectorUsage(usage);
+    } catch {
+      // Usage badges are an enhancement; ignore failures silently.
+      setDetectorUsage({});
     }
-  }, [t]);
+  }, []);
 
   React.useEffect(() => {
-    void load();
-  }, [load]);
+    void loadDetectorUsage();
+  }, [loadDetectorUsage]);
 
   const openCreate = React.useCallback(() => {
     setEditing(null);
@@ -99,42 +97,17 @@ export function AiProvidersCard() {
     async (saved: AiProviderConfigResponseDto, close: boolean) => {
       const isNew = !providers.some((p) => p.id === saved.id);
       if (close) {
-        toast.success(isNew ? t("aiProvider.created") : t("aiProvider.updated"));
+        toast.success(
+          isNew ? t("aiProvider.created") : t("aiProvider.updated"),
+        );
       }
-      await load();
-      // If this is the only provider and no default is set, make it the default.
-      if (isNew && !defaultId) {
-        try {
-          await updateSettings({ aiProviderConfigId: saved.id });
-        } catch {
-          // Non-fatal: the user can pick a default manually.
-        }
-      }
+      await refresh();
       if (close) {
         setFormOpen(false);
         setEditing(null);
       }
-      // When close is false the persistence happened as part of a test
-      // connection: keep the dialog open so the result stays visible. The form
-      // tracks the saved id internally so a later save updates the same record.
     },
-    [providers, defaultId, load, updateSettings, t],
-  );
-
-  const handleDefaultChange = React.useCallback(
-    async (value: string) => {
-      const next = value === NONE_VALUE ? null : value;
-      try {
-        await updateSettings({ aiProviderConfigId: next });
-      } catch (updateError) {
-        toast.error(
-          updateError instanceof Error
-            ? updateError.message
-            : t("settings.failedToSave"),
-        );
-      }
-    },
-    [updateSettings, t],
+    [providers, refresh, t],
   );
 
   const handleDelete = React.useCallback(async () => {
@@ -146,7 +119,7 @@ export function AiProvidersCard() {
       });
       toast.success(t("aiProvider.deleted"));
       setDeleteTarget(null);
-      await load();
+      await refresh();
     } catch (deleteError) {
       toast.error(
         deleteError instanceof Error
@@ -156,7 +129,13 @@ export function AiProvidersCard() {
     } finally {
       setDeleting(false);
     }
-  }, [deleteTarget, load, t]);
+  }, [deleteTarget, refresh, t]);
+
+  function detectorLabel(count: number): string {
+    return count === 1
+      ? t("aiProvider.detectorBadgeOne")
+      : t("aiProvider.detectorsBadge", { count });
+  }
 
   return (
     <Card className="panel-card rounded-[6px]">
@@ -169,8 +148,8 @@ export function AiProvidersCard() {
                 {t("aiProvider.sectionTitle")}
               </p>
             </div>
-            <CardTitle>{t("aiProvider.sectionTitle")}</CardTitle>
-            <CardDescription>{t("aiProvider.sectionDesc")}</CardDescription>
+            <CardTitle>{t("aiProvider.manageTitle")}</CardTitle>
+            <CardDescription>{t("aiProvider.manageDesc")}</CardDescription>
           </div>
           <Button size="sm" onClick={openCreate}>
             <Plus className="mr-2 h-3.5 w-3.5" />
@@ -179,7 +158,7 @@ export function AiProvidersCard() {
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-4">
         {loading ? (
           <div className="flex min-h-24 items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -194,103 +173,102 @@ export function AiProvidersCard() {
         ) : null}
 
         {!loading && !error ? (
-          <>
-            {providers.length === 0 ? (
-              <p className="rounded-[4px] border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
-                {t("aiProvider.noProviders")}
-              </p>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <p className="text-xs font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                    {t("aiProvider.defaultLabel")}
-                  </p>
-                  <Select
-                    value={defaultId ?? NONE_VALUE}
-                    onValueChange={(v) => void handleDefaultChange(v)}
-                  >
-                    <SelectTrigger className="h-10 rounded-[4px] border-2 border-border">
-                      <SelectValue placeholder={t("aiProvider.noDefault")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE_VALUE}>
-                        {t("aiProvider.noDefault")}
-                      </SelectItem>
-                      {providers.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {t("aiProvider.defaultDesc")}
-                  </p>
-                </div>
+          providers.length === 0 ? (
+            <p className="rounded-[4px] border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
+              {t("aiProvider.noProviders")}
+            </p>
+          ) : (
+            <ul className="grid gap-3">
+              {providers.map((p) => {
+                const isAssistant = p.id === assistantId;
+                const detectors = detectorUsage[p.id] ?? [];
+                const inUse = detectors.length > 0;
+                const lockDelete = isAssistant || inUse;
+                const deleteHint = isAssistant
+                  ? t("aiProvider.deleteAssistantHint")
+                  : inUse
+                    ? t("aiProvider.deleteInUseHint")
+                    : t("aiProvider.delete");
 
-                <ul className="divide-y divide-border rounded-[4px] border border-border">
-                  {providers.map((p) => (
-                    <li
-                      key={p.id}
-                      className="flex items-center justify-between gap-3 px-4 py-3"
-                    >
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium">
-                            {p.name}
-                          </span>
-                          {p.id === defaultId ? (
-                            <Badge variant="secondary" className="text-[10px]">
-                              {t("aiProvider.defaultBadge")}
-                            </Badge>
-                          ) : null}
-                        </div>
-                        <p className="truncate font-mono text-xs text-muted-foreground">
-                          {t(
-                            `aiProvider.providers.${p.provider}` as TranslationKey,
-                          )}
-                          {p.model ? ` · ${p.model}` : ""}
-                          {p.hasApiKey && p.apiKeyPreview
-                            ? ` · ${p.apiKeyPreview}`
-                            : ""}
-                        </p>
+                return (
+                  <li
+                    key={p.id}
+                    className={`flex items-center justify-between gap-3 rounded-[4px] border-2 bg-muted/20 px-4 py-3 transition-colors ${
+                      isAssistant
+                        ? "border-[#d97706]/50 bg-[#d97706]/[0.06]"
+                        : "border-border"
+                    }`}
+                  >
+                    <div className="min-w-0 space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-sm font-semibold">
+                          {p.name}
+                        </span>
+                        {isAssistant ? (
+                          <Badge className="gap-1 border-[#d97706]/40 bg-[#d97706]/10 text-[#b45309] dark:text-[#fbbf24]">
+                            <Sparkles className="h-3 w-3" />
+                            {t("aiProvider.assistantBadge")}
+                          </Badge>
+                        ) : null}
+                        {inUse ? (
+                          <Badge
+                            variant="outline"
+                            className="gap-1"
+                            title={detectors.join(", ")}
+                          >
+                            <ScanSearch className="h-3 w-3" />
+                            {detectorLabel(detectors.length)}
+                          </Badge>
+                        ) : null}
                       </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEdit(p)}
-                          title={t("aiProvider.edit")}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeleteTarget(p)}
-                          title={t("aiProvider.delete")}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </>
+                      <p className="truncate font-mono text-xs text-muted-foreground">
+                        {t(
+                          `aiProvider.providers.${p.provider}` as TranslationKey,
+                        )}
+                        {p.model ? ` · ${p.model}` : ""}
+                        {p.hasApiKey && p.apiKeyPreview
+                          ? ` · ${p.apiKeyPreview}`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(p)}
+                        title={t("aiProvider.edit")}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeleteTarget(p)}
+                        disabled={lockDelete}
+                        title={deleteHint}
+                      >
+                        <Trash2
+                          className={`h-3.5 w-3.5 ${lockDelete ? "" : "text-destructive"}`}
+                        />
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )
         ) : null}
       </CardContent>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[6px] border-2 border-border sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {editing
                 ? t("aiProvider.editProvider")
                 : t("aiProvider.newProvider")}
             </DialogTitle>
-            <DialogDescription>{t("aiProvider.sectionDesc")}</DialogDescription>
+            <DialogDescription>{t("aiProvider.manageDesc")}</DialogDescription>
           </DialogHeader>
           <AiProviderForm
             config={editing}
@@ -306,11 +284,13 @@ export function AiProvidersCard() {
           if (!open) setDeleteTarget(null);
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-[6px] border-2 border-border">
           <AlertDialogHeader>
             <AlertDialogTitle>{t("aiProvider.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("aiProvider.deleteConfirm", { name: deleteTarget?.name ?? "" })}
+              {t("aiProvider.deleteConfirm", {
+                name: deleteTarget?.name ?? "",
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -318,6 +298,7 @@ export function AiProvidersCard() {
               {t("aiProvider.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
               onClick={(e) => {
                 e.preventDefault();
                 void handleDelete();

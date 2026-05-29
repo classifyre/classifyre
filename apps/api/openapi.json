@@ -6694,6 +6694,11 @@
             "type": "object",
             "additionalProperties": true
           },
+          "aiProviderConfigId": {
+            "type": "string",
+            "description": "AI provider credential ID backing this detector (LLM detectors only).",
+            "nullable": true
+          },
           "isActive": {
             "type": "boolean"
           },
@@ -6792,9 +6797,14 @@
             "description": "Whether this detector can be selected in sources",
             "default": true
           },
+          "aiProviderConfigId": {
+            "type": "string",
+            "description": "AI provider credential ID. Required for LLM (AI) detectors; the API resolves and injects the decrypted provider config at scan time.",
+            "example": "3f1c2b6e-1d4a-4c7e-9c2a-7b6d5e4f3a21"
+          },
           "pipelineSchema": {
             "type": "object",
-            "description": "Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)"
+            "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | FEATURE_EXTRACTION | OBJECT_DETECTION)"
           }
         },
         "required": [
@@ -6936,9 +6946,14 @@
             "description": "Whether this detector can be selected in sources",
             "default": true
           },
+          "aiProviderConfigId": {
+            "type": "string",
+            "description": "AI provider credential ID. Required for LLM (AI) detectors; the API resolves and injects the decrypted provider config at scan time.",
+            "example": "3f1c2b6e-1d4a-4c7e-9c2a-7b6d5e4f3a21"
+          },
           "pipelineSchema": {
             "type": "object",
-            "description": "Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)"
+            "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | FEATURE_EXTRACTION | OBJECT_DETECTION)"
           }
         }
       },

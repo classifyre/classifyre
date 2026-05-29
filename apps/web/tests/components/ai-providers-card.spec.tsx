@@ -149,6 +149,14 @@ async function mockApi(page: CtPage, initial: StoredProvider[]) {
     });
   });
 
+  await page.route("**/custom-detectors", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([]),
+    });
+  });
+
   await page.route("**/ai-provider-configs/*/test", async (route) => {
     testCalls += 1;
     const id = route.request().url().split("/").slice(-2, -1)[0];
@@ -170,7 +178,7 @@ async function mockApi(page: CtPage, initial: StoredProvider[]) {
   };
 }
 
-test("creating a provider posts it and sets it as the default", async ({
+test("creating a provider posts it and shows it in the list", async ({
   mount,
   page,
 }) => {
@@ -192,7 +200,6 @@ test("creating a provider posts it and sets it as the default", async ({
     provider: "CLAUDE",
     apiKey: "sk-test-12345678",
   });
-  await expect.poll(() => mock.getDefaultId()).toBe("cfg-1");
   await expect(
     component.getByRole("listitem").filter({ hasText: "Prod Claude" }),
   ).toBeVisible();

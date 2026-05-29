@@ -578,6 +578,7 @@ export type CustomDetectorResponseDto = {
   config: Record<string, unknown>;
   lastTrainedAt?: string | null;
   lastTrainingSummary?: Record<string, unknown> | null;
+  aiProviderConfigId?: string | null;
   latestTrainingRun?: CustomDetectorTrainingRunDto | null;
   findingsCount: number;
   sourcesUsingCount: number;
