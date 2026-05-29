@@ -565,9 +565,7 @@ export class SandboxService {
         // Temp files live on SANDBOX_TEMP_DIR (emptyDir in K8s, os.tmpdir()
         // otherwise) and are deleted in the finally block below.
         const tmpDir =
-          process.env.SANDBOX_TEMP_DIR ||
-          process.env.TEMP_DIR ||
-          os.tmpdir();
+          process.env.SANDBOX_TEMP_DIR || process.env.TEMP_DIR || os.tmpdir();
         const tempFilePath = path.join(
           tmpDir,
           `sandbox-${runId}-${startTime}${fileExtension}`,

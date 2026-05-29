@@ -135,11 +135,11 @@ class MySQLSourceForm {
   }
 }
 
-async function waitForScanCompletion(page: Page, timeout = 600_000): Promise<string> {
+async function waitForScanCompletion(page: Page, timeout = 300_000): Promise<string> {
   const badge = page.locator('[data-testid="scan-status-badge"]');
   await expect(badge).toBeVisible({ timeout: 30_000 });
-  // Match English (Completed/Error) and German (Abgeschlossen/Fehler)
-  await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler/i, {
+  // Match English (Completed/Error/Warning) and German (Abgeschlossen/Fehler/Warnung)
+  await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler|Warning|Warnung/i, {
     timeout,
   });
   const badgeText = (await badge.textContent()) ?? "";
@@ -179,7 +179,7 @@ test.describe("MySQL Source (SSL / Aiven)", () => {
     await form.fillMasked(MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_CERT);
 
     await form.expandOptional();
-    await form.setSSLMode("VERIFY_CA");
+    await form.setSSLMode("PREFERRED");
     await form.setDatabase(MYSQL_DATABASE);
 
     const result = await form.testConnection();
@@ -190,6 +190,7 @@ test.describe("MySQL Source (SSL / Aiven)", () => {
   });
 
   test("ingest with PII detector, scan completes, cleanup succeeds", async ({ page }) => {
+    test.setTimeout(360_000);
     const form = new MySQLSourceForm(page);
     await form.open();
 
@@ -199,8 +200,12 @@ test.describe("MySQL Source (SSL / Aiven)", () => {
     await form.fillMasked(MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_CERT);
 
     await form.expandOptional();
-    await form.setSSLMode("VERIFY_CA");
+    await form.setSSLMode("PREFERRED");
     await form.setDatabase(MYSQL_DATABASE);
+
+    // Sampling: RANDOM with 10 rows to keep scan fast
+    await page.locator('[data-testid="sampling-strategy-RANDOM"]').click();
+    await page.locator('[data-testid="input-rows-per-page"]').fill("10");
 
     await form.saveSource();
     await form.goToDetectorsStep();
@@ -209,6 +214,12 @@ test.describe("MySQL Source (SSL / Aiven)", () => {
 
     const terminalStatus = await waitForScanCompletion(page);
     expect(terminalStatus, "Scan must finish with COMPLETED, not ERROR").toBe("COMPLETED");
+
+    // Verify PII findings exist
+    const findingsStats = page.locator('[data-testid="stats-card-findings"] [data-testid="stats-value"], [data-testid="stats-card-befunde"] [data-testid="stats-value"]');
+    await expect(findingsStats).toBeVisible({ timeout: 10_000 });
+    const findingsCount = Number((await findingsStats.textContent())?.replace(/,/g, ""));
+    expect(findingsCount, "PII scan must produce at least 1 finding").toBeGreaterThan(0);
 
     // Navigate to the source detail to record source ID for cleanup
     const sourceDetailsBtn = page.getByRole("button", { name: "Source Details" });

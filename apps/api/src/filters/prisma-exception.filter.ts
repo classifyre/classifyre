@@ -23,12 +23,9 @@ import { FastifyReply } from 'fastify';
 const RETRYABLE_CODES = new Set(['P1001', 'P2024', 'P2028', 'P2034']);
 
 @Catch(PrismaClientKnownRequestError, PrismaClientInitializationError)
-export class PrismaExceptionFilter
-  implements
-    ExceptionFilter<
-      PrismaClientKnownRequestError | PrismaClientInitializationError
-    >
-{
+export class PrismaExceptionFilter implements ExceptionFilter<
+  PrismaClientKnownRequestError | PrismaClientInitializationError
+> {
   private readonly logger = new Logger(PrismaExceptionFilter.name);
 
   catch(
@@ -41,17 +38,20 @@ export class PrismaExceptionFilter
     const code =
       exception instanceof PrismaClientKnownRequestError
         ? exception.code
-        : exception.errorCode ?? 'P1000';
+        : (exception.errorCode ?? 'P1000');
 
     if (RETRYABLE_CODES.has(code)) {
-      this.logger.warn(`Database transient error [${code}]: ${exception.message}`);
+      this.logger.warn(
+        `Database transient error [${code}]: ${exception.message}`,
+      );
       void reply
         .status(HttpStatus.SERVICE_UNAVAILABLE)
         .header('Retry-After', '5')
         .send({
           statusCode: HttpStatus.SERVICE_UNAVAILABLE,
           error: 'Service Unavailable',
-          message: 'Database is temporarily unavailable — please retry in a moment.',
+          message:
+            'Database is temporarily unavailable — please retry in a moment.',
           code,
         });
       return;
