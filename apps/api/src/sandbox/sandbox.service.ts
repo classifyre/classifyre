@@ -7,6 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { spawn, type ChildProcess } from 'child_process';
+import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
@@ -534,42 +535,64 @@ export class SandboxService {
     detectors: unknown[],
   ): Promise<void> {
     const startTime = Date.now();
-    const usesKubernetesJobs =
-      this.kubernetesCliJobService?.isEnabled() ?? false;
-    const tmpDir = usesKubernetesJobs
-      ? this.getSandboxSharedDir(runId)
-      : process.env.TEMP_DIR || '/tmp';
-    const tempFilePath = path.join(
-      tmpDir,
-      usesKubernetesJobs
-        ? `input${fileExtension}`
-        : `sandbox-${runId}-${startTime}${fileExtension}`,
-    );
-    const detectorsFile = path.join(
-      tmpDir,
-      usesKubernetesJobs ? 'detectors.json' : `sandbox-detectors-${runId}.json`,
-    );
 
     try {
-      // Mark as RUNNING
       await this.prisma.sandboxRun.update({
         where: { id: runId },
         data: { status: SandboxRunStatus.RUNNING },
       });
 
-      // Write temp files
-      await fs.mkdir(tmpDir, { recursive: true });
-      await fs.writeFile(tempFilePath, fileBuffer);
       const expandedDetectors = await this.expandCustomDetectors(detectors);
-      await fs.writeFile(
-        detectorsFile,
-        JSON.stringify(expandedDetectors, null, 2),
-      );
 
-      // Execute CLI
-      const { stdout, exitCode } = usesKubernetesJobs
-        ? await this.executeSandboxJob(runId, tempFilePath, detectorsFile)
-        : await this.executeSandboxLocally(runId, tempFilePath, detectorsFile);
+      let stdout: string;
+      let exitCode: number;
+
+      if (this.kubernetesCliJobService?.isEnabled()) {
+        // Kubernetes mode: run as a K8s Job.
+        // File and detectors are base64-encoded into env vars and decoded
+        // inside the job pod's /tmp — same pattern as RECIPE_B64 for extractions.
+        // No shared filesystem needed; data is ephemeral to the job pod.
+        const result = await this.kubernetesCliJobService.runSandboxJob({
+          runId,
+          fileBuffer,
+          fileExtension,
+          detectors: expandedDetectors,
+        });
+        stdout = result.output;
+        exitCode = result.exitCode;
+      } else {
+        // Local mode (bare Node or all-in-one Docker): run as a subprocess.
+        // Temp files live on SANDBOX_TEMP_DIR (emptyDir in K8s, os.tmpdir()
+        // otherwise) and are deleted in the finally block below.
+        const tmpDir =
+          process.env.SANDBOX_TEMP_DIR || process.env.TEMP_DIR || os.tmpdir();
+        const tempFilePath = path.join(
+          tmpDir,
+          `sandbox-${runId}-${startTime}${fileExtension}`,
+        );
+        const detectorsFile = path.join(
+          tmpDir,
+          `sandbox-detectors-${runId}.json`,
+        );
+        try {
+          await fs.mkdir(tmpDir, { recursive: true });
+          await fs.writeFile(tempFilePath, fileBuffer);
+          await fs.writeFile(
+            detectorsFile,
+            JSON.stringify(expandedDetectors, null, 2),
+          );
+          const localResult = await this.executeSandboxLocally(
+            runId,
+            tempFilePath,
+            detectorsFile,
+          );
+          stdout = localResult.stdout;
+          exitCode = localResult.exitCode;
+        } finally {
+          await fs.unlink(tempFilePath).catch(() => undefined);
+          await fs.unlink(detectorsFile).catch(() => undefined);
+        }
+      }
 
       if (exitCode !== 0) {
         throw new Error(`CLI exited with code ${exitCode}: ${stdout}`);
@@ -621,15 +644,6 @@ export class SandboxService {
           },
         })
         .catch(() => undefined);
-    } finally {
-      if (usesKubernetesJobs) {
-        await fs
-          .rm(tmpDir, { recursive: true, force: true })
-          .catch(() => undefined);
-      } else {
-        await fs.unlink(tempFilePath).catch(() => undefined);
-        await fs.unlink(detectorsFile).catch(() => undefined);
-      }
     }
   }
 
@@ -783,28 +797,6 @@ export class SandboxService {
     if (isLastReference && run.s3Key) {
       await this.sandboxFileStorage.deleteFile(run.s3Key, 0);
     }
-  }
-
-  private async executeSandboxJob(
-    runId: string,
-    inputFilePath: string,
-    detectorsFilePath: string,
-  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    if (!this.kubernetesCliJobService?.isEnabled()) {
-      throw new Error('Kubernetes CLI job service is not enabled');
-    }
-
-    const result = await this.kubernetesCliJobService.runSandboxJob({
-      runId,
-      inputFilePath,
-      detectorsFilePath,
-    });
-
-    return {
-      stdout: result.output,
-      stderr: '',
-      exitCode: result.exitCode,
-    };
   }
 
   private async executeSandboxLocally(

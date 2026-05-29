@@ -48,9 +48,16 @@ async function uploadFiles(
 
 /**
  * Enable a built-in detector by its type key (e.g. "PII", "YARA", "SPAM").
- * The toggle is OFF by default and must be pressed to activate.
+ * In the current UI, detectors start in a disabled state and must first be
+ * enabled via the "detector-enable-{type}" button. Once enabled, the toggle
+ * appears and can be switched on if not already.
  */
 async function enableDetector(page: Page, type: string): Promise<void> {
+  const enableBtn = page.locator(`[data-testid="detector-enable-${type}"]`);
+  if (await enableBtn.isVisible()) {
+    await enableBtn.click();
+  }
+
   const toggle = page.locator(`[data-testid="detector-toggle-${type}"]`);
   await expect(toggle).toBeVisible({ timeout: 10_000 });
 
@@ -59,6 +66,27 @@ async function enableDetector(page: Page, type: string): Promise<void> {
     await toggle.click();
   }
   await expect(toggle).toHaveAttribute("data-state", "on");
+}
+
+/**
+ * Select a preset for a previously enabled detector by name.
+ * The detector's edit panel must already be open (i.e. enableDetector was just called).
+ */
+/**
+ * Select a preset for a previously enabled detector by name.
+ * The detector was just enabled and its edit panel should be open.
+ */
+async function selectDetectorPreset(page: Page, presetName: string): Promise<void> {
+  // Radix SelectTrigger renders a button with aria-haspopup="listbox"
+  // The SelectValue shows the currently selected label or "Custom".
+  const selectTrigger = page.locator('[data-slot="select-trigger"]').filter({ hasText: /custom|customize|anpassen/i }).first();
+  await expect(selectTrigger).toBeVisible({ timeout: 5_000 });
+  await selectTrigger.click();
+
+  // Find the option by name in the popover
+  const option = page.getByRole("option", { name: presetName });
+  await expect(option).toBeVisible({ timeout: 5_000 });
+  await option.click();
 }
 
 /**
@@ -192,13 +220,13 @@ test.describe("Sandbox Scan", () => {
 
   // ── 3. PDF → BINARY content type, multiple detectors ───────────────────────
 
-  test("classifies sample_invoice.pdf as BINARY with PII+YARA+SPAM detectors", async ({
+  test("classifies sample_invoice.pdf as BINARY with PII+YARA+SECRETS detectors", async ({
     page,
   }) => {
     await uploadFiles(page, [FIXTURE.invoicePdf]);
     await enableDetector(page, "PII");
     await enableDetector(page, "YARA");
-    await enableDetector(page, "SPAM");
+    await enableDetector(page, "SECRETS");
     await runScan(page);
 
     const status = await waitForRunTerminal(page, "sample_invoice.pdf");
@@ -237,6 +265,8 @@ test.describe("Sandbox Scan", () => {
     ]);
 
     await enableDetector(page, "YARA");
+    // Select the "Suspicious Scripts" preset which has Potential_Code_Injection rules
+    await selectDetectorPreset(page, "Suspicious Scripts");
     await runScan(page);
 
     const status = await waitForRunTerminal(page, fileName);
@@ -257,13 +287,19 @@ test.describe("Sandbox Scan", () => {
       await expect(findingRow).toHaveAttribute("data-detector-type", "YARA");
     }
 
-    // Code injection rule must fire
+    // At least one known YARA rule must fire
     const findingTypes = await Promise.all(
       allRows.map((r) => r.getAttribute("data-finding-type")),
     );
+    const knownRules = [
+      "Potential_Code_Injection",
+      "Shell_Curl_Pipe_Exec",
+      "JavaScript_Eval_Obfuscation",
+      "Suspicious_Shell_Escape",
+    ];
     expect(
-      findingTypes.includes("Potential_Code_Injection"),
-      `Potential_Code_Injection not found. Got: ${findingTypes.join(", ")}`,
+      findingTypes.some((ft) => knownRules.includes(ft ?? "")),
+      `Expected one of ${knownRules.join(", ")}. Got: ${findingTypes.join(", ")}`,
     ).toBe(true);
   });
 

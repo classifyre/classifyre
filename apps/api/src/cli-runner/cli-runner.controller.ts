@@ -9,6 +9,7 @@ import {
   Patch,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,6 +21,7 @@ import {
 import { CliRunnerService } from './cli-runner.service';
 import { RunnerStatus } from '@prisma/client';
 import { AllowInDemoMode } from '../demo-mode.decorator';
+import { CliBackpressureGuard } from '../guards/cli-backpressure.guard';
 import {
   StartRunnerDto,
   CreateExternalRunnerDto,
@@ -66,6 +68,7 @@ export class CliRunnerController {
     );
   }
 
+  @UseGuards(CliBackpressureGuard)
   @Post('sources/:sourceId/runners/external')
   @ApiOperation({
     summary: 'Create runner record for external CLI REST ingestion',
@@ -103,6 +106,7 @@ export class CliRunnerController {
     return this.cliRunnerService.deleteRunner(runnerId);
   }
 
+  @UseGuards(CliBackpressureGuard)
   @AllowInDemoMode()
   @Patch('runners/:runnerId/status')
   @ApiOperation({ summary: 'Update runner status' })
@@ -125,6 +129,7 @@ export class CliRunnerController {
     );
   }
 
+  @UseGuards(CliBackpressureGuard)
   @Post('runners/:runnerId/assets/discover')
   @ApiOperation({ summary: 'Register discovered asset hashes for a runner' })
   @ApiBody({ type: RegisterDiscoveredAssetsDto })
@@ -139,6 +144,7 @@ export class CliRunnerController {
     );
   }
 
+  @UseGuards(CliBackpressureGuard)
   @Patch('runners/:runnerId/assets/status')
   @ApiOperation({ summary: 'Update processing status of runner assets' })
   @ApiBody({ type: UpdateRunnerAssetStatusDto })
