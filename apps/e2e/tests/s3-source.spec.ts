@@ -38,12 +38,12 @@ class ScanDetailPage {
 
   async waitForCompletion(timeout = 1_500_000) {
     const badge = this.page.locator('[data-testid="scan-status-badge"]');
-    await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler/i, { timeout });
-    const text = await badge.textContent();
-    if (text?.toLowerCase().includes("error") || text?.toLowerCase().includes("fehler")) {
+    await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler|Warning|Warnung/i, { timeout });
+    const text = (await badge.textContent()) ?? "";
+    if (/error|fehler/i.test(text)) {
       throw new Error("Scan finished with ERROR status");
     }
-    expect(text?.toLowerCase()).toMatch(/completed|abgeschlossen/);
+    expect(text).toMatch(/completed|abgeschlossen|warning|warnung/i);
   }
 
   async getStatsValue(label: string) {

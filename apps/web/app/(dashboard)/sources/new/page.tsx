@@ -218,11 +218,11 @@ export default function NewSourcePage() {
       return savedId;
     } catch (error) {
       console.error("Failed to save source:", error);
-      toast.error(
-        error instanceof Error
-          ? `Failed to save source: ${error.message}`
-          : "Failed to save source. Please try again.",
+      const errorMessage = await extractApiErrorMessage(
+        error,
+        "Failed to save source. Please try again.",
       );
+      toast.error(errorMessage);
       return null;
     } finally {
       setIsSavingConfig(false);
