@@ -99,10 +99,12 @@ api:
     autoGenerate: true
 
   sandbox:
-    # -- Mount path for the sandbox emptyDir volume (temp files for in-process CLI scans).
-    # Must match SANDBOX_TEMP_DIR env var. An emptyDir is used so temp files are
-    # ephemeral (cleared on pod restart) and never spill onto the container's
-    # overlay filesystem.
+    # -- Mount path for the sandbox emptyDir volume (temp files for local subprocess mode).
+    # Must match SANDBOX_TEMP_DIR env var. The emptyDir keeps temp files off the
+    # container overlay filesystem and ensures they are cleared on pod restart.
+    # In Kubernetes (K8S_JOBS_ENABLED=1) sandbox runs as a K8s Job: file data is
+    # passed via base64 env vars (same pattern as RECIPE_B64 for extractions) and
+    # decoded inside the job pod's /tmp — no shared volume required.
     tempDir: /var/lib/classifyre/sandbox-tmp
     # -- Size limit for the sandbox emptyDir. Prevents runaway uploads filling the node.
     tempSizeLimit: 2Gi
