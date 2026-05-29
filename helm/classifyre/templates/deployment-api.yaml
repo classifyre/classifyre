@@ -232,11 +232,16 @@ spec:
           envFrom:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if .Values.api.cliJobs.enabled }}
+          {{- if or .Values.api.cliJobs.enabled .Values.api.extraVolumeMounts }}
           volumeMounts:
+            {{- if .Values.api.cliJobs.enabled }}
             - name: cli-job-template
               mountPath: /etc/classifyre/cli-job-template
               readOnly: true
+            {{- end }}
+            {{- with .Values.api.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
           {{- with .Values.api.resources }}
           resources:
@@ -279,11 +284,16 @@ spec:
           lifecycle:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- if .Values.api.cliJobs.enabled }}
+      {{- if or .Values.api.cliJobs.enabled .Values.api.extraVolumes }}
       volumes:
+        {{- if .Values.api.cliJobs.enabled }}
         - name: cli-job-template
           configMap:
             name: {{ include "classifyre.api.fullname" . }}-cli-job-template
+        {{- end }}
+        {{- with .Values.api.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
       {{- with .Values.api.nodeSelector }}
       nodeSelector:

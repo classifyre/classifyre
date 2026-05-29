@@ -102,6 +102,10 @@ api:
   extraEnv: []
   # -- Extra envFrom sources for API container.
   extraEnvFrom: []
+  # -- Extra volume mounts for the API container.
+  extraVolumeMounts: []
+  # -- Extra volumes for the API pod.
+  extraVolumes: []
 
   resources:
     # -- API resource requests.
@@ -313,6 +317,10 @@ api:
 
     # -- Additional environment variables for CLI jobs (list of EnvVar objects; supports secretKeyRef etc.).
     extraEnv: []
+    # -- Extra volume mounts for CLI job containers.
+    extraVolumeMounts: []
+    # -- Extra volumes for CLI job pods.
+    extraVolumes: []
 
     uvCache:
       # -- Enable shared PVC for uv cache (pip package cache shared across CLI jobs).
