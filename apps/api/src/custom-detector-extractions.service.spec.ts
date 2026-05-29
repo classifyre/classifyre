@@ -175,4 +175,31 @@ describe('CustomDetectorExtractionsService', () => {
     expect(upsertCall.create.pipelineResult).toEqual(pipelineResult);
     expect(upsertCall.create.findingId).toBe('find-2');
   });
+
+  it('createFromIngestion upserts on the provided transaction client', async () => {
+    const { service, prisma } = createService();
+    const tx = {
+      customDetectorExtraction: { upsert: jest.fn().mockResolvedValue({}) },
+    };
+
+    await service.createFromIngestion(
+      {
+        findingId: 'find-tx',
+        customDetectorId: 'det-1',
+        customDetectorKey: 'sentiment',
+        sourceId: 'src-1',
+        assetId: 'asset-1',
+        runnerId: null,
+        detectorVersion: 1,
+        pipelineResult: { language: 'de' },
+        extractedAt: new Date(),
+      },
+      tx as never,
+    );
+
+    // The transaction client receives the upsert so the FK to the just-created
+    // finding resolves; the global prisma client is not used.
+    expect(tx.customDetectorExtraction.upsert).toHaveBeenCalledTimes(1);
+    expect(prisma.customDetectorExtraction.upsert).not.toHaveBeenCalled();
+  });
 });

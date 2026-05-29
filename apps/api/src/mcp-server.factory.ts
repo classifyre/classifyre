@@ -446,13 +446,20 @@ export class McpServerFactoryService {
       {
         title: 'Create Custom Detector',
         description:
-          'Create a GLiNER2-powered custom detector. Supply a pipeline_schema with entities, classification, and/or validation sections. At least one entity or classification task is required.',
+          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, FEATURE_EXTRACTION, or OBJECT_DETECTION. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt.',
         inputSchema: {
           key: z.string().optional(),
           name: z.string(),
           description: z.string().optional(),
+          aiProviderConfigId: z
+            .string()
+            .uuid()
+            .optional()
+            .describe(
+              'AI provider credential ID. Required for LLM (AI) detectors.',
+            ),
           pipeline_schema: jsonObjectSchema.describe(
-            'GLiNER2 pipeline schema. Example: { model: { name: "fastino/gliner2-base-v1" }, entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } }, validation: { confidence_threshold: 0.8, rules: [] } }',
+            'Pipeline schema. GLiNER2 example: { type: "GLINER2", entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } } }. LLM (AI) example: { type: "LLM", system_prompt: "Classify the sentiment of the text.", labels: [{ name: "good" }, { name: "bad" }, { name: "violent" }], severity_map: [{ pattern: "violent", severity: "critical" }], output_fields: [{ name: "language", type: "string" }] }',
           ),
           isActive: z.boolean().optional(),
         },
@@ -471,15 +478,22 @@ export class McpServerFactoryService {
       {
         title: 'Update Custom Detector',
         description:
-          'Update detector metadata, pipeline schema, or activation status.',
+          'Update detector metadata, pipeline schema, AI provider credential, or activation status.',
         inputSchema: {
           id: z.string().uuid(),
           key: z.string().optional(),
           name: z.string().optional(),
           description: z.string().nullable().optional(),
+          aiProviderConfigId: z
+            .string()
+            .uuid()
+            .optional()
+            .describe(
+              'AI provider credential ID. Required for LLM (AI) detectors.',
+            ),
           pipeline_schema: jsonObjectSchema
             .optional()
-            .describe('Updated GLiNER2 pipeline schema'),
+            .describe('Updated pipeline schema (any supported type).'),
           isActive: z.boolean().optional(),
         },
       },
