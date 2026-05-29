@@ -90,14 +90,19 @@ export class KubernetesCliJobService {
 
   async runSandboxJob(params: {
     runId: string;
-    inputFilePath: string;
-    detectorsFilePath: string;
+    fileBuffer: Buffer;
+    fileExtension: string;
+    detectors: unknown[];
   }): Promise<CliJobResult> {
     return this.runJob({
       sourceId: params.runId,
       mode: 'sandbox',
-      sandboxInputPath: params.inputFilePath,
-      sandboxDetectorsPath: params.detectorsFilePath,
+      sandboxFileB64: params.fileBuffer.toString('base64'),
+      sandboxFileExt: params.fileExtension,
+      sandboxDetectorsB64: Buffer.from(
+        JSON.stringify(params.detectors),
+        'utf8',
+      ).toString('base64'),
       jobTrackingKey: params.runId,
     });
   }
@@ -214,8 +219,9 @@ export class KubernetesCliJobService {
     recipe?: Record<string, unknown>;
     outputRestUrl?: string;
     hasSuccessfulRuns?: boolean;
-    sandboxInputPath?: string;
-    sandboxDetectorsPath?: string;
+    sandboxFileB64?: string;
+    sandboxFileExt?: string;
+    sandboxDetectorsB64?: string;
     jobTrackingKey?: string;
     onLogChunk?: CliJobLogHandler;
     onJobCreated?: CliJobCreatedHandler;
@@ -390,8 +396,9 @@ export class KubernetesCliJobService {
       recipe?: Record<string, unknown>;
       outputRestUrl?: string;
       hasSuccessfulRuns?: boolean;
-      sandboxInputPath?: string;
-      sandboxDetectorsPath?: string;
+      sandboxFileB64?: string;
+      sandboxFileExt?: string;
+      sandboxDetectorsB64?: string;
     },
   ): V1Job {
     const job = JSON.parse(JSON.stringify(template)) as V1Job;
@@ -476,16 +483,22 @@ export class KubernetesCliJobService {
         value: params.hasSuccessfulRuns ? '1' : '0',
       });
     }
-    if (params.sandboxInputPath) {
-      envMap.set('SANDBOX_INPUT_PATH', {
-        name: 'SANDBOX_INPUT_PATH',
-        value: params.sandboxInputPath,
+    if (params.sandboxFileB64) {
+      envMap.set('SANDBOX_FILE_B64', {
+        name: 'SANDBOX_FILE_B64',
+        value: params.sandboxFileB64,
       });
     }
-    if (params.sandboxDetectorsPath) {
-      envMap.set('SANDBOX_DETECTORS_PATH', {
-        name: 'SANDBOX_DETECTORS_PATH',
-        value: params.sandboxDetectorsPath,
+    if (params.sandboxFileExt !== undefined) {
+      envMap.set('SANDBOX_FILE_EXT', {
+        name: 'SANDBOX_FILE_EXT',
+        value: params.sandboxFileExt,
+      });
+    }
+    if (params.sandboxDetectorsB64) {
+      envMap.set('SANDBOX_DETECTORS_B64', {
+        name: 'SANDBOX_DETECTORS_B64',
+        value: params.sandboxDetectorsB64,
       });
     }
 
@@ -557,32 +570,39 @@ export class KubernetesCliJobService {
   }
 
   private buildJobCommand(mode: CliJobMode, workDir: string): string {
-    const command =
-      mode === 'extract'
-        ? [
-            '"$PYTHON_BIN" -m src.main extract /tmp/recipe.json',
-            '--output-type rest',
-            '--output-rest-url "$OUTPUT_REST_URL"',
-            '--output-batch-size "$OUTPUT_BATCH_SIZE"',
-            '--source-id "$SOURCE_ID"',
-            '--runner-id "$RUNNER_ID"',
-            '--managed-runner',
-          ].join(' ')
-        : mode === 'test'
-          ? '"$PYTHON_BIN" -m src.main test /tmp/recipe.json'
-          : '"$PYTHON_BIN" -m src.main sandbox "$SANDBOX_INPUT_PATH" --detectors-file "$SANDBOX_DETECTORS_PATH"';
-
     const prelude = ['set -eu'];
-    if (mode !== 'sandbox') {
-      prelude.push('printf "%s" "$RECIPE_B64" | base64 -d > /tmp/recipe.json');
-    }
+    let command: string;
+
     if (mode === 'extract') {
+      prelude.push('printf "%s" "$RECIPE_B64" | base64 -d > /tmp/recipe.json');
       prelude.push('RUNNER_ID="${RUNNER_ID:-}"');
       prelude.push('SOURCE_ID="${SOURCE_ID:-}"');
       prelude.push(
         'OUTPUT_REST_URL="${CLASSIFYRE_OUTPUT_REST_URL:-http://127.0.0.1:8000}"',
       );
       prelude.push('OUTPUT_BATCH_SIZE="${CLASSIFYRE_OUTPUT_BATCH_SIZE:-20}"');
+      command = [
+        '"$PYTHON_BIN" -m src.main extract /tmp/recipe.json',
+        '--output-type rest',
+        '--output-rest-url "$OUTPUT_REST_URL"',
+        '--output-batch-size "$OUTPUT_BATCH_SIZE"',
+        '--source-id "$SOURCE_ID"',
+        '--runner-id "$RUNNER_ID"',
+        '--managed-runner',
+      ].join(' ');
+    } else if (mode === 'test') {
+      prelude.push('printf "%s" "$RECIPE_B64" | base64 -d > /tmp/recipe.json');
+      command = '"$PYTHON_BIN" -m src.main test /tmp/recipe.json';
+    } else {
+      // sandbox: decode file and detectors from base64 env vars, same pattern as recipe
+      prelude.push(
+        'printf "%s" "$SANDBOX_FILE_B64" | base64 -d > "/tmp/sandbox-input${SANDBOX_FILE_EXT:-}"',
+      );
+      prelude.push(
+        'printf "%s" "$SANDBOX_DETECTORS_B64" | base64 -d > /tmp/sandbox-detectors.json',
+      );
+      command =
+        '"$PYTHON_BIN" -m src.main sandbox "/tmp/sandbox-input${SANDBOX_FILE_EXT:-}" --detectors-file /tmp/sandbox-detectors.json';
     }
 
     return [
