@@ -20,6 +20,18 @@ import { mapValues } from '../runtime';
  */
 export interface AiProviderConfigResponseDto {
     /**
+     * Unique identifier.
+     * @type {string}
+     * @memberof AiProviderConfigResponseDto
+     */
+    id: string;
+    /**
+     * User-friendly label for this credential.
+     * @type {string}
+     * @memberof AiProviderConfigResponseDto
+     */
+    name: string;
+    /**
      * 
      * @type {string}
      * @memberof AiProviderConfigResponseDto
@@ -50,6 +62,12 @@ export interface AiProviderConfigResponseDto {
      */
     baseUrl: string | null;
     /**
+     * Context window size in tokens. Null when unspecified.
+     * @type {number}
+     * @memberof AiProviderConfigResponseDto
+     */
+    contextSize: number | null;
+    /**
      * 
      * @type {Date}
      * @memberof AiProviderConfigResponseDto
@@ -79,11 +97,14 @@ export type AiProviderConfigResponseDtoProviderEnum = typeof AiProviderConfigRes
  * Check if a given object implements the AiProviderConfigResponseDto interface.
  */
 export function instanceOfAiProviderConfigResponseDto(value: object): value is AiProviderConfigResponseDto {
+    if (!('id' in value) || value['id'] === undefined) return false;
+    if (!('name' in value) || value['name'] === undefined) return false;
     if (!('provider' in value) || value['provider'] === undefined) return false;
     if (!('model' in value) || value['model'] === undefined) return false;
     if (!('hasApiKey' in value) || value['hasApiKey'] === undefined) return false;
     if (!('apiKeyPreview' in value) || value['apiKeyPreview'] === undefined) return false;
     if (!('baseUrl' in value) || value['baseUrl'] === undefined) return false;
+    if (!('contextSize' in value) || value['contextSize'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     return true;
@@ -99,11 +120,14 @@ export function AiProviderConfigResponseDtoFromJSONTyped(json: any, ignoreDiscri
     }
     return {
         
+        'id': json['id'],
+        'name': json['name'],
         'provider': json['provider'],
         'model': json['model'],
         'hasApiKey': json['hasApiKey'],
         'apiKeyPreview': json['apiKeyPreview'],
         'baseUrl': json['baseUrl'],
+        'contextSize': json['contextSize'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
     };
@@ -120,11 +144,14 @@ export function AiProviderConfigResponseDtoToJSONTyped(value?: AiProviderConfigR
 
     return {
         
+        'id': value['id'],
+        'name': value['name'],
         'provider': value['provider'],
         'model': value['model'],
         'hasApiKey': value['hasApiKey'],
         'apiKeyPreview': value['apiKeyPreview'],
         'baseUrl': value['baseUrl'],
+        'contextSize': value['contextSize'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
     };

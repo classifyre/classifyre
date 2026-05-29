@@ -91,6 +91,18 @@ export interface SandboxRunDto {
      * @memberof SandboxRunDto
      */
     durationMs?: number;
+    /**
+     * S3 object key for the uploaded file (null when S3 is not configured)
+     * @type {string}
+     * @memberof SandboxRunDto
+     */
+    s3Key?: string;
+    /**
+     * SHA-256 content hash of the uploaded file (used for duplicate detection)
+     * @type {string}
+     * @memberof SandboxRunDto
+     */
+    contentHash?: string;
 }
 
 
@@ -160,6 +172,8 @@ export function SandboxRunDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         'status': json['status'],
         'errorMessage': json['errorMessage'] == null ? undefined : json['errorMessage'],
         'durationMs': json['durationMs'] == null ? undefined : json['durationMs'],
+        's3Key': json['s3Key'] == null ? undefined : json['s3Key'],
+        'contentHash': json['contentHash'] == null ? undefined : json['contentHash'],
     };
 }
 
@@ -186,6 +200,8 @@ export function SandboxRunDtoToJSONTyped(value?: SandboxRunDto | null, ignoreDis
         'status': value['status'],
         'errorMessage': value['errorMessage'],
         'durationMs': value['durationMs'],
+        's3Key': value['s3Key'],
+        'contentHash': value['contentHash'],
     };
 }
 

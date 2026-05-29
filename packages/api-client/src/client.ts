@@ -32,6 +32,7 @@ export { FindingsApi } from "./generated/src/apis/FindingsApi";
 export { NotificationsApi } from "./generated/src/apis/NotificationsApi";
 export { SandboxApi } from "./generated/src/apis/SandboxApi";
 export { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
+export { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
 export {
   SandboxControllerListRunsContentTypeEnum,
   SandboxControllerListRunsDetectorTypeEnum,
@@ -110,7 +111,9 @@ export type {
   NotificationListResponseDto,
   InstanceSettingsResponseDto,
   AiProviderConfigResponseDto,
+  CreateAiProviderConfigDto,
   UpdateAiProviderConfigDto,
+  AiProviderConfigTestResultDto,
   AiCompleteRequestDto,
   AiCompleteResponseDto,
   AiMessageDto,
@@ -152,6 +155,7 @@ export {
   UpdateInstanceSettingsDtoLanguageEnum,
   UpdateInstanceSettingsDtoTimeFormatEnum,
   AiProviderConfigResponseDtoProviderEnum,
+  CreateAiProviderConfigDtoProviderEnum,
   UpdateAiProviderConfigDtoProviderEnum,
   SandboxRunDtoContentTypeEnum,
   SandboxRunDtoStatusEnum,
@@ -742,6 +746,7 @@ import { FindingsApi } from "./generated/src/apis/FindingsApi";
 import { NotificationsApi } from "./generated/src/apis/NotificationsApi";
 import { SandboxApi } from "./generated/src/apis/SandboxApi";
 import { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
+import { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -795,6 +800,7 @@ class ApiClient {
   public notifications: NotificationsApi;
   public sandbox: SandboxApi;
   public instanceSettings: InstanceSettingsApi;
+  public aiProviderConfigs: AIProviderConfigsApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -807,6 +813,7 @@ class ApiClient {
     this.notifications = new NotificationsApi(this.config);
     this.sandbox = new SandboxApi(this.config);
     this.instanceSettings = new InstanceSettingsApi(this.config);
+    this.aiProviderConfigs = new AIProviderConfigsApi(this.config);
   }
 
   async searchAssets(

@@ -378,20 +378,27 @@ model InstanceSettings {
   language   InstanceLanguage @default(AUTOMATIC)
   timezone   String           @default("AUTOMATIC")
   timeFormat InstanceTimeFormat @default(AUTOMATIC) @map("time_format")
+  aiProviderConfigId String?  @map("ai_provider_config_id")
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  aiProviderConfig AiProviderConfig? @relation(fields: [aiProviderConfigId], references: [id], onDelete: SetNull)
 
   @@map("instance_settings")
 }
 
 model AiProviderConfig {
-  id        Int            @id @default(1)
-  provider  AiProviderType @default(CLAUDE)
-  model     String         @default("")
-  apiKeyEnc String?        @map("api_key_enc")
-  baseUrl   String?        @map("base_url")
-  createdAt DateTime       @default(now()) @map("created_at")
-  updatedAt DateTime       @updatedAt @map("updated_at")
+  id          String         @id @default(uuid())
+  name        String
+  provider    AiProviderType @default(CLAUDE)
+  model       String         @default("")
+  apiKeyEnc   String?        @map("api_key_enc")
+  baseUrl     String?        @map("base_url")
+  contextSize Int?           @map("context_size")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  instanceSettings InstanceSettings[]
 
   @@map("ai_provider_config")
 }
