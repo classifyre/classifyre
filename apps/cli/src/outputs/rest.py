@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 from typing import Any, Literal, cast
 from urllib.parse import urljoin
 
@@ -13,36 +14,66 @@ from .base import OutputRuntimeContext, OutputType
 
 logger = logging.getLogger(__name__)
 
+
+class _JitteredRetry(Retry):
+    """urllib3 Retry subclass that adds ±25 % multiplicative jitter to the
+    computed backoff so that multiple concurrent CLI jobs do not all retry
+    at exactly the same moment (thundering-herd mitigation).
+
+    The jitter is applied *after* the standard exponential backoff formula
+    and the backoff_max cap, so it never pushes the delay above
+    backoff_max * 1.25.
+    """
+
+    _JITTER_FACTOR: float = 0.25
+
+    def get_backoff_time(self) -> float:  # type: ignore[override]
+        base = super().get_backoff_time()
+        if base == 0:
+            return 0.0
+        lo = base * (1 - self._JITTER_FACTOR)
+        hi = base * (1 + self._JITTER_FACTOR)
+        return random.uniform(lo, hi)
+
+
 # Retry policy for CLI → API REST calls.
 #
 # What we retry and why:
-#   connect=3  — pod restarted / not yet ready (RemoteDisconnected, ConnectionReset,
+#   connect=8  — pod restarted / not yet ready (RemoteDisconnected, ConnectionReset,
 #                ConnectTimeout). Request never reached the application.
-#   read=3     — API is under load and slow to respond (ReadTimeout). Safe to retry
+#   read=8     — API is under load and slow to respond (ReadTimeout). Safe to retry
 #                because all endpoints are idempotent (bulk ingest is upsert-based,
 #                status/findings updates are set-operations).
-#   status     -- transient HTTP errors from an overloaded or restarting API:
+#   status=8   — transient HTTP errors from an overloaded or restarting API:
 #                  408 Request Timeout   - API-level timeout
 #                  429 Too Many Requests - rate-limited / backpressure
 #                  502 Bad Gateway       - proxy has no upstream yet
-#                  503 Service Unavail.  - pod not ready
+#                  503 Service Unavail.  - under-pressure / pod not ready
 #                  504 Gateway Timeout   - upstream took too long
 #
-# backoff_factor=2: waits 0 s, 2 s, 4 s, 8 s, 16 s between attempts (urllib3
-# formula: backoff_factor * (2 ** (attempt - 1)), first retry is immediate).
-# Total extra wait before giving up: ~30 s across 5 attempts -- necessary on a
-# single-node VPS where the API may stay under load for 10-20 s during heavy
-# concurrent scan jobs before event-loop pressure drops. Worst-case a single
-# call costs 6 * 120 s = 12 min, acceptable for a long-running scan job.
+# backoff_factor=2, backoff_max=60: exponential cap at 60 s, with ±25 % jitter
+# (see _JitteredRetry). Approximate wait schedule between attempts:
+#   attempt 1 → immediate (0 s)
+#   attempt 2 → ~2 s
+#   attempt 3 → ~4 s
+#   attempt 4 → ~8 s
+#   attempt 5 → ~16 s
+#   attempt 6 → ~32 s
+#   attempt 7 → ~60 s  (capped)
+#   attempt 8 → ~60 s  (capped)
+# Total extra wait: ~182 s (~3 min) — covers extended load spikes on a
+# single-node VPS before event-loop pressure drops. Worst-case a single
+# call costs 8 * 120 s + 182 s = ~18 min, acceptable for long-running scans.
 #
-# POST and PATCH are explicitly allowed: without this, urllib3 only retries
+# POST and PATCH are explicitly allowed: without this urllib3 only retries
 # idempotent methods (GET/HEAD) by default.
-_RETRY_POLICY = Retry(
-    total=5,
-    connect=5,
-    read=5,
-    status=5,
+_RETRY_POLICY = _JitteredRetry(
+    total=8,
+    connect=8,
+    read=8,
+    status=8,
     backoff_factor=2,
+    backoff_max=60,
     status_forcelist={408, 429, 502, 503, 504},
     allowed_methods={"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
     raise_on_status=False,

@@ -47,6 +47,11 @@ async function bootstrap() {
   //   NestJS+Prisma). Override lower only after measuring your actual heap.
   // UNDER_PRESSURE_MAX_RSS_BYTES         (default: 1 GB)
   //   Total process memory guard. Override lower only after measuring RSS.
+  // Register under-pressure for metrics sampling and the /api/health/pressure
+  // status endpoint. Auto-rejection is disabled (pressureHandler is a no-op)
+  // so that normal UI/API traffic is never blocked. CliBackpressureGuard reads
+  // fastify.isUnderPressure() and applies the 503 selectively on the 6 CLI
+  // ingestion endpoints only.
   await app.register(underPressure, {
     maxEventLoopDelay: parseInt(
       process.env.UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY ?? '1000',
@@ -60,8 +65,8 @@ async function bootstrap() {
       process.env.UNDER_PRESSURE_MAX_RSS_BYTES ?? String(1024 * 1024 * 1024),
       10,
     ),
-    message: 'Server is under load — please retry in a moment.',
-    retryAfter: 5,
+    // No-op: guard handles per-route rejection, not this global hook.
+    pressureHandler: (_req, _rep, _type, _value) => undefined,
     exposeStatusRoute: '/api/health/pressure',
   });
 

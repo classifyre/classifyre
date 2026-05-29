@@ -9,6 +9,7 @@ import {
   HttpStatus,
   BadRequestException,
   NotFoundException,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -31,6 +32,7 @@ import { SearchAssetsResponseDto } from '../dto/search-assets-response.dto';
 import { SearchAssetsChartsRequestDto } from '../dto/search-assets-charts-request.dto';
 import { SearchAssetsChartsResponseDto } from '../dto/search-assets-charts-response.dto';
 import { AllowInDemoMode } from '../demo-mode.decorator';
+import { CliBackpressureGuard } from '../guards/cli-backpressure.guard';
 import { SearchFindingsRequestDto } from '../dto/search-findings-request.dto';
 import { SearchFindingsResponseDto } from '../dto/search-findings-response.dto';
 import { SearchFindingsChartsRequestDto } from '../dto/search-findings-charts-request.dto';
@@ -220,6 +222,7 @@ export class SourceAssetsController {
     });
   }
 
+  @UseGuards(CliBackpressureGuard)
   @AllowInDemoMode()
   @Post('bulk')
   @ApiOperation({
@@ -342,6 +345,7 @@ export class SourceAssetsController {
     });
   }
 
+  @UseGuards(CliBackpressureGuard)
   @AllowInDemoMode()
   @Post('finalize')
   @ApiOperation({
