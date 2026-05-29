@@ -1,6 +1,5 @@
 import {
   CanActivate,
-  ExecutionContext,
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -34,13 +33,11 @@ import '@fastify/under-pressure'; // augments FastifyInstance with isUnderPressu
 export class CliBackpressureGuard implements CanActivate {
   constructor(private readonly adapterHost: HttpAdapterHost) {}
 
-  canActivate(_context: ExecutionContext): boolean {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-    const fastify = this.adapterHost.httpAdapter.getInstance() as any;
+  canActivate(): boolean {
+    const fastify = this.adapterHost.httpAdapter.getInstance();
 
     if (
       typeof fastify.isUnderPressure === 'function' &&
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       (fastify.isUnderPressure() as boolean)
     ) {
       throw new ServiceUnavailableException({
