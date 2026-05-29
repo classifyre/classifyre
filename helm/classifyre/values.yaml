@@ -98,6 +98,15 @@ api:
     # -- Generated key is persisted via Kubernetes Secret lookup across upgrades.
     autoGenerate: true
 
+  sandbox:
+    # -- Mount path for the sandbox emptyDir volume (temp files for in-process CLI scans).
+    # Must match SANDBOX_TEMP_DIR env var. An emptyDir is used so temp files are
+    # ephemeral (cleared on pod restart) and never spill onto the container's
+    # overlay filesystem.
+    tempDir: /var/lib/classifyre/sandbox-tmp
+    # -- Size limit for the sandbox emptyDir. Prevents runaway uploads filling the node.
+    tempSizeLimit: 2Gi
+
   # -- Extra environment variables for API container.
   extraEnv: []
   # -- Extra envFrom sources for API container.
