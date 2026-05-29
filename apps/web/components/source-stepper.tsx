@@ -111,6 +111,7 @@ export function VerticalStepperNav({
                 type="button"
                 disabled={!canNavigate}
                 onClick={() => onNavigate(step.id)}
+                data-testid={`stepper-step-${step.id}`}
                 className={cn(
                   "group mb-1 flex-1 rounded-[4px] px-2 py-2 text-left transition-colors",
                   !isLast && "pb-6",
@@ -166,6 +167,7 @@ export function HorizontalStepperNav({
                 type="button"
                 disabled={!canNavigate}
                 onClick={() => onNavigate(step.id)}
+                data-testid={`stepper-step-${step.id}`}
                 className={cn(
                   "flex min-w-0 flex-1 items-center gap-2 rounded-[4px] px-2 py-1.5 text-left transition-colors",
                   canNavigate && !isActive && "hover:bg-accent/10",

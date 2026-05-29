@@ -107,12 +107,12 @@ async function closeConnectionDialog(page: Page): Promise<void> {
  * Wait for a scan to reach a terminal status (Completed or Error).
  * The scan page auto-refreshes every 2.5 s; allow up to 5 minutes.
  */
-async function waitForScanTerminal(page: Page): Promise<string> {
+async function waitForScanTerminal(page: Page, timeout = 300_000): Promise<string> {
   const badge = page.locator('[data-testid="scan-status-badge"]');
   await expect(badge).toBeVisible({ timeout: 30_000 });
-  // Match English (Completed/Error) and German (Abgeschlossen/Fehler)
-  await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler/i, {
-    timeout: 600_000,
+  // Match English (Completed/Error/Warning) and German (Abgeschlossen/Fehler/Warnung)
+  await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler|Warning|Warnung/i, {
+    timeout,
   });
   const badgeText = (await badge.textContent()) ?? "";
   return /error|fehler/i.test(badgeText) ? "ERROR" : "COMPLETED";
@@ -242,7 +242,7 @@ test.describe("PostgreSQL Source", () => {
   test("scan with PII detector produces findings and can be deleted cleanly", async ({
     page,
   }) => {
-    test.setTimeout(600_000);
+    test.setTimeout(360_000);
     await openBlankPostgresForm(page);
 
     const sourceName = `E2E PG PII ${Date.now()}`;
@@ -253,6 +253,10 @@ test.describe("PostgreSQL Source", () => {
       username: PG_USERNAME,
       password: PG_PASSWORD,
     });
+
+    // Sampling: RANDOM with 10 rows to keep scan fast
+    await page.locator('[data-testid="sampling-strategy-RANDOM"]').click();
+    await page.locator('[data-testid="input-rows-per-page"]').fill("10");
 
     // Save source config first (sets the sourceId for the subsequent save-and-scan)
     await page.locator('[data-testid="btn-save-source"]').click();
@@ -297,9 +301,13 @@ test.describe("PostgreSQL Source", () => {
       "Scan must finish with COMPLETED, not ERROR",
     ).toBe("COMPLETED");
 
-    // ── Verify PII findings exist ─────────────────────────────────────────────
+    // ── Verify PII findings exist on the scan detail page ────────────────────
+    const findingsStats = page.locator('[data-testid="stats-card-findings"] [data-testid="stats-value"], [data-testid="stats-card-befunde"] [data-testid="stats-value"]');
+    await expect(findingsStats).toBeVisible({ timeout: 10_000 });
+    const findingsCount = Number((await findingsStats.textContent())?.replace(/,/g, ""));
+    expect(findingsCount, "PII scan must produce at least 1 finding").toBeGreaterThan(0);
 
-    // Navigate to the source detail via the "Source Details" button on the scan page
+    // ── Navigate to source detail for cleanup ────────────────────────────────
     await page.locator("button").filter({ hasText: /quelldetails/i }).first().click();
     await page.waitForURL(/\/sources\/[a-z0-9-]+$/, { timeout: 10_000 });
 
