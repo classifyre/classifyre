@@ -263,54 +263,49 @@ export class CustomDetectorTestsService {
     inputText: string,
   ): Promise<Record<string, unknown>> {
     const runId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const useK8s = this.kubernetesCliJobService?.isEnabled() ?? false;
 
-    const tmpDir = useK8s
-      ? this.getDetectorTestSharedDir(runId)
-      : process.env.TEMP_DIR || os.tmpdir();
+    const detectorEntry = {
+      type: 'CUSTOM',
+      enabled: true,
+      config: {
+        custom_detector_key: detector.key,
+        name: detector.name,
+        pipeline_schema: detector.pipelineSchema,
+      },
+    };
 
-    const textFile = path.join(
-      tmpDir,
-      useK8s ? 'input.txt' : `detector-test-${runId}.txt`,
-    );
-    const detectorsFile = path.join(
-      tmpDir,
-      useK8s ? 'detectors.json' : `detector-test-${runId}-detectors.json`,
-    );
+    let stdout: string;
 
-    try {
-      await fs.mkdir(tmpDir, { recursive: true });
-      await fs.writeFile(textFile, inputText, 'utf8');
-
-      const detectorEntry = {
-        type: 'CUSTOM',
-        enabled: true,
-        config: {
-          custom_detector_key: detector.key,
-          name: detector.name,
-          pipeline_schema: detector.pipelineSchema,
-        },
-      };
-      await fs.writeFile(
-        detectorsFile,
-        JSON.stringify([detectorEntry], null, 2),
+    if (this.kubernetesCliJobService?.isEnabled()) {
+      // K8s mode: pass data via base64 env vars — same pattern as RECIPE_B64.
+      // No shared filesystem required; the job pod decodes to /tmp and cleans up on exit.
+      const result = await this.kubernetesCliJobService.runSandboxJob({
+        runId,
+        fileBuffer: Buffer.from(inputText, 'utf8'),
+        fileExtension: '.txt',
+        detectors: [detectorEntry],
+      });
+      if (result.exitCode !== 0) {
+        throw new Error(
+          `CLI exited with code ${result.exitCode}: ${result.output}`,
+        );
+      }
+      stdout = result.output;
+    } else {
+      // Local mode: write temp files and run CLI subprocess directly.
+      const tmpDir = process.env.TEMP_DIR || os.tmpdir();
+      const textFile = path.join(tmpDir, `detector-test-${runId}.txt`);
+      const detectorsFile = path.join(
+        tmpDir,
+        `detector-test-${runId}-detectors.json`,
       );
-
-      let stdout: string;
-
-      if (useK8s) {
-        const result = await this.kubernetesCliJobService!.runSandboxJob({
-          runId,
-          inputFilePath: textFile,
-          detectorsFilePath: detectorsFile,
-        });
-        if (result.exitCode !== 0) {
-          throw new Error(
-            `CLI exited with code ${result.exitCode}: ${result.output}`,
-          );
-        }
-        stdout = result.output;
-      } else {
+      try {
+        await fs.mkdir(tmpDir, { recursive: true });
+        await fs.writeFile(textFile, inputText, 'utf8');
+        await fs.writeFile(
+          detectorsFile,
+          JSON.stringify([detectorEntry], null, 2),
+        );
         const cliPath = this.getCliPath();
         const venvPython = path.join(cliPath, '.venv', 'bin', 'python');
         const command =
@@ -323,33 +318,19 @@ export class CustomDetectorTestsService {
         // Subsequent runs reuse the cached model and finish in ~10–15 s.
         const result = await execAsync(command, { timeout: 180_000 });
         stdout = result.stdout;
-      }
-
-      const parsed = parseCliOutput(stdout);
-
-      return {
-        findings: parsed.findings,
-        findingsCount: parsed.findings.length,
-        matched: parsed.findings.length > 0,
-      };
-    } finally {
-      if (useK8s) {
-        await fs
-          .rm(tmpDir, { recursive: true, force: true })
-          .catch(() => undefined);
-      } else {
+      } finally {
         await fs.unlink(textFile).catch(() => undefined);
         await fs.unlink(detectorsFile).catch(() => undefined);
       }
     }
-  }
 
-  private getDetectorTestSharedDir(runId: string): string {
-    const rootDir = path.resolve(
-      process.env.RUNNER_LOGS_DIR ||
-        path.join(process.cwd(), 'var', 'runner-logs'),
-    );
-    return path.join(rootDir, 'detector-tests', runId);
+    const parsed = parseCliOutput(stdout);
+
+    return {
+      findings: parsed.findings,
+      findingsCount: parsed.findings.length,
+      matched: parsed.findings.length > 0,
+    };
   }
 
   private getCliPath(): string {

@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { AssetType, Source, Prisma, RunnerStatus } from '@prisma/client';
 import * as crypto from 'crypto';
@@ -17,6 +22,37 @@ import {
   SearchSourcesResponseDto,
 } from './dto/search-sources-response.dto';
 import { getSourceCategory } from './dto/source-type-schema';
+
+/**
+ * Round-trip the config through JSON serialization to:
+ *  1. Produce a plain, structurally clean object (no undefined values, etc.)
+ *  2. Validate the object is fully serializable before it reaches the Prisma
+ *     query engine — guarding against the rare Bun/Prisma-engine issue where
+ *     large JSONB parameter values arrive truncated at PostgreSQL (P2028-adjacent).
+ *
+ * Throws InternalServerErrorException if the config cannot be cleanly
+ * serialized, rather than letting a cryptic "invalid input syntax for type json"
+ * propagate from PostgreSQL.
+ */
+function assertSerializableConfig(
+  config: Record<string, unknown>,
+): Prisma.InputJsonObject {
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(config);
+  } catch (err) {
+    throw new InternalServerErrorException(
+      `Source config could not be serialized to JSON: ${String(err)}`,
+    );
+  }
+  try {
+    return JSON.parse(serialized) as Prisma.InputJsonObject;
+  } catch (err) {
+    throw new InternalServerErrorException(
+      `Source config produced invalid JSON during serialization — this is a bug: ${String(err)}`,
+    );
+  }
+}
 
 @Injectable()
 export class SourceService {
@@ -111,7 +147,7 @@ export class SourceService {
         name,
         type: assetType,
         sourceCategory: getSourceCategory(type),
-        config: encryptedConfig as Prisma.JsonObject,
+        config: assertSerializableConfig(encryptedConfig),
       },
     });
   }
@@ -139,7 +175,7 @@ export class SourceService {
         this.maskedConfigCryptoService.encryptMaskedConfig(
           updateSourceDto.config,
         );
-      updateData.config = encryptedConfig as Prisma.JsonObject;
+      updateData.config = assertSerializableConfig(encryptedConfig);
     }
 
     return this.prisma.source.update({

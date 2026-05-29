@@ -9,10 +9,12 @@ import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Logger } from '@nestjs/common';
 import multipart from '@fastify/multipart';
+import underPressure from '@fastify/under-pressure';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { McpServerFactoryService } from './mcp-server.factory';
 import { McpTokenService } from './mcp-token.service';
 import { InstanceSettingsService } from './instance-settings.service';
+import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -30,6 +32,48 @@ async function bootstrap() {
   await app.register(multipart, {
     limits: { fileSize: 50 * 1024 * 1024, files: 1 },
   });
+
+  // Backpressure guard — returns 503 when the process is genuinely overloaded.
+  // All thresholds are opt-in via env vars. Heap/RSS checks default to 0
+  // (disabled) because NestJS+Prisma steady-state memory is deployment-specific
+  // and almost always close to limits on constrained hosts; enabling them without
+  // measurement causes constant false-positive 503s. Enable only after profiling.
+  //
+  // UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY  (default: 1000 ms)
+  //   Primary signal: event loop blocked above this threshold means Node is
+  //   CPU-starved and genuinely cannot schedule new work.
+  // UNDER_PRESSURE_MAX_HEAP_USED_BYTES   (default: 768 MB)
+  //   Only fires near OOM — set well above steady-state (~250 MB for
+  //   NestJS+Prisma). Override lower only after measuring your actual heap.
+  // UNDER_PRESSURE_MAX_RSS_BYTES         (default: 1 GB)
+  //   Total process memory guard. Override lower only after measuring RSS.
+  // Register under-pressure for metrics sampling and the /api/health/pressure
+  // status endpoint. Auto-rejection is disabled (pressureHandler is a no-op)
+  // so that normal UI/API traffic is never blocked. CliBackpressureGuard reads
+  // fastify.isUnderPressure() and applies the 503 selectively on the 6 CLI
+  // ingestion endpoints only.
+  await app.register(underPressure, {
+    maxEventLoopDelay: parseInt(
+      process.env.UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY ?? '1000',
+      10,
+    ),
+    maxHeapUsedBytes: parseInt(
+      process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES ??
+        String(768 * 1024 * 1024),
+      10,
+    ),
+    maxRssBytes: parseInt(
+      process.env.UNDER_PRESSURE_MAX_RSS_BYTES ?? String(1024 * 1024 * 1024),
+      10,
+    ),
+    // No-op: guard handles per-route rejection, not this global hook.
+    pressureHandler: () => undefined,
+    exposeStatusRoute: '/api/health/pressure',
+  });
+
+  // Map transient Prisma overload errors (P2028, P2034, P2024) to 503 so the
+  // CLI retry policy handles them the same way as under-pressure rejections.
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
   const config = new DocumentBuilder()
     .setTitle('Classifyre API')

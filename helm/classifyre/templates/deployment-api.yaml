@@ -170,6 +170,8 @@ spec:
                   name: {{ include "classifyre.databaseSecretName" . }}
                   key: {{ .Values.postgres.external.existingSecretUrlKey }}
             {{- end }}
+            - name: SANDBOX_TEMP_DIR
+              value: {{ .Values.api.sandbox.tempDir | quote }}
             {{- range $key, $value := .Values.api.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
@@ -232,12 +234,18 @@ spec:
           envFrom:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if .Values.api.cliJobs.enabled }}
           volumeMounts:
+            {{- /* Dedicated emptyDir for sandbox temp files — ephemeral, no external storage needed. */}}
+            - name: sandbox-temp
+              mountPath: {{ .Values.api.sandbox.tempDir | quote }}
+            {{- if .Values.api.cliJobs.enabled }}
             - name: cli-job-template
               mountPath: /etc/classifyre/cli-job-template
               readOnly: true
-          {{- end }}
+            {{- end }}
+            {{- with .Values.api.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.api.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -279,12 +287,20 @@ spec:
           lifecycle:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- if .Values.api.cliJobs.enabled }}
       volumes:
+        - name: sandbox-temp
+          emptyDir:
+            {{- if .Values.api.sandbox.tempSizeLimit }}
+            sizeLimit: {{ .Values.api.sandbox.tempSizeLimit | quote }}
+            {{- end }}
+        {{- if .Values.api.cliJobs.enabled }}
         - name: cli-job-template
           configMap:
             name: {{ include "classifyre.api.fullname" . }}-cli-job-template
-      {{- end }}
+        {{- end }}
+        {{- with .Values.api.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- with .Values.api.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

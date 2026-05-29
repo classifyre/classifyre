@@ -17,12 +17,13 @@
     },
     "apps/api": {
       "name": "@classifyre/api",
-      "version": "0.4.4",
+      "version": "0.4.9-SNAPSHOT",
       "dependencies": {
         "@anthropic-ai/sdk": "^0.98.0",
         "@aws-sdk/client-s3": "^3.1032.0",
         "@fastify/multipart": "^10.0.0",
         "@fastify/static": "^9.0.0",
+        "@fastify/under-pressure": "^9.0.3",
         "@google/genai": "^2.6.0",
         "@kubernetes/client-node": "^1.4.0",
         "@modelcontextprotocol/sdk": "^1.29.0",
@@ -95,7 +96,7 @@
     },
     "apps/blog": {
       "name": "@classifyre/blog",
-      "version": "0.4.4",
+      "version": "0.4.9-SNAPSHOT",
       "dependencies": {
         "@workspace/schemas": "workspace:*",
         "@workspace/ui": "workspace:*",
@@ -123,11 +124,11 @@
     },
     "apps/cli": {
       "name": "@classifyre/cli",
-      "version": "0.4.4",
+      "version": "0.4.9-SNAPSHOT",
     },
     "apps/docs": {
       "name": "@classifyre/docs",
-      "version": "0.4.4",
+      "version": "0.4.9-SNAPSHOT",
       "dependencies": {
         "@theguild/remark-mermaid": "^0.3.0",
         "@workspace/schemas": "workspace:*",
@@ -165,7 +166,7 @@
     },
     "apps/web": {
       "name": "@classifyre/web",
-      "version": "0.4.4",
+      "version": "0.4.9-SNAPSHOT",
       "dependencies": {
         "@hookform/resolvers": "^5.2.2",
         "@monaco-editor/react": "^4.7.0",
@@ -214,7 +215,7 @@
     },
     "packages/api-client": {
       "name": "@workspace/api-client",
-      "version": "0.4.4",
+      "version": "0.4.9-SNAPSHOT",
       "devDependencies": {
         "@openapitools/openapi-generator-cli": "2.34.0",
         "@types/node": "^25.5.2",
@@ -223,7 +224,7 @@
     },
     "packages/devops": {
       "name": "@workspace/devops",
-      "version": "0.4.4",
+      "version": "0.4.9-SNAPSHOT",
     },
     "packages/eslint-config": {
       "name": "@workspace/eslint-config",
@@ -247,7 +248,7 @@
     },
     "packages/schemas": {
       "name": "@workspace/schemas",
-      "version": "0.4.4",
+      "version": "0.4.9-SNAPSHOT",
       "dependencies": {
         "zod": "^4.3.6",
       },
@@ -624,6 +625,8 @@
     "@fastify/send": ["@fastify/send@4.1.0", "", { "dependencies": { "@lukeed/ms": "^2.0.2", "escape-html": "~1.0.3", "fast-decode-uri-component": "^1.0.1", "http-errors": "^2.0.0", "mime": "^3" } }, "sha512-TMYeQLCBSy2TOFmV95hQWkiTYgC/SEx7vMdV+wnZVX4tt8VBLKzmH8vV9OzJehV0+XBfg+WxPMt5wp+JBUKsVw=="],
 
     "@fastify/static": ["@fastify/static@9.1.3", "", { "dependencies": { "@fastify/accept-negotiator": "^2.0.0", "@fastify/send": "^4.0.0", "content-disposition": "^1.0.1", "fastify-plugin": "^5.0.0", "fastq": "^1.17.1", "glob": "^13.0.0" } }, "sha512-aXrYtsiryLhRxRNaxNqsn7FUISeb7rB9q4eHUPIot5aeQBLNahnz1m6thzm7JWC1poSGXS9XrX8DvuMivp2hkQ=="],
+
+    "@fastify/under-pressure": ["@fastify/under-pressure@9.0.3", "", { "dependencies": { "@fastify/error": "^4.0.0", "fastify-plugin": "^5.0.0" } }, "sha512-uWzyFn9ThgGgynxyoX/kqgLtPtNBXXvQgN3U8fSRPNBS1y5mEZC/uCBRx03hXm9PDsQwTGN7qt83ItsHVQ0L4A=="],
 
     "@floating-ui/core": ["@floating-ui/core@1.7.5", "", { "dependencies": { "@floating-ui/utils": "^0.2.11" } }, "sha512-1Ih4WTWyw0+lKyFMcBHGbb5U5FtuHJuujoyyr5zTaWS5EYMeT6Jb2AuDeftsCsEuchO+mM2ij5+q9crhydzLhQ=="],
 

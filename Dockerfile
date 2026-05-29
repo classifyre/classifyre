@@ -108,9 +108,16 @@ FROM node:${NODE_VERSION}-bookworm-slim AS web-final
 COPY --from=web-builder /repo/apps/web/.next/standalone /app
 COPY --from=web-builder /repo/apps/web/.next/static /app/apps/web/.next/static
 COPY --from=web-builder /repo/apps/web/public /app/apps/web/public
+# Match uid 10001 from helm podSecurityContext so the container runs non-root.
+# Pre-create .next/cache so Next.js image optimisation works even when
+# readOnlyRootFilesystem is later enabled (pair with an emptyDir volume mount).
+RUN groupadd -g 10001 classifyre && useradd -u 10001 -g 10001 -r classifyre \
+    && mkdir -p /app/apps/web/.next/cache \
+    && chown -R 10001:10001 /app
 EXPOSE 3000
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
+USER 10001
 CMD ["node", "/app/apps/web/server.js"]
 
 # ── api-final: NestJS API server ──────────────────────────────────────────────
@@ -125,9 +132,13 @@ COPY --from=api-builder /repo/apps/api/prisma /app/api/prisma
 COPY --from=api-builder /repo/apps/api/prisma.config.ts /app/api/prisma.config.ts
 COPY --from=api-builder /repo/packages/schemas /app/packages/schemas
 COPY --from=api-builder /repo/packages/schemas/node_modules /app/packages/schemas/node_modules
-RUN ln -s /app/node_modules /node_modules && \
-    ln -sfn /app/packages /packages
+# Match uid 10001 from helm podSecurityContext so Prisma engine files are accessible non-root.
+RUN groupadd -g 10001 classifyre && useradd -u 10001 -g 10001 -r classifyre \
+    && ln -s /app/node_modules /node_modules \
+    && ln -sfn /app/packages /packages \
+    && chown -R 10001:10001 /app
 WORKDIR /app/api
+USER 10001
 EXPOSE 8000
 ENV NODE_ENV=production \
     PORT=8000

@@ -197,7 +197,10 @@ export function SamplingCard({
         {/* ── Advanced ───────────────────────────────────────────────────────── */}
         <Accordion type="multiple">
           <AccordionItem value="advanced" className="border-border/20">
-            <AccordionTrigger className="py-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground hover:no-underline hover:text-foreground">
+            <AccordionTrigger
+              className="py-2 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground hover:no-underline hover:text-foreground"
+              data-testid="accordion-trigger-advanced-sampling"
+            >
               {t("sources.sampling.advanced")}
             </AccordionTrigger>
             <AccordionContent className="pt-2 space-y-3">
@@ -215,6 +218,7 @@ export function SamplingCard({
                   onChange={(e) => handleRowsPerPageChange(e.target.value)}
                   disabled={disabled}
                   className="font-mono text-xs border-2 border-border/40 focus:border-border rounded-[4px] h-9"
+                  data-testid="input-rows-per-page"
                 />
                 <p className="text-[10px] text-muted-foreground font-mono pl-0.5">
                   {t("sources.sampling.rowsPerPageDesc")}
