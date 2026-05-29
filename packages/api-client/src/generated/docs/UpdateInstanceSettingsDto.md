@@ -11,6 +11,7 @@ Name | Type
 `language` | string
 `timezone` | string
 `timeFormat` | string
+`aiProviderConfigId` | string
 
 ## Example
 
@@ -24,6 +25,7 @@ const example = {
   "language": ENGLISH,
   "timezone": America/New_York,
   "timeFormat": TWELVE_HOUR,
+  "aiProviderConfigId": null,
 } satisfies UpdateInstanceSettingsDto
 
 console.log(example)

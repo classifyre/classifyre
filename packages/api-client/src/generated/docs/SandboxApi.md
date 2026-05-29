@@ -8,6 +8,7 @@ All URIs are relative to *http://localhost*
 | [**sandboxControllerDeleteRun**](SandboxApi.md#sandboxcontrollerdeleterun) | **DELETE** /sandbox/runs/{id} | Delete a sandbox run |
 | [**sandboxControllerGetRun**](SandboxApi.md#sandboxcontrollergetrun) | **GET** /sandbox/runs/{id} | Get a sandbox run by ID |
 | [**sandboxControllerListRuns**](SandboxApi.md#sandboxcontrollerlistruns) | **GET** /sandbox/runs | List sandbox runs (paginated) |
+| [**sandboxControllerRerunRun**](SandboxApi.md#sandboxcontrollerrerunrun) | **POST** /sandbox/runs/{id}/rerun | Re-run a sandbox run with different detectors |
 
 
 
@@ -77,6 +78,7 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **201** |  |  -  |
+| **409** | Conflict — a run with the same file content already exists |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -87,7 +89,7 @@ No authorization required
 
 Delete a sandbox run
 
-Deletes a sandbox run record. If the run is currently in progress the CLI process is killed first.
+Deletes a sandbox run record and its associated S3 file (if no other runs share it). If the run is currently in progress the CLI process is killed first.
 
 ### Example
 
@@ -298,6 +300,77 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## sandboxControllerRerunRun
+
+> SandboxRunDto sandboxControllerRerunRun(id, rerunSandboxRunDto)
+
+Re-run a sandbox run with different detectors
+
+Creates a new sandbox run using the same uploaded file as an existing run but with a different set of detectors. Requires S3 storage to be configured so the original file can be retrieved. The original run is not modified.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SandboxApi,
+} from '@workspace/api-client';
+import type { SandboxControllerRerunRunRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SandboxApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // RerunSandboxRunDto
+    rerunSandboxRunDto: ...,
+  } satisfies SandboxControllerRerunRunRequest;
+
+  try {
+    const data = await api.sandboxControllerRerunRun(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **rerunSandboxRunDto** | [RerunSandboxRunDto](RerunSandboxRunDto.md) |  | |
+
+### Return type
+
+[**SandboxRunDto**](SandboxRunDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **201** | New run created from the original file |  -  |
+| **409** | Conflict — identical file already has a non-error run (only when skipDuplicateCheck is false) |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

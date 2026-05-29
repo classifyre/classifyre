@@ -18,7 +18,7 @@ import { Clock3, Globe, Languages, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { McpSettingsCard } from "@/components/mcp-settings-card";
-import { AiProviderSettingsCard } from "@/components/ai-provider-settings-card";
+import { AiProvidersCard } from "@/components/ai-providers-card";
 import { useTranslation } from "@/hooks/use-translation";
 
 type SettingsDraft = {
@@ -282,7 +282,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <AiProviderSettingsCard />
+      <AiProvidersCard />
 
       <McpSettingsCard />
     </div>

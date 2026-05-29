@@ -18,6 +18,11 @@ export interface AiCompletionOptions {
    * Default: 2 (3 total attempts).
    */
   maxRetries?: number;
+  /**
+   * Target a specific AI provider credential by id. When omitted, the
+   * instance-wide default selected in Settings is used.
+   */
+  configId?: string;
 }
 
 export interface AiResponse<T = string> {

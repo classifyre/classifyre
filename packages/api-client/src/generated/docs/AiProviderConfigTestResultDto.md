@@ -1,34 +1,24 @@
 
-# RunnerLogsResponseDto
+# AiProviderConfigTestResultDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`runnerId` | string
-`entries` | [Array&lt;RunnerLogEntryDto&gt;](RunnerLogEntryDto.md)
-`nextCursor` | string
-`cursor` | string
-`hasMore` | boolean
-`take` | number
-`total` | number
+`provider` | string
+`model` | string
 
 ## Example
 
 ```typescript
-import type { RunnerLogsResponseDto } from '@workspace/api-client'
+import type { AiProviderConfigTestResultDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "runnerId": null,
-  "entries": null,
-  "nextCursor": null,
-  "cursor": null,
-  "hasMore": null,
-  "take": null,
-  "total": null,
-} satisfies RunnerLogsResponseDto
+  "provider": CLAUDE,
+  "model": claude-sonnet-4-5,
+} satisfies AiProviderConfigTestResultDto
 
 console.log(example)
 
@@ -37,7 +27,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as RunnerLogsResponseDto
+const exampleParsed = JSON.parse(exampleJSON) as AiProviderConfigTestResultDto
 console.log(exampleParsed)
 ```
 

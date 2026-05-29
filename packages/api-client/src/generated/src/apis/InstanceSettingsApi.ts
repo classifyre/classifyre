@@ -15,19 +15,15 @@
 
 import * as runtime from '../runtime';
 import type {
-  AiProviderConfigResponseDto,
   CreateMcpTokenDto,
   InstanceSettingsResponseDto,
   McpOverviewResponseDto,
   McpTokenCreatedResponseDto,
   McpTokenResponseDto,
-  UpdateAiProviderConfigDto,
   UpdateInstanceSettingsDto,
   UpdateMcpTokenDto,
 } from '../models/index';
 import {
-    AiProviderConfigResponseDtoFromJSON,
-    AiProviderConfigResponseDtoToJSON,
     CreateMcpTokenDtoFromJSON,
     CreateMcpTokenDtoToJSON,
     InstanceSettingsResponseDtoFromJSON,
@@ -38,17 +34,11 @@ import {
     McpTokenCreatedResponseDtoToJSON,
     McpTokenResponseDtoFromJSON,
     McpTokenResponseDtoToJSON,
-    UpdateAiProviderConfigDtoFromJSON,
-    UpdateAiProviderConfigDtoToJSON,
     UpdateInstanceSettingsDtoFromJSON,
     UpdateInstanceSettingsDtoToJSON,
     UpdateMcpTokenDtoFromJSON,
     UpdateMcpTokenDtoToJSON,
 } from '../models/index';
-
-export interface AiProviderConfigControllerUpdateConfigRequest {
-    updateAiProviderConfigDto: UpdateAiProviderConfigDto;
-}
 
 export interface InstanceSettingsControllerUpdateSettingsRequest {
     updateInstanceSettingsDto: UpdateInstanceSettingsDto;
@@ -71,78 +61,6 @@ export interface McpSettingsControllerUpdateTokenRequest {
  * 
  */
 export class InstanceSettingsApi extends runtime.BaseAPI {
-
-    /**
-     * Returns the current AI provider, model, base URL, and a masked API key preview.
-     * Get AI provider configuration
-     */
-    async aiProviderConfigControllerGetConfigRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AiProviderConfigResponseDto>> {
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/instance-settings/ai-provider`;
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => AiProviderConfigResponseDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * Returns the current AI provider, model, base URL, and a masked API key preview.
-     * Get AI provider configuration
-     */
-    async aiProviderConfigControllerGetConfig(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AiProviderConfigResponseDto> {
-        const response = await this.aiProviderConfigControllerGetConfigRaw(initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * Update any combination of provider, model, API key (plaintext — stored encrypted), and base URL. Pass apiKey as an empty string to clear a stored key.
-     * Update AI provider configuration
-     */
-    async aiProviderConfigControllerUpdateConfigRaw(requestParameters: AiProviderConfigControllerUpdateConfigRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AiProviderConfigResponseDto>> {
-        if (requestParameters['updateAiProviderConfigDto'] == null) {
-            throw new runtime.RequiredError(
-                'updateAiProviderConfigDto',
-                'Required parameter "updateAiProviderConfigDto" was null or undefined when calling aiProviderConfigControllerUpdateConfig().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-        headerParameters['Content-Type'] = 'application/json';
-
-
-        let urlPath = `/instance-settings/ai-provider`;
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'PUT',
-            headers: headerParameters,
-            query: queryParameters,
-            body: UpdateAiProviderConfigDtoToJSON(requestParameters['updateAiProviderConfigDto']),
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => AiProviderConfigResponseDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * Update any combination of provider, model, API key (plaintext — stored encrypted), and base URL. Pass apiKey as an empty string to clear a stored key.
-     * Update AI provider configuration
-     */
-    async aiProviderConfigControllerUpdateConfig(requestParameters: AiProviderConfigControllerUpdateConfigRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AiProviderConfigResponseDto> {
-        const response = await this.aiProviderConfigControllerUpdateConfigRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
 
     /**
      * Retrieve global instance-level settings used across the entire application.

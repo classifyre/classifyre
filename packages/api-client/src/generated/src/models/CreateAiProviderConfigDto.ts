@@ -16,43 +16,43 @@ import { mapValues } from '../runtime';
 /**
  * 
  * @export
- * @interface UpdateAiProviderConfigDto
+ * @interface CreateAiProviderConfigDto
  */
-export interface UpdateAiProviderConfigDto {
+export interface CreateAiProviderConfigDto {
     /**
      * User-friendly label for this credential.
      * @type {string}
-     * @memberof UpdateAiProviderConfigDto
+     * @memberof CreateAiProviderConfigDto
      */
-    name?: string;
+    name: string;
     /**
      * 
      * @type {string}
-     * @memberof UpdateAiProviderConfigDto
+     * @memberof CreateAiProviderConfigDto
      */
-    provider?: UpdateAiProviderConfigDtoProviderEnum;
+    provider: CreateAiProviderConfigDtoProviderEnum;
     /**
      * Model identifier.
      * @type {string}
-     * @memberof UpdateAiProviderConfigDto
+     * @memberof CreateAiProviderConfigDto
      */
     model?: string;
     /**
-     * Plaintext API key. Sent once, stored encrypted. Pass an empty string to clear the key.
+     * Plaintext API key. Sent once, stored encrypted.
      * @type {string}
-     * @memberof UpdateAiProviderConfigDto
+     * @memberof CreateAiProviderConfigDto
      */
     apiKey?: string;
     /**
      * Base URL for OpenAI-compatible providers. Ignored for CLAUDE and GEMINI.
      * @type {string}
-     * @memberof UpdateAiProviderConfigDto
+     * @memberof CreateAiProviderConfigDto
      */
     baseUrl?: string;
     /**
      * Context window size in tokens.
      * @type {number}
-     * @memberof UpdateAiProviderConfigDto
+     * @memberof CreateAiProviderConfigDto
      */
     contextSize?: number;
 }
@@ -61,33 +61,35 @@ export interface UpdateAiProviderConfigDto {
 /**
  * @export
  */
-export const UpdateAiProviderConfigDtoProviderEnum = {
+export const CreateAiProviderConfigDtoProviderEnum = {
     OpenaiCompatible: 'OPENAI_COMPATIBLE',
     Claude: 'CLAUDE',
     Gemini: 'GEMINI'
 } as const;
-export type UpdateAiProviderConfigDtoProviderEnum = typeof UpdateAiProviderConfigDtoProviderEnum[keyof typeof UpdateAiProviderConfigDtoProviderEnum];
+export type CreateAiProviderConfigDtoProviderEnum = typeof CreateAiProviderConfigDtoProviderEnum[keyof typeof CreateAiProviderConfigDtoProviderEnum];
 
 
 /**
- * Check if a given object implements the UpdateAiProviderConfigDto interface.
+ * Check if a given object implements the CreateAiProviderConfigDto interface.
  */
-export function instanceOfUpdateAiProviderConfigDto(value: object): value is UpdateAiProviderConfigDto {
+export function instanceOfCreateAiProviderConfigDto(value: object): value is CreateAiProviderConfigDto {
+    if (!('name' in value) || value['name'] === undefined) return false;
+    if (!('provider' in value) || value['provider'] === undefined) return false;
     return true;
 }
 
-export function UpdateAiProviderConfigDtoFromJSON(json: any): UpdateAiProviderConfigDto {
-    return UpdateAiProviderConfigDtoFromJSONTyped(json, false);
+export function CreateAiProviderConfigDtoFromJSON(json: any): CreateAiProviderConfigDto {
+    return CreateAiProviderConfigDtoFromJSONTyped(json, false);
 }
 
-export function UpdateAiProviderConfigDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean): UpdateAiProviderConfigDto {
+export function CreateAiProviderConfigDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean): CreateAiProviderConfigDto {
     if (json == null) {
         return json;
     }
     return {
         
-        'name': json['name'] == null ? undefined : json['name'],
-        'provider': json['provider'] == null ? undefined : json['provider'],
+        'name': json['name'],
+        'provider': json['provider'],
         'model': json['model'] == null ? undefined : json['model'],
         'apiKey': json['apiKey'] == null ? undefined : json['apiKey'],
         'baseUrl': json['baseUrl'] == null ? undefined : json['baseUrl'],
@@ -95,11 +97,11 @@ export function UpdateAiProviderConfigDtoFromJSONTyped(json: any, ignoreDiscrimi
     };
 }
 
-export function UpdateAiProviderConfigDtoToJSON(json: any): UpdateAiProviderConfigDto {
-    return UpdateAiProviderConfigDtoToJSONTyped(json, false);
+export function CreateAiProviderConfigDtoToJSON(json: any): CreateAiProviderConfigDto {
+    return CreateAiProviderConfigDtoToJSONTyped(json, false);
 }
 
-export function UpdateAiProviderConfigDtoToJSONTyped(value?: UpdateAiProviderConfigDto | null, ignoreDiscriminator: boolean = false): any {
+export function CreateAiProviderConfigDtoToJSONTyped(value?: CreateAiProviderConfigDto | null, ignoreDiscriminator: boolean = false): any {
     if (value == null) {
         return value;
     }

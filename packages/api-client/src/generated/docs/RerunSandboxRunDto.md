@@ -1,34 +1,24 @@
 
-# RunnerLogsResponseDto
+# RerunSandboxRunDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`runnerId` | string
-`entries` | [Array&lt;RunnerLogEntryDto&gt;](RunnerLogEntryDto.md)
-`nextCursor` | string
-`cursor` | string
-`hasMore` | boolean
-`take` | number
-`total` | number
+`detectors` | Array&lt;string&gt;
+`skipDuplicateCheck` | boolean
 
 ## Example
 
 ```typescript
-import type { RunnerLogsResponseDto } from '@workspace/api-client'
+import type { RerunSandboxRunDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "runnerId": null,
-  "entries": null,
-  "nextCursor": null,
-  "cursor": null,
-  "hasMore": null,
-  "take": null,
-  "total": null,
-} satisfies RunnerLogsResponseDto
+  "detectors": [{"type":"SECRETS","enabled":true,"config":{}}],
+  "skipDuplicateCheck": null,
+} satisfies RerunSandboxRunDto
 
 console.log(example)
 
@@ -37,7 +27,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as RunnerLogsResponseDto
+const exampleParsed = JSON.parse(exampleJSON) as RerunSandboxRunDto
 console.log(exampleParsed)
 ```
 
