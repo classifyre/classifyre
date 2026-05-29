@@ -7,7 +7,7 @@ api:
   image:
     repository: classifyre/api
     tag: "fix-deployment_cli"
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
   env:
     DEMO_MODE: "false"
@@ -31,7 +31,7 @@ api:
     image:
       repository: classifyre/cli
       tag: "fix-deployment_cli"
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
 
 
 frontend:

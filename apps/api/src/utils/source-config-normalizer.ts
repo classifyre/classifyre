@@ -53,6 +53,16 @@ function removeUndefinedKeys(value: JsonRecord) {
   }
 }
 
+function removeNullValues(value: JsonRecord) {
+  for (const [key, entry] of Object.entries(value)) {
+    if (entry === null) {
+      delete value[key];
+    } else if (typeof entry === 'object' && !Array.isArray(entry)) {
+      removeNullValues(entry as JsonRecord);
+    }
+  }
+}
+
 function normalizeObjectStorageShape(type: string, config: JsonRecord) {
   const required = ensureNestedObject(config, 'required');
   const optional = ensureNestedObject(config, 'optional');
@@ -297,6 +307,7 @@ export function normalizeSourceConfig(
   normalizeLegacyShape(type, normalized);
   normalizeSampling(normalized);
   normalizeRequiredBlock(normalized);
+  removeNullValues(normalized);
 
   return normalized;
 }

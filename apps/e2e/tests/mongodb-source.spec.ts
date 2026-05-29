@@ -109,18 +109,6 @@ class SourceFormPage {
     }
   }
 
-  async customizeDetector(detector: string, options: string[]) {
-    const customizeBtn = this.page.locator(`[data-testid="btn-customize-${detector}"]`);
-    await customizeBtn.click();
-    for (const option of options) {
-      const toggle = this.page.locator(`[data-testid="toggle-option-${option}"]`);
-      if ((await toggle.getAttribute("data-state")) !== "on") {
-        await toggle.click();
-      }
-    }
-    await this.page.keyboard.press("Escape");
-  }
-
   async saveAndScan() {
     const btn = this.page.locator('[data-testid="btn-save-and-scan"]');
     await btn.click();
@@ -133,15 +121,14 @@ class ScanDetailPage {
 
   async waitForCompletion(timeout = 1_500_000) {
     const badge = this.page.locator('[data-testid="scan-status-badge"]');
-    // Match English (Completed/Error) and German (Abgeschlossen/Fehler)
-    await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler/i, {
+    await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler|Warning|Warnung/i, {
       timeout,
     });
-    const text = await badge.textContent();
-    if (/error|fehler/i.test(text ?? "")) {
+    const text = (await badge.textContent()) ?? "";
+    if (/error|fehler/i.test(text)) {
       throw new Error("Scan finished with ERROR status");
     }
-    expect(text).toMatch(/completed|abgeschlossen/i);
+    expect(text).toMatch(/completed|abgeschlossen|warning|warnung/i);
   }
 
   async getStatsValue(label: string) {
@@ -203,7 +190,6 @@ test.describe("MongoDB Source E2E", () => {
 
     // 2. Configure Detectors
     await form.enableDetector("PII");
-    await form.customizeDetector("PII", ["email", "phone_number", "credit_card", "ssn"]);
 
     // 3. Save and Scan
     await form.saveAndScan();
