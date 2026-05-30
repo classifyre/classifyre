@@ -4,6 +4,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MinLength,
 } from 'class-validator';
@@ -45,9 +46,18 @@ export class CreateCustomDetectorDto {
   @IsBoolean()
   isActive?: boolean;
 
+  @ApiPropertyOptional({
+    description:
+      'AI provider credential ID. Required for LLM (AI) detectors; the API resolves and injects the decrypted provider config at scan time.',
+    example: '3f1c2b6e-1d4a-4c7e-9c2a-7b6d5e4f3a21',
+  })
+  @IsOptional()
+  @IsUUID()
+  aiProviderConfigId?: string;
+
   @ApiProperty({
     description:
-      'Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)',
+      'Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | FEATURE_EXTRACTION | OBJECT_DETECTION)',
   })
   @IsObject()
   pipelineSchema: Record<string, unknown>;

@@ -52,4 +52,15 @@ export class UpdateInstanceSettingsDto {
   @IsOptional()
   @IsIn(INSTANCE_TIME_FORMAT_VALUES)
   timeFormat?: InstanceTimeFormatValue;
+
+  @ApiPropertyOptional({
+    description:
+      'Id of the AI provider credential to use as the instance-wide default. ' +
+      'Pass null or an empty string to clear the selection.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  aiProviderConfigId?: string | null;
 }

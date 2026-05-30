@@ -291,12 +291,12 @@ api:
       requests:
         cpu: 500m
         memory: 1Gi
-        ephemeral-storage: 5Gi
+        ephemeral-storage: 1Gi
       # -- CLI job resource limits.
       limits:
         cpu: "2"
         memory: 4Gi
-        ephemeral-storage: 20Gi
+        ephemeral-storage: 10Gi
 
     # -- CLI job scheduling: node selector.
     nodeSelector: {}
@@ -351,7 +351,16 @@ api:
       # -- jobs are guaranteed to land on the same node. On multi-node clusters with concurrent
       # -- jobs, set accessModes: [ReadWriteMany] and use a shared StorageClass (EFS, NFS, etc.)
       # -- to avoid jobs hanging with "Multi-Attach error" when two jobs land on different nodes.
-      size: 30Gi
+      size: 10Gi
+      prune:
+        # -- Enable a CronJob that runs `uv cache prune` on a schedule to prevent unbounded cache growth.
+        enabled: true
+        # -- Cron schedule for cache pruning. Default: weekly on Sunday at 02:00.
+        schedule: "0 2 * * 0"
+        # -- Image used by the prune CronJob (defaults to the CLI job image).
+        image: ""
+        # -- TTL for completed prune jobs (seconds).
+        ttlSecondsAfterFinished: 3600
 
 frontend:
   # -- Number of web replicas when autoscaling is disabled.

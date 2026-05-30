@@ -51,6 +51,12 @@ All URIs are relative to *http://localhost*
 | Class | Method | HTTP request | Description
 | ----- | ------ | ------------ | -------------
 *AIApi* | [**aiControllerComplete**](docs/AIApi.md#aicontrollercomplete) | **POST** /ai/complete | Generate a text completion
+*AIProviderConfigsApi* | [**aiProviderConfigControllerCreate**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollercreate) | **POST** /ai-provider-configs | Create an AI provider configuration
+*AIProviderConfigsApi* | [**aiProviderConfigControllerGet**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerget) | **GET** /ai-provider-configs/{id} | Get a single AI provider configuration
+*AIProviderConfigsApi* | [**aiProviderConfigControllerList**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerlist) | **GET** /ai-provider-configs | List AI provider configurations
+*AIProviderConfigsApi* | [**aiProviderConfigControllerRemove**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerremove) | **DELETE** /ai-provider-configs/{id} | Delete an AI provider configuration
+*AIProviderConfigsApi* | [**aiProviderConfigControllerTest**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollertest) | **POST** /ai-provider-configs/{id}/test | Test an AI provider configuration
+*AIProviderConfigsApi* | [**aiProviderConfigControllerUpdate**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerupdate) | **PUT** /ai-provider-configs/{id} | Update an AI provider configuration
 *AssetsApi* | [**assetsControllerGetAsset**](docs/AssetsApi.md#assetscontrollergetasset) | **GET** /assets/{id} | Get asset by ID
 *AssetsApi* | [**searchAssetsControllerSearchAssets**](docs/AssetsApi.md#searchassetscontrollersearchassets) | **POST** /search/assets | Search assets with findings
 *AssetsApi* | [**searchAssetsControllerSearchAssetsCharts**](docs/AssetsApi.md#searchassetscontrollersearchassetscharts) | **POST** /search/assets/charts | Search assets charts overview
@@ -92,8 +98,6 @@ All URIs are relative to *http://localhost*
 *FindingsApi* | [**findingsControllerUpdate**](docs/FindingsApi.md#findingscontrollerupdate) | **PATCH** /findings/{id} | Update a finding
 *HealthApi* | [**healthControllerGetHealth**](docs/HealthApi.md#healthcontrollergethealth) | **GET** / | Health check
 *HealthApi* | [**healthControllerPing**](docs/HealthApi.md#healthcontrollerping) | **GET** /ping | Ping endpoint
-*InstanceSettingsApi* | [**aiProviderConfigControllerGetConfig**](docs/InstanceSettingsApi.md#aiproviderconfigcontrollergetconfig) | **GET** /instance-settings/ai-provider | Get AI provider configuration
-*InstanceSettingsApi* | [**aiProviderConfigControllerUpdateConfig**](docs/InstanceSettingsApi.md#aiproviderconfigcontrollerupdateconfig) | **PUT** /instance-settings/ai-provider | Update AI provider configuration
 *InstanceSettingsApi* | [**instanceSettingsControllerGetSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollergetsettings) | **GET** /instance-settings | Get instance settings
 *InstanceSettingsApi* | [**instanceSettingsControllerUpdateSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollerupdatesettings) | **PUT** /instance-settings | Update instance settings
 *InstanceSettingsApi* | [**mcpSettingsControllerCreateToken**](docs/InstanceSettingsApi.md#mcpsettingscontrollercreatetoken) | **POST** /instance-settings/mcp/tokens | Create MCP access token
@@ -125,6 +129,7 @@ All URIs are relative to *http://localhost*
 *SandboxApi* | [**sandboxControllerDeleteRun**](docs/SandboxApi.md#sandboxcontrollerdeleterun) | **DELETE** /sandbox/runs/{id} | Delete a sandbox run
 *SandboxApi* | [**sandboxControllerGetRun**](docs/SandboxApi.md#sandboxcontrollergetrun) | **GET** /sandbox/runs/{id} | Get a sandbox run by ID
 *SandboxApi* | [**sandboxControllerListRuns**](docs/SandboxApi.md#sandboxcontrollerlistruns) | **GET** /sandbox/runs | List sandbox runs (paginated)
+*SandboxApi* | [**sandboxControllerRerunRun**](docs/SandboxApi.md#sandboxcontrollerrerunrun) | **POST** /sandbox/runs/{id}/rerun | Re-run a sandbox run with different detectors
 *SemanticLayerGlossaryApi* | [**glossaryControllerCreate**](docs/SemanticLayerGlossaryApi.md#glossarycontrollercreate) | **POST** /semantic/glossary | Create a new glossary term
 *SemanticLayerGlossaryApi* | [**glossaryControllerDelete**](docs/SemanticLayerGlossaryApi.md#glossarycontrollerdelete) | **DELETE** /semantic/glossary/{id} | Delete a glossary term
 *SemanticLayerGlossaryApi* | [**glossaryControllerFindAll**](docs/SemanticLayerGlossaryApi.md#glossarycontrollerfindall) | **GET** /semantic/glossary | List all glossary terms
@@ -162,6 +167,7 @@ All URIs are relative to *http://localhost*
 - [AiCompleteResponseDto](docs/AiCompleteResponseDto.md)
 - [AiMessageDto](docs/AiMessageDto.md)
 - [AiProviderConfigResponseDto](docs/AiProviderConfigResponseDto.md)
+- [AiProviderConfigTestResultDto](docs/AiProviderConfigTestResultDto.md)
 - [AssetFindingDetectorCountDto](docs/AssetFindingDetectorCountDto.md)
 - [AssetFindingSeverityCountDto](docs/AssetFindingSeverityCountDto.md)
 - [AssetFindingStatusCountDto](docs/AssetFindingStatusCountDto.md)
@@ -178,6 +184,7 @@ All URIs are relative to *http://localhost*
 - [BulkUpdateFindingsDto](docs/BulkUpdateFindingsDto.md)
 - [BulkUpdateFindingsResponseDto](docs/BulkUpdateFindingsResponseDto.md)
 - [CliRunnerControllerUpdateRunnerStatusRequest](docs/CliRunnerControllerUpdateRunnerStatusRequest.md)
+- [CreateAiProviderConfigDto](docs/CreateAiProviderConfigDto.md)
 - [CreateCustomDetectorDto](docs/CreateCustomDetectorDto.md)
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
@@ -230,6 +237,7 @@ All URIs are relative to *http://localhost*
 - [QueryMetricTimeSeriesDto](docs/QueryMetricTimeSeriesDto.md)
 - [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)
 - [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
+- [RerunSandboxRunDto](docs/RerunSandboxRunDto.md)
 - [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
 - [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
 - [RunnerAssetStatusUpdateItem](docs/RunnerAssetStatusUpdateItem.md)

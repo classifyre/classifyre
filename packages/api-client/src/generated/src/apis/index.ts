@@ -1,6 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export { AIApi } from './AIApi';
+export { AIProviderConfigsApi } from './AIProviderConfigsApi';
 export { AssetsApi } from './AssetsApi';
 export { AssistantApi } from './AssistantApi';
 export { CustomDetectorExtractionsApi } from './CustomDetectorExtractionsApi';

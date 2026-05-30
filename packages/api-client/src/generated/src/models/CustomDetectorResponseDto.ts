@@ -65,6 +65,12 @@ export interface CustomDetectorResponseDto {
      */
     pipelineSchema: { [key: string]: any; };
     /**
+     * AI provider credential ID backing this detector (LLM detectors only).
+     * @type {string}
+     * @memberof CustomDetectorResponseDto
+     */
+    aiProviderConfigId?: string | null;
+    /**
      * 
      * @type {boolean}
      * @memberof CustomDetectorResponseDto
@@ -173,6 +179,7 @@ export function CustomDetectorResponseDtoFromJSONTyped(json: any, ignoreDiscrimi
         'name': json['name'],
         'description': json['description'] == null ? undefined : json['description'],
         'pipelineSchema': json['pipelineSchema'],
+        'aiProviderConfigId': json['aiProviderConfigId'] == null ? undefined : json['aiProviderConfigId'],
         'isActive': json['isActive'],
         'version': json['version'],
         'lastTrainedAt': json['lastTrainedAt'] == null ? undefined : (new Date(json['lastTrainedAt'])),
@@ -204,6 +211,7 @@ export function CustomDetectorResponseDtoToJSONTyped(value?: CustomDetectorRespo
         'name': value['name'],
         'description': value['description'],
         'pipelineSchema': value['pipelineSchema'],
+        'aiProviderConfigId': value['aiProviderConfigId'],
         'isActive': value['isActive'],
         'version': value['version'],
         'lastTrainedAt': value['lastTrainedAt'] == null ? value['lastTrainedAt'] : value['lastTrainedAt'].toISOString(),

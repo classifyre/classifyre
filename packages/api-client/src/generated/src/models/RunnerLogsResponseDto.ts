@@ -46,7 +46,7 @@ export interface RunnerLogsResponseDto {
      */
     nextCursor?: string | null;
     /**
-     * Cursor to continue reading from (byte offset)
+     * Cursor for the next page (i:N format)
      * @type {string}
      * @memberof RunnerLogsResponseDto
      */
@@ -63,6 +63,12 @@ export interface RunnerLogsResponseDto {
      * @memberof RunnerLogsResponseDto
      */
     take: number;
+    /**
+     * Total filtered entry count (for pagination)
+     * @type {number}
+     * @memberof RunnerLogsResponseDto
+     */
+    total: number;
 }
 
 /**
@@ -74,6 +80,7 @@ export function instanceOfRunnerLogsResponseDto(value: object): value is RunnerL
     if (!('cursor' in value) || value['cursor'] === undefined) return false;
     if (!('hasMore' in value) || value['hasMore'] === undefined) return false;
     if (!('take' in value) || value['take'] === undefined) return false;
+    if (!('total' in value) || value['total'] === undefined) return false;
     return true;
 }
 
@@ -93,6 +100,7 @@ export function RunnerLogsResponseDtoFromJSONTyped(json: any, ignoreDiscriminato
         'cursor': json['cursor'],
         'hasMore': json['hasMore'],
         'take': json['take'],
+        'total': json['total'],
     };
 }
 
@@ -113,6 +121,7 @@ export function RunnerLogsResponseDtoToJSONTyped(value?: RunnerLogsResponseDto |
         'cursor': value['cursor'],
         'hasMore': value['hasMore'],
         'take': value['take'],
+        'total': value['total'],
     };
 }
 

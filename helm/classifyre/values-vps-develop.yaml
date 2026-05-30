@@ -17,14 +17,6 @@ api:
     minReplicas: 2
     maxReplicas: 4
 
-  migration:
-    # TODO: remove once classifyre/api image is rebuilt with chown 10001 (Dockerfile api-final fix).
-    # Prisma engine files in 0.4.8 are root-owned; migration needs write access to extract them.
-    containerSecurityContext:
-      runAsUser: 0
-      runAsGroup: 0
-      runAsNonRoot: false
-
   cliJobs:
     image:
       repository: classifyre/cli
