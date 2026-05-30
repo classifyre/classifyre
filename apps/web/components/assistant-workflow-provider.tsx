@@ -15,7 +15,6 @@ import {
 import { assistantContexts } from "@workspace/schemas/assistant";
 import { AssistantWorkflowPanel, Button } from "@workspace/ui/components";
 import { toast } from "sonner";
-import { usePathname } from "next/navigation";
 import { Rnd } from "react-rnd";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 
@@ -131,7 +130,7 @@ export function AssistantWorkflowProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  const { settings } = useInstanceSettings();
   const [bridge, setBridge] = React.useState<AssistantPageBridge | null>(null);
   const [open, setOpen] = React.useState(false);
   const [messages, setMessages] = React.useState<AssistantTranscriptMessage[]>(
@@ -179,13 +178,22 @@ export function AssistantWorkflowProvider({
     };
   }, [viewport]);
 
+  // Reset the conversation only when the assistant context actually changes
+  // (e.g. navigating from source.create to detector.create). Incidental bridge
+  // re-registration on the same page must NOT slam the panel closed.
+  const contextKey = bridge?.contextKey ?? null;
+  const prevContextKeyRef = React.useRef<string | null>(null);
   React.useEffect(() => {
+    if (prevContextKeyRef.current === contextKey) {
+      return;
+    }
+    prevContextKeyRef.current = contextKey;
     setMessages([]);
     setPendingConfirmation(null);
     setInput("");
     setUploadedFiles([]);
     setOpen(false);
-  }, [pathname]);
+  }, [contextKey]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") {
@@ -205,15 +213,20 @@ export function AssistantWorkflowProvider({
   }, []);
 
   React.useEffect(() => {
-    if (!open || viewport.width === 0 || viewport.height === 0) {
+    if (!open) {
       return;
     }
+
+    // Fall back to the effective viewport so the panel still initializes its
+    // geometry on first open even if the resize listener hasn't fired yet.
+    const vw = viewport.width || effectiveViewport.width;
+    const vh = viewport.height || effectiveViewport.height;
 
     setAssistantWindow((current) => {
       const baseState = current;
       const next = baseState
-        ? clampAssistantWindowState(baseState, viewport.width, viewport.height)
-        : createAssistantWindowState(viewport.width, viewport.height);
+        ? clampAssistantWindowState(baseState, vw, vh)
+        : createAssistantWindowState(vw, vh);
 
       if (
         current &&
@@ -227,7 +240,13 @@ export function AssistantWorkflowProvider({
 
       return next;
     });
-  }, [open, viewport.height, viewport.width]);
+  }, [
+    open,
+    viewport.height,
+    viewport.width,
+    effectiveViewport.height,
+    effectiveViewport.width,
+  ]);
 
   React.useEffect(() => {
     if (!open) {
@@ -398,7 +417,10 @@ export function AssistantWorkflowProvider({
     [],
   );
 
-  const active = Boolean(bridge?.canOpen);
+  // Single source of truth: the assistant is only "active" when a page bridge is
+  // registered AND the instance has AI enabled AND we're not in read-only demo mode.
+  const active =
+    Boolean(bridge?.canOpen) && settings.aiEnabled && !settings.demoMode;
   const contextValue = React.useMemo<AssistantWorkflowContextValue>(
     () => ({
       active,
@@ -471,7 +493,7 @@ export function AssistantWorkflowProvider({
     <AssistantWorkflowContext.Provider value={contextValue}>
       {children}
       <AssistantWorkflowFab />
-      {open && resolvedAssistantWindow ? (
+      {active && open && resolvedAssistantWindow ? (
         <Rnd
           size={{
             width: resolvedAssistantWindow.width,
@@ -556,20 +578,22 @@ export function AssistantWorkflowProvider({
 
 function AssistantWorkflowFab() {
   const context = useAssistantWorkflow();
-  const { settings } = useInstanceSettings();
-  if (!context.active || settings.demoMode) {
+  // `context.active` already accounts for aiEnabled + demoMode.
+  if (!context.active) {
     return null;
   }
 
   return (
-    <div className="pointer-events-none fixed right-6 bottom-6 z-40">
+    // Hidden below `md` so it never covers the sticky Save/Test/Run toolbar on
+    // mobile — the header trigger remains available on small screens.
+    <div className="pointer-events-none fixed right-6 bottom-6 z-40 hidden md:block">
       <Button
         type="button"
         onClick={() => context.setOpen(true)}
         className="pointer-events-auto h-14 rounded-[6px] border-2 border-border bg-[var(--color-accent)] px-4 text-[var(--color-accent-foreground)] shadow-[6px_6px_0_var(--color-border)] transition-[transform,color] hover:-translate-y-[1px] hover:text-[var(--color-primary-foreground)]"
       >
         <Wand2 className="mr-2 h-4 w-4" />
-        Assitant
+        Assistant
       </Button>
     </div>
   );
@@ -577,9 +601,9 @@ function AssistantWorkflowFab() {
 
 export function AssistantWorkflowTrigger() {
   const context = useAssistantWorkflow();
-  const { settings } = useInstanceSettings();
 
-  if (!context.active || settings.demoMode) {
+  // `context.active` already accounts for aiEnabled + demoMode.
+  if (!context.active) {
     return null;
   }
 

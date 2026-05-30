@@ -130,10 +130,72 @@ jest.mock('@workspace/schemas/assistant', () => {
 });
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { AssistantService } from './assistant.service';
+import {
+  AssistantService,
+  summarizeSchemaForPrompt,
+} from './assistant.service';
 import { AiClientService } from './ai';
 import { McpToolExecutorService } from './mcp-tool-executor.service';
 import { BadRequestException } from '@nestjs/common';
+
+describe('summarizeSchemaForPrompt', () => {
+  it('flattens nested objects, arrays of objects, enums, required and secrets', () => {
+    const summary = summarizeSchemaForPrompt({
+      type: 'object',
+      required: ['name'],
+      properties: {
+        name: { type: 'string', description: 'Display name' },
+        required: {
+          type: 'object',
+          required: ['host'],
+          properties: {
+            host: { type: 'string', description: 'Database host' },
+            port: { type: 'integer' },
+          },
+        },
+        masked: {
+          type: 'object',
+          properties: {
+            password: { type: 'string' },
+          },
+        },
+        optional: {
+          type: 'object',
+          properties: {
+            ssl_mode: { enum: ['disable', 'require', 'verify-full'] },
+            rules: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['id'],
+                properties: {
+                  id: { type: 'string' },
+                  pattern: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(summary).toContain('name : string (required)');
+    expect(summary).toContain('required.host : string (required)');
+    expect(summary).toContain('required.port : integer');
+    expect(summary).toContain('masked.password : string (secret)');
+    expect(summary).toContain(
+      'optional.ssl_mode : enum[disable|require|verify-full]',
+    );
+    expect(summary).toContain('optional.rules[].id : string (required)');
+    expect(summary).toContain('optional.rules[].pattern : string');
+  });
+
+  it('returns an empty string when there is no schema or no properties', () => {
+    expect(summarizeSchemaForPrompt(null)).toBe('');
+    expect(summarizeSchemaForPrompt(undefined)).toBe('');
+    expect(summarizeSchemaForPrompt({ type: 'object' })).toBe('');
+  });
+});
 
 describe('AssistantService', () => {
   let service: AssistantService;
@@ -309,6 +371,96 @@ describe('AssistantService', () => {
       ]),
     );
     expect(aiClient.completeText).toHaveBeenCalled();
+  });
+
+  it('passes the resolved schema field paths into the system prompt', async () => {
+    aiClient.completeJson.mockResolvedValue({
+      content: {
+        assistantMessage: 'Filling in the host.',
+        patches: [],
+        requestedOperation: null,
+      },
+    });
+
+    await service.respond({
+      messages: [{ role: 'user', content: 'set host to db.internal' }],
+      context: {
+        key: 'source.create',
+        route: '/sources/new',
+        title: 'Source Setup Assistant',
+        entityId: null,
+        values: { name: '', type: 'POSTGRESQL' },
+        schema: {
+          type: 'object',
+          properties: {
+            required: {
+              type: 'object',
+              required: ['host'],
+              properties: {
+                host: { type: 'string', description: 'PostgreSQL host' },
+              },
+            },
+          },
+        },
+        validation: {
+          isValid: false,
+          missingFields: ['required.host'],
+          errors: [],
+        },
+        metadata: {
+          sourceType: 'POSTGRESQL',
+          schedule: { enabled: false, cron: '', timezone: 'UTC' },
+          detectors: [],
+          customDetectorIds: [],
+        },
+        supportedOperations: ['create_source'],
+      },
+    });
+
+    const [messages] = aiClient.completeJson.mock.calls[0] as [
+      Array<{ role: string; content: string }>,
+    ];
+    const systemPrompt =
+      messages.find((message) => message.role === 'system')?.content ?? '';
+    expect(systemPrompt).toContain('## Form schema');
+    expect(systemPrompt).toContain('required.host : string (required)');
+  });
+
+  it('omits the schema section from the system prompt when no schema is provided', async () => {
+    aiClient.completeJson.mockResolvedValue({
+      content: {
+        assistantMessage: 'Okay.',
+        patches: [],
+        requestedOperation: null,
+      },
+    });
+
+    await service.respond({
+      messages: [{ role: 'user', content: 'hello' }],
+      context: {
+        key: 'source.create',
+        route: '/sources/new',
+        title: 'Source Setup Assistant',
+        entityId: null,
+        values: { name: '', type: 'SLACK' },
+        schema: null,
+        validation: { isValid: false, missingFields: ['name'], errors: [] },
+        metadata: {
+          sourceType: 'SLACK',
+          schedule: { enabled: false, cron: '', timezone: 'UTC' },
+          detectors: [],
+          customDetectorIds: [],
+        },
+        supportedOperations: ['create_source'],
+      },
+    });
+
+    const [messages] = aiClient.completeJson.mock.calls[0] as [
+      Array<{ role: string; content: string }>,
+    ];
+    const systemPrompt =
+      messages.find((message) => message.role === 'system')?.content ?? '';
+    expect(systemPrompt).not.toContain('## Form schema');
   });
 
   it('applies inferred name patch and asks for missing fields when user gives partial intent', async () => {
