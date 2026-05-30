@@ -5,6 +5,17 @@ export type DetectorTrainingStatus =
   | "SUCCEEDED"
   | "FAILED";
 
+export type PipelineSubtype =
+  | "REGEX"
+  | "GLINER2"
+  | "LLM"
+  | "TEXT_CLASSIFICATION"
+  | "IMAGE_CLASSIFICATION"
+  | "FEATURE_EXTRACTION"
+  | "OBJECT_DETECTION";
+
+export type DetectorMethod = "RULESET" | "CLASSIFIER" | "ENTITY";
+
 export function detectorCatalogStatusLabel(
   isActive: boolean,
 ): DetectorCatalogStatus {
@@ -28,4 +39,59 @@ export function detectorTrainingStatusToRunnerStatus(status?: string | null) {
     default:
       return "PENDING";
   }
+}
+
+export function detectorTypeTranslationKey(
+  method?: string | null,
+  pipelineType?: string | null,
+): string {
+  const normalizedMethod = method?.toUpperCase();
+
+  if (normalizedMethod === "RULESET") return "detectors.methods.rulesets";
+  if (normalizedMethod === "CLASSIFIER") return "detectors.methods.classifiers";
+  if (normalizedMethod === "ENTITY") return "detectors.methods.entity";
+
+  if (pipelineType) {
+    const normalized = pipelineType.toLowerCase();
+    return `detectors.types.${normalized}.title`;
+  }
+
+  if (
+    normalizedMethod === "SECRETS" ||
+    normalizedMethod === "PII" ||
+    normalizedMethod === "YARA" ||
+    normalizedMethod === "BROKEN_LINKS" ||
+    normalizedMethod === "CODE_SECURITY"
+  ) {
+    return `detectors.builtIn.${normalizedMethod.toLowerCase()}`;
+  }
+
+  return "detectors.methods.custom";
+}
+
+export function detectorTypeIconName(
+  method?: string | null,
+  pipelineType?: string | null,
+): string {
+  const normalizedMethod = method?.toUpperCase();
+
+  if (normalizedMethod === "RULESET") return "Regex";
+  if (normalizedMethod === "CLASSIFIER") return "Brain";
+  if (normalizedMethod === "ENTITY") return "Layers";
+
+  const normalizedPipeline = pipelineType?.toUpperCase();
+  if (normalizedPipeline === "REGEX") return "Regex";
+  if (normalizedPipeline === "GLINER2") return "Layers";
+  if (normalizedPipeline === "LLM") return "Bot";
+  if (normalizedPipeline === "TEXT_CLASSIFICATION") return "Brain";
+  if (normalizedPipeline === "IMAGE_CLASSIFICATION") return "Image";
+  if (normalizedPipeline === "FEATURE_EXTRACTION") return "Network";
+  if (normalizedPipeline === "OBJECT_DETECTION") return "ScanSearch";
+
+  if (normalizedMethod === "SECRETS" || normalizedMethod === "CODE_SECURITY") return "Shield";
+  if (normalizedMethod === "PII") return "Shield";
+  if (normalizedMethod === "YARA") return "ShieldAlert";
+  if (normalizedMethod === "BROKEN_LINKS") return "Link2";
+
+  return "Sparkles";
 }
