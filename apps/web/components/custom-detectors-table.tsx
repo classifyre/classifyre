@@ -58,20 +58,6 @@ function getPageItems(current: number, total: number) {
     return Array.from(pages).sort((a, b) => a - b);
 }
 
-function pipelineStepBadges(pipelineSchema: Record<string, unknown>): string[] {
-    const steps: string[] = [];
-    if (pipelineSchema.entities && Object.keys(pipelineSchema.entities as object).length > 0) {
-        steps.push("Entities");
-    }
-    if (pipelineSchema.classification && Object.keys(pipelineSchema.classification as object).length > 0) {
-        steps.push("Classification");
-    }
-    if (pipelineSchema.validation) {
-        steps.push("Validation");
-    }
-    return steps.length > 0 ? steps : ["Pipeline"];
-}
-
 function compareNullableDate(
     left?: string | null,
     right?: string | null,
@@ -346,7 +332,7 @@ export function CustomDetectorsTable() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>{renderSortHead("Detector", "name")}</TableHead>
-                                <TableHead>Pipeline Steps</TableHead>
+                                <TableHead>{t("common.type")}</TableHead>
                                 <TableHead>
                                     {renderSortHead(t("common.status"), "status")}
                                 </TableHead>
@@ -383,10 +369,7 @@ export function CustomDetectorsTable() {
                                     >
                                         <TableCell>
                                             <div className="space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <p className="font-medium leading-tight">{row.name}</p>
-                                                    <CustomDetectorTypeBadge method={row.method}/>
-                                                </div>
+                                                <p className="font-medium leading-tight">{row.name}</p>
                                                 <p className="font-mono text-[11px] text-muted-foreground">
                                                     {row.key}
                                                 </p>
@@ -398,17 +381,10 @@ export function CustomDetectorsTable() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex flex-wrap gap-1">
-                                                {pipelineStepBadges((row as any).pipelineSchema).map((step) => (
-                                                    <Badge
-                                                        key={step}
-                                                        variant="outline"
-                                                        className="text-[10px] font-mono"
-                                                    >
-                                                        {step}
-                                                    </Badge>
-                                                ))}
-                                            </div>
+                                            <CustomDetectorTypeBadge
+                                                method={row.method}
+                                                pipelineType={(row as any).pipelineSchema?.type as string | undefined}
+                                            />
                                         </TableCell>
                                         <TableCell>
                                             <Badge

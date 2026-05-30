@@ -15,6 +15,7 @@ import { Input } from "@workspace/ui/components/input";
 import {
   Select,
   SelectContent,
+  SelectItem,
   SelectPrimitive,
   SelectTrigger,
   SelectValue,
@@ -263,6 +264,11 @@ function DetectorConfigRow({
       )}
     >
       <div className="flex items-center gap-3 px-4 py-3">
+        <CustomDetectorTypeBadge
+          method={detector.type}
+          className="shrink-0"
+        />
+
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span
@@ -282,6 +288,11 @@ function DetectorConfigRow({
           {detector.description && (
             <p className="text-xs text-muted-foreground truncate mt-0.5">
               {detector.description}
+            </p>
+          )}
+          {detector.categories.length > 0 && (
+            <p className="text-[10px] font-mono text-muted-foreground/60 mt-0.5">
+              {detector.categories.join(" • ")} • {t("detectors.prebuilt")}
             </p>
           )}
         </div>
@@ -445,19 +456,22 @@ function CustomDetectorRow({
         enabled ? "border-l-[#b7ff00]" : "border-l-transparent",
       )}
     >
-      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex items-center gap-3 px-4 py-3">
+        <CustomDetectorTypeBadge
+          method={detector.method}
+          pipelineType={(detector as any).pipelineSchema?.type as string | undefined}
+          className="shrink-0"
+        />
+
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                "text-sm truncate",
-                enabled ? "font-semibold" : "font-medium text-muted-foreground",
-              )}
-            >
-              {detector.name}
-            </span>
-            <CustomDetectorTypeBadge method={detector.method} className="shrink-0" />
-          </div>
+          <span
+            className={cn(
+              "text-sm truncate",
+              enabled ? "font-semibold" : "font-medium text-muted-foreground",
+            )}
+          >
+            {detector.name}
+          </span>
           <p className="text-xs text-muted-foreground truncate mt-0.5">
             {detector.description?.trim() || t("sources.scanConfig.fallbackDesc")}
           </p>
@@ -578,6 +592,7 @@ export const SourceScanConfig = React.forwardRef<
     string | null
   >(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "BUILT_IN" | "CUSTOM">("ALL");
   const [displayOrder, setDisplayOrder] = useState<string[]>([]);
   const [isCreatingDetector, setIsCreatingDetector] = useState(false);
   const [editingDetectorId, setEditingDetectorId] = useState<string | null>(null);
@@ -675,10 +690,12 @@ export const SourceScanConfig = React.forwardRef<
 
   const visibleBuiltInDetectors = useMemo(
     () =>
-      orderedDetectors.filter((detector) =>
-        matchesSearch(detector, presetMap.get(detector.type) ?? [], searchTerm),
-      ),
-    [orderedDetectors, presetMap, searchTerm],
+      typeFilter !== "CUSTOM"
+        ? orderedDetectors.filter((detector) =>
+            matchesSearch(detector, presetMap.get(detector.type) ?? [], searchTerm),
+          )
+        : [],
+    [orderedDetectors, presetMap, searchTerm, typeFilter],
   );
 
   const selectedCustomDetectorSet = useMemo(
@@ -696,10 +713,12 @@ export const SourceScanConfig = React.forwardRef<
   );
   const visibleCustomDetectors = useMemo(
     () =>
-      selectableCustomDetectors.filter((detector) =>
-        matchesCustomDetectorSearch(detector, searchTerm),
-      ),
-    [searchTerm, selectableCustomDetectors],
+      typeFilter !== "BUILT_IN"
+        ? selectableCustomDetectors.filter((detector) =>
+            matchesCustomDetectorSearch(detector, searchTerm),
+          )
+        : [],
+    [searchTerm, selectableCustomDetectors, typeFilter],
   );
 
   const enabledCount =
@@ -777,24 +796,40 @@ export const SourceScanConfig = React.forwardRef<
           </div>
         </div>
 
-        <div className="relative mt-3">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder={t("sources.scanConfig.searchPlaceholder")}
+        <div className="mt-3 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder={t("sources.scanConfig.searchPlaceholder")}
               className="h-10 rounded-[4px] border-2 border-border bg-background pl-9 text-sm shadow-[3px_3px_0_var(--color-border)] focus-visible:ring-0"
-          />
-          {searchQuery ? (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-1 top-1/2 h-7 -translate-y-1/2 rounded-[4px] px-2 text-xs"
-            >
-              Clear
-            </Button>
-          ) : null}
+            />
+            {searchQuery ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-1 top-1/2 h-7 -translate-y-1/2 rounded-[4px] px-2 text-xs"
+              >
+                Clear
+              </Button>
+            ) : null}
+          </div>
+
+          <Select
+            value={typeFilter}
+            onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}
+          >
+            <SelectTrigger className="h-10 w-[150px] rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">{t("sources.scanConfig.filterAll")}</SelectItem>
+              <SelectItem value="BUILT_IN">{t("sources.scanConfig.filterPrebuilt")}</SelectItem>
+              <SelectItem value="CUSTOM">{t("sources.scanConfig.filterCustom")}</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </Card>
 
