@@ -196,6 +196,7 @@
     "assetNew": "Neu",
     "assetUpdated": "Aktualisiert",
     "assetUnchanged": "Unverändert",
+    "assetDeleted": "Gelöscht",
     "totalAssets": "Gesamte Assets",
     "detail": {
       "sourceDetails": "Quellendetails",
@@ -304,6 +305,9 @@
       "version": "Version",
       "fallbackDesc": "Wiederverwendbarer Detektor aus dem gemeinsamen Katalog.",
       "searchPlaceholder": "Detektoren, Voreinstellungen, Kategorien oder Schlüssel suchen...",
+      "filterAll": "Alle",
+      "filterPrebuilt": "Vorgefertigt",
+      "filterCustom": "Benutzerdefiniert",
       "on": "An",
       "off": "Aus",
       "customPreset": "Benutzerdefiniert",
@@ -676,7 +680,8 @@
       "classifiersLong": "Trainieren Sie ein Machine-Learning-Modell zur Kategorisierung von Text in eigene Labels. Unterstützt Zero-Shot-Klassifizierung und Feinabstimmung mit eigenen Beispielen. Geeignet für Intent-Erkennung, Themen-Routing oder Tonanalyse.",
       "entity": "Entität",
       "entityDesc": "Benutzerdefinierte Entitätsextraktion mit eigenen Labelmengen.",
-      "entityLong": "Extrahieren Sie benannte Entitäten aus Text mit einem vortrainierten GLiNER-Modell und eigenen Labels. Ideal für Personen, Organisationen, Produkte, Codes oder beliebige Konzepte."
+      "entityLong": "Extrahieren Sie benannte Entitäten aus Text mit einem vortrainierten GLiNER-Modell und eigenen Labels. Ideal für Personen, Organisationen, Produkte, Codes oder beliebige Konzepte.",
+      "custom": "Benutzerdefiniert"
     },
     "editor": {
       "methodSetup": "Methoden-Konfiguration",
@@ -946,6 +951,14 @@
     "chooseTemplate": "Startpunkt wählen",
     "chooseTemplateDesc": "Wähle ein vorgefertigtes Beispiel oder konfiguriere von Grund auf.",
     "templateBadge": "Vorlage",
+    "prebuilt": "Vorgefertigt",
+    "builtIn": {
+      "secrets": "Geheimnisse",
+      "pii": "PII",
+      "yara": "YARA",
+      "broken_links": "Defekte Links",
+      "code_security": "Codesicherheit"
+    },
     "comingSoon": "Demnächst",
     "select": "Auswählen →",
     "typeGroups": {

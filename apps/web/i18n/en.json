@@ -196,6 +196,7 @@
     "assetNew": "New",
     "assetUpdated": "Updated",
     "assetUnchanged": "Unchanged",
+    "assetDeleted": "Deleted",
     "totalAssets": "Total Assets",
     "detail": {
       "sourceDetails": "Source Details",
@@ -304,6 +305,9 @@
       "version": "Version",
       "fallbackDesc": "Reusable detector from the shared custom detector catalog.",
       "searchPlaceholder": "Search detectors, presets, categories, or custom detector keys...",
+      "filterAll": "All",
+      "filterPrebuilt": "Pre-built",
+      "filterCustom": "Custom",
       "on": "On",
       "off": "Off",
       "customPreset": "Custom",
@@ -676,7 +680,8 @@
       "classifiersLong": "Train a machine learning model to categorize text into your own labels. Supports zero-shot classification out of the box and fine-tuning with your own examples. Best for intent detection, topic routing, or tone analysis.",
       "entity": "Entity",
       "entityDesc": "Named entity extraction with custom label vocabularies.",
-      "entityLong": "Extract named entities from text using a pre-trained GLiNER model with your custom label set. Great for finding people, organizations, products, codes, or any concept you define."
+      "entityLong": "Extract named entities from text using a pre-trained GLiNER model with your custom label set. Great for finding people, organizations, products, codes, or any concept you define.",
+      "custom": "Custom"
     },
     "editor": {
       "methodSetup": "Method setup",
@@ -946,6 +951,14 @@
     "chooseTemplate": "Choose a starting point",
     "chooseTemplateDesc": "Pick a pre-built example to start from, or configure from scratch.",
     "templateBadge": "Template",
+    "prebuilt": "Pre-built",
+    "builtIn": {
+      "secrets": "Secrets",
+      "pii": "PII",
+      "yara": "YARA",
+      "broken_links": "Broken Links",
+      "code_security": "Code Security"
+    },
     "comingSoon": "Coming soon",
     "select": "Select →",
     "typeGroups": {
