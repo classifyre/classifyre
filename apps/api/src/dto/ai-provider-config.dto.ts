@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -66,6 +67,13 @@ export class AiProviderConfigResponseDto {
   })
   contextSize: number | null;
 
+  @ApiProperty({
+    description:
+      'Whether the provider/model accepts image/PDF (vision) input. When true, detectors using this credential send rendered file images to the model instead of extracted text.',
+    example: false,
+  })
+  supportsVision: boolean;
+
   @ApiProperty()
   createdAt: Date;
 
@@ -124,6 +132,15 @@ export class CreateAiProviderConfigDto {
   @IsInt()
   @Min(1)
   contextSize?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether the provider/model accepts image/PDF (vision) input. Defaults to false.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  supportsVision?: boolean;
 }
 
 export class UpdateAiProviderConfigDto {
@@ -180,6 +197,15 @@ export class UpdateAiProviderConfigDto {
   @IsInt()
   @Min(1)
   contextSize?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether the provider/model accepts image/PDF (vision) input. Defaults to false.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  supportsVision?: boolean;
 }
 
 export class AiProviderConfigTestResultDto {

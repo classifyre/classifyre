@@ -8338,6 +8338,11 @@
             "example": 200000,
             "nullable": true
           },
+          "supportsVision": {
+            "type": "boolean",
+            "description": "Whether the provider/model accepts image/PDF (vision) input. When true, detectors using this credential send rendered file images to the model instead of extracted text.",
+            "example": false
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -8356,6 +8361,7 @@
           "apiKeyPreview",
           "baseUrl",
           "contextSize",
+          "supportsVision",
           "createdAt",
           "updatedAt"
         ]
@@ -8396,6 +8402,11 @@
             "type": "number",
             "description": "Context window size in tokens.",
             "example": 200000
+          },
+          "supportsVision": {
+            "type": "boolean",
+            "description": "Whether the provider/model accepts image/PDF (vision) input. Defaults to false.",
+            "example": false
           }
         },
         "required": [
@@ -8439,6 +8450,11 @@
             "type": "number",
             "description": "Context window size in tokens.",
             "example": 200000
+          },
+          "supportsVision": {
+            "type": "boolean",
+            "description": "Whether the provider/model accepts image/PDF (vision) input. Defaults to false.",
+            "example": false
           }
         }
       },

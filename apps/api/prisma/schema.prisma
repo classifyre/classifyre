@@ -398,6 +398,7 @@ model AiProviderConfig {
   apiKeyEnc   String?        @map("api_key_enc")
   baseUrl     String?        @map("base_url")
   contextSize Int?           @map("context_size")
+  supportsVision Boolean     @default(false) @map("supports_vision")
   createdAt   DateTime       @default(now()) @map("created_at")
   updatedAt   DateTime       @updatedAt @map("updated_at")
 

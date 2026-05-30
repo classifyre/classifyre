@@ -1027,6 +1027,10 @@ class LLMProviderRuntime(BaseModel):
     context_size: int | None = Field(
         None, description='Optional context window size configured for the provider.'
     )
+    supports_vision: bool | None = Field(
+        False,
+        description='Whether the resolved provider/model accepts image/PDF input. When true the detector renders supported files to images and sends them to the model as multimodal input instead of extracting text.',
+    )
 
 
 class Type4(StrEnum):

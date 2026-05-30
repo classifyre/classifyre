@@ -12,6 +12,7 @@ Name | Type
 `apiKey` | string
 `baseUrl` | string
 `contextSize` | number
+`supportsVision` | boolean
 
 ## Example
 
@@ -26,6 +27,7 @@ const example = {
   "apiKey": sk-proj-...,
   "baseUrl": https://openrouter.ai/api/v1,
   "contextSize": 200000,
+  "supportsVision": false,
 } satisfies UpdateAiProviderConfigDto
 
 console.log(example)

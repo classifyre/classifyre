@@ -94,6 +94,10 @@ regex = [
 ]
 llm = [
     "litellm>=1.86.2",
+    # Pure-wheel PDF renderer (permissive license, no system binaries) used to
+    # rasterise PDF pages to images for vision-capable LLM detectors.
+    "pypdfium2>=4.30.0",
+    "pillow>=12.2.0",
 ]
 detectors = [
     { include-group = "file-processing" },
@@ -271,6 +275,8 @@ module = [
     "setfit",
     "litellm.*",
     "litellm",
+    "pypdfium2.*",
+    "pypdfium2",
     "sklearn.*",
     "sklearn",
     "numpy",
