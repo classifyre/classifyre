@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import { AiConfigError } from './ai/errors';
@@ -132,6 +136,20 @@ export class AiProviderConfigService {
 
   async remove(id: string): Promise<void> {
     await this.findOrThrow(id);
+
+    // Detectors reference this credential via an onDelete: Restrict FK, so a
+    // raw delete throws Prisma P2003. Surface a clear 409 with the dependent
+    // detector count instead of a generic 500.
+    const dependentDetectors = await this.prisma.customDetector.count({
+      where: { aiProviderConfigId: id },
+    });
+    if (dependentDetectors > 0) {
+      throw new ConflictException(
+        `Cannot delete this AI provider: it is used by ${dependentDetectors} custom detector` +
+          `${dependentDetectors === 1 ? '' : 's'}. Reassign or delete them first.`,
+      );
+    }
+
     await this.prisma.aiProviderConfig.delete({ where: { id } });
   }
 
@@ -176,6 +194,7 @@ export class AiProviderConfigService {
       model: config.model,
       apiKey,
       baseUrl: config.baseUrl,
+      contextSize: config.contextSize,
     };
   }
 }
