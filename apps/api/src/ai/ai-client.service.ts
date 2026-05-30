@@ -43,7 +43,7 @@ export class AiClientService {
     messages: AiMessage[],
     options: AiCompletionOptions = {},
   ): Promise<AiResponse<string>> {
-    const config = await this.getRuntimeConfig();
+    const config = await this.getRuntimeConfig(options.configId);
     const provider = createProvider(config.provider);
     const raw = await provider.complete(messages, config, options);
     return { content: raw, model: config.model, provider: config.provider };
@@ -66,7 +66,7 @@ export class AiClientService {
     schema: JsonSchema,
     options: AiCompletionOptions = {},
   ): Promise<AiResponse<T>> {
-    const config = await this.getRuntimeConfig();
+    const config = await this.getRuntimeConfig(options.configId);
     const provider = createProvider(config.provider);
     const maxRetries = options.maxRetries ?? 2;
 
@@ -118,27 +118,19 @@ export class AiClientService {
 
   // ── Internal helpers ────────────────────────────────────────────────────────
 
-  private async getRuntimeConfig(): Promise<AiProviderRuntimeConfig> {
-    const stored = await this.providerConfigService.getConfig();
-    const apiKey = await this.providerConfigService.getDecryptedApiKey();
+  private async getRuntimeConfig(
+    configId?: string,
+  ): Promise<AiProviderRuntimeConfig> {
+    const id =
+      configId ?? (await this.providerConfigService.getDefaultConfigId());
 
-    if (!apiKey) {
+    if (!id) {
       throw new AiConfigError(
-        'No AI API key configured. Add one in Settings → AI Provider.',
-      );
-    }
-    if (!stored.model.trim()) {
-      throw new AiConfigError(
-        'No AI model configured. Set one in Settings → AI Provider.',
+        'No default AI provider selected. Choose one in Settings → AI Providers.',
       );
     }
 
-    return {
-      provider: stored.provider,
-      model: stored.model,
-      apiKey,
-      baseUrl: stored.baseUrl,
-    };
+    return this.providerConfigService.getRuntimeConfig(id);
   }
 }
 

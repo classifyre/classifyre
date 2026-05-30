@@ -158,7 +158,7 @@ class _FakeSession:
         self.responses = responses
         self.calls: list[dict[str, Any]] = []
 
-    def mount(self, prefix: str, adapter: Any) -> None:  # noqa: ARG002
+    def mount(self, prefix: str, adapter: Any) -> None:
         """Absorb HTTPAdapter.mount() calls from RestOutputSink.__init__."""
 
     def request(

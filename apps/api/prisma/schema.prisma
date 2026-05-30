@@ -193,9 +193,11 @@ model CustomDetector {
   version             Int                         @default(1)
   lastTrainedAt       DateTime?                   @map("last_trained_at")
   lastTrainingSummary Json?                       @map("last_training_summary") @db.JsonB
+  aiProviderConfigId  String?                     @map("ai_provider_config_id")
   createdAt           DateTime                    @default(now()) @map("created_at")
   updatedAt           DateTime                    @updatedAt @map("updated_at")
 
+  aiProviderConfig    AiProviderConfig?           @relation(fields: [aiProviderConfigId], references: [id], onDelete: Restrict)
   findings            Finding[]
   feedback            CustomDetectorFeedback[]
   trainingRuns        CustomDetectorTrainingRun[]
@@ -204,6 +206,7 @@ model CustomDetector {
   testScenarios       CustomDetectorTestScenario[]
 
   @@index([isActive])
+  @@index([aiProviderConfigId])
   @@map("custom_detectors")
 }
 
@@ -378,20 +381,28 @@ model InstanceSettings {
   language   InstanceLanguage @default(AUTOMATIC)
   timezone   String           @default("AUTOMATIC")
   timeFormat InstanceTimeFormat @default(AUTOMATIC) @map("time_format")
+  aiProviderConfigId String?  @map("ai_provider_config_id")
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  aiProviderConfig AiProviderConfig? @relation(fields: [aiProviderConfigId], references: [id], onDelete: SetNull)
 
   @@map("instance_settings")
 }
 
 model AiProviderConfig {
-  id        Int            @id @default(1)
-  provider  AiProviderType @default(CLAUDE)
-  model     String         @default("")
-  apiKeyEnc String?        @map("api_key_enc")
-  baseUrl   String?        @map("base_url")
-  createdAt DateTime       @default(now()) @map("created_at")
-  updatedAt DateTime       @updatedAt @map("updated_at")
+  id          String         @id @default(uuid())
+  name        String
+  provider    AiProviderType @default(CLAUDE)
+  model       String         @default("")
+  apiKeyEnc   String?        @map("api_key_enc")
+  baseUrl     String?        @map("base_url")
+  contextSize Int?           @map("context_size")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  instanceSettings InstanceSettings[]
+  customDetectors  CustomDetector[]
 
   @@map("ai_provider_config")
 }

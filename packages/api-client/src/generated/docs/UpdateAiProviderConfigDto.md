@@ -6,10 +6,12 @@
 
 Name | Type
 ------------ | -------------
+`name` | string
 `provider` | string
 `model` | string
 `apiKey` | string
 `baseUrl` | string
+`contextSize` | number
 
 ## Example
 
@@ -18,10 +20,12 @@ import type { UpdateAiProviderConfigDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
+  "name": Production Claude,
   "provider": CLAUDE,
   "model": claude-sonnet-4-5,
   "apiKey": sk-proj-...,
   "baseUrl": https://openrouter.ai/api/v1,
+  "contextSize": 200000,
 } satisfies UpdateAiProviderConfigDto
 
 console.log(example)

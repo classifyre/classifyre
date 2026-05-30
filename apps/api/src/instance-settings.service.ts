@@ -22,6 +22,7 @@ export class InstanceSettingsService {
       language: settings.language,
       timezone: settings.timezone,
       timeFormat: settings.timeFormat,
+      aiProviderConfigId: settings.aiProviderConfigId,
       demoMode: this.demoMode.isDemoMode,
       createdAt: settings.createdAt,
       updatedAt: settings.updatedAt,
@@ -60,6 +61,30 @@ export class InstanceSettingsService {
     // Allow "AUTOMATIC" as a special value (resolved client-side)
     const timezone = rawTimezone;
 
+    let aiProviderConfigUpdate: Prisma.InstanceSettingsUpdateInput | null =
+      null;
+    if (updateDto.aiProviderConfigId !== undefined) {
+      const targetId = updateDto.aiProviderConfigId?.trim() || null;
+      if (targetId) {
+        const exists = await this.prisma.aiProviderConfig.findUnique({
+          where: { id: targetId },
+          select: { id: true },
+        });
+        if (!exists) {
+          throw new BadRequestException(
+            `AI provider config "${targetId}" does not exist`,
+          );
+        }
+        aiProviderConfigUpdate = {
+          aiProviderConfig: { connect: { id: targetId } },
+        };
+      } else {
+        aiProviderConfigUpdate = {
+          aiProviderConfig: { disconnect: true },
+        };
+      }
+    }
+
     const data: Prisma.InstanceSettingsUpdateInput = {
       ...(updateDto.aiEnabled !== undefined
         ? { aiEnabled: updateDto.aiEnabled }
@@ -74,6 +99,7 @@ export class InstanceSettingsService {
       ...(updateDto.timeFormat !== undefined
         ? { timeFormat: updateDto.timeFormat }
         : {}),
+      ...(aiProviderConfigUpdate ?? {}),
     };
 
     const settings = await this.prisma.instanceSettings.update({
