@@ -18,6 +18,8 @@ import {
   type CustomDetectorEditorSubmit,
 } from "@/components/custom-detector-editor";
 import type { CustomDetectorEditorHandle } from "@/components/custom-detector-editor";
+import { LLMDetectorEditor } from "@/components/llm-detector-editor";
+import type { LLMDetectorEditorHandle } from "@/components/llm-detector-editor";
 import { useTranslation } from "@/hooks/use-translation";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -55,6 +57,7 @@ export const DetectorEditorForm = React.forwardRef<
   const pipelineRef = React.useRef<PipelineDetectorEditorHandle>(null);
   const regexRef = React.useRef<RegexDetectorEditorHandle>(null);
   const transformerRef = React.useRef<TransformerDetectorEditorHandle>(null);
+  const llmRef = React.useRef<LLMDetectorEditorHandle>(null);
   const customRef = React.useRef<CustomDetectorEditorHandle>(null);
 
   const isPipelineDetector = Boolean(
@@ -63,6 +66,7 @@ export const DetectorEditorForm = React.forwardRef<
   const pipelineSchemaType = (detector.pipelineSchema as Record<string, unknown>)
     ?.type as string | undefined;
   const isRegexPipeline = isPipelineDetector && pipelineSchemaType === "REGEX";
+  const isLLMPipeline = isPipelineDetector && pipelineSchemaType === "LLM";
   const isTransformerPipeline =
     isPipelineDetector && !!pipelineSchemaType && TRANSFORMER_PIPELINE_TYPES.has(pipelineSchemaType);
 
@@ -73,6 +77,7 @@ export const DetectorEditorForm = React.forwardRef<
       description?: string;
       isActive?: boolean;
       pipelineSchema?: Record<string, unknown>;
+      aiProviderConfigId?: string;
       config?: Record<string, unknown>;
       method?: string;
     }) => {
@@ -84,6 +89,7 @@ export const DetectorEditorForm = React.forwardRef<
           description: payload.description,
           isActive: payload.isActive,
           pipelineSchema: payload.pipelineSchema,
+          aiProviderConfigId: payload.aiProviderConfigId,
           config: payload.config,
           method: payload.method,
         } as any);
@@ -111,6 +117,10 @@ export const DetectorEditorForm = React.forwardRef<
             await transformerRef.current?.submit();
             return true;
           }
+          if (isLLMPipeline) {
+            await llmRef.current?.submit();
+            return true;
+          }
           if (isRegexPipeline) {
             await regexRef.current?.submit();
             return true;
@@ -126,7 +136,7 @@ export const DetectorEditorForm = React.forwardRef<
         }
       },
     }),
-    [isPipelineDetector, isRegexPipeline, isTransformerPipeline],
+    [isPipelineDetector, isRegexPipeline, isLLMPipeline, isTransformerPipeline],
   );
 
   if (isTransformerPipeline) {
@@ -151,6 +161,37 @@ export const DetectorEditorForm = React.forwardRef<
             description: payload.description,
             isActive: payload.isActive,
             pipelineSchema: payload.pipelineSchema,
+          });
+        }}
+      />
+    );
+  }
+
+  if (isLLMPipeline) {
+    return (
+      <LLMDetectorEditor
+        ref={llmRef}
+        mode="edit"
+        detectorId={detector.id}
+        submitLabel={t("common.save")}
+        isSubmitting={isSaving}
+        embedded={embedded}
+        initialPipelineSchema={detector.pipelineSchema}
+        initialName={detector.name}
+        initialKey={detector.key}
+        initialDescription={detector.description ?? ""}
+        initialIsActive={detector.isActive}
+        initialAiProviderConfigId={
+          (detector as { aiProviderConfigId?: string | null }).aiProviderConfigId ?? null
+        }
+        onSubmit={async (payload) => {
+          await handleSave({
+            name: payload.name,
+            key: payload.key,
+            description: payload.description,
+            isActive: payload.isActive,
+            pipelineSchema: payload.pipelineSchema,
+            aiProviderConfigId: payload.aiProviderConfigId,
           });
         }}
       />

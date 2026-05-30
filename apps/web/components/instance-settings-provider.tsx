@@ -61,6 +61,7 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   language: InstanceSettingsResponseDtoLanguageEnum.Automatic,
   timezone: "AUTOMATIC",
   timeFormat: InstanceSettingsResponseDtoTimeFormatEnum.Automatic,
+  aiProviderConfigId: null,
   createdAt: new Date(0),
   updatedAt: new Date(0),
 };

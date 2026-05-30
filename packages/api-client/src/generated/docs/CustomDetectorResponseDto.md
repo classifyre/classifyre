@@ -11,6 +11,7 @@ Name | Type
 `name` | string
 `description` | string
 `pipelineSchema` | { [key: string]: any; }
+`aiProviderConfigId` | string
 `isActive` | boolean
 `version` | number
 `lastTrainedAt` | Date
@@ -36,6 +37,7 @@ const example = {
   "name": null,
   "description": null,
   "pipelineSchema": null,
+  "aiProviderConfigId": null,
   "isActive": null,
   "version": null,
   "lastTrainedAt": null,

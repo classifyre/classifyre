@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `cursor` | string
+`skip` | number
 `take` | number
 `search` | string
 `levels` | Array&lt;string&gt;
@@ -21,6 +22,7 @@ import type { SearchRunnerLogsBodyDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "cursor": null,
+  "skip": null,
   "take": null,
   "search": null,
   "levels": null,

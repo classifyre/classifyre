@@ -2,10 +2,12 @@
 .npmignore
 README.md
 docs/AIApi.md
+docs/AIProviderConfigsApi.md
 docs/AiCompleteRequestDto.md
 docs/AiCompleteResponseDto.md
 docs/AiMessageDto.md
 docs/AiProviderConfigResponseDto.md
+docs/AiProviderConfigTestResultDto.md
 docs/AssetFindingDetectorCountDto.md
 docs/AssetFindingSeverityCountDto.md
 docs/AssetFindingStatusCountDto.md
@@ -24,6 +26,7 @@ docs/BulkIngestAssetsDto.md
 docs/BulkUpdateFindingsDto.md
 docs/BulkUpdateFindingsResponseDto.md
 docs/CliRunnerControllerUpdateRunnerStatusRequest.md
+docs/CreateAiProviderConfigDto.md
 docs/CreateCustomDetectorDto.md
 docs/CreateExternalRunnerDto.md
 docs/CreateFindingDto.md
@@ -83,6 +86,7 @@ docs/QueryMetricDto.md
 docs/QueryMetricTimeSeriesDto.md
 docs/RegisterDiscoveredAssetsDto.md
 docs/RegisterDiscoveredAssetsResponseDto.md
+docs/RerunSandboxRunDto.md
 docs/RunnerAssetItemDto.md
 docs/RunnerAssetProgressDto.md
 docs/RunnerAssetStatusUpdateItem.md
@@ -167,6 +171,7 @@ docs/UpdateRunnerAssetStatusDto.md
 docs/UpdateSourceDto.md
 package.json
 src/apis/AIApi.ts
+src/apis/AIProviderConfigsApi.ts
 src/apis/AssetsApi.ts
 src/apis/AssistantApi.ts
 src/apis/CustomDetectorExtractionsApi.ts
@@ -188,6 +193,7 @@ src/models/AiCompleteRequestDto.ts
 src/models/AiCompleteResponseDto.ts
 src/models/AiMessageDto.ts
 src/models/AiProviderConfigResponseDto.ts
+src/models/AiProviderConfigTestResultDto.ts
 src/models/AssetFindingDetectorCountDto.ts
 src/models/AssetFindingSeverityCountDto.ts
 src/models/AssetFindingStatusCountDto.ts
@@ -204,6 +210,7 @@ src/models/BulkIngestAssetsDto.ts
 src/models/BulkUpdateFindingsDto.ts
 src/models/BulkUpdateFindingsResponseDto.ts
 src/models/CliRunnerControllerUpdateRunnerStatusRequest.ts
+src/models/CreateAiProviderConfigDto.ts
 src/models/CreateCustomDetectorDto.ts
 src/models/CreateExternalRunnerDto.ts
 src/models/CreateFindingDto.ts
@@ -256,6 +263,7 @@ src/models/QueryMetricDto.ts
 src/models/QueryMetricTimeSeriesDto.ts
 src/models/RegisterDiscoveredAssetsDto.ts
 src/models/RegisterDiscoveredAssetsResponseDto.ts
+src/models/RerunSandboxRunDto.ts
 src/models/RunnerAssetItemDto.ts
 src/models/RunnerAssetProgressDto.ts
 src/models/RunnerAssetStatusUpdateItem.ts
