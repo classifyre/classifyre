@@ -43,7 +43,7 @@ function DetectorTypeCard({
 }) {
   const { t } = useTranslation();
   const Icon = DETECTOR_ICONS[kind];
-  const available = kind !== "llm";
+  const available = true;
 
   const title = t(`detectors.types.${kind}.title`);
   const tagline = t(`detectors.types.${kind}.tagline`);

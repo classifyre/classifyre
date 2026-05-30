@@ -1,17 +1,8 @@
 /**
  * E2E tests for S3-Compatible Storage source workflow (Backblaze B2).
- * Covers two separate bucket sources:
- *  - Bucket 1: testinertiabucket (S3_BUCKET_1)
- *  - Bucket 2: testmediabucket   (S3_BUCKET_2)
- *
- * Each test:
- *  1. Creates the source, fills credentials and endpoint from env vars
- *  2. Tests the connection (expects success)
- *  3. Runs a scan and verifies assets are discovered
- *  4. Deletes the source
- *
- * Note: detector configuration is intentionally omitted — detectors will be
- * added in a follow-up test iteration.
+ * Covers two separate bucket sources that have data:
+ *  - Bucket 2: testinertiabucket (S3_BUCKET_2)
+ *  - Bucket 3: medidataclassifyre (S3_BUCKET_3)
  */
 
 import { test, expect, type Page } from "@playwright/test";
@@ -26,7 +17,6 @@ function requireEnv(name: string): string {
 
 const S3_KEY_ID = requireEnv("S3_KEY_ID");
 const S3_APP_KEY = requireEnv("S3_APP_KEY");
-const S3_BUCKET_1 = requireEnv("S3_BUCKET_1");
 const S3_BUCKET_2 = requireEnv("S3_BUCKET_2");
 const S3_BUCKET_3 = requireEnv("S3_BUCKET_3");
 const S3_ENDPOINT = requireEnv("S3_ENDPOINT");
@@ -150,10 +140,10 @@ async function runS3BucketTest(page: Page, bucket: string): Promise<void> {
 
 test.describe("S3-Compatible Storage Source E2E", () => {
   test(
-    "should create S3 source for bucket 1 (testmediabucket), run scan and verify assets",
+    "should create S3 source for bucket 2 (testinertiabucket), run scan and verify assets",
     async ({ page }) => {
       test.setTimeout(1_800_000);
-      await runS3BucketTest(page, S3_BUCKET_1);
+      await runS3BucketTest(page, S3_BUCKET_2);
     },
   );
 

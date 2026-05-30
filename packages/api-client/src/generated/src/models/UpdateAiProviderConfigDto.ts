@@ -20,6 +20,12 @@ import { mapValues } from '../runtime';
  */
 export interface UpdateAiProviderConfigDto {
     /**
+     * User-friendly label for this credential.
+     * @type {string}
+     * @memberof UpdateAiProviderConfigDto
+     */
+    name?: string;
+    /**
      * 
      * @type {string}
      * @memberof UpdateAiProviderConfigDto
@@ -43,6 +49,12 @@ export interface UpdateAiProviderConfigDto {
      * @memberof UpdateAiProviderConfigDto
      */
     baseUrl?: string;
+    /**
+     * Context window size in tokens.
+     * @type {number}
+     * @memberof UpdateAiProviderConfigDto
+     */
+    contextSize?: number;
 }
 
 
@@ -74,10 +86,12 @@ export function UpdateAiProviderConfigDtoFromJSONTyped(json: any, ignoreDiscrimi
     }
     return {
         
+        'name': json['name'] == null ? undefined : json['name'],
         'provider': json['provider'] == null ? undefined : json['provider'],
         'model': json['model'] == null ? undefined : json['model'],
         'apiKey': json['apiKey'] == null ? undefined : json['apiKey'],
         'baseUrl': json['baseUrl'] == null ? undefined : json['baseUrl'],
+        'contextSize': json['contextSize'] == null ? undefined : json['contextSize'],
     };
 }
 
@@ -92,10 +106,12 @@ export function UpdateAiProviderConfigDtoToJSONTyped(value?: UpdateAiProviderCon
 
     return {
         
+        'name': value['name'],
         'provider': value['provider'],
         'model': value['model'],
         'apiKey': value['apiKey'],
         'baseUrl': value['baseUrl'],
+        'contextSize': value['contextSize'],
     };
 }
 
