@@ -1044,7 +1044,7 @@ export class KubernetesCliJobService {
       error?.response?.body?.message ||
       error?.message ||
       '';
-    if (status === 404) {
+    if (status === 404 || this.isNotFound(error)) {
       return true;
     }
     if (status === 400) {
