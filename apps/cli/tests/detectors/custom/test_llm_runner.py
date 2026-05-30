@@ -126,6 +126,22 @@ def test_openai_compatible_uses_api_base_and_prefix() -> None:
     assert kwargs["api_base"] == "https://integrate.api.nvidia.com/v1"
 
 
+def test_max_tokens_passed_as_int() -> None:
+    # max_tokens is a RootModel[int] wrapper; it must be unwrapped to a plain int
+    # before being handed to litellm, otherwise the completion request fails.
+    completion = _mock_completion({"labels": []})
+    runner = _runner(_schema(max_tokens=256), completion)
+    runner.detect(TEXT, "text/plain")
+    assert completion.call_args.kwargs["max_tokens"] == 256
+
+
+def test_max_tokens_defaults_to_none() -> None:
+    completion = _mock_completion({"labels": []})
+    runner = _runner(_schema(), completion)
+    runner.detect(TEXT, "text/plain")
+    assert completion.call_args.kwargs["max_tokens"] is None
+
+
 def test_non_text_content_skipped() -> None:
     completion = _mock_completion({"labels": [{"name": "bad", "confidence": 0.9}]})
     runner = _runner(_schema(), completion)
