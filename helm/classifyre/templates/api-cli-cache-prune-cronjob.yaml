@@ -1,0 +1,66 @@
+{{- if and .Values.api.cliJobs.enabled .Values.api.cliJobs.uvCache.enabled .Values.api.cliJobs.uvCache.prune.enabled }}
+{{- $pruneImage := .Values.api.cliJobs.uvCache.prune.image | default (printf "%s:%s" .Values.api.cliJobs.image.repository (.Values.api.cliJobs.image.tag | default .Chart.AppVersion)) }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ printf "%s-cli-uv-cache-prune" (include "classifyre.fullname" .) }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: cli-cache-prune
+spec:
+  schedule: {{ .Values.api.cliJobs.uvCache.prune.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: {{ .Values.api.cliJobs.uvCache.prune.ttlSecondsAfterFinished }}
+      template:
+        spec:
+          restartPolicy: OnFailure
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          volumes:
+            - name: uv-cache
+              persistentVolumeClaim:
+                claimName: {{ .Values.api.cliJobs.uvCache.existingClaim | default (printf "%s-cli-uv-cache" (include "classifyre.fullname" .)) }}
+          containers:
+            - name: prune
+              image: {{ $pruneImage }}
+              imagePullPolicy: {{ .Values.api.cliJobs.image.pullPolicy }}
+              command:
+                - sh
+                - -c
+                - |
+                  echo "Cache size before prune:" && du -sh {{ .Values.api.cliJobs.uvCache.mountPath }}
+                  UV_CACHE_DIR={{ .Values.api.cliJobs.uvCache.mountPath }} uv cache prune
+                  echo "Cache size after prune:" && du -sh {{ .Values.api.cliJobs.uvCache.mountPath }}
+              env:
+                - name: UV_CACHE_DIR
+                  value: {{ .Values.api.cliJobs.uvCache.mountPath | quote }}
+              volumeMounts:
+                - name: uv-cache
+                  mountPath: {{ .Values.api.cliJobs.uvCache.mountPath }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: false
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+{{- end }}

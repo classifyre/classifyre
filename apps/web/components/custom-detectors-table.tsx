@@ -32,6 +32,7 @@ import {
 import {formatDate, formatRelative} from "@/lib/date";
 import {detectorCatalogStatusLabel, detectorCatalogStatusToRunnerStatus,} from "@/lib/custom-detector-badge";
 import {getRunnerStatusBadgeTone} from "@/lib/runner-status-badge";
+import {CustomDetectorTypeBadge} from "@/components/detector-type-badge";
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
@@ -55,20 +56,6 @@ function getPageItems(current: number, total: number) {
     if (current > 2) pages.add(current - 1);
     if (current < total - 1) pages.add(current + 1);
     return Array.from(pages).sort((a, b) => a - b);
-}
-
-function pipelineStepBadges(pipelineSchema: Record<string, unknown>): string[] {
-    const steps: string[] = [];
-    if (pipelineSchema.entities && Object.keys(pipelineSchema.entities as object).length > 0) {
-        steps.push("Entities");
-    }
-    if (pipelineSchema.classification && Object.keys(pipelineSchema.classification as object).length > 0) {
-        steps.push("Classification");
-    }
-    if (pipelineSchema.validation) {
-        steps.push("Validation");
-    }
-    return steps.length > 0 ? steps : ["Pipeline"];
 }
 
 function compareNullableDate(
@@ -345,7 +332,7 @@ export function CustomDetectorsTable() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>{renderSortHead("Detector", "name")}</TableHead>
-                                <TableHead>Pipeline Steps</TableHead>
+                                <TableHead>{t("common.type")}</TableHead>
                                 <TableHead>
                                     {renderSortHead(t("common.status"), "status")}
                                 </TableHead>
@@ -394,17 +381,10 @@ export function CustomDetectorsTable() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex flex-wrap gap-1">
-                                                {pipelineStepBadges((row as any).pipelineSchema).map((step) => (
-                                                    <Badge
-                                                        key={step}
-                                                        variant="outline"
-                                                        className="text-[10px] font-mono"
-                                                    >
-                                                        {step}
-                                                    </Badge>
-                                                ))}
-                                            </div>
+                                            <CustomDetectorTypeBadge
+                                                method={row.method}
+                                                pipelineType={(row as any).pipelineSchema?.type as string | undefined}
+                                            />
                                         </TableCell>
                                         <TableCell>
                                             <Badge
