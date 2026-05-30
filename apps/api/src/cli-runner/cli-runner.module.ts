@@ -10,6 +10,7 @@ import { KubernetesCliJobService } from './kubernetes-cli-job.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { RunnerLogStorageService } from './runner-log-storage.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
+import { AiProviderConfigService } from '../ai-provider-config.service';
 
 @Module({
   providers: [
@@ -19,6 +20,7 @@ import { CustomDetectorsService } from '../custom-detectors.service';
     KubernetesCliJobService,
     MaskedConfigCryptoService,
     CustomDetectorsService,
+    AiProviderConfigService,
     RunnerLogStorageService,
   ],
   controllers: [CliRunnerController, SearchRunnersController],

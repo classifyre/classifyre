@@ -49,6 +49,12 @@ export interface UpdateInstanceSettingsDto {
      * @memberof UpdateInstanceSettingsDto
      */
     timeFormat?: UpdateInstanceSettingsDtoTimeFormatEnum;
+    /**
+     * Id of the AI provider credential to use as the instance-wide default. Pass null or an empty string to clear the selection.
+     * @type {string}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    aiProviderConfigId?: string | null;
 }
 
 
@@ -95,6 +101,7 @@ export function UpdateInstanceSettingsDtoFromJSONTyped(json: any, ignoreDiscrimi
         'language': json['language'] == null ? undefined : json['language'],
         'timezone': json['timezone'] == null ? undefined : json['timezone'],
         'timeFormat': json['timeFormat'] == null ? undefined : json['timeFormat'],
+        'aiProviderConfigId': json['aiProviderConfigId'] == null ? undefined : json['aiProviderConfigId'],
     };
 }
 
@@ -114,6 +121,7 @@ export function UpdateInstanceSettingsDtoToJSONTyped(value?: UpdateInstanceSetti
         'language': value['language'],
         'timezone': value['timezone'],
         'timeFormat': value['timeFormat'],
+        'aiProviderConfigId': value['aiProviderConfigId'],
     };
 }
 

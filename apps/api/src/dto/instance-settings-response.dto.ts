@@ -50,6 +50,13 @@ export class InstanceSettingsResponseDto {
 
   @ApiProperty({
     description:
+      'Id of the AI provider credential used as the instance-wide default. Null when unset.',
+    nullable: true,
+  })
+  aiProviderConfigId: string | null;
+
+  @ApiProperty({
+    description:
       'Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.',
     example: false,
   })
