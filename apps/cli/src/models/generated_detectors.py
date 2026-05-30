@@ -189,7 +189,7 @@ class DetectorCatalog(RootModel[list[DetectorCatalogEntry]]):
                 'categories': ['CLASSIFICATION', 'COMPLIANCE'],
                 'supported_asset_types': ['TXT', 'TABLE', 'URL', 'IMAGE'],
                 'recommended_model': 'mDeBERTa-v3 + SetFit + GLiNER + HuggingFace transformers',
-                'notes': 'User-defined rules and pipelines tailored to specific business needs. Supports regex, GLiNER2, LLM, text classification, image classification, feature extraction, and object detection pipelines.',
+                'notes': 'User-defined rules and pipelines tailored to specific business needs. Supports regex, GLiNER2, AI/LLM (prompt-driven classification + extraction via a configured provider), text classification, image classification, feature extraction, and object detection pipelines.',
             },
         ],
         description='Detector capability catalog used for planning and runtime routing',
@@ -954,18 +954,156 @@ class RegexPipelineSchema(BaseModel):
     validation: PipelineValidationConfig | None = None
 
 
+class LLMLabelDefinition(BaseModel):
+    """
+    One classification label the AI detector may assign to content.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str = Field(
+        ...,
+        description="Label name returned by the model (e.g. 'good', 'bad', 'violent').",
+    )
+    description: str | None = Field(
+        '', description='Guidance describing when this label applies.'
+    )
+
+
 class Type3(StrEnum):
+    string = 'string'
+    number = 'number'
+    boolean = 'boolean'
+    list_string_ = 'list[string]'
+    list_number_ = 'list[number]'
+
+
+class LLMOutputField(BaseModel):
+    """
+    One structured property the AI detector extracts and stores in finding metadata and extracted_data.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str = Field(
+        ..., description='Output field name — becomes a key in extracted_data JSON.'
+    )
+    description: str | None = Field(
+        '', description='Hint for what this field captures.'
+    )
+    type: Type3 | None = 'string'
+
+
+class Provider(StrEnum):
+    """
+    Resolved AI provider type.
+    """
+
+    OPENAI_COMPATIBLE = 'OPENAI_COMPATIBLE'
+    CLAUDE = 'CLAUDE'
+    GEMINI = 'GEMINI'
+
+
+class LLMProviderRuntime(BaseModel):
+    """
+    Runtime-only provider credentials injected by the API at dispatch time. Never persisted with the detector config and rejected on create/update.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    provider: Provider = Field(..., description='Resolved AI provider type.')
+    model: str = Field(
+        ...,
+        description='Resolved model identifier (e.g. gpt-4o, claude-sonnet-4-5, gemini-2.0-flash).',
+    )
+    api_key: str = Field(..., description='Decrypted provider API key.')
+    base_url: str | None = Field(
+        None,
+        description='Base URL for OpenAI-compatible endpoints. Null for managed providers.',
+    )
+    context_size: int | None = Field(
+        None, description='Optional context window size configured for the provider.'
+    )
+
+
+class Type4(StrEnum):
     LLM = 'LLM'
 
 
+class MaxTokens(RootModel[int]):
+    root: int = Field(
+        None,
+        description='Maximum tokens to generate. Provider default when null.',
+        ge=1,
+    )
+
+
 class LLMPipelineSchema(BaseModel):
+    """
+    AI detector pipeline. Sends content to a configured LLM provider with a system prompt, classifies it against a label set, and extracts structured fields. Predicted labels become findings (severity via severity_map); extracted fields are stored in finding metadata and extracted_data.
+    """
+
     model_config = ConfigDict(
         extra='forbid',
     )
     type: Literal['LLM'] = 'LLM'
+    system_prompt: str = Field(
+        ...,
+        description='Instruction describing what the model should detect, classify, and extract.',
+    )
+    response_example: str | None = Field(
+        None,
+        description='Optional few-shot example of the JSON the model should return.',
+    )
+    temperature: float | None = Field(
+        0.0,
+        description='Sampling temperature. Lower is more deterministic.',
+        ge=0.0,
+        le=2.0,
+    )
+    max_tokens: MaxTokens | None = Field(
+        None, description='Maximum tokens to generate. Provider default when null.'
+    )
+    labels: list[LLMLabelDefinition] | None = Field(
+        [],
+        description='Classification taxonomy the model assigns to content.',
+        validate_default=True,
+    )
+    multi_label: bool | None = Field(
+        False, description='Allow more than one label per asset.'
+    )
+    severity: Severity | None = Field(
+        'info',
+        description='Default severity when no severity_map rule matches a predicted label.',
+    )
+    severity_map: list[PipelineSeverityRule] | None = Field(
+        None,
+        description='Ordered rules mapping predicted labels to severity levels. First matching rule wins.',
+    )
+    confidence_threshold: float | None = Field(
+        0.5,
+        description='Minimum model confidence to report a label as a finding (0-1).',
+        ge=0.0,
+        le=1.0,
+    )
+    output_fields: list[LLMOutputField] | None = Field(
+        [],
+        description='Structured properties the model extracts. Stored in finding metadata and extracted_data.',
+        validate_default=True,
+    )
+    content_limit: int | None = Field(
+        8000, description='Maximum characters of content sent to the model.', ge=1
+    )
+    provider_runtime: LLMProviderRuntime | None = Field(
+        None,
+        description='Runtime-only credentials injected by the API at dispatch. Never persisted; rejected on create/update.',
+    )
 
 
-class Type4(StrEnum):
+class Type5(StrEnum):
     TEXT_CLASSIFICATION = 'TEXT_CLASSIFICATION'
 
 
@@ -1055,7 +1193,7 @@ class TextClassificationPipelineSchema(BaseModel):
     )
 
 
-class Type5(StrEnum):
+class Type6(StrEnum):
     IMAGE_CLASSIFICATION = 'IMAGE_CLASSIFICATION'
 
 
@@ -1108,7 +1246,7 @@ class ImageClassificationPipelineSchema(BaseModel):
     )
 
 
-class Type6(StrEnum):
+class Type7(StrEnum):
     FEATURE_EXTRACTION = 'FEATURE_EXTRACTION'
 
 
@@ -1180,7 +1318,7 @@ class FeatureExtractionPipelineSchema(BaseModel):
     )
 
 
-class Type7(StrEnum):
+class Type8(StrEnum):
     OBJECT_DETECTION = 'OBJECT_DETECTION'
 
 

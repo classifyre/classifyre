@@ -15,10 +15,13 @@
 
 import * as runtime from '../runtime';
 import type {
+  RerunSandboxRunDto,
   SandboxRunDto,
   SandboxRunListResponseDto,
 } from '../models/index';
 import {
+    RerunSandboxRunDtoFromJSON,
+    RerunSandboxRunDtoToJSON,
     SandboxRunDtoFromJSON,
     SandboxRunDtoToJSON,
     SandboxRunListResponseDtoFromJSON,
@@ -48,6 +51,11 @@ export interface SandboxControllerListRunsRequest {
     sortOrder?: SandboxControllerListRunsSortOrderEnum;
     skip?: number;
     limit?: number;
+}
+
+export interface SandboxControllerRerunRunRequest {
+    id: string;
+    rerunSandboxRunDto: RerunSandboxRunDto;
 }
 
 /**
@@ -126,7 +134,7 @@ export class SandboxApi extends runtime.BaseAPI {
     }
 
     /**
-     * Deletes a sandbox run record. If the run is currently in progress the CLI process is killed first.
+     * Deletes a sandbox run record and its associated S3 file (if no other runs share it). If the run is currently in progress the CLI process is killed first.
      * Delete a sandbox run
      */
     async sandboxControllerDeleteRunRaw(requestParameters: SandboxControllerDeleteRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -156,7 +164,7 @@ export class SandboxApi extends runtime.BaseAPI {
     }
 
     /**
-     * Deletes a sandbox run record. If the run is currently in progress the CLI process is killed first.
+     * Deletes a sandbox run record and its associated S3 file (if no other runs share it). If the run is currently in progress the CLI process is killed first.
      * Delete a sandbox run
      */
     async sandboxControllerDeleteRun(requestParameters: SandboxControllerDeleteRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -262,6 +270,55 @@ export class SandboxApi extends runtime.BaseAPI {
      */
     async sandboxControllerListRuns(requestParameters: SandboxControllerListRunsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SandboxRunListResponseDto> {
         const response = await this.sandboxControllerListRunsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates a new sandbox run using the same uploaded file as an existing run but with a different set of detectors. Requires S3 storage to be configured so the original file can be retrieved. The original run is not modified.
+     * Re-run a sandbox run with different detectors
+     */
+    async sandboxControllerRerunRunRaw(requestParameters: SandboxControllerRerunRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SandboxRunDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling sandboxControllerRerunRun().'
+            );
+        }
+
+        if (requestParameters['rerunSandboxRunDto'] == null) {
+            throw new runtime.RequiredError(
+                'rerunSandboxRunDto',
+                'Required parameter "rerunSandboxRunDto" was null or undefined when calling sandboxControllerRerunRun().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/sandbox/runs/{id}/rerun`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: RerunSandboxRunDtoToJSON(requestParameters['rerunSandboxRunDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SandboxRunDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Creates a new sandbox run using the same uploaded file as an existing run but with a different set of detectors. Requires S3 storage to be configured so the original file can be retrieved. The original run is not modified.
+     * Re-run a sandbox run with different detectors
+     */
+    async sandboxControllerRerunRun(requestParameters: SandboxControllerRerunRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SandboxRunDto> {
+        const response = await this.sandboxControllerRerunRunRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

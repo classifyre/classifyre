@@ -18,6 +18,8 @@ Name | Type
 `status` | string
 `errorMessage` | string
 `durationMs` | number
+`s3Key` | string
+`contentHash` | string
 
 ## Example
 
@@ -38,6 +40,8 @@ const example = {
   "status": null,
   "errorMessage": null,
   "durationMs": null,
+  "s3Key": null,
+  "contentHash": null,
 } satisfies SandboxRunDto
 
 console.log(example)

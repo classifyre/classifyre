@@ -38,12 +38,29 @@ describe('CustomDetectorsService', () => {
       source: {
         findUnique: jest.fn(),
       },
+      aiProviderConfig: {
+        findUnique: jest.fn(),
+      },
     };
 
-    const service = new CustomDetectorsService(prisma as any);
+    const aiProviderConfigService = {
+      get: jest.fn().mockResolvedValue({ id: 'ai-1' }),
+      getRuntimeConfig: jest.fn().mockResolvedValue({
+        provider: 'CLAUDE',
+        model: 'claude-sonnet-4-5',
+        apiKey: 'sk-test',
+        baseUrl: null,
+        contextSize: 128000,
+      }),
+    };
+
+    const service = new CustomDetectorsService(
+      prisma as any,
+      aiProviderConfigService as any,
+    );
     prisma.$queryRaw.mockResolvedValue([]);
 
-    return { service, prisma };
+    return { service, prisma, aiProviderConfigService };
   }
 
   it('creates a custom detector with a GLINER2 pipeline schema', async () => {
@@ -83,6 +100,158 @@ describe('CustomDetectorsService', () => {
     expect(prisma.customDetector.create).toHaveBeenCalled();
     expect(result.key).toBe('cust_legal_risk');
     expect(result.pipelineSchema).toEqual(pipelineSchema);
+  });
+
+  it('creates an LLM detector and persists the AI provider FK', async () => {
+    const { service, prisma, aiProviderConfigService } = createService();
+
+    const pipelineSchema = {
+      type: 'LLM',
+      system_prompt: 'Classify the sentiment.',
+      labels: [{ name: 'good' }, { name: 'bad' }],
+    };
+
+    prisma.customDetector.create.mockResolvedValue({
+      id: 'det-llm',
+      key: 'cust_sentiment',
+      name: 'Sentiment',
+      description: null,
+      isActive: true,
+      version: 1,
+      pipelineSchema,
+      aiProviderConfigId: 'ai-1',
+      lastTrainedAt: null,
+      lastTrainingSummary: null,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      trainingRuns: [],
+      _count: { findings: 0 },
+    });
+
+    const result = await service.create({
+      name: 'Sentiment',
+      key: 'cust_sentiment',
+      aiProviderConfigId: 'ai-1',
+      pipelineSchema,
+    });
+
+    expect(aiProviderConfigService.get).toHaveBeenCalledWith('ai-1');
+    expect(prisma.customDetector.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ aiProviderConfigId: 'ai-1' }),
+      }),
+    );
+    expect(result.aiProviderConfigId).toBe('ai-1');
+  });
+
+  it('rejects an LLM detector without aiProviderConfigId', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.create({
+        name: 'Sentiment',
+        pipelineSchema: { type: 'LLM', system_prompt: 'Classify.' },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects an LLM detector missing system_prompt', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.create({
+        name: 'Sentiment',
+        aiProviderConfigId: 'ai-1',
+        pipelineSchema: { type: 'LLM' },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects a client-supplied provider_runtime', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.create({
+        name: 'Sentiment',
+        aiProviderConfigId: 'ai-1',
+        pipelineSchema: {
+          type: 'LLM',
+          system_prompt: 'Classify.',
+          provider_runtime: { provider: 'CLAUDE', model: 'x', api_key: 'leak' },
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('injects decrypted provider_runtime into LLM recipe entries', async () => {
+    const { service, prisma, aiProviderConfigService } = createService();
+
+    prisma.customDetector.findMany.mockResolvedValue([
+      {
+        id: 'det-llm',
+        key: 'cust_sentiment',
+        name: 'Sentiment',
+        description: null,
+        isActive: true,
+        aiProviderConfigId: 'ai-1',
+        pipelineSchema: { type: 'LLM', system_prompt: 'Classify.' },
+      },
+    ]);
+
+    const entries = await service.buildRuntimeCustomDetectorsByKeys([
+      'cust_sentiment',
+    ]);
+
+    expect(aiProviderConfigService.getRuntimeConfig).toHaveBeenCalledWith(
+      'ai-1',
+    );
+    const schema = entries[0].detector.config.pipeline_schema as Record<
+      string,
+      any
+    >;
+    expect(schema.provider_runtime).toEqual({
+      provider: 'CLAUDE',
+      model: 'claude-sonnet-4-5',
+      api_key: 'sk-test',
+      base_url: null,
+      context_size: 128000,
+    });
+  });
+
+  it('skips an LLM detector whose provider credential cannot be resolved', async () => {
+    const { service, prisma, aiProviderConfigService } = createService();
+
+    prisma.customDetector.findMany.mockResolvedValue([
+      {
+        id: 'det-llm',
+        key: 'cust_broken',
+        name: 'Broken',
+        description: null,
+        isActive: true,
+        aiProviderConfigId: 'ai-1',
+        pipelineSchema: { type: 'LLM', system_prompt: 'Classify.' },
+      },
+      {
+        id: 'det-regex',
+        key: 'cust_regex',
+        name: 'Regex',
+        description: null,
+        isActive: true,
+        aiProviderConfigId: null,
+        pipelineSchema: { type: 'REGEX', patterns: [] },
+      },
+    ]);
+    aiProviderConfigService.getRuntimeConfig.mockRejectedValue(
+      new Error('AI provider "X" has no API key configured.'),
+    );
+
+    const entries = await service.buildRuntimeCustomDetectorsByKeys([
+      'cust_broken',
+      'cust_regex',
+    ]);
+
+    // The broken LLM detector is dropped; the healthy regex detector survives.
+    expect(entries.map((e) => e.key)).toEqual(['cust_regex']);
   });
 
   it('rejects unknown IDs in assertActiveDetectorIds', async () => {

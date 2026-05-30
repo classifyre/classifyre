@@ -17,6 +17,13 @@ export class CustomDetectorResponseDto {
   @ApiProperty({ type: 'object', additionalProperties: true })
   pipelineSchema: Record<string, unknown>;
 
+  @ApiPropertyOptional({
+    description:
+      'AI provider credential ID backing this detector (LLM detectors only).',
+    nullable: true,
+  })
+  aiProviderConfigId?: string | null;
+
   @ApiProperty()
   isActive: boolean;
 

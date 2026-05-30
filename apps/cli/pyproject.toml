@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-cli"
-version = "0.4.9"
+version = "0.4.10"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -91,6 +91,9 @@ custom = [
 regex = [
     "google-re2>=1.1",
 ]
+llm = [
+    "litellm>=1.86.2",
+]
 detectors = [
     { include-group = "file-processing" },
     { include-group = "privacy" },
@@ -101,6 +104,7 @@ detectors = [
     { include-group = "classification" },
     { include-group = "custom" },
     { include-group = "regex" },
+    { include-group = "llm" },
 ]
 file-processing = [
     "filetype>=1.2.0",
@@ -264,6 +268,8 @@ module = [
     "datasets",
     "setfit.*",
     "setfit",
+    "litellm.*",
+    "litellm",
     "sklearn.*",
     "sklearn",
     "numpy",

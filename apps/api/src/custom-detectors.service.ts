@@ -18,6 +18,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as XLSX from 'xlsx';
 import { PrismaService } from './prisma.service';
+import { AiProviderConfigService } from './ai-provider-config.service';
 import { stableStringify } from './utils/masked-config.utils';
 import { resolveSchemaFile } from './utils/schema-path';
 import { CreateCustomDetectorDto } from './dto/create-custom-detector.dto';
@@ -125,7 +126,10 @@ function stringifySpreadsheetCell(value: unknown): string {
 export class CustomDetectorsService {
   private readonly logger = new Logger(CustomDetectorsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly aiProviderConfigService: AiProviderConfigService,
+  ) {}
 
   private parseDelimitedLine(line: string, delimiter: string): string[] {
     const cells: string[] = [];
@@ -729,9 +733,12 @@ export class CustomDetectorsService {
     const incoming = input.pipelineSchema;
     const schemaType = (incoming.type as string | undefined) ?? 'GLINER2';
 
-    // Transformer pipeline types store config directly in pipeline_schema —
+    // Transformer and LLM pipeline types store config directly in pipeline_schema —
     // don't merge GLINER2 defaults (entities/classification/validation) on top.
-    if (CustomDetectorsService.TRANSFORMER_PIPELINE_TYPES.has(schemaType)) {
+    if (
+      CustomDetectorsService.TRANSFORMER_PIPELINE_TYPES.has(schemaType) ||
+      schemaType === 'LLM'
+    ) {
       const config: JsonRecord = {
         custom_detector_key: input.key,
         name: input.name,
@@ -801,9 +808,14 @@ export class CustomDetectorsService {
     }
 
     if (schemaType === 'LLM') {
-      if (!schema.prompt || typeof schema.prompt !== 'string') {
+      if (!schema.system_prompt || typeof schema.system_prompt !== 'string') {
         throw new BadRequestException(
-          'LLM pipeline schema must define a prompt string',
+          'LLM (AI) pipeline schema must define a system_prompt string',
+        );
+      }
+      if (schema.provider_runtime !== undefined) {
+        throw new BadRequestException(
+          'provider_runtime is injected by the server and must not be supplied by clients',
         );
       }
       return;
@@ -837,6 +849,60 @@ export class CustomDetectorsService {
         'Pipeline schema must define at least one entity or one classification task',
       );
     }
+  }
+
+  /**
+   * Resolve the AI provider credential FK for a detector. LLM detectors require
+   * a valid `aiProviderConfigId`; all other types must not carry one (returns null).
+   */
+  private async resolveAiProviderConfigId(
+    pipelineSchema: Record<string, unknown>,
+    requested: string | null | undefined,
+  ): Promise<string | null> {
+    const schemaType = (pipelineSchema.type as string | undefined) ?? 'GLINER2';
+    if (schemaType !== 'LLM') {
+      return null;
+    }
+    if (!requested || typeof requested !== 'string') {
+      throw new BadRequestException(
+        'LLM (AI) detectors require aiProviderConfigId referencing a configured AI provider credential',
+      );
+    }
+    // Throws NotFoundException when the credential does not exist.
+    await this.aiProviderConfigService.get(requested);
+    return requested;
+  }
+
+  /**
+   * For LLM detectors, resolve the configured provider credential (decrypting the
+   * API key) and inject a runtime-only `provider_runtime` block into the pipeline
+   * schema so the CLI worker can call the provider directly. No-op for other types.
+   */
+  private async injectLlmProviderRuntime(
+    pipelineSchema: Record<string, unknown>,
+    aiProviderConfigId: string | null,
+  ): Promise<Record<string, unknown>> {
+    const schemaType = (pipelineSchema.type as string | undefined) ?? 'GLINER2';
+    if (schemaType !== 'LLM') {
+      return pipelineSchema;
+    }
+    if (!aiProviderConfigId) {
+      throw new BadRequestException(
+        'LLM (AI) detector is missing an AI provider credential and cannot be dispatched',
+      );
+    }
+    const runtime =
+      await this.aiProviderConfigService.getRuntimeConfig(aiProviderConfigId);
+    return {
+      ...pipelineSchema,
+      provider_runtime: {
+        provider: runtime.provider,
+        model: runtime.model,
+        api_key: runtime.apiKey,
+        base_url: runtime.baseUrl ?? null,
+        context_size: runtime.contextSize ?? null,
+      },
+    };
   }
 
   private toTrainingRunDto(
@@ -877,6 +943,7 @@ export class CustomDetectorsService {
       name: detector.name,
       description: detector.description,
       pipelineSchema: asRecord((detector as any).pipelineSchema),
+      aiProviderConfigId: (detector as any).aiProviderConfigId ?? null,
       isActive: detector.isActive,
       version: detector.version,
       lastTrainedAt: detector.lastTrainedAt,
@@ -1030,6 +1097,10 @@ export class CustomDetectorsService {
   ): Promise<CustomDetectorResponseDto> {
     const key = this.normalizeKey(dto.key ?? `cust_${dto.name}`);
     this.validatePipelineSchema(dto.pipelineSchema);
+    const aiProviderConfigId = await this.resolveAiProviderConfigId(
+      dto.pipelineSchema,
+      dto.aiProviderConfigId,
+    );
 
     let detector;
     try {
@@ -1039,6 +1110,7 @@ export class CustomDetectorsService {
           name: dto.name,
           description: dto.description,
           pipelineSchema: dto.pipelineSchema as Prisma.InputJsonValue,
+          aiProviderConfigId,
           isActive: dto.isActive ?? true,
         } as any,
         include: {
@@ -1085,6 +1157,15 @@ export class CustomDetectorsService {
       this.validatePipelineSchema(nextPipelineSchema);
     }
 
+    const requestedProviderId =
+      dto.aiProviderConfigId !== undefined
+        ? dto.aiProviderConfigId
+        : ((existing as any).aiProviderConfigId as string | null);
+    const aiProviderConfigId = await this.resolveAiProviderConfigId(
+      nextPipelineSchema,
+      requestedProviderId,
+    );
+
     const nextVersion =
       stableStringify(nextPipelineSchema) !==
       stableStringify((existing as any).pipelineSchema)
@@ -1101,6 +1182,7 @@ export class CustomDetectorsService {
           description: nextDescription,
           isActive: dto.isActive ?? existing.isActive,
           pipelineSchema: nextPipelineSchema as Prisma.InputJsonValue,
+          aiProviderConfigId,
           version: nextVersion,
         } as any,
         include: {
@@ -1244,27 +1326,15 @@ export class CustomDetectorsService {
     });
 
     const byId = new Map(rows.map((row) => [row.id, row]));
-    return normalizedIds
+    const orderedRows = normalizedIds
       .map((id) => byId.get(id))
-      .filter((row): row is CustomDetector => Boolean(row))
-      .map((row) => ({
-        id: row.id,
-        key: row.key,
-        name: row.name,
-        detector: {
-          type: 'CUSTOM' as const,
-          enabled: true,
-          config: {
-            custom_detector_key: row.key,
-            name: row.name,
-            description: row.description,
-            languages: ['de', 'en'],
-            confidence_threshold: 0.7,
-            max_findings: 100,
-            pipeline_schema: asRecord((row as any).pipelineSchema),
-          },
-        },
-      }));
+      .filter((row): row is CustomDetector => Boolean(row));
+    const entries = await Promise.all(
+      orderedRows.map((row) => this.toRuntimeEntry(row)),
+    );
+    return entries.filter((entry): entry is NonNullable<typeof entry> =>
+      Boolean(entry),
+    );
   }
 
   /**
@@ -1299,27 +1369,65 @@ export class CustomDetectorsService {
     });
 
     const byKey = new Map(rows.map((row) => [row.key, row]));
-    return normalizedKeys
+    const orderedRows = normalizedKeys
       .map((key) => byKey.get(key))
-      .filter((row): row is CustomDetector => Boolean(row))
-      .map((row) => ({
-        id: row.id,
-        key: row.key,
-        name: row.name,
-        detector: {
-          type: 'CUSTOM' as const,
-          enabled: true,
-          config: {
-            custom_detector_key: row.key,
-            name: row.name,
-            description: row.description,
-            languages: ['de', 'en'],
-            confidence_threshold: 0.7,
-            max_findings: 100,
-            pipeline_schema: asRecord((row as any).pipelineSchema),
-          },
+      .filter((row): row is CustomDetector => Boolean(row));
+    const entries = await Promise.all(
+      orderedRows.map((row) => this.toRuntimeEntry(row)),
+    );
+    return entries.filter((entry): entry is NonNullable<typeof entry> =>
+      Boolean(entry),
+    );
+  }
+
+  /**
+   * Build a single recipe entry from a custom detector row, hydrating LLM
+   * provider credentials when needed. Returns null when an LLM detector's
+   * provider credential cannot be resolved (missing key/model/credential) so a
+   * single misconfigured detector is skipped rather than failing the whole run.
+   */
+  private async toRuntimeEntry(row: CustomDetector): Promise<{
+    id: string;
+    key: string;
+    name: string;
+    detector: {
+      type: 'CUSTOM';
+      enabled: true;
+      config: Record<string, unknown>;
+    };
+  } | null> {
+    let pipelineSchema: Record<string, unknown>;
+    try {
+      pipelineSchema = await this.injectLlmProviderRuntime(
+        asRecord((row as any).pipelineSchema),
+        (row as any).aiProviderConfigId ?? null,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Skipping custom detector "${row.key}" (${row.id}): unable to resolve AI provider credential — ${String(
+          error instanceof Error ? error.message : error,
+        )}`,
+      );
+      return null;
+    }
+    return {
+      id: row.id,
+      key: row.key,
+      name: row.name,
+      detector: {
+        type: 'CUSTOM' as const,
+        enabled: true,
+        config: {
+          custom_detector_key: row.key,
+          name: row.name,
+          description: row.description,
+          languages: ['de', 'en'],
+          confidence_threshold: 0.7,
+          max_findings: 100,
+          pipeline_schema: pipelineSchema,
         },
-      }));
+      },
+    };
   }
 
   // ── Training examples CRUD ─────────────────────────────────────────────────

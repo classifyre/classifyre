@@ -1057,13 +1057,7 @@ export function AssetsTable({
                           <Badge
                             variant={statusVariant[asset.status] || "outline"}
                           >
-                            {asset.status === "NEW"
-                              ? t("assets.assetNew" as TranslationKey)
-                              : asset.status === "UPDATED"
-                                ? t("assets.assetUpdated" as TranslationKey)
-                                : asset.status === "UNCHANGED"
-                                  ? t("assets.assetUnchanged" as TranslationKey)
-                                  : asset.status}
+                            {t(`sources.asset${asset.status.charAt(0) + asset.status.slice(1).toLowerCase()}` as TranslationKey)}
                           </Badge>
                         </TableCell>
 
