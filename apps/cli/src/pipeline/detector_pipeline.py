@@ -410,7 +410,7 @@ class DetectorPipeline:
             )
             return page_findings, page_types, page_errors, page_content, page_num
 
-        async def _collect_done_and_flush() -> None:
+        async def _collect_done_and_flush(min_findings: int = 1) -> None:
             nonlocal detector_types_run, unflushed_count
             done = {t for t in pending_tasks if t.done()}
             for task in done:
@@ -430,7 +430,7 @@ class DetectorPipeline:
                 )
                 unflushed_count += len(page_findings)
 
-            if unflushed_count >= findings_flush_size and unflushed_count > 0:
+            if unflushed_count >= min_findings and unflushed_count > 0:
                 logger.debug(
                     "  %s flushing %d findings (%d total)",
                     asset.name,
@@ -449,36 +449,17 @@ class DetectorPipeline:
             if not text_content:
                 continue
 
+            # Bound the number of detector tasks in flight. While the buffer is
+            # full we batch flushes by ``findings_flush_size`` to avoid hammering
+            # the API when pages pile up faster than detectors can drain them.
             while len(pending_tasks) >= max_pending:
-                done, pending_tasks_set = await asyncio.wait(
-                    pending_tasks,
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-                pending_tasks = pending_tasks_set
-                for task in done:
-                    page_findings, page_types, page_errors, page_content, _pn = task.result()
-                    for finding in page_findings:
-                        self.content_provider.enrich_finding_location(
-                            finding,
-                            asset,
-                            page_content,
-                        )
-                    findings.extend(page_findings)
-                    errors.extend(page_errors)
-                    detector_types_run = self._merge_detector_types(
-                        detector_types_run,
-                        page_types,
-                    )
-                    unflushed_count += len(page_findings)
-                if unflushed_count >= findings_flush_size and unflushed_count > 0:
-                    logger.info(
-                        "  %s flushing %d findings (%d total)",
-                        asset.name,
-                        unflushed_count,
-                        len(findings),
-                    )
-                    await on_findings_flushed(list(findings))
-                    unflushed_count = 0
+                await asyncio.wait(pending_tasks, return_when=asyncio.FIRST_COMPLETED)
+                await _collect_done_and_flush(findings_flush_size)
+
+            # Steady state: flush findings from any page that has already
+            # finished as soon as they are available, so real findings stream to
+            # the API per page instead of only once the whole asset is processed.
+            await _collect_done_and_flush()
 
             task = asyncio.create_task(_detect_page(text_content, page_index))
             pending_tasks.add(task)
