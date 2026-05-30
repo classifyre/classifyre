@@ -183,7 +183,7 @@ def test_supported_content_types_gated_by_vision() -> None:
 def test_vision_detect_builds_image_blocks_and_findings(monkeypatch) -> None:
     monkeypatch.setattr(
         "src.detectors.custom.runners._llm.render_to_images",
-        lambda content, content_type, **_: [b"\x89PNG-page-1", b"\x89PNG-page-2"],
+        lambda _content, _content_type, **_: [b"\x89PNG-page-1", b"\x89PNG-page-2"],
     )
     completion = _mock_completion(
         {"labels": [{"name": "bad", "confidence": 0.9}], "fields": {"language": "en"}}
@@ -217,7 +217,7 @@ def test_vision_disabled_returns_no_findings_for_bytes(monkeypatch) -> None:
 def test_vision_no_images_rendered_returns_empty(monkeypatch) -> None:
     monkeypatch.setattr(
         "src.detectors.custom.runners._llm.render_to_images",
-        lambda *a, **k: [],
+        lambda *_, **__: [],
     )
     completion = _mock_completion({"labels": [{"name": "bad", "confidence": 0.9}]})
     runner = _runner(_schema(provider_runtime=_vision_runtime()), completion)

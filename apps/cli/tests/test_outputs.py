@@ -157,6 +157,7 @@ class _FakeSession:
     def __init__(self, responses: list[_FakeResponse]):
         self.responses = responses
         self.calls: list[dict[str, Any]] = []
+        self.headers: dict[str, str] = {}
 
     def mount(self, prefix: str, adapter: Any) -> None:
         """Absorb HTTPAdapter.mount() calls from RestOutputSink.__init__."""
