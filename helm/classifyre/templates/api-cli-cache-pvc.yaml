@@ -1,8 +1,14 @@
 {{- if and .Values.api.cliJobs.enabled .Values.api.cliJobs.uvCache.enabled (not .Values.api.cliJobs.uvCache.existingClaim) }}
+{{- $pvcName := printf "%s-cli-uv-cache" (include "classifyre.fullname" .) }}
+{{- $existing := lookup "v1" "PersistentVolumeClaim" .Release.Namespace $pvcName }}
+{{- $storage := .Values.api.cliJobs.uvCache.size }}
+{{- if $existing }}
+{{- $storage = dig "spec" "resources" "requests" "storage" .Values.api.cliJobs.uvCache.size $existing }}
+{{- end }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ printf "%s-cli-uv-cache" (include "classifyre.fullname" .) }}
+  name: {{ $pvcName }}
   labels:
     {{- include "classifyre.commonLabels" . | nindent 4 }}
 spec:
@@ -10,7 +16,7 @@ spec:
     {{- toYaml .Values.api.cliJobs.uvCache.accessModes | nindent 4 }}
   resources:
     requests:
-      storage: {{ .Values.api.cliJobs.uvCache.size }}
+      storage: {{ $storage }}
   {{- with .Values.api.cliJobs.uvCache.storageClassName }}
   storageClassName: {{ . | quote }}
   {{- end }}
