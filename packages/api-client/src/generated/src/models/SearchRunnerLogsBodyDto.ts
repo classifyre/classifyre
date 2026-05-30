@@ -20,11 +20,17 @@ import { mapValues } from '../runtime';
  */
 export interface SearchRunnerLogsBodyDto {
     /**
-     * Opaque pagination cursor
+     * Opaque pagination cursor (i:N = skip N entries)
      * @type {string}
      * @memberof SearchRunnerLogsBodyDto
      */
     cursor?: string;
+    /**
+     * Index-based skip (takes precedence over cursor)
+     * @type {number}
+     * @memberof SearchRunnerLogsBodyDto
+     */
+    skip?: number;
     /**
      * 
      * @type {number}
@@ -110,6 +116,7 @@ export function SearchRunnerLogsBodyDtoFromJSONTyped(json: any, ignoreDiscrimina
     return {
         
         'cursor': json['cursor'] == null ? undefined : json['cursor'],
+        'skip': json['skip'] == null ? undefined : json['skip'],
         'take': json['take'] == null ? undefined : json['take'],
         'search': json['search'] == null ? undefined : json['search'],
         'levels': json['levels'] == null ? undefined : json['levels'],
@@ -130,6 +137,7 @@ export function SearchRunnerLogsBodyDtoToJSONTyped(value?: SearchRunnerLogsBodyD
     return {
         
         'cursor': value['cursor'],
+        'skip': value['skip'],
         'take': value['take'],
         'search': value['search'],
         'levels': value['levels'],

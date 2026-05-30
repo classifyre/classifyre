@@ -10,6 +10,7 @@ Name | Type
 `key` | string
 `description` | string
 `isActive` | boolean
+`aiProviderConfigId` | string
 `pipelineSchema` | object
 
 ## Example
@@ -23,6 +24,7 @@ const example = {
   "key": cust_support_ticket_extractor,
   "description": Extracts order IDs, amounts, and intent from support tickets,
   "isActive": null,
+  "aiProviderConfigId": 3f1c2b6e-1d4a-4c7e-9c2a-7b6d5e4f3a21,
   "pipelineSchema": null,
 } satisfies UpdateCustomDetectorDto
 

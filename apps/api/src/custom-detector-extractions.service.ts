@@ -116,18 +116,24 @@ export class CustomDetectorExtractionsService {
     };
   }
 
-  async createFromIngestion(data: {
-    findingId: string;
-    customDetectorId: string | null;
-    customDetectorKey: string;
-    sourceId: string;
-    assetId: string;
-    runnerId: string | null;
-    detectorVersion: number;
-    pipelineResult: Record<string, unknown>;
-    extractedAt: Date;
-  }): Promise<void> {
-    await (this.prisma.customDetectorExtraction.upsert as any)({
+  async createFromIngestion(
+    data: {
+      findingId: string;
+      customDetectorId: string | null;
+      customDetectorKey: string;
+      sourceId: string;
+      assetId: string;
+      runnerId: string | null;
+      detectorVersion: number;
+      pipelineResult: Record<string, unknown>;
+      extractedAt: Date;
+    },
+    // When called from within a transaction, pass the transaction client so the
+    // extraction row is inserted in the same transaction as its parent finding —
+    // otherwise the finding is still uncommitted and the FK constraint fails (P2003).
+    client: Pick<PrismaService, 'customDetectorExtraction'> = this.prisma,
+  ): Promise<void> {
+    await (client.customDetectorExtraction.upsert as any)({
       where: { findingId: data.findingId },
       create: {
         findingId: data.findingId,

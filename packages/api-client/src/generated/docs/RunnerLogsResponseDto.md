@@ -12,6 +12,7 @@ Name | Type
 `cursor` | string
 `hasMore` | boolean
 `take` | number
+`total` | number
 
 ## Example
 
@@ -26,6 +27,7 @@ const example = {
   "cursor": null,
   "hasMore": null,
   "take": null,
+  "total": null,
 } satisfies RunnerLogsResponseDto
 
 console.log(example)

@@ -1895,17 +1895,21 @@ export class AssetService {
               detection.detectionIdentity,
             );
             if (!savedFinding) continue;
-            await this.customDetectorExtractionsService.createFromIngestion({
-              findingId: savedFinding.id,
-              customDetectorId: detection.customDetectorId ?? null,
-              customDetectorKey: detection.customDetectorKey,
-              sourceId: detection.sourceId,
-              assetId: detection.assetId,
-              runnerId: detection.runnerId ?? null,
-              detectorVersion: 1,
-              pipelineResult: detection.pipelineResult,
-              extractedAt: detection.detectedAt ?? new Date(),
-            });
+            await this.customDetectorExtractionsService.createFromIngestion(
+              {
+                findingId: savedFinding.id,
+                customDetectorId: detection.customDetectorId ?? null,
+                customDetectorKey: detection.customDetectorKey,
+                sourceId: detection.sourceId,
+                assetId: detection.assetId,
+                runnerId: detection.runnerId ?? null,
+                detectorVersion: 1,
+                pipelineResult: detection.pipelineResult,
+                extractedAt: detection.detectedAt ?? new Date(),
+              },
+              // Use the transaction client so the FK to the just-created finding resolves.
+              tx as unknown as Pick<PrismaService, 'customDetectorExtraction'>,
+            );
           }
         }
 

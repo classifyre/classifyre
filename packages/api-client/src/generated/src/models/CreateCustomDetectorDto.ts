@@ -44,7 +44,13 @@ export interface CreateCustomDetectorDto {
      */
     isActive?: boolean;
     /**
-     * Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)
+     * AI provider credential ID. Required for LLM (AI) detectors; the API resolves and injects the decrypted provider config at scan time.
+     * @type {string}
+     * @memberof CreateCustomDetectorDto
+     */
+    aiProviderConfigId?: string;
+    /**
+     * Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | FEATURE_EXTRACTION | OBJECT_DETECTION)
      * @type {object}
      * @memberof CreateCustomDetectorDto
      */
@@ -74,6 +80,7 @@ export function CreateCustomDetectorDtoFromJSONTyped(json: any, ignoreDiscrimina
         'key': json['key'] == null ? undefined : json['key'],
         'description': json['description'] == null ? undefined : json['description'],
         'isActive': json['isActive'] == null ? undefined : json['isActive'],
+        'aiProviderConfigId': json['aiProviderConfigId'] == null ? undefined : json['aiProviderConfigId'],
         'pipelineSchema': json['pipelineSchema'],
     };
 }
@@ -93,6 +100,7 @@ export function CreateCustomDetectorDtoToJSONTyped(value?: CreateCustomDetectorD
         'key': value['key'],
         'description': value['description'],
         'isActive': value['isActive'],
+        'aiProviderConfigId': value['aiProviderConfigId'],
         'pipelineSchema': value['pipelineSchema'],
     };
 }

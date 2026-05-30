@@ -12,6 +12,7 @@ Name | Type
 `language` | string
 `timezone` | string
 `timeFormat` | string
+`aiProviderConfigId` | string
 `demoMode` | boolean
 `createdAt` | Date
 `updatedAt` | Date
@@ -29,6 +30,7 @@ const example = {
   "language": ENGLISH,
   "timezone": AUTOMATIC,
   "timeFormat": TWELVE_HOUR,
+  "aiProviderConfigId": null,
   "demoMode": false,
   "createdAt": null,
   "updatedAt": null,

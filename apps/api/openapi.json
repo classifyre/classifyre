@@ -2886,11 +2886,76 @@
         ]
       }
     },
-    "/instance-settings/ai-provider": {
+    "/ai-provider-configs": {
       "get": {
-        "description": "Returns the current AI provider, model, base URL, and a masked API key preview.",
-        "operationId": "AiProviderConfigController_getConfig",
+        "description": "Returns all stored AI provider credentials with masked API key previews.",
+        "operationId": "AiProviderConfigController_list",
         "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AiProviderConfigResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List AI provider configurations",
+        "tags": [
+          "AI Provider Configs"
+        ]
+      },
+      "post": {
+        "description": "Create a reusable credential. The API key is sent in plaintext and stored encrypted.",
+        "operationId": "AiProviderConfigController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAiProviderConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiProviderConfigResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create an AI provider configuration",
+        "tags": [
+          "AI Provider Configs"
+        ]
+      }
+    },
+    "/ai-provider-configs/{id}": {
+      "get": {
+        "operationId": "AiProviderConfigController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2903,15 +2968,24 @@
             }
           }
         },
-        "summary": "Get AI provider configuration",
+        "summary": "Get a single AI provider configuration",
         "tags": [
-          "Instance Settings"
+          "AI Provider Configs"
         ]
       },
       "put": {
-        "description": "Update any combination of provider, model, API key (plaintext — stored encrypted), and base URL. Pass apiKey as an empty string to clear a stored key.",
-        "operationId": "AiProviderConfigController_updateConfig",
-        "parameters": [],
+        "description": "Update any combination of name, provider, model, API key (plaintext — stored encrypted), base URL, and context size. Pass apiKey as an empty string to clear a stored key.",
+        "operationId": "AiProviderConfigController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2934,9 +3008,69 @@
             }
           }
         },
-        "summary": "Update AI provider configuration",
+        "summary": "Update an AI provider configuration",
         "tags": [
-          "Instance Settings"
+          "AI Provider Configs"
+        ]
+      },
+      "delete": {
+        "operationId": "AiProviderConfigController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          }
+        },
+        "summary": "Delete an AI provider configuration",
+        "tags": [
+          "AI Provider Configs"
+        ]
+      }
+    },
+    "/ai-provider-configs/{id}/test": {
+      "post": {
+        "description": "Runs a small structured-JSON round-trip against the given credential to verify the provider, model, and API key work.",
+        "operationId": "AiProviderConfigController_test",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiProviderConfigTestResultDto"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "AI provider returned an error"
+          },
+          "503": {
+            "description": "AI provider not configured or rate limit hit"
+          }
+        },
+        "summary": "Test an AI provider configuration",
+        "tags": [
+          "AI Provider Configs"
         ]
       }
     },
@@ -3756,6 +3890,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict — a run with the same file content already exists"
           }
         },
         "summary": "Upload a file and run detectors on it",
@@ -3944,7 +4081,7 @@
         ]
       },
       "delete": {
-        "description": "Deletes a sandbox run record. If the run is currently in progress the CLI process is killed first.",
+        "description": "Deletes a sandbox run record and its associated S3 file (if no other runs share it). If the run is currently in progress the CLI process is killed first.",
         "operationId": "SandboxController_deleteRun",
         "parameters": [
           {
@@ -3962,6 +4099,51 @@
           }
         },
         "summary": "Delete a sandbox run",
+        "tags": [
+          "Sandbox"
+        ]
+      }
+    },
+    "/sandbox/runs/{id}/rerun": {
+      "post": {
+        "description": "Creates a new sandbox run using the same uploaded file as an existing run\nbut with a different set of detectors. Requires S3 storage to be configured so\nthe original file can be retrieved. The original run is not modified.",
+        "operationId": "SandboxController_rerunRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RerunSandboxRunDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New run created from the original file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxRunDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict — identical file already has a non-error run (only when skipDuplicateCheck is false)"
+          }
+        },
+        "summary": "Re-run a sandbox run with different detectors",
         "tags": [
           "Sandbox"
         ]
@@ -4879,6 +5061,7 @@
           },
           "latestRunner": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/LatestRunnerSummaryDto"
@@ -6511,6 +6694,11 @@
             "type": "object",
             "additionalProperties": true
           },
+          "aiProviderConfigId": {
+            "type": "string",
+            "description": "AI provider credential ID backing this detector (LLM detectors only).",
+            "nullable": true
+          },
           "isActive": {
             "type": "boolean"
           },
@@ -6609,9 +6797,14 @@
             "description": "Whether this detector can be selected in sources",
             "default": true
           },
+          "aiProviderConfigId": {
+            "type": "string",
+            "description": "AI provider credential ID. Required for LLM (AI) detectors; the API resolves and injects the decrypted provider config at scan time.",
+            "example": "3f1c2b6e-1d4a-4c7e-9c2a-7b6d5e4f3a21"
+          },
           "pipelineSchema": {
             "type": "object",
-            "description": "Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)"
+            "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | FEATURE_EXTRACTION | OBJECT_DETECTION)"
           }
         },
         "required": [
@@ -6753,9 +6946,14 @@
             "description": "Whether this detector can be selected in sources",
             "default": true
           },
+          "aiProviderConfigId": {
+            "type": "string",
+            "description": "AI provider credential ID. Required for LLM (AI) detectors; the API resolves and injects the decrypted provider config at scan time.",
+            "example": "3f1c2b6e-1d4a-4c7e-9c2a-7b6d5e4f3a21"
+          },
           "pipelineSchema": {
             "type": "object",
-            "description": "Pipeline schema defining entities, classification, and validation (type: GLINER2 | REGEX | LLM)"
+            "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | FEATURE_EXTRACTION | OBJECT_DETECTION)"
           }
         }
       },
@@ -7453,6 +7651,7 @@
           },
           "source": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/DiscoveryRunSourceDto"
@@ -7747,6 +7946,11 @@
             ],
             "example": "TWELVE_HOUR"
           },
+          "aiProviderConfigId": {
+            "type": "string",
+            "description": "Id of the AI provider credential used as the instance-wide default. Null when unset.",
+            "nullable": true
+          },
           "demoMode": {
             "type": "boolean",
             "description": "Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.",
@@ -7768,6 +7972,7 @@
           "language",
           "timezone",
           "timeFormat",
+          "aiProviderConfigId",
           "demoMode",
           "createdAt",
           "updatedAt"
@@ -7808,6 +8013,11 @@
               "TWENTY_FOUR_HOUR"
             ],
             "example": "TWELVE_HOUR"
+          },
+          "aiProviderConfigId": {
+            "type": "string",
+            "description": "Id of the AI provider credential to use as the instance-wide default. Pass null or an empty string to clear the selection.",
+            "nullable": true
           }
         }
       },
@@ -8082,6 +8292,15 @@
       "AiProviderConfigResponseDto": {
         "type": "object",
         "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "User-friendly label for this credential.",
+            "example": "Production Claude"
+          },
           "provider": {
             "type": "string",
             "enum": [
@@ -8113,6 +8332,12 @@
             "example": "https://openrouter.ai/api/v1",
             "nullable": true
           },
+          "contextSize": {
+            "type": "number",
+            "description": "Context window size in tokens. Null when unspecified.",
+            "example": 200000,
+            "nullable": true
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -8123,18 +8348,69 @@
           }
         },
         "required": [
+          "id",
+          "name",
           "provider",
           "model",
           "hasApiKey",
           "apiKeyPreview",
           "baseUrl",
+          "contextSize",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "CreateAiProviderConfigDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "User-friendly label for this credential.",
+            "example": "Production Claude"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "OPENAI_COMPATIBLE",
+              "CLAUDE",
+              "GEMINI"
+            ],
+            "example": "CLAUDE"
+          },
+          "model": {
+            "type": "string",
+            "description": "Model identifier.",
+            "example": "claude-sonnet-4-5"
+          },
+          "apiKey": {
+            "type": "string",
+            "description": "Plaintext API key. Sent once, stored encrypted.",
+            "example": "sk-proj-..."
+          },
+          "baseUrl": {
+            "type": "string",
+            "description": "Base URL for OpenAI-compatible providers. Ignored for CLAUDE and GEMINI.",
+            "example": "https://openrouter.ai/api/v1"
+          },
+          "contextSize": {
+            "type": "number",
+            "description": "Context window size in tokens.",
+            "example": 200000
+          }
+        },
+        "required": [
+          "name",
+          "provider"
         ]
       },
       "UpdateAiProviderConfigDto": {
         "type": "object",
         "properties": {
+          "name": {
+            "type": "string",
+            "description": "User-friendly label for this credential.",
+            "example": "Production Claude"
+          },
           "provider": {
             "type": "string",
             "enum": [
@@ -8158,8 +8434,35 @@
             "type": "string",
             "description": "Base URL for OpenAI-compatible providers. Ignored for CLAUDE and GEMINI.",
             "example": "https://openrouter.ai/api/v1"
+          },
+          "contextSize": {
+            "type": "number",
+            "description": "Context window size in tokens.",
+            "example": 200000
           }
         }
+      },
+      "AiProviderConfigTestResultDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "OPENAI_COMPATIBLE",
+              "CLAUDE",
+              "GEMINI"
+            ],
+            "example": "CLAUDE"
+          },
+          "model": {
+            "type": "string",
+            "example": "claude-sonnet-4-5"
+          }
+        },
+        "required": [
+          "provider",
+          "model"
+        ]
       },
       "AiMessageDto": {
         "type": "object",
@@ -8542,7 +8845,12 @@
         "properties": {
           "cursor": {
             "type": "string",
-            "description": "Opaque pagination cursor"
+            "description": "Opaque pagination cursor (i:N = skip N entries)"
+          },
+          "skip": {
+            "type": "number",
+            "description": "Index-based skip (takes precedence over cursor)",
+            "minimum": 0
           },
           "take": {
             "type": "number",
@@ -8656,7 +8964,7 @@
           },
           "cursor": {
             "type": "string",
-            "description": "Cursor to continue reading from (byte offset)"
+            "description": "Cursor for the next page (i:N format)"
           },
           "hasMore": {
             "type": "boolean"
@@ -8665,6 +8973,10 @@
             "type": "number",
             "minimum": 1,
             "maximum": 1000
+          },
+          "total": {
+            "type": "number",
+            "description": "Total filtered entry count (for pagination)"
           }
         },
         "required": [
@@ -8672,7 +8984,8 @@
           "entries",
           "cursor",
           "hasMore",
-          "take"
+          "take",
+          "total"
         ]
       },
       "ListRunnersResponseDto": {
@@ -9244,6 +9557,7 @@
           },
           "asset": {
             "nullable": true,
+            "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/AssetListItemDto"
@@ -9341,6 +9655,14 @@
           },
           "durationMs": {
             "type": "number"
+          },
+          "s3Key": {
+            "type": "string",
+            "description": "S3 object key for the uploaded file (null when S3 is not configured)"
+          },
+          "contentHash": {
+            "type": "string",
+            "description": "SHA-256 content hash of the uploaded file (used for duplicate detection)"
           }
         },
         "required": [
@@ -9380,6 +9702,30 @@
           "total",
           "skip",
           "limit"
+        ]
+      },
+      "RerunSandboxRunDto": {
+        "type": "object",
+        "properties": {
+          "detectors": {
+            "type": "array",
+            "description": "Array of detector config objects to use for the new run",
+            "example": [
+              {
+                "type": "SECRETS",
+                "enabled": true,
+                "config": {}
+              }
+            ]
+          },
+          "skipDuplicateCheck": {
+            "type": "boolean",
+            "description": "When true, skip the duplicate-file check and create a new run even if an identical file exists",
+            "default": false
+          }
+        },
+        "required": [
+          "detectors"
         ]
       },
       "GlossaryFilterMappingDto": {
