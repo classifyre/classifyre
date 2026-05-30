@@ -50,6 +50,7 @@ describe('CustomDetectorsService', () => {
         model: 'claude-sonnet-4-5',
         apiKey: 'sk-test',
         baseUrl: null,
+        contextSize: 128000,
       }),
     };
 
@@ -196,13 +197,14 @@ describe('CustomDetectorsService', () => {
         pipelineSchema: { type: 'LLM', system_prompt: 'Classify.' },
       },
     ]);
-    prisma.aiProviderConfig.findUnique.mockResolvedValue({ contextSize: 128000 });
 
     const entries = await service.buildRuntimeCustomDetectorsByKeys([
       'cust_sentiment',
     ]);
 
-    expect(aiProviderConfigService.getRuntimeConfig).toHaveBeenCalledWith('ai-1');
+    expect(aiProviderConfigService.getRuntimeConfig).toHaveBeenCalledWith(
+      'ai-1',
+    );
     const schema = entries[0].detector.config.pipeline_schema as Record<
       string,
       any
@@ -214,6 +216,42 @@ describe('CustomDetectorsService', () => {
       base_url: null,
       context_size: 128000,
     });
+  });
+
+  it('skips an LLM detector whose provider credential cannot be resolved', async () => {
+    const { service, prisma, aiProviderConfigService } = createService();
+
+    prisma.customDetector.findMany.mockResolvedValue([
+      {
+        id: 'det-llm',
+        key: 'cust_broken',
+        name: 'Broken',
+        description: null,
+        isActive: true,
+        aiProviderConfigId: 'ai-1',
+        pipelineSchema: { type: 'LLM', system_prompt: 'Classify.' },
+      },
+      {
+        id: 'det-regex',
+        key: 'cust_regex',
+        name: 'Regex',
+        description: null,
+        isActive: true,
+        aiProviderConfigId: null,
+        pipelineSchema: { type: 'REGEX', patterns: [] },
+      },
+    ]);
+    aiProviderConfigService.getRuntimeConfig.mockRejectedValue(
+      new Error('AI provider "X" has no API key configured.'),
+    );
+
+    const entries = await service.buildRuntimeCustomDetectorsByKeys([
+      'cust_broken',
+      'cust_regex',
+    ]);
+
+    // The broken LLM detector is dropped; the healthy regex detector survives.
+    expect(entries.map((e) => e.key)).toEqual(['cust_regex']);
   });
 
   it('rejects unknown IDs in assertActiveDetectorIds', async () => {

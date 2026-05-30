@@ -82,7 +82,7 @@ class LLMRunner(BaseRunner):
                 api_key=self._runtime.api_key,
                 api_base=self._runtime.base_url or None,
                 temperature=schema.temperature if schema.temperature is not None else 0.0,
-                max_tokens=schema.max_tokens,
+                max_tokens=self._max_tokens(),
                 messages=messages,
                 response_format={"type": "json_object"},
             )
@@ -104,6 +104,15 @@ class LLMRunner(BaseRunner):
         return list(_TEXT_CONTENT_TYPES)
 
     # ── Internals ────────────────────────────────────────────────────────────
+
+    def _max_tokens(self) -> int | None:
+        # `max_tokens` is generated as a RootModel[int] wrapper, so unwrap `.root`
+        # before handing it to litellm — passing the model object serialises to an
+        # invalid request body and fails the whole completion.
+        raw = self._schema.max_tokens
+        if raw is None:
+            return None
+        return getattr(raw, "root", raw)
 
     def _model_string(self) -> str:
         prefix = _PROVIDER_PREFIX.get(self._runtime.provider.value, "openai")
