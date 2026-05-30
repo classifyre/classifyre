@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { api } from "@workspace/api-client";
 import { PipelineDetectorEditor } from "@/components/pipeline-detector-editor";
 import { RegexDetectorEditor } from "@/components/regex-detector-editor";
+import { LLMDetectorEditor } from "@/components/llm-detector-editor";
 import {
   TransformerDetectorEditor,
   type TransformerPipelineType,
@@ -72,6 +73,7 @@ export function DetectorCreatorForm({
     key?: string;
     description?: string;
     isActive?: boolean;
+    aiProviderConfigId?: string;
     pipelineSchema: Record<string, unknown>;
   }) => {
     try {
@@ -81,6 +83,7 @@ export function DetectorCreatorForm({
         key: payload.key,
         description: payload.description,
         isActive: payload.isActive ?? true,
+        aiProviderConfigId: payload.aiProviderConfigId,
         pipelineSchema: payload.pipelineSchema,
       } as any);
       toast.success(t("detectors.created"));
@@ -124,6 +127,8 @@ export function DetectorCreatorForm({
     ? "Build a GLiNER2 pipeline detector. Define entities to extract and classification tasks — all run in a single model pass."
     : selectedKind === "regex"
     ? "Build a regex pattern detector. Define precise pattern-matching rules — fast, deterministic, zero ML overhead."
+    : selectedKind === "llm"
+    ? "Build an AI detector. Write a prompt, define labels and extraction fields, and a configured LLM provider classifies and extracts from content."
     : isTransformerKind(selectedKind)
     ? (() => {
         const labels: Record<TransformerDetectorKind, string> = {
@@ -212,6 +217,16 @@ export function DetectorCreatorForm({
       {/* Phase 2: Regex form with stepper */}
       {selectedKind === "regex" && (
         <RegexDetectorEditor
+          mode="create"
+          submitLabel={t("detectors.create")}
+          isSubmitting={isSaving}
+          onSubmit={handleCreate}
+        />
+      )}
+
+      {/* Phase 2: AI (LLM) form with stepper */}
+      {selectedKind === "llm" && (
+        <LLMDetectorEditor
           mode="create"
           submitLabel={t("detectors.create")}
           isSubmitting={isSaving}

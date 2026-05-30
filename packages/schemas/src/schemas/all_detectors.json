@@ -294,7 +294,7 @@
             "IMAGE"
           ],
           "recommended_model": "mDeBERTa-v3 + SetFit + GLiNER + HuggingFace transformers",
-          "notes": "User-defined rules and pipelines tailored to specific business needs. Supports regex, GLiNER2, LLM, text classification, image classification, feature extraction, and object detection pipelines."
+          "notes": "User-defined rules and pipelines tailored to specific business needs. Supports regex, GLiNER2, AI/LLM (prompt-driven classification + extraction via a configured provider), text classification, image classification, feature extraction, and object detection pipelines."
         }
       ]
     },
@@ -1613,9 +1613,115 @@
       },
       "additionalProperties": false
     },
+    "LLMLabelDefinition": {
+      "title": "LLMLabelDefinition",
+      "type": "object",
+      "description": "One classification label the AI detector may assign to content.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Label name returned by the model (e.g. 'good', 'bad', 'violent')."
+        },
+        "description": {
+          "type": "string",
+          "default": "",
+          "description": "Guidance describing when this label applies."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "LLMOutputField": {
+      "title": "LLMOutputField",
+      "type": "object",
+      "description": "One structured property the AI detector extracts and stores in finding metadata and extracted_data.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Output field name — becomes a key in extracted_data JSON."
+        },
+        "description": {
+          "type": "string",
+          "default": "",
+          "description": "Hint for what this field captures."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "list[string]",
+            "list[number]"
+          ],
+          "default": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "LLMProviderRuntime": {
+      "title": "LLMProviderRuntime",
+      "type": "object",
+      "description": "Runtime-only provider credentials injected by the API at dispatch time. Never persisted with the detector config and rejected on create/update.",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "OPENAI_COMPATIBLE",
+            "CLAUDE",
+            "GEMINI"
+          ],
+          "description": "Resolved AI provider type."
+        },
+        "model": {
+          "type": "string",
+          "description": "Resolved model identifier (e.g. gpt-4o, claude-sonnet-4-5, gemini-2.0-flash)."
+        },
+        "api_key": {
+          "type": "string",
+          "description": "Decrypted provider API key."
+        },
+        "base_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Base URL for OpenAI-compatible endpoints. Null for managed providers."
+        },
+        "context_size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional context window size configured for the provider."
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "api_key"
+      ],
+      "additionalProperties": false
+    },
     "LLMPipelineSchema": {
       "title": "LLMPipelineSchema",
       "type": "object",
+      "description": "AI detector pipeline. Sends content to a configured LLM provider with a system prompt, classifies it against a label set, and extracts structured fields. Predicted labels become findings (severity via severity_map); extracted fields are stored in finding metadata and extracted_data.",
       "properties": {
         "type": {
           "type": "string",
@@ -1623,8 +1729,120 @@
             "LLM"
           ],
           "default": "LLM"
+        },
+        "system_prompt": {
+          "type": "string",
+          "description": "Instruction describing what the model should detect, classify, and extract."
+        },
+        "response_example": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional few-shot example of the JSON the model should return."
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 0.0,
+          "description": "Sampling temperature. Lower is more deterministic."
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum tokens to generate. Provider default when null."
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LLMLabelDefinition"
+          },
+          "default": [],
+          "description": "Classification taxonomy the model assigns to content."
+        },
+        "multi_label": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow more than one label per asset."
+        },
+        "severity": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Severity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "info",
+          "description": "Default severity when no severity_map rule matches a predicted label."
+        },
+        "severity_map": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PipelineSeverityRule"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Ordered rules mapping predicted labels to severity levels. First matching rule wins."
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5,
+          "description": "Minimum model confidence to report a label as a finding (0-1)."
+        },
+        "output_fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LLMOutputField"
+          },
+          "default": [],
+          "description": "Structured properties the model extracts. Stored in finding metadata and extracted_data."
+        },
+        "content_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 8000,
+          "description": "Maximum characters of content sent to the model."
+        },
+        "provider_runtime": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LLMProviderRuntime"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Runtime-only credentials injected by the API at dispatch. Never persisted; rejected on create/update."
         }
       },
+      "required": [
+        "system_prompt"
+      ],
       "additionalProperties": false
     },
     "TextClassificationPipelineSchema": {

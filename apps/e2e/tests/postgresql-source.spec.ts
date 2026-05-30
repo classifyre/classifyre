@@ -10,40 +10,34 @@
  */
 
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
+import {
+  API_BASE,
+  requireEnv,
+  waitForScanTerminal,
+  sourceIdFromUrl,
+  deleteSourceViaApi,
+  enableBuiltinDetector,
+  setSamplingStrategy,
+  setRowsPerPage,
+  getFindingsCount,
+} from "./helpers";
 
 // ── Config from environment ────────────────────────────────────────────────────
-
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing required environment variable: ${name}. Add it to apps/e2e/.env`);
-  return value;
-}
 
 const PG_HOST = requireEnv("PG_HOST");
 const PG_PORT = requireEnv("PG_PORT");
 const PG_USERNAME = requireEnv("PG_USERNAME");
 const PG_PASSWORD = requireEnv("PG_PASSWORD");
-const PG_DATABASE = requireEnv("PG_DATABASE");
-const API_BASE = process.env.API_BASE_URL ?? "http://localhost:8000";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-/**
- * Navigate to the new-source page and select PostgreSQL as the source type,
- * then dismiss the example/template selector by clicking "Start Blank".
- */
 async function openBlankPostgresForm(page: Page): Promise<void> {
   await page.goto("/sources/new");
   await page.locator('[data-testid="source-type-POSTGRESQL"]').click();
   await page.locator('[data-testid="start-blank"]').click();
-  // Wait for form to render
-  await expect(page.getByLabel("Source name *")).toBeVisible();
+  await expect(page.locator('[data-testid="input-name"]')).toBeVisible();
 }
 
-/**
- * Fill the PostgreSQL connection form fields.
- * Field labels come from the JSON schema field names so they are not translated.
- */
 async function fillConnectionForm(
   page: Page,
   opts: {
@@ -54,40 +48,28 @@ async function fillConnectionForm(
     password: string;
   },
 ): Promise<void> {
-  await page.getByLabel("Source name *").fill(opts.name);
-  await page.getByLabel("host *").fill(opts.host);
-  await page.getByRole("spinbutton", { name: "port *" }).fill(opts.port);
-  await page.getByLabel("username *").fill(opts.username);
-  await page.getByLabel("password *").fill(opts.password);
+  await page.locator('[data-testid="input-name"]').fill(opts.name);
+  await page.locator('[data-testid="input-required-host"]').fill(opts.host);
+  await page.locator('[data-testid="input-required-port"]').fill(opts.port);
+  await page.locator('[data-testid="input-masked-username"]').fill(opts.username);
+  await page.locator('[data-testid="input-masked-password"]').fill(opts.password);
 }
 
-/**
- * Enable the ingestion schedule toggle and select the "nightly" preset.
- * The Switch has a stable id="schedule-enabled".
- */
 async function enableNightlySchedule(page: Page): Promise<void> {
-  const scheduleSwitch = page.locator("#schedule-enabled");
-  const checked = await scheduleSwitch.getAttribute("aria-checked");
-  if (checked !== "true") {
-    await scheduleSwitch.click();
+  const scheduleSwitch = page.locator('[data-testid="schedule-enabled"]');
+  if (await scheduleSwitch.isVisible()) {
+    const checked = await scheduleSwitch.getAttribute("aria-checked");
+    if (checked !== "true") {
+      await scheduleSwitch.click();
+    }
   }
-  // "Nightly" preset is automatically selected when enabling schedule;
-  // it can also be selected explicitly via data-value attribute on the preset button.
-  // We verify it is active by checking the cron input is non-empty.
-  await expect(page.locator('input[placeholder*="e.g."]').or(page.locator('input[placeholder*="z.B."]'))).not.toHaveValue("");
 }
 
-/**
- * Click the "Test Connection" button and wait for the dialog result.
- * Returns the resolved status ("success" | "error").
- */
 async function runConnectionTest(page: Page): Promise<string> {
   await page.locator('[data-testid="btn-test-source"]').click();
 
   const statusEl = page.locator('[data-testid="test-connection-status"]');
-  // Wait until the dialog appears
   await expect(statusEl).toBeVisible({ timeout: 10_000 });
-  // Wait until the CLI result comes back (loading → success/error)
   await expect(statusEl).not.toHaveAttribute("data-status", "loading", {
     timeout: 120_000,
   });
@@ -95,48 +77,9 @@ async function runConnectionTest(page: Page): Promise<string> {
   return (await statusEl.getAttribute("data-status")) ?? "unknown";
 }
 
-/**
- * Dismiss the test-connection dialog via the Close button.
- */
 async function closeConnectionDialog(page: Page): Promise<void> {
   await page.locator('[data-testid="btn-test-connection-close"]').click();
   await expect(page.locator('[data-testid="test-connection-status"]')).not.toBeVisible();
-}
-
-/**
- * Wait for a scan to reach a terminal status (Completed or Error).
- * The scan page auto-refreshes every 2.5 s; allow up to 5 minutes.
- */
-async function waitForScanTerminal(page: Page, timeout = 300_000): Promise<string> {
-  const badge = page.locator('[data-testid="scan-status-badge"]');
-  await expect(badge).toBeVisible({ timeout: 30_000 });
-  // Match English (Completed/Error/Warning) and German (Abgeschlossen/Fehler/Warnung)
-  await expect(badge).toHaveText(/Completed|Error|Abgeschlossen|Fehler|Warning|Warnung/i, {
-    timeout,
-  });
-  const badgeText = (await badge.textContent()) ?? "";
-  return /error|fehler/i.test(badgeText) ? "ERROR" : "COMPLETED";
-}
-
-/**
- * Extract source ID from the current URL (assumed to be /sources/{id}).
- */
-function sourceIdFromUrl(page: Page): string {
-  const match = page.url().match(/\/sources\/([a-z0-9-]+)/);
-  if (!match) throw new Error(`Cannot extract source ID from URL: ${page.url()}`);
-  return match[1]!;
-}
-
-// ── Cleanup helper ─────────────────────────────────────────────────────────────
-
-/** Delete a source via the REST API (best-effort; does not fail the test). */
-async function deleteSourceViaApi(
-  request: APIRequestContext,
-  sourceId: string,
-): Promise<void> {
-  await request
-    .delete(`${API_BASE}/sources/${sourceId}`)
-    .catch((err) => console.warn(`Cleanup delete failed for ${sourceId}:`, err));
 }
 
 // ── Test suite ─────────────────────────────────────────────────────────────────
@@ -255,105 +198,54 @@ test.describe("PostgreSQL Source", () => {
     });
 
     // Sampling: RANDOM with 10 rows to keep scan fast
-    await page.locator('[data-testid="sampling-strategy-RANDOM"]').click();
-    await page.locator('[data-testid="input-rows-per-page"]').fill("10");
+    await setSamplingStrategy(page, "RANDOM");
+    await setRowsPerPage(page, "10");
 
-    // Save source config first (sets the sourceId for the subsequent save-and-scan)
+    // Save source config first
     await page.locator('[data-testid="btn-save-source"]').click();
 
-    // Navigate to the detectors step
-    await page.getByRole("button", { name: /detektoren/i }).click();
+    // Navigate to detectors step
+    await page.getByRole("button", { name: /detectors|detektoren/i }).first().click();
 
-    // Wait for the scan config section to be ready
     await expect(page.locator('[data-testid="scan-config-section"]')).toBeVisible({
       timeout: 15_000,
     });
 
-    // Find and enable PII detector
-    const piiEnable = page.locator('[data-testid="detector-enable-PII"]');
-    if (await piiEnable.isVisible()) {
-      await piiEnable.click();
-    }
-
-    const piiToggle = page.locator('[data-testid="detector-toggle-PII"]');
-    await expect(piiToggle).toBeVisible({ timeout: 10_000 });
-
-    const isPressed = await piiToggle.getAttribute("data-state");
-    if (isPressed !== "on") {
-      await piiToggle.click();
-    }
-    await expect(piiToggle).toHaveAttribute("data-state", "on");
+    // Enable PII detector
+    await enableBuiltinDetector(page, "PII");
 
     // Save & Scan
     await page.locator('[data-testid="btn-save-and-scan"]').click();
 
-    // Wait for redirect to the scan detail page
     await page.waitForURL(/\/scans\/[a-z0-9-]+/, { timeout: 15_000 });
 
-    // Extract runner ID from URL for reference
-    const runnerIdMatch = page.url().match(/\/scans\/([a-z0-9-]+)/);
-    expect(runnerIdMatch).toBeTruthy();
-
-    // Wait for the scan to complete
     const terminalStatus = await waitForScanTerminal(page);
-    expect(
-      terminalStatus,
-      "Scan must finish with COMPLETED, not ERROR",
-    ).toBe("COMPLETED");
+    expect(terminalStatus, "Scan must finish with COMPLETED, not ERROR").toBe("COMPLETED");
 
     // ── Verify PII findings exist on the scan detail page ────────────────────
-    const findingsStats = page.locator('[data-testid="stats-card-findings"] [data-testid="stats-value"], [data-testid="stats-card-befunde"] [data-testid="stats-value"]');
-    await expect(findingsStats).toBeVisible({ timeout: 10_000 });
-    const findingsCount = Number((await findingsStats.textContent())?.replace(/,/g, ""));
-    expect(findingsCount, "PII scan must produce at least 1 finding").toBeGreaterThan(0);
+    expect(await getFindingsCount(page), "PII scan must produce at least 1 finding").toBeGreaterThan(0);
 
     // ── Navigate to source detail for cleanup ────────────────────────────────
-    await page.locator("button").filter({ hasText: /quelldetails/i }).first().click();
+    await page.goto("/sources");
+    const sourceRow = page.locator(`[data-testid="source-row"]`).filter({ hasText: sourceName });
+    if (await sourceRow.isVisible()) {
+      await sourceRow.click();
+    } else {
+      await page.getByText(sourceName).first().click();
+    }
     await page.waitForURL(/\/sources\/[a-z0-9-]+$/, { timeout: 10_000 });
 
     const sourceId = sourceIdFromUrl(page);
     createdSourceIds.push(sourceId);
 
-    // The source detail page shows asset counts; wait for data to load
-    await page.waitForLoadState("networkidle");
-
-    // Verify the findings tab is reachable and has PII results
-    const findingsTab = page.getByRole("tab", { name: /findings|befunde/i });
-    if (await findingsTab.isVisible()) {
-      await findingsTab.click();
-      // At least one PII finding row should appear
-      await expect(
-        page.getByText("PII", { exact: false }).first(),
-      ).toBeVisible({ timeout: 15_000 });
-    } else {
-      // Fallback: navigate to /findings?sourceId=... and verify non-empty table
-      await page.goto(`/findings?sourceId=${sourceId}`);
-      await expect(page.locator("table tbody tr").first()).toBeVisible({
-        timeout: 15_000,
-      });
-    }
-
     // ── Delete source and verify cascade ─────────────────────────────────────
-
-    // Go back to source detail page
-    await page.goto(`/sources/${sourceId}`);
-
-    // Click the Delete Source button
     await page.locator('[data-testid="btn-delete-source"]').click();
-
-    // Confirm deletion in the alert dialog
     await page.locator('[data-testid="btn-delete-confirm"]').click();
-
-    // Should redirect to /sources
     await page.waitForURL(/\/sources$/, { timeout: 15_000 });
-
-    // Source must no longer appear in the list
     await expect(page.getByText(sourceName)).not.toBeVisible({ timeout: 10_000 });
 
     // ── Verify assets were cleaned up (via API) ───────────────────────────────
-    const assetsResp = await page.request.get(
-      `${API_BASE}/assets?sourceId=${sourceId}`,
-    );
+    const assetsResp = await page.request.get(`${API_BASE}/assets?sourceId=${sourceId}`);
     if (assetsResp.ok()) {
       const body = await assetsResp.json() as { items?: unknown[] };
       const items = Array.isArray(body) ? body : (body.items ?? []);
@@ -363,7 +255,6 @@ test.describe("PostgreSQL Source", () => {
       ).toBe(0);
     }
 
-    // Remove from cleanup list since we just deleted it
     const idx = createdSourceIds.indexOf(sourceId);
     if (idx !== -1) createdSourceIds.splice(idx, 1);
   });

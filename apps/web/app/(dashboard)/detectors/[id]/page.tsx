@@ -32,6 +32,7 @@ import {
 } from "@/components/custom-detector-editor";
 import { PipelineDetectorEditor } from "@/components/pipeline-detector-editor";
 import { RegexDetectorEditor } from "@/components/regex-detector-editor";
+import { LLMDetectorEditor } from "@/components/llm-detector-editor";
 import {
   TransformerDetectorEditor,
   type TransformerPipelineType,
@@ -45,6 +46,7 @@ import { useTranslation } from "@/hooks/use-translation";
 // pipelineSchema rather than config/method. Extend locally until codegen is refreshed.
 type DetectorWithPipeline = CustomDetectorResponseDto & {
   pipelineSchema?: Record<string, unknown>;
+  aiProviderConfigId?: string | null;
 };
 
 export default function CustomDetectorDetailsPage() {
@@ -73,8 +75,9 @@ export default function CustomDetectorDetailsPage() {
       const isPipeline = Boolean(detectorPayload.pipelineSchema && Object.keys(detectorPayload.pipelineSchema).length > 0);
       const loadedType = (detectorPayload.pipelineSchema as Record<string, unknown>)?.type as string | undefined;
       const isRegex = isPipeline && loadedType === "REGEX";
+      const isLlm = isPipeline && loadedType === "LLM";
       const isTransformer = isPipeline && !!loadedType && ["TEXT_CLASSIFICATION", "IMAGE_CLASSIFICATION", "FEATURE_EXTRACTION", "OBJECT_DETECTION"].includes(loadedType);
-      if (!isRegex && !isTransformer && (isPipeline || detectorPayload.method !== "RULESET")) {
+      if (!isRegex && !isLlm && !isTransformer && (isPipeline || detectorPayload.method !== "RULESET")) {
         const historyPayload = await api.listCustomDetectorTrainingHistory(
           detectorId,
           50,
@@ -171,7 +174,10 @@ export default function CustomDetectorDetailsPage() {
   const isPipelineDetector = Boolean(detector.pipelineSchema && Object.keys(detector.pipelineSchema).length > 0);
   const pipelineSchemaType = (detector.pipelineSchema as Record<string, unknown>)?.type as string | undefined;
   const isRegexPipeline = isPipelineDetector && pipelineSchemaType === "REGEX";
+  const isLLMPipeline = isPipelineDetector && pipelineSchemaType === "LLM";
   const isTransformerPipeline = isPipelineDetector && !!pipelineSchemaType && TRANSFORMER_PIPELINE_TYPES.has(pipelineSchemaType);
+  // Detectors that have no model-training step (regex / LLM / transformer).
+  const isNonTrainable = isRegexPipeline || isLLMPipeline || isTransformerPipeline;
 
   return (
     <div className="space-y-6">
@@ -185,7 +191,7 @@ export default function CustomDetectorDetailsPage() {
           {t("detectors.backToCustom")}
         </Button>
         <div className="flex items-center gap-2">
-          {!isRegexPipeline && !isTransformerPipeline && (isPipelineDetector || detector.method !== "RULESET") && (
+          {!isNonTrainable && (isPipelineDetector || detector.method !== "RULESET") && (
             <Button
               variant="outline"
               size="sm"
@@ -221,7 +227,7 @@ export default function CustomDetectorDetailsPage() {
           </div>
         </CardHeader>
         <CardContent
-          className={`grid gap-3 ${(!isRegexPipeline && !isTransformerPipeline && (isPipelineDetector || detector.method !== "RULESET")) ? "md:grid-cols-3" : "md:grid-cols-2"}`}
+          className={`grid gap-3 ${(!isNonTrainable && (isPipelineDetector || detector.method !== "RULESET")) ? "md:grid-cols-3" : "md:grid-cols-2"}`}
         >
           <div className="rounded-[4px] border border-border/20 p-3">
             <p className="text-xs text-muted-foreground mb-1">
@@ -254,7 +260,7 @@ export default function CustomDetectorDetailsPage() {
               {detector.sourcesWithFindingsCount}
             </p>
           </div>
-          {!isRegexPipeline && !isTransformerPipeline && (isPipelineDetector || detector.method !== "RULESET") && (
+          {!isNonTrainable && (isPipelineDetector || detector.method !== "RULESET") && (
             <div className="rounded-[4px] border border-border/20 p-3">
               <p className="text-xs text-muted-foreground">
                 {t("detectors.lastTrained")}
@@ -330,6 +336,38 @@ export default function CustomDetectorDetailsPage() {
               }
             }}
           />
+        ) : isLLMPipeline ? (
+          <LLMDetectorEditor
+            mode="edit"
+            detectorId={detectorId}
+            submitLabel={t("common.save")}
+            isSubmitting={isSaving}
+            initialPipelineSchema={detector.pipelineSchema}
+            initialName={detector.name}
+            initialKey={detector.key}
+            initialDescription={detector.description ?? ""}
+            initialIsActive={detector.isActive}
+            initialAiProviderConfigId={detector.aiProviderConfigId ?? null}
+            onSubmit={async (payload) => {
+              try {
+                setIsSaving(true);
+                await api.updateCustomDetector(detectorId, {
+                  name: payload.name,
+                  key: payload.key,
+                  description: payload.description,
+                  isActive: payload.isActive,
+                  pipelineSchema: payload.pipelineSchema,
+                  aiProviderConfigId: payload.aiProviderConfigId,
+                } as any);
+                toast.success(t("detectors.saved"));
+                await load();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : t("detectors.failedToSave"));
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+          />
         ) : (
           <PipelineDetectorEditor
             mode="edit"
@@ -387,7 +425,7 @@ export default function CustomDetectorDetailsPage() {
         </section>
       )}
 
-      {!isRegexPipeline && !isTransformerPipeline && (isPipelineDetector || detector.method !== "RULESET") && (
+      {!isNonTrainable && (isPipelineDetector || detector.method !== "RULESET") && (
         <section data-testid="training-history-section" className="space-y-4">
           <div>
             <h2 className="font-serif text-2xl font-black uppercase tracking-[0.06em]">

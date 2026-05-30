@@ -25,19 +25,16 @@ jest.mock('./providers', () => ({
 
 // ── Mock AiProviderConfigService ─────────────────────────────────────────────
 
-const mockConfig = {
-  provider: 'CLAUDE' as const,
+const mockRuntimeConfig: AiProviderRuntimeConfig = {
+  provider: 'CLAUDE',
   model: 'claude-sonnet-4-5',
-  hasApiKey: true,
-  apiKeyPreview: 'sk-a...b123',
+  apiKey: 'sk-test-key',
   baseUrl: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
 };
 
 const mockProviderConfigService = {
-  getConfig: jest.fn().mockResolvedValue(mockConfig),
-  getDecryptedApiKey: jest.fn().mockResolvedValue('sk-test-key'),
+  getDefaultConfigId: jest.fn().mockResolvedValue('config-1'),
+  getRuntimeConfig: jest.fn().mockResolvedValue(mockRuntimeConfig),
 };
 
 // ── Test suite ───────────────────────────────────────────────────────────────
@@ -58,9 +55,9 @@ describe('AiClientService', () => {
 
     service = module.get(AiClientService);
     jest.clearAllMocks();
-    mockProviderConfigService.getConfig.mockResolvedValue(mockConfig);
-    mockProviderConfigService.getDecryptedApiKey.mockResolvedValue(
-      'sk-test-key',
+    mockProviderConfigService.getDefaultConfigId.mockResolvedValue('config-1');
+    mockProviderConfigService.getRuntimeConfig.mockResolvedValue(
+      mockRuntimeConfig,
     );
   });
 
@@ -79,23 +76,37 @@ describe('AiClientService', () => {
       expect(result.provider).toBe('CLAUDE');
     });
 
-    it('throws AiConfigError when no API key is stored', async () => {
-      mockProviderConfigService.getDecryptedApiKey.mockResolvedValueOnce(null);
+    it('throws AiConfigError when no default provider is selected', async () => {
+      mockProviderConfigService.getDefaultConfigId.mockResolvedValueOnce(null);
 
       await expect(
         service.completeText([{ role: 'user', content: 'hi' }]),
       ).rejects.toBeInstanceOf(AiConfigError);
     });
 
-    it('throws AiConfigError when model is empty', async () => {
-      mockProviderConfigService.getConfig.mockResolvedValueOnce({
-        ...mockConfig,
-        model: '',
-      });
+    it('propagates AiConfigError from the resolved credential', async () => {
+      mockProviderConfigService.getRuntimeConfig.mockRejectedValueOnce(
+        new AiConfigError('no key'),
+      );
 
       await expect(
         service.completeText([{ role: 'user', content: 'hi' }]),
       ).rejects.toBeInstanceOf(AiConfigError);
+    });
+
+    it('targets a specific credential when configId is passed', async () => {
+      mockProviderComplete.mockResolvedValueOnce('ok');
+
+      await service.completeText([{ role: 'user', content: 'hi' }], {
+        configId: 'config-2',
+      });
+
+      expect(mockProviderConfigService.getRuntimeConfig).toHaveBeenCalledWith(
+        'config-2',
+      );
+      expect(
+        mockProviderConfigService.getDefaultConfigId,
+      ).not.toHaveBeenCalled();
     });
 
     it('surfaces AiAuthError without retrying', async () => {
