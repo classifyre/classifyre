@@ -32,6 +32,7 @@ import {
 import {formatDate, formatRelative} from "@/lib/date";
 import {detectorCatalogStatusLabel, detectorCatalogStatusToRunnerStatus,} from "@/lib/custom-detector-badge";
 import {getRunnerStatusBadgeTone} from "@/lib/runner-status-badge";
+import {CustomDetectorTypeBadge} from "@/components/detector-type-badge";
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
@@ -382,7 +383,10 @@ export function CustomDetectorsTable() {
                                     >
                                         <TableCell>
                                             <div className="space-y-1">
-                                                <p className="font-medium leading-tight">{row.name}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-medium leading-tight">{row.name}</p>
+                                                    <CustomDetectorTypeBadge method={row.method}/>
+                                                </div>
                                                 <p className="font-mono text-[11px] text-muted-foreground">
                                                     {row.key}
                                                 </p>

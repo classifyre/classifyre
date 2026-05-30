@@ -37,6 +37,7 @@ import {
 import { DetectorCreatorForm } from "@/components/detector-creator-form";
 import { DetectorEditorForm } from "@/components/detector-editor-form";
 import type { DetectorEditorFormHandle } from "@/components/detector-editor-form";
+import { CustomDetectorTypeBadge } from "@/components/detector-type-badge";
 
 export interface DetectorConfigInput {
   type: string;
@@ -249,11 +250,6 @@ function DetectorConfigRow({
     onStateChange({ config: nextConfig });
   };
 
-  const handleEnable = () => {
-    onStateChange({ enabled: true });
-    setIsEditOpen(true);
-  };
-
   const selectedPresetLabel =
     selectedPreset && selectedPreset !== "custom"
       ? presetOptions.find((preset) => preset.id === selectedPreset)?.name
@@ -266,66 +262,71 @@ function DetectorConfigRow({
         enabled ? "border-l-[#b7ff00]" : "border-l-transparent",
       )}
     >
-      {!enabled ? (
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 px-4 py-3 text-left text-muted-foreground hover:text-foreground hover:bg-muted/20 transition-colors cursor-pointer"
-          onClick={handleEnable}
-          data-testid={`detector-enable-${detector.type}`}
-        >
-          <div className="min-w-0 flex-1">
-            <span className="text-sm font-medium truncate">{displayName}</span>
-            {detector.description && (
-              <p className="text-xs text-muted-foreground/70 truncate mt-0.5">
-                {detector.description}
-              </p>
-            )}
-          </div>
-        </button>
-      ) : (
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold truncate">{displayName}</span>
-              {selectedPresetLabel && (
-                <Badge variant="outline" className="border-2 border-border shrink-0 text-[10px]">
-                  {selectedPresetLabel}
-                </Badge>
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "text-sm truncate",
+                enabled ? "font-semibold" : "font-medium text-muted-foreground",
               )}
-            </div>
-            {detector.description && (
-              <p className="text-xs text-muted-foreground truncate mt-0.5">
-                {detector.description}
-              </p>
+            >
+              {displayName}
+            </span>
+            {selectedPresetLabel && (
+              <Badge variant="outline" className="border-2 border-border shrink-0 text-[10px]">
+                {selectedPresetLabel}
+              </Badge>
             )}
           </div>
+          {detector.description && (
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              {detector.description}
+            </p>
+          )}
+        </div>
 
+        {enabled && (
           <Button
             type="button"
             size="sm"
-            variant="outline"
+            variant={isEditOpen ? "default" : "outline"}
             className="shrink-0 rounded-[4px] border-2 border-border"
             onClick={() => setIsEditOpen((prev) => !prev)}
             data-testid={`btn-edit-${detector.type}`}
           >
-            <Pencil className="h-3.5 w-3.5 mr-1" />
-            {t("sources.scanConfig.edit")}
+            {isEditOpen ? (
+              <>
+                <X className="h-3.5 w-3.5 mr-1" />
+                {t("common.close")}
+              </>
+            ) : (
+              <>
+                <Pencil className="h-3.5 w-3.5 mr-1" />
+                {t("sources.scanConfig.edit")}
+              </>
+            )}
           </Button>
+        )}
 
-          <Toggle
-            variant="outline"
-            size="sm"
-            pressed={enabled}
-            onPressedChange={() => onStateChange({ enabled: false })}
-            className="shrink-0 cursor-pointer"
-            data-testid={`detector-toggle-${detector.type}`}
-          >
-            {t("sources.scanConfig.off")}
-          </Toggle>
-        </div>
-      )}
+        <Toggle
+          variant="outline"
+          size="sm"
+          pressed={enabled}
+          onPressedChange={(pressed) => {
+            if (!pressed) {
+              setIsEditOpen(false);
+            }
+            onStateChange({ enabled: pressed });
+          }}
+          className="shrink-0 cursor-pointer"
+          data-testid={`detector-toggle-${detector.type}`}
+        >
+          {enabled ? t("common.on") : t("common.off")}
+        </Toggle>
+      </div>
 
-      <Collapsible open={isEditOpen} onOpenChange={setIsEditOpen}>
+      <Collapsible open={isEditOpen && enabled} onOpenChange={setIsEditOpen}>
         <CollapsibleContent>
           <div className="border-t-2 border-border bg-muted/20 px-4 py-4 space-y-4">
             {presetOptions.length > 0 && (
@@ -410,14 +411,6 @@ function DetectorConfigRow({
   );
 }
 
-function formatCustomDetectorMethod(method: string | undefined): string {
-  if (!method) return "Custom";
-  return method
-    .toLowerCase()
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
 function CustomDetectorRow({
   detector,
   enabled,
@@ -454,14 +447,17 @@ function CustomDetectorRow({
     >
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="min-w-0 flex-1">
-          <span
-            className={cn(
-              "text-sm truncate",
-              enabled ? "font-semibold" : "font-medium text-muted-foreground",
-            )}
-          >
-            {detector.name}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "text-sm truncate",
+                enabled ? "font-semibold" : "font-medium text-muted-foreground",
+              )}
+            >
+              {detector.name}
+            </span>
+            <CustomDetectorTypeBadge method={detector.method} className="shrink-0" />
+          </div>
           <p className="text-xs text-muted-foreground truncate mt-0.5">
             {detector.description?.trim() || t("sources.scanConfig.fallbackDesc")}
           </p>
