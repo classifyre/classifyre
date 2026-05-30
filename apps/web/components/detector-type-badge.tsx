@@ -1,45 +1,58 @@
 "use client";
 
 import * as React from "react";
-import { Brain, Layers, Regex, Sparkles, type LucideIcon } from "lucide-react";
+import {
+  Bot,
+  Brain,
+  Image,
+  Layers,
+  Link2,
+  Network,
+  Regex,
+  ScanSearch,
+  Shield,
+  ShieldAlert,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import { cn } from "@workspace/ui/lib/utils";
+import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
+import {
+  detectorTypeIconName,
+  detectorTypeTranslationKey,
+} from "@/lib/custom-detector-badge";
 
-// ── Custom detector type → icon + label ──────────────────────────────────────
-//
-// A small reusable badge that pairs a detector's method ("type") with a
-// matching icon so custom detectors are easy to differentiate at a glance —
-// both in the catalog table and when picking detectors for a source.
-
-interface DetectorTypeMeta {
-  label: string;
-  Icon: LucideIcon;
-}
-
-const METHOD_META: Record<string, DetectorTypeMeta> = {
-  RULESET: { label: "Ruleset", Icon: Regex },
-  CLASSIFIER: { label: "Classifier", Icon: Brain },
-  ENTITY: { label: "Entity", Icon: Layers },
+const ICON_MAP: Record<string, LucideIcon> = {
+  Bot,
+  Brain,
+  Image,
+  Layers,
+  Link2,
+  Network,
+  Regex,
+  ScanSearch,
+  Shield,
+  ShieldAlert,
+  Sparkles,
 };
-
-const FALLBACK_META: DetectorTypeMeta = { label: "Custom", Icon: Sparkles };
-
-export function getCustomDetectorTypeMeta(method?: string | null): DetectorTypeMeta {
-  if (!method) {
-    return FALLBACK_META;
-  }
-  return METHOD_META[method.toUpperCase()] ?? FALLBACK_META;
-}
 
 export function CustomDetectorTypeBadge({
   method,
+  pipelineType,
   className,
   ...props
 }: {
   method?: string | null;
+  pipelineType?: string | null;
   className?: string;
 } & Omit<React.ComponentProps<typeof Badge>, "children">) {
-  const { label, Icon } = getCustomDetectorTypeMeta(method);
+  const { t } = useTranslation();
+  const iconName = detectorTypeIconName(method, pipelineType);
+  const labelKey = detectorTypeTranslationKey(method, pipelineType);
+  const Icon = ICON_MAP[iconName] ?? Sparkles;
+
   return (
     <Badge
       variant="outline"
@@ -50,7 +63,7 @@ export function CustomDetectorTypeBadge({
       {...props}
     >
       <Icon className="h-3 w-3" />
-      {label}
+      {t(labelKey as TranslationKey)}
     </Badge>
   );
 }
