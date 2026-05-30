@@ -893,10 +893,6 @@ export class CustomDetectorsService {
     }
     const runtime =
       await this.aiProviderConfigService.getRuntimeConfig(aiProviderConfigId);
-    const row = await this.prisma.aiProviderConfig.findUnique({
-      where: { id: aiProviderConfigId },
-      select: { contextSize: true },
-    });
     return {
       ...pipelineSchema,
       provider_runtime: {
@@ -904,7 +900,7 @@ export class CustomDetectorsService {
         model: runtime.model,
         api_key: runtime.apiKey,
         base_url: runtime.baseUrl ?? null,
-        context_size: row?.contextSize ?? null,
+        context_size: runtime.contextSize ?? null,
       },
     };
   }
@@ -1333,7 +1329,12 @@ export class CustomDetectorsService {
     const orderedRows = normalizedIds
       .map((id) => byId.get(id))
       .filter((row): row is CustomDetector => Boolean(row));
-    return Promise.all(orderedRows.map((row) => this.toRuntimeEntry(row)));
+    const entries = await Promise.all(
+      orderedRows.map((row) => this.toRuntimeEntry(row)),
+    );
+    return entries.filter((entry): entry is NonNullable<typeof entry> =>
+      Boolean(entry),
+    );
   }
 
   /**
@@ -1371,23 +1372,44 @@ export class CustomDetectorsService {
     const orderedRows = normalizedKeys
       .map((key) => byKey.get(key))
       .filter((row): row is CustomDetector => Boolean(row));
-    return Promise.all(orderedRows.map((row) => this.toRuntimeEntry(row)));
+    const entries = await Promise.all(
+      orderedRows.map((row) => this.toRuntimeEntry(row)),
+    );
+    return entries.filter((entry): entry is NonNullable<typeof entry> =>
+      Boolean(entry),
+    );
   }
 
   /**
    * Build a single recipe entry from a custom detector row, hydrating LLM
-   * provider credentials when needed.
+   * provider credentials when needed. Returns null when an LLM detector's
+   * provider credential cannot be resolved (missing key/model/credential) so a
+   * single misconfigured detector is skipped rather than failing the whole run.
    */
   private async toRuntimeEntry(row: CustomDetector): Promise<{
     id: string;
     key: string;
     name: string;
-    detector: { type: 'CUSTOM'; enabled: true; config: Record<string, unknown> };
-  }> {
-    const pipelineSchema = await this.injectLlmProviderRuntime(
-      asRecord((row as any).pipelineSchema),
-      (row as any).aiProviderConfigId ?? null,
-    );
+    detector: {
+      type: 'CUSTOM';
+      enabled: true;
+      config: Record<string, unknown>;
+    };
+  } | null> {
+    let pipelineSchema: Record<string, unknown>;
+    try {
+      pipelineSchema = await this.injectLlmProviderRuntime(
+        asRecord((row as any).pipelineSchema),
+        (row as any).aiProviderConfigId ?? null,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Skipping custom detector "${row.key}" (${row.id}): unable to resolve AI provider credential — ${String(
+          error instanceof Error ? error.message : error,
+        )}`,
+      );
+      return null;
+    }
     return {
       id: row.id,
       key: row.key,

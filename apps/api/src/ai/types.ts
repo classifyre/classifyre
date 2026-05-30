@@ -39,6 +39,7 @@ export interface AiProviderRuntimeConfig {
   model: string;
   apiKey: string;
   baseUrl?: string | null;
+  contextSize?: number | null;
 }
 
 /** Internal interface every provider must implement. */
