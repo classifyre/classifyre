@@ -24,6 +24,7 @@ import {
   SandboxRunsSortOrder,
 } from './dto/query-sandbox-runs.dto';
 import { KubernetesCliJobService } from '../cli-runner/kubernetes-cli-job.service';
+import { AiProviderConfigService } from '../ai-provider-config.service';
 import { SandboxFileStorageService } from './sandbox-file-storage.service';
 
 const TABULAR_MIME_TYPES = new Set([
@@ -376,6 +377,7 @@ export class SandboxService {
   constructor(
     private prisma: PrismaService,
     private sandboxFileStorage: SandboxFileStorageService,
+    private aiProviderConfigService: AiProviderConfigService,
     @Optional()
     private kubernetesCliJobService?: KubernetesCliJobService,
   ) {}
@@ -881,56 +883,120 @@ export class SandboxService {
 
     const records = await this.prisma.customDetector.findMany({
       where: { key: { in: keys } },
-      select: { key: true, name: true, pipelineSchema: true },
+      select: {
+        key: true,
+        name: true,
+        pipelineSchema: true,
+        aiProviderConfigId: true,
+      },
     });
 
     const byKey = new Map(records.map((r) => [r.key, r]));
 
-    return detectors.map((d) => {
-      if (!d || typeof d !== 'object' || Array.isArray(d)) return d;
-      const item = d as Record<string, unknown>;
-      const type = typeof item.type === 'string' ? item.type.toUpperCase() : '';
-      const detectorKey =
-        typeof item.custom_detector_key === 'string'
-          ? item.custom_detector_key
-          : '';
+    return Promise.all(
+      detectors.map(async (d) => {
+        if (!d || typeof d !== 'object' || Array.isArray(d)) return d;
+        const item = d as Record<string, unknown>;
+        const type =
+          typeof item.type === 'string' ? item.type.toUpperCase() : '';
+        const detectorKey =
+          typeof item.custom_detector_key === 'string'
+            ? item.custom_detector_key
+            : '';
 
-      if (type !== 'CUSTOM' || !detectorKey) return d;
+        if (type !== 'CUSTOM' || !detectorKey) return d;
 
-      const record = byKey.get(detectorKey);
-      if (!record) {
-        this.logger.warn(
-          `Custom detector key "${detectorKey}" not found in database; skipping expansion`,
-        );
-        return d;
-      }
+        const record = byKey.get(detectorKey);
+        if (!record) {
+          this.logger.warn(
+            `Custom detector key "${detectorKey}" not found in database; skipping expansion`,
+          );
+          return d;
+        }
 
-      const existingConfig =
-        item.config &&
-        typeof item.config === 'object' &&
-        !Array.isArray(item.config)
-          ? (item.config as Record<string, unknown>)
-          : {};
+        const existingConfig =
+          item.config &&
+          typeof item.config === 'object' &&
+          !Array.isArray(item.config)
+            ? (item.config as Record<string, unknown>)
+            : {};
 
-      const isPipeline =
-        record.pipelineSchema &&
-        typeof record.pipelineSchema === 'object' &&
-        Object.keys(record.pipelineSchema).length > 0;
+        const isPipeline =
+          record.pipelineSchema &&
+          typeof record.pipelineSchema === 'object' &&
+          Object.keys(record.pipelineSchema).length > 0;
 
+        // LLM (AI) detectors need a runtime-only provider_runtime block with the
+        // decrypted credentials injected before dispatch — same as the extract /
+        // runner path. Without this the CLI's LLMRunner refuses to initialise.
+        const pipelineSchema = isPipeline
+          ? await this.injectLlmProviderRuntime(
+              record.pipelineSchema as Record<string, unknown>,
+              record.aiProviderConfigId,
+              detectorKey,
+            )
+          : undefined;
+
+        return {
+          ...item,
+          config: {
+            // caller-supplied overrides DB defaults, but identity fields are pinned
+            ...existingConfig,
+            // identity fields always come from DB to ensure correctness
+            custom_detector_key: record.key,
+            name: record.name,
+            ...(pipelineSchema
+              ? { method: 'PIPELINE', pipeline_schema: pipelineSchema }
+              : {}),
+          },
+        };
+      }),
+    );
+  }
+
+  /**
+   * Inject a runtime-only `provider_runtime` block (decrypted credentials) into
+   * an LLM detector's pipeline schema so the sandbox CLI worker can call the
+   * provider directly. No-op for non-LLM pipelines. On resolution failure the
+   * schema is returned unchanged and a warning logged — the CLI will then report
+   * the missing-credential error for that detector without failing the run.
+   */
+  private async injectLlmProviderRuntime(
+    pipelineSchema: Record<string, unknown>,
+    aiProviderConfigId: string | null,
+    detectorKey: string,
+  ): Promise<Record<string, unknown>> {
+    if ((pipelineSchema.type as string | undefined) !== 'LLM') {
+      return pipelineSchema;
+    }
+    if (!aiProviderConfigId) {
+      this.logger.warn(
+        `AI detector "${detectorKey}" has no AI provider credential; cannot inject provider_runtime`,
+      );
+      return pipelineSchema;
+    }
+    try {
+      const runtime =
+        await this.aiProviderConfigService.getRuntimeConfig(aiProviderConfigId);
       return {
-        ...item,
-        config: {
-          // caller-supplied overrides DB defaults, but identity fields are pinned
-          ...existingConfig,
-          // identity fields always come from DB to ensure correctness
-          custom_detector_key: record.key,
-          name: record.name,
-          ...(isPipeline
-            ? { method: 'PIPELINE', pipeline_schema: record.pipelineSchema }
-            : {}),
+        ...pipelineSchema,
+        provider_runtime: {
+          provider: runtime.provider,
+          model: runtime.model,
+          api_key: runtime.apiKey,
+          base_url: runtime.baseUrl ?? null,
+          context_size: runtime.contextSize ?? null,
+          supports_vision: runtime.supportsVision ?? false,
         },
       };
-    });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to resolve AI provider for detector "${detectorKey}": ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return pipelineSchema;
+    }
   }
 
   private getSandboxSharedDir(runId: string): string {
