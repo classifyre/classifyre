@@ -507,6 +507,30 @@ export class SandboxService {
     return run;
   }
 
+  /**
+   * Return the transient input-file bytes for an in-flight K8s sandbox run.
+   * Consumed by the job's init-container over the cluster network. Available
+   * only while the file is staged (cleared once the job finishes).
+   */
+  async getInputData(
+    id: string,
+  ): Promise<{ data: Buffer; contentType: string; fileName: string }> {
+    const run = await this.prisma.sandboxRun.findUnique({
+      where: { id },
+      select: { inputData: true, fileType: true, fileName: true },
+    });
+    if (!run || !run.inputData) {
+      throw new NotFoundException(
+        `Input file for sandbox run ${id} is not available`,
+      );
+    }
+    return {
+      data: Buffer.from(run.inputData),
+      contentType: run.fileType || 'application/octet-stream',
+      fileName: run.fileName,
+    };
+  }
+
   private validateDetectors(detectors: unknown[]): void {
     const validTypes = new Set<string>(Object.values(DetectorType));
     for (const detector of detectors) {
@@ -551,17 +575,28 @@ export class SandboxService {
 
       if (this.kubernetesCliJobService?.isEnabled()) {
         // Kubernetes mode: run as a K8s Job.
-        // File and detectors are base64-encoded into env vars and decoded
-        // inside the job pod's /tmp — same pattern as RECIPE_B64 for extractions.
-        // No shared filesystem needed; data is ephemeral to the job pod.
-        const result = await this.kubernetesCliJobService.runSandboxJob({
-          runId,
-          fileBuffer,
-          fileExtension,
-          detectors: expandedDetectors,
+        // The input file is transported via a per-job emptyDir volume that an
+        // init-container populates by downloading from the API over the cluster
+        // network (see /sandbox/runs/:id/input). We persist the bytes here so
+        // any API replica can serve them, then clear them once the job ends.
+        // The volume dies with the job pod. Sandbox never uses S3.
+        await this.prisma.sandboxRun.update({
+          where: { id: runId },
+          data: { inputData: new Uint8Array(fileBuffer) },
         });
-        stdout = result.output;
-        exitCode = result.exitCode;
+        try {
+          const result = await this.kubernetesCliJobService.runSandboxJob({
+            runId,
+            fileExtension,
+            detectors: expandedDetectors,
+          });
+          stdout = result.output;
+          exitCode = result.exitCode;
+        } finally {
+          await this.prisma.sandboxRun
+            .update({ where: { id: runId }, data: { inputData: null } })
+            .catch(() => undefined);
+        }
       } else {
         // Local mode (bare Node or all-in-one Docker): run as a subprocess.
         // Temp files live on SANDBOX_TEMP_DIR (emptyDir in K8s, os.tmpdir()

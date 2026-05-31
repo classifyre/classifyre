@@ -90,15 +90,21 @@ export class KubernetesCliJobService {
 
   async runSandboxJob(params: {
     runId: string;
-    fileBuffer: Buffer;
     fileExtension: string;
     detectors: unknown[];
+    /**
+     * Tiny inline payloads only (e.g. the custom-detector test text). Real
+     * sandbox file uploads MUST omit this so the file is transported via the
+     * per-job volume (init-container downloads it from the API) — never inlined,
+     * never via S3. Inlining large files overflows the K8s object-size limit.
+     */
+    inlineFileB64?: string;
   }): Promise<CliJobResult> {
     return this.runJob({
       sourceId: params.runId,
       mode: 'sandbox',
-      sandboxFileB64: params.fileBuffer.toString('base64'),
       sandboxFileExt: params.fileExtension,
+      sandboxFileB64: params.inlineFileB64,
       sandboxDetectorsB64: Buffer.from(
         JSON.stringify(params.detectors),
         'utf8',
@@ -219,8 +225,8 @@ export class KubernetesCliJobService {
     recipe?: Record<string, unknown>;
     outputRestUrl?: string;
     hasSuccessfulRuns?: boolean;
-    sandboxFileB64?: string;
     sandboxFileExt?: string;
+    sandboxFileB64?: string;
     sandboxDetectorsB64?: string;
     jobTrackingKey?: string;
     onLogChunk?: CliJobLogHandler;
@@ -396,8 +402,8 @@ export class KubernetesCliJobService {
       recipe?: Record<string, unknown>;
       outputRestUrl?: string;
       hasSuccessfulRuns?: boolean;
-      sandboxFileB64?: string;
       sandboxFileExt?: string;
+      sandboxFileB64?: string;
       sandboxDetectorsB64?: string;
     },
   ): V1Job {
@@ -483,16 +489,18 @@ export class KubernetesCliJobService {
         value: params.hasSuccessfulRuns ? '1' : '0',
       });
     }
-    if (params.sandboxFileB64) {
-      envMap.set('SANDBOX_FILE_B64', {
-        name: 'SANDBOX_FILE_B64',
-        value: params.sandboxFileB64,
-      });
-    }
     if (params.sandboxFileExt !== undefined) {
       envMap.set('SANDBOX_FILE_EXT', {
         name: 'SANDBOX_FILE_EXT',
         value: params.sandboxFileExt,
+      });
+    }
+    // Inline payload is reserved for tiny internal inputs (detector tests). Real
+    // sandbox file uploads omit this and use the per-job volume transport below.
+    if (params.sandboxFileB64) {
+      envMap.set('SANDBOX_FILE_B64', {
+        name: 'SANDBOX_FILE_B64',
+        value: params.sandboxFileB64,
       });
     }
     if (params.sandboxDetectorsB64) {
@@ -512,9 +520,18 @@ export class KubernetesCliJobService {
       this.setEnvValue(envMap, 'UV_CACHE_DIR', process.env.UV_CACHE_DIR);
     }
 
+    // Real sandbox file uploads (no inline payload) use the per-job volume
+    // transport; tiny inline inputs (detector tests) decode from the env var.
+    const sandboxViaVolume =
+      params.mode === 'sandbox' && !params.sandboxFileB64;
+
     container.env = Array.from(envMap.values());
     container.command = ['/bin/sh', '-lc'];
-    container.args = [this.buildJobCommand(params.mode, workDir)];
+    container.args = [this.buildJobCommand(params.mode, workDir, sandboxViaVolume)];
+
+    if (sandboxViaVolume) {
+      this.attachSandboxInputVolume(jobAny, container, envMap);
+    }
 
     // Apply per-source resource overrides from recipe
     const recipeResources = (params.recipe as any)?.resources;
@@ -615,7 +632,11 @@ export class KubernetesCliJobService {
     }
   }
 
-  private buildJobCommand(mode: CliJobMode, workDir: string): string {
+  private buildJobCommand(
+    mode: CliJobMode,
+    workDir: string,
+    sandboxViaVolume = false,
+  ): string {
     const prelude = ['set -eu'];
     let command: string;
 
@@ -640,15 +661,21 @@ export class KubernetesCliJobService {
       prelude.push('printf "%s" "$RECIPE_B64" | base64 -d > /tmp/recipe.json');
       command = '"$PYTHON_BIN" -m src.main test /tmp/recipe.json';
     } else {
-      // sandbox: decode file and detectors from base64 env vars, same pattern as recipe
-      prelude.push(
-        'printf "%s" "$SANDBOX_FILE_B64" | base64 -d > "/tmp/sandbox-input${SANDBOX_FILE_EXT:-}"',
-      );
       prelude.push(
         'printf "%s" "$SANDBOX_DETECTORS_B64" | base64 -d > /tmp/sandbox-detectors.json',
       );
-      command =
-        '"$PYTHON_BIN" -m src.main sandbox "/tmp/sandbox-input${SANDBOX_FILE_EXT:-}" --detectors-file /tmp/sandbox-detectors.json';
+      let inputPath: string;
+      if (sandboxViaVolume) {
+        // File placed at /sandbox-input/input<ext> by the init-container.
+        inputPath = '/sandbox-input/input${SANDBOX_FILE_EXT:-}';
+      } else {
+        // Tiny inline payload (detector tests): decode the env var to /tmp.
+        prelude.push(
+          'printf "%s" "$SANDBOX_FILE_B64" | base64 -d > "/tmp/sandbox-input${SANDBOX_FILE_EXT:-}"',
+        );
+        inputPath = '/tmp/sandbox-input${SANDBOX_FILE_EXT:-}';
+      }
+      command = `"$PYTHON_BIN" -m src.main sandbox "${inputPath}" --detectors-file /tmp/sandbox-detectors.json`;
     }
 
     return [
@@ -657,6 +684,83 @@ export class KubernetesCliJobService {
       'if [ -x ".venv/bin/python" ]; then PYTHON_BIN=".venv/bin/python"; else PYTHON_BIN="$(command -v python3 || command -v python)"; fi',
       command,
     ].join('; ');
+  }
+
+  /**
+   * Wire up the sandbox input-file transport: a per-job `emptyDir` volume that an
+   * init-container populates by downloading the file from the API over the
+   * cluster network. The volume (and the file) die with the job pod — no S3, no
+   * oversized base64 env var, no shared persistent storage.
+   */
+  private attachSandboxInputVolume(
+    jobAny: any,
+    container: V1Container,
+    envMap: Map<string, V1EnvVar>,
+  ): void {
+    const mountPath = '/sandbox-input';
+    const podSpec = jobAny.spec.template.spec;
+
+    podSpec.volumes = [
+      ...(podSpec.volumes || []),
+      { name: 'sandbox-input', emptyDir: {} },
+    ];
+    container.volumeMounts = [
+      ...(container.volumeMounts || []),
+      { name: 'sandbox-input', mountPath },
+    ];
+
+    const initEnv: V1EnvVar[] = [
+      {
+        name: 'CLASSIFYRE_OUTPUT_REST_URL',
+        value: envMap.get('CLASSIFYRE_OUTPUT_REST_URL')?.value || '',
+      },
+      { name: 'SOURCE_ID', value: envMap.get('SOURCE_ID')?.value || '' },
+      {
+        name: 'SANDBOX_FILE_EXT',
+        value: envMap.get('SANDBOX_FILE_EXT')?.value || '',
+      },
+    ];
+
+    const initContainer: V1Container = {
+      name: 'sandbox-input-fetch',
+      image: container.image,
+      imagePullPolicy: container.imagePullPolicy,
+      ...(container.securityContext
+        ? { securityContext: container.securityContext }
+        : {}),
+      env: initEnv,
+      volumeMounts: [{ name: 'sandbox-input', mountPath }],
+      command: ['/bin/sh', '-lc'],
+      args: [this.buildSandboxFetchCommand(mountPath)],
+    } as V1Container;
+
+    podSpec.initContainers = [...(podSpec.initContainers || []), initContainer];
+  }
+
+  /** Shell+python script the init-container runs to fetch the sandbox file. */
+  private buildSandboxFetchCommand(mountPath: string): string {
+    const py = [
+      'import os,sys,time,urllib.request',
+      "base=os.environ.get('CLASSIFYRE_OUTPUT_REST_URL','').rstrip('/')",
+      "rid=os.environ.get('SOURCE_ID','')",
+      "ext=os.environ.get('SANDBOX_FILE_EXT','')",
+      'url=f"{base}/sandbox/runs/{rid}/input"',
+      `dst=f"${mountPath}/input"+ext`,
+      'last=None',
+      'for attempt in range(30):',
+      '    try:',
+      '        with urllib.request.urlopen(url, timeout=60) as r, open(dst,"wb") as f:',
+      '            while True:',
+      '                chunk=r.read(1048576)',
+      '                if not chunk: break',
+      '                f.write(chunk)',
+      '        print(f"sandbox input downloaded to {dst}", flush=True); sys.exit(0)',
+      '    except Exception as e:',
+      '        last=e; print(f"attempt {attempt+1} failed: {e}", flush=True); time.sleep(2)',
+      'print(f"failed to download sandbox input from {url}: {last}", file=sys.stderr); sys.exit(1)',
+    ].join('\n');
+    // Heredoc keeps the python source free of shell interpolation.
+    return `set -eu; python3 - <<'PYEOF'\n${py}\nPYEOF`;
   }
 
   private async waitForJobCompletion(

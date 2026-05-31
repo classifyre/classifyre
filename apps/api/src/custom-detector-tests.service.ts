@@ -277,13 +277,14 @@ export class CustomDetectorTestsService {
     let stdout: string;
 
     if (this.kubernetesCliJobService?.isEnabled()) {
-      // K8s mode: pass data via base64 env vars — same pattern as RECIPE_B64.
-      // No shared filesystem required; the job pod decodes to /tmp and cleans up on exit.
+      // K8s mode: the detector-test input is tiny text — safe to inline as a
+      // base64 env var (no large-file / object-size concern). Real sandbox file
+      // uploads use the per-job volume transport instead.
       const result = await this.kubernetesCliJobService.runSandboxJob({
         runId,
-        fileBuffer: Buffer.from(inputText, 'utf8'),
         fileExtension: '.txt',
         detectors: [detectorEntry],
+        inlineFileB64: Buffer.from(inputText, 'utf8').toString('base64'),
       });
       if (result.exitCode !== 0) {
         throw new Error(
