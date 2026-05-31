@@ -320,10 +320,10 @@ function compareNullableNumbers(
 }
 
 function sortRunsInMemory(
-  runs: Prisma.SandboxRunGetPayload<Record<string, never>>[],
+  runs: Omit<Prisma.SandboxRunGetPayload<Record<string, never>>, 'inputData'>[],
   sortBy: SandboxRunsSortBy,
   sortOrder: SandboxRunsSortOrder,
-): Prisma.SandboxRunGetPayload<Record<string, never>>[] {
+): Omit<Prisma.SandboxRunGetPayload<Record<string, never>>, 'inputData'>[] {
   const direction = sortOrder === SandboxRunsSortOrder.ASC ? 1 : -1;
   const sorted = [...runs].sort((a, b) => {
     switch (sortBy) {
@@ -425,9 +425,16 @@ export class SandboxService {
       },
     });
 
-    void this.processRun(run.id, fileBuffer, fileName, fileExtension, detectors, {
-      append: false,
-    });
+    void this.processRun(
+      run.id,
+      fileBuffer,
+      fileName,
+      fileExtension,
+      detectors,
+      {
+        append: false,
+      },
+    );
 
     return run;
   }
@@ -663,17 +670,15 @@ export class SandboxService {
         },
       });
     } catch (error: unknown) {
-      const rawMessage =
-        error instanceof Error ? error.message : String(error);
+      const rawMessage = error instanceof Error ? error.message : String(error);
       // The worker is OOM-killed when a file is too large for this instance's
       // memory limits — surface that clearly (capacity is instance-dependent).
-      const errorMessage = /OOMKilled|out of memory|exit(?:ed with)? code 137/i.test(
-        rawMessage,
-      )
-        ? 'The file was too large to process within this instance’s memory limit ' +
-          '(the worker was out-of-memory killed). Try a smaller file or increase the ' +
-          'sandbox worker memory limit.'
-        : rawMessage;
+      const errorMessage =
+        /OOMKilled|out of memory|exit(?:ed with)? code 137/i.test(rawMessage)
+          ? 'The file was too large to process within this instance’s memory limit ' +
+            '(the worker was out-of-memory killed). Try a smaller file or increase the ' +
+            'sandbox worker memory limit.'
+          : rawMessage;
       this.logger.error(`Sandbox run ${runId} failed: ${rawMessage}`);
 
       await this.prisma.sandboxRun
@@ -765,6 +770,7 @@ export class SandboxService {
     const runs = await this.prisma.sandboxRun.findMany({
       where,
       orderBy: { createdAt: 'desc' },
+      omit: { inputData: true },
     });
 
     const filtered = runs.filter((run) => {
@@ -786,10 +792,7 @@ export class SandboxService {
 
     const sorted = sortRunsInMemory(filtered, sortBy, sortOrder);
     const total = sorted.length;
-    // Strip the (potentially large) input bytes from client responses.
-    const items = sorted
-      .slice(skip, skip + limit)
-      .map(({ inputData: _inputData, ...rest }) => rest);
+    const items = sorted.slice(skip, skip + limit);
 
     return { items, total, skip, limit };
   }
