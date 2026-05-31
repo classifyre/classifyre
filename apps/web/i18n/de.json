@@ -1162,7 +1162,17 @@
       "fileNameAZ": "Dateiname A-Z",
       "largestFile": "Größte Datei",
       "updating": "Wird aktualisiert",
-      "refreshingRuns": "Ausführungen werden aktualisiert"
+      "refreshingRuns": "Ausführungen werden aktualisiert",
+      "pickDetectors": "Detektoren hinzufügen",
+      "searchDetectors": "Detektoren suchen...",
+      "noDetectors": "Keine Detektoren gefunden",
+      "rescanAppend": "Erneut scannen (anhängen)",
+      "clearFindings": "Funde löschen",
+      "selectDetectorsFirst": "Mindestens einen Detektor auswählen",
+      "rescanStarted": "Erneuter Scan gestartet — Funde werden angehängt",
+      "rescanFailed": "Erneuter Scan konnte nicht gestartet werden",
+      "findingsCleared": "Funde gelöscht",
+      "clearFailed": "Funde konnten nicht gelöscht werden"
     },
     "monitorDesc": "Sandbox-Läufe überwachen und Detektor-Befunde prüfen",
     "newScan": "Neuer Sandbox-Scan",

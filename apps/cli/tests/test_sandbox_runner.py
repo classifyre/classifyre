@@ -109,9 +109,9 @@ def test_large_image_not_truncated(tmp_path: Path) -> None:
     _runner_with(det).run(img_path)
 
     assert len(det.calls) == 1
-    content, content_type = det.calls[0]
+    content, _ = det.calls[0]
     assert isinstance(content, bytes)
-    # Whole file delivered — not truncated to the 1 MB text cap.
+    # Whole file delivered — not truncated.
     assert len(content) == size
     # And it's still a decodable image.
     Image.open(io.BytesIO(content)).verify()

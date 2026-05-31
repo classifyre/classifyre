@@ -199,29 +199,36 @@ Each object has the shape:
   }
 
   @Post('runs/:id/rerun')
-  @HttpCode(HttpStatus.CREATED)
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Re-run a sandbox run with different detectors',
-    description: `Creates a new sandbox run using the same uploaded file as an existing run
-but with a different set of detectors. Requires S3 storage to be configured so
-the original file can be retrieved. The original run is not modified.`,
+    summary: 'Re-scan a run with different detectors (appends findings)',
+    description: `Re-scans the SAME run's already-uploaded file with a different set of
+detectors and appends the new findings to the run. No new run is created and the
+file is reused from storage — no re-upload, never S3.`,
   })
   @ApiBody({ type: RerunSandboxRunDto })
   @ApiResponse({
-    status: 201,
+    status: 200,
     type: SandboxRunDto,
-    description: 'New run created from the original file',
-  })
-  @ApiResponse({
-    status: 409,
-    description:
-      'Conflict — identical file already has a non-error run (only when skipDuplicateCheck is false)',
+    description: 'The run, now re-scanning (status RUNNING)',
   })
   rerunRun(
     @Param('id') id: string,
     @Body() dto: RerunSandboxRunDto,
   ): Promise<SandboxRunDto> {
     return this.sandboxService.rerunRun(id, dto.detectors ?? []);
+  }
+
+  @Delete('runs/:id/findings')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Clear all findings for a run',
+    description:
+      'Removes all findings from the run while keeping the uploaded file so it can be re-scanned.',
+  })
+  @ApiResponse({ status: 200, type: SandboxRunDto })
+  clearFindings(@Param('id') id: string): Promise<SandboxRunDto> {
+    return this.sandboxService.clearFindings(id);
   }
 
   @Delete('runs/:id')

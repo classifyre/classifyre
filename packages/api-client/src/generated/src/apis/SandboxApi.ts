@@ -28,6 +28,10 @@ import {
     SandboxRunListResponseDtoToJSON,
 } from '../models/index';
 
+export interface SandboxControllerClearFindingsRequest {
+    id: string;
+}
+
 export interface SandboxControllerCreateRunRequest {
     file: Blob;
     detectors: string;
@@ -38,6 +42,10 @@ export interface SandboxControllerDeleteRunRequest {
 }
 
 export interface SandboxControllerGetRunRequest {
+    id: string;
+}
+
+export interface SandboxControllerGetRunInputRequest {
     id: string;
 }
 
@@ -62,6 +70,45 @@ export interface SandboxControllerRerunRunRequest {
  * 
  */
 export class SandboxApi extends runtime.BaseAPI {
+
+    /**
+     * Removes all findings from the run while keeping the uploaded file so it can be re-scanned.
+     * Clear all findings for a run
+     */
+    async sandboxControllerClearFindingsRaw(requestParameters: SandboxControllerClearFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SandboxRunDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling sandboxControllerClearFindings().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/sandbox/runs/{id}/findings`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => SandboxRunDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Removes all findings from the run while keeping the uploaded file so it can be re-scanned.
+     * Clear all findings for a run
+     */
+    async sandboxControllerClearFindings(requestParameters: SandboxControllerClearFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SandboxRunDto> {
+        const response = await this.sandboxControllerClearFindingsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, …) and run one or more detectors against its extracted text.  **`detectors`** is a JSON string containing an array of detector config objects. Each object has the shape: ```json { \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } } ```  ### Detector types & sample configs  | Type | What it finds | |------|---------------| | `SECRETS` | API keys, tokens, private keys | | `PII` | Emails, SSNs, credit cards, phone numbers | | `YARA` | Custom YARA rule matches | | `BROKEN_LINKS` | Unreachable URLs in text | | `CUSTOM` | User-defined pipelines (REGEX, GLiNER2, HuggingFace transformers) |  **Minimal — secrets only (all patterns):** ```json [{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}] ```  **PII with specific patterns:** ```json [{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}] ```  **Secrets + PII combined:** ```json [   {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},   {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}} ] ```  **Full scan — all detectors:** ```json [   {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},   {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},   {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}} ] ```
@@ -209,6 +256,44 @@ export class SandboxApi extends runtime.BaseAPI {
     }
 
     /**
+     * Internal endpoint used by the Kubernetes sandbox job init-container to fetch the input file over the cluster network. Available only while the file is staged (during the run).
+     * Download the staged input file for an in-flight sandbox run
+     */
+    async sandboxControllerGetRunInputRaw(requestParameters: SandboxControllerGetRunInputRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling sandboxControllerGetRunInput().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/sandbox/runs/{id}/input`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Internal endpoint used by the Kubernetes sandbox job init-container to fetch the input file over the cluster network. Available only while the file is staged (during the run).
+     * Download the staged input file for an in-flight sandbox run
+     */
+    async sandboxControllerGetRunInput(requestParameters: SandboxControllerGetRunInputRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.sandboxControllerGetRunInputRaw(requestParameters, initOverrides);
+    }
+
+    /**
      * List sandbox runs (paginated)
      */
     async sandboxControllerListRunsRaw(requestParameters: SandboxControllerListRunsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SandboxRunListResponseDto>> {
@@ -274,8 +359,8 @@ export class SandboxApi extends runtime.BaseAPI {
     }
 
     /**
-     * Creates a new sandbox run using the same uploaded file as an existing run but with a different set of detectors. Requires S3 storage to be configured so the original file can be retrieved. The original run is not modified.
-     * Re-run a sandbox run with different detectors
+     * Re-scans the SAME run\'s already-uploaded file with a different set of detectors and appends the new findings to the run. No new run is created and the file is reused from storage — no re-upload, never S3.
+     * Re-scan a run with different detectors (appends findings)
      */
     async sandboxControllerRerunRunRaw(requestParameters: SandboxControllerRerunRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SandboxRunDto>> {
         if (requestParameters['id'] == null) {
@@ -314,8 +399,8 @@ export class SandboxApi extends runtime.BaseAPI {
     }
 
     /**
-     * Creates a new sandbox run using the same uploaded file as an existing run but with a different set of detectors. Requires S3 storage to be configured so the original file can be retrieved. The original run is not modified.
-     * Re-run a sandbox run with different detectors
+     * Re-scans the SAME run\'s already-uploaded file with a different set of detectors and appends the new findings to the run. No new run is created and the file is reused from storage — no re-upload, never S3.
+     * Re-scan a run with different detectors (appends findings)
      */
     async sandboxControllerRerunRun(requestParameters: SandboxControllerRerunRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SandboxRunDto> {
         const response = await this.sandboxControllerRerunRunRaw(requestParameters, initOverrides);
