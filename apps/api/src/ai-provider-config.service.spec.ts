@@ -116,7 +116,7 @@ describe('AiProviderConfigService supportsVision', () => {
       supportsVision: false,
     });
 
-    await service.update('ai-1', { supportsVision: false } as any);
+    await service.update('ai-1', { supportsVision: false });
 
     expect(prisma.aiProviderConfig.update).toHaveBeenCalledWith(
       expect.objectContaining({
