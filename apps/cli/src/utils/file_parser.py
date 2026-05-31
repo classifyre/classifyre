@@ -169,6 +169,21 @@ def _reset_docling_singleton() -> None:
         _docling_state.attempted = False
 
 
+def _require_file_processing(module_name: str) -> object:
+    """Import an optional file-parsing dependency, auto-installing on first miss.
+
+    The CLI image ships only default dependencies; file-parsing libraries
+    (pdfplumber, python-docx, openpyxl, pyarrow, filetype, chardet) live in the
+    optional ``file-processing`` uv group and are installed on demand at runtime
+    (mirrors how detectors pull their own groups). Raises MissingDependencyError
+    if the group cannot be installed; callers already treat that as a parse
+    failure / fall back gracefully.
+    """
+    from ..detectors.dependencies import require_module
+
+    return require_module(module_name, "file parser", ["file-processing"])
+
+
 def _normalize_mime_type(mime_type: str | None) -> str:
     if not mime_type:
         return ""
@@ -239,9 +254,9 @@ def _sniff_text_mime(file_bytes: bytes) -> str:
     # Try to decode a sample for text-based sniffing
     sample = ""
     try:
-        import chardet
+        chardet = _require_file_processing("chardet")
 
-        detected = chardet.detect(file_bytes[:4096])
+        detected = chardet.detect(file_bytes[:4096])  # type: ignore[attr-defined]
         encoding = detected.get("encoding") or "utf-8"
         sample = file_bytes[:4096].decode(encoding, errors="replace")
     except Exception:
@@ -282,9 +297,9 @@ def detect_mime_type(file_bytes: bytes) -> str:
         return magic_mime_type
 
     try:
-        import filetype
+        filetype = _require_file_processing("filetype")
 
-        kind = filetype.guess(file_bytes)
+        kind = filetype.guess(file_bytes)  # type: ignore[attr-defined]
         if kind is not None:
             return str(kind.mime)
     except Exception as e:
@@ -313,9 +328,9 @@ def _extract_pdf_text(file_bytes: bytes) -> tuple[str, str | None]:
     try:
         import io
 
-        import pdfplumber
+        pdfplumber = _require_file_processing("pdfplumber")
 
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:  # type: ignore[attr-defined]
             pages = []
             for page in pdf.pages:
                 text = page.extract_text() or ""
@@ -428,9 +443,9 @@ def extract_text(
         try:
             import io
 
-            import docx
+            docx = _require_file_processing("docx")
 
-            doc = docx.Document(io.BytesIO(file_bytes))
+            doc = docx.Document(io.BytesIO(file_bytes))  # type: ignore[attr-defined]
             parts: list[str] = []
             for para in doc.paragraphs:
                 if para.text.strip():
@@ -449,9 +464,11 @@ def extract_text(
         try:
             import io
 
-            import openpyxl
+            openpyxl = _require_file_processing("openpyxl")
 
-            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+            wb = openpyxl.load_workbook(  # type: ignore[attr-defined]
+                io.BytesIO(file_bytes), read_only=True, data_only=True
+            )
             rows: list[str] = []
             for sheet in wb.worksheets:
                 for row in sheet.iter_rows(values_only=True):
@@ -489,9 +506,9 @@ def extract_text(
         try:
             import io
 
-            import pyarrow.parquet as pq  # type: ignore[import-not-found, import-untyped]
+            pq = _require_file_processing("pyarrow.parquet")
 
-            table = pq.read_table(io.BytesIO(file_bytes))
+            table = pq.read_table(io.BytesIO(file_bytes))  # type: ignore[attr-defined]
             column_names = table.schema.names
             lines: list[str] = []
             for row_index in range(table.num_rows):
@@ -517,9 +534,9 @@ def extract_text(
 def _decode_bytes(file_bytes: bytes) -> str:
     """Decode bytes to str using chardet for encoding detection."""
     try:
-        import chardet
+        chardet = _require_file_processing("chardet")
 
-        detected = chardet.detect(file_bytes[:65536])
+        detected = chardet.detect(file_bytes[:65536])  # type: ignore[attr-defined]
         encoding = detected.get("encoding") or "utf-8"
         return file_bytes.decode(encoding, errors="replace")
     except Exception:
@@ -674,12 +691,12 @@ def _iter_parquet_pages(
     try:
         import io
 
-        import pyarrow.parquet as pq  # type: ignore[import-not-found, import-untyped]
+        pq = _require_file_processing("pyarrow.parquet")
 
         # ParquetFile + iter_batches() reads one row-group at a time instead of
         # loading the whole table into memory, and surfaces schema errors early
         # (before reading any data) so a bad file can't lock the C++ thread pool.
-        pf = pq.ParquetFile(io.BytesIO(file_bytes))
+        pf = pq.ParquetFile(io.BytesIO(file_bytes))  # type: ignore[attr-defined]
         abs_row = 0
         for batch in pf.iter_batches(batch_size=batch_size):
             col_names = batch.schema.names
@@ -760,9 +777,9 @@ def parse_file(file_path: Path, *, enable_ocr: bool = False) -> ParsedFile:
     encoding: str | None = None
     if not parsed.is_binary and parsed.text_content:
         try:
-            import chardet
+            chardet = _require_file_processing("chardet")
 
-            detected = chardet.detect(file_bytes[:65536])
+            detected = chardet.detect(file_bytes[:65536])  # type: ignore[attr-defined]
             encoding = detected.get("encoding")
         except Exception:
             pass

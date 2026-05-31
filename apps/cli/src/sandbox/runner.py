@@ -56,6 +56,20 @@ class SandboxRunner:
         return False
 
     @staticmethod
+    def _is_file_mime(mime_type: str) -> bool:
+        """MIME types that should be delivered to a detector as raw bytes.
+
+        Includes images/audio/video, generic binary, and PDFs. PDFs are *not*
+        ``is_binary`` (they have a text layer) but a file-capable detector — e.g.
+        a vision LLM detector — needs the original bytes to render page images,
+        so route them through the byte path too.
+        """
+        return mime_type.startswith(("image/", "audio/", "video/")) or mime_type in (
+            "application/pdf",
+            "application/octet-stream",
+        )
+
+    @staticmethod
     def _supports_mime(supported: list[str], mime_type: str) -> bool:
         if mime_type in supported:
             return True
@@ -75,46 +89,60 @@ class SandboxRunner:
         tasks = []
         active_detectors = []
 
-        if parsed.is_binary:
-            raw_bytes = file_path.read_bytes()
-            mime_type = parsed.mime_type
-            if len(raw_bytes) > _CONTENT_SIZE_LIMIT:
-                logger.warning(
-                    f"Binary content ({len(raw_bytes)} bytes) exceeds limit "
-                    f"({_CONTENT_SIZE_LIMIT} bytes); truncating."
-                )
-                raw_bytes = raw_bytes[:_CONTENT_SIZE_LIMIT]
-            for detector in detectors:
-                if self._is_binary_detector(detector) and self._supports_mime(
-                    detector.get_supported_content_types(), mime_type
-                ):
-                    tasks.append(detector.detect(raw_bytes, mime_type))
-                    active_detectors.append(detector)
-        else:
-            if parsed.parse_error:
-                logger.warning(
-                    "Text extraction failed (%s): %s", parsed.mime_type, parsed.parse_error
-                )
-            text = parsed.text_content
-            if not text.strip():
-                logger.warning(
-                    "No text content extracted from %s file; skipping text detectors.",
-                    parsed.mime_type,
-                )
-                return parsed, []
-            if len(text) > _CONTENT_SIZE_LIMIT:
-                logger.warning(
-                    f"Content size ({len(text)} bytes) exceeds limit "
-                    f"({_CONTENT_SIZE_LIMIT} bytes); truncating."
-                )
-                text = text[:_CONTENT_SIZE_LIMIT]
-            for detector in detectors:
-                supported = detector.get_supported_content_types()
-                if "text/plain" in supported:
-                    tasks.append(detector.detect(text, "text/plain"))
-                    active_detectors.append(detector)
+        mime_type = parsed.mime_type
+        file_mime = self._is_file_mime(mime_type)
+
+        # Lazily read raw bytes only when a file-capable detector needs them.
+        raw_bytes: bytes | None = None
+
+        def _get_raw_bytes() -> bytes:
+            nonlocal raw_bytes
+            if raw_bytes is None:
+                data = file_path.read_bytes()
+                if len(data) > _CONTENT_SIZE_LIMIT:
+                    logger.warning(
+                        f"Binary content ({len(data)} bytes) exceeds limit "
+                        f"({_CONTENT_SIZE_LIMIT} bytes); truncating."
+                    )
+                    data = data[:_CONTENT_SIZE_LIMIT]
+                raw_bytes = data
+            return raw_bytes
+
+        if parsed.parse_error:
+            logger.warning("Text extraction failed (%s): %s", mime_type, parsed.parse_error)
+
+        text = parsed.text_content
+        if len(text) > _CONTENT_SIZE_LIMIT:
+            logger.warning(
+                f"Content size ({len(text)} bytes) exceeds limit "
+                f"({_CONTENT_SIZE_LIMIT} bytes); truncating."
+            )
+            text = text[:_CONTENT_SIZE_LIMIT]
+
+        for detector in detectors:
+            supported = detector.get_supported_content_types()
+            # File/binary delivery: a file-capable detector (e.g. vision LLM,
+            # image classifier) that supports this file's MIME gets raw bytes —
+            # even for PDFs, which are not ``is_binary`` but still need the
+            # original file to render page images.
+            if (
+                file_mime
+                and self._is_binary_detector(detector)
+                and self._supports_mime(supported, mime_type)
+            ):
+                tasks.append(detector.detect(_get_raw_bytes(), mime_type))
+                active_detectors.append(detector)
+            # Text delivery: text detectors get the extracted text layer.
+            elif "text/plain" in supported and text.strip():
+                tasks.append(detector.detect(text, "text/plain"))
+                active_detectors.append(detector)
 
         if not tasks:
+            if not text.strip() and not file_mime:
+                logger.warning(
+                    "No text content extracted from %s file; skipping text detectors.",
+                    mime_type,
+                )
             return parsed, []
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
