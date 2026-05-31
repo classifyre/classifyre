@@ -4,12 +4,81 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**sandboxControllerClearFindings**](SandboxApi.md#sandboxcontrollerclearfindings) | **DELETE** /sandbox/runs/{id}/findings | Clear all findings for a run |
 | [**sandboxControllerCreateRun**](SandboxApi.md#sandboxcontrollercreaterun) | **POST** /sandbox/runs | Upload a file and run detectors on it |
 | [**sandboxControllerDeleteRun**](SandboxApi.md#sandboxcontrollerdeleterun) | **DELETE** /sandbox/runs/{id} | Delete a sandbox run |
 | [**sandboxControllerGetRun**](SandboxApi.md#sandboxcontrollergetrun) | **GET** /sandbox/runs/{id} | Get a sandbox run by ID |
+| [**sandboxControllerGetRunInput**](SandboxApi.md#sandboxcontrollergetruninput) | **GET** /sandbox/runs/{id}/input | Download the staged input file for an in-flight sandbox run |
 | [**sandboxControllerListRuns**](SandboxApi.md#sandboxcontrollerlistruns) | **GET** /sandbox/runs | List sandbox runs (paginated) |
-| [**sandboxControllerRerunRun**](SandboxApi.md#sandboxcontrollerrerunrun) | **POST** /sandbox/runs/{id}/rerun | Re-run a sandbox run with different detectors |
+| [**sandboxControllerRerunRun**](SandboxApi.md#sandboxcontrollerrerunrun) | **POST** /sandbox/runs/{id}/rerun | Re-scan a run with different detectors (appends findings) |
 
+
+
+## sandboxControllerClearFindings
+
+> SandboxRunDto sandboxControllerClearFindings(id)
+
+Clear all findings for a run
+
+Removes all findings from the run while keeping the uploaded file so it can be re-scanned.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SandboxApi,
+} from '@workspace/api-client';
+import type { SandboxControllerClearFindingsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SandboxApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies SandboxControllerClearFindingsRequest;
+
+  try {
+    const data = await api.sandboxControllerClearFindings(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**SandboxRunDto**](SandboxRunDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## sandboxControllerCreateRun
@@ -215,6 +284,73 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## sandboxControllerGetRunInput
+
+> sandboxControllerGetRunInput(id)
+
+Download the staged input file for an in-flight sandbox run
+
+Internal endpoint used by the Kubernetes sandbox job init-container to fetch the input file over the cluster network. Available only while the file is staged (during the run).
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SandboxApi,
+} from '@workspace/api-client';
+import type { SandboxControllerGetRunInputRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SandboxApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies SandboxControllerGetRunInputRequest;
+
+  try {
+    const data = await api.sandboxControllerGetRunInput(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## sandboxControllerListRuns
 
 > SandboxRunListResponseDto sandboxControllerListRuns(search, status, contentType, detectorType, hasFindings, sortBy, sortOrder, skip, limit)
@@ -308,9 +444,9 @@ No authorization required
 
 > SandboxRunDto sandboxControllerRerunRun(id, rerunSandboxRunDto)
 
-Re-run a sandbox run with different detectors
+Re-scan a run with different detectors (appends findings)
 
-Creates a new sandbox run using the same uploaded file as an existing run but with a different set of detectors. Requires S3 storage to be configured so the original file can be retrieved. The original run is not modified.
+Re-scans the SAME run\&#39;s already-uploaded file with a different set of detectors and appends the new findings to the run. No new run is created and the file is reused from storage — no re-upload, never S3.
 
 ### Example
 
@@ -369,8 +505,7 @@ No authorization required
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **201** | New run created from the original file |  -  |
-| **409** | Conflict — identical file already has a non-error run (only when skipDuplicateCheck is false) |  -  |
+| **200** | The run, now re-scanning (status RUNNING) |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

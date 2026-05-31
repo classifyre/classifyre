@@ -92,19 +92,15 @@ export class KubernetesCliJobService {
     runId: string;
     fileExtension: string;
     detectors: unknown[];
-    /**
-     * Tiny inline payloads only (e.g. the custom-detector test text). Real
-     * sandbox file uploads MUST omit this so the file is transported via the
-     * per-job volume (init-container downloads it from the API) — never inlined,
-     * never via S3. Inlining large files overflows the K8s object-size limit.
-     */
-    inlineFileB64?: string;
   }): Promise<CliJobResult> {
+    // The input file is always transported via the per-job volume: an
+    // init-container downloads it from the API (GET /sandbox/runs/:id/input)
+    // into an emptyDir that dies with the job. Never inlined, never via S3.
+    // Callers that don't have a persisted SandboxRun row must create one first.
     return this.runJob({
       sourceId: params.runId,
       mode: 'sandbox',
       sandboxFileExt: params.fileExtension,
-      sandboxFileB64: params.inlineFileB64,
       sandboxDetectorsB64: Buffer.from(
         JSON.stringify(params.detectors),
         'utf8',
@@ -226,7 +222,6 @@ export class KubernetesCliJobService {
     outputRestUrl?: string;
     hasSuccessfulRuns?: boolean;
     sandboxFileExt?: string;
-    sandboxFileB64?: string;
     sandboxDetectorsB64?: string;
     jobTrackingKey?: string;
     onLogChunk?: CliJobLogHandler;
@@ -270,7 +265,12 @@ export class KubernetesCliJobService {
 
       cleanupReason = 'failure';
       const exitCode = completion.exitCode ?? 1;
-      return { exitCode, output, jobName, namespace };
+      // Surface the pod's failure context (e.g. "Termination reason: OOMKilled")
+      // so callers can report a meaningful error instead of empty output.
+      const failureOutput = [output, completion.failureContext]
+        .filter((s): s is string => Boolean(s && s.trim()))
+        .join('\n\n');
+      return { exitCode, output: failureOutput, jobName, namespace };
     } finally {
       if (jobTrackingKey) {
         this.runningJobsByRunnerId.delete(jobTrackingKey);
@@ -403,7 +403,6 @@ export class KubernetesCliJobService {
       outputRestUrl?: string;
       hasSuccessfulRuns?: boolean;
       sandboxFileExt?: string;
-      sandboxFileB64?: string;
       sandboxDetectorsB64?: string;
     },
   ): V1Job {
@@ -495,14 +494,6 @@ export class KubernetesCliJobService {
         value: params.sandboxFileExt,
       });
     }
-    // Inline payload is reserved for tiny internal inputs (detector tests). Real
-    // sandbox file uploads omit this and use the per-job volume transport below.
-    if (params.sandboxFileB64) {
-      envMap.set('SANDBOX_FILE_B64', {
-        name: 'SANDBOX_FILE_B64',
-        value: params.sandboxFileB64,
-      });
-    }
     if (params.sandboxDetectorsB64) {
       envMap.set('SANDBOX_DETECTORS_B64', {
         name: 'SANDBOX_DETECTORS_B64',
@@ -520,16 +511,12 @@ export class KubernetesCliJobService {
       this.setEnvValue(envMap, 'UV_CACHE_DIR', process.env.UV_CACHE_DIR);
     }
 
-    // Real sandbox file uploads (no inline payload) use the per-job volume
-    // transport; tiny inline inputs (detector tests) decode from the env var.
-    const sandboxViaVolume =
-      params.mode === 'sandbox' && !params.sandboxFileB64;
-
     container.env = Array.from(envMap.values());
     container.command = ['/bin/sh', '-lc'];
-    container.args = [this.buildJobCommand(params.mode, workDir, sandboxViaVolume)];
+    container.args = [this.buildJobCommand(params.mode, workDir)];
 
-    if (sandboxViaVolume) {
+    // Sandbox jobs always receive their input file via the per-job volume.
+    if (params.mode === 'sandbox') {
       this.attachSandboxInputVolume(jobAny, container, envMap);
     }
 
@@ -632,11 +619,7 @@ export class KubernetesCliJobService {
     }
   }
 
-  private buildJobCommand(
-    mode: CliJobMode,
-    workDir: string,
-    sandboxViaVolume = false,
-  ): string {
+  private buildJobCommand(mode: CliJobMode, workDir: string): string {
     const prelude = ['set -eu'];
     let command: string;
 
@@ -661,21 +644,13 @@ export class KubernetesCliJobService {
       prelude.push('printf "%s" "$RECIPE_B64" | base64 -d > /tmp/recipe.json');
       command = '"$PYTHON_BIN" -m src.main test /tmp/recipe.json';
     } else {
+      // sandbox: the input file is placed at /sandbox-input/input<ext> by the
+      // init-container (downloaded from the API). Only detectors travel as env.
       prelude.push(
         'printf "%s" "$SANDBOX_DETECTORS_B64" | base64 -d > /tmp/sandbox-detectors.json',
       );
-      let inputPath: string;
-      if (sandboxViaVolume) {
-        // File placed at /sandbox-input/input<ext> by the init-container.
-        inputPath = '/sandbox-input/input${SANDBOX_FILE_EXT:-}';
-      } else {
-        // Tiny inline payload (detector tests): decode the env var to /tmp.
-        prelude.push(
-          'printf "%s" "$SANDBOX_FILE_B64" | base64 -d > "/tmp/sandbox-input${SANDBOX_FILE_EXT:-}"',
-        );
-        inputPath = '/tmp/sandbox-input${SANDBOX_FILE_EXT:-}';
-      }
-      command = `"$PYTHON_BIN" -m src.main sandbox "${inputPath}" --detectors-file /tmp/sandbox-detectors.json`;
+      command =
+        '"$PYTHON_BIN" -m src.main sandbox "/sandbox-input/input${SANDBOX_FILE_EXT:-}" --detectors-file /tmp/sandbox-detectors.json';
     }
 
     return [

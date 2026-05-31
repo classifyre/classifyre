@@ -4104,9 +4104,34 @@
         ]
       }
     },
+    "/sandbox/runs/{id}/input": {
+      "get": {
+        "description": "Internal endpoint used by the Kubernetes sandbox job init-container to fetch the input file over the cluster network. Available only while the file is staged (during the run).",
+        "operationId": "SandboxController_getRunInput",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Download the staged input file for an in-flight sandbox run",
+        "tags": [
+          "Sandbox"
+        ]
+      }
+    },
     "/sandbox/runs/{id}/rerun": {
       "post": {
-        "description": "Creates a new sandbox run using the same uploaded file as an existing run\nbut with a different set of detectors. Requires S3 storage to be configured so\nthe original file can be retrieved. The original run is not modified.",
+        "description": "Re-scans the SAME run's already-uploaded file with a different set of\ndetectors and appends the new findings to the run. No new run is created and the\nfile is reused from storage — no re-upload, never S3.",
         "operationId": "SandboxController_rerunRun",
         "parameters": [
           {
@@ -4129,8 +4154,8 @@
           }
         },
         "responses": {
-          "201": {
-            "description": "New run created from the original file",
+          "200": {
+            "description": "The run, now re-scanning (status RUNNING)",
             "content": {
               "application/json": {
                 "schema": {
@@ -4138,12 +4163,41 @@
                 }
               }
             }
-          },
-          "409": {
-            "description": "Conflict — identical file already has a non-error run (only when skipDuplicateCheck is false)"
           }
         },
-        "summary": "Re-run a sandbox run with different detectors",
+        "summary": "Re-scan a run with different detectors (appends findings)",
+        "tags": [
+          "Sandbox"
+        ]
+      }
+    },
+    "/sandbox/runs/{id}/findings": {
+      "delete": {
+        "description": "Removes all findings from the run while keeping the uploaded file so it can be re-scanned.",
+        "operationId": "SandboxController_clearFindings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxRunDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Clear all findings for a run",
         "tags": [
           "Sandbox"
         ]

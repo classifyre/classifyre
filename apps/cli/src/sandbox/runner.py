@@ -13,12 +13,6 @@ from ..utils.file_parser import ParsedFile, parse_file
 
 logger = logging.getLogger(__name__)
 
-_CONTENT_SIZE_LIMIT = 1_048_576  # 1 MB — cap for extracted *text* sent to detectors
-# Binary files (images/PDFs) must NOT be truncated mid-stream — that corrupts the
-# file so it can't be decoded/rendered. They're delivered whole up to this cap;
-# render_to_images downscales images, so the payload to the model stays bounded.
-_BINARY_SIZE_LIMIT = 50 * 1_048_576  # 50 MB
-
 
 class SandboxRunner:
     """Run a set of detectors against a single local file."""
@@ -96,36 +90,23 @@ class SandboxRunner:
         mime_type = parsed.mime_type
         file_mime = self._is_file_mime(mime_type)
 
-        # Lazily read raw bytes only when a file-capable detector needs them.
+        # Content is delivered whole — never truncated. Truncation corrupts
+        # binary files (images/PDFs) and drops potentially-important text, and
+        # capacity is an instance concern: if a file is too large the worker is
+        # OOM-killed and the failure is surfaced to the user, rather than silently
+        # scanning partial content.
         raw_bytes: bytes | None = None
 
         def _get_raw_bytes() -> bytes:
             nonlocal raw_bytes
             if raw_bytes is None:
-                data = file_path.read_bytes()
-                # Never truncate binary mid-stream (it corrupts images/PDFs). Skip
-                # only if absurdly large to avoid OOM.
-                if len(data) > _BINARY_SIZE_LIMIT:
-                    logger.warning(
-                        "Binary content (%d bytes) exceeds limit (%d bytes); skipping byte delivery.",
-                        len(data),
-                        _BINARY_SIZE_LIMIT,
-                    )
-                    raw_bytes = b""
-                else:
-                    raw_bytes = data
+                raw_bytes = file_path.read_bytes()
             return raw_bytes
 
         if parsed.parse_error:
             logger.warning("Text extraction failed (%s): %s", mime_type, parsed.parse_error)
 
         text = parsed.text_content
-        if len(text) > _CONTENT_SIZE_LIMIT:
-            logger.warning(
-                f"Content size ({len(text)} bytes) exceeds limit "
-                f"({_CONTENT_SIZE_LIMIT} bytes); truncating."
-            )
-            text = text[:_CONTENT_SIZE_LIMIT]
 
         for detector in detectors:
             supported = detector.get_supported_content_types()

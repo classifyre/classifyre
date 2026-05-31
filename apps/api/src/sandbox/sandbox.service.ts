@@ -393,39 +393,25 @@ export class SandboxService {
     const fileExtension = path.extname(fileName);
     const fileSizeBytes = fileBuffer.length;
 
-    // Duplicate detection: reject if another non-error run has the same file content.
-    let contentHash: string | undefined;
-    let s3Key: string | undefined;
-
-    if (this.sandboxFileStorage.isEnabled) {
-      contentHash = this.sandboxFileStorage.computeHash(fileBuffer);
-
-      if (!options?.skipDuplicateCheck) {
-        const existing = await this.prisma.sandboxRun.findFirst({
-          where: {
-            contentHash,
-            status: { not: SandboxRunStatus.ERROR },
-          },
-          orderBy: { createdAt: 'desc' },
+    // Duplicate detection: reject if another non-error run has the same content.
+    // Hash is computed locally (no S3 — sandbox never uses object storage).
+    const contentHash = this.sandboxFileStorage.computeHash(fileBuffer);
+    if (!options?.skipDuplicateCheck) {
+      const existing = await this.prisma.sandboxRun.findFirst({
+        where: { contentHash, status: { not: SandboxRunStatus.ERROR } },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (existing) {
+        throw new ConflictException({
+          message: 'A run with the same file content already exists.',
+          existingRunId: existing.id,
         });
-
-        if (existing) {
-          throw new ConflictException({
-            message: 'A run with the same file content already exists.',
-            existingRunId: existing.id,
-          });
-        }
       }
-
-      const uploaded = await this.sandboxFileStorage.uploadFile(
-        fileBuffer,
-        fileExtension,
-      );
-      s3Key = uploaded.s3Key;
-      contentHash = uploaded.contentHash;
     }
 
-    // Create DB record with PENDING status
+    // The uploaded file is stored on the run itself so it can be (a) transported
+    // to the K8s job via the per-job volume and (b) re-scanned later with
+    // different detectors without re-uploading. Never written to S3.
     const run = await this.prisma.sandboxRun.create({
       data: {
         fileName,
@@ -434,77 +420,82 @@ export class SandboxService {
         fileSizeBytes,
         detectors: detectors as any,
         status: SandboxRunStatus.PENDING,
-        s3Key: s3Key ?? null,
-        contentHash: contentHash ?? null,
+        contentHash,
+        inputData: new Uint8Array(fileBuffer),
       },
     });
 
-    void this.processRun(
-      run.id,
-      fileBuffer,
-      fileName,
-      fileExtension,
-      detectors,
-    );
+    void this.processRun(run.id, fileBuffer, fileName, fileExtension, detectors, {
+      append: false,
+    });
 
     return run;
   }
 
   /**
-   * Re-run an existing completed (or errored) sandbox run with a different
-   * set of detectors. Requires S3 to be enabled so the original file can be
-   * retrieved. Creates a brand-new SandboxRun record that shares the same
-   * S3 object (content-addressed key).
+   * Re-scan an existing run's file with a different set of detectors, appending
+   * the new findings to the same run (no new run, no history). The original
+   * uploaded file is reused from `inputData` — no re-upload, never S3.
    */
-  async rerunRun(originalRunId: string, detectors: unknown[]) {
+  async rerunRun(runId: string, detectors: unknown[]) {
     this.validateDetectors(detectors);
 
-    const original = await this.prisma.sandboxRun.findUnique({
-      where: { id: originalRunId },
+    const run = await this.prisma.sandboxRun.findUnique({
+      where: { id: runId },
+      select: {
+        id: true,
+        status: true,
+        fileName: true,
+        fileExtension: true,
+        inputData: true,
+      },
     });
-    if (!original) {
-      throw new NotFoundException(`Sandbox run ${originalRunId} not found`);
+    if (!run) {
+      throw new NotFoundException(`Sandbox run ${runId} not found`);
     }
     if (
-      original.status === SandboxRunStatus.PENDING ||
-      original.status === SandboxRunStatus.RUNNING
+      run.status === SandboxRunStatus.PENDING ||
+      run.status === SandboxRunStatus.RUNNING
     ) {
-      throw new BadRequestException(
-        'Cannot rerun a run that is still in progress',
-      );
+      throw new BadRequestException('Run is still in progress');
     }
-    if (!original.s3Key || !this.sandboxFileStorage.isEnabled) {
+    if (!run.inputData) {
       throw new BadRequestException(
-        'Rerun requires S3 storage to be configured and the original run to have an uploaded file',
+        'The original file for this run is no longer available; upload it again.',
       );
     }
 
-    const fileBuffer = await this.sandboxFileStorage.downloadFile(
-      original.s3Key,
-    );
-
-    const run = await this.prisma.sandboxRun.create({
-      data: {
-        fileName: original.fileName,
-        fileType: '',
-        fileExtension: original.fileExtension,
-        fileSizeBytes: original.fileSizeBytes,
-        detectors: detectors as any,
-        status: SandboxRunStatus.PENDING,
-        s3Key: original.s3Key,
-        contentHash: original.contentHash,
-      },
+    await this.prisma.sandboxRun.update({
+      where: { id: runId },
+      data: { status: SandboxRunStatus.PENDING },
     });
 
     void this.processRun(
-      run.id,
-      fileBuffer,
-      original.fileName,
-      original.fileExtension,
+      runId,
+      Buffer.from(run.inputData),
+      run.fileName,
+      run.fileExtension,
       detectors,
+      { append: true },
     );
 
-    return run;
+    return this.getRun(runId);
+  }
+
+  /** Clear all findings for a run (keeps the file so it can be re-scanned). */
+  async clearFindings(runId: string) {
+    const run = await this.prisma.sandboxRun.findUnique({
+      where: { id: runId },
+      select: { id: true },
+    });
+    if (!run) {
+      throw new NotFoundException(`Sandbox run ${runId} not found`);
+    }
+    await this.prisma.sandboxRun.update({
+      where: { id: runId },
+      data: { findings: [] },
+    });
+    return this.getRun(runId);
   }
 
   /**
@@ -559,6 +550,7 @@ export class SandboxService {
     fileName: string,
     fileExtension: string,
     detectors: unknown[],
+    options: { append: boolean },
   ): Promise<void> {
     const startTime = Date.now();
 
@@ -574,29 +566,18 @@ export class SandboxService {
       let exitCode: number;
 
       if (this.kubernetesCliJobService?.isEnabled()) {
-        // Kubernetes mode: run as a K8s Job.
-        // The input file is transported via a per-job emptyDir volume that an
-        // init-container populates by downloading from the API over the cluster
-        // network (see /sandbox/runs/:id/input). We persist the bytes here so
-        // any API replica can serve them, then clear them once the job ends.
-        // The volume dies with the job pod. Sandbox never uses S3.
-        await this.prisma.sandboxRun.update({
-          where: { id: runId },
-          data: { inputData: new Uint8Array(fileBuffer) },
+        // Kubernetes mode: run as a K8s Job. The input file is transported via a
+        // per-job emptyDir volume that an init-container populates by downloading
+        // it from the API (GET /sandbox/runs/:id/input — served from inputData,
+        // which persists on the run). The volume dies with the job pod. Never S3,
+        // never inlined.
+        const result = await this.kubernetesCliJobService.runSandboxJob({
+          runId,
+          fileExtension,
+          detectors: expandedDetectors,
         });
-        try {
-          const result = await this.kubernetesCliJobService.runSandboxJob({
-            runId,
-            fileExtension,
-            detectors: expandedDetectors,
-          });
-          stdout = result.output;
-          exitCode = result.exitCode;
-        } finally {
-          await this.prisma.sandboxRun
-            .update({ where: { id: runId }, data: { inputData: null } })
-            .catch(() => undefined);
-        }
+        stdout = result.output;
+        exitCode = result.exitCode;
       } else {
         // Local mode (bare Node or all-in-one Docker): run as a subprocess.
         // Temp files live on SANDBOX_TEMP_DIR (emptyDir in K8s, os.tmpdir()
@@ -655,21 +636,45 @@ export class SandboxService {
         this.logger.warn(`Sandbox run ${runId}: ${parseError}`);
       }
 
+      // Append mode (rerun with different detectors) accumulates findings onto
+      // the existing run; the initial run replaces.
+      let mergedFindings: unknown[] = sanitizedFindings;
+      if (options.append) {
+        const current = await this.prisma.sandboxRun.findUnique({
+          where: { id: runId },
+          select: { findings: true },
+        });
+        const existing = Array.isArray(current?.findings)
+          ? (current.findings as unknown[])
+          : [];
+        mergedFindings = [...existing, ...sanitizedFindings];
+      }
+
       await this.prisma.sandboxRun.update({
         where: { id: runId },
         data: {
           status: SandboxRunStatus.COMPLETED,
           fileType: normalizedMimeType,
           contentType: mimeToContentType(normalizedMimeType),
-          findings: sanitizedFindings as any,
+          findings: mergedFindings as any,
+          detectors: detectors as any,
           durationMs,
           ...(parseError ? { errorMessage: parseError } : {}),
         },
       });
     } catch (error: unknown) {
-      const errorMessage =
+      const rawMessage =
         error instanceof Error ? error.message : String(error);
-      this.logger.error(`Sandbox run ${runId} failed: ${errorMessage}`);
+      // The worker is OOM-killed when a file is too large for this instance's
+      // memory limits — surface that clearly (capacity is instance-dependent).
+      const errorMessage = /OOMKilled|out of memory|exit(?:ed with)? code 137/i.test(
+        rawMessage,
+      )
+        ? 'The file was too large to process within this instance’s memory limit ' +
+          '(the worker was out-of-memory killed). Try a smaller file or increase the ' +
+          'sandbox worker memory limit.'
+        : rawMessage;
+      this.logger.error(`Sandbox run ${runId} failed: ${rawMessage}`);
 
       await this.prisma.sandboxRun
         .update({
@@ -749,6 +754,7 @@ export class SandboxService {
           orderBy,
           skip,
           take: limit,
+          omit: { inputData: true },
         }),
         this.prisma.sandboxRun.count({ where }),
       ]);
@@ -780,13 +786,19 @@ export class SandboxService {
 
     const sorted = sortRunsInMemory(filtered, sortBy, sortOrder);
     const total = sorted.length;
-    const items = sorted.slice(skip, skip + limit);
+    // Strip the (potentially large) input bytes from client responses.
+    const items = sorted
+      .slice(skip, skip + limit)
+      .map(({ inputData: _inputData, ...rest }) => rest);
 
     return { items, total, skip, limit };
   }
 
   async getRun(id: string) {
-    const run = await this.prisma.sandboxRun.findUnique({ where: { id } });
+    const run = await this.prisma.sandboxRun.findUnique({
+      where: { id },
+      omit: { inputData: true },
+    });
     if (!run) {
       throw new NotFoundException(`Sandbox run ${id} not found`);
     }
@@ -817,23 +829,9 @@ export class SandboxService {
       .rm(this.getSandboxSharedDir(id), { recursive: true, force: true })
       .catch(() => undefined);
 
-    // Count and delete inside a transaction so the refcount is taken under
-    // the same row lock as the delete, preventing a concurrent rerunRun from
-    // sneaking in between count and delete and losing its S3 object reference.
-    let isLastReference = false;
-    await this.prisma.$transaction(async (tx) => {
-      if (run.s3Key && run.contentHash && this.sandboxFileStorage.isEnabled) {
-        const refCount = await tx.sandboxRun.count({
-          where: { contentHash: run.contentHash },
-        });
-        isLastReference = refCount === 1;
-      }
-      await tx.sandboxRun.delete({ where: { id } });
-    });
-
-    if (isLastReference && run.s3Key) {
-      await this.sandboxFileStorage.deleteFile(run.s3Key, 0);
-    }
+    // The file lives only on the run row (inputData) — deleting the row removes
+    // it. Sandbox never uses S3, so there is nothing external to clean up.
+    await this.prisma.sandboxRun.delete({ where: { id } });
   }
 
   private async executeSandboxLocally(

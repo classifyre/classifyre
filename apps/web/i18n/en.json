@@ -1162,7 +1162,17 @@
       "fileNameAZ": "File name A-Z",
       "largestFile": "Largest file",
       "updating": "Updating",
-      "refreshingRuns": "Refreshing runs"
+      "refreshingRuns": "Refreshing runs",
+      "pickDetectors": "Add detectors to run",
+      "searchDetectors": "Search detectors...",
+      "noDetectors": "No detectors found",
+      "rescanAppend": "Re-scan (append)",
+      "clearFindings": "Clear findings",
+      "selectDetectorsFirst": "Select at least one detector",
+      "rescanStarted": "Re-scan started — findings will be appended",
+      "rescanFailed": "Failed to start re-scan",
+      "findingsCleared": "Findings cleared",
+      "clearFailed": "Failed to clear findings"
     },
     "monitorDesc": "Monitor sandbox runs and inspect detector findings",
     "newScan": "New sandbox scan",
