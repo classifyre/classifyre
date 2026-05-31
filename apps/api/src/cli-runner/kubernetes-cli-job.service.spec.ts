@@ -333,6 +333,61 @@ describe('KubernetesCliJobService', () => {
     ).toBeUndefined();
   });
 
+  it('strips server-generated identity fields from a captured-job template', () => {
+    const service = new KubernetesCliJobService();
+    // Simulates K8S_CLI_JOB_TEMPLATE_PATH pointing at a dumped live Job, which
+    // carries a prior job's selector + controller-uid/job-name pod labels.
+    const job = (service as any).buildJobFromTemplate(
+      {
+        apiVersion: 'batch/v1',
+        kind: 'Job',
+        metadata: {
+          uid: 'old-uid',
+          resourceVersion: '12345',
+          labels: { 'controller-uid': 'stale-uid' },
+        },
+        status: { active: 1 },
+        spec: {
+          selector: {
+            matchLabels: { 'batch.kubernetes.io/controller-uid': 'stale-uid' },
+          },
+          manualSelector: false,
+          template: {
+            metadata: {
+              labels: {
+                'controller-uid': 'stale-uid',
+                'job-name': 'old-job',
+                'batch.kubernetes.io/controller-uid': 'stale-uid',
+                'batch.kubernetes.io/job-name': 'old-job',
+              },
+            },
+            spec: { containers: [{ name: 'cli', image: 'cli:latest' }] },
+          },
+        },
+      },
+      { sourceId: 'source-1', mode: 'extract', recipe: { type: 'POSTGRESQL' } },
+    );
+
+    expect((job as any).status).toBeUndefined();
+    expect(job.metadata?.uid).toBeUndefined();
+    expect((job.metadata as any)?.resourceVersion).toBeUndefined();
+    expect(job.spec?.selector).toBeUndefined();
+    expect((job.spec as any)?.manualSelector).toBeUndefined();
+
+    const podLabels = job.spec?.template?.metadata?.labels ?? {};
+    for (const key of [
+      'controller-uid',
+      'job-name',
+      'batch.kubernetes.io/controller-uid',
+      'batch.kubernetes.io/job-name',
+    ]) {
+      expect(podLabels[key]).toBeUndefined();
+    }
+    expect(job.metadata?.labels?.['controller-uid']).toBeUndefined();
+    // Our own labels survive.
+    expect(podLabels['app.kubernetes.io/managed-by']).toBe('classifyre-api');
+  });
+
   it('injects successful-run state env var into extract jobs', () => {
     const service = new KubernetesCliJobService();
     const job = (service as any).buildJobFromTemplate(
