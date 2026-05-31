@@ -13,7 +13,11 @@ from ..utils.file_parser import ParsedFile, parse_file
 
 logger = logging.getLogger(__name__)
 
-_CONTENT_SIZE_LIMIT = 1_048_576  # 1 MB
+_CONTENT_SIZE_LIMIT = 1_048_576  # 1 MB — cap for extracted *text* sent to detectors
+# Binary files (images/PDFs) must NOT be truncated mid-stream — that corrupts the
+# file so it can't be decoded/rendered. They're delivered whole up to this cap;
+# render_to_images downscales images, so the payload to the model stays bounded.
+_BINARY_SIZE_LIMIT = 50 * 1_048_576  # 50 MB
 
 
 class SandboxRunner:
@@ -99,13 +103,17 @@ class SandboxRunner:
             nonlocal raw_bytes
             if raw_bytes is None:
                 data = file_path.read_bytes()
-                if len(data) > _CONTENT_SIZE_LIMIT:
+                # Never truncate binary mid-stream (it corrupts images/PDFs). Skip
+                # only if absurdly large to avoid OOM.
+                if len(data) > _BINARY_SIZE_LIMIT:
                     logger.warning(
-                        f"Binary content ({len(data)} bytes) exceeds limit "
-                        f"({_CONTENT_SIZE_LIMIT} bytes); truncating."
+                        "Binary content (%d bytes) exceeds limit (%d bytes); skipping byte delivery.",
+                        len(data),
+                        _BINARY_SIZE_LIMIT,
                     )
-                    data = data[:_CONTENT_SIZE_LIMIT]
-                raw_bytes = data
+                    raw_bytes = b""
+                else:
+                    raw_bytes = data
             return raw_bytes
 
         if parsed.parse_error:

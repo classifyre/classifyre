@@ -95,6 +95,28 @@ def test_pdf_goes_to_vision_detector_as_bytes(tmp_path: Path) -> None:
     assert content_type == "application/pdf"
 
 
+def test_large_image_not_truncated(tmp_path: Path) -> None:
+    pytest.importorskip("PIL")
+    from PIL import Image
+
+    # A noisy image that encodes to > 1 MB so it would trip the old text cap.
+    img_path = tmp_path / "big.png"
+    Image.effect_noise((1400, 1400), 120).convert("RGB").save(img_path, format="PNG")
+    size = img_path.stat().st_size
+    assert size > 1_048_576, f"fixture not large enough ({size} bytes)"
+
+    det = _RecordingDetector(_VISION_TYPES)
+    _runner_with(det).run(img_path)
+
+    assert len(det.calls) == 1
+    content, content_type = det.calls[0]
+    assert isinstance(content, bytes)
+    # Whole file delivered — not truncated to the 1 MB text cap.
+    assert len(content) == size
+    # And it's still a decodable image.
+    Image.open(io.BytesIO(content)).verify()
+
+
 def test_text_detector_gets_text_not_bytes(tmp_path: Path) -> None:
     txt = tmp_path / "notes.txt"
     txt.write_text("hello world contact me at a@b.com")
