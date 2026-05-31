@@ -9,6 +9,7 @@ import {
   Param,
   Query,
   Req,
+  Res,
   BadRequestException,
 } from '@nestjs/common';
 import {
@@ -19,7 +20,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import '@fastify/multipart';
-import type { FastifyRequest } from 'fastify';
+import type { FastifyRequest, FastifyReply } from 'fastify';
 import { SandboxService } from './sandbox.service';
 import { QuerySandboxRunsDto } from './dto/query-sandbox-runs.dto';
 import { SandboxRunDto } from './dto/sandbox-run.dto';
@@ -176,6 +177,25 @@ Each object has the shape:
   @ApiResponse({ status: 200, type: SandboxRunDto })
   getRun(@Param('id') id: string): Promise<SandboxRunDto> {
     return this.sandboxService.getRun(id);
+  }
+
+  @Get('runs/:id/input')
+  @ApiOperation({
+    summary: 'Download the staged input file for an in-flight sandbox run',
+    description:
+      'Internal endpoint used by the Kubernetes sandbox job init-container to fetch the input file over the cluster network. Available only while the file is staged (during the run).',
+  })
+  async getRunInput(
+    @Param('id') id: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const { data, contentType, fileName } =
+      await this.sandboxService.getInputData(id);
+    await reply
+      .header('Content-Type', contentType)
+      .header('Content-Length', String(data.length))
+      .header('Content-Disposition', `attachment; filename="${fileName}"`)
+      .send(data);
   }
 
   @Post('runs/:id/rerun')
