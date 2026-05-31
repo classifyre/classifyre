@@ -566,7 +566,53 @@ export class KubernetesCliJobService {
       }
     }
 
+    this.stripServerGeneratedFields(jobAny);
     return job;
+  }
+
+  /**
+   * Remove identity fields the Kubernetes API server owns/auto-generates on a
+   * Job. If a configured job template (K8S_CLI_JOB_TEMPLATE_PATH) was captured
+   * from a live Job — e.g. `kubectl get job -o json` — it carries the previous
+   * job's `controller-uid`/`job-name` pod labels and an auto-generated
+   * `spec.selector`. Reusing those on a new Job is rejected with HTTP 422
+   * ("controller-uid must be <new-uid>" / "selector not auto-generated"). Strip
+   * them so the API server regenerates a fresh, consistent identity.
+   */
+  private stripServerGeneratedFields(jobAny: any): void {
+    delete jobAny.status;
+    if (jobAny.metadata) {
+      for (const key of [
+        'uid',
+        'resourceVersion',
+        'generation',
+        'creationTimestamp',
+        'selfLink',
+        'managedFields',
+      ]) {
+        delete jobAny.metadata[key];
+      }
+    }
+    if (jobAny.spec) {
+      delete jobAny.spec.selector;
+      delete jobAny.spec.manualSelector;
+    }
+    const autoLabelKeys = [
+      'controller-uid',
+      'job-name',
+      'batch.kubernetes.io/controller-uid',
+      'batch.kubernetes.io/job-name',
+    ];
+    for (const labels of [
+      jobAny.metadata?.labels,
+      jobAny.spec?.template?.metadata?.labels,
+    ]) {
+      if (labels) {
+        for (const key of autoLabelKeys) {
+          delete labels[key];
+        }
+      }
+    }
   }
 
   private buildJobCommand(mode: CliJobMode, workDir: string): string {
