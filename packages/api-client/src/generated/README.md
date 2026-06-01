@@ -58,6 +58,7 @@ All URIs are relative to *http://localhost*
 *AIProviderConfigsApi* | [**aiProviderConfigControllerTest**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollertest) | **POST** /ai-provider-configs/{id}/test | Test an AI provider configuration
 *AIProviderConfigsApi* | [**aiProviderConfigControllerUpdate**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerupdate) | **PUT** /ai-provider-configs/{id} | Update an AI provider configuration
 *AssetsApi* | [**assetsControllerGetAsset**](docs/AssetsApi.md#assetscontrollergetasset) | **GET** /assets/{id} | Get asset by ID
+*AssetsApi* | [**assetsControllerGetAssetChildren**](docs/AssetsApi.md#assetscontrollergetassetchildren) | **GET** /assets/{id}/children | List child assets
 *AssetsApi* | [**searchAssetsControllerSearchAssets**](docs/AssetsApi.md#searchassetscontrollersearchassets) | **POST** /search/assets | Search assets with findings
 *AssetsApi* | [**searchAssetsControllerSearchAssetsCharts**](docs/AssetsApi.md#searchassetscontrollersearchassetscharts) | **POST** /search/assets/charts | Search assets charts overview
 *AssetsApi* | [**searchAssetsControllerSearchFindings**](docs/AssetsApi.md#searchassetscontrollersearchfindings) | **POST** /search/findings | Search findings

@@ -39,6 +39,8 @@ import {
 } from "@/components/transformer-detector-editor";
 import { CustomDetectorTrainingHistoryTable } from "@/components/custom-detector-training-history-table";
 import { CustomDetectorExtractionCoverage } from "@/components/custom-detector-extraction-coverage";
+import { VisualScanBadge } from "@/components/detector-type-badge";
+import { isVisualDetector } from "@/lib/custom-detector-badge";
 import { formatDate } from "@/lib/date";
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -219,7 +221,10 @@ export default function CustomDetectorDetailsPage() {
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <CardTitle>{detector.name}</CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle>{detector.name}</CardTitle>
+                {isVisualDetector(pipelineSchemaType) ? <VisualScanBadge /> : null}
+              </div>
               <CardDescription className="font-mono text-xs">
                 {detector.key}
               </CardDescription>

@@ -752,6 +752,67 @@ describe('AssetService', () => {
       expect(result.deleted).toBe(0);
     });
 
+    it('should link child assets to their parent via parent_hash', async () => {
+      const incomingAssets = [
+        {
+          hash: 'parent-1',
+          checksum: 'checksum-parent',
+          name: 'dataset.parquet',
+          external_url: 'https://example.com/dataset.parquet',
+          links: [],
+          asset_type: 'TABLE',
+          findings: [],
+        },
+        {
+          hash: 'child-1',
+          checksum: 'checksum-child',
+          name: 'dataset.parquet#row=1;col=image',
+          external_url: 'https://example.com/dataset.parquet#row=1;col=image',
+          links: ['parent-1'],
+          asset_type: 'IMAGE',
+          parent_hash: 'parent-1',
+          findings: [],
+        },
+      ];
+
+      mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+      const txUpdateMany = jest.fn().mockResolvedValue({});
+      const mockTransaction = (callback: any) => {
+        const tx = {
+          asset: {
+            createMany: jest.fn().mockResolvedValue({}),
+            update: jest.fn().mockResolvedValue({}),
+            updateMany: txUpdateMany,
+            findMany: jest.fn().mockResolvedValue([
+              { id: 'db-parent-1', hash: 'parent-1', parentId: null },
+              { id: 'db-child-1', hash: 'child-1', parentId: null },
+            ]),
+          },
+          finding: {
+            findMany: jest.fn().mockResolvedValue([]),
+            createMany: jest.fn().mockResolvedValue({}),
+            update: jest.fn().mockResolvedValue({}),
+          },
+          runner: {
+            update: jest.fn().mockResolvedValue({}),
+          },
+        };
+        return callback(tx);
+      };
+
+      mockPrismaService.$transaction.mockImplementation(mockTransaction);
+
+      const result = await service.bulkIngest(sourceId, runnerId, incomingAssets);
+
+      expect(result.created).toBe(2);
+      // The child is linked to the parent's DB id.
+      expect(txUpdateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['db-child-1'] } },
+        data: { parentId: 'db-parent-1' },
+      });
+    });
+
     it('should mark assets as UPDATED when checksum changes', async () => {
       const existingAsset = {
         id: 'db-asset-1',

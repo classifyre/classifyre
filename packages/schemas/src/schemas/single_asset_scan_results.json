@@ -32,6 +32,19 @@
       "title": "Links",
       "type": "array"
     },
+    "parent_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Hash of the parent asset when this asset was extracted from inside another file (e.g. an image embedded in a parquet/office document). Null for top-level assets.",
+      "title": "Parent Hash"
+    },
     "asset_type": {
       "$ref": "#/definitions/AssetType",
       "description": "Canonical asset content type",
