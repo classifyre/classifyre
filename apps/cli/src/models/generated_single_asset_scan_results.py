@@ -209,11 +209,6 @@ class SingleAssetScanResults(BaseModel):
     links: list[str] = Field(
         ..., description='Linked asset hashes referenced by this asset', title='Links'
     )
-    parent_hash: str | None = Field(
-        None,
-        description='Hash of the parent asset when this asset was extracted from inside another file (e.g. an image embedded in a parquet/office document). Null for top-level assets.',
-        title='Parent Hash',
-    )
     asset_type: AssetType = Field(
         ..., description='Canonical asset content type', title='Asset Type'
     )

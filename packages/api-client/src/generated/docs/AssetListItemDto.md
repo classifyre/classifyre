@@ -18,7 +18,6 @@ Name | Type
 `runnerId` | string
 `lastScannedAt` | Date
 `status` | string
-`parentId` | string
 `createdAt` | Date
 `updatedAt` | Date
 
@@ -41,7 +40,6 @@ const example = {
   "runnerId": null,
   "lastScannedAt": null,
   "status": null,
-  "parentId": null,
   "createdAt": null,
   "updatedAt": null,
 } satisfies AssetListItemDto

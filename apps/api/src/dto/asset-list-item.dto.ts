@@ -38,13 +38,6 @@ export class AssetListItemDto {
   @ApiProperty({ enum: AssetStatus })
   status: AssetStatus;
 
-  @ApiPropertyOptional({
-    description:
-      'Hash of the parent asset when this asset was extracted from inside another file (e.g. an image embedded in a parquet/office document). Null for top-level assets.',
-    nullable: true,
-  })
-  parentId?: string | null;
-
   @ApiProperty()
   createdAt: Date;
 

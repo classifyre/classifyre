@@ -65,10 +65,6 @@ export interface AssetsControllerGetAssetRequest {
     id: string;
 }
 
-export interface AssetsControllerGetAssetChildrenRequest {
-    id: string;
-}
-
 export interface SearchAssetsControllerSearchAssetsRequest {
     searchAssetsRequestDto: SearchAssetsRequestDto;
 }
@@ -150,45 +146,6 @@ export class AssetsApi extends runtime.BaseAPI {
      */
     async assetsControllerGetAsset(requestParameters: AssetsControllerGetAssetRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetListItemDto> {
         const response = await this.assetsControllerGetAssetRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * List assets extracted from inside this asset (e.g. images embedded in a parquet or office document).
-     * List child assets
-     */
-    async assetsControllerGetAssetChildrenRaw(requestParameters: AssetsControllerGetAssetChildrenRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<AssetListItemDto>>> {
-        if (requestParameters['id'] == null) {
-            throw new runtime.RequiredError(
-                'id',
-                'Required parameter "id" was null or undefined when calling assetsControllerGetAssetChildren().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/assets/{id}/children`;
-        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(AssetListItemDtoFromJSON));
-    }
-
-    /**
-     * List assets extracted from inside this asset (e.g. images embedded in a parquet or office document).
-     * List child assets
-     */
-    async assetsControllerGetAssetChildren(requestParameters: AssetsControllerGetAssetChildrenRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<AssetListItemDto>> {
-        const response = await this.assetsControllerGetAssetChildrenRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

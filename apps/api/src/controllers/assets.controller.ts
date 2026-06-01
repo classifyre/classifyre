@@ -74,26 +74,6 @@ export class AssetsController {
     }
     return assetDetails;
   }
-
-  @Get(':id/children')
-  @ApiOperation({
-    summary: 'List child assets',
-    description:
-      'List assets extracted from inside this asset (e.g. images embedded in a parquet or office document).',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'Parent asset unique identifier',
-    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Child assets belonging to the parent',
-    type: [AssetListItemDto],
-  })
-  async getAssetChildren(@Param('id') id: string): Promise<AssetListItemDto[]> {
-    return this.assetService.getAssetChildren(id);
-  }
 }
 
 @AllowInDemoMode()

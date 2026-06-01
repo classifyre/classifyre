@@ -637,11 +637,7 @@
       "backToDiscovery": "Back to Discovery",
       "goBack": "Go back",
       "loading": "Loading asset details...",
-      "openSource": "Open Source",
-      "embeddedImages": "Embedded images",
-      "embeddedImagesDesc": "Images extracted from inside this file, each scanned as its own asset.",
-      "partOf": "Embedded in",
-      "viewParent": "View parent asset"
+      "openSource": "Open Source"
     }
   },
   "detectors": {

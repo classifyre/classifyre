@@ -219,18 +219,16 @@ async def test_s3_storage_emits_child_image_assets_for_parquet(monkeypatch):
     async for batch in source.extract():
         assets.extend(batch)
 
-    parents = [a for a in assets if a.parent_hash is None]
-    children = [a for a in assets if a.parent_hash is not None]
+    parents = [a for a in assets if a.asset_type == OutputAssetType.TABLE]
+    children = [a for a in assets if a.asset_type == OutputAssetType.IMAGE]
 
     assert len(parents) == 1
     parent = parents[0]
-    assert parent.asset_type == OutputAssetType.TABLE
-    # One child IMAGE asset per embedded image, linked to the parent.
+    # One child IMAGE asset per embedded image, referenced from the parent's links.
     assert len(children) == 2
+    child_hashes = {c.hash for c in children}
+    assert child_hashes.issubset(set(parent.links))
     for child in children:
-        assert child.asset_type == OutputAssetType.IMAGE
-        assert child.parent_hash == parent.hash
-        assert parent.hash in child.links
         # Bytes are cached so the binary-detector path serves them with no download.
         fetched = await source.fetch_content_bytes(child.hash)
         assert fetched is not None
