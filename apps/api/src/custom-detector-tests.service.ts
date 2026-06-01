@@ -277,20 +277,40 @@ export class CustomDetectorTestsService {
     let stdout: string;
 
     if (this.kubernetesCliJobService?.isEnabled()) {
-      // K8s mode: pass data via base64 env vars — same pattern as RECIPE_B64.
-      // No shared filesystem required; the job pod decodes to /tmp and cleans up on exit.
-      const result = await this.kubernetesCliJobService.runSandboxJob({
-        runId,
-        fileBuffer: Buffer.from(inputText, 'utf8'),
-        fileExtension: '.txt',
-        detectors: [detectorEntry],
+      // K8s mode: stage the test text as a transient sandbox run so it travels
+      // through the SAME per-job volume transport as real sandbox files (the
+      // job's init-container downloads it from /sandbox/runs/:id/input). The
+      // staging row is deleted as soon as the job finishes. No base64 inline.
+      const textBuffer = Buffer.from(inputText, 'utf8');
+      const staged = await this.prisma.sandboxRun.create({
+        data: {
+          fileName: `detector-test-${runId}.txt`,
+          fileType: '',
+          fileExtension: '.txt',
+          fileSizeBytes: textBuffer.length,
+          detectors: [detectorEntry] as any,
+          status: 'RUNNING',
+          inputData: new Uint8Array(textBuffer),
+        },
+        select: { id: true },
       });
-      if (result.exitCode !== 0) {
-        throw new Error(
-          `CLI exited with code ${result.exitCode}: ${result.output}`,
-        );
+      try {
+        const result = await this.kubernetesCliJobService.runSandboxJob({
+          runId: staged.id,
+          fileExtension: '.txt',
+          detectors: [detectorEntry],
+        });
+        if (result.exitCode !== 0) {
+          throw new Error(
+            `CLI exited with code ${result.exitCode}: ${result.output}`,
+          );
+        }
+        stdout = result.output;
+      } finally {
+        await this.prisma.sandboxRun
+          .delete({ where: { id: staged.id } })
+          .catch(() => undefined);
       }
-      stdout = result.output;
     } else {
       // Local mode: write temp files and run CLI subprocess directly.
       const tmpDir = process.env.TEMP_DIR || os.tmpdir();

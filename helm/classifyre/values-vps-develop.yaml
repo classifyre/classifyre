@@ -11,11 +11,12 @@ api:
 
   env:
     DEMO_MODE: "false"
+    MAX_CONCURRENT_RUNNERS: "1"
 
-  # Single-node VPS: same cap as production namespace.
+  # Single-node VPS: minimal footprint.
   autoscaling:
-    minReplicas: 2
-    maxReplicas: 4
+    minReplicas: 1
+    maxReplicas: 1
 
   cliJobs:
     image:
@@ -32,6 +33,10 @@ frontend:
     repository: classifyre/web
     tag: "develop"
     pullPolicy: Always
+
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 1
 
   service:
     type: NodePort

@@ -21,8 +21,11 @@ import {
   Loader2,
   Search,
   Trash2,
+  RotateCw,
+  Eraser,
   type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { formatRelative } from "@/lib/date";
 import { getAssetTypeIcon } from "@/lib/asset-type-icon";
 import {
@@ -321,12 +324,163 @@ function FindingsRow({ findings }: { findings: SandboxFinding[] }) {
   );
 }
 
+// Built-in detector types offered for a quick re-scan alongside custom detectors.
+const RERUN_BUILTIN_TYPES = ["PII", "SECRETS", "CODE_SECURITY"] as const;
+
+function RunActions({
+  run,
+  onChanged,
+}: {
+  run: SandboxRunDto;
+  onChanged: () => void;
+}) {
+  const { t } = useTranslation();
+  const [customDetectors, setCustomDetectors] = useState<
+    { key: string; name: string }[]
+  >([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+
+  const findings = Array.isArray(run.findings) ? run.findings : [];
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .listCustomDetectors()
+      .then((list) => {
+        if (cancelled) return;
+        const items = Array.isArray(list) ? list : [];
+        setCustomDetectors(
+          items.map((d) => ({ key: d.key, name: d.name || d.key })),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Option value scheme: "builtin:PII" or "custom:<key>".
+  const buildPayload = () =>
+    selected
+      .map((value) => {
+        if (value.startsWith("custom:")) {
+          return {
+            type: "CUSTOM",
+            enabled: true,
+            custom_detector_key: value.slice("custom:".length),
+            config: {},
+          };
+        }
+        return { type: value.slice("builtin:".length), enabled: true, config: {} };
+      })
+      .filter((d) => d.type);
+
+  const handleRerun = async () => {
+    const detectors = buildPayload();
+    if (detectors.length === 0) {
+      toast.error(t("sandbox.runs.selectDetectorsFirst"));
+      return;
+    }
+    setIsRunning(true);
+    try {
+      await api.sandbox.sandboxControllerRerunRun({
+        id: run.id,
+        // API accepts detector objects; generated type is loosely Array<string>.
+        rerunSandboxRunDto: { detectors: detectors as unknown as string[] },
+      });
+      toast.success(t("sandbox.runs.rescanStarted"));
+      onChanged();
+    } catch {
+      toast.error(t("sandbox.runs.rescanFailed"));
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const handleClear = async () => {
+    setIsClearing(true);
+    try {
+      await api.sandbox.sandboxControllerClearFindings({ id: run.id });
+      toast.success(t("sandbox.runs.findingsCleared"));
+      onChanged();
+    } catch {
+      toast.error(t("sandbox.runs.clearFailed"));
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-t bg-muted/20 px-4 py-3">
+      <MultiSelect values={selected} onValuesChange={setSelected}>
+        <MultiSelectTrigger className="h-8 w-[260px] rounded-[4px] border-2 border-border">
+          <MultiSelectValue placeholder={t("sandbox.runs.pickDetectors")} />
+        </MultiSelectTrigger>
+        <MultiSelectContent
+          search={{
+            placeholder: t("sandbox.runs.searchDetectors"),
+            emptyMessage: t("sandbox.runs.noDetectors"),
+          }}
+        >
+          <MultiSelectGroup>
+            {RERUN_BUILTIN_TYPES.map((type) => (
+              <MultiSelectItem key={type} value={`builtin:${type}`}>
+                {formatEnumLabel(type)}
+              </MultiSelectItem>
+            ))}
+            {customDetectors.map((d) => (
+              <MultiSelectItem key={d.key} value={`custom:${d.key}`}>
+                {d.name}
+              </MultiSelectItem>
+            ))}
+          </MultiSelectGroup>
+        </MultiSelectContent>
+      </MultiSelect>
+
+      <Button
+        size="sm"
+        className="h-8 rounded-[4px]"
+        disabled={isRunning || selected.length === 0}
+        onClick={() => void handleRerun()}
+        data-testid="btn-rerun-run"
+      >
+        {isRunning ? (
+          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <RotateCw className="mr-1.5 h-3.5 w-3.5" />
+        )}
+        {t("sandbox.runs.rescanAppend")}
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-8 rounded-[4px]"
+        disabled={isClearing || findings.length === 0}
+        onClick={() => void handleClear()}
+        data-testid="btn-clear-findings"
+      >
+        {isClearing ? (
+          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Eraser className="mr-1.5 h-3.5 w-3.5" />
+        )}
+        {t("sandbox.runs.clearFindings")}
+      </Button>
+    </div>
+  );
+}
+
 function RunRow({
   run,
   onDelete,
+  onChanged,
 }: {
   run: SandboxRunDto;
   onDelete: (id: string) => Promise<void>;
+  onChanged: () => void;
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
@@ -489,6 +643,7 @@ function RunRow({
         <TableRow>
           <TableCell colSpan={12} className="p-0">
             <FindingsRow findings={findings} />
+            <RunActions run={run} onChanged={onChanged} />
           </TableCell>
         </TableRow>
       ) : null}
@@ -866,7 +1021,12 @@ export function SandboxRunsTable({
               </TableHeader>
               <TableBody>
                 {runs.map((run) => (
-                  <RunRow key={run.id} run={run} onDelete={handleDelete} />
+                  <RunRow
+                    key={run.id}
+                    run={run}
+                    onDelete={handleDelete}
+                    onChanged={() => void fetchRuns(true)}
+                  />
                 ))}
               </TableBody>
             </Table>

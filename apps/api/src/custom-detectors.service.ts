@@ -901,6 +901,7 @@ export class CustomDetectorsService {
         api_key: runtime.apiKey,
         base_url: runtime.baseUrl ?? null,
         context_size: runtime.contextSize ?? null,
+        supports_vision: runtime.supportsVision ?? false,
       },
     };
   }
