@@ -600,18 +600,6 @@ export class AssetService {
     };
   }
 
-  /** List child assets (e.g. images embedded in a parquet/office file) of a parent. */
-  async getAssetChildren(parentId: string): Promise<NormalizedAsset[]> {
-    const children = await this.prisma.asset.findMany({
-      where: { parentId },
-      orderBy: [{ externalUrl: 'asc' }, { createdAt: 'asc' }],
-    });
-    return children.map((asset) => ({
-      ...asset,
-      links: this.normalizeLinks(asset.links),
-    }));
-  }
-
   assets(params: {
     skip?: number;
     take?: number;
@@ -1471,30 +1459,20 @@ export class AssetService {
   }
 
   /**
-   * Set parentId on child assets that carry a parent_hash (e.g. images embedded
-   * in a parquet/office file). Grouped by parent to minimize update calls and
-   * skipped when the link already exists, so re-ingestion is idempotent.
+   * Merge link arrays preserving existing order and appending new, unique entries.
+   * Links accumulate across ingestions — they are never removed — so an asset that
+   * references extracted children (e.g. images in a parquet/office file) keeps them.
    */
-  private async linkChildAssets(
-    tx: Prisma.TransactionClient,
-    batch: Record<string, any>[],
-    existingAssetsMap: Map<string, Asset>,
-  ): Promise<void> {
-    const idsByParent = new Map<string, string[]>();
-    for (const asset of batch) {
-      const parentHash = asset.parent_hash ?? asset.parentHash;
-      if (!parentHash) continue;
-      const child = existingAssetsMap.get(String(asset.hash));
-      const parent = existingAssetsMap.get(String(parentHash));
-      if (!child || !parent || child.parentId === parent.id) continue;
-      const ids = idsByParent.get(parent.id) ?? [];
-      ids.push(child.id);
-      idsByParent.set(parent.id, ids);
-      existingAssetsMap.set(String(asset.hash), { ...child, parentId: parent.id });
+  private mergeLinks(existing: unknown, incoming: string[]): string[] {
+    const merged = this.normalizeLinks(existing);
+    const seen = new Set(merged);
+    for (const link of incoming) {
+      if (!seen.has(link)) {
+        seen.add(link);
+        merged.push(link);
+      }
     }
-    for (const [parentId, ids] of idsByParent) {
-      await tx.asset.updateMany({ where: { id: { in: ids } }, data: { parentId } });
-    }
+    return merged;
   }
 
   private processBatch(
@@ -1525,11 +1503,19 @@ export class AssetService {
           const assetHash = String(hash);
           const existingAsset = existingAssetsMap.get(assetHash);
 
+          // Links accumulate (append, never remove): an asset that embeds others
+          // — e.g. a parquet/office file referencing extracted child images —
+          // gains a link per child, merged with whatever it already had.
+          const incomingLinks = this.normalizeLinks(links);
+          const mergedLinks = existingAsset
+            ? this.mergeLinks(existingAsset.links, incomingLinks)
+            : incomingLinks;
+
           const assetData = {
             checksum: String(checksum),
             name: String(name),
             externalUrl: String(external_url),
-            links: this.normalizeLinks(links),
+            links: mergedLinks,
             assetType: this.normalizeAssetType(asset_type),
             sourceType,
             runnerId,
@@ -1608,12 +1594,6 @@ export class AssetService {
             },
           });
         }
-
-        // Link child assets (e.g. images embedded in a parquet/office file) to
-        // their parent. Parents are emitted before their children, so by now the
-        // parent exists in the source-wide map. Done as a second pass because a
-        // parent and its children can be created within the same batch.
-        await this.linkChildAssets(tx, batch, existingAssetsMap);
 
         // When streaming ingestion, stubs are sent before detector results.
         // Skip all findings processing so existing findings are not resolved prematurely.

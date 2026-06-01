@@ -31,7 +31,6 @@ export default function AssetDetailPage() {
   const [assetDetails, setAssetDetails] = useState<AssetListItemDto | null>(
     null,
   );
-  const [children, setChildren] = useState<AssetListItemDto[]>([]);
   const [sourceMeta, setSourceMeta] = useState<{
     id: string;
     name: string;
@@ -53,16 +52,6 @@ export default function AssetDetailPage() {
         });
         if (!isActive) return;
         setAssetDetails(assetResponse);
-
-        try {
-          const childAssets =
-            await api.assets.assetsControllerGetAssetChildren({ id: assetId });
-          if (!isActive) return;
-          setChildren(childAssets);
-        } catch {
-          if (!isActive) return;
-          setChildren([]);
-        }
 
         if (assetResponse.sourceId) {
           try {
@@ -96,7 +85,6 @@ export default function AssetDetailPage() {
         );
         setAssetDetails(null);
         setSourceMeta(null);
-        setChildren([]);
       } finally {
         if (isActive) {
           setLoading(false);
@@ -193,14 +181,6 @@ export default function AssetDetailPage() {
             <p className="text-muted-foreground">
               {assetLabel} • {sourceLabel}
             </p>
-            {assetDetails.parentId ? (
-              <Link
-                href={`/assets/${assetDetails.parentId}`}
-                className="text-xs text-muted-foreground underline-offset-4 hover:underline"
-              >
-                {t("assets.detail.partOf")} → {t("assets.detail.viewParent")}
-              </Link>
-            ) : null}
           </div>
         </div>
         {sourceId && (
@@ -283,34 +263,6 @@ export default function AssetDetailPage() {
           </div>
         </CardContent>
       </Card>
-
-      {children.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {t("assets.detail.embeddedImages")} ({children.length})
-            </CardTitle>
-            <CardDescription>
-              {t("assets.detail.embeddedImagesDesc")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="divide-y divide-border/40">
-              {children.map((child) => (
-                <li key={child.id}>
-                  <Link
-                    href={`/assets/${child.id}`}
-                    className="flex items-center justify-between gap-3 py-2 text-sm underline-offset-4 hover:underline"
-                  >
-                    <span className="font-mono break-all">{child.name}</span>
-                    <Badge variant="outline">{child.assetType}</Badge>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
 
       {lockedFilters && (
         <Suspense>

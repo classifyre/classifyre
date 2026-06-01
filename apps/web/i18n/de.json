@@ -637,11 +637,7 @@
       "backToDiscovery": "Zurück zur Übersicht",
       "goBack": "Zurück",
       "loading": "Asset-Details werden geladen...",
-      "openSource": "Quelle öffnen",
-      "embeddedImages": "Eingebettete Bilder",
-      "embeddedImagesDesc": "Aus dieser Datei extrahierte Bilder, jeweils als eigenes Asset geprüft.",
-      "partOf": "Eingebettet in",
-      "viewParent": "Übergeordnetes Asset anzeigen"
+      "openSource": "Quelle öffnen"
     }
   },
   "detectors": {

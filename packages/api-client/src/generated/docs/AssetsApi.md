@@ -5,7 +5,6 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**assetsControllerGetAsset**](AssetsApi.md#assetscontrollergetasset) | **GET** /assets/{id} | Get asset by ID |
-| [**assetsControllerGetAssetChildren**](AssetsApi.md#assetscontrollergetassetchildren) | **GET** /assets/{id}/children | List child assets |
 | [**searchAssetsControllerSearchAssets**](AssetsApi.md#searchassetscontrollersearchassets) | **POST** /search/assets | Search assets with findings |
 | [**searchAssetsControllerSearchAssetsCharts**](AssetsApi.md#searchassetscontrollersearchassetscharts) | **POST** /search/assets/charts | Search assets charts overview |
 | [**searchAssetsControllerSearchFindings**](AssetsApi.md#searchassetscontrollersearchfindings) | **POST** /search/findings | Search findings |
@@ -81,73 +80,6 @@ No authorization required
 |-------------|-------------|------------------|
 | **200** | Asset details |  -  |
 | **404** | Asset not found |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
-
-
-## assetsControllerGetAssetChildren
-
-> Array&lt;AssetListItemDto&gt; assetsControllerGetAssetChildren(id)
-
-List child assets
-
-List assets extracted from inside this asset (e.g. images embedded in a parquet or office document).
-
-### Example
-
-```ts
-import {
-  Configuration,
-  AssetsApi,
-} from '@workspace/api-client';
-import type { AssetsControllerGetAssetChildrenRequest } from '@workspace/api-client';
-
-async function example() {
-  console.log("🚀 Testing @workspace/api-client SDK...");
-  const api = new AssetsApi();
-
-  const body = {
-    // string | Parent asset unique identifier
-    id: a1b2c3d4-e5f6-7890-abcd-ef1234567890,
-  } satisfies AssetsControllerGetAssetChildrenRequest;
-
-  try {
-    const data = await api.assetsControllerGetAssetChildren(body);
-    console.log(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-// Run the test
-example().catch(console.error);
-```
-
-### Parameters
-
-
-| Name | Type | Description  | Notes |
-|------------- | ------------- | ------------- | -------------|
-| **id** | `string` | Parent asset unique identifier | [Defaults to `undefined`] |
-
-### Return type
-
-[**Array&lt;AssetListItemDto&gt;**](AssetListItemDto.md)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
-- **Accept**: `application/json`
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-| **200** | Child assets belonging to the parent |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

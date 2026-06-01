@@ -92,12 +92,6 @@ export interface AssetListItemDto {
      */
     status: AssetListItemDtoStatusEnum;
     /**
-     * Hash of the parent asset when this asset was extracted from inside another file (e.g. an image embedded in a parquet/office document). Null for top-level assets.
-     * @type {string}
-     * @memberof AssetListItemDto
-     */
-    parentId?: string | null;
-    /**
      * 
      * @type {Date}
      * @memberof AssetListItemDto
@@ -215,7 +209,6 @@ export function AssetListItemDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'runnerId': json['runnerId'] == null ? undefined : json['runnerId'],
         'lastScannedAt': json['lastScannedAt'] == null ? undefined : (new Date(json['lastScannedAt'])),
         'status': json['status'],
-        'parentId': json['parentId'] == null ? undefined : json['parentId'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
     };
@@ -244,7 +237,6 @@ export function AssetListItemDtoToJSONTyped(value?: AssetListItemDto | null, ign
         'runnerId': value['runnerId'],
         'lastScannedAt': value['lastScannedAt'] == null ? value['lastScannedAt'] : value['lastScannedAt'].toISOString(),
         'status': value['status'],
-        'parentId': value['parentId'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
     };

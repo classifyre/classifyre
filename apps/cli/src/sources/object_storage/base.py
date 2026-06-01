@@ -429,8 +429,9 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
         # Files that embed images (parquet image datasets, office docs) yield a
         # child IMAGE asset per embedded image so each flows through the normal
-        # image-detector path with its own findings. Bytes are cached here so the
-        # existing fetch_content_bytes() path serves them without re-downloading.
+        # image-detector path with its own findings. The parent simply references
+        # each child via its links array (no separate parent/child machinery).
+        # Bytes are cached here so fetch_content_bytes() serves them without re-download.
         if snapshot.raw_bytes is not None and has_embedded_images(snapshot.mime_type):
             self._queue_child_image_assets(
                 parent=asset,
@@ -449,12 +450,14 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         mime_type: str,
         ref: ObjectRef,
     ) -> None:
-        """Extract embedded images and queue each as a child IMAGE asset of *parent*."""
+        """Extract embedded images, queue each as a child IMAGE asset, and link them
+        from the parent (appended to ``parent.links``, never removing existing links)."""
         try:
-            images = iter_embedded_images(file_bytes, mime_type)
-            for image in images:
+            for image in iter_embedded_images(file_bytes, mime_type):
                 child = self._build_child_image_asset(parent, image, ref)
                 self._pending_child_assets.append(child)
+                if child.hash not in parent.links:
+                    parent.links.append(child.hash)
         except Exception as exc:
             logger.warning(
                 "Failed to extract embedded images from %s: %s", parent.external_url, exc
@@ -469,7 +472,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         child_url = f"{parent.external_url}#{image.location}"
         child_hash = self.generate_hash_id(child_url)
         metadata = {
-            "parent_hash": parent.hash,
+            "source_hash": parent.hash,
             "location": image.location,
             "mime_type": image.mime_type,
             "size_bytes": len(image.image_bytes),
@@ -486,9 +489,8 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             checksum=self.calculate_checksum(metadata),
             name=f"{parent.name}#{image.location}",
             external_url=child_url,
-            links=[parent.hash],
+            links=[],
             asset_type=OutputAssetType.IMAGE,
-            parent_hash=parent.hash,
             source_id=self.source_id,
             created_at=ref.last_modified,
             updated_at=ref.last_modified,
