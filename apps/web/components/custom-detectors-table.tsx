@@ -30,9 +30,9 @@ import {
     TableRow,
 } from "@workspace/ui/components";
 import {formatDate, formatRelative} from "@/lib/date";
-import {detectorCatalogStatusLabel, detectorCatalogStatusToRunnerStatus,} from "@/lib/custom-detector-badge";
+import {detectorCatalogStatusLabel, detectorCatalogStatusToRunnerStatus, isVisualDetector,} from "@/lib/custom-detector-badge";
 import {getRunnerStatusBadgeTone} from "@/lib/runner-status-badge";
-import {CustomDetectorTypeBadge} from "@/components/detector-type-badge";
+import {CustomDetectorTypeBadge, VisualScanBadge} from "@/components/detector-type-badge";
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
@@ -381,10 +381,17 @@ export function CustomDetectorsTable() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <CustomDetectorTypeBadge
-                                                method={row.method}
-                                                pipelineType={(row as any).pipelineSchema?.type as string | undefined}
-                                            />
+                                            <div className="flex flex-wrap items-center gap-1">
+                                                <CustomDetectorTypeBadge
+                                                    method={row.method}
+                                                    pipelineType={(row as any).pipelineSchema?.type as string | undefined}
+                                                />
+                                                {isVisualDetector(
+                                                    (row as any).pipelineSchema?.type as string | undefined,
+                                                ) ? (
+                                                    <VisualScanBadge />
+                                                ) : null}
+                                            </div>
                                         </TableCell>
                                         <TableCell>
                                             <Badge

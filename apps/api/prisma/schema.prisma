@@ -52,8 +52,11 @@ model Asset {
   lastScannedAt DateTime?   @map("last_scanned_at")
   runnerId      String?     @map("runner_id")
   status        AssetStatus @default(NEW)
+  parentId      String?     @map("parent_id")
   runner        Runner?     @relation(fields: [runnerId], references: [id])
   source        Source      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  parent        Asset?      @relation("AssetChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children      Asset[]     @relation("AssetChildren")
   findings      Finding[]
   customDetectorExtractions CustomDetectorExtraction[]
 
@@ -65,6 +68,7 @@ model Asset {
   @@index([lastScannedAt])
   @@index([sourceId])
   @@index([status])
+  @@index([parentId])
   @@unique([sourceId, hash])
   @@map("assets")
 }

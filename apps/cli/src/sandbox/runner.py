@@ -8,7 +8,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from ..models.generated_single_asset_scan_results import DetectionResult
+from ..models.generated_single_asset_scan_results import DetectionResult, Location
+from ..utils.embedded_images import has_embedded_images, iter_embedded_images
 from ..utils.file_parser import ParsedFile, parse_file
 
 logger = logging.getLogger(__name__)
@@ -126,7 +127,11 @@ class SandboxRunner:
                 tasks.append(detector.detect(text, "text/plain"))
                 active_detectors.append(detector)
 
-        if not tasks:
+        # Files that embed images (parquet image datasets, office docs) get each
+        # embedded image run through the image/binary detectors directly, with
+        # findings tagged by the embedded-image location so the UI can group them.
+        embedded_images = has_embedded_images(mime_type)
+        if not tasks and not embedded_images:
             if not text.strip() and not file_mime:
                 logger.warning(
                     "No text content extracted from %s file; skipping text detectors.",
@@ -134,11 +139,10 @@ class SandboxRunner:
                 )
             return parsed, []
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        all_findings: list[DetectionResult] = []
         detected_at = datetime.now(UTC)
+        all_findings: list[DetectionResult] = []
 
+        results = await asyncio.gather(*tasks, return_exceptions=True) if tasks else []
         for detector, result in zip(active_detectors, results, strict=False):
             if isinstance(result, Exception):
                 logger.error(f"Detector {detector.__class__.__name__} failed: {result}")
@@ -155,7 +159,78 @@ class SandboxRunner:
                             )
                         )
 
+        if embedded_images:
+            all_findings.extend(
+                await self._run_embedded_image_detectors(
+                    detectors=detectors,
+                    file_bytes=_get_raw_bytes(),
+                    mime_type=mime_type,
+                    detected_at=detected_at,
+                )
+            )
+
         return parsed, all_findings
+
+    async def _run_embedded_image_detectors(
+        self,
+        *,
+        detectors: list[Any],
+        file_bytes: bytes,
+        mime_type: str,
+        detected_at: datetime,
+    ) -> list[DetectionResult]:
+        """Run image/binary detectors over each image embedded in a container file."""
+        binary_detectors = [d for d in detectors if self._is_binary_detector(d)]
+        if not binary_detectors:
+            return []
+
+        findings: list[DetectionResult] = []
+        for image in iter_embedded_images(file_bytes, mime_type):
+            compatible = [
+                d
+                for d in binary_detectors
+                if self._supports_mime(d.get_supported_content_types(), image.mime_type)
+            ]
+            if not compatible:
+                continue
+            results = await asyncio.gather(
+                *(d.detect(image.image_bytes, image.mime_type) for d in compatible),
+                return_exceptions=True,
+            )
+            for detector, result in zip(compatible, results, strict=False):
+                if isinstance(result, Exception):
+                    logger.error(
+                        "Detector %s failed on embedded image %s: %s",
+                        detector.__class__.__name__,
+                        image.location,
+                        result,
+                    )
+                    continue
+                if not isinstance(result, list):
+                    continue
+                for finding in result:
+                    if isinstance(finding, DetectionResult):
+                        findings.append(self._tag_embedded(finding, image.location, detected_at))
+        return findings
+
+    @staticmethod
+    def _tag_embedded(
+        finding: DetectionResult, location_label: str, detected_at: datetime
+    ) -> DetectionResult:
+        """Attach the embedded-image location to a finding for parent-file grouping."""
+        metadata = dict(finding.metadata or {})
+        metadata["embedded_location"] = location_label
+        location = finding.location or Location()
+        if not location.path:
+            location = location.model_copy(update={"path": location_label})
+        return finding.model_copy(
+            update={
+                "runner_id": "sandbox",
+                "detected_at": detected_at,
+                "metadata": metadata,
+                "location": location,
+            }
+        )
 
     def run(self, file_path: Path) -> tuple[ParsedFile, list[DetectionResult]]:
         """Synchronous wrapper around run_async."""

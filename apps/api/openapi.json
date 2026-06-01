@@ -882,6 +882,43 @@
         ]
       }
     },
+    "/assets/{id}/children": {
+      "get": {
+        "description": "List assets extracted from inside this asset (e.g. images embedded in a parquet or office document).",
+        "operationId": "AssetsController_getAssetChildren",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Parent asset unique identifier",
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Child assets belonging to the parent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssetListItemDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List child assets",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
     "/search/assets": {
       "post": {
         "description": "Search paginated assets and their matching findings with nested body filters.",
@@ -5306,6 +5343,11 @@
               "UNCHANGED",
               "DELETED"
             ]
+          },
+          "parentId": {
+            "type": "string",
+            "description": "Hash of the parent asset when this asset was extracted from inside another file (e.g. an image embedded in a parquet/office document). Null for top-level assets.",
+            "nullable": true
           },
           "createdAt": {
             "format": "date-time",

@@ -637,11 +637,19 @@
       "backToDiscovery": "Back to Discovery",
       "goBack": "Go back",
       "loading": "Loading asset details...",
-      "openSource": "Open Source"
+      "openSource": "Open Source",
+      "embeddedImages": "Embedded images",
+      "embeddedImagesDesc": "Images extracted from inside this file, each scanned as its own asset.",
+      "partOf": "Embedded in",
+      "viewParent": "View parent asset"
     }
   },
   "detectors": {
     "title": "Custom Detectors",
+    "visual": {
+      "badge": "Visual",
+      "tooltip": "Processes images visually rather than as text"
+    },
     "detail": {
       "title": "Detector Details"
     },
