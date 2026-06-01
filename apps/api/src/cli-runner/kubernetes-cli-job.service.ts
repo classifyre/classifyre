@@ -707,7 +707,7 @@ export class KubernetesCliJobService {
       volumeMounts: [{ name: 'sandbox-input', mountPath }],
       command: ['/bin/sh', '-lc'],
       args: [this.buildSandboxFetchCommand(mountPath)],
-    } as V1Container;
+    };
 
     podSpec.initContainers = [...(podSpec.initContainers || []), initContainer];
   }

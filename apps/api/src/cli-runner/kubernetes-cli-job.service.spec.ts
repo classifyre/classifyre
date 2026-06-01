@@ -323,7 +323,7 @@ describe('KubernetesCliJobService', () => {
         ).toString('base64'),
       },
     );
-    const podSpec = job.spec?.template?.spec as any;
+    const podSpec = job.spec?.template?.spec;
     const env = podSpec?.containers?.[0]?.env ?? [];
 
     // File is NOT inlined anymore.
@@ -400,11 +400,11 @@ describe('KubernetesCliJobService', () => {
       { sourceId: 'source-1', mode: 'extract', recipe: { type: 'POSTGRESQL' } },
     );
 
-    expect((job as any).status).toBeUndefined();
+    expect(job.status).toBeUndefined();
     expect(job.metadata?.uid).toBeUndefined();
-    expect((job.metadata as any)?.resourceVersion).toBeUndefined();
+    expect(job.metadata?.resourceVersion).toBeUndefined();
     expect(job.spec?.selector).toBeUndefined();
-    expect((job.spec as any)?.manualSelector).toBeUndefined();
+    expect(job.spec?.manualSelector).toBeUndefined();
 
     const podLabels = job.spec?.template?.metadata?.labels ?? {};
     for (const key of [
