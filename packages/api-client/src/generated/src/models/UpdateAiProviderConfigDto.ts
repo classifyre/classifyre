@@ -55,6 +55,12 @@ export interface UpdateAiProviderConfigDto {
      * @memberof UpdateAiProviderConfigDto
      */
     contextSize?: number;
+    /**
+     * Whether the provider/model accepts image/PDF (vision) input. Defaults to false.
+     * @type {boolean}
+     * @memberof UpdateAiProviderConfigDto
+     */
+    supportsVision?: boolean;
 }
 
 
@@ -92,6 +98,7 @@ export function UpdateAiProviderConfigDtoFromJSONTyped(json: any, ignoreDiscrimi
         'apiKey': json['apiKey'] == null ? undefined : json['apiKey'],
         'baseUrl': json['baseUrl'] == null ? undefined : json['baseUrl'],
         'contextSize': json['contextSize'] == null ? undefined : json['contextSize'],
+        'supportsVision': json['supportsVision'] == null ? undefined : json['supportsVision'],
     };
 }
 
@@ -112,6 +119,7 @@ export function UpdateAiProviderConfigDtoToJSONTyped(value?: UpdateAiProviderCon
         'apiKey': value['apiKey'],
         'baseUrl': value['baseUrl'],
         'contextSize': value['contextSize'],
+        'supportsVision': value['supportsVision'],
     };
 }
 

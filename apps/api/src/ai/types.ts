@@ -40,6 +40,7 @@ export interface AiProviderRuntimeConfig {
   apiKey: string;
   baseUrl?: string | null;
   contextSize?: number | null;
+  supportsVision: boolean;
 }
 
 /** Internal interface every provider must implement. */

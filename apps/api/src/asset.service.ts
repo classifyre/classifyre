@@ -1908,7 +1908,7 @@ export class AssetService {
                 extractedAt: detection.detectedAt ?? new Date(),
               },
               // Use the transaction client so the FK to the just-created finding resolves.
-              tx as unknown as Pick<PrismaService, 'customDetectorExtraction'>,
+              tx,
             );
           }
         }

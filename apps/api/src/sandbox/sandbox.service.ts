@@ -24,6 +24,7 @@ import {
   SandboxRunsSortOrder,
 } from './dto/query-sandbox-runs.dto';
 import { KubernetesCliJobService } from '../cli-runner/kubernetes-cli-job.service';
+import { AiProviderConfigService } from '../ai-provider-config.service';
 import { SandboxFileStorageService } from './sandbox-file-storage.service';
 
 const TABULAR_MIME_TYPES = new Set([
@@ -319,10 +320,10 @@ function compareNullableNumbers(
 }
 
 function sortRunsInMemory(
-  runs: Prisma.SandboxRunGetPayload<Record<string, never>>[],
+  runs: Omit<Prisma.SandboxRunGetPayload<Record<string, never>>, 'inputData'>[],
   sortBy: SandboxRunsSortBy,
   sortOrder: SandboxRunsSortOrder,
-): Prisma.SandboxRunGetPayload<Record<string, never>>[] {
+): Omit<Prisma.SandboxRunGetPayload<Record<string, never>>, 'inputData'>[] {
   const direction = sortOrder === SandboxRunsSortOrder.ASC ? 1 : -1;
   const sorted = [...runs].sort((a, b) => {
     switch (sortBy) {
@@ -376,6 +377,7 @@ export class SandboxService {
   constructor(
     private prisma: PrismaService,
     private sandboxFileStorage: SandboxFileStorageService,
+    private aiProviderConfigService: AiProviderConfigService,
     @Optional()
     private kubernetesCliJobService?: KubernetesCliJobService,
   ) {}
@@ -391,39 +393,25 @@ export class SandboxService {
     const fileExtension = path.extname(fileName);
     const fileSizeBytes = fileBuffer.length;
 
-    // Duplicate detection: reject if another non-error run has the same file content.
-    let contentHash: string | undefined;
-    let s3Key: string | undefined;
-
-    if (this.sandboxFileStorage.isEnabled) {
-      contentHash = this.sandboxFileStorage.computeHash(fileBuffer);
-
-      if (!options?.skipDuplicateCheck) {
-        const existing = await this.prisma.sandboxRun.findFirst({
-          where: {
-            contentHash,
-            status: { not: SandboxRunStatus.ERROR },
-          },
-          orderBy: { createdAt: 'desc' },
+    // Duplicate detection: reject if another non-error run has the same content.
+    // Hash is computed locally (no S3 — sandbox never uses object storage).
+    const contentHash = this.sandboxFileStorage.computeHash(fileBuffer);
+    if (!options?.skipDuplicateCheck) {
+      const existing = await this.prisma.sandboxRun.findFirst({
+        where: { contentHash, status: { not: SandboxRunStatus.ERROR } },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (existing) {
+        throw new ConflictException({
+          message: 'A run with the same file content already exists.',
+          existingRunId: existing.id,
         });
-
-        if (existing) {
-          throw new ConflictException({
-            message: 'A run with the same file content already exists.',
-            existingRunId: existing.id,
-          });
-        }
       }
-
-      const uploaded = await this.sandboxFileStorage.uploadFile(
-        fileBuffer,
-        fileExtension,
-      );
-      s3Key = uploaded.s3Key;
-      contentHash = uploaded.contentHash;
     }
 
-    // Create DB record with PENDING status
+    // The uploaded file is stored on the run itself so it can be (a) transported
+    // to the K8s job via the per-job volume and (b) re-scanned later with
+    // different detectors without re-uploading. Never written to S3.
     const run = await this.prisma.sandboxRun.create({
       data: {
         fileName,
@@ -432,8 +420,8 @@ export class SandboxService {
         fileSizeBytes,
         detectors: detectors as any,
         status: SandboxRunStatus.PENDING,
-        s3Key: s3Key ?? null,
-        contentHash: contentHash ?? null,
+        contentHash,
+        inputData: new Uint8Array(fileBuffer),
       },
     });
 
@@ -443,66 +431,102 @@ export class SandboxService {
       fileName,
       fileExtension,
       detectors,
+      {
+        append: false,
+      },
     );
 
     return run;
   }
 
   /**
-   * Re-run an existing completed (or errored) sandbox run with a different
-   * set of detectors. Requires S3 to be enabled so the original file can be
-   * retrieved. Creates a brand-new SandboxRun record that shares the same
-   * S3 object (content-addressed key).
+   * Re-scan an existing run's file with a different set of detectors, appending
+   * the new findings to the same run (no new run, no history). The original
+   * uploaded file is reused from `inputData` — no re-upload, never S3.
    */
-  async rerunRun(originalRunId: string, detectors: unknown[]) {
+  async rerunRun(runId: string, detectors: unknown[]) {
     this.validateDetectors(detectors);
 
-    const original = await this.prisma.sandboxRun.findUnique({
-      where: { id: originalRunId },
+    const run = await this.prisma.sandboxRun.findUnique({
+      where: { id: runId },
+      select: {
+        id: true,
+        status: true,
+        fileName: true,
+        fileExtension: true,
+        inputData: true,
+      },
     });
-    if (!original) {
-      throw new NotFoundException(`Sandbox run ${originalRunId} not found`);
+    if (!run) {
+      throw new NotFoundException(`Sandbox run ${runId} not found`);
     }
     if (
-      original.status === SandboxRunStatus.PENDING ||
-      original.status === SandboxRunStatus.RUNNING
+      run.status === SandboxRunStatus.PENDING ||
+      run.status === SandboxRunStatus.RUNNING
     ) {
-      throw new BadRequestException(
-        'Cannot rerun a run that is still in progress',
-      );
+      throw new BadRequestException('Run is still in progress');
     }
-    if (!original.s3Key || !this.sandboxFileStorage.isEnabled) {
+    if (!run.inputData) {
       throw new BadRequestException(
-        'Rerun requires S3 storage to be configured and the original run to have an uploaded file',
+        'The original file for this run is no longer available; upload it again.',
       );
     }
 
-    const fileBuffer = await this.sandboxFileStorage.downloadFile(
-      original.s3Key,
-    );
-
-    const run = await this.prisma.sandboxRun.create({
-      data: {
-        fileName: original.fileName,
-        fileType: '',
-        fileExtension: original.fileExtension,
-        fileSizeBytes: original.fileSizeBytes,
-        detectors: detectors as any,
-        status: SandboxRunStatus.PENDING,
-        s3Key: original.s3Key,
-        contentHash: original.contentHash,
-      },
+    await this.prisma.sandboxRun.update({
+      where: { id: runId },
+      data: { status: SandboxRunStatus.PENDING },
     });
 
     void this.processRun(
-      run.id,
-      fileBuffer,
-      original.fileName,
-      original.fileExtension,
+      runId,
+      Buffer.from(run.inputData),
+      run.fileName,
+      run.fileExtension,
       detectors,
+      { append: true },
     );
 
-    return run;
+    return this.getRun(runId);
+  }
+
+  /** Clear all findings for a run (keeps the file so it can be re-scanned). */
+  async clearFindings(runId: string) {
+    const run = await this.prisma.sandboxRun.findUnique({
+      where: { id: runId },
+      select: { id: true },
+    });
+    if (!run) {
+      throw new NotFoundException(`Sandbox run ${runId} not found`);
+    }
+    await this.prisma.sandboxRun.update({
+      where: { id: runId },
+      data: { findings: [] },
+    });
+    return this.getRun(runId);
+  }
+
+  /**
+   * Return the transient input-file bytes for an in-flight K8s sandbox run.
+   * Consumed by the job's init-container over the cluster network. Available
+   * only while the file is staged (cleared once the job finishes).
+   */
+  async getInputData(
+    id: string,
+  ): Promise<{ data: Buffer; contentType: string; fileName: string }> {
+    const run = await this.prisma.sandboxRun.findUnique({
+      where: { id },
+      select: { inputData: true, fileType: true, fileName: true },
+    });
+    if (!run || !run.inputData) {
+      throw new NotFoundException(
+        `Input file for sandbox run ${id} is not available`,
+      );
+    }
+    return {
+      data: Buffer.from(run.inputData),
+      contentType: run.fileType || 'application/octet-stream',
+      fileName: run.fileName,
+    };
   }
 
   private validateDetectors(detectors: unknown[]): void {
@@ -533,6 +557,7 @@ export class SandboxService {
     fileName: string,
     fileExtension: string,
     detectors: unknown[],
+    options: { append: boolean },
   ): Promise<void> {
     const startTime = Date.now();
 
@@ -548,13 +573,13 @@ export class SandboxService {
       let exitCode: number;
 
       if (this.kubernetesCliJobService?.isEnabled()) {
-        // Kubernetes mode: run as a K8s Job.
-        // File and detectors are base64-encoded into env vars and decoded
-        // inside the job pod's /tmp — same pattern as RECIPE_B64 for extractions.
-        // No shared filesystem needed; data is ephemeral to the job pod.
+        // Kubernetes mode: run as a K8s Job. The input file is transported via a
+        // per-job emptyDir volume that an init-container populates by downloading
+        // it from the API (GET /sandbox/runs/:id/input — served from inputData,
+        // which persists on the run). The volume dies with the job pod. Never S3,
+        // never inlined.
         const result = await this.kubernetesCliJobService.runSandboxJob({
           runId,
-          fileBuffer,
           fileExtension,
           detectors: expandedDetectors,
         });
@@ -618,21 +643,43 @@ export class SandboxService {
         this.logger.warn(`Sandbox run ${runId}: ${parseError}`);
       }
 
+      // Append mode (rerun with different detectors) accumulates findings onto
+      // the existing run; the initial run replaces.
+      let mergedFindings: unknown[] = sanitizedFindings;
+      if (options.append) {
+        const current = await this.prisma.sandboxRun.findUnique({
+          where: { id: runId },
+          select: { findings: true },
+        });
+        const existing = Array.isArray(current?.findings)
+          ? (current.findings as unknown[])
+          : [];
+        mergedFindings = [...existing, ...sanitizedFindings];
+      }
+
       await this.prisma.sandboxRun.update({
         where: { id: runId },
         data: {
           status: SandboxRunStatus.COMPLETED,
           fileType: normalizedMimeType,
           contentType: mimeToContentType(normalizedMimeType),
-          findings: sanitizedFindings as any,
+          findings: mergedFindings as any,
+          detectors: detectors as any,
           durationMs,
           ...(parseError ? { errorMessage: parseError } : {}),
         },
       });
     } catch (error: unknown) {
+      const rawMessage = error instanceof Error ? error.message : String(error);
+      // The worker is OOM-killed when a file is too large for this instance's
+      // memory limits — surface that clearly (capacity is instance-dependent).
       const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      this.logger.error(`Sandbox run ${runId} failed: ${errorMessage}`);
+        /OOMKilled|out of memory|exit(?:ed with)? code 137/i.test(rawMessage)
+          ? 'The file was too large to process within this instance’s memory limit ' +
+            '(the worker was out-of-memory killed). Try a smaller file or increase the ' +
+            'sandbox worker memory limit.'
+          : rawMessage;
+      this.logger.error(`Sandbox run ${runId} failed: ${rawMessage}`);
 
       await this.prisma.sandboxRun
         .update({
@@ -712,6 +759,7 @@ export class SandboxService {
           orderBy,
           skip,
           take: limit,
+          omit: { inputData: true },
         }),
         this.prisma.sandboxRun.count({ where }),
       ]);
@@ -722,6 +770,7 @@ export class SandboxService {
     const runs = await this.prisma.sandboxRun.findMany({
       where,
       orderBy: { createdAt: 'desc' },
+      omit: { inputData: true },
     });
 
     const filtered = runs.filter((run) => {
@@ -749,7 +798,10 @@ export class SandboxService {
   }
 
   async getRun(id: string) {
-    const run = await this.prisma.sandboxRun.findUnique({ where: { id } });
+    const run = await this.prisma.sandboxRun.findUnique({
+      where: { id },
+      omit: { inputData: true },
+    });
     if (!run) {
       throw new NotFoundException(`Sandbox run ${id} not found`);
     }
@@ -780,23 +832,9 @@ export class SandboxService {
       .rm(this.getSandboxSharedDir(id), { recursive: true, force: true })
       .catch(() => undefined);
 
-    // Count and delete inside a transaction so the refcount is taken under
-    // the same row lock as the delete, preventing a concurrent rerunRun from
-    // sneaking in between count and delete and losing its S3 object reference.
-    let isLastReference = false;
-    await this.prisma.$transaction(async (tx) => {
-      if (run.s3Key && run.contentHash && this.sandboxFileStorage.isEnabled) {
-        const refCount = await tx.sandboxRun.count({
-          where: { contentHash: run.contentHash },
-        });
-        isLastReference = refCount === 1;
-      }
-      await tx.sandboxRun.delete({ where: { id } });
-    });
-
-    if (isLastReference && run.s3Key) {
-      await this.sandboxFileStorage.deleteFile(run.s3Key, 0);
-    }
+    // The file lives only on the run row (inputData) — deleting the row removes
+    // it. Sandbox never uses S3, so there is nothing external to clean up.
+    await this.prisma.sandboxRun.delete({ where: { id } });
   }
 
   private async executeSandboxLocally(
@@ -881,56 +919,120 @@ export class SandboxService {
 
     const records = await this.prisma.customDetector.findMany({
       where: { key: { in: keys } },
-      select: { key: true, name: true, pipelineSchema: true },
+      select: {
+        key: true,
+        name: true,
+        pipelineSchema: true,
+        aiProviderConfigId: true,
+      },
     });
 
     const byKey = new Map(records.map((r) => [r.key, r]));
 
-    return detectors.map((d) => {
-      if (!d || typeof d !== 'object' || Array.isArray(d)) return d;
-      const item = d as Record<string, unknown>;
-      const type = typeof item.type === 'string' ? item.type.toUpperCase() : '';
-      const detectorKey =
-        typeof item.custom_detector_key === 'string'
-          ? item.custom_detector_key
-          : '';
+    return Promise.all(
+      detectors.map(async (d) => {
+        if (!d || typeof d !== 'object' || Array.isArray(d)) return d;
+        const item = d as Record<string, unknown>;
+        const type =
+          typeof item.type === 'string' ? item.type.toUpperCase() : '';
+        const detectorKey =
+          typeof item.custom_detector_key === 'string'
+            ? item.custom_detector_key
+            : '';
 
-      if (type !== 'CUSTOM' || !detectorKey) return d;
+        if (type !== 'CUSTOM' || !detectorKey) return d;
 
-      const record = byKey.get(detectorKey);
-      if (!record) {
-        this.logger.warn(
-          `Custom detector key "${detectorKey}" not found in database; skipping expansion`,
-        );
-        return d;
-      }
+        const record = byKey.get(detectorKey);
+        if (!record) {
+          this.logger.warn(
+            `Custom detector key "${detectorKey}" not found in database; skipping expansion`,
+          );
+          return d;
+        }
 
-      const existingConfig =
-        item.config &&
-        typeof item.config === 'object' &&
-        !Array.isArray(item.config)
-          ? (item.config as Record<string, unknown>)
-          : {};
+        const existingConfig =
+          item.config &&
+          typeof item.config === 'object' &&
+          !Array.isArray(item.config)
+            ? (item.config as Record<string, unknown>)
+            : {};
 
-      const isPipeline =
-        record.pipelineSchema &&
-        typeof record.pipelineSchema === 'object' &&
-        Object.keys(record.pipelineSchema).length > 0;
+        const isPipeline =
+          record.pipelineSchema &&
+          typeof record.pipelineSchema === 'object' &&
+          Object.keys(record.pipelineSchema).length > 0;
 
+        // LLM (AI) detectors need a runtime-only provider_runtime block with the
+        // decrypted credentials injected before dispatch — same as the extract /
+        // runner path. Without this the CLI's LLMRunner refuses to initialise.
+        const pipelineSchema = isPipeline
+          ? await this.injectLlmProviderRuntime(
+              record.pipelineSchema as Record<string, unknown>,
+              record.aiProviderConfigId,
+              detectorKey,
+            )
+          : undefined;
+
+        return {
+          ...item,
+          config: {
+            // caller-supplied overrides DB defaults, but identity fields are pinned
+            ...existingConfig,
+            // identity fields always come from DB to ensure correctness
+            custom_detector_key: record.key,
+            name: record.name,
+            ...(pipelineSchema
+              ? { method: 'PIPELINE', pipeline_schema: pipelineSchema }
+              : {}),
+          },
+        };
+      }),
+    );
+  }
+
+  /**
+   * Inject a runtime-only `provider_runtime` block (decrypted credentials) into
+   * an LLM detector's pipeline schema so the sandbox CLI worker can call the
+   * provider directly. No-op for non-LLM pipelines. On resolution failure the
+   * schema is returned unchanged and a warning logged — the CLI will then report
+   * the missing-credential error for that detector without failing the run.
+   */
+  private async injectLlmProviderRuntime(
+    pipelineSchema: Record<string, unknown>,
+    aiProviderConfigId: string | null,
+    detectorKey: string,
+  ): Promise<Record<string, unknown>> {
+    if ((pipelineSchema.type as string | undefined) !== 'LLM') {
+      return pipelineSchema;
+    }
+    if (!aiProviderConfigId) {
+      this.logger.warn(
+        `AI detector "${detectorKey}" has no AI provider credential; cannot inject provider_runtime`,
+      );
+      return pipelineSchema;
+    }
+    try {
+      const runtime =
+        await this.aiProviderConfigService.getRuntimeConfig(aiProviderConfigId);
       return {
-        ...item,
-        config: {
-          // caller-supplied overrides DB defaults, but identity fields are pinned
-          ...existingConfig,
-          // identity fields always come from DB to ensure correctness
-          custom_detector_key: record.key,
-          name: record.name,
-          ...(isPipeline
-            ? { method: 'PIPELINE', pipeline_schema: record.pipelineSchema }
-            : {}),
+        ...pipelineSchema,
+        provider_runtime: {
+          provider: runtime.provider,
+          model: runtime.model,
+          api_key: runtime.apiKey,
+          base_url: runtime.baseUrl ?? null,
+          context_size: runtime.contextSize ?? null,
+          supports_vision: runtime.supportsVision ?? false,
         },
       };
-    });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to resolve AI provider for detector "${detectorKey}": ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return pipelineSchema;
+    }
   }
 
   private getSandboxSharedDir(runId: string): string {

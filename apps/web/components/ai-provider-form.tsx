@@ -17,6 +17,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Switch,
 } from "@workspace/ui/components";
 import {
   CheckCircle2,
@@ -46,6 +47,7 @@ type Draft = {
   apiKey: string;
   baseUrl: string;
   contextSize: string;
+  supportsVision: boolean;
 };
 
 function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
@@ -57,6 +59,7 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
       apiKey: "",
       baseUrl: "",
       contextSize: "",
+      supportsVision: false,
     };
   }
   return {
@@ -66,6 +69,7 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
     apiKey: "",
     baseUrl: config.baseUrl ?? "",
     contextSize: config.contextSize != null ? String(config.contextSize) : "",
+    supportsVision: config.supportsVision ?? false,
   };
 }
 
@@ -90,6 +94,7 @@ function buildCreatePayload(draft: Draft): CreateAiProviderConfigDto {
     ...(parseContextSize(draft.contextSize) !== undefined
       ? { contextSize: parseContextSize(draft.contextSize) }
       : {}),
+    supportsVision: draft.supportsVision,
   };
 }
 
@@ -105,6 +110,7 @@ function buildUpdatePayload(draft: Draft): UpdateAiProviderConfigDto {
     ...(parseContextSize(draft.contextSize) !== undefined
       ? { contextSize: parseContextSize(draft.contextSize) }
       : {}),
+    supportsVision: draft.supportsVision,
   };
 }
 
@@ -315,6 +321,27 @@ export function AiProviderForm({ config, onSaved, onCancel }: AiProviderFormProp
           value={draft.contextSize}
           onChange={(e) =>
             setDraft((prev) => ({ ...prev, contextSize: e.target.value }))
+          }
+        />
+      </div>
+
+      <div className="flex items-start justify-between gap-4 rounded-[4px] border-2 border-border px-3 py-3">
+        <div className="space-y-1">
+          <Label
+            htmlFor="ai-provider-supports-vision"
+            className="text-xs font-mono uppercase tracking-[0.12em]"
+          >
+            {t("aiProvider.supportsVision")}
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            {t("aiProvider.supportsVisionDesc")}
+          </p>
+        </div>
+        <Switch
+          id="ai-provider-supports-vision"
+          checked={draft.supportsVision}
+          onCheckedChange={(checked) =>
+            setDraft((prev) => ({ ...prev, supportsVision: checked }))
           }
         />
       </div>

@@ -291,12 +291,16 @@ api:
       requests:
         cpu: 500m
         memory: 1Gi
-        ephemeral-storage: 1Gi
+        # CLI containers routinely use 5-6 Gi (uv package downloads, pip wheels,
+        # extracted asset temp files). Requesting 6 Gi matches real usage so the
+        # scheduler only places jobs on nodes with enough disk and kubelet does not
+        # rank them as high-priority eviction candidates under node disk pressure.
+        ephemeral-storage: 6Gi
       # -- CLI job resource limits.
       limits:
         cpu: "2"
         memory: 4Gi
-        ephemeral-storage: 10Gi
+        ephemeral-storage: 20Gi
 
     # -- CLI job scheduling: node selector.
     nodeSelector: {}

@@ -24,6 +24,11 @@ import { AiProviderConfigService } from '../ai-provider-config.service';
     RunnerLogStorageService,
   ],
   controllers: [CliRunnerController, SearchRunnersController],
-  exports: [CliRunnerService, RunnerLogStorageService, KubernetesCliJobService],
+  exports: [
+    CliRunnerService,
+    RunnerLogStorageService,
+    KubernetesCliJobService,
+    AiProviderConfigService,
+  ],
 })
 export class CliRunnerModule {}
