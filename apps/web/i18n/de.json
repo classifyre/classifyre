@@ -642,6 +642,10 @@
   },
   "detectors": {
     "title": "Custom-Detektoren",
+    "visual": {
+      "badge": "Visuell",
+      "tooltip": "Verarbeitet Bilder visuell statt als Text"
+    },
     "detail": {
       "title": "Detektor-Details"
     },

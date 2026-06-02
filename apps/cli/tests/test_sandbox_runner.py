@@ -67,6 +67,76 @@ def _write_pdf(path: Path) -> None:
         pdf.close()
 
 
+class _FindingImageDetector:
+    """Image detector that returns one finding per call, recording inputs."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[Any, str]] = []
+
+    def get_supported_content_types(self) -> list[str]:
+        return ["image/png", "image/jpeg", "image/tiff"]
+
+    async def detect(self, content: Any, content_type: str) -> list:
+        from src.models.generated_single_asset_scan_results import (
+            DetectionResult,
+            DetectorType,
+            Severity,
+        )
+
+        self.calls.append((content, content_type))
+        return [
+            DetectionResult(
+                detector_type=DetectorType.CUSTOM,
+                finding_type="classification:cat",
+                category="CONTENT",
+                severity=Severity.info,
+                confidence=0.9,
+                matched_content="cat",
+            )
+        ]
+
+
+def _write_hf_parquet(path: Path) -> None:
+    pa = pytest.importorskip("pyarrow")
+    pq = pytest.importorskip("pyarrow.parquet")
+    pytest.importorskip("PIL")
+    from PIL import Image
+
+    def _png(color: str) -> bytes:
+        buf = io.BytesIO()
+        Image.new("RGB", (8, 8), color).save(buf, format="PNG")
+        return buf.getvalue()
+
+    table = pa.table(
+        {
+            "image": pa.array(
+                [{"bytes": _png("red"), "path": None}, {"bytes": _png("blue"), "path": None}]
+            ),
+            "label": pa.array([1, 2], type=pa.int64()),
+        }
+    )
+    pq.write_table(table, path)
+
+
+def test_parquet_embedded_images_go_to_image_detector(tmp_path: Path) -> None:
+    parquet = tmp_path / "dataset.parquet"
+    _write_hf_parquet(parquet)
+    det = _FindingImageDetector()
+
+    _parsed, findings = _runner_with(det).run(parquet)
+
+    # One call per embedded image, each receiving decoded image bytes.
+    assert len(det.calls) == 2
+    for content, content_type in det.calls:
+        assert isinstance(content, bytes)
+        assert content_type == "image/png"
+    # Findings are tagged with the embedded-image location for grouping.
+    assert len(findings) == 2
+    locations = {f.metadata.get("embedded_location") for f in findings}
+    assert locations == {"row=1;col=image", "row=2;col=image"}
+    assert all(f.location and f.location.path for f in findings)
+
+
 def test_image_goes_to_vision_detector_as_bytes(tmp_path: Path) -> None:
     img = tmp_path / "invoice.png"
     _write_png(img)

@@ -752,6 +752,72 @@ describe('AssetService', () => {
       expect(result.deleted).toBe(0);
     });
 
+    it('should append to existing links instead of removing them on update', async () => {
+      const existingAsset = {
+        id: 'db-parent-1',
+        hash: 'parent-1',
+        checksum: 'old-checksum',
+        name: 'dataset.parquet',
+        externalUrl: 'https://example.com/dataset.parquet',
+        links: ['child-1'],
+        assetType: 'TABLE',
+        sourceType: AssetType.WORDPRESS,
+        status: AssetStatus.NEW,
+        runnerId: 'old-runner',
+        sourceId,
+        lastScannedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const incomingAssets = [
+        {
+          hash: 'parent-1',
+          checksum: 'new-checksum',
+          name: 'dataset.parquet',
+          external_url: 'https://example.com/dataset.parquet',
+          links: ['child-2'],
+          asset_type: 'TABLE',
+          findings: [],
+        },
+      ];
+
+      mockPrismaService.asset.findMany.mockResolvedValue([existingAsset]);
+
+      const txUpdate = jest.fn().mockResolvedValue({});
+      const mockTransaction = (callback: any) => {
+        const tx = {
+          asset: {
+            createMany: jest.fn().mockResolvedValue({}),
+            update: txUpdate,
+            updateMany: jest.fn().mockResolvedValue({}),
+            findMany: jest.fn().mockResolvedValue([]),
+          },
+          finding: {
+            findMany: jest.fn().mockResolvedValue([]),
+            createMany: jest.fn().mockResolvedValue({}),
+            update: jest.fn().mockResolvedValue({}),
+          },
+          runner: {
+            update: jest.fn().mockResolvedValue({}),
+          },
+        };
+        return callback(tx);
+      };
+
+      mockPrismaService.$transaction.mockImplementation(mockTransaction);
+
+      await service.bulkIngest(sourceId, runnerId, incomingAssets);
+
+      // Existing link preserved, new link appended (union, no removal).
+      expect(txUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'db-parent-1' },
+          data: expect.objectContaining({ links: ['child-1', 'child-2'] }),
+        }),
+      );
+    });
+
     it('should mark assets as UPDATED when checksum changes', async () => {
       const existingAsset = {
         id: 'db-asset-1',

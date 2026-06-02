@@ -69,6 +69,25 @@ export function detectorTypeTranslationKey(
   return "detectors.methods.custom";
 }
 
+/**
+ * Whether a detector processes content visually (as images) rather than as text.
+ * IMAGE_CLASSIFICATION and OBJECT_DETECTION are inherently visual; an LLM detector
+ * is visual only when its provider is configured with vision (image/PDF) input.
+ */
+export function isVisualDetector(
+  pipelineType?: string | null,
+  supportsVision?: boolean | null,
+): boolean {
+  const normalized = pipelineType?.toUpperCase();
+  if (normalized === "IMAGE_CLASSIFICATION" || normalized === "OBJECT_DETECTION") {
+    return true;
+  }
+  if (normalized === "LLM" && supportsVision) {
+    return true;
+  }
+  return false;
+}
+
 export function detectorTypeIconName(
   method?: string | null,
   pipelineType?: string | null,

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import logging
 from typing import Any
 
@@ -11,8 +10,9 @@ from ....models.generated_single_asset_scan_results import DetectionResult
 from ...dependencies import ensure_torch, require_module
 from ._base import (
     _DEFAULT_IMAGE_CLASSIFICATION_MODEL,
-    _IMAGE_CONTENT_TYPES,
+    _IMAGE_INPUT_CONTENT_TYPES,
     BaseRunner,
+    _load_input_images,
     _resolve_pipeline_severity,
 )
 
@@ -54,45 +54,55 @@ class ImageClassificationRunner(BaseRunner):
         raise NotImplementedError("ImageClassificationRunner uses detect() directly")
 
     def detect(self, content: str | bytes, content_type: str) -> list[DetectionResult]:
-        if not content_type.startswith("image/"):
-            return []
         if isinstance(content, str):
             logger.warning("image_classification: received string content, expected bytes")
             return []
 
+        # image/* opens directly; PDFs are rasterised to one image per page.
+        images = _load_input_images(content, content_type, self._pil)
+        if not images:
+            return []
+
         schema = self._schema
         threshold = schema.confidence_threshold if schema.confidence_threshold is not None else 0.0
+        multi_page = len(images) > 1
         results: list[DetectionResult] = []
-        try:
-            image = self._pil.open(io.BytesIO(content))
-            predictions: list[dict[str, Any]] = self._pipe(image) or []
-            for pred in predictions:
-                label: str = pred.get("label", "unknown")
-                score: float = float(pred.get("score", 0.0))
-                if score < threshold:
-                    continue
-                severity = _resolve_pipeline_severity(label, schema.severity_map)
-                results.append(
-                    self._make_result(
-                        finding_type=f"classification:{label}",
-                        category="CONTENT",
-                        severity=severity,
-                        confidence=score,
-                        matched_content=f"Image classified as: {label} ({score:.3f})",
-                        location=None,
-                        metadata={
-                            "image_size": f"{image.size[0]}x{image.size[1]}",
-                            "image_mode": image.mode,
-                            "model": self._model_id,
-                        },
+        for page_index, image in images:
+            try:
+                predictions: list[dict[str, Any]] = self._pipe(image) or []
+                for pred in predictions:
+                    label: str = pred.get("label", "unknown")
+                    score: float = float(pred.get("score", 0.0))
+                    if score < threshold:
+                        continue
+                    severity = _resolve_pipeline_severity(label, schema.severity_map)
+                    page_suffix = f" (page {page_index + 1})" if multi_page else ""
+                    metadata: dict[str, Any] = {
+                        "image_size": f"{image.size[0]}x{image.size[1]}",
+                        "image_mode": image.mode,
+                        "model": self._model_id,
+                    }
+                    if multi_page:
+                        metadata["page"] = page_index + 1
+                    results.append(
+                        self._make_result(
+                            finding_type=f"classification:{label}",
+                            category="CONTENT",
+                            severity=severity,
+                            confidence=score,
+                            matched_content=(
+                                f"Image classified as: {label} ({score:.3f}){page_suffix}"
+                            ),
+                            location=None,
+                            metadata=metadata,
+                        )
                     )
+            except Exception as exc:
+                logger.error(
+                    "image_classification error (model=%s): %s", self._model_id, exc, exc_info=True
                 )
-        except Exception as exc:
-            logger.error(
-                "image_classification error (model=%s): %s", self._model_id, exc, exc_info=True
-            )
         results.sort(key=lambda r: r.confidence, reverse=True)
         return results
 
     def get_supported_content_types(self) -> list[str]:
-        return list(_IMAGE_CONTENT_TYPES)
+        return list(_IMAGE_INPUT_CONTENT_TYPES)

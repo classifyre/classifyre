@@ -642,6 +642,10 @@
   },
   "detectors": {
     "title": "Custom Detectors",
+    "visual": {
+      "badge": "Visual",
+      "tooltip": "Processes images visually rather than as text"
+    },
     "detail": {
       "title": "Detector Details"
     },
