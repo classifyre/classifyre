@@ -126,7 +126,9 @@ class SandboxRunner:
                 active_detectors.append(detector)
             # Text delivery: text detectors get the extracted text layer.
             elif "text/plain" in supported and text.strip():
-                logger.info("Sandbox: dispatching '%s' on extracted text (%d chars)", label, len(text))
+                logger.info(
+                    "Sandbox: dispatching '%s' on extracted text (%d chars)", label, len(text)
+                )
                 tasks.append(detector.detect(text, "text/plain"))
                 active_detectors.append(detector)
             else:

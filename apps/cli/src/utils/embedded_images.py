@@ -98,7 +98,8 @@ def detect_parquet_image_columns(parquet_file: object) -> dict[str, str]:
         field_type = field.type
         if pa.types.is_struct(field_type):  # type: ignore[attr-defined]
             child_names = {
-                field_type.field(i).name for i in range(field_type.num_fields)  # type: ignore[attr-defined]
+                field_type.field(i).name
+                for i in range(field_type.num_fields)  # type: ignore[attr-defined]
             }
             if "bytes" in child_names:
                 image_columns[field.name] = "struct"
@@ -107,7 +108,8 @@ def detect_parquet_image_columns(parquet_file: object) -> dict[str, str]:
         ):
             if not sampled:
                 sampled_batch = next(
-                    iter(parquet_file.iter_batches(batch_size=32)), None  # type: ignore[attr-defined]
+                    iter(parquet_file.iter_batches(batch_size=32)),
+                    None,  # type: ignore[attr-defined]
                 )
                 sampled = True
             if sampled_batch is not None and _binary_column_is_image(sampled_batch, field.name):
