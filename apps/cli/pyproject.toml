@@ -48,7 +48,7 @@ privacy = [
     # mid-run in frozen/venv contexts. 8.x eagerly loads all data at import time,
     # avoiding ModuleNotFoundError during Presidio phone number analysis.
     "phonenumbers>=8.13.0,<10.0.0",
-    "numpy>=1.26.0,<2.0.0",
+    "numpy>=1.26.0,<3.0.0",
 ]
 security = [
     "detect-secrets>=1.5.0",
