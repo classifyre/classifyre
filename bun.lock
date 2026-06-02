@@ -17,9 +17,9 @@
     },
     "apps/api": {
       "name": "@classifyre/api",
-      "version": "0.4.9-SNAPSHOT",
+      "version": "0.4.11-SNAPSHOT",
       "dependencies": {
-        "@anthropic-ai/sdk": "^0.98.0",
+        "@anthropic-ai/sdk": "^0.100.1",
         "@aws-sdk/client-s3": "^3.1032.0",
         "@fastify/multipart": "^10.0.0",
         "@fastify/static": "^9.0.0",
@@ -96,7 +96,7 @@
     },
     "apps/blog": {
       "name": "@classifyre/blog",
-      "version": "0.4.9-SNAPSHOT",
+      "version": "0.4.11-SNAPSHOT",
       "dependencies": {
         "@workspace/schemas": "workspace:*",
         "@workspace/ui": "workspace:*",
@@ -124,11 +124,11 @@
     },
     "apps/cli": {
       "name": "@classifyre/cli",
-      "version": "0.4.9-SNAPSHOT",
+      "version": "0.4.11-SNAPSHOT",
     },
     "apps/docs": {
       "name": "@classifyre/docs",
-      "version": "0.4.9-SNAPSHOT",
+      "version": "0.4.11-SNAPSHOT",
       "dependencies": {
         "@theguild/remark-mermaid": "^0.3.0",
         "@workspace/schemas": "workspace:*",
@@ -166,7 +166,7 @@
     },
     "apps/web": {
       "name": "@classifyre/web",
-      "version": "0.4.9-SNAPSHOT",
+      "version": "0.4.11-SNAPSHOT",
       "dependencies": {
         "@hookform/resolvers": "^5.2.2",
         "@monaco-editor/react": "^4.7.0",
@@ -215,7 +215,7 @@
     },
     "packages/api-client": {
       "name": "@workspace/api-client",
-      "version": "0.4.9-SNAPSHOT",
+      "version": "0.4.11-SNAPSHOT",
       "devDependencies": {
         "@openapitools/openapi-generator-cli": "2.34.0",
         "@types/node": "^25.5.2",
@@ -224,7 +224,7 @@
     },
     "packages/devops": {
       "name": "@workspace/devops",
-      "version": "0.4.9-SNAPSHOT",
+      "version": "0.4.11-SNAPSHOT",
     },
     "packages/eslint-config": {
       "name": "@workspace/eslint-config",
@@ -248,7 +248,7 @@
     },
     "packages/schemas": {
       "name": "@workspace/schemas",
-      "version": "0.4.9-SNAPSHOT",
+      "version": "0.4.11-SNAPSHOT",
       "dependencies": {
         "zod": "^4.3.6",
       },
@@ -346,7 +346,7 @@
 
     "@antfu/install-pkg": ["@antfu/install-pkg@1.1.0", "", { "dependencies": { "package-manager-detector": "^1.3.0", "tinyexec": "^1.0.1" } }, "sha512-MGQsmw10ZyI+EJo45CdSER4zEb+p31LpDAFp2Z3gkSd1yqVZGi0Ebx++YTEMonJy4oChEMLsxZ64j8FH6sSqtQ=="],
 
-    "@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.98.1", "", { "dependencies": { "json-schema-to-ts": "^3.1.1", "standardwebhooks": "^1.0.0" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-mqMQBMqAG0AoWStJEXrjDd3MrMyMiaIye9/5q2b3j5JxRF/2E7jgYlHSIJHiPj+4ztfsFH4Lcfj94WeXg2mAhg=="],
+    "@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.100.1", "", { "dependencies": { "json-schema-to-ts": "^3.1.1", "standardwebhooks": "^1.0.0" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-RANcEe7LpiLczkKGOwoXOTuFdPhuubS0i4xaAKOMpcqc55YO0mukgxppV7eygx3DXNjxWT6RYOLPyOy0aIAmwg=="],
 
     "@aws-crypto/crc32": ["@aws-crypto/crc32@5.2.0", "", { "dependencies": { "@aws-crypto/util": "^5.2.0", "@aws-sdk/types": "^3.222.0", "tslib": "^2.6.2" } }, "sha512-nLbCWqQNgUiwwtFsen1AdzAtvuLRsQS8rYgMuxCrdKf9kOssamGLuPwyTY9wyYblNr9+1XM8v6zoDTPPSIeANg=="],
 
