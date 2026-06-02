@@ -2051,11 +2051,9 @@ class DatabricksInput(CoreInput):
     required: PersonalAccessToken | ServicePrincipalOAuthM2M | AzureServicePrincipal = (
         Field(..., title='DatabricksRequired')
     )
-    masked: (
-        DatabricksMaskedPat
-        | DatabricksMaskedServicePrincipal
-        | DatabricksMaskedAzureServicePrincipal
-    ) = Field(..., title='DatabricksMasked')
+    masked: DatabricksMaskedPat | DatabricksMaskedServicePrincipal = Field(
+        ..., title='DatabricksMasked'
+    )
     optional: DatabricksOptional | None = None
     detectors: list[Detector] | None = Field(
         None, description='Detectors to run on ingested content'

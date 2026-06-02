@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import requests
 
 from ...models.generated_input import (
+    AzureServicePrincipal,
     DatabricksInput,
     DatabricksMaskedAzureServicePrincipal,
     DatabricksMaskedPat,
@@ -20,11 +21,10 @@ from ...models.generated_input import (
     DatabricksOptionalConnection,
     DatabricksOptionalExtraction,
     DatabricksOptionalScope,
-    DatabricksRequiredAzureServicePrincipal,
-    DatabricksRequiredPat,
-    DatabricksRequiredServicePrincipal,
+    PersonalAccessToken,
     SamplingConfig,
     SamplingStrategy,
+    ServicePrincipalOAuthM2M,
 )
 from ...models.generated_single_asset_scan_results import (
     AssetType as OutputAssetType,
@@ -108,15 +108,15 @@ class DatabricksSource(BaseTabularSource):
         required = self.config.required
         masked = self.config.masked
 
-        if isinstance(required, DatabricksRequiredPat):
+        if isinstance(required, PersonalAccessToken):
             if not isinstance(masked, DatabricksMaskedPat):
                 raise ValueError("DATABRICKS PAT_TOKEN auth requires masked.token")
             return
-        if isinstance(required, DatabricksRequiredServicePrincipal):
+        if isinstance(required, ServicePrincipalOAuthM2M):
             if not isinstance(masked, DatabricksMaskedServicePrincipal):
                 raise ValueError("DATABRICKS SERVICE_PRINCIPAL auth requires masked.client_secret")
             return
-        if isinstance(required, DatabricksRequiredAzureServicePrincipal):
+        if isinstance(required, AzureServicePrincipal):
             if not isinstance(masked, DatabricksMaskedAzureServicePrincipal):
                 raise ValueError(
                     "DATABRICKS AZURE_SERVICE_PRINCIPAL auth requires masked.client_secret"
@@ -171,10 +171,10 @@ class DatabricksSource(BaseTabularSource):
         return int(self._connection_options().statement_timeout_seconds or 60)
 
     def _is_pat_mode(self) -> bool:
-        return isinstance(self.config.required, DatabricksRequiredPat)
+        return isinstance(self.config.required, PersonalAccessToken)
 
     def _is_azure_sp_mode(self) -> bool:
-        return isinstance(self.config.required, DatabricksRequiredAzureServicePrincipal)
+        return isinstance(self.config.required, AzureServicePrincipal)
 
     def _masked_pat_token(self) -> str:
         masked = self.config.masked
@@ -185,7 +185,7 @@ class DatabricksSource(BaseTabularSource):
     def _service_principal_credentials(self) -> tuple[str, str]:
         required = self.config.required
         masked = self.config.masked
-        if not isinstance(required, DatabricksRequiredServicePrincipal):
+        if not isinstance(required, ServicePrincipalOAuthM2M):
             raise ValueError("SERVICE_PRINCIPAL auth mode is required")
         if not isinstance(masked, DatabricksMaskedServicePrincipal):
             raise ValueError("DATABRICKS SERVICE_PRINCIPAL auth requires masked.client_secret")
@@ -194,7 +194,7 @@ class DatabricksSource(BaseTabularSource):
     def _azure_sp_credentials(self) -> tuple[str, str, str]:
         required = self.config.required
         masked = self.config.masked
-        if not isinstance(required, DatabricksRequiredAzureServicePrincipal):
+        if not isinstance(required, AzureServicePrincipal):
             raise ValueError("AZURE_SERVICE_PRINCIPAL auth mode is required")
         if not isinstance(masked, DatabricksMaskedAzureServicePrincipal):
             raise ValueError(
