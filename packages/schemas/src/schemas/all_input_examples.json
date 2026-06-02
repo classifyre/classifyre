@@ -931,6 +931,57 @@
           "rows_per_page": 50
         }
       }
+    },
+    {
+      "name": "Azure service principal with tenant-wide scan",
+      "description": "Scan Azure Databricks workspace using Azure AD service principal authentication with catalog scope filtering",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "42 14 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "DATABRICKS",
+        "required": {
+          "auth_mode": "AZURE_SERVICE_PRINCIPAL",
+          "workspace_url": "https://adb-1234567890123456.7.azuredatabricks.net",
+          "warehouse_id": "your-warehouse-id",
+          "client_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+          "tenant_id": "ffffffff-gggg-hhhh-iiii-jjjjjjjjjjjj"
+        },
+        "masked": {
+          "client_secret": "your-azure-client-secret"
+        },
+        "optional": {
+          "scope": {
+            "include_catalogs": [
+              "production",
+              "analytics"
+            ],
+            "exclude_schemas": [
+              "information_schema"
+            ],
+            "table_limit_per_schema": 100
+          },
+          "extraction": {
+            "include_table_lineage": true,
+            "include_column_lineage": false,
+            "include_notebooks": true,
+            "include_pipelines": false
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 50
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
     }
   ],
   "SNOWFLAKE": [
