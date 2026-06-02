@@ -27,7 +27,7 @@
     "test:i18n": "jest src/i18n/i18n-keys.spec.ts --no-coverage"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.98.0",
+    "@anthropic-ai/sdk": "^0.100.1",
     "@aws-sdk/client-s3": "^3.1032.0",
     "@fastify/multipart": "^10.0.0",
     "@fastify/static": "^9.0.0",
