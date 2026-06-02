@@ -1735,9 +1735,6 @@
         },
         {
           "$ref": "#/definitions/DatabricksMaskedServicePrincipal"
-        },
-        {
-          "$ref": "#/definitions/DatabricksMaskedAzureServicePrincipal"
         }
       ]
     },
