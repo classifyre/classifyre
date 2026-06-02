@@ -4,7 +4,7 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.4.11.dev0"
+version = "0.4.11"
 source = { editable = "." }
 dependencies = [
     { name = "fastjsonschema" },
