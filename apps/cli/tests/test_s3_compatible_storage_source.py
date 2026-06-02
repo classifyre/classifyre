@@ -171,6 +171,74 @@ def test_s3_storage_iter_asset_pages_enables_ocr_from_sampling(
     assert captured["file_name"] == "scan.pdf"
 
 
+def _hf_parquet_bytes() -> bytes:
+    import io
+
+    pa = pytest.importorskip("pyarrow")
+    pq = pytest.importorskip("pyarrow.parquet")
+    from PIL import Image
+
+    def _png(color: str) -> bytes:
+        buf = io.BytesIO()
+        Image.new("RGB", (8, 8), color).save(buf, format="PNG")
+        return buf.getvalue()
+
+    table = pa.table(
+        {
+            "image": pa.array(
+                [{"bytes": _png("red"), "path": None}, {"bytes": _png("blue"), "path": None}]
+            ),
+            "label": pa.array([6, 7], type=pa.int64()),
+        }
+    )
+    buf = io.BytesIO()
+    pq.write_table(table, buf)
+    return buf.getvalue()
+
+
+@pytest.mark.asyncio
+async def test_s3_storage_emits_child_image_assets_for_parquet(monkeypatch):
+    pytest.importorskip("PIL")
+    source = S3CompatibleStorageSource(_recipe(strategy="LATEST", rows_per_page=10))
+    ref = _ref("exports/dataset.parquet", days_ago=0)
+    monkeypatch.setattr(source, "_list_objects", lambda: [ref])
+
+    parquet_bytes = _hf_parquet_bytes()
+    monkeypatch.setattr(
+        source,
+        "_build_snapshot",
+        lambda _ref: ContentSnapshot(
+            mime_type="application/parquet",
+            raw_content="",
+            text_content="",
+            parse_error=None,
+            downloaded_bytes=len(parquet_bytes),
+            raw_bytes=parquet_bytes,
+        ),
+    )
+
+    assets = []
+    async for batch in source.extract():
+        assets.extend(batch)
+
+    parents = [a for a in assets if a.asset_type == OutputAssetType.TABLE]
+    children = [a for a in assets if a.asset_type == OutputAssetType.IMAGE]
+
+    assert len(parents) == 1
+    parent = parents[0]
+    # One child IMAGE asset per embedded image, referenced from the parent's links.
+    assert len(children) == 2
+    child_hashes = {c.hash for c in children}
+    assert child_hashes.issubset(set(parent.links))
+    for child in children:
+        # Bytes are cached so the binary-detector path serves them with no download.
+        fetched = await source.fetch_content_bytes(child.hash)
+        assert fetched is not None
+        image_bytes, mime = fetched
+        assert mime == "image/png"
+        assert image_bytes.startswith(b"\x89PNG")
+
+
 def test_s3_storage_external_url_for_custom_endpoint():
     source = S3CompatibleStorageSource(
         {

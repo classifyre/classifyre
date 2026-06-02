@@ -51,6 +51,7 @@ describe('CustomDetectorsService', () => {
         apiKey: 'sk-test',
         baseUrl: null,
         contextSize: 128000,
+        supportsVision: true,
       }),
     };
 
@@ -215,6 +216,7 @@ describe('CustomDetectorsService', () => {
       api_key: 'sk-test',
       base_url: null,
       context_size: 128000,
+      supports_vision: true,
     });
   });
 

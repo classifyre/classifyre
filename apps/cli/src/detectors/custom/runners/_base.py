@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+import logging
 import re
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
@@ -38,6 +40,32 @@ _IMAGE_CONTENT_TYPES = [
     "image/bmp",
     "image/tiff",
 ]
+# Content types HuggingFace image detectors accept. Non-image renderable files
+# (PDFs) are rasterised page-by-page via render_to_images before classification,
+# mirroring the vision LLM detector's input handling.
+_IMAGE_INPUT_CONTENT_TYPES = [*_IMAGE_CONTENT_TYPES, "application/pdf"]
+
+logger = logging.getLogger(__name__)
+
+
+def _load_input_images(content: bytes, content_type: str, pil: Any) -> list[tuple[int, Any]]:
+    """Return ``(page_index, PIL.Image)`` tuples for an image or renderable file.
+
+    Image MIME types open directly; PDFs (and any type ``render_to_images`` supports)
+    are rasterised to one image per page. Unsupported types return ``[]``.
+    """
+    from ....utils.file_to_images import render_to_images, supported_mime_type
+
+    normalized = content_type.split(";", 1)[0].strip().lower()
+    try:
+        if normalized.startswith("image/"):
+            return [(0, pil.open(io.BytesIO(content)))]
+        if supported_mime_type(content_type):
+            pages = render_to_images(content, content_type)
+            return [(idx, pil.open(io.BytesIO(png))) for idx, png in enumerate(pages)]
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Failed to load input images (%s): %s", normalized, exc)
+    return []
 
 
 def _resolve_pipeline_severity(

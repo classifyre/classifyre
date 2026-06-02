@@ -435,6 +435,9 @@ export const LLMDetectorEditor = React.forwardRef<
                     {providers.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name} — {p.provider} / {p.model}
+                        {p.supportsVision
+                          ? ` · ${t("detectors.llm.providerVisionTag")}`
+                          : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -468,6 +471,11 @@ export const LLMDetectorEditor = React.forwardRef<
                   {t("detectors.llm.newProvider")}
                 </Button>
               </div>
+              {selectedProvider?.supportsVision ? (
+                <p className="text-xs text-muted-foreground">
+                  {t("detectors.llm.providerVisionHint")}
+                </p>
+              ) : null}
             </div>
           </Card>
         </div>

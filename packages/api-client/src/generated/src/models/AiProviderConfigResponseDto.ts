@@ -68,6 +68,12 @@ export interface AiProviderConfigResponseDto {
      */
     contextSize: number | null;
     /**
+     * Whether the provider/model accepts image/PDF (vision) input. When true, detectors using this credential send rendered file images to the model instead of extracted text.
+     * @type {boolean}
+     * @memberof AiProviderConfigResponseDto
+     */
+    supportsVision: boolean;
+    /**
      * 
      * @type {Date}
      * @memberof AiProviderConfigResponseDto
@@ -105,6 +111,7 @@ export function instanceOfAiProviderConfigResponseDto(value: object): value is A
     if (!('apiKeyPreview' in value) || value['apiKeyPreview'] === undefined) return false;
     if (!('baseUrl' in value) || value['baseUrl'] === undefined) return false;
     if (!('contextSize' in value) || value['contextSize'] === undefined) return false;
+    if (!('supportsVision' in value) || value['supportsVision'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     return true;
@@ -128,6 +135,7 @@ export function AiProviderConfigResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'apiKeyPreview': json['apiKeyPreview'],
         'baseUrl': json['baseUrl'],
         'contextSize': json['contextSize'],
+        'supportsVision': json['supportsVision'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
     };
@@ -152,6 +160,7 @@ export function AiProviderConfigResponseDtoToJSONTyped(value?: AiProviderConfigR
         'apiKeyPreview': value['apiKeyPreview'],
         'baseUrl': value['baseUrl'],
         'contextSize': value['contextSize'],
+        'supportsVision': value['supportsVision'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
     };

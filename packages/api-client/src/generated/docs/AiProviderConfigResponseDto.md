@@ -14,6 +14,7 @@ Name | Type
 `apiKeyPreview` | string
 `baseUrl` | string
 `contextSize` | number
+`supportsVision` | boolean
 `createdAt` | Date
 `updatedAt` | Date
 
@@ -32,6 +33,7 @@ const example = {
   "apiKeyPreview": sk-p...xyz4,
   "baseUrl": https://openrouter.ai/api/v1,
   "contextSize": 200000,
+  "supportsVision": false,
   "createdAt": null,
   "updatedAt": null,
 } satisfies AiProviderConfigResponseDto

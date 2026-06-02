@@ -79,15 +79,15 @@ def test_label_to_severity_and_extraction() -> None:
     runner = _runner(_schema(), completion)
     results = runner.detect(TEXT, "text/plain")
 
-    assert {r.finding_type for r in results} == {"llm:violent", "llm:bad"}
-    violent = next(r for r in results if r.finding_type == "llm:violent")
+    assert {r.finding_type for r in results} == {"violent", "bad"}
+    violent = next(r for r in results if r.finding_type == "violent")
     assert violent.severity == Severity.critical
     assert violent.matched_content == "gewalttätig"
     assert violent.extracted_data == {"language": "de"}
     assert violent.extraction_method == "LLM"
     assert violent.metadata["provider"] == "CLAUDE"
 
-    bad = next(r for r in results if r.finding_type == "llm:bad")
+    bad = next(r for r in results if r.finding_type == "bad")
     assert bad.severity == Severity.medium
 
 
@@ -155,3 +155,82 @@ def test_malformed_json_returns_no_findings() -> None:
     completion = MagicMock(return_value=SimpleNamespace(choices=[SimpleNamespace(message=message)]))
     runner = _runner(_schema(), completion)
     assert runner.detect(TEXT, "text/plain") == []
+
+
+# ── Vision / file input ───────────────────────────────────────────────────────
+
+
+def _vision_runtime() -> LLMProviderRuntime:
+    return LLMProviderRuntime(
+        provider="CLAUDE", model="claude-sonnet-4-5", api_key="sk-test", supports_vision=True
+    )
+
+
+def test_supported_content_types_gated_by_vision() -> None:
+    completion = _mock_completion({"labels": []})
+
+    text_only = _runner(_schema(), completion)
+    assert "image/png" not in text_only.get_supported_content_types()
+    assert "application/pdf" not in text_only.get_supported_content_types()
+
+    vision = _runner(_schema(provider_runtime=_vision_runtime()), completion)
+    supported = vision.get_supported_content_types()
+    assert "text/plain" in supported
+    assert "image/png" in supported
+    assert "application/pdf" in supported
+
+
+def test_vision_detect_builds_image_blocks_and_findings(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.detectors.custom.runners._llm.render_to_images",
+        lambda _content, _content_type, **_: [b"\x89PNG-page-1", b"\x89PNG-page-2"],
+    )
+    completion = _mock_completion(
+        {"labels": [{"name": "bad", "confidence": 0.9}], "fields": {"language": "en"}}
+    )
+    runner = _runner(_schema(provider_runtime=_vision_runtime()), completion)
+
+    results = runner.detect(b"%PDF-1.4 fake", "application/pdf")
+
+    assert [r.finding_type for r in results] == ["bad"]
+    finding = results[0]
+    assert finding.metadata["input"] == "vision"
+    assert finding.metadata["vision_pages"] == 2
+
+    messages = completion.call_args.kwargs["messages"]
+    user_blocks = messages[1]["content"]
+    assert [b["type"] for b in user_blocks] == ["image_url", "image_url"]
+    assert user_blocks[0]["image_url"]["url"].startswith("data:image/png;base64,")
+
+
+def test_vision_disabled_returns_no_findings_for_bytes(monkeypatch) -> None:
+    called = MagicMock(return_value=[b"img"])
+    monkeypatch.setattr("src.detectors.custom.runners._llm.render_to_images", called)
+    completion = _mock_completion({"labels": [{"name": "bad", "confidence": 0.9}]})
+    runner = _runner(_schema(), completion)  # supports_vision defaults off
+
+    assert runner.detect(b"%PDF-1.4 fake", "application/pdf") == []
+    called.assert_not_called()
+    completion.assert_not_called()
+
+
+def test_vision_no_images_rendered_returns_empty(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.detectors.custom.runners._llm.render_to_images",
+        lambda *_, **__: [],
+    )
+    completion = _mock_completion({"labels": [{"name": "bad", "confidence": 0.9}]})
+    runner = _runner(_schema(provider_runtime=_vision_runtime()), completion)
+
+    assert runner.detect(b"not-a-real-pdf", "application/pdf") == []
+    completion.assert_not_called()
+
+
+def test_vision_unsupported_mime_skipped(monkeypatch) -> None:
+    called = MagicMock(return_value=[b"img"])
+    monkeypatch.setattr("src.detectors.custom.runners._llm.render_to_images", called)
+    completion = _mock_completion({"labels": []})
+    runner = _runner(_schema(provider_runtime=_vision_runtime()), completion)
+
+    assert runner.detect(b"audio-bytes", "audio/mpeg") == []
+    called.assert_not_called()

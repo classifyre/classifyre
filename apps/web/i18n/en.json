@@ -23,6 +23,12 @@
     "semantic": "Semantic Layer"
   },
   "common": {
+    "duration": {
+      "hours": "{{count}}h",
+      "minutes": "{{count}}m",
+      "seconds": "{{count}}s",
+      "empty": "—"
+    },
     "loading": "Loading...",
     "rowsPerPage": "Rows per page",
     "rows": "{{size}} rows",
@@ -154,6 +160,13 @@
     "loading": "Loading sources…",
     "unnamedSource": "Unnamed source",
     "deleted": "Source deleted. Related assets and findings were removed.",
+    "deleteFailed": "Failed to delete source",
+    "delete": {
+      "title": "Delete source?",
+      "cannotUndo": "This action cannot be undone.",
+      "permanentTitle": "Permanent removal",
+      "permanentBody": "Deleting this source will permanently remove the source, all related assets, and all findings."
+    },
     "typeRequired": "Source type is required",
     "nameRequired": "Source name is required",
     "saved": "Source settings saved",
@@ -206,6 +219,7 @@
       "lastScan": "Last Scan",
       "notScannedYet": "Not scanned yet",
       "lastScanStatus": "Last Scan Status",
+      "lastRunDuration": "Last Run Duration",
       "currentRun": "Current Run",
       "viewRun": "View Run",
       "lastRunSummary": "Last Run Summary",
@@ -642,6 +656,10 @@
   },
   "detectors": {
     "title": "Custom Detectors",
+    "visual": {
+      "badge": "Visual",
+      "tooltip": "Processes images visually rather than as text"
+    },
     "detail": {
       "title": "Detector Details"
     },
@@ -913,6 +931,8 @@
       "providerPlaceholder": "Select a provider credential",
       "providerLoading": "Loading providers…",
       "providerEmpty": "No AI providers configured",
+      "providerVisionTag": "vision",
+      "providerVisionHint": "This provider accepts image/PDF input. Image and PDF assets are rendered to images and sent to the model directly instead of using text extraction.",
       "newProvider": "New provider",
       "editProvider": "Edit provider",
       "promptTitle": "Prompt",
@@ -1099,9 +1119,15 @@
     },
     "runProgress": {
       "title": "Run Progress",
-      "description": "Estimated from processed assets",
+      "description": "Asset processing status for this run",
       "progress": "Progress",
-      "durationSoFar": "Duration so far: {{duration}}"
+      "durationSoFar": "Duration so far: {{duration}}",
+      "processed": "Processed",
+      "processing": "Processing",
+      "pending": "Pending",
+      "errored": "Errored",
+      "finishedOf": "{{finished}} of {{total}} assets",
+      "complete": "{{percent}}% complete"
     },
     "runTimeline": {
       "title": "Run Timeline",
@@ -1160,7 +1186,17 @@
       "fileNameAZ": "File name A-Z",
       "largestFile": "Largest file",
       "updating": "Updating",
-      "refreshingRuns": "Refreshing runs"
+      "refreshingRuns": "Refreshing runs",
+      "pickDetectors": "Add detectors to run",
+      "searchDetectors": "Search detectors...",
+      "noDetectors": "No detectors found",
+      "rescanAppend": "Re-scan (append)",
+      "clearFindings": "Clear findings",
+      "selectDetectorsFirst": "Select at least one detector",
+      "rescanStarted": "Re-scan started — findings will be appended",
+      "rescanFailed": "Failed to start re-scan",
+      "findingsCleared": "Findings cleared",
+      "clearFailed": "Failed to clear findings"
     },
     "monitorDesc": "Monitor sandbox runs and inspect detector findings",
     "newScan": "New sandbox scan",
@@ -1421,6 +1457,8 @@
     "nameRequired": "Name is required",
     "contextSize": "Context size (tokens)",
     "contextSizePlaceholder": "e.g. 200000",
+    "supportsVision": "Supports image / PDF input (vision)",
+    "supportsVisionDesc": "Enable when this model accepts images. Detectors using this credential send rendered file images (PDF pages, images) to the model instead of extracted text.",
     "addProvider": "Add provider",
     "editProvider": "Edit provider",
     "newProvider": "New provider",

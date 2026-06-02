@@ -60,6 +60,7 @@ export type {
   LatestRunnerSummaryDto,
   BulkIngestAssetsDto,
   RunnerDto,
+  RunnerAssetProgressDto,
   ListRunnersResponseDto,
   DeleteRunnerResponseDto,
   RunnerLogEntryDto,

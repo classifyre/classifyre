@@ -267,7 +267,7 @@ async def test_object_detection_runner_emits_entity_finding_with_box() -> None:
     findings = runner.detect(b"\xff\xd8\xff", "image/jpeg")
     assert len(findings) == 1
     f = findings[0]
-    assert f.finding_type == "entity:person"
+    assert f.finding_type == "person"
     assert f.detector_type == DetectorType.CUSTOM
     assert f.location is not None
     assert "box" in (f.metadata or {})
@@ -282,8 +282,8 @@ async def test_object_detection_runner_filters_below_threshold() -> None:
     runner = _make_object_runner(dets, confidence_threshold=0.5)
     findings = runner.detect(b"\xff\xd8\xff", "image/jpeg")
     labels = {f.finding_type for f in findings}
-    assert "entity:car" not in labels
-    assert "entity:person" in labels
+    assert "car" not in labels
+    assert "person" in labels
 
 
 @pytest.mark.asyncio

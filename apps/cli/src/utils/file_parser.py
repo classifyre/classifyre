@@ -169,6 +169,21 @@ def _reset_docling_singleton() -> None:
         _docling_state.attempted = False
 
 
+def _require_file_processing(module_name: str) -> object:
+    """Import an optional file-parsing dependency, auto-installing on first miss.
+
+    The CLI image ships only default dependencies; file-parsing libraries
+    (pdfplumber, python-docx, openpyxl, pyarrow, filetype, chardet) live in the
+    optional ``file-processing`` uv group and are installed on demand at runtime
+    (mirrors how detectors pull their own groups). Raises MissingDependencyError
+    if the group cannot be installed; callers already treat that as a parse
+    failure / fall back gracefully.
+    """
+    from ..detectors.dependencies import require_module
+
+    return require_module(module_name, "file parser", ["file-processing"])
+
+
 def _normalize_mime_type(mime_type: str | None) -> str:
     if not mime_type:
         return ""
@@ -239,9 +254,9 @@ def _sniff_text_mime(file_bytes: bytes) -> str:
     # Try to decode a sample for text-based sniffing
     sample = ""
     try:
-        import chardet
+        chardet = _require_file_processing("chardet")
 
-        detected = chardet.detect(file_bytes[:4096])
+        detected = chardet.detect(file_bytes[:4096])  # type: ignore[attr-defined]
         encoding = detected.get("encoding") or "utf-8"
         sample = file_bytes[:4096].decode(encoding, errors="replace")
     except Exception:
@@ -282,9 +297,9 @@ def detect_mime_type(file_bytes: bytes) -> str:
         return magic_mime_type
 
     try:
-        import filetype
+        filetype = _require_file_processing("filetype")
 
-        kind = filetype.guess(file_bytes)
+        kind = filetype.guess(file_bytes)  # type: ignore[attr-defined]
         if kind is not None:
             return str(kind.mime)
     except Exception as e:
@@ -313,9 +328,9 @@ def _extract_pdf_text(file_bytes: bytes) -> tuple[str, str | None]:
     try:
         import io
 
-        import pdfplumber
+        pdfplumber = _require_file_processing("pdfplumber")
 
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:  # type: ignore[attr-defined]
             pages = []
             for page in pdf.pages:
                 text = page.extract_text() or ""
@@ -428,9 +443,9 @@ def extract_text(
         try:
             import io
 
-            import docx
+            docx = _require_file_processing("docx")
 
-            doc = docx.Document(io.BytesIO(file_bytes))
+            doc = docx.Document(io.BytesIO(file_bytes))  # type: ignore[attr-defined]
             parts: list[str] = []
             for para in doc.paragraphs:
                 if para.text.strip():
@@ -449,9 +464,11 @@ def extract_text(
         try:
             import io
 
-            import openpyxl
+            openpyxl = _require_file_processing("openpyxl")
 
-            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+            wb = openpyxl.load_workbook(  # type: ignore[attr-defined]
+                io.BytesIO(file_bytes), read_only=True, data_only=True
+            )
             rows: list[str] = []
             for sheet in wb.worksheets:
                 for row in sheet.iter_rows(values_only=True):
@@ -484,29 +501,12 @@ def extract_text(
     if mime_type.startswith("text/"):
         return _decode_bytes(file_bytes), None
 
-    # Parquet
+    # Parquet — stream row-by-row (never read_table the whole file into memory)
+    # and reuse the page iterator so image columns get placeholders, not raw bytes.
     if mime_type in ("application/parquet", "application/vnd.apache.parquet"):
         try:
-            import io
-
-            import pyarrow.parquet as pq  # type: ignore[import-not-found, import-untyped]
-
-            table = pq.read_table(io.BytesIO(file_bytes))
-            column_names = table.schema.names
-            lines: list[str] = []
-            for row_index in range(table.num_rows):
-                lines.append(f"row_{row_index + 1}:")
-                for col in column_names:
-                    col_array = table.column(col)
-                    cell = col_array[row_index].as_py()
-                    cell_str = "" if cell is None else str(cell)
-                    rendered_lines = cell_str.splitlines() or [""]
-                    first_line, *continuation_lines = rendered_lines
-                    lines.append(f"  {col}: {first_line}")
-                    for cont in continuation_lines:
-                        lines.append(f"    {cont}")
-                lines.append("")
-            return "\n".join(lines), None
+            pages = _iter_parquet_pages(file_bytes, batch_size=1000, include_column_names=True)
+            return "\n".join(pages), None
         except Exception as e:
             return "", f"Parquet extraction failed: {e}"
 
@@ -517,9 +517,9 @@ def extract_text(
 def _decode_bytes(file_bytes: bytes) -> str:
     """Decode bytes to str using chardet for encoding detection."""
     try:
-        import chardet
+        chardet = _require_file_processing("chardet")
 
-        detected = chardet.detect(file_bytes[:65536])
+        detected = chardet.detect(file_bytes[:65536])  # type: ignore[attr-defined]
         encoding = detected.get("encoding") or "utf-8"
         return file_bytes.decode(encoding, errors="replace")
     except Exception:
@@ -674,12 +674,20 @@ def _iter_parquet_pages(
     try:
         import io
 
-        import pyarrow.parquet as pq  # type: ignore[import-not-found, import-untyped]
+        pq = _require_file_processing("pyarrow.parquet")
 
         # ParquetFile + iter_batches() reads one row-group at a time instead of
         # loading the whole table into memory, and surfaces schema errors early
         # (before reading any data) so a bad file can't lock the C++ thread pool.
-        pf = pq.ParquetFile(io.BytesIO(file_bytes))
+        pf = pq.ParquetFile(io.BytesIO(file_bytes))  # type: ignore[attr-defined]
+
+        # Image columns (HF Image structs, raw image-byte columns) carry binary
+        # blobs that are useless and wasteful as row text — they're surfaced
+        # separately as child IMAGE assets. Render a compact placeholder instead.
+        from .embedded_images import detect_parquet_image_columns, extract_image_bytes
+
+        image_columns = detect_parquet_image_columns(pf)
+
         abs_row = 0
         for batch in pf.iter_batches(batch_size=batch_size):
             col_names = batch.schema.names
@@ -688,7 +696,12 @@ def _iter_parquet_pages(
                 lines.append(f"row_{abs_row + 1}:")
                 for col_i, col in enumerate(col_names):
                     cell = batch.column(col_i)[local_idx].as_py()
-                    cell_str = "" if cell is None else str(cell)
+                    if col in image_columns:
+                        cell_str = _format_image_placeholder(
+                            extract_image_bytes(cell, image_columns[col])
+                        )
+                    else:
+                        cell_str = "" if cell is None else str(cell)
                     first, *rest = cell_str.splitlines() or [""]
                     lines.append(f"  {col}: {first}" if include_column_names else f"  {first}")
                     lines.extend(f"    {c}" for c in rest)
@@ -719,6 +732,20 @@ def _iter_csv_pages(
             yield _format_tabular_page([dict(row)], headers, total_seen, include_column_names)
     except Exception as exc:
         logger.warning("CSV page iteration failed: %s", exc)
+
+
+def _format_image_placeholder(raw: bytes | None) -> str:
+    """Compact stand-in for an embedded-image cell, so its bytes never hit text detectors."""
+    if not raw:
+        return "<image>"
+    size = len(raw)
+    if size >= 1024 * 1024:
+        human = f"{size / 1024 / 1024:.1f} MB"
+    elif size >= 1024:
+        human = f"{size / 1024:.0f} KB"
+    else:
+        human = f"{size} B"
+    return f"<image: {human}>"
 
 
 def _format_tabular_page(
@@ -760,9 +787,9 @@ def parse_file(file_path: Path, *, enable_ocr: bool = False) -> ParsedFile:
     encoding: str | None = None
     if not parsed.is_binary and parsed.text_content:
         try:
-            import chardet
+            chardet = _require_file_processing("chardet")
 
-            detected = chardet.detect(file_bytes[:65536])
+            detected = chardet.detect(file_bytes[:65536])  # type: ignore[attr-defined]
             encoding = detected.get("encoding")
         except Exception:
             pass
