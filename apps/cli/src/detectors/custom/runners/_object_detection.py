@@ -94,11 +94,11 @@ class ObjectDetectionRunner(BaseRunner):
                         metadata["page"] = page_index + 1
                     results.append(
                         self._make_result(
-                            finding_type=f"entity:{label}",
+                            finding_type=label,
                             category="CONTENT",
                             severity=severity,
                             confidence=score,
-                            matched_content=f"Detected: {label} ({score:.3f})",
+                            matched_content=label,
                             location=Location(
                                 description=(
                                     f"{page_prefix}box xmin={box.get('xmin')} ymin={box.get('ymin')}"
