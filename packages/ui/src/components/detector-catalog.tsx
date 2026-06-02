@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search } from "lucide-react";
+import { Eye, Search } from "lucide-react";
 
 import { cn } from "@workspace/ui/lib/utils";
 
@@ -74,6 +74,16 @@ function DetectorCatalogCard({
         </div>
 
         <div className="mt-auto flex flex-wrap items-center gap-2">
+          {item.isVisual && (
+            <Badge
+              variant="outline"
+              className="gap-1 border-2 border-border text-[10px] font-mono uppercase tracking-[0.08em]"
+              title="Detector supports visual / image input"
+            >
+              <Eye className="h-3 w-3" />
+              Visual Scan
+            </Badge>
+          )}
           {item.categories.map((category) => (
             <Badge
               key={`${item.type}-${category}`}

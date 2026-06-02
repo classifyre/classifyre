@@ -264,7 +264,7 @@ class LLMRunner(BaseRunner):
             results.append(
                 DetectionResult(
                     detector_type=DetectorType.CUSTOM,
-                    finding_type=f"llm:{label}",
+                    finding_type=label,
                     category="CLASSIFICATION",
                     severity=severity,
                     confidence=min(0.99, confidence),
