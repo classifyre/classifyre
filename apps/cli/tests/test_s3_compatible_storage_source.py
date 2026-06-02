@@ -185,7 +185,9 @@ def _hf_parquet_bytes() -> bytes:
 
     table = pa.table(
         {
-            "image": pa.array([{"bytes": _png("red"), "path": None}, {"bytes": _png("blue"), "path": None}]),
+            "image": pa.array(
+                [{"bytes": _png("red"), "path": None}, {"bytes": _png("blue"), "path": None}]
+            ),
             "label": pa.array([6, 7], type=pa.int64()),
         }
     )
