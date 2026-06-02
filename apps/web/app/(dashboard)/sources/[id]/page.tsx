@@ -49,6 +49,7 @@ import { getSourceIcon } from "@/lib/source-type-icon";
 import { RunnerStatusBadge } from "@/components/runner-status-badge";
 import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
 import { useTranslation } from "@/hooks/use-translation";
+import { useFormatDuration } from "@/hooks/use-format-duration";
 
 const EMPTY_CHARTS: SearchAssetsChartsResponseDto = {
   totals: {
@@ -86,6 +87,7 @@ const getApiBase = () =>
 
 export default function SourceViewPage() {
   const { t } = useTranslation();
+  const formatDuration = useFormatDuration();
   const router = useRouter();
   const params = useParams();
   const sourceId = params.id as string;
@@ -381,12 +383,6 @@ export default function SourceViewPage() {
     );
   }
 
-  const latestRunHref = source.currentRunnerId
-    ? `/scans/${source.currentRunnerId}`
-    : lastRunner?.id
-      ? `/scans/${lastRunner.id}`
-      : null;
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -402,7 +398,7 @@ export default function SourceViewPage() {
               </h1>
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <span>{source.type} source</span>
-                <RunnerStatusBadge status={source.runnerStatus} />              </div>
+              </div>
             </div>
           </div>
         </div>
@@ -484,21 +480,6 @@ export default function SourceViewPage() {
               <CardContent>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1">
-                    <p className="text-xs uppercase text-muted-foreground">
-                      {t("common.status")}
-                    </p>
-                    {latestRunHref ? (
-                      <button
-                        type="button"
-                        onClick={() => router.push(latestRunHref)}
-                        className="inline-flex cursor-pointer transition-opacity hover:opacity-80"
-                      >
-                        <RunnerStatusBadge status={source.runnerStatus} />
-                      </button>
-                    ) : (
-                      <RunnerStatusBadge status={source.runnerStatus} />                    )}
-                  </div>
-                  <div className="space-y-1">
                     <p className="text-xs uppercase text-muted-foreground">{t("common.type")}</p>
                     <div className="inline-flex items-center gap-2">
                       <SourceTypeIcon className="h-4 w-4 text-muted-foreground" />
@@ -577,6 +558,16 @@ export default function SourceViewPage() {
                     ) : (
                       <p className="text-sm">—</p>
                     )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase text-muted-foreground">
+                      {t("sources.detail.lastRunDuration")}
+                    </p>
+                    <p className="text-sm">
+                      {lastRunner
+                        ? formatDuration(lastRunner.durationMs)
+                        : t("common.duration.empty")}
+                    </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs uppercase text-muted-foreground">
@@ -736,6 +727,12 @@ export default function SourceViewPage() {
                                   runner.assetsUnchanged
                                 ).toLocaleString(),
                               })}
+                              {runner.durationMs != null && (
+                                <span className="text-muted-foreground/60">
+                                  {" · "}
+                                  {formatDuration(runner.durationMs)}
+                                </span>
+                              )}
                             </p>
                           </div>
                           <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
