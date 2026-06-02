@@ -79,15 +79,15 @@ def test_label_to_severity_and_extraction() -> None:
     runner = _runner(_schema(), completion)
     results = runner.detect(TEXT, "text/plain")
 
-    assert {r.finding_type for r in results} == {"llm:violent", "llm:bad"}
-    violent = next(r for r in results if r.finding_type == "llm:violent")
+    assert {r.finding_type for r in results} == {"violent", "bad"}
+    violent = next(r for r in results if r.finding_type == "violent")
     assert violent.severity == Severity.critical
     assert violent.matched_content == "gewalttätig"
     assert violent.extracted_data == {"language": "de"}
     assert violent.extraction_method == "LLM"
     assert violent.metadata["provider"] == "CLAUDE"
 
-    bad = next(r for r in results if r.finding_type == "llm:bad")
+    bad = next(r for r in results if r.finding_type == "bad")
     assert bad.severity == Severity.medium
 
 
@@ -192,7 +192,7 @@ def test_vision_detect_builds_image_blocks_and_findings(monkeypatch) -> None:
 
     results = runner.detect(b"%PDF-1.4 fake", "application/pdf")
 
-    assert [r.finding_type for r in results] == ["llm:bad"]
+    assert [r.finding_type for r in results] == ["bad"]
     finding = results[0]
     assert finding.metadata["input"] == "vision"
     assert finding.metadata["vision_pages"] == 2

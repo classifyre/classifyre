@@ -44,6 +44,7 @@ export default function DetectorsPage() {
     priority: d.catalogMeta.priority,
     groupId: resolveDetectorGroupId(d.detectorType, d.catalogMeta.categories),
     href: `/detectors/${d.slug}/`,
+    isVisual: d.catalogMeta.supportedAssetTypes.includes("IMAGE"),
   }));
 
   return (

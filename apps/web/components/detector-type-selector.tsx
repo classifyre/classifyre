@@ -44,6 +44,7 @@ function DetectorTypeCard({
   const { t } = useTranslation();
   const Icon = DETECTOR_ICONS[kind];
   const available = true;
+  const isVisual = kind === "image_classification" || kind === "object_detection";
 
   const title = t(`detectors.types.${kind}.title`);
   const tagline = t(`detectors.types.${kind}.tagline`);
@@ -68,6 +69,16 @@ function DetectorTypeCard({
       {!available && (
         <span className="absolute right-4 top-4 rounded-[3px] border border-border bg-background px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-[0.08em] text-muted-foreground">
           {t("detectors.comingSoon")}
+        </span>
+      )}
+
+      {/* Visual-detector pill — marks detectors that scan images, not text */}
+      {available && isVisual && (
+        <span
+          title={t("detectors.visual.tooltip")}
+          className="absolute right-4 top-4 rounded-[3px] border border-border bg-background px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-[0.08em] text-muted-foreground"
+        >
+          {t("detectors.visual.badge")}
         </span>
       )}
 

@@ -633,7 +633,7 @@ class DetectorPipeline:
         detected_at = datetime.now(UTC)
 
         for i, (detector, result) in enumerate(zip(runnable_detectors, results, strict=False)):
-            detector_name = detector.__class__.__name__
+            detector_name = self._detector_log_label(detector)
             via = task_via[i]
             loc = f"{asset_name}:{page_tag}" if page_tag else asset_name
 

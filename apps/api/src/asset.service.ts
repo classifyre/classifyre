@@ -1458,6 +1458,23 @@ export class AssetService {
     return { deleted: missingAssetIds.length };
   }
 
+  /**
+   * Merge link arrays preserving existing order and appending new, unique entries.
+   * Links accumulate across ingestions — they are never removed — so an asset that
+   * references extracted children (e.g. images in a parquet/office file) keeps them.
+   */
+  private mergeLinks(existing: unknown, incoming: string[]): string[] {
+    const merged = this.normalizeLinks(existing);
+    const seen = new Set(merged);
+    for (const link of incoming) {
+      if (!seen.has(link)) {
+        seen.add(link);
+        merged.push(link);
+      }
+    }
+    return merged;
+  }
+
   private processBatch(
     batch: Record<string, any>[],
     sourceId: string,
@@ -1486,11 +1503,19 @@ export class AssetService {
           const assetHash = String(hash);
           const existingAsset = existingAssetsMap.get(assetHash);
 
+          // Links accumulate (append, never remove): an asset that embeds others
+          // — e.g. a parquet/office file referencing extracted child images —
+          // gains a link per child, merged with whatever it already had.
+          const incomingLinks = this.normalizeLinks(links);
+          const mergedLinks = existingAsset
+            ? this.mergeLinks(existingAsset.links, incomingLinks)
+            : incomingLinks;
+
           const assetData = {
             checksum: String(checksum),
             name: String(name),
             externalUrl: String(external_url),
-            links: this.normalizeLinks(links),
+            links: mergedLinks,
             assetType: this.normalizeAssetType(asset_type),
             sourceType,
             runnerId,
