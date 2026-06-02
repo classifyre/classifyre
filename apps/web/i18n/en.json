@@ -23,6 +23,12 @@
     "semantic": "Semantic Layer"
   },
   "common": {
+    "duration": {
+      "hours": "{{count}}h",
+      "minutes": "{{count}}m",
+      "seconds": "{{count}}s",
+      "empty": "—"
+    },
     "loading": "Loading...",
     "rowsPerPage": "Rows per page",
     "rows": "{{size}} rows",
@@ -154,6 +160,13 @@
     "loading": "Loading sources…",
     "unnamedSource": "Unnamed source",
     "deleted": "Source deleted. Related assets and findings were removed.",
+    "deleteFailed": "Failed to delete source",
+    "delete": {
+      "title": "Delete source?",
+      "cannotUndo": "This action cannot be undone.",
+      "permanentTitle": "Permanent removal",
+      "permanentBody": "Deleting this source will permanently remove the source, all related assets, and all findings."
+    },
     "typeRequired": "Source type is required",
     "nameRequired": "Source name is required",
     "saved": "Source settings saved",
@@ -206,6 +219,7 @@
       "lastScan": "Last Scan",
       "notScannedYet": "Not scanned yet",
       "lastScanStatus": "Last Scan Status",
+      "lastRunDuration": "Last Run Duration",
       "currentRun": "Current Run",
       "viewRun": "View Run",
       "lastRunSummary": "Last Run Summary",
@@ -1105,9 +1119,15 @@
     },
     "runProgress": {
       "title": "Run Progress",
-      "description": "Estimated from processed assets",
+      "description": "Asset processing status for this run",
       "progress": "Progress",
-      "durationSoFar": "Duration so far: {{duration}}"
+      "durationSoFar": "Duration so far: {{duration}}",
+      "processed": "Processed",
+      "processing": "Processing",
+      "pending": "Pending",
+      "errored": "Errored",
+      "finishedOf": "{{finished}} of {{total}} assets",
+      "complete": "{{percent}}% complete"
     },
     "runTimeline": {
       "title": "Run Timeline",

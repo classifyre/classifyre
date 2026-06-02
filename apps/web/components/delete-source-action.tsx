@@ -53,7 +53,7 @@ export function DeleteSourceAction({
     } catch (error) {
       console.error("Failed to delete source:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to delete source",
+        error instanceof Error ? error.message : t("sources.deleteFailed"),
       );
     } finally {
       setIsDeleting(false);
@@ -95,27 +95,28 @@ export function DeleteSourceAction({
             ) : (
               <Trash2 className="h-4 w-4" />
             )}
-            Delete Source
+            {t("sources.deleteSource")}
           </Button>
         )}
       </AlertDialogTrigger>
       <AlertDialogContent className="rounded-[6px] border-2 border-border">
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete source?</AlertDialogTitle>
+          <AlertDialogTitle>{t("sources.delete.title")}</AlertDialogTitle>
           <AlertDialogDescription>
-            This action cannot be undone.
+            {t("sources.delete.cannotUndo")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <Alert variant="destructive" className="border-destructive/40">
           <ShieldAlert className="h-4 w-4" />
-          <AlertTitle>Permanent removal</AlertTitle>
+          <AlertTitle>{t("sources.delete.permanentTitle")}</AlertTitle>
           <AlertDescription>
-            Deleting this source will permanently remove the source, all related
-            assets, and all findings.
+            {t("sources.delete.permanentBody")}
           </AlertDescription>
         </Alert>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isDeleting}>
+            {t("common.cancel")}
+          </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={isDeleting}
@@ -123,7 +124,7 @@ export function DeleteSourceAction({
             className="rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
             data-testid="btn-delete-confirm"
           >
-            {isDeleting ? "Deleting..." : "Delete Source"}
+            {isDeleting ? t("common.deleting") : t("sources.deleteSource")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

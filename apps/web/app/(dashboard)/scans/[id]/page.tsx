@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import {
   api,
+  type RunnerAssetProgressDto,
   type RunnerDto,
   type RunnerLogEntryDto,
   type SearchAssetsChartsResponseDto,
@@ -26,6 +27,7 @@ import {
 } from "@workspace/api-client";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
+import { useFormatDuration } from "@/hooks/use-format-duration";
 import { RunnerAssetsTable } from "@/components/runner-assets-table";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { RunnerLogViewer } from "@/components/runner-log-viewer";
@@ -42,7 +44,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  Progress,
   Spinner,
   Tabs,
   TabsContent,
@@ -76,24 +77,9 @@ const EMPTY_FINDINGS_CHARTS: SearchFindingsChartsResponseDto = {
   topAssets: [],
 };
 
-function calculateProgress(runner: RunnerDto): number {
-  if (!isRunnerStatusRunning(runner.status) || !runner.startedAt) return 0;
-  const processed = runner.assetsCreated + runner.assetsUpdated;
-  return processed > 0
-    ? Math.min(95, Math.round((processed / Math.max(processed, 100)) * 100))
-    : 10;
-}
-
-function formatDuration(ms?: number | null) {
-  if (!ms) return "N/A";
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${minutes}m ${secs}s`;
-}
-
 export default function RunnerDetailPage() {
   const { t } = useTranslation();
+  const formatDuration = useFormatDuration();
   const { s3Configured } = useServerConfig();
   const params = useParams();
   const router = useRouter();
@@ -108,6 +94,8 @@ export default function RunnerDetailPage() {
     useState<SearchAssetsChartsResponseDto>(EMPTY_ASSETS_CHARTS);
   const [findingsCharts, setFindingsCharts] =
     useState<SearchFindingsChartsResponseDto>(EMPTY_FINDINGS_CHARTS);
+  const [assetProgress, setAssetProgress] =
+    useState<RunnerAssetProgressDto | null>(null);
   const [isOverviewRefreshing, setIsOverviewRefreshing] = useState(false);
 
   const [isStopping, setIsStopping] = useState(false);
@@ -119,28 +107,33 @@ export default function RunnerDetailPage() {
       setIsOverviewRefreshing(true);
       setOverviewError(null);
 
-      const [nextAssetsCharts, nextFindingsCharts] = await Promise.all([
-        api.searchAssetsCharts({
-          assets: {
-            sourceId: currentRunner.sourceId,
+      const [nextAssetsCharts, nextFindingsCharts, nextAssetProgress] =
+        await Promise.all([
+          api.searchAssetsCharts({
+            assets: {
+              sourceId: currentRunner.sourceId,
+              runnerId: currentRunner.id,
+            },
+            findings: {
+              runnerId: [currentRunner.id],
+              includeResolved: true,
+            },
+          }),
+          api.searchFindingsCharts({
+            filters: {
+              runnerId: [currentRunner.id],
+              includeResolved: true,
+            },
+            windowDays: 30,
+          }),
+          api.runners.cliRunnerControllerGetRunnerAssetProgress({
             runnerId: currentRunner.id,
-          },
-          findings: {
-            runnerId: [currentRunner.id],
-            includeResolved: true,
-          },
-        }),
-        api.searchFindingsCharts({
-          filters: {
-            runnerId: [currentRunner.id],
-            includeResolved: true,
-          },
-          windowDays: 30,
-        }),
-      ]);
+          }),
+        ]);
 
       setAssetsCharts(nextAssetsCharts ?? EMPTY_ASSETS_CHARTS);
       setFindingsCharts(nextFindingsCharts ?? EMPTY_FINDINGS_CHARTS);
+      setAssetProgress(nextAssetProgress ?? null);
     } catch (err) {
       console.error("Failed to refresh runner overview:", err);
       setOverviewError(
@@ -356,7 +349,33 @@ export default function RunnerDetailPage() {
   }
 
   const assetsTotal = assetsCharts.totals.totalAssets;
-  const progress = calculateProgress(runner);
+  const progressTotal = assetProgress?.total ?? 0;
+  const progressFinished =
+    (assetProgress?.processed ?? 0) + (assetProgress?.error ?? 0);
+  const progressPercent =
+    progressTotal > 0
+      ? Math.round((progressFinished / progressTotal) * 100)
+      : 0;
+  const progressSegments =
+    progressTotal > 0
+      ? [
+          {
+            key: "processed",
+            value: assetProgress?.processed ?? 0,
+            className: "bg-accent",
+          },
+          {
+            key: "error",
+            value: assetProgress?.error ?? 0,
+            className: "bg-destructive",
+          },
+          {
+            key: "processing",
+            value: assetProgress?.processing ?? 0,
+            className: "bg-accent/40 animate-pulse",
+          },
+        ]
+      : [];
 
   return (
     <div className="space-y-6">
@@ -394,7 +413,7 @@ export default function RunnerDetailPage() {
             disabled={!sourceDetailsId}
           >
             <FileText className="h-4 w-4" />
-            Source Details
+            {t("sources.detail.sourceDetails")}
           </Button>
           <Button
             variant="outline"
@@ -404,7 +423,7 @@ export default function RunnerDetailPage() {
             disabled={!sourceDetailsId}
           >
             <Pencil className="h-4 w-4" />
-            Edit Source
+            {t("sources.editSource")}
           </Button>
           <Button
             variant="outline"
@@ -523,7 +542,7 @@ export default function RunnerDetailPage() {
             ))}
           </div>
 
-          {isRunnerStatusRunning(runner.status) && (
+          {progressTotal > 0 && (
             <Card className="border-2 border-black rounded-[6px]">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{t("scans.runProgress.title")}</CardTitle>
@@ -531,12 +550,49 @@ export default function RunnerDetailPage() {
                   {t("scans.runProgress.description")}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t("scans.runProgress.progress")}</span>
-                  <span className="font-medium">{progress}%</span>
+                  <span className="text-muted-foreground">
+                    {t("scans.runProgress.finishedOf", {
+                      finished: progressFinished.toLocaleString(),
+                      total: progressTotal.toLocaleString(),
+                    })}
+                  </span>
+                  <span className="font-medium">
+                    {t("scans.runProgress.complete", { percent: progressPercent })}
+                  </span>
                 </div>
-                <Progress value={progress} />
+                <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+                  {progressSegments.map((segment) =>
+                    segment.value > 0 ? (
+                      <div
+                        key={segment.key}
+                        className={`h-full ${segment.className} transition-all`}
+                        style={{
+                          width: `${(segment.value / progressTotal) * 100}%`,
+                        }}
+                      />
+                    ) : null,
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-accent" />
+                    {t("scans.runProgress.processed")}: {(assetProgress?.processed ?? 0).toLocaleString()}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-accent/40" />
+                    {t("scans.runProgress.processing")}: {(assetProgress?.processing ?? 0).toLocaleString()}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                    {t("scans.runProgress.pending")}: {(assetProgress?.pending ?? 0).toLocaleString()}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-destructive" />
+                    {t("scans.runProgress.errored")}: {(assetProgress?.error ?? 0).toLocaleString()}
+                  </span>
+                </div>
                 {runner.durationMs != null && (
                   <p className="text-xs text-muted-foreground">
                     {t("scans.runProgress.durationSoFar", { duration: formatDuration(runner.durationMs) })}
@@ -613,7 +669,7 @@ export default function RunnerDetailPage() {
                   </span>
                 </div>
                 <div className="pt-1 flex items-center justify-between border-t">
-                  <span className="text-muted-foreground">Total Assets</span>
+                  <span className="text-muted-foreground">{t("scans.stats.assets")}</span>
                   <span className="font-semibold">
                     {assetsCharts.totals.totalAssets.toLocaleString()}
                   </span>
