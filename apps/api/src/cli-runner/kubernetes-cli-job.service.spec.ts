@@ -268,27 +268,27 @@ describe('KubernetesCliJobService', () => {
     expect(command).toContain('--managed-runner');
   });
 
-  it('builds sandbox command decoding file and detectors from base64 env vars', () => {
+  it('builds sandbox command reading file from the mounted volume', () => {
     const service = new KubernetesCliJobService();
     const command = (service as any).buildJobCommand(
       'sandbox',
       '/app/apps/cli',
+      true, // sandboxViaVolume
     );
 
     expect(command).toContain('cd /app/apps/cli');
-    expect(command).toContain('SANDBOX_FILE_B64');
+    // File is no longer inlined; it is read from the init-container volume.
+    expect(command).not.toContain('SANDBOX_FILE_B64');
+    expect(command).toContain('/sandbox-input/input${SANDBOX_FILE_EXT:-}');
     expect(command).toContain('SANDBOX_DETECTORS_B64');
     expect(command).toContain('base64 -d');
     expect(command).toContain('src.main sandbox');
     expect(command).toContain('--detectors-file /tmp/sandbox-detectors.json');
     expect(command).not.toContain('RECIPE_B64');
-    expect(command).not.toContain('SANDBOX_INPUT_PATH');
-    expect(command).not.toContain('SANDBOX_DETECTORS_PATH');
   });
 
-  it('injects sandbox file env vars into sandbox jobs', () => {
+  it('transports the sandbox file via an init-container + emptyDir volume (no base64 inline)', () => {
     const service = new KubernetesCliJobService();
-    const fileBuffer = Buffer.from('hello world', 'utf8');
     const detectors = [{ type: 'BUILTIN_EMAIL', enabled: true }];
     const job = (service as any).buildJobFromTemplate(
       {
@@ -297,7 +297,18 @@ describe('KubernetesCliJobService', () => {
         spec: {
           template: {
             spec: {
-              containers: [{ name: 'cli', image: 'cli:latest' }],
+              containers: [
+                {
+                  name: 'cli',
+                  image: 'cli:latest',
+                  env: [
+                    {
+                      name: 'CLASSIFYRE_OUTPUT_REST_URL',
+                      value: 'http://api.svc:8000',
+                    },
+                  ],
+                },
+              ],
             },
           },
         },
@@ -305,7 +316,6 @@ describe('KubernetesCliJobService', () => {
       {
         sourceId: 'sandbox-run-1',
         mode: 'sandbox',
-        sandboxFileB64: fileBuffer.toString('base64'),
         sandboxFileExt: '.txt',
         sandboxDetectorsB64: Buffer.from(
           JSON.stringify(detectors),
@@ -313,24 +323,101 @@ describe('KubernetesCliJobService', () => {
         ).toString('base64'),
       },
     );
-    const env = job.spec?.template?.spec?.containers?.[0]?.env ?? [];
+    const podSpec = job.spec?.template?.spec;
+    const env = podSpec?.containers?.[0]?.env ?? [];
 
+    // File is NOT inlined anymore.
     expect(
-      env.find((item: any) => item.name === 'SANDBOX_FILE_B64')?.value,
-    ).toBe(fileBuffer.toString('base64'));
+      env.find((item: any) => item.name === 'SANDBOX_FILE_B64'),
+    ).toBeUndefined();
     expect(
       env.find((item: any) => item.name === 'SANDBOX_FILE_EXT')?.value,
     ).toBe('.txt');
     expect(
       env.find((item: any) => item.name === 'SANDBOX_DETECTORS_B64')?.value,
     ).toBe(Buffer.from(JSON.stringify(detectors), 'utf8').toString('base64'));
-    expect(env.find((item: any) => item.name === 'RECIPE_B64')).toBeUndefined();
+
+    // emptyDir volume mounted into the main container.
     expect(
-      env.find((item: any) => item.name === 'SANDBOX_INPUT_PATH'),
-    ).toBeUndefined();
+      podSpec.volumes?.find((v: any) => v.name === 'sandbox-input')?.emptyDir,
+    ).toBeDefined();
     expect(
-      env.find((item: any) => item.name === 'SANDBOX_DETECTORS_PATH'),
-    ).toBeUndefined();
+      podSpec.containers[0].volumeMounts?.find(
+        (m: any) => m.name === 'sandbox-input',
+      )?.mountPath,
+    ).toBe('/sandbox-input');
+
+    // init-container fetches the file from the API into the volume.
+    const init = podSpec.initContainers?.find(
+      (c: any) => c.name === 'sandbox-input-fetch',
+    );
+    expect(init).toBeDefined();
+    expect(init.image).toBe('cli:latest');
+    expect(
+      init.volumeMounts?.find((m: any) => m.name === 'sandbox-input')
+        ?.mountPath,
+    ).toBe('/sandbox-input');
+    expect(init.args?.[0]).toContain('/sandbox/runs/');
+    expect(init.args?.[0]).toContain('/input');
+    expect(
+      init.env?.find((e: any) => e.name === 'CLASSIFYRE_OUTPUT_REST_URL')
+        ?.value,
+    ).toBe('http://api.svc:8000');
+  });
+
+  it('strips server-generated identity fields from a captured-job template', () => {
+    const service = new KubernetesCliJobService();
+    // Simulates K8S_CLI_JOB_TEMPLATE_PATH pointing at a dumped live Job, which
+    // carries a prior job's selector + controller-uid/job-name pod labels.
+    const job = (service as any).buildJobFromTemplate(
+      {
+        apiVersion: 'batch/v1',
+        kind: 'Job',
+        metadata: {
+          uid: 'old-uid',
+          resourceVersion: '12345',
+          labels: { 'controller-uid': 'stale-uid' },
+        },
+        status: { active: 1 },
+        spec: {
+          selector: {
+            matchLabels: { 'batch.kubernetes.io/controller-uid': 'stale-uid' },
+          },
+          manualSelector: false,
+          template: {
+            metadata: {
+              labels: {
+                'controller-uid': 'stale-uid',
+                'job-name': 'old-job',
+                'batch.kubernetes.io/controller-uid': 'stale-uid',
+                'batch.kubernetes.io/job-name': 'old-job',
+              },
+            },
+            spec: { containers: [{ name: 'cli', image: 'cli:latest' }] },
+          },
+        },
+      },
+      { sourceId: 'source-1', mode: 'extract', recipe: { type: 'POSTGRESQL' } },
+    );
+
+    expect(job.status).toBeUndefined();
+    expect(job.metadata?.uid).toBeUndefined();
+    expect(job.metadata?.resourceVersion).toBeUndefined();
+    expect(job.spec?.selector).toBeUndefined();
+    expect(job.spec?.manualSelector).toBeUndefined();
+
+    const podLabels = job.spec?.template?.metadata?.labels ?? {};
+    for (const key of [
+      'controller-uid',
+      'job-name',
+      'batch.kubernetes.io/controller-uid',
+      'batch.kubernetes.io/job-name',
+    ]) {
+      expect(podLabels[key]).toBeUndefined();
+    }
+    expect(job.metadata?.labels?.['controller-uid']).toBeUndefined();
+    // Our own labels survive.
+    expect(podLabels['app.kubernetes.io/managed-by']).toBe('classifyre-api');
   });
 
   it('injects successful-run state env var into extract jobs', () => {

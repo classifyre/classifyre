@@ -20,6 +20,7 @@ from ...models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
 )
+from ...utils.embedded_images import EmbeddedImage, has_embedded_images, iter_embedded_images
 from ...utils.file_parser import infer_mime_type_from_file_name, resolve_mime_type
 from ...utils.hashing import hash_id, unhash_id
 from ..base import BaseSource
@@ -133,6 +134,8 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         # Keyed by both asset_hash and external_url for O(1) lookup from either.
         self._bytes_cache: dict[str, bytes] = {}
         self._mime_cache: dict[str, str] = {}
+        # Child IMAGE assets queued while transforming the current object.
+        self._pending_child_assets: list[SingleAssetScanResults] = []
 
     def _asset_type_value(self) -> str:
         type_value = self.config.type
@@ -423,7 +426,76 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         )
         self._hash_to_uri[asset_hash] = external_url
         self._object_ref_by_hash[asset_hash] = ref
+
+        # Files that embed images (parquet image datasets, office docs) yield a
+        # child IMAGE asset per embedded image so each flows through the normal
+        # image-detector path with its own findings. The parent simply references
+        # each child via its links array (no separate parent/child machinery).
+        # Bytes are cached here so fetch_content_bytes() serves them without re-download.
+        if snapshot.raw_bytes is not None and has_embedded_images(snapshot.mime_type):
+            self._queue_child_image_assets(
+                parent=asset,
+                file_bytes=snapshot.raw_bytes,
+                mime_type=snapshot.mime_type,
+                ref=ref,
+            )
+
         return asset
+
+    def _queue_child_image_assets(
+        self,
+        *,
+        parent: SingleAssetScanResults,
+        file_bytes: bytes,
+        mime_type: str,
+        ref: ObjectRef,
+    ) -> None:
+        """Extract embedded images, queue each as a child IMAGE asset, and link them
+        from the parent (appended to ``parent.links``, never removing existing links)."""
+        try:
+            for image in iter_embedded_images(file_bytes, mime_type):
+                child = self._build_child_image_asset(parent, image, ref)
+                self._pending_child_assets.append(child)
+                if child.hash not in parent.links:
+                    parent.links.append(child.hash)
+        except Exception as exc:
+            logger.warning(
+                "Failed to extract embedded images from %s: %s", parent.external_url, exc
+            )
+
+    def _build_child_image_asset(
+        self,
+        parent: SingleAssetScanResults,
+        image: EmbeddedImage,
+        ref: ObjectRef,
+    ) -> SingleAssetScanResults:
+        child_url = f"{parent.external_url}#{image.location}"
+        child_hash = self.generate_hash_id(child_url)
+        metadata = {
+            "source_hash": parent.hash,
+            "location": image.location,
+            "mime_type": image.mime_type,
+            "size_bytes": len(image.image_bytes),
+        }
+        # Serve the image bytes from cache (keyed by both hash and url) so the
+        # binary-detector path resolves them with no extra network round-trip.
+        self._bytes_cache[child_hash] = image.image_bytes
+        self._bytes_cache[child_url] = image.image_bytes
+        self._mime_cache[child_hash] = image.mime_type
+        self._mime_cache[child_url] = image.mime_type
+        self._hash_to_uri[child_hash] = child_url
+        return SingleAssetScanResults(
+            hash=child_hash,
+            checksum=self.calculate_checksum(metadata),
+            name=f"{parent.name}#{image.location}",
+            external_url=child_url,
+            links=[],
+            asset_type=OutputAssetType.IMAGE,
+            source_id=self.source_id,
+            created_at=ref.last_modified,
+            updated_at=ref.last_modified,
+            runner_id=self.runner_id,
+        )
 
     def test_connection(self) -> dict[str, Any]:
         result = {
@@ -452,6 +524,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._object_ref_by_hash = {}
         self._bytes_cache = {}
         self._mime_cache = {}
+        self._pending_child_assets = []
 
         refs = self._list_objects()
         sampled_refs = self._apply_sampling(refs)
@@ -461,17 +534,20 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             if self._aborted:
                 break
 
+            self._pending_child_assets = []
             try:
                 asset = self._to_asset(ref)
             except Exception as exc:
                 logger.warning("Skipping object %s due to transformation error: %s", ref.key, exc)
                 continue
 
-            if asset.hash in self._seen_hashes:
-                continue
-
-            self._seen_hashes.add(asset.hash)
-            batch.append(asset)
+            # Parent first, then any child IMAGE assets queued during _to_asset so
+            # the parent always exists before its children when ingested.
+            for candidate in (asset, *self._pending_child_assets):
+                if candidate.hash in self._seen_hashes:
+                    continue
+                self._seen_hashes.add(candidate.hash)
+                batch.append(candidate)
 
             if len(batch) >= self.BATCH_SIZE:
                 yield batch

@@ -8,6 +8,7 @@ export type DetectorCatalogItem = {
   priority?: string | null;
   groupId: string;
   href?: string;
+  isVisual?: boolean;
 };
 
 export type DetectorCatalogGroup = {

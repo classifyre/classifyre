@@ -38,7 +38,9 @@ import {
 import { DetectorCreatorForm } from "@/components/detector-creator-form";
 import { DetectorEditorForm } from "@/components/detector-editor-form";
 import type { DetectorEditorFormHandle } from "@/components/detector-editor-form";
-import { CustomDetectorTypeBadge } from "@/components/detector-type-badge";
+import { CustomDetectorTypeBadge, VisualScanBadge } from "@/components/detector-type-badge";
+import { isVisualDetector } from "@/lib/custom-detector-badge";
+import { useDetectorVision } from "@/hooks/use-detector-vision";
 
 export interface DetectorConfigInput {
   type: string;
@@ -441,6 +443,7 @@ function CustomDetectorRow({
 }) {
   const { t } = useTranslation();
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const { supportsVision } = useDetectorVision();
 
   const editorCallbackRef = useCallback(
     (node: DetectorEditorFormHandle | null) => {
@@ -462,6 +465,12 @@ function CustomDetectorRow({
           pipelineType={(detector as any).pipelineSchema?.type as string | undefined}
           className="shrink-0"
         />
+        {isVisualDetector(
+          (detector as any).pipelineSchema?.type as string | undefined,
+          supportsVision(detector.aiProviderConfigId),
+        ) ? (
+          <VisualScanBadge />
+        ) : null}
 
         <div className="min-w-0 flex-1">
           <span

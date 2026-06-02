@@ -398,6 +398,7 @@ model AiProviderConfig {
   apiKeyEnc   String?        @map("api_key_enc")
   baseUrl     String?        @map("base_url")
   contextSize Int?           @map("context_size")
+  supportsVision Boolean     @default(false) @map("supports_vision")
   createdAt   DateTime       @default(now()) @map("created_at")
   updatedAt   DateTime       @updatedAt @map("updated_at")
 
@@ -595,6 +596,10 @@ model SandboxRun {
   // S3-backed file storage: key in the sandbox bucket and SHA-256 content hash
   s3Key         String?          @map("s3_key")
   contentHash   String?          @map("content_hash")
+  // Transient file bytes for K8s job transport: the input file is stored here
+  // only while a K8s sandbox job runs, served to the job's init-container over
+  // the cluster network, then cleared. Never uses S3 for the sandbox.
+  inputData     Bytes?           @map("input_data")
 
   @@index([status])
   @@index([createdAt])

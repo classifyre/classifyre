@@ -30,6 +30,7 @@ const mockRuntimeConfig: AiProviderRuntimeConfig = {
   model: 'claude-sonnet-4-5',
   apiKey: 'sk-test-key',
   baseUrl: null,
+  supportsVision: false,
 };
 
 const mockProviderConfigService = {

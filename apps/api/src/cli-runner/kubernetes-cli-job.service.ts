@@ -90,14 +90,16 @@ export class KubernetesCliJobService {
 
   async runSandboxJob(params: {
     runId: string;
-    fileBuffer: Buffer;
     fileExtension: string;
     detectors: unknown[];
   }): Promise<CliJobResult> {
+    // The input file is always transported via the per-job volume: an
+    // init-container downloads it from the API (GET /sandbox/runs/:id/input)
+    // into an emptyDir that dies with the job. Never inlined, never via S3.
+    // Callers that don't have a persisted SandboxRun row must create one first.
     return this.runJob({
       sourceId: params.runId,
       mode: 'sandbox',
-      sandboxFileB64: params.fileBuffer.toString('base64'),
       sandboxFileExt: params.fileExtension,
       sandboxDetectorsB64: Buffer.from(
         JSON.stringify(params.detectors),
@@ -219,7 +221,6 @@ export class KubernetesCliJobService {
     recipe?: Record<string, unknown>;
     outputRestUrl?: string;
     hasSuccessfulRuns?: boolean;
-    sandboxFileB64?: string;
     sandboxFileExt?: string;
     sandboxDetectorsB64?: string;
     jobTrackingKey?: string;
@@ -264,7 +265,12 @@ export class KubernetesCliJobService {
 
       cleanupReason = 'failure';
       const exitCode = completion.exitCode ?? 1;
-      return { exitCode, output, jobName, namespace };
+      // Surface the pod's failure context (e.g. "Termination reason: OOMKilled")
+      // so callers can report a meaningful error instead of empty output.
+      const failureOutput = [output, completion.failureContext]
+        .filter((s): s is string => Boolean(s && s.trim()))
+        .join('\n\n');
+      return { exitCode, output: failureOutput, jobName, namespace };
     } finally {
       if (jobTrackingKey) {
         this.runningJobsByRunnerId.delete(jobTrackingKey);
@@ -396,7 +402,6 @@ export class KubernetesCliJobService {
       recipe?: Record<string, unknown>;
       outputRestUrl?: string;
       hasSuccessfulRuns?: boolean;
-      sandboxFileB64?: string;
       sandboxFileExt?: string;
       sandboxDetectorsB64?: string;
     },
@@ -483,12 +488,6 @@ export class KubernetesCliJobService {
         value: params.hasSuccessfulRuns ? '1' : '0',
       });
     }
-    if (params.sandboxFileB64) {
-      envMap.set('SANDBOX_FILE_B64', {
-        name: 'SANDBOX_FILE_B64',
-        value: params.sandboxFileB64,
-      });
-    }
     if (params.sandboxFileExt !== undefined) {
       envMap.set('SANDBOX_FILE_EXT', {
         name: 'SANDBOX_FILE_EXT',
@@ -515,6 +514,11 @@ export class KubernetesCliJobService {
     container.env = Array.from(envMap.values());
     container.command = ['/bin/sh', '-lc'];
     container.args = [this.buildJobCommand(params.mode, workDir)];
+
+    // Sandbox jobs always receive their input file via the per-job volume.
+    if (params.mode === 'sandbox') {
+      this.attachSandboxInputVolume(jobAny, container, envMap);
+    }
 
     // Apply per-source resource overrides from recipe
     const recipeResources = (params.recipe as any)?.resources;
@@ -566,7 +570,53 @@ export class KubernetesCliJobService {
       }
     }
 
+    this.stripServerGeneratedFields(jobAny);
     return job;
+  }
+
+  /**
+   * Remove identity fields the Kubernetes API server owns/auto-generates on a
+   * Job. If a configured job template (K8S_CLI_JOB_TEMPLATE_PATH) was captured
+   * from a live Job — e.g. `kubectl get job -o json` — it carries the previous
+   * job's `controller-uid`/`job-name` pod labels and an auto-generated
+   * `spec.selector`. Reusing those on a new Job is rejected with HTTP 422
+   * ("controller-uid must be <new-uid>" / "selector not auto-generated"). Strip
+   * them so the API server regenerates a fresh, consistent identity.
+   */
+  private stripServerGeneratedFields(jobAny: any): void {
+    delete jobAny.status;
+    if (jobAny.metadata) {
+      for (const key of [
+        'uid',
+        'resourceVersion',
+        'generation',
+        'creationTimestamp',
+        'selfLink',
+        'managedFields',
+      ]) {
+        delete jobAny.metadata[key];
+      }
+    }
+    if (jobAny.spec) {
+      delete jobAny.spec.selector;
+      delete jobAny.spec.manualSelector;
+    }
+    const autoLabelKeys = [
+      'controller-uid',
+      'job-name',
+      'batch.kubernetes.io/controller-uid',
+      'batch.kubernetes.io/job-name',
+    ];
+    for (const labels of [
+      jobAny.metadata?.labels,
+      jobAny.spec?.template?.metadata?.labels,
+    ]) {
+      if (labels) {
+        for (const key of autoLabelKeys) {
+          delete labels[key];
+        }
+      }
+    }
   }
 
   private buildJobCommand(mode: CliJobMode, workDir: string): string {
@@ -594,15 +644,13 @@ export class KubernetesCliJobService {
       prelude.push('printf "%s" "$RECIPE_B64" | base64 -d > /tmp/recipe.json');
       command = '"$PYTHON_BIN" -m src.main test /tmp/recipe.json';
     } else {
-      // sandbox: decode file and detectors from base64 env vars, same pattern as recipe
-      prelude.push(
-        'printf "%s" "$SANDBOX_FILE_B64" | base64 -d > "/tmp/sandbox-input${SANDBOX_FILE_EXT:-}"',
-      );
+      // sandbox: the input file is placed at /sandbox-input/input<ext> by the
+      // init-container (downloaded from the API). Only detectors travel as env.
       prelude.push(
         'printf "%s" "$SANDBOX_DETECTORS_B64" | base64 -d > /tmp/sandbox-detectors.json',
       );
       command =
-        '"$PYTHON_BIN" -m src.main sandbox "/tmp/sandbox-input${SANDBOX_FILE_EXT:-}" --detectors-file /tmp/sandbox-detectors.json';
+        '"$PYTHON_BIN" -m src.main sandbox "/sandbox-input/input${SANDBOX_FILE_EXT:-}" --detectors-file /tmp/sandbox-detectors.json';
     }
 
     return [
@@ -611,6 +659,83 @@ export class KubernetesCliJobService {
       'if [ -x ".venv/bin/python" ]; then PYTHON_BIN=".venv/bin/python"; else PYTHON_BIN="$(command -v python3 || command -v python)"; fi',
       command,
     ].join('; ');
+  }
+
+  /**
+   * Wire up the sandbox input-file transport: a per-job `emptyDir` volume that an
+   * init-container populates by downloading the file from the API over the
+   * cluster network. The volume (and the file) die with the job pod — no S3, no
+   * oversized base64 env var, no shared persistent storage.
+   */
+  private attachSandboxInputVolume(
+    jobAny: any,
+    container: V1Container,
+    envMap: Map<string, V1EnvVar>,
+  ): void {
+    const mountPath = '/sandbox-input';
+    const podSpec = jobAny.spec.template.spec;
+
+    podSpec.volumes = [
+      ...(podSpec.volumes || []),
+      { name: 'sandbox-input', emptyDir: {} },
+    ];
+    container.volumeMounts = [
+      ...(container.volumeMounts || []),
+      { name: 'sandbox-input', mountPath },
+    ];
+
+    const initEnv: V1EnvVar[] = [
+      {
+        name: 'CLASSIFYRE_OUTPUT_REST_URL',
+        value: envMap.get('CLASSIFYRE_OUTPUT_REST_URL')?.value || '',
+      },
+      { name: 'SOURCE_ID', value: envMap.get('SOURCE_ID')?.value || '' },
+      {
+        name: 'SANDBOX_FILE_EXT',
+        value: envMap.get('SANDBOX_FILE_EXT')?.value || '',
+      },
+    ];
+
+    const initContainer: V1Container = {
+      name: 'sandbox-input-fetch',
+      image: container.image,
+      imagePullPolicy: container.imagePullPolicy,
+      ...(container.securityContext
+        ? { securityContext: container.securityContext }
+        : {}),
+      env: initEnv,
+      volumeMounts: [{ name: 'sandbox-input', mountPath }],
+      command: ['/bin/sh', '-lc'],
+      args: [this.buildSandboxFetchCommand(mountPath)],
+    };
+
+    podSpec.initContainers = [...(podSpec.initContainers || []), initContainer];
+  }
+
+  /** Shell+python script the init-container runs to fetch the sandbox file. */
+  private buildSandboxFetchCommand(mountPath: string): string {
+    const py = [
+      'import os,sys,time,urllib.request',
+      "base=os.environ.get('CLASSIFYRE_OUTPUT_REST_URL','').rstrip('/')",
+      "rid=os.environ.get('SOURCE_ID','')",
+      "ext=os.environ.get('SANDBOX_FILE_EXT','')",
+      'url=f"{base}/sandbox/runs/{rid}/input"',
+      `dst=f"${mountPath}/input"+ext`,
+      'last=None',
+      'for attempt in range(30):',
+      '    try:',
+      '        with urllib.request.urlopen(url, timeout=60) as r, open(dst,"wb") as f:',
+      '            while True:',
+      '                chunk=r.read(1048576)',
+      '                if not chunk: break',
+      '                f.write(chunk)',
+      '        print(f"sandbox input downloaded to {dst}", flush=True); sys.exit(0)',
+      '    except Exception as e:',
+      '        last=e; print(f"attempt {attempt+1} failed: {e}", flush=True); time.sleep(2)',
+      'print(f"failed to download sandbox input from {url}: {last}", file=sys.stderr); sys.exit(1)',
+    ].join('\n');
+    // Heredoc keeps the python source free of shell interpolation.
+    return `set -eu; python3 - <<'PYEOF'\n${py}\nPYEOF`;
   }
 
   private async waitForJobCompletion(
@@ -1044,7 +1169,7 @@ export class KubernetesCliJobService {
       error?.response?.body?.message ||
       error?.message ||
       '';
-    if (status === 404) {
+    if (status === 404 || this.isNotFound(error)) {
       return true;
     }
     if (status === 400) {

@@ -131,6 +131,10 @@ class RestOutputSink:
         self.base_url = base_url.rstrip("/")
         self.timeout_sec = timeout_sec
         self.session = requests.Session()
+        # Disable keep-alive so stale pooled connections are never reused after
+        # a pod restart or server-side keep-alive timeout.  Each request opens
+        # a fresh TCP connection, which is cheap enough for our batch cadence.
+        self.session.headers.update({"Connection": "close"})
         adapter = HTTPAdapter(max_retries=_RETRY_POLICY)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)

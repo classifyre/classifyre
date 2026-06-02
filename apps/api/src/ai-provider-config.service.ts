@@ -54,6 +54,7 @@ export class AiProviderConfigService {
       apiKeyPreview,
       baseUrl: config.baseUrl,
       contextSize: config.contextSize,
+      supportsVision: config.supportsVision,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
     };
@@ -94,6 +95,7 @@ export class AiProviderConfigService {
             : null,
         baseUrl: dto.baseUrl && dto.baseUrl.length > 0 ? dto.baseUrl : null,
         contextSize: dto.contextSize ?? null,
+        supportsVision: dto.supportsVision ?? false,
       },
     });
     return this.toResponse(created);
@@ -125,6 +127,9 @@ export class AiProviderConfigService {
     }
     if (dto.contextSize !== undefined) {
       data.contextSize = dto.contextSize;
+    }
+    if (dto.supportsVision !== undefined) {
+      data.supportsVision = dto.supportsVision;
     }
 
     const updated = await this.prisma.aiProviderConfig.update({
@@ -195,6 +200,7 @@ export class AiProviderConfigService {
       apiKey,
       baseUrl: config.baseUrl,
       contextSize: config.contextSize,
+      supportsVision: config.supportsVision,
     };
   }
 }

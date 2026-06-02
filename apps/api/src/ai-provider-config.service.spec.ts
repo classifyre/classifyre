@@ -5,6 +5,8 @@ function createService() {
   const prisma = {
     aiProviderConfig: {
       findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
       delete: jest.fn().mockResolvedValue(undefined),
     },
     customDetector: {
@@ -55,5 +57,80 @@ describe('AiProviderConfigService.remove', () => {
     await expect(service.remove('missing')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+});
+
+describe('AiProviderConfigService supportsVision', () => {
+  const baseRow = {
+    id: 'ai-1',
+    name: 'Vision Claude',
+    provider: 'CLAUDE',
+    model: 'claude-sonnet-4-5',
+    apiKeyEnc: 'enc:sk-test',
+    baseUrl: null,
+    contextSize: null,
+    supportsVision: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  it('persists supportsVision on create and returns it', async () => {
+    const { service, prisma } = createService();
+    prisma.aiProviderConfig.create.mockResolvedValue(baseRow);
+
+    const result = await service.create({
+      name: 'Vision Claude',
+      provider: 'CLAUDE',
+      supportsVision: true,
+    } as any);
+
+    expect(prisma.aiProviderConfig.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ supportsVision: true }),
+      }),
+    );
+    expect(result.supportsVision).toBe(true);
+  });
+
+  it('defaults supportsVision to false on create when omitted', async () => {
+    const { service, prisma } = createService();
+    prisma.aiProviderConfig.create.mockResolvedValue({
+      ...baseRow,
+      supportsVision: false,
+    });
+
+    await service.create({ name: 'Text Claude', provider: 'CLAUDE' } as any);
+
+    expect(prisma.aiProviderConfig.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ supportsVision: false }),
+      }),
+    );
+  });
+
+  it('updates supportsVision when provided', async () => {
+    const { service, prisma } = createService();
+    prisma.aiProviderConfig.findUnique.mockResolvedValue(baseRow);
+    prisma.aiProviderConfig.update.mockResolvedValue({
+      ...baseRow,
+      supportsVision: false,
+    });
+
+    await service.update('ai-1', { supportsVision: false });
+
+    expect(prisma.aiProviderConfig.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ supportsVision: false }),
+      }),
+    );
+  });
+
+  it('includes supportsVision in the resolved runtime config', async () => {
+    const { service, prisma } = createService();
+    prisma.aiProviderConfig.findUnique.mockResolvedValue(baseRow);
+
+    const runtime = await service.getRuntimeConfig('ai-1');
+
+    expect(runtime.supportsVision).toBe(true);
   });
 });

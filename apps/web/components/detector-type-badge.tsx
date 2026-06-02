@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   Bot,
   Brain,
+  Eye,
   Image,
   Layers,
   Link2,
@@ -64,6 +65,31 @@ export function CustomDetectorTypeBadge({
     >
       <Icon className="h-3 w-3" />
       {t(labelKey as TranslationKey)}
+    </Badge>
+  );
+}
+
+/**
+ * Badge marking a detector that processes content visually (images) rather than
+ * as text — e.g. image classification, object detection, or a vision-enabled LLM.
+ */
+export function VisualScanBadge({
+  className,
+  ...props
+}: { className?: string } & Omit<React.ComponentProps<typeof Badge>, "children">) {
+  const { t } = useTranslation();
+  return (
+    <Badge
+      variant="outline"
+      title={t("detectors.visual.tooltip")}
+      className={cn(
+        "gap-1 border-2 border-border text-[10px] font-mono uppercase tracking-[0.08em]",
+        className,
+      )}
+      {...props}
+    >
+      <Eye className="h-3 w-3" />
+      {t("detectors.visual.badge")}
     </Badge>
   );
 }

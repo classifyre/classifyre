@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -17,8 +18,9 @@ from ....models.generated_single_asset_scan_results import (
     DetectionResult,
     DetectorType,
 )
+from ....utils.file_to_images import render_to_images, supported_mime_type
 from ...dependencies import require_module
-from ._base import _TEXT_CONTENT_TYPES, BaseRunner, _resolve_pipeline_severity
+from ._base import _IMAGE_CONTENT_TYPES, _TEXT_CONTENT_TYPES, BaseRunner, _resolve_pipeline_severity
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,14 @@ _PROVIDER_PREFIX: dict[str, str] = {
     "GEMINI": "gemini",
     "OPENAI_COMPATIBLE": "openai",
 }
+
+# Content types a vision-capable LLM detector renders to images and sends to the
+# model directly. PDFs are rasterised page-by-page; images pass through.
+_VISION_CONTENT_TYPES = [*_IMAGE_CONTENT_TYPES, "application/pdf"]
+
+# Cap the number of rendered page images sent in a single completion to bound
+# token cost and request size for multi-page PDFs.
+_MAX_VISION_IMAGES = 20
 
 
 class LLMRunner(BaseRunner):
@@ -60,7 +70,7 @@ class LLMRunner(BaseRunner):
 
     def detect(self, content: str | bytes, content_type: str) -> list[DetectionResult]:
         if isinstance(content, bytes):
-            return []
+            return self._detect_vision(content, content_type)
         if content_type not in _TEXT_CONTENT_TYPES:
             return []
         text = content.strip()
@@ -75,7 +85,48 @@ class LLMRunner(BaseRunner):
             {"role": "system", "content": self._build_system_prompt()},
             {"role": "user", "content": snippet},
         ]
+        return self._complete_and_parse(messages, snippet)
 
+    def _detect_vision(self, content: bytes, content_type: str) -> list[DetectionResult]:
+        """Render a binary file (image/PDF) to images and classify via the model."""
+        if not self._vision_enabled():
+            return []
+        if not supported_mime_type(content_type):
+            return []
+
+        images = render_to_images(
+            content,
+            content_type,
+            max_pages=_MAX_VISION_IMAGES,
+        )
+        if not images:
+            return []
+
+        image_blocks = [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/png;base64,{base64.b64encode(png).decode('ascii')}"
+                },
+            }
+            for png in images[:_MAX_VISION_IMAGES]
+        ]
+        messages = [
+            {"role": "system", "content": self._build_system_prompt()},
+            {"role": "user", "content": image_blocks},
+        ]
+        # matched_content fallback descriptor — there is no text snippet for files.
+        descriptor = f"[{content_type}, {len(image_blocks)} page image(s)]"
+        return self._complete_and_parse(messages, descriptor, vision_pages=len(image_blocks))
+
+    def _complete_and_parse(
+        self,
+        messages: list[dict[str, Any]],
+        snippet: str,
+        *,
+        vision_pages: int | None = None,
+    ) -> list[DetectionResult]:
+        schema = self._schema
         try:
             response = self._litellm.completion(
                 model=self._model_string(),
@@ -98,10 +149,16 @@ class LLMRunner(BaseRunner):
             )
             return []
 
-        return self._results_from_payload(snippet, parsed)
+        return self._results_from_payload(snippet, parsed, vision_pages=vision_pages)
+
+    def _vision_enabled(self) -> bool:
+        return bool(getattr(self._runtime, "supports_vision", False))
 
     def get_supported_content_types(self) -> list[str]:
-        return list(_TEXT_CONTENT_TYPES)
+        types = list(_TEXT_CONTENT_TYPES)
+        if self._vision_enabled():
+            types.extend(_VISION_CONTENT_TYPES)
+        return types
 
     # ── Internals ────────────────────────────────────────────────────────────
 
@@ -175,7 +232,13 @@ class LLMRunner(BaseRunner):
                 return {}
         return parsed if isinstance(parsed, dict) else {}
 
-    def _results_from_payload(self, snippet: str, payload: dict[str, Any]) -> list[DetectionResult]:
+    def _results_from_payload(
+        self,
+        snippet: str,
+        payload: dict[str, Any],
+        *,
+        vision_pages: int | None = None,
+    ) -> list[DetectionResult]:
         schema = self._schema
         threshold = schema.confidence_threshold if schema.confidence_threshold is not None else 0.5
         default_severity = schema.severity or Severity.info
@@ -201,7 +264,7 @@ class LLMRunner(BaseRunner):
             results.append(
                 DetectionResult(
                     detector_type=DetectorType.CUSTOM,
-                    finding_type=f"llm:{label}",
+                    finding_type=label,
                     category="CLASSIFICATION",
                     severity=severity,
                     confidence=min(0.99, confidence),
@@ -216,6 +279,8 @@ class LLMRunner(BaseRunner):
                         "model": self._runtime.model,
                         "label": label,
                         "fields": extracted,
+                        "input": "vision" if vision_pages is not None else "text",
+                        **({"vision_pages": vision_pages} if vision_pages is not None else {}),
                     },
                     extracted_data=extracted or None,
                     extraction_method="LLM",

@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-cli"
-version = "0.4.10"
+version = "0.4.11"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -47,7 +47,7 @@ privacy = [
     # mid-run in frozen/venv contexts. 8.x eagerly loads all data at import time,
     # avoiding ModuleNotFoundError during Presidio phone number analysis.
     "phonenumbers>=8.13.0,<10.0.0",
-    "numpy>=1.26.0,<2.0.0",
+    "numpy>=1.26.0,<3.0.0",
 ]
 security = [
     "detect-secrets>=1.5.0",
@@ -93,6 +93,10 @@ regex = [
 ]
 llm = [
     "litellm>=1.86.2",
+    # Pure-wheel PDF renderer (permissive license, no system binaries) used to
+    # rasterise PDF pages to images for vision-capable LLM detectors.
+    "pypdfium2>=4.30.0",
+    "pillow>=12.2.0",
 ]
 detectors = [
     { include-group = "file-processing" },
@@ -270,6 +274,8 @@ module = [
     "setfit",
     "litellm.*",
     "litellm",
+    "pypdfium2.*",
+    "pypdfium2",
     "sklearn.*",
     "sklearn",
     "numpy",
