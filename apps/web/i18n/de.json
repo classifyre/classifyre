@@ -23,6 +23,12 @@
     "semantic": "Semantische Schicht"
   },
   "common": {
+    "duration": {
+      "hours": "{{count}} Std.",
+      "minutes": "{{count}} Min.",
+      "seconds": "{{count}} Sek.",
+      "empty": "—"
+    },
     "loading": "Wird geladen...",
     "rowsPerPage": "Zeilen pro Seite",
     "rows": "{{size}} Zeilen",
@@ -154,6 +160,13 @@
     "loading": "Quellen werden geladen…",
     "unnamedSource": "Unbenannte Quelle",
     "deleted": "Quelle gelöscht. Zugehörige Assets und Befunde wurden entfernt.",
+    "deleteFailed": "Quelle konnte nicht gelöscht werden",
+    "delete": {
+      "title": "Quelle löschen?",
+      "cannotUndo": "Diese Aktion kann nicht rückgängig gemacht werden.",
+      "permanentTitle": "Dauerhafte Entfernung",
+      "permanentBody": "Durch das Löschen dieser Quelle werden die Quelle, alle zugehörigen Assets und alle Befunde dauerhaft entfernt."
+    },
     "typeRequired": "Quellentyp ist erforderlich",
     "nameRequired": "Quellenname ist erforderlich",
     "saved": "Quelleneinstellungen gespeichert",
@@ -206,6 +219,7 @@
       "lastScan": "Letzter Scan",
       "notScannedYet": "Noch nicht gescannt",
       "lastScanStatus": "Letzter Scan-Status",
+      "lastRunDuration": "Dauer der letzten Ausführung",
       "currentRun": "Aktueller Lauf",
       "viewRun": "Lauf anzeigen",
       "lastRunSummary": "Zusammenfassung letzter Lauf",
@@ -1105,9 +1119,15 @@
     },
     "runProgress": {
       "title": "Ausführungsfortschritt",
-      "description": "Geschätzt aus verarbeiteten Assets",
+      "description": "Asset-Verarbeitungsstatus für diese Ausführung",
       "progress": "Fortschritt",
-      "durationSoFar": "Bisherige Dauer: {{duration}}"
+      "durationSoFar": "Bisherige Dauer: {{duration}}",
+      "processed": "Verarbeitet",
+      "processing": "In Bearbeitung",
+      "pending": "Ausstehend",
+      "errored": "Fehlerhaft",
+      "finishedOf": "{{finished}} von {{total}} Assets",
+      "complete": "{{percent}}% abgeschlossen"
     },
     "runTimeline": {
       "title": "Ausführungszeitachse",
