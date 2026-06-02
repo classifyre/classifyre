@@ -230,7 +230,7 @@ class DatabricksSource(BaseTabularSource):
 
     def _acquire_azure_token(self) -> str:
         # Azure AD v1 token endpoint; resource ID is the fixed Databricks app in Azure
-        _DATABRICKS_AZURE_RESOURCE = "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
+        _databricks_azure_resource = "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
         tenant_id, client_id, client_secret = self._azure_sp_credentials()
         response = self.session.post(
             f"https://login.microsoftonline.com/{tenant_id}/oauth2/token",
@@ -238,7 +238,7 @@ class DatabricksSource(BaseTabularSource):
                 "grant_type": "client_credentials",
                 "client_id": client_id,
                 "client_secret": client_secret,
-                "resource": _DATABRICKS_AZURE_RESOURCE,
+                "resource": _databricks_azure_resource,
             },
             timeout=self._timeout_seconds(),
         )
