@@ -1,0 +1,81 @@
+---
+title: GLiNER2 Pipeline
+description: Single-pass neural entity extraction and classification — no training data required.
+---
+
+import { PipelineSchemaTable } from "@/components/pipeline-schema-table"
+import { Badge, Separator } from "@workspace/ui/components"
+
+# GLiNER2 Pipeline
+
+<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+  Text · Zero-shot NER
+</Badge>
+
+GLiNER2 is a generalist named-entity recognition model that extracts entities and runs classification tasks in a single forward pass. You describe the entities you want using plain English labels — no labelled training examples needed.
+
+<Separator className="my-6" />
+
+## When to use
+
+- **Named entity extraction** — pull people, organisations, locations, products, or any custom concept from unstructured text.
+- **Domain-specific terminology** — extract contract parties, regulatory identifiers, product codes, or internal jargon without building a labelled dataset.
+- **Combined extraction + classification** — run entity extraction and content classification simultaneously in one model call.
+- **Rapid prototyping** — iterate on entity types by editing label names, not retraining a model.
+- **Low-volume or low-latency requirements** — the single-pass design keeps inference cost predictable.
+
+## How it works
+
+The GLiNER2 model treats entity extraction as a token-span prediction task guided by the label names you provide. At inference time, the model attends to both the content and the label strings together, scoring spans for each label. This means you can add or remove entity types by changing configuration alone.
+
+The `entities` map defines which spans to extract. Each key is a label name your team uses; Classifyre stores matched spans as findings with that label attached. The optional `classification` block runs independent classification heads in the same pass.
+
+The `model` block lets you pin a specific HuggingFace checkpoint and device. The `validation` block adds post-extraction constraints: minimum span length, allowed character sets, or regex guards that filter noisy predictions.
+
+<Separator className="my-6" />
+
+## Configuration
+
+<PipelineSchemaTable definition="GLiNER2PipelineSchema" />
+
+<Separator className="my-6" />
+
+## Examples
+
+### Extract contract parties and regulatory codes
+
+```json
+{
+  "type": "GLINER2",
+  "entities": {
+    "ContractParty": {
+      "description": "Named organisation or individual that is a signatory"
+    },
+    "RegulatoryCode": {
+      "description": "Reference to a regulation, directive, or standard (e.g. GDPR Art. 6)"
+    }
+  }
+}
+```
+
+### Combined extraction and content classification
+
+```json
+{
+  "type": "GLINER2",
+  "entities": {
+    "PersonName": { "description": "Full name of a person mentioned in the document" },
+    "ProjectName": { "description": "Internal project or initiative name" }
+  },
+  "classification": {
+    "SensitivityLevel": {
+      "description": "Overall sensitivity of the document",
+      "labels": ["public", "internal", "confidential", "restricted"]
+    }
+  },
+  "model": {
+    "name": "urchade/gliner_multi_pii-v1",
+    "device": "cpu"
+  }
+}
+```

@@ -120,6 +120,17 @@
       "aiProviders": "AI Providers",
       "mcp": "MCP Servers"
     },
+    "version": {
+      "heading": "Software Version",
+      "desc": "The currently installed version of Classifyre running on this instance.",
+      "current": "Current version",
+      "upToDate": "Up to date",
+      "updateAvailable": "Update Available",
+      "updateDesc": "A newer version of Classifyre is available.",
+      "latest": "Latest",
+      "viewReleaseNotes": "View release notes",
+      "newRelease": "New Release"
+    },
     "regionHeading": "Region & Format",
     "regionDesc": "Language, clock, and timezone used across the instance.",
     "assistant": {

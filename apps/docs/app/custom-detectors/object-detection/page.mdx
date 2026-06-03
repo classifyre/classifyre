@@ -1,0 +1,72 @@
+---
+title: Object Detection
+description: Locate and label objects in images with bounding boxes and confidence-based severity mapping.
+---
+
+import { PipelineSchemaTable } from "@/components/pipeline-schema-table"
+import { Badge, Separator } from "@workspace/ui/components"
+
+# Object Detection
+
+<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+  Image · HuggingFace · Visual
+</Badge>
+
+The Object Detection detector runs any HuggingFace `object-detection` pipeline on image assets. Each detected object becomes a finding with bounding box coordinates, confidence score, and the object label. A `severity_map` maps specific labels to severity levels for downstream routing.
+
+<Separator className="my-6" />
+
+## When to use
+
+- **Sensitive object detection** — flag images containing weapons, ID documents, medical devices, or other controlled objects.
+- **Workplace safety** — detect missing personal protective equipment (PPE) in facility photos or video frames.
+- **Brand compliance** — locate specific logos or product placements in marketing assets.
+- **Data loss prevention** — identify screenshots or photos that contain whiteboards, screens, or handwritten notes with potential data exposure.
+- **Asset cataloguing** — automatically tag images by the objects they contain to support structured search and filtering.
+
+## How it works
+
+Classifyre runs the HuggingFace `object-detection` pipeline on each image asset. Each detected instance above `confidence_threshold` produces a separate finding with `bbox` (bounding box coordinates), `score`, and `label` in the finding metadata.
+
+Use `top_k` to limit detections per image to the highest-confidence results. The optional `nms_threshold` controls non-maximum suppression — lower values remove more overlapping detections. `min_box_area` discards small-area detections that are likely noise.
+
+<Separator className="my-6" />
+
+## Configuration
+
+<PipelineSchemaTable definition="ObjectDetectionPipelineSchema" />
+
+<Separator className="my-6" />
+
+## Examples
+
+### Detect weapons or sensitive objects
+
+```json
+{
+  "type": "OBJECT_DETECTION",
+  "model": "facebook/detr-resnet-50",
+  "confidence_threshold": 0.7,
+  "severity_map": [
+    { "label": "knife", "severity": "high" },
+    { "label": "gun", "severity": "critical" }
+  ],
+  "top_k": 20
+}
+```
+
+### PPE compliance check
+
+```json
+{
+  "type": "OBJECT_DETECTION",
+  "model": "keremberke/yolov8m-hard-hat-detection",
+  "confidence_threshold": 0.5,
+  "nms_threshold": 0.45,
+  "min_box_area": 400,
+  "severity_map": [
+    { "label": "no-hardhat", "severity": "high" }
+  ],
+  "severity": "info"
+}
+```

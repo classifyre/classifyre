@@ -1,0 +1,80 @@
+---
+title: Regex Patterns
+description: Deterministic, zero-ML pattern matching for codes, IDs, and structured formats.
+---
+
+import { PipelineSchemaTable } from "@/components/pipeline-schema-table"
+import { Badge, Separator } from "@workspace/ui/components"
+
+# Regex Patterns
+
+<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+  Text · Deterministic · No ML
+</Badge>
+
+The Regex detector matches content against one or more regular expression patterns. Matches are exact and deterministic — the same input always produces the same output, with no model inference cost.
+
+<Separator className="my-6" />
+
+## When to use
+
+- **Structured codes and identifiers** — order numbers, ticket IDs, IBAN / credit-card formats, employee IDs, or any token with a known structure.
+- **Policy phrases and keywords** — contract clauses, prohibited terms, or required disclosures that must appear verbatim.
+- **High-throughput scanning** — regex is the fastest detection method in Classifyre; use it wherever deterministic matching is sufficient.
+- **Compliance audit trails** — exact matches are easy to explain to auditors without model interpretability concerns.
+- **Combining with other detectors** — layer a regex detector with a GLiNER2 or LLM detector to handle structured patterns separately from semantic ones.
+
+## How it works
+
+The `patterns` map defines one or more named rules. Each rule specifies a `pattern` (a regular expression string) and optional metadata. Classifyre applies every pattern to the scanned asset content and creates a finding for each match.
+
+Matches include the matched span, the pattern name, and the source position. You can map pattern names to severity levels using a `severity_map` if some patterns represent higher-risk matches than others.
+
+<Separator className="my-6" />
+
+## Configuration
+
+<PipelineSchemaTable definition="RegexPipelineSchema" />
+
+<Separator className="my-6" />
+
+## Examples
+
+### IBAN and order number detection
+
+```json
+{
+  "type": "REGEX",
+  "patterns": {
+    "IBAN": {
+      "pattern": "\\b[A-Z]{2}\\d{2}[A-Z0-9]{4}\\d{7}([A-Z0-9]?){0,16}\\b",
+      "description": "International bank account number"
+    },
+    "OrderNumber": {
+      "pattern": "\\bORD-\\d{6,10}\\b",
+      "description": "Internal order reference in ORD-NNNNNN format"
+    }
+  }
+}
+```
+
+### Prohibited terms with severity mapping
+
+```json
+{
+  "type": "REGEX",
+  "patterns": {
+    "ProhibitedVendor": {
+      "pattern": "\\b(VendorAlpha|VendorBeta)\\b",
+      "description": "Reference to a vendor on the restricted list"
+    },
+    "EmbargoCurrency": {
+      "pattern": "\\b(XBT|ZEC|XMR)\\b",
+      "description": "Reference to a sanctioned or embargoed currency token"
+    }
+  },
+  "validation": {
+    "case_sensitive": false
+  }
+}
+```

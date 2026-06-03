@@ -113,10 +113,22 @@ const navbar = (
   <Navbar
     logoLink="/"
     logo={
-      <div className="flex items-center gap-3">
-        <span className="font-serif text-xl font-black uppercase tracking-[0.08em]">
-          Classifyre
-        </span>
+      <div className="flex items-center gap-2">
+        <div className="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg">
+          <img
+            src="/clasifyre_icon.png"
+            width={32}
+            height={32}
+            alt="Classifyre"
+            className="size-full object-cover"
+          />
+        </div>
+        <div className="grid flex-1 text-left text-sm leading-tight">
+          <span className="truncate font-serif font-bold">Classifyre</span>
+          <span className="truncate font-mono text-[10px] text-muted-foreground">
+            Detect. Classify. Label.
+          </span>
+        </div>
       </div>
     }
     className="classifyre-blog-navbar border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
@@ -132,7 +144,9 @@ const navbar = (
       </Button>
       <Button
         asChild
-        className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
+        variant="ghost"
+        size="sm"
+        className="border-2 border-accent bg-accent text-black hover:bg-accent/90 hover:text-black"
       >
         <a href="https://demo.classifyre.com/" target="_blank" rel="noreferrer">
           Demo
@@ -318,7 +332,7 @@ export default async function RootLayout({
           }}
           nextThemes={{
             attribute: "class",
-            defaultTheme: "light",
+            defaultTheme: "system",
             disableTransitionOnChange: true,
             storageKey: "classifyre-blog-theme-v2",
           }}
