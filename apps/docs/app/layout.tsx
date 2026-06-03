@@ -342,9 +342,9 @@ const navbar = (
           />
         </div>
         <div className="grid flex-1 text-left text-sm leading-tight">
-          <span className="truncate font-serif font-bold">Classifyre</span>
+          <span className="truncate font-serif font-bold">Classifyre Docs</span>
           <span className="truncate font-mono text-[10px] text-muted-foreground">
-            {softwareVersionLabel} · Docs
+            {softwareVersionLabel}
           </span>
         </div>
       </div>
@@ -412,11 +412,11 @@ export default async function RootLayout({
           </Script>
         )}
         <Layout
-          banner={banner}
+          // banner={banner}
           navbar={navbar}
           footer={footer}
           pageMap={pageMap}
-          docsRepositoryBase="https://github.com/Ostap-Bender/unstructured/tree/main/apps/docs"
+          docsRepositoryBase="https://github.com/classifyre-com/classifyre/tree/develop/apps/docs"
           sidebar={{
             defaultMenuCollapseLevel: 2,
             defaultOpen: true,
