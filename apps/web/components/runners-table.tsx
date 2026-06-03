@@ -25,7 +25,6 @@ import {
   type SourceListItem,
 } from "@workspace/api-client";
 import {
-  Badge,
   Button,
   EmptyState,
   Input,
@@ -47,7 +46,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Spinner,
   Table,
   TableBody,
   TableCell,

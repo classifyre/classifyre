@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { Download, ExternalLink } from "lucide-react";
 import { Button } from "@workspace/ui/components";
 import {
   Dialog,
@@ -12,6 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog";
+import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
 
 // Mirror of api-client getBaseUrl() for the browser: relative /api proxied by Next.
 function getApiBaseUrl(): string {
@@ -70,11 +72,12 @@ export function CsvExportButton({
   exportPath,
   buildQuery,
   total,
-  label = "Download CSV",
+  label,
   disabled = false,
-  title = "Export to CSV",
+  title,
   entityLabel = "rows",
 }: CsvExportButtonProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
   const handleDownload = () => {
@@ -102,28 +105,34 @@ export function CsvExportButton({
         className="gap-2"
       >
         <Download className="h-4 w-4" />
-        {label}
+        {label ?? t("csvExport.label" as TranslationKey)}
       </Button>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle>{title ?? t("csvExport.title" as TranslationKey)}</DialogTitle>
           <DialogDescription>
-            <span className="font-mono font-medium text-foreground">
-              {total.toLocaleString()}
-            </span>{" "}
-            {entityLabel} matching the current filters will be exported. Large
-            exports stream directly to your download.
+            {t("csvExport.description" as TranslationKey, { count: total.toLocaleString(), entityLabel })}{" "}
+            <a
+              href="/docs/data-export/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 underline underline-offset-2"
+            >
+              {t("csvExport.descriptionLink" as TranslationKey)}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+            {t("csvExport.descriptionSuffix" as TranslationKey)}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="ghost" size="sm">
-              Cancel
+              {t("csvExport.cancel" as TranslationKey)}
             </Button>
           </DialogClose>
           <Button size="sm" className="gap-2" onClick={handleDownload}>
             <Download className="h-4 w-4" />
-            Download
+            {t("csvExport.download" as TranslationKey)}
           </Button>
         </DialogFooter>
       </DialogContent>
