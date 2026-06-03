@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./source-docs": "./src/source-docs.ts",
     "./detector-docs": "./src/detector-docs.ts",
+    "./pipeline-schema-utils": "./src/pipeline-schema-utils.ts",
     "./assistant": "./src/assistant.ts",
     "./package.json": "./package.json",
     "./all_input_sources": "./src/schemas/all_input_sources.json",

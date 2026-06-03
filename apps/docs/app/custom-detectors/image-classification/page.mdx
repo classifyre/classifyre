@@ -1,0 +1,73 @@
+---
+title: Image Classification
+description: Classify images with any HuggingFace vision model and map labels to severity findings.
+---
+
+import { PipelineSchemaTable } from "@/components/pipeline-schema-table"
+import { Badge, Separator } from "@workspace/ui/components"
+
+# Image Classification
+
+<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+  Image · HuggingFace · Visual
+</Badge>
+
+The Image Classification detector runs any HuggingFace `image-classification` pipeline on image assets. It returns labels and confidence scores, optionally maps specific labels to severity levels, and stores findings alongside the source image reference.
+
+<Separator className="my-6" />
+
+## When to use
+
+- **NSFW detection** — classify uploaded or scanned images for adult or explicit content before they reach storage or downstream systems.
+- **Harmful content filtering** — flag images containing violence, self-harm indicators, or other policy-violating categories.
+- **Custom image category labelling** — deploy a model fine-tuned on your own image dataset to tag product photos, document scans, or media assets.
+- **Automated content moderation** — route high-severity predictions to a human review queue using `severity_map`.
+- **Compliance and data governance** — detect sensitive image types (e.g. ID documents, medical imagery) in data lake scans.
+
+## How it works
+
+Classifyre loads the HuggingFace vision model and runs the `image-classification` pipeline on each image asset. The top-k predictions above `confidence_threshold` are stored as findings. Labels in the `severity_map` override the default `severity` level.
+
+The default model is `google/vit-base-patch16-224` when no `model` is specified — a general-purpose ViT that serves as a useful baseline before you deploy a task-specific checkpoint.
+
+<Separator className="my-6" />
+
+## Configuration
+
+<PipelineSchemaTable definition="ImageClassificationPipelineSchema" />
+
+<Separator className="my-6" />
+
+## Examples
+
+### NSFW image detection (default model)
+
+```json
+{
+  "type": "IMAGE_CLASSIFICATION",
+  "confidence_threshold": 0.75,
+  "severity_map": [
+    { "label": "nsfw", "severity": "high" },
+    { "label": "suggestive", "severity": "medium" }
+  ]
+}
+```
+
+### Custom document-type classifier
+
+```json
+{
+  "type": "IMAGE_CLASSIFICATION",
+  "model": "my-org/document-type-classifier",
+  "model_revision": "main",
+  "device": "cpu",
+  "top_k": 3,
+  "confidence_threshold": 0.6,
+  "severity_map": [
+    { "label": "passport", "severity": "high" },
+    { "label": "id_card", "severity": "high" },
+    { "label": "medical_record", "severity": "high" }
+  ],
+  "severity": "info"
+}
+```

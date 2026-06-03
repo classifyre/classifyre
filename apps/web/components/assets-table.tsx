@@ -1216,6 +1216,7 @@ export function AssetsTable({
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
+                  label={t("common.pagination.previous")}
                   href="#"
                   onClick={(event) => {
                     event.preventDefault();
@@ -1237,7 +1238,7 @@ export function AssetsTable({
                   <Fragment key={`page-group-${pageNumber}`}>
                     {showEllipsis && (
                       <PaginationItem>
-                        <PaginationEllipsis />
+                        <PaginationEllipsis label={t("common.pagination.morePages")} />
                       </PaginationItem>
                     )}
 
@@ -1259,6 +1260,7 @@ export function AssetsTable({
 
               <PaginationItem>
                 <PaginationNext
+                  label={t("common.pagination.next")}
                   href="#"
                   onClick={(event) => {
                     event.preventDefault();

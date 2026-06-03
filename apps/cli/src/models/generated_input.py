@@ -1078,9 +1078,10 @@ class DatabricksAuthMode(StrEnum):
 
     PAT_TOKEN = 'PAT_TOKEN'
     SERVICE_PRINCIPAL = 'SERVICE_PRINCIPAL'
+    AZURE_SERVICE_PRINCIPAL = 'AZURE_SERVICE_PRINCIPAL'
 
 
-class DatabricksRequiredPat(BaseModel):
+class PersonalAccessToken(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -1094,7 +1095,7 @@ class DatabricksRequiredPat(BaseModel):
     )
 
 
-class DatabricksRequiredServicePrincipal(BaseModel):
+class ServicePrincipalOAuthM2M(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -1107,6 +1108,24 @@ class DatabricksRequiredServicePrincipal(BaseModel):
         ..., description='Databricks SQL warehouse ID used for sampling queries'
     )
     client_id: str = Field(..., description='Databricks service principal client ID')
+
+
+class AzureServicePrincipal(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['AZURE_SERVICE_PRINCIPAL']
+    workspace_url: AnyUrl = Field(
+        ...,
+        description='Azure Databricks workspace URL (for example, https://adb-1234567890123456.7.azuredatabricks.net)',
+    )
+    warehouse_id: str = Field(
+        ..., description='Databricks SQL warehouse ID used for sampling queries'
+    )
+    client_id: str = Field(
+        ..., description='Azure AD application (client) ID for the service principal'
+    )
+    tenant_id: str = Field(..., description='Azure AD tenant ID')
 
 
 class DatabricksMaskedPat(BaseModel):
@@ -1122,6 +1141,15 @@ class DatabricksMaskedServicePrincipal(BaseModel):
     )
     client_secret: str = Field(
         ..., description='Databricks service principal client secret'
+    )
+
+
+class DatabricksMaskedAzureServicePrincipal(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    client_secret: str = Field(
+        ..., description='Azure AD client secret for the service principal'
     )
 
 
@@ -2020,8 +2048,8 @@ class DatabricksInput(CoreInput):
     type: Literal['DATABRICKS'] = Field(
         'DATABRICKS', description='Type of the asset or source'
     )
-    required: DatabricksRequiredPat | DatabricksRequiredServicePrincipal = Field(
-        ..., title='DatabricksRequired'
+    required: PersonalAccessToken | ServicePrincipalOAuthM2M | AzureServicePrincipal = (
+        Field(..., title='DatabricksRequired')
     )
     masked: DatabricksMaskedPat | DatabricksMaskedServicePrincipal = Field(
         ..., title='DatabricksMasked'

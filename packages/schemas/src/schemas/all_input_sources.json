@@ -1579,12 +1579,13 @@
       "type": "string",
       "enum": [
         "PAT_TOKEN",
-        "SERVICE_PRINCIPAL"
+        "SERVICE_PRINCIPAL",
+        "AZURE_SERVICE_PRINCIPAL"
       ],
       "description": "Databricks authentication mode"
     },
     "DatabricksRequiredPat": {
-      "title": "DatabricksRequiredPat",
+      "title": "Personal Access Token",
       "type": "object",
       "properties": {
         "auth_mode": {
@@ -1608,7 +1609,7 @@
       "additionalProperties": false
     },
     "DatabricksRequiredServicePrincipal": {
-      "title": "DatabricksRequiredServicePrincipal",
+      "title": "Service Principal (OAuth M2M)",
       "type": "object",
       "properties": {
         "auth_mode": {
@@ -1636,6 +1637,40 @@
       ],
       "additionalProperties": false
     },
+    "DatabricksRequiredAzureServicePrincipal": {
+      "title": "Azure Service Principal",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "AZURE_SERVICE_PRINCIPAL"
+        },
+        "workspace_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Azure Databricks workspace URL (for example, https://adb-1234567890123456.7.azuredatabricks.net)"
+        },
+        "warehouse_id": {
+          "type": "string",
+          "description": "Databricks SQL warehouse ID used for sampling queries"
+        },
+        "client_id": {
+          "type": "string",
+          "description": "Azure AD application (client) ID for the service principal"
+        },
+        "tenant_id": {
+          "type": "string",
+          "description": "Azure AD tenant ID"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "workspace_url",
+        "warehouse_id",
+        "client_id",
+        "tenant_id"
+      ],
+      "additionalProperties": false
+    },
     "DatabricksRequired": {
       "title": "DatabricksRequired",
       "oneOf": [
@@ -1644,6 +1679,9 @@
         },
         {
           "$ref": "#/definitions/DatabricksRequiredServicePrincipal"
+        },
+        {
+          "$ref": "#/definitions/DatabricksRequiredAzureServicePrincipal"
         }
       ]
     },
@@ -1668,6 +1706,20 @@
         "client_secret": {
           "type": "string",
           "description": "Databricks service principal client secret"
+        }
+      },
+      "required": [
+        "client_secret"
+      ],
+      "additionalProperties": false
+    },
+    "DatabricksMaskedAzureServicePrincipal": {
+      "title": "DatabricksMaskedAzureServicePrincipal",
+      "type": "object",
+      "properties": {
+        "client_secret": {
+          "type": "string",
+          "description": "Azure AD client secret for the service principal"
         }
       },
       "required": [
