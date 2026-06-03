@@ -119,8 +119,9 @@ export class SourceService {
     config: Record<string, unknown>;
     type: string;
     name?: string;
+    description?: string;
   }): Promise<Source> {
-    const { config, type, name: providedName } = createSourceDto;
+    const { config, type, name: providedName, description } = createSourceDto;
     const assetType = this.asAssetType(type);
     const fallbackSuffix = crypto.randomUUID().split('-')[0];
     const name = providedName || `${type}_${fallbackSuffix}`;
@@ -145,6 +146,7 @@ export class SourceService {
     return this.prisma.source.create({
       data: {
         name,
+        description: description ?? null,
         type: assetType,
         sourceCategory: getSourceCategory(type),
         config: assertSerializableConfig(encryptedConfig),
@@ -156,6 +158,7 @@ export class SourceService {
     sourceId: string,
     updateSourceDto: {
       name?: string;
+      description?: string;
       type?: string;
       config?: Record<string, any>;
     },
@@ -164,6 +167,10 @@ export class SourceService {
 
     if (updateSourceDto.name !== undefined) {
       updateData.name = updateSourceDto.name;
+    }
+
+    if (updateSourceDto.description !== undefined) {
+      updateData.description = updateSourceDto.description;
     }
 
     if (updateSourceDto.type !== undefined) {
@@ -334,6 +341,7 @@ export class SourceService {
       return {
         id: source.id,
         name: source.name,
+        description: source.description,
         type: source.type,
         runnerStatus: source.runnerStatus,
         latestRunner,

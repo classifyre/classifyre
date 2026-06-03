@@ -160,6 +160,12 @@
     "title": "Sources",
     "description": "Manage your data sources and connections",
     "addSource": "Add Source",
+    "form": {
+      "nameLabel": "Source name",
+      "nameHelp": "Give your source a memorable name to identify it",
+      "descriptionLabel": "Description",
+      "descriptionHelp": "Optional. Add notes about what this source is for."
+    },
     "totalSources": "Total Sources",
     "connectedSources": "Connected sources",
     "healthy": "Healthy",
