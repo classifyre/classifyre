@@ -11,7 +11,6 @@ import { Banner, Head } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
 import { Footer, Layout, Navbar } from "nextra-theme-docs";
 
-import { Badge } from "@workspace/ui/components";
 import { softwareVersionLabel } from "@workspace/ui/lib/software-version";
 import { getAllSourceDocs } from "@workspace/schemas/source-docs";
 import { getAllDetectorDocs } from "@workspace/schemas/detector-docs";
@@ -332,19 +331,20 @@ const banner = (
 const navbar = (
   <Navbar
     logo={
-      <div className="flex items-center gap-3">
-        <Badge
-          variant="secondary"
-          className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground"
-        >
-          Docs
-        </Badge>
-        <div className="flex items-center gap-2">
-          <span className="font-serif text-xl font-black uppercase tracking-[0.08em]">
-            Classifyre
-          </span>
-          <span className="rounded-[4px] border border-border/70 bg-background/80 px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
-            {softwareVersionLabel}
+      <div className="flex items-center gap-2">
+        <div className="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg">
+          <img
+            src="/clasifyre_icon.png"
+            width={32}
+            height={32}
+            alt="Classifyre"
+            className="size-full object-cover"
+          />
+        </div>
+        <div className="grid flex-1 text-left text-sm leading-tight">
+          <span className="truncate font-serif font-bold">Classifyre</span>
+          <span className="truncate font-mono text-[10px] text-muted-foreground">
+            {softwareVersionLabel} · Docs
           </span>
         </div>
       </div>

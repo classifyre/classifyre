@@ -1,0 +1,83 @@
+---
+title: AI Detector
+description: Prompt-driven classification and structured field extraction using a large language model.
+---
+
+import { PipelineSchemaTable } from "@/components/pipeline-schema-table"
+import { Badge, Separator } from "@workspace/ui/components"
+
+# AI Detector
+
+<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+  Text · LLM · Prompt-based
+</Badge>
+
+The AI Detector sends asset content to a configured LLM provider along with a system prompt you write. The model classifies the content against a label taxonomy you define, optionally extracts structured fields, and returns findings with the predicted labels and extracted data attached.
+
+<Separator className="my-6" />
+
+## When to use
+
+- **Nuanced classification** — renewal risk, escalation intent, executive tone, regulatory concern — signals where rules and keyword lists fall short.
+- **Structured extraction from free text** — pull contract party names, renewal dates, risk clauses, or routing metadata from unstructured documents.
+- **Rapidly evolving categories** — add or rename labels by editing the config; no retraining needed.
+- **Multi-label content** — the `multi_label` option allows a single asset to receive multiple findings when content spans several categories.
+- **Explanation-oriented workflows** — the prompt is a plain-English artefact that stakeholders can read and approve.
+
+## How it works
+
+Classifyre injects the asset content and your `system_prompt` into the LLM provider at dispatch time. The model returns a JSON response with predicted labels and any extracted fields. Each predicted label becomes a finding; extracted fields are stored in the finding's `extracted_data` map.
+
+The `labels` array defines the classification taxonomy. Each label has a name and an optional description that guides the model. The `severity_map` maps specific label predictions to severity levels. The `output_fields` array defines structured properties the model should extract alongside classification.
+
+The LLM provider and credentials are configured at the source level — the detector config itself is provider-agnostic. See [AI Provider configuration](/sources) for setup details.
+
+<Separator className="my-6" />
+
+## Configuration
+
+<PipelineSchemaTable definition="LLMPipelineSchema" />
+
+<Separator className="my-6" />
+
+## Examples
+
+### Renewal risk classifier with field extraction
+
+```json
+{
+  "type": "LLM",
+  "system_prompt": "You are a contract analyst. Classify the document for renewal risk and extract the key renewal date and responsible party.",
+  "labels": [
+    { "name": "no_risk", "description": "No renewal concerns identified" },
+    { "name": "low_risk", "description": "Mild risk signals, monitoring recommended" },
+    { "name": "high_risk", "description": "Clear renewal risk, action required" }
+  ],
+  "severity_map": [
+    { "label": "high_risk", "severity": "high" },
+    { "label": "low_risk", "severity": "medium" }
+  ],
+  "output_fields": [
+    { "name": "renewal_date", "description": "The contract renewal or expiry date" },
+    { "name": "responsible_party", "description": "Person or team responsible for renewal" }
+  ],
+  "severity": "info",
+  "confidence_threshold": 0.6
+}
+```
+
+### Executive escalation detector
+
+```json
+{
+  "type": "LLM",
+  "system_prompt": "You are a support triage assistant. Detect whether this message requires executive escalation based on language, urgency, or explicit requests.",
+  "labels": [
+    { "name": "no_escalation", "description": "Standard support request" },
+    { "name": "escalate", "description": "Requires manager or executive attention" }
+  ],
+  "severity_map": [{ "label": "escalate", "severity": "high" }],
+  "temperature": 0.0,
+  "max_tokens": 256
+}
+```

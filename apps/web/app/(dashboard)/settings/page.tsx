@@ -32,6 +32,7 @@ import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { McpSettingsCard } from "@/components/mcp-settings-card";
 import { AiProvidersCard } from "@/components/ai-providers-card";
 import { AiAssistantSettingsCard } from "@/components/ai-assistant-settings-card";
+import { VersionSettingsSection } from "@/components/version-update-notifier";
 import { useTranslation } from "@/hooks/use-translation";
 
 type SettingsDraft = {
@@ -209,6 +210,12 @@ export default function SettingsPage() {
           value="general"
           className="space-y-6 duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
+          <Card className="panel-card rounded-[6px]">
+            <CardContent className="p-5">
+              <VersionSettingsSection />
+            </CardContent>
+          </Card>
+
           <Card className="panel-card rounded-[6px]">
             <CardContent className="space-y-6 p-5">
               <div className="flex items-center gap-2">
