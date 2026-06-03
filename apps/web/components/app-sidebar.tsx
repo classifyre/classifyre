@@ -12,7 +12,6 @@ import {
   AlertTriangle,
   FileText,
   FlaskConical,
-  Layers,
 } from "lucide-react";
 import {
   Sidebar,

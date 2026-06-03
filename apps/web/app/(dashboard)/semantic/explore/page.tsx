@@ -22,7 +22,7 @@ import {
   type MetricDefinition,
   type MetricResult,
 } from "@/lib/semantic-api";
-import { TrendingUp, BarChart3 } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 
 const DIMENSIONS = [
