@@ -13,16 +13,18 @@ from urllib.parse import urlparse
 import requests
 
 from ...models.generated_input import (
+    AzureServicePrincipal,
     DatabricksInput,
+    DatabricksMaskedAzureServicePrincipal,
     DatabricksMaskedPat,
     DatabricksMaskedServicePrincipal,
     DatabricksOptionalConnection,
     DatabricksOptionalExtraction,
     DatabricksOptionalScope,
-    DatabricksRequiredPat,
-    DatabricksRequiredServicePrincipal,
+    PersonalAccessToken,
     SamplingConfig,
     SamplingStrategy,
+    ServicePrincipalOAuthM2M,
 )
 from ...models.generated_single_asset_scan_results import (
     AssetType as OutputAssetType,
@@ -106,13 +108,19 @@ class DatabricksSource(BaseTabularSource):
         required = self.config.required
         masked = self.config.masked
 
-        if isinstance(required, DatabricksRequiredPat):
+        if isinstance(required, PersonalAccessToken):
             if not isinstance(masked, DatabricksMaskedPat):
                 raise ValueError("DATABRICKS PAT_TOKEN auth requires masked.token")
             return
-        if isinstance(required, DatabricksRequiredServicePrincipal):
+        if isinstance(required, ServicePrincipalOAuthM2M):
             if not isinstance(masked, DatabricksMaskedServicePrincipal):
                 raise ValueError("DATABRICKS SERVICE_PRINCIPAL auth requires masked.client_secret")
+            return
+        if isinstance(required, AzureServicePrincipal):
+            if not isinstance(masked, DatabricksMaskedAzureServicePrincipal):
+                raise ValueError(
+                    "DATABRICKS AZURE_SERVICE_PRINCIPAL auth requires masked.client_secret"
+                )
             return
         raise ValueError("Unsupported DATABRICKS auth configuration")
 
@@ -163,7 +171,10 @@ class DatabricksSource(BaseTabularSource):
         return int(self._connection_options().statement_timeout_seconds or 60)
 
     def _is_pat_mode(self) -> bool:
-        return isinstance(self.config.required, DatabricksRequiredPat)
+        return isinstance(self.config.required, PersonalAccessToken)
+
+    def _is_azure_sp_mode(self) -> bool:
+        return isinstance(self.config.required, AzureServicePrincipal)
 
     def _masked_pat_token(self) -> str:
         masked = self.config.masked
@@ -174,11 +185,22 @@ class DatabricksSource(BaseTabularSource):
     def _service_principal_credentials(self) -> tuple[str, str]:
         required = self.config.required
         masked = self.config.masked
-        if not isinstance(required, DatabricksRequiredServicePrincipal):
+        if not isinstance(required, ServicePrincipalOAuthM2M):
             raise ValueError("SERVICE_PRINCIPAL auth mode is required")
         if not isinstance(masked, DatabricksMaskedServicePrincipal):
             raise ValueError("DATABRICKS SERVICE_PRINCIPAL auth requires masked.client_secret")
         return required.client_id, masked.client_secret
+
+    def _azure_sp_credentials(self) -> tuple[str, str, str]:
+        required = self.config.required
+        masked = self.config.masked
+        if not isinstance(required, AzureServicePrincipal):
+            raise ValueError("AZURE_SERVICE_PRINCIPAL auth mode is required")
+        if not isinstance(masked, DatabricksMaskedAzureServicePrincipal):
+            raise ValueError(
+                "DATABRICKS AZURE_SERVICE_PRINCIPAL auth requires masked.client_secret"
+            )
+        return required.tenant_id, required.client_id, masked.client_secret
 
     def _is_access_token_expired(self) -> bool:
         if self._access_token_expiry is None:
@@ -206,12 +228,38 @@ class DatabricksSource(BaseTabularSource):
         self._access_token_expiry = datetime.now(UTC) + timedelta(seconds=max(expires_in - 300, 0))
         return token.strip()
 
+    def _acquire_azure_token(self) -> str:
+        # Azure AD v1 token endpoint; resource ID is the fixed Databricks app in Azure
+        _databricks_azure_resource = "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
+        tenant_id, client_id, client_secret = self._azure_sp_credentials()
+        response = self.session.post(
+            f"https://login.microsoftonline.com/{tenant_id}/oauth2/token",
+            data={
+                "grant_type": "client_credentials",
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "resource": _databricks_azure_resource,
+            },
+            timeout=self._timeout_seconds(),
+        )
+        response.raise_for_status()
+        payload = response.json()
+        token = payload.get("access_token")
+        if not isinstance(token, str) or not token.strip():
+            raise ValueError("Azure AD token response did not include access_token")
+        expires_in = int(payload.get("expires_in", 3600))
+        self._access_token_expiry = datetime.now(UTC) + timedelta(seconds=max(expires_in - 300, 0))
+        return token.strip()
+
     def _access_token_value(self) -> str:
         if self._is_pat_mode():
             return self._masked_pat_token().strip()
         if self._access_token and not self._is_access_token_expired():
             return self._access_token
-        self._access_token = self._acquire_service_principal_token()
+        if self._is_azure_sp_mode():
+            self._access_token = self._acquire_azure_token()
+        else:
+            self._access_token = self._acquire_service_principal_token()
         return self._access_token
 
     def _authorization_header(self) -> str:
@@ -860,7 +908,12 @@ class DatabricksSource(BaseTabularSource):
                 with conn.cursor() as cursor:
                     cursor.execute("SELECT 1")
                     cursor.fetchone()
-            auth_mode = "PAT_TOKEN" if self._is_pat_mode() else "SERVICE_PRINCIPAL"
+            if self._is_pat_mode():
+                auth_mode = "PAT_TOKEN"
+            elif self._is_azure_sp_mode():
+                auth_mode = "AZURE_SERVICE_PRINCIPAL"
+            else:
+                auth_mode = "SERVICE_PRINCIPAL"
             result["status"] = "SUCCESS"
             result["message"] = (
                 "Successfully connected to Databricks Unity Catalog "

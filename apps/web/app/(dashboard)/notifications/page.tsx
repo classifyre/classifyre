@@ -696,6 +696,7 @@ export default function NotificationsPage() {
                   <PaginationContent>
                     <PaginationItem>
                       <PaginationPrevious
+                        label={t("common.pagination.previous")}
                         href="#"
                         aria-disabled={page <= 1}
                         className={
@@ -719,7 +720,7 @@ export default function NotificationsPage() {
                         <div key={pageNumber} className="flex items-center">
                           {needsEllipsis ? (
                             <PaginationItem>
-                              <PaginationEllipsis />
+                              <PaginationEllipsis label={t("common.pagination.morePages")} />
                             </PaginationItem>
                           ) : null}
                           <PaginationItem>
@@ -740,6 +741,7 @@ export default function NotificationsPage() {
 
                     <PaginationItem>
                       <PaginationNext
+                        label={t("common.pagination.next")}
                         href="#"
                         aria-disabled={page >= totalPages}
                         className={

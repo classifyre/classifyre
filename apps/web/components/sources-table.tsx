@@ -904,6 +904,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
+                  label={t("common.pagination.previous")}
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
@@ -921,7 +922,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                   <Fragment key={`page-group-${pageNumber}`}>
                     {showEllipsis && (
                       <PaginationItem>
-                        <PaginationEllipsis />
+                        <PaginationEllipsis label={t("common.pagination.morePages")} />
                       </PaginationItem>
                     )}
                     <PaginationItem>
@@ -941,6 +942,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
               })}
               <PaginationItem>
                 <PaginationNext
+                  label={t("common.pagination.next")}
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();

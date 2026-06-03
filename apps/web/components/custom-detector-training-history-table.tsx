@@ -323,6 +323,7 @@ export function CustomDetectorTrainingHistoryTable({
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious
+              label={t("common.pagination.previous")}
               href="#"
               aria-disabled={!canPrev}
               tabIndex={canPrev ? 0 : -1}
@@ -343,7 +344,7 @@ export function CustomDetectorTrainingHistoryTable({
               <Fragment key={item}>
                 {showEllipsis ? (
                   <PaginationItem>
-                    <PaginationEllipsis />
+                    <PaginationEllipsis label={t("common.pagination.morePages")} />
                   </PaginationItem>
                 ) : null}
                 <PaginationItem>
@@ -364,6 +365,7 @@ export function CustomDetectorTrainingHistoryTable({
 
           <PaginationItem>
             <PaginationNext
+              label={t("common.pagination.next")}
               href="#"
               aria-disabled={!canNext}
               tabIndex={canNext ? 0 : -1}
