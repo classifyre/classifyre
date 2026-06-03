@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `type` | string
 `name` | string
+`description` | string
 `config` | object
 `scheduleEnabled` | boolean
 `scheduleCron` | string
@@ -22,6 +23,7 @@ import type { CreateSourceDto } from '@workspace/api-client'
 const example = {
   "type": WORDPRESS,
   "name": Production WordPress,
+  "description": Primary marketing blog, scanned nightly for leaked secrets,
   "config": {"type":"WORDPRESS","required":{"url":"https://blog.example.com"},"masked":{"username":"admin","application_password":"your-application-password"},"optional":{"content":{"fetch_posts":true,"fetch_pages":true}}},
   "scheduleEnabled": true,
   "scheduleCron": 30 1 * * *,

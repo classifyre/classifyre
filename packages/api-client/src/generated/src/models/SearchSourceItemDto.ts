@@ -44,6 +44,12 @@ export interface SearchSourceItemDto {
      * @type {string}
      * @memberof SearchSourceItemDto
      */
+    description?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof SearchSourceItemDto
+     */
     type: string;
     /**
      * 
@@ -120,6 +126,7 @@ export function SearchSourceItemDtoFromJSONTyped(json: any, ignoreDiscriminator:
         
         'id': json['id'],
         'name': json['name'],
+        'description': json['description'] == null ? undefined : json['description'],
         'type': json['type'],
         'runnerStatus': json['runnerStatus'] == null ? undefined : json['runnerStatus'],
         'latestRunner': json['latestRunner'] == null ? undefined : LatestRunnerSummaryDtoFromJSON(json['latestRunner']),
@@ -145,6 +152,7 @@ export function SearchSourceItemDtoToJSONTyped(value?: SearchSourceItemDto | nul
         
         'id': value['id'],
         'name': value['name'],
+        'description': value['description'],
         'type': value['type'],
         'runnerStatus': value['runnerStatus'],
         'latestRunner': LatestRunnerSummaryDtoToJSON(value['latestRunner']),

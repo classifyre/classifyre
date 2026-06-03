@@ -51,12 +51,10 @@ export const metadata: Metadata = {
   },
 };
 
-const sourceEntries = Object.entries(SOURCE_TYPE_CATALOG_META).map(
-  ([type, meta]) => ({
-    type,
-    ...meta,
-  }),
-);
+const sourceEntries = Object.keys(SOURCE_TYPE_CATALOG_META).map((type) => ({
+  type,
+  ...resolveSourceCatalogMeta(type),
+}));
 
 const marqueeEntries = [...sourceEntries, ...sourceEntries];
 const dockerRunCommand = [

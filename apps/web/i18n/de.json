@@ -160,6 +160,12 @@
     "title": "Quellen",
     "description": "Datenquellen und Verbindungen verwalten",
     "addSource": "Quelle hinzufügen",
+    "form": {
+      "nameLabel": "Quellenname",
+      "nameHelp": "Geben Sie Ihrer Quelle einen einprägsamen Namen zur Identifizierung",
+      "descriptionLabel": "Beschreibung",
+      "descriptionHelp": "Optional. Fügen Sie Notizen hinzu, wofür diese Quelle dient."
+    },
     "totalSources": "Quellen gesamt",
     "connectedSources": "Verbundene Quellen",
     "healthy": "Fehlerfrei",

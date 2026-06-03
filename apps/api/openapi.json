@@ -5509,6 +5509,11 @@
             "description": "The name of the source",
             "example": "Production WordPress"
           },
+          "description": {
+            "type": "string",
+            "description": "Optional human-readable description of this source",
+            "example": "Primary marketing blog, scanned nightly for leaked secrets"
+          },
           "config": {
             "type": "object",
             "description": "Configuration for the source (depends on type)",
@@ -5561,6 +5566,11 @@
           "name": {
             "type": "string",
             "example": "Production WordPress"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "example": "Primary marketing blog, scanned nightly for leaked secrets"
           },
           "type": {
             "type": "string",
@@ -5680,6 +5690,11 @@
             "type": "string",
             "description": "The name of the source",
             "example": "Production WordPress"
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional human-readable description of this source",
+            "example": "Primary marketing blog, scanned nightly for leaked secrets"
           },
           "config": {
             "type": "object",
@@ -5920,6 +5935,10 @@
           },
           "name": {
             "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
           },
           "type": {
             "type": "string"
