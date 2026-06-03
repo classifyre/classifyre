@@ -1251,6 +1251,7 @@ export function FindingsTable({
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
+                  label={t("common.pagination.previous")}
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
@@ -1268,7 +1269,7 @@ export function FindingsTable({
                   <Fragment key={`page-group-${pageNumber}`}>
                     {showEllipsis && (
                       <PaginationItem>
-                        <PaginationEllipsis />
+                        <PaginationEllipsis label={t("common.pagination.morePages")} />
                       </PaginationItem>
                     )}
                     <PaginationItem>
@@ -1288,6 +1289,7 @@ export function FindingsTable({
               })}
               <PaginationItem>
                 <PaginationNext
+                  label={t("common.pagination.next")}
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();

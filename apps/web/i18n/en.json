@@ -92,7 +92,12 @@
     "statusPending": "Pending",
     "statusWarning": "Warning",
     "notSet": "Not set",
-    "language": "Language"
+    "language": "Language",
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "morePages": "More pages"
+    }
   },
   "settings": {
     "title": "Settings",
@@ -378,6 +383,8 @@
   },
   "findings": {
     "title": "Findings",
+    "description": "Unified findings table with server-side filtering, plus overview charts and stats.",
+    "totalFindings": "Total Findings",
     "findingsTrend": "Findings Trend",
     "severityTimeline": "Severity timeline for the selected window.",
     "noTrendData": "No trend data available for the selected scope.",
@@ -1046,6 +1053,7 @@
     "detail": {
       "title": "Scan Details"
     },
+    "loading": "Loading scans visualizations...",
     "subtitle": "Search run history and filter by operational status from one surface.",
     "runTrend": "Run Trend",
     "runTrendDescription": "Status distribution over the selected timeline.",

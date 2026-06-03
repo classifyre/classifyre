@@ -506,6 +506,7 @@ export function CustomDetectorsTable() {
                 <PaginationContent>
                     <PaginationItem>
                         <PaginationPrevious
+                            label={t("common.pagination.previous")}
                             href="#"
                             aria-disabled={!canPrev}
                             tabIndex={canPrev ? 0 : -1}
@@ -526,7 +527,7 @@ export function CustomDetectorsTable() {
                             <Fragment key={item}>
                                 {showEllipsis ? (
                                     <PaginationItem>
-                                        <PaginationEllipsis/>
+                                        <PaginationEllipsis label={t("common.pagination.morePages")}/>
                                     </PaginationItem>
                                 ) : null}
                                 <PaginationItem>
@@ -547,6 +548,7 @@ export function CustomDetectorsTable() {
 
                     <PaginationItem>
                         <PaginationNext
+                            label={t("common.pagination.next")}
                             href="#"
                             aria-disabled={!canNext}
                             tabIndex={canNext ? 0 : -1}

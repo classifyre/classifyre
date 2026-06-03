@@ -43,9 +43,43 @@ function getSeverityChartColor(score: number): string {
   return "#65B581";
 }
 
+type ThemeColors = {
+  foreground: string;
+  mutedForeground: string;
+  border: string;
+};
+
+const DEFAULT_THEME: ThemeColors = {
+  foreground: "#0a0a0a",
+  mutedForeground: "#64748B",
+  border: "#CBD5F5",
+};
+
+function readCSSVar(styles: CSSStyleDeclaration, name: string, fallback: string) {
+  return styles.getPropertyValue(name).trim() || fallback;
+}
+
+function resolveThemeColors(): ThemeColors {
+  if (typeof window === "undefined") return DEFAULT_THEME;
+  const styles = getComputedStyle(document.documentElement);
+  return {
+    foreground: readCSSVar(styles, "--foreground", DEFAULT_THEME.foreground),
+    mutedForeground: readCSSVar(styles, "--muted-foreground", DEFAULT_THEME.mutedForeground),
+    border: readCSSVar(styles, "--border", DEFAULT_THEME.border),
+  };
+}
+
 export default function AssetsPage() {
   const { t } = useTranslation();
   const router = useRouter();
+  const [themeColors, setThemeColors] = useState<ThemeColors>(resolveThemeColors);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => setThemeColors(resolveThemeColors()));
+    observer.observe(root, { attributes: true, attributeFilter: ["class", "style"] });
+    return () => observer.disconnect();
+  }, []);
   const [selectedStatuses, setSelectedStatuses] = useState<AssetStatusFilter[]>(
     [],
   );
@@ -168,7 +202,7 @@ export default function AssetsPage() {
         value: baseOverview.totals.unchangedAssets,
       },
     ],
-    [baseOverview],
+    [baseOverview, t],
   );
 
   const topAssetsOption = useMemo<echarts.EChartsCoreOption>(() => {
@@ -196,9 +230,11 @@ export default function AssetsPage() {
       xAxis: {
         type: "value",
         name: "Findings",
+        nameTextStyle: { color: themeColors.mutedForeground },
+        axisLabel: { color: themeColors.mutedForeground, fontSize: 10 },
         splitLine: {
           lineStyle: {
-            color: "#e5e7eb",
+            color: themeColors.border,
           },
         },
       },
@@ -210,6 +246,7 @@ export default function AssetsPage() {
           width: 220,
           overflow: "truncate",
           fontSize: 11,
+          color: themeColors.mutedForeground,
           cursor: "pointer",
         },
       },
@@ -241,17 +278,18 @@ export default function AssetsPage() {
             show: true,
             position: "right",
             fontSize: 10,
+            color: themeColors.mutedForeground,
           },
         },
       ],
     };
-  }, [chartOverview.topAssetsByFindings]);
+  }, [chartOverview.topAssetsByFindings, themeColors]);
 
   const sourceOption = useMemo<echarts.EChartsCoreOption>(() => {
     const sourceRows = chartOverview.topSourcesByAssetVolume;
 
     return {
-      color: ["#111827"],
+      color: [themeColors.foreground],
       grid: {
         left: 8,
         right: 12,
@@ -268,9 +306,11 @@ export default function AssetsPage() {
       xAxis: {
         type: "value",
         name: "Assets",
+        nameTextStyle: { color: themeColors.mutedForeground },
+        axisLabel: { color: themeColors.mutedForeground, fontSize: 10 },
         splitLine: {
           lineStyle: {
-            color: "#e5e7eb",
+            color: themeColors.border,
           },
         },
       },
@@ -283,6 +323,7 @@ export default function AssetsPage() {
           width: 220,
           overflow: "truncate",
           fontSize: 11,
+          color: themeColors.mutedForeground,
           cursor: "pointer",
         },
       },
@@ -298,11 +339,12 @@ export default function AssetsPage() {
             show: true,
             position: "right",
             fontSize: 10,
+            color: themeColors.mutedForeground,
           },
         },
       ],
     };
-  }, [chartOverview.topSourcesByAssetVolume]);
+  }, [chartOverview.topSourcesByAssetVolume, themeColors]);
 
   const hasChartData =
     chartOverview.topAssetsByFindings.length > 0 ||
@@ -353,7 +395,7 @@ export default function AssetsPage() {
                   <Card
                     className={
                       isActive
-                        ? "overflow-hidden border-2 border-accent/30 bg-background text-accent rounded-[6px]"
+                        ? "overflow-hidden border-2 border-accent/30 bg-background rounded-[6px]"
                         : "border-2 border-border rounded-[6px] transition-all group-hover:bg-secondary/40"
                     }
                   >
@@ -361,7 +403,7 @@ export default function AssetsPage() {
                       <p
                         className={
                           isActive
-                            ? "text-[11px] font-mono uppercase tracking-[0.16em] text-accent/80"
+                            ? "text-[11px] font-mono uppercase tracking-[0.16em]"
                             : "text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground"
                         }
                       >

@@ -43,9 +43,40 @@ const EMPTY_CHARTS: SearchRunnersChartsResponseDto = {
   topSources: [],
 };
 
+type ThemeColors = {
+  mutedForeground: string;
+  border: string;
+};
+
+const DEFAULT_THEME: ThemeColors = {
+  mutedForeground: "#64748B",
+  border: "#CBD5F5",
+};
+
+function readCSSVar(styles: CSSStyleDeclaration, name: string, fallback: string) {
+  return styles.getPropertyValue(name).trim() || fallback;
+}
+
+function resolveThemeColors(): ThemeColors {
+  if (typeof window === "undefined") return DEFAULT_THEME;
+  const styles = getComputedStyle(document.documentElement);
+  return {
+    mutedForeground: readCSSVar(styles, "--muted-foreground", DEFAULT_THEME.mutedForeground),
+    border: readCSSVar(styles, "--border", DEFAULT_THEME.border),
+  };
+}
+
 export default function ScansPage() {
   const router = useRouter();
   const { t } = useTranslation();
+  const [themeColors, setThemeColors] = useState<ThemeColors>(resolveThemeColors);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => setThemeColors(resolveThemeColors()));
+    observer.observe(root, { attributes: true, attributeFilter: ["class", "style"] });
+    return () => observer.disconnect();
+  }, []);
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [windowDays, setWindowDays] = useState("30");
@@ -163,6 +194,11 @@ export default function ScansPage() {
     [baseCharts, t],
   );
 
+  const textStyle = useMemo(
+    () => ({ color: themeColors.mutedForeground, fontSize: 11 }),
+    [themeColors.mutedForeground],
+  );
+
   const trendOption = useMemo<echarts.EChartsCoreOption>(
     () => ({
       color: ["#f59e0b", "#3b82f6", "#22c55e", "#ef4444"],
@@ -171,15 +207,16 @@ export default function ScansPage() {
         trigger: "axis",
         axisPointer: { type: "shadow" },
       },
-      legend: { top: 0, textStyle: { fontSize: 11 } },
+      legend: { top: 0, textStyle },
       xAxis: {
         type: "category",
         data: chartData.timeline.map((row) => row.date),
-        axisLabel: { fontSize: 10 },
+        axisLabel: { color: themeColors.mutedForeground, fontSize: 10 },
       },
       yAxis: {
         type: "value",
-        splitLine: { lineStyle: { color: "#e5e7eb" } },
+        axisLabel: { color: themeColors.mutedForeground, fontSize: 10 },
+        splitLine: { lineStyle: { color: themeColors.border } },
       },
       series: [
         {
@@ -208,7 +245,7 @@ export default function ScansPage() {
         },
       ],
     }),
-    [chartData.timeline, t],
+    [chartData.timeline, t, textStyle, themeColors.border, themeColors.mutedForeground],
   );
 
   const topSourcesOption = useMemo<echarts.EChartsCoreOption>(
@@ -219,10 +256,11 @@ export default function ScansPage() {
         trigger: "axis",
         axisPointer: { type: "shadow" },
       },
-      legend: { top: 0, textStyle: { fontSize: 11 } },
+      legend: { top: 0, textStyle },
       xAxis: {
         type: "value",
-        splitLine: { lineStyle: { color: "#e5e7eb" } },
+        axisLabel: { color: themeColors.mutedForeground, fontSize: 10 },
+        splitLine: { lineStyle: { color: themeColors.border } },
       },
       yAxis: {
         type: "category",
@@ -233,6 +271,7 @@ export default function ScansPage() {
           width: 220,
           overflow: "truncate",
           fontSize: 11,
+          color: themeColors.mutedForeground,
           cursor: "pointer",
         },
       },
@@ -241,29 +280,31 @@ export default function ScansPage() {
           name: "Runs",
           type: "bar",
           data: chartData.topSources.map((row) => row.runs),
-          itemStyle: { borderRadius: [0, 4, 4, 0] },
-          cursor: "pointer",
           label: {
             show: true,
             position: "right",
             fontSize: 10,
+            color: themeColors.mutedForeground,
           },
+          itemStyle: { borderRadius: [0, 4, 4, 0] },
+          cursor: "pointer",
         },
         {
           name: "Findings",
           type: "bar",
           data: chartData.topSources.map((row) => row.findings),
-          itemStyle: { borderRadius: [0, 4, 4, 0] },
-          cursor: "pointer",
           label: {
             show: true,
             position: "right",
             fontSize: 10,
+            color: themeColors.mutedForeground,
           },
+          itemStyle: { borderRadius: [0, 4, 4, 0] },
+          cursor: "pointer",
         },
       ],
     }),
-    [chartData.topSources],
+    [chartData.topSources, textStyle, themeColors.border, themeColors.mutedForeground],
   );
 
   const hasChartData =
@@ -307,7 +348,7 @@ export default function ScansPage() {
       {isLoading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="ml-2 text-sm">{t("common.loading")} scans visualizations...</span>
+          <span className="ml-2 text-sm">{t("scans.loading")}</span>
         </div>
       ) : (
         <>
@@ -333,7 +374,7 @@ export default function ScansPage() {
                   <Card
                     className={
                       isActive
-                        ? "overflow-hidden border-2 border-accent/30 bg-background text-accent rounded-[6px]"
+                        ? "overflow-hidden border-2 border-accent/30 bg-background rounded-[6px]"
                         : "border-2 border-border rounded-[6px] transition-all group-hover:bg-secondary/40"
                     }
                   >
@@ -341,7 +382,7 @@ export default function ScansPage() {
                       <p
                         className={
                           isActive
-                            ? "text-[11px] font-mono uppercase tracking-[0.16em] text-accent/80"
+                            ? "text-[11px] font-mono uppercase tracking-[0.16em]"
                             : "text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground"
                         }
                       >
