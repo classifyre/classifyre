@@ -58,6 +58,10 @@ All URIs are relative to *http://localhost*
 *AIProviderConfigsApi* | [**aiProviderConfigControllerTest**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollertest) | **POST** /ai-provider-configs/{id}/test | Test an AI provider configuration
 *AIProviderConfigsApi* | [**aiProviderConfigControllerUpdate**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerupdate) | **PUT** /ai-provider-configs/{id} | Update an AI provider configuration
 *AssetsApi* | [**assetsControllerGetAsset**](docs/AssetsApi.md#assetscontrollergetasset) | **GET** /assets/{id} | Get asset by ID
+*AssetsApi* | [**searchAssetsControllerExportAssets**](docs/AssetsApi.md#searchassetscontrollerexportassets) | **GET** /search/assets/export | Export assets (with findings) as CSV
+*AssetsApi* | [**searchAssetsControllerExportFindings**](docs/AssetsApi.md#searchassetscontrollerexportfindings) | **GET** /search/findings/export | Export findings as CSV
+*AssetsApi* | [**searchAssetsControllerQueryAssets**](docs/AssetsApi.md#searchassetscontrollerqueryassets) | **GET** /search/assets/query | Query assets with findings (cursor-paginated JSON)
+*AssetsApi* | [**searchAssetsControllerQueryFindings**](docs/AssetsApi.md#searchassetscontrollerqueryfindings) | **GET** /search/findings/query | Query findings (cursor-paginated JSON)
 *AssetsApi* | [**searchAssetsControllerSearchAssets**](docs/AssetsApi.md#searchassetscontrollersearchassets) | **POST** /search/assets | Search assets with findings
 *AssetsApi* | [**searchAssetsControllerSearchAssetsCharts**](docs/AssetsApi.md#searchassetscontrollersearchassetscharts) | **POST** /search/assets/charts | Search assets charts overview
 *AssetsApi* | [**searchAssetsControllerSearchFindings**](docs/AssetsApi.md#searchassetscontrollersearchfindings) | **POST** /search/findings | Search findings
@@ -122,6 +126,8 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**cliRunnerControllerStopRunner**](docs/RunnersApi.md#clirunnercontrollerstoprunner) | **PATCH** /runners/{runnerId}/stop | Stop running CLI process
 *RunnersApi* | [**cliRunnerControllerUpdateRunnerAssetStatuses**](docs/RunnersApi.md#clirunnercontrollerupdaterunnerassetstatuses) | **PATCH** /runners/{runnerId}/assets/status | Update processing status of runner assets
 *RunnersApi* | [**cliRunnerControllerUpdateRunnerStatus**](docs/RunnersApi.md#clirunnercontrollerupdaterunnerstatusoperation) | **PATCH** /runners/{runnerId}/status | Update runner status
+*RunnersApi* | [**searchRunnersControllerExportRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollerexportrunnerassets) | **GET** /search/runner-assets/export | Export runner assets as CSV
+*RunnersApi* | [**searchRunnersControllerQueryRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollerqueryrunnerassets) | **GET** /search/runner-assets/query | Query runner assets (cursor-paginated JSON)
 *RunnersApi* | [**searchRunnersControllerSearchRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerassets) | **POST** /search/runner-assets | Search runner assets
 *RunnersApi* | [**searchRunnersControllerSearchRunners**](docs/RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners
 *RunnersApi* | [**searchRunnersControllerSearchRunnersCharts**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview
@@ -220,6 +226,7 @@ All URIs are relative to *http://localhost*
 - [InstanceSettingsResponseDto](docs/InstanceSettingsResponseDto.md)
 - [LatestRunnerSummaryDto](docs/LatestRunnerSummaryDto.md)
 - [ListRunnersResponseDto](docs/ListRunnersResponseDto.md)
+- [LiveQueryResponseDto](docs/LiveQueryResponseDto.md)
 - [LocationDto](docs/LocationDto.md)
 - [MarkAllReadDto](docs/MarkAllReadDto.md)
 - [McpCapabilityGroupDto](docs/McpCapabilityGroupDto.md)

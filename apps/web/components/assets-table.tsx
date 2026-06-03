@@ -68,6 +68,7 @@ import {
 } from "@workspace/ui/components";
 import { getSourceIcon } from "../lib/source-type-icon";
 import { getAssetTypeIcon } from "../lib/asset-type-icon";
+import { CsvExportButton, filtersToSearchParams } from "./csv-export-button";
 import { useUrlParams } from "../lib/url-filters";
 import {
   DetectorSummaryBadges,
@@ -835,12 +836,40 @@ export function AssetsTable({
           </MultiSelectContent>
         </MultiSelect>
 
-        {isFilterLoading ? (
-          <div className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            {t("common.sources")}
-          </div>
-        ) : null}
+        <div className="ml-auto flex items-center gap-2">
+          {isFilterLoading ? (
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              {t("common.sources")}
+            </span>
+          ) : null}
+          <CsvExportButton
+            exportPath="search/assets/export"
+            total={total}
+            entityLabel="asset findings"
+            buildQuery={() => {
+              const request = buildRequest({
+                draft,
+                sort,
+                skip: 0,
+                limit: 0,
+                scope,
+                assetStatuses,
+              });
+              return filtersToSearchParams({
+                asset_search: request.assets?.search,
+                asset_sourceId: request.assets?.sourceId,
+                asset_status: request.assets?.status,
+                finding_detectorType: request.findings?.detectorType,
+                finding_severity: request.findings?.severity,
+                finding_includeResolved: request.findings?.includeResolved,
+                excludeFindings: request.options?.excludeFindings,
+                includeAssetsWithoutFindings:
+                  request.options?.includeAssetsWithoutFindings,
+              });
+            }}
+          />
+        </div>
       </div>
 
       {error && (
