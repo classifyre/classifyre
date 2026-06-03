@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   api,
   type NotificationResponseDto,
-  NotificationResponseDtoTypeEnum,
 } from "@workspace/api-client";
 import {
   Badge,
