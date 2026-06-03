@@ -10,6 +10,7 @@ import {
   BadRequestException,
   NotFoundException,
   UseGuards,
+  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,7 +18,18 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
+  ApiProduces,
+  ApiQuery,
 } from '@nestjs/swagger';
+import type { FastifyReply } from 'fastify';
+import { PgStreamService } from '../export/pg-stream.service';
+import { ExportQueryService } from '../export/export-query.service';
+import { LiveQueryService } from '../export/live-query.service';
+import {
+  ExportAssetsQueryDto,
+  ExportFindingsQueryDto,
+  LiveQueryResponseDto,
+} from '../dto/export-query.dto';
 import { AssetService } from '../asset.service';
 import { FindingsService } from '../findings.service';
 import { SourceService } from '../source.service';
@@ -83,7 +95,104 @@ export class SearchAssetsController {
   constructor(
     private readonly assetService: AssetService,
     private readonly findingsService: FindingsService,
+    private readonly pgStreamService: PgStreamService,
+    private readonly exportQueryService: ExportQueryService,
+    private readonly liveQueryService: LiveQueryService,
   ) {}
+
+  @Get('findings/query')
+  @ApiOperation({
+    summary: 'Query findings (cursor-paginated JSON)',
+    description:
+      'Returns a page of findings as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set. Order is stable for incremental refresh; sort/filter in the client.',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Page size (default 1000, max 10000)',
+  })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    description: 'Opaque cursor from a previous page',
+  })
+  @ApiResponse({ status: 200, type: LiveQueryResponseDto })
+  async queryFindings(
+    @Query() query: ExportFindingsQueryDto,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ): Promise<LiveQueryResponseDto> {
+    return this.liveQueryService.queryFindings(query, { limit, cursor });
+  }
+
+  @Get('assets/query')
+  @ApiOperation({
+    summary: 'Query assets with findings (cursor-paginated JSON)',
+    description:
+      'Returns a page of asset-finding rows as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set.',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Page size (default 1000, max 10000)',
+  })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    description: 'Opaque cursor from a previous page',
+  })
+  @ApiResponse({ status: 200, type: LiveQueryResponseDto })
+  async queryAssets(
+    @Query() query: ExportAssetsQueryDto,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ): Promise<LiveQueryResponseDto> {
+    return this.liveQueryService.queryAssets(query, { limit, cursor });
+  }
+
+  @Get('findings/export')
+  @ApiOperation({
+    summary: 'Export findings as CSV',
+    description:
+      'Streams all findings matching the current filters as a CSV download.',
+  })
+  @ApiProduces('text/csv')
+  @ApiResponse({
+    status: 200,
+    description: 'CSV stream of findings',
+    content: { 'text/csv': { schema: { type: 'string', format: 'binary' } } },
+  })
+  async exportFindings(
+    @Query() query: ExportFindingsQueryDto,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    await this.pgStreamService.streamCsv(
+      reply,
+      this.exportQueryService.buildFindingsQuery(query),
+    );
+  }
+
+  @Get('assets/export')
+  @ApiOperation({
+    summary: 'Export assets (with findings) as CSV',
+    description:
+      'Streams assets matching the current filters as a CSV download. One row per asset-finding.',
+  })
+  @ApiProduces('text/csv')
+  @ApiResponse({
+    status: 200,
+    description: 'CSV stream of assets',
+    content: { 'text/csv': { schema: { type: 'string', format: 'binary' } } },
+  })
+  async exportAssets(
+    @Query() query: ExportAssetsQueryDto,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    await this.pgStreamService.streamCsv(
+      reply,
+      this.exportQueryService.buildAssetsQuery(query),
+    );
+  }
 
   @Post('assets')
   @HttpCode(HttpStatus.OK)

@@ -1543,6 +1543,15 @@
       "GEMINI": "Gemini (Google)"
     }
   },
+  "csvExport": {
+    "label": "CSV herunterladen",
+    "title": "Nach CSV exportieren",
+    "cancel": "Abbrechen",
+    "download": "Herunterladen",
+    "description": "{{count}} {{entityLabel}}, die den aktuellen Filtern entsprechen, werden exportiert. Große Exporte werden direkt in Ihren Download gestreamt. Sie können auch live mit Excel verbinden, um diese Daten direkt abzurufen — siehe die",
+    "descriptionLink": "Dokumentation",
+    "descriptionSuffix": "für Einrichtungsanweisungen."
+  },
   "clipboard": {
     "copied": "{{label}} kopiert",
     "failedToCopy": "{{label}} konnte nicht kopiert werden"
