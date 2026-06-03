@@ -460,7 +460,7 @@ export default function DiscoveryPage() {
         </PanelCard>
 
         {/* ── ACTIVITY: Today/Week/Month ─── */}
-        <PanelCard className="flex flex-col justify-between overflow-hidden border-accent/30 bg-background text-accent shadow-[3px_3px_0_color-mix(in_srgb,var(--color-accent)_15%,transparent)] sm:shadow-[6px_6px_0_color-mix(in_srgb,var(--color-accent)_15%,transparent)] sm:p-6 xl:col-span-3 xl:row-span-2">
+        <PanelCard className="flex flex-col justify-between overflow-hidden border-accent/30 bg-foreground dark:bg-background text-accent shadow-[3px_3px_0_color-mix(in_srgb,var(--color-accent)_15%,transparent)] sm:shadow-[6px_6px_0_color-mix(in_srgb,var(--color-accent)_15%,transparent)] sm:p-6 xl:col-span-3 xl:row-span-2">
           <span className="text-[11px] uppercase tracking-[0.25em] text-accent/80 font-mono font-semibold">
             {t("discovery.incoming")}
           </span>
