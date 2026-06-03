@@ -16,6 +16,8 @@ All URIs are relative to *http://localhost*
 | [**cliRunnerControllerStopRunner**](RunnersApi.md#clirunnercontrollerstoprunner) | **PATCH** /runners/{runnerId}/stop | Stop running CLI process |
 | [**cliRunnerControllerUpdateRunnerAssetStatuses**](RunnersApi.md#clirunnercontrollerupdaterunnerassetstatuses) | **PATCH** /runners/{runnerId}/assets/status | Update processing status of runner assets |
 | [**cliRunnerControllerUpdateRunnerStatus**](RunnersApi.md#clirunnercontrollerupdaterunnerstatusoperation) | **PATCH** /runners/{runnerId}/status | Update runner status |
+| [**searchRunnersControllerExportRunnerAssets**](RunnersApi.md#searchrunnerscontrollerexportrunnerassets) | **GET** /search/runner-assets/export | Export runner assets as CSV |
+| [**searchRunnersControllerQueryRunnerAssets**](RunnersApi.md#searchrunnerscontrollerqueryrunnerassets) | **GET** /search/runner-assets/query | Query runner assets (cursor-paginated JSON) |
 | [**searchRunnersControllerSearchRunnerAssets**](RunnersApi.md#searchrunnerscontrollersearchrunnerassets) | **POST** /search/runner-assets | Search runner assets |
 | [**searchRunnersControllerSearchRunners**](RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners |
 | [**searchRunnersControllerSearchRunnersCharts**](RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview |
@@ -831,6 +833,158 @@ No authorization required
 
 - **Content-Type**: `application/json`
 - **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## searchRunnersControllerExportRunnerAssets
+
+> Blob searchRunnersControllerExportRunnerAssets(runnerId, search, status)
+
+Export runner assets as CSV
+
+Streams runner_assets rows for a runner matching the current filters as a CSV download.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { SearchRunnersControllerExportRunnerAssetsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string (optional)
+    runnerId: runnerId_example,
+    // string (optional)
+    search: search_example,
+    // Array<'PENDING' | 'PROCESSING' | 'PROCESSED' | 'ERROR'> (optional)
+    status: ...,
+  } satisfies SearchRunnersControllerExportRunnerAssetsRequest;
+
+  try {
+    const data = await api.searchRunnersControllerExportRunnerAssets(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **search** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **status** | `PENDING`, `PROCESSING`, `PROCESSED`, `ERROR` |  | [Optional] [Enum: PENDING, PROCESSING, PROCESSED, ERROR] |
+
+### Return type
+
+**Blob**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `text/csv`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | CSV stream of runner assets |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## searchRunnersControllerQueryRunnerAssets
+
+> LiveQueryResponseDto searchRunnersControllerQueryRunnerAssets(runnerId, search, status, limit, cursor)
+
+Query runner assets (cursor-paginated JSON)
+
+Returns a page of runner_assets rows as JSON for live consumption (e.g. Excel Power Query). Follow &#x60;nextCursor&#x60; to page through the full result set.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  RunnersApi,
+} from '@workspace/api-client';
+import type { SearchRunnersControllerQueryRunnerAssetsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new RunnersApi();
+
+  const body = {
+    // string (optional)
+    runnerId: runnerId_example,
+    // string (optional)
+    search: search_example,
+    // Array<'PENDING' | 'PROCESSING' | 'PROCESSED' | 'ERROR'> (optional)
+    status: ...,
+    // string | Page size (default 1000, max 10000) (optional)
+    limit: limit_example,
+    // string | Opaque cursor from a previous page (optional)
+    cursor: cursor_example,
+  } satisfies SearchRunnersControllerQueryRunnerAssetsRequest;
+
+  try {
+    const data = await api.searchRunnersControllerQueryRunnerAssets(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **runnerId** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **search** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **status** | `PENDING`, `PROCESSING`, `PROCESSED`, `ERROR` |  | [Optional] [Enum: PENDING, PROCESSING, PROCESSED, ERROR] |
+| **limit** | `string` | Page size (default 1000, max 10000) | [Optional] [Defaults to `undefined`] |
+| **cursor** | `string` | Opaque cursor from a previous page | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**LiveQueryResponseDto**](LiveQueryResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
 
 
 ### HTTP response details

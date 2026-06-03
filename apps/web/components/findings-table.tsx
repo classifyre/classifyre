@@ -62,6 +62,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components";
 import { getSourceIcon } from "../lib/source-type-icon";
+import { CsvExportButton, filtersToSearchParams } from "./csv-export-button";
 import { useUrlParams } from "../lib/url-filters";
 import { toFindingStatusBadgeValue } from "../lib/finding-status-badge";
 import { useTranslation } from "@/hooks/use-translation";
@@ -759,12 +760,25 @@ export function FindingsTable({
           </MultiSelectContent>
         </MultiSelect>
 
-        {isFilterLoading && (
-          <div className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Loading…
-          </div>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {isFilterLoading && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Loading…
+            </span>
+          )}
+          <CsvExportButton
+            exportPath="search/findings/export"
+            total={total}
+            entityLabel="findings"
+            buildQuery={() =>
+              filtersToSearchParams({
+                ...(buildRequest({ draft, skip: 0, limit: 0, lockedFilters })
+                  .filters ?? {}),
+              })
+            }
+          />
+        </div>
       </div>
 
       {/* ── Selection banner ── */}

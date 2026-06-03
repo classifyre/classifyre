@@ -11,8 +11,10 @@ import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { RunnerLogStorageService } from './runner-log-storage.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
 import { AiProviderConfigService } from '../ai-provider-config.service';
+import { ExportModule } from '../export/export.module';
 
 @Module({
+  imports: [ExportModule],
   providers: [
     CliRunnerService,
     PrismaService,

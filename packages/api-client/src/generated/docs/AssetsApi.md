@@ -5,6 +5,10 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**assetsControllerGetAsset**](AssetsApi.md#assetscontrollergetasset) | **GET** /assets/{id} | Get asset by ID |
+| [**searchAssetsControllerExportAssets**](AssetsApi.md#searchassetscontrollerexportassets) | **GET** /search/assets/export | Export assets (with findings) as CSV |
+| [**searchAssetsControllerExportFindings**](AssetsApi.md#searchassetscontrollerexportfindings) | **GET** /search/findings/export | Export findings as CSV |
+| [**searchAssetsControllerQueryAssets**](AssetsApi.md#searchassetscontrollerqueryassets) | **GET** /search/assets/query | Query assets with findings (cursor-paginated JSON) |
+| [**searchAssetsControllerQueryFindings**](AssetsApi.md#searchassetscontrollerqueryfindings) | **GET** /search/findings/query | Query findings (cursor-paginated JSON) |
 | [**searchAssetsControllerSearchAssets**](AssetsApi.md#searchassetscontrollersearchassets) | **POST** /search/assets | Search assets with findings |
 | [**searchAssetsControllerSearchAssetsCharts**](AssetsApi.md#searchassetscontrollersearchassetscharts) | **POST** /search/assets/charts | Search assets charts overview |
 | [**searchAssetsControllerSearchFindings**](AssetsApi.md#searchassetscontrollersearchfindings) | **POST** /search/findings | Search findings |
@@ -80,6 +84,388 @@ No authorization required
 |-------------|-------------|------------------|
 | **200** | Asset details |  -  |
 | **404** | Asset not found |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## searchAssetsControllerExportAssets
+
+> Blob searchAssetsControllerExportAssets(assetSearch, assetSourceId, assetStatus, assetSourceType, findingDetectorType, findingSeverity, findingStatus, findingIncludeResolved, excludeFindings, includeAssetsWithoutFindings)
+
+Export assets (with findings) as CSV
+
+Streams assets matching the current filters as a CSV download. One row per asset-finding.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AssetsApi,
+} from '@workspace/api-client';
+import type { SearchAssetsControllerExportAssetsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AssetsApi();
+
+  const body = {
+    // string | Search asset name / url / hash (optional)
+    assetSearch: assetSearch_example,
+    // string | Single source id filter (optional)
+    assetSourceId: assetSourceId_example,
+    // Array<'NEW' | 'UPDATED' | 'UNCHANGED' | 'DELETED'> (optional)
+    assetStatus: ...,
+    // Array<'JIRA' | 'CONFLUENCE' | 'CROWD' | 'BITBUCKET' | 'SERVICEDESK' | 'XRAY' | 'GOOGLE_DRIVE' | 'GOOGLE_SHEETS' | 'GOOGLE_DOCS' | 'GOOGLE_SLIDES' | 'WORDPRESS' | 'SLACK' | 'S3_COMPATIBLE_STORAGE' | 'AZURE_BLOB_STORAGE' | 'GOOGLE_CLOUD_STORAGE' | 'POSTGRESQL' | 'MYSQL' | 'MSSQL' | 'ORACLE' | 'HIVE' | 'DATABRICKS' | 'SNOWFLAKE' | 'MONGODB' | 'NEO4J' | 'SQLITE' | 'POWERBI' | 'TABLEAU' | 'CUSTOM'> (optional)
+    assetSourceType: ...,
+    // Array<'SECRETS' | 'PII' | 'YARA' | 'BROKEN_LINKS' | 'CODE_SECURITY' | 'CUSTOM'> (optional)
+    findingDetectorType: ...,
+    // Array<'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'> (optional)
+    findingSeverity: ...,
+    // Array<'OPEN' | 'FALSE_POSITIVE' | 'RESOLVED' | 'IGNORED'> (optional)
+    findingStatus: ...,
+    // boolean (optional)
+    findingIncludeResolved: true,
+    // boolean (optional)
+    excludeFindings: true,
+    // boolean (optional)
+    includeAssetsWithoutFindings: true,
+  } satisfies SearchAssetsControllerExportAssetsRequest;
+
+  try {
+    const data = await api.searchAssetsControllerExportAssets(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **assetSearch** | `string` | Search asset name / url / hash | [Optional] [Defaults to `undefined`] |
+| **assetSourceId** | `string` | Single source id filter | [Optional] [Defaults to `undefined`] |
+| **assetStatus** | `NEW`, `UPDATED`, `UNCHANGED`, `DELETED` |  | [Optional] [Enum: NEW, UPDATED, UNCHANGED, DELETED] |
+| **assetSourceType** | `JIRA`, `CONFLUENCE`, `CROWD`, `BITBUCKET`, `SERVICEDESK`, `XRAY`, `GOOGLE_DRIVE`, `GOOGLE_SHEETS`, `GOOGLE_DOCS`, `GOOGLE_SLIDES`, `WORDPRESS`, `SLACK`, `S3_COMPATIBLE_STORAGE`, `AZURE_BLOB_STORAGE`, `GOOGLE_CLOUD_STORAGE`, `POSTGRESQL`, `MYSQL`, `MSSQL`, `ORACLE`, `HIVE`, `DATABRICKS`, `SNOWFLAKE`, `MONGODB`, `NEO4J`, `SQLITE`, `POWERBI`, `TABLEAU`, `CUSTOM` |  | [Optional] [Enum: JIRA, CONFLUENCE, CROWD, BITBUCKET, SERVICEDESK, XRAY, GOOGLE_DRIVE, GOOGLE_SHEETS, GOOGLE_DOCS, GOOGLE_SLIDES, WORDPRESS, SLACK, S3_COMPATIBLE_STORAGE, AZURE_BLOB_STORAGE, GOOGLE_CLOUD_STORAGE, POSTGRESQL, MYSQL, MSSQL, ORACLE, HIVE, DATABRICKS, SNOWFLAKE, MONGODB, NEO4J, SQLITE, POWERBI, TABLEAU, CUSTOM] |
+| **findingDetectorType** | `SECRETS`, `PII`, `YARA`, `BROKEN_LINKS`, `CODE_SECURITY`, `CUSTOM` |  | [Optional] [Enum: SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM] |
+| **findingSeverity** | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO` |  | [Optional] [Enum: CRITICAL, HIGH, MEDIUM, LOW, INFO] |
+| **findingStatus** | `OPEN`, `FALSE_POSITIVE`, `RESOLVED`, `IGNORED` |  | [Optional] [Enum: OPEN, FALSE_POSITIVE, RESOLVED, IGNORED] |
+| **findingIncludeResolved** | `boolean` |  | [Optional] [Defaults to `false`] |
+| **excludeFindings** | `boolean` |  | [Optional] [Defaults to `false`] |
+| **includeAssetsWithoutFindings** | `boolean` |  | [Optional] [Defaults to `false`] |
+
+### Return type
+
+**Blob**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `text/csv`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | CSV stream of assets |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## searchAssetsControllerExportFindings
+
+> Blob searchAssetsControllerExportFindings(search, sourceId, detectorType, customDetectorKey, findingType, category, severity, status, includeResolved)
+
+Export findings as CSV
+
+Streams all findings matching the current filters as a CSV download.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AssetsApi,
+} from '@workspace/api-client';
+import type { SearchAssetsControllerExportFindingsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AssetsApi();
+
+  const body = {
+    // string (optional)
+    search: search_example,
+    // Array<string> (optional)
+    sourceId: ...,
+    // Array<'SECRETS' | 'PII' | 'YARA' | 'BROKEN_LINKS' | 'CODE_SECURITY' | 'CUSTOM'> (optional)
+    detectorType: ...,
+    // Array<string> (optional)
+    customDetectorKey: ...,
+    // Array<string> (optional)
+    findingType: ...,
+    // Array<string> (optional)
+    category: ...,
+    // Array<'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'> (optional)
+    severity: ...,
+    // Array<'OPEN' | 'FALSE_POSITIVE' | 'RESOLVED' | 'IGNORED'> (optional)
+    status: ...,
+    // boolean (optional)
+    includeResolved: true,
+  } satisfies SearchAssetsControllerExportFindingsRequest;
+
+  try {
+    const data = await api.searchAssetsControllerExportFindings(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **search** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **sourceId** | `Array<string>` |  | [Optional] |
+| **detectorType** | `SECRETS`, `PII`, `YARA`, `BROKEN_LINKS`, `CODE_SECURITY`, `CUSTOM` |  | [Optional] [Enum: SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM] |
+| **customDetectorKey** | `Array<string>` |  | [Optional] |
+| **findingType** | `Array<string>` |  | [Optional] |
+| **category** | `Array<string>` |  | [Optional] |
+| **severity** | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO` |  | [Optional] [Enum: CRITICAL, HIGH, MEDIUM, LOW, INFO] |
+| **status** | `OPEN`, `FALSE_POSITIVE`, `RESOLVED`, `IGNORED` |  | [Optional] [Enum: OPEN, FALSE_POSITIVE, RESOLVED, IGNORED] |
+| **includeResolved** | `boolean` |  | [Optional] [Defaults to `false`] |
+
+### Return type
+
+**Blob**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `text/csv`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | CSV stream of findings |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## searchAssetsControllerQueryAssets
+
+> LiveQueryResponseDto searchAssetsControllerQueryAssets(assetSearch, assetSourceId, assetStatus, assetSourceType, findingDetectorType, findingSeverity, findingStatus, findingIncludeResolved, excludeFindings, includeAssetsWithoutFindings, limit, cursor)
+
+Query assets with findings (cursor-paginated JSON)
+
+Returns a page of asset-finding rows as JSON for live consumption (e.g. Excel Power Query). Follow &#x60;nextCursor&#x60; to page through the full result set.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AssetsApi,
+} from '@workspace/api-client';
+import type { SearchAssetsControllerQueryAssetsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AssetsApi();
+
+  const body = {
+    // string | Search asset name / url / hash (optional)
+    assetSearch: assetSearch_example,
+    // string | Single source id filter (optional)
+    assetSourceId: assetSourceId_example,
+    // Array<'NEW' | 'UPDATED' | 'UNCHANGED' | 'DELETED'> (optional)
+    assetStatus: ...,
+    // Array<'JIRA' | 'CONFLUENCE' | 'CROWD' | 'BITBUCKET' | 'SERVICEDESK' | 'XRAY' | 'GOOGLE_DRIVE' | 'GOOGLE_SHEETS' | 'GOOGLE_DOCS' | 'GOOGLE_SLIDES' | 'WORDPRESS' | 'SLACK' | 'S3_COMPATIBLE_STORAGE' | 'AZURE_BLOB_STORAGE' | 'GOOGLE_CLOUD_STORAGE' | 'POSTGRESQL' | 'MYSQL' | 'MSSQL' | 'ORACLE' | 'HIVE' | 'DATABRICKS' | 'SNOWFLAKE' | 'MONGODB' | 'NEO4J' | 'SQLITE' | 'POWERBI' | 'TABLEAU' | 'CUSTOM'> (optional)
+    assetSourceType: ...,
+    // Array<'SECRETS' | 'PII' | 'YARA' | 'BROKEN_LINKS' | 'CODE_SECURITY' | 'CUSTOM'> (optional)
+    findingDetectorType: ...,
+    // Array<'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'> (optional)
+    findingSeverity: ...,
+    // Array<'OPEN' | 'FALSE_POSITIVE' | 'RESOLVED' | 'IGNORED'> (optional)
+    findingStatus: ...,
+    // boolean (optional)
+    findingIncludeResolved: true,
+    // boolean (optional)
+    excludeFindings: true,
+    // boolean (optional)
+    includeAssetsWithoutFindings: true,
+    // string | Page size (default 1000, max 10000) (optional)
+    limit: limit_example,
+    // string | Opaque cursor from a previous page (optional)
+    cursor: cursor_example,
+  } satisfies SearchAssetsControllerQueryAssetsRequest;
+
+  try {
+    const data = await api.searchAssetsControllerQueryAssets(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **assetSearch** | `string` | Search asset name / url / hash | [Optional] [Defaults to `undefined`] |
+| **assetSourceId** | `string` | Single source id filter | [Optional] [Defaults to `undefined`] |
+| **assetStatus** | `NEW`, `UPDATED`, `UNCHANGED`, `DELETED` |  | [Optional] [Enum: NEW, UPDATED, UNCHANGED, DELETED] |
+| **assetSourceType** | `JIRA`, `CONFLUENCE`, `CROWD`, `BITBUCKET`, `SERVICEDESK`, `XRAY`, `GOOGLE_DRIVE`, `GOOGLE_SHEETS`, `GOOGLE_DOCS`, `GOOGLE_SLIDES`, `WORDPRESS`, `SLACK`, `S3_COMPATIBLE_STORAGE`, `AZURE_BLOB_STORAGE`, `GOOGLE_CLOUD_STORAGE`, `POSTGRESQL`, `MYSQL`, `MSSQL`, `ORACLE`, `HIVE`, `DATABRICKS`, `SNOWFLAKE`, `MONGODB`, `NEO4J`, `SQLITE`, `POWERBI`, `TABLEAU`, `CUSTOM` |  | [Optional] [Enum: JIRA, CONFLUENCE, CROWD, BITBUCKET, SERVICEDESK, XRAY, GOOGLE_DRIVE, GOOGLE_SHEETS, GOOGLE_DOCS, GOOGLE_SLIDES, WORDPRESS, SLACK, S3_COMPATIBLE_STORAGE, AZURE_BLOB_STORAGE, GOOGLE_CLOUD_STORAGE, POSTGRESQL, MYSQL, MSSQL, ORACLE, HIVE, DATABRICKS, SNOWFLAKE, MONGODB, NEO4J, SQLITE, POWERBI, TABLEAU, CUSTOM] |
+| **findingDetectorType** | `SECRETS`, `PII`, `YARA`, `BROKEN_LINKS`, `CODE_SECURITY`, `CUSTOM` |  | [Optional] [Enum: SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM] |
+| **findingSeverity** | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO` |  | [Optional] [Enum: CRITICAL, HIGH, MEDIUM, LOW, INFO] |
+| **findingStatus** | `OPEN`, `FALSE_POSITIVE`, `RESOLVED`, `IGNORED` |  | [Optional] [Enum: OPEN, FALSE_POSITIVE, RESOLVED, IGNORED] |
+| **findingIncludeResolved** | `boolean` |  | [Optional] [Defaults to `false`] |
+| **excludeFindings** | `boolean` |  | [Optional] [Defaults to `false`] |
+| **includeAssetsWithoutFindings** | `boolean` |  | [Optional] [Defaults to `false`] |
+| **limit** | `string` | Page size (default 1000, max 10000) | [Optional] [Defaults to `undefined`] |
+| **cursor** | `string` | Opaque cursor from a previous page | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**LiveQueryResponseDto**](LiveQueryResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## searchAssetsControllerQueryFindings
+
+> LiveQueryResponseDto searchAssetsControllerQueryFindings(search, sourceId, detectorType, customDetectorKey, findingType, category, severity, status, includeResolved, limit, cursor)
+
+Query findings (cursor-paginated JSON)
+
+Returns a page of findings as JSON for live consumption (e.g. Excel Power Query). Follow &#x60;nextCursor&#x60; to page through the full result set. Order is stable for incremental refresh; sort/filter in the client.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AssetsApi,
+} from '@workspace/api-client';
+import type { SearchAssetsControllerQueryFindingsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AssetsApi();
+
+  const body = {
+    // string (optional)
+    search: search_example,
+    // Array<string> (optional)
+    sourceId: ...,
+    // Array<'SECRETS' | 'PII' | 'YARA' | 'BROKEN_LINKS' | 'CODE_SECURITY' | 'CUSTOM'> (optional)
+    detectorType: ...,
+    // Array<string> (optional)
+    customDetectorKey: ...,
+    // Array<string> (optional)
+    findingType: ...,
+    // Array<string> (optional)
+    category: ...,
+    // Array<'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'> (optional)
+    severity: ...,
+    // Array<'OPEN' | 'FALSE_POSITIVE' | 'RESOLVED' | 'IGNORED'> (optional)
+    status: ...,
+    // boolean (optional)
+    includeResolved: true,
+    // string | Page size (default 1000, max 10000) (optional)
+    limit: limit_example,
+    // string | Opaque cursor from a previous page (optional)
+    cursor: cursor_example,
+  } satisfies SearchAssetsControllerQueryFindingsRequest;
+
+  try {
+    const data = await api.searchAssetsControllerQueryFindings(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **search** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **sourceId** | `Array<string>` |  | [Optional] |
+| **detectorType** | `SECRETS`, `PII`, `YARA`, `BROKEN_LINKS`, `CODE_SECURITY`, `CUSTOM` |  | [Optional] [Enum: SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM] |
+| **customDetectorKey** | `Array<string>` |  | [Optional] |
+| **findingType** | `Array<string>` |  | [Optional] |
+| **category** | `Array<string>` |  | [Optional] |
+| **severity** | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO` |  | [Optional] [Enum: CRITICAL, HIGH, MEDIUM, LOW, INFO] |
+| **status** | `OPEN`, `FALSE_POSITIVE`, `RESOLVED`, `IGNORED` |  | [Optional] [Enum: OPEN, FALSE_POSITIVE, RESOLVED, IGNORED] |
+| **includeResolved** | `boolean` |  | [Optional] [Defaults to `false`] |
+| **limit** | `string` | Page size (default 1000, max 10000) | [Optional] [Defaults to `undefined`] |
+| **cursor** | `string` | Opaque cursor from a previous page | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**LiveQueryResponseDto**](LiveQueryResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

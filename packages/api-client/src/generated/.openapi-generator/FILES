@@ -66,6 +66,7 @@ docs/InstanceSettingsApi.md
 docs/InstanceSettingsResponseDto.md
 docs/LatestRunnerSummaryDto.md
 docs/ListRunnersResponseDto.md
+docs/LiveQueryResponseDto.md
 docs/LocationDto.md
 docs/MarkAllReadDto.md
 docs/McpCapabilityGroupDto.md
@@ -244,6 +245,7 @@ src/models/HealthControllerGetHealth200Response.ts
 src/models/InstanceSettingsResponseDto.ts
 src/models/LatestRunnerSummaryDto.ts
 src/models/ListRunnersResponseDto.ts
+src/models/LiveQueryResponseDto.ts
 src/models/LocationDto.ts
 src/models/MarkAllReadDto.ts
 src/models/McpCapabilityGroupDto.ts

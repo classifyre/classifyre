@@ -882,6 +882,686 @@
         ]
       }
     },
+    "/search/findings/query": {
+      "get": {
+        "description": "Returns a page of findings as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set. Order is stable for incremental refresh; sort/filter in the client.",
+        "operationId": "SearchAssetsController_queryFindings",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "detectorType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "SECRETS",
+                  "PII",
+                  "YARA",
+                  "BROKEN_LINKS",
+                  "CODE_SECURITY",
+                  "CUSTOM"
+                ]
+              }
+            }
+          },
+          {
+            "name": "customDetectorKey",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "findingType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "CRITICAL",
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW",
+                  "INFO"
+                ]
+              }
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "OPEN",
+                  "FALSE_POSITIVE",
+                  "RESOLVED",
+                  "IGNORED"
+                ]
+              }
+            }
+          },
+          {
+            "name": "includeResolved",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Page size (default 1000, max 10000)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from a previous page",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveQueryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Query findings (cursor-paginated JSON)",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/search/assets/query": {
+      "get": {
+        "description": "Returns a page of asset-finding rows as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set.",
+        "operationId": "SearchAssetsController_queryAssets",
+        "parameters": [
+          {
+            "name": "asset_search",
+            "required": false,
+            "in": "query",
+            "description": "Search asset name / url / hash",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asset_sourceId",
+            "required": false,
+            "in": "query",
+            "description": "Single source id filter",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asset_status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "NEW",
+                  "UPDATED",
+                  "UNCHANGED",
+                  "DELETED"
+                ]
+              }
+            }
+          },
+          {
+            "name": "asset_sourceType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "JIRA",
+                  "CONFLUENCE",
+                  "CROWD",
+                  "BITBUCKET",
+                  "SERVICEDESK",
+                  "XRAY",
+                  "GOOGLE_DRIVE",
+                  "GOOGLE_SHEETS",
+                  "GOOGLE_DOCS",
+                  "GOOGLE_SLIDES",
+                  "WORDPRESS",
+                  "SLACK",
+                  "S3_COMPATIBLE_STORAGE",
+                  "AZURE_BLOB_STORAGE",
+                  "GOOGLE_CLOUD_STORAGE",
+                  "POSTGRESQL",
+                  "MYSQL",
+                  "MSSQL",
+                  "ORACLE",
+                  "HIVE",
+                  "DATABRICKS",
+                  "SNOWFLAKE",
+                  "MONGODB",
+                  "NEO4J",
+                  "SQLITE",
+                  "POWERBI",
+                  "TABLEAU",
+                  "CUSTOM"
+                ]
+              }
+            }
+          },
+          {
+            "name": "finding_detectorType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "SECRETS",
+                  "PII",
+                  "YARA",
+                  "BROKEN_LINKS",
+                  "CODE_SECURITY",
+                  "CUSTOM"
+                ]
+              }
+            }
+          },
+          {
+            "name": "finding_severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "CRITICAL",
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW",
+                  "INFO"
+                ]
+              }
+            }
+          },
+          {
+            "name": "finding_status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "OPEN",
+                  "FALSE_POSITIVE",
+                  "RESOLVED",
+                  "IGNORED"
+                ]
+              }
+            }
+          },
+          {
+            "name": "finding_includeResolved",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "excludeFindings",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "includeAssetsWithoutFindings",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Page size (default 1000, max 10000)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from a previous page",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveQueryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Query assets with findings (cursor-paginated JSON)",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/search/findings/export": {
+      "get": {
+        "description": "Streams all findings matching the current filters as a CSV download.",
+        "operationId": "SearchAssetsController_exportFindings",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "detectorType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "SECRETS",
+                  "PII",
+                  "YARA",
+                  "BROKEN_LINKS",
+                  "CODE_SECURITY",
+                  "CUSTOM"
+                ]
+              }
+            }
+          },
+          {
+            "name": "customDetectorKey",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "findingType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "CRITICAL",
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW",
+                  "INFO"
+                ]
+              }
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "OPEN",
+                  "FALSE_POSITIVE",
+                  "RESOLVED",
+                  "IGNORED"
+                ]
+              }
+            }
+          },
+          {
+            "name": "includeResolved",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV stream of findings",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Export findings as CSV",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/search/assets/export": {
+      "get": {
+        "description": "Streams assets matching the current filters as a CSV download. One row per asset-finding.",
+        "operationId": "SearchAssetsController_exportAssets",
+        "parameters": [
+          {
+            "name": "asset_search",
+            "required": false,
+            "in": "query",
+            "description": "Search asset name / url / hash",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asset_sourceId",
+            "required": false,
+            "in": "query",
+            "description": "Single source id filter",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asset_status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "NEW",
+                  "UPDATED",
+                  "UNCHANGED",
+                  "DELETED"
+                ]
+              }
+            }
+          },
+          {
+            "name": "asset_sourceType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "JIRA",
+                  "CONFLUENCE",
+                  "CROWD",
+                  "BITBUCKET",
+                  "SERVICEDESK",
+                  "XRAY",
+                  "GOOGLE_DRIVE",
+                  "GOOGLE_SHEETS",
+                  "GOOGLE_DOCS",
+                  "GOOGLE_SLIDES",
+                  "WORDPRESS",
+                  "SLACK",
+                  "S3_COMPATIBLE_STORAGE",
+                  "AZURE_BLOB_STORAGE",
+                  "GOOGLE_CLOUD_STORAGE",
+                  "POSTGRESQL",
+                  "MYSQL",
+                  "MSSQL",
+                  "ORACLE",
+                  "HIVE",
+                  "DATABRICKS",
+                  "SNOWFLAKE",
+                  "MONGODB",
+                  "NEO4J",
+                  "SQLITE",
+                  "POWERBI",
+                  "TABLEAU",
+                  "CUSTOM"
+                ]
+              }
+            }
+          },
+          {
+            "name": "finding_detectorType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "SECRETS",
+                  "PII",
+                  "YARA",
+                  "BROKEN_LINKS",
+                  "CODE_SECURITY",
+                  "CUSTOM"
+                ]
+              }
+            }
+          },
+          {
+            "name": "finding_severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "CRITICAL",
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW",
+                  "INFO"
+                ]
+              }
+            }
+          },
+          {
+            "name": "finding_status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "OPEN",
+                  "FALSE_POSITIVE",
+                  "RESOLVED",
+                  "IGNORED"
+                ]
+              }
+            }
+          },
+          {
+            "name": "finding_includeResolved",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "excludeFindings",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "includeAssetsWithoutFindings",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV stream of assets",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Export assets (with findings) as CSV",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
     "/search/assets": {
       "post": {
         "description": "Search paginated assets and their matching findings with nested body filters.",
@@ -3750,6 +4430,141 @@
         ]
       }
     },
+    "/search/runner-assets/query": {
+      "get": {
+        "description": "Returns a page of runner_assets rows as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set.",
+        "operationId": "SearchRunnersController_queryRunnerAssets",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "PENDING",
+                  "PROCESSING",
+                  "PROCESSED",
+                  "ERROR"
+                ]
+              }
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Page size (default 1000, max 10000)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from a previous page",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveQueryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Query runner assets (cursor-paginated JSON)",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
+    "/search/runner-assets/export": {
+      "get": {
+        "description": "Streams runner_assets rows for a runner matching the current filters as a CSV download.",
+        "operationId": "SearchRunnersController_exportRunnerAssets",
+        "parameters": [
+          {
+            "name": "runnerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "PENDING",
+                  "PROCESSING",
+                  "PROCESSED",
+                  "ERROR"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV stream of runner assets",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Export runner assets as CSV",
+        "tags": [
+          "Runners"
+        ]
+      }
+    },
     "/search/runners": {
       "post": {
         "description": "Search paginated runners with nested body filters and server-side sorting.",
@@ -5329,6 +6144,28 @@
           "status",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "LiveQueryResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "Page of result rows. Each row is a flat object keyed by column name.",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "Opaque cursor for the next page, or null when this is the last page. Pass it back as the `cursor` query param to fetch the next page.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
         ]
       },
       "SearchAssetsFiltersDto": {
