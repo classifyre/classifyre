@@ -309,7 +309,7 @@ export default async function RootLayout({
             navbar={navbar}
             footer={footer}
             pageMap={pageMap}
-            docsRepositoryBase="https://github.com/Ostap-Bender/unstructured/tree/main/apps/blog"
+            docsRepositoryBase="https://github.com/classifyre-com/classifyre/tree/main/apps/blog"
             sidebar={{
                 defaultMenuCollapseLevel: 2,
                 defaultOpen: true,

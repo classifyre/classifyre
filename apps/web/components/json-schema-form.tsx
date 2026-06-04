@@ -2209,6 +2209,7 @@ export const JsonSchemaForm = React.forwardRef<
     JIRA: false,
     SERVICEDESK: false,
     SQLITE: true,
+    NOTION: false,
   };
   const isTabular =
     assistantSourceType && isIngestionSourceType(assistantSourceType)

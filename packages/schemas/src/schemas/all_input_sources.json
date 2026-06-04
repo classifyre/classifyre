@@ -62,6 +62,9 @@
     },
     {
       "$ref": "#/definitions/SQLiteInput"
+    },
+    {
+      "$ref": "#/definitions/NotionInput"
     }
   ],
   "definitions": {
@@ -87,7 +90,8 @@
         "CONFLUENCE",
         "JIRA",
         "SERVICEDESK",
-        "SQLITE"
+        "SQLITE",
+        "NOTION"
       ],
       "description": "Type of the asset or source"
     },
@@ -4395,6 +4399,182 @@
           },
           "required": [
             "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "NotionRequired": {
+      "title": "NotionRequired",
+      "type": "object",
+      "description": "Notion has no required connection fields; the integration token lives in the masked section.",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "NotionMasked": {
+      "title": "NotionMasked",
+      "type": "object",
+      "properties": {
+        "notion_token": {
+          "type": "string",
+          "description": "Notion API token used as a Bearer credential. Accepts an internal integration secret (ntn_...) or an OAuth public-integration access token."
+        }
+      },
+      "required": [
+        "notion_token"
+      ],
+      "additionalProperties": false
+    },
+    "NotionOptionalConnection": {
+      "title": "NotionOptionalConnection",
+      "type": "object",
+      "description": "HTTP, version, and retry settings for Notion API calls.",
+      "properties": {
+        "notion_version": {
+          "type": "string",
+          "default": "2025-09-03",
+          "description": "Notion-Version header sent with every request. Defaults to the data-sources API version."
+        },
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "default": 30,
+          "description": "HTTP request timeout for Notion API calls"
+        },
+        "rate_limit_delay_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Additional delay between API requests to reduce rate-limit pressure"
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3,
+          "description": "Maximum retry attempts for transient API failures and rate limits"
+        }
+      },
+      "additionalProperties": false
+    },
+    "NotionOptionalScope": {
+      "title": "NotionOptionalScope",
+      "type": "object",
+      "description": "Optional Notion scope filters. When omitted, all content shared with the integration is eligible for sampling.",
+      "properties": {
+        "page_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 250,
+          "description": "Restrict extraction to specific page IDs (up to 250)"
+        },
+        "data_source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 250,
+          "description": "Restrict extraction to specific data source IDs (up to 250)"
+        },
+        "search_query": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional full-text query passed to the Notion search endpoint to narrow discovery"
+        }
+      },
+      "additionalProperties": false
+    },
+    "NotionOptionalContent": {
+      "title": "NotionOptionalContent",
+      "type": "object",
+      "description": "Notion content extraction controls.",
+      "properties": {
+        "include_comments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include page and block comments and aggregate them into a per-page comments asset"
+        },
+        "include_files": {
+          "type": "boolean",
+          "default": true,
+          "description": "Materialize files from file/image/pdf/video blocks, file properties, and page icon/cover as related assets"
+        },
+        "include_linked_pages": {
+          "type": "boolean",
+          "default": true,
+          "description": "Wire parent, relation, and mention references between pages into the asset links graph"
+        },
+        "include_data_sources": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit Notion data sources (databases) as assets with their schema and link their row pages"
+        },
+        "file_max_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "default": 5242880,
+          "description": "Maximum bytes downloaded per file for MIME inference and text extraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "NotionOptional": {
+      "title": "NotionOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/NotionOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/NotionOptionalScope"
+        },
+        "content": {
+          "$ref": "#/definitions/NotionOptionalContent"
+        }
+      },
+      "additionalProperties": false
+    },
+    "NotionInput": {
+      "title": "NotionInput",
+      "label": "Notion",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "NOTION"
+            },
+            "required": {
+              "$ref": "#/definitions/NotionRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/NotionMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/NotionOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
             "sampling"
           ],
           "additionalProperties": false

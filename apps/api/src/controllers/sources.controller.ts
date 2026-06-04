@@ -315,6 +315,31 @@ export class SourcesController {
           },
         },
       },
+      notion: {
+        summary: 'Notion Source',
+        value: {
+          type: 'NOTION',
+          name: 'Product Notion',
+          config: {
+            type: 'NOTION',
+            required: {},
+            masked: {
+              notion_token: 'ntn_your-internal-integration-token',
+            },
+            optional: {
+              content: {
+                include_comments: true,
+                include_files: true,
+                include_data_sources: true,
+              },
+            },
+            sampling: {
+              strategy: 'LATEST',
+              rows_per_page: 50,
+            },
+          },
+        },
+      },
       servicedesk: {
         summary: 'Service Desk Source',
         value: {
