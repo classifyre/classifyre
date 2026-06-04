@@ -21,6 +21,7 @@ from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ...utils.embedded_images import EmbeddedImage, has_embedded_images, iter_embedded_images
+from ...utils.file_metadata import extract_file_metadata
 from ...utils.file_parser import infer_mime_type_from_file_name, resolve_mime_type
 from ...utils.hashing import hash_id, unhash_id
 from ..base import BaseSource
@@ -412,6 +413,26 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 }
             )
 
+        # Normalized metadata persisted on the asset (consistent keys across
+        # sources). Merge richer file-level metadata when the bytes are available.
+        asset_metadata: dict[str, Any] = {
+            "provider": self.provider_label,
+            "object_key": ref.key,
+            "size_bytes": ref.size,
+            "mime_type": snapshot.mime_type,
+        }
+        if ref.etag:
+            asset_metadata["etag"] = ref.etag
+        if snapshot.parse_error:
+            asset_metadata["parse_error"] = snapshot.parse_error
+        if snapshot.raw_bytes is not None:
+            file_meta = extract_file_metadata(
+                snapshot.raw_bytes,
+                snapshot.mime_type,
+                file_name=ref.key,
+            )
+            asset_metadata.update({k: v for k, v in file_meta.items() if v is not None})
+
         asset = SingleAssetScanResults(
             hash=asset_hash,
             checksum=self.calculate_checksum(metadata),
@@ -423,6 +444,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             created_at=ref.last_modified,
             updated_at=ref.last_modified,
             runner_id=self.runner_id,
+            metadata=asset_metadata,
         )
         self._hash_to_uri[asset_hash] = external_url
         self._object_ref_by_hash[asset_hash] = ref

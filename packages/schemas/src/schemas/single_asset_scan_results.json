@@ -103,6 +103,20 @@
       "default": null,
       "description": "Statistics about the detector scan for this asset",
       "title": "Scan Stats"
+    },
+    "metadata": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Source-specific asset metadata using normalized keys (size_bytes, row_count, etc.) where applicable",
+      "title": "Metadata"
     }
   },
   "required": [

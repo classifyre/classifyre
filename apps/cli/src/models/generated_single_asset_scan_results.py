@@ -238,3 +238,8 @@ class SingleAssetScanResults(BaseModel):
         description='Statistics about the detector scan for this asset',
         title='Scan Stats',
     )
+    metadata: dict[str, Any] | None = Field(
+        None,
+        description='Source-specific asset metadata using normalized keys (size_bytes, row_count, etc.) where applicable',
+        title='Metadata',
+    )

@@ -57,7 +57,10 @@ const findingForAssetSelect = {
   updatedAt: true,
 } satisfies Prisma.FindingSelect;
 
-type NormalizedAsset = Omit<Asset, 'links'> & { links: string[] };
+type NormalizedAsset = Omit<Asset, 'links' | 'metadata'> & {
+  links: string[];
+  metadata?: Record<string, unknown>;
+};
 
 type RawFindingForAssetListItem = Prisma.FindingGetPayload<{
   select: typeof findingForAssetSelect;
@@ -191,6 +194,26 @@ export class AssetService {
     return value
       .map((entry) => String(entry).trim())
       .filter((entry) => entry.length > 0);
+  }
+
+  /**
+   * Accepts the source-supplied `metadata` object and returns it for JSONB
+   * persistence, or `undefined` when absent/invalid so existing values are
+   * preserved on update (never overwritten with null).
+   */
+  private normalizeMetadata(value: unknown): Prisma.InputJsonValue | undefined {
+    if (value != null && typeof value === 'object' && !Array.isArray(value)) {
+      return value;
+    }
+    return undefined;
+  }
+
+  /** Read-side: coerce a JSONB column into a plain object for response DTOs. */
+  private metadataRecord(value: unknown): Record<string, unknown> | undefined {
+    if (value != null && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    return undefined;
   }
 
   private normalizeBoolean(value: unknown): boolean {
@@ -597,6 +620,7 @@ export class AssetService {
     return {
       ...asset,
       links: this.normalizeLinks(asset.links),
+      metadata: this.metadataRecord(asset.metadata),
     };
   }
 
@@ -626,7 +650,7 @@ export class AssetService {
     status?: AssetStatus[];
     sourceTypes?: AssetType[];
   }): Promise<{
-    items: Array<Omit<Asset, 'links'> & { links: string[] }>;
+    items: NormalizedAsset[];
     total: number;
     skip: number;
     limit: number;
@@ -690,6 +714,7 @@ export class AssetService {
     const normalizedItems = items.map((item) => ({
       ...item,
       links: this.normalizeLinks(item.links),
+      metadata: this.metadataRecord(item.metadata),
     }));
 
     return {
@@ -839,6 +864,7 @@ export class AssetService {
           asset: {
             ...asset,
             links: this.normalizeLinks(asset.links),
+            metadata: this.metadataRecord(asset.metadata),
           },
           findings: [],
         })),
@@ -903,6 +929,7 @@ export class AssetService {
         asset: {
           ...asset,
           links: this.normalizeLinks(asset.links),
+          metadata: this.metadataRecord(asset.metadata),
         },
         findings: findingsByAssetId.get(asset.id) ?? [],
       })),
@@ -1511,6 +1538,12 @@ export class AssetService {
             ? this.mergeLinks(existingAsset.links, incomingLinks)
             : incomingLinks;
 
+          // Kept out of `assetData` (which seeds the Asset-typed map) because
+          // Prisma's write-time InputJsonValue is not assignable to the model's
+          // JsonValue. Added only to the DB create/update payloads below.
+          const metadata = this.normalizeMetadata(asset.metadata);
+          const metadataPayload = metadata !== undefined ? { metadata } : {};
+
           const assetData = {
             checksum: String(checksum),
             name: String(name),
@@ -1528,6 +1561,7 @@ export class AssetService {
             assetsToCreate.push({
               hash: assetHash,
               ...assetData,
+              ...metadataPayload,
               status: AssetStatus.NEW,
             });
           } else if (existingAsset.checksum !== String(checksum)) {
@@ -1536,6 +1570,7 @@ export class AssetService {
               id: existingAsset.id,
               data: {
                 ...assetData,
+                ...metadataPayload,
                 status: AssetStatus.UPDATED,
               },
             });
@@ -1592,6 +1627,18 @@ export class AssetService {
               status: AssetStatus.UNCHANGED,
               lastScannedAt: scannedAt,
             },
+          });
+        }
+
+        // Denormalize metadata onto the runner_asset row (keyed by runnerId +
+        // assetHash) for convenient display without an Asset join. updateMany
+        // no-ops when the row was not (yet) registered for this runner.
+        for (const asset of batch) {
+          const metadata = this.normalizeMetadata(asset.metadata);
+          if (metadata === undefined) continue;
+          await tx.runnerAsset.updateMany({
+            where: { runnerId, assetHash: String(asset.hash) },
+            data: { metadata },
           });
         }
 

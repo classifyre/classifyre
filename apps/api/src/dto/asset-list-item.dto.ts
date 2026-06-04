@@ -43,4 +43,11 @@ export class AssetListItemDto {
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiPropertyOptional({
+    description: 'Source-specific asset metadata',
+    type: 'object',
+    additionalProperties: true,
+  })
+  metadata?: Record<string, unknown>;
 }

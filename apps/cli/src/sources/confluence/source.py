@@ -313,6 +313,20 @@ class ConfluenceSource(BaseSource):
             "status": page.get("status"),
             "links_count": len(related_hashes),
         }
+        asset_metadata: dict[str, Any] = {
+            "page_id": page_id,
+            "title": title,
+            "links_count": len(related_hashes),
+        }
+        space_id = page.get("spaceId")
+        if space_id is not None:
+            asset_metadata["space_key"] = str(space_id)
+        status = page.get("status")
+        if isinstance(status, str) and status:
+            asset_metadata["status"] = status
+        author_id = page.get("authorId")
+        if isinstance(author_id, str) and author_id:
+            asset_metadata["author"] = author_id
         page_asset = SingleAssetScanResults(
             hash=page_hash,
             checksum=self.calculate_checksum(page_metadata),
@@ -330,6 +344,7 @@ class ConfluenceSource(BaseSource):
                 )
             ),
             runner_id=self.runner_id,
+            metadata=asset_metadata,
         )
 
         return [page_asset, *related_assets]
@@ -368,6 +383,15 @@ class ConfluenceSource(BaseSource):
             if download_url:
                 self._attachment_download_url_by_hash[attachment_hash] = download_url
 
+            attachment_metadata: dict[str, Any] = {
+                "title": attachment_name,
+                "page_hash": page_hash,
+            }
+            if mime:
+                attachment_metadata["mime_type"] = mime
+            file_size = attachment.get("fileSize")
+            if isinstance(file_size, int):
+                attachment_metadata["size_bytes"] = file_size
             assets.append(
                 SingleAssetScanResults(
                     hash=attachment_hash,
@@ -380,6 +404,7 @@ class ConfluenceSource(BaseSource):
                     created_at=now,
                     updated_at=now,
                     runner_id=self.runner_id,
+                    metadata=attachment_metadata,
                 )
             )
             hashes.append(attachment_hash)
@@ -453,6 +478,10 @@ class ConfluenceSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
+            metadata={
+                "page_id": page_id,
+                "comments_count": len(comment_items),
+            },
         )
         return comments_asset, [comments_hash]
 
@@ -578,6 +607,7 @@ class ConfluenceSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
+            metadata={"referenced_by": page_hash},
         )
 
     def _display_name_from_url(self, url: str) -> str:

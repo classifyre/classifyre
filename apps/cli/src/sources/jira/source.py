@@ -286,6 +286,7 @@ class JiraSource(BaseSource):
             created_at=parse_datetime(str(fields.get("created") or "")),
             updated_at=parse_datetime(str(fields.get("updated") or "")),
             runner_id=self.runner_id,
+            metadata=self._normalized_issue_metadata(issue_key, fields, len(issue_links)),
         )
 
         assets: list[SingleAssetScanResults] = [issue_asset]
@@ -413,6 +414,18 @@ class JiraSource(BaseSource):
                 "size": attachment.get("size"),
                 "filename": filename,
             }
+            attachment_metadata: dict[str, Any] = {
+                "issue_hash": issue_hash,
+                "filename": filename,
+            }
+            if mime:
+                attachment_metadata["mime_type"] = mime
+            size = attachment.get("size")
+            if isinstance(size, int):
+                attachment_metadata["size_bytes"] = size
+            author = self._user_display(attachment.get("author"))
+            if author:
+                attachment_metadata["author"] = author
             assets.append(
                 SingleAssetScanResults(
                     hash=attachment_hash,
@@ -425,6 +438,7 @@ class JiraSource(BaseSource):
                     created_at=now,
                     updated_at=now,
                     runner_id=self.runner_id,
+                    metadata=attachment_metadata,
                 )
             )
             hashes.append(attachment_hash)
@@ -460,6 +474,50 @@ class JiraSource(BaseSource):
             if isinstance(name, str):
                 return name
         return str(value or "")
+
+    def _user_display(self, value: Any) -> str | None:
+        if isinstance(value, dict):
+            for key in ("emailAddress", "displayName", "name"):
+                candidate = value.get(key)
+                if isinstance(candidate, str) and candidate:
+                    return candidate
+        return None
+
+    def _normalized_issue_metadata(
+        self,
+        issue_key: str,
+        fields: dict[str, Any],
+        links_count: int,
+    ) -> dict[str, Any]:
+        """Build normalized + Jira-specific metadata from flattened issue fields."""
+        metadata: dict[str, Any] = {
+            "issue_key": issue_key,
+            "links_count": links_count,
+        }
+        issue_type = self._value_name(fields.get("issuetype"))
+        if issue_type:
+            metadata["issue_type"] = issue_type
+        status = self._value_name(fields.get("status"))
+        if status:
+            metadata["status"] = status
+        priority = self._value_name(fields.get("priority"))
+        if priority:
+            metadata["priority"] = priority
+        project = fields.get("project")
+        if isinstance(project, dict) and isinstance(project.get("key"), str):
+            metadata["project_key"] = project["key"]
+        assignee = self._user_display(fields.get("assignee"))
+        if assignee:
+            metadata["assignee"] = assignee
+        author = self._user_display(fields.get("reporter"))
+        if author:
+            metadata["author"] = author
+        labels = fields.get("labels")
+        if isinstance(labels, list):
+            tags = [label for label in labels if isinstance(label, str) and label]
+            if tags:
+                metadata["tags"] = tags
+        return metadata
 
     def _asset_type_from_mime_or_name(
         self,

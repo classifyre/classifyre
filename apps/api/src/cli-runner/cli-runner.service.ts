@@ -3230,6 +3230,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           findings_total: number | null;
           findings_by_severity: Record<string, number> | null;
           findings_by_detector: Record<string, number> | null;
+          metadata: Prisma.JsonValue;
           created_at: Date;
         }>
       >(
@@ -3249,6 +3250,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         findingsTotal: row.findings_total,
         findingsBySeverity: row.findings_by_severity,
         findingsByDetector: row.findings_by_detector,
+        metadata: row.metadata,
         createdAt: row.created_at,
       }));
     } else {
@@ -3295,10 +3297,16 @@ export class CliRunnerService implements OnApplicationBootstrap {
         status: true,
         createdAt: true,
         updatedAt: true,
+        metadata: true,
       },
     });
 
     const assetByHash = new Map(assets.map((a) => [a.hash, a]));
+
+    const asMetadata = (value: unknown): Record<string, unknown> | null =>
+      value != null && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : null;
 
     const items = runnerAssets.map((ra) => {
       const asset = assetByHash.get(ra.assetHash) ?? null;
@@ -3324,6 +3332,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           !Array.isArray(ra.findingsByDetector)
             ? (ra.findingsByDetector as Record<string, Record<string, number>>)
             : null,
+        metadata: asMetadata(ra.metadata) ?? asMetadata(asset?.metadata),
         asset: asset
           ? {
               id: asset.id,
@@ -3340,6 +3349,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
               status: asset.status,
               createdAt: asset.createdAt,
               updatedAt: asset.updatedAt,
+              metadata: asMetadata(asset.metadata) ?? undefined,
             }
           : null,
       };

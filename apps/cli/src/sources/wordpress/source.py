@@ -348,6 +348,29 @@ class WordPressSource(BaseSource):
             "links_count": len(link_urls),
         }
 
+        asset_metadata: dict[str, Any] = {
+            "wp_id": wp_id,
+            "title": title,
+            "links_count": len(link_urls),
+        }
+        if slug:
+            asset_metadata["slug"] = slug
+        status = item.get("status")
+        if isinstance(status, str) and status:
+            asset_metadata["status"] = status
+        post_type = item.get("type")
+        if isinstance(post_type, str) and post_type:
+            asset_metadata["post_type"] = post_type
+        author = item.get("author")
+        if author is not None:
+            asset_metadata["author"] = str(author)
+        tags = item.get("tags")
+        if isinstance(tags, list) and tags:
+            asset_metadata["tags"] = [str(tag) for tag in tags]
+        categories = item.get("categories")
+        if isinstance(categories, list) and categories:
+            asset_metadata["categories"] = [str(cat) for cat in categories]
+
         page_asset = SingleAssetScanResults(
             hash=page_hash,
             checksum=self.calculate_checksum(metadata),
@@ -359,6 +382,7 @@ class WordPressSource(BaseSource):
             created_at=created_dt,
             updated_at=updated_dt,
             runner_id=self.runner_id,
+            metadata=asset_metadata,
         )
 
         image_assets = [
@@ -443,6 +467,7 @@ class WordPressSource(BaseSource):
             created_at=created_at,
             updated_at=updated_at,
             runner_id=self.runner_id,
+            metadata={"referenced_by": page_hash},
         )
 
     def _image_name_from_url(self, image_url: str) -> str:
