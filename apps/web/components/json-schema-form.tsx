@@ -2144,6 +2144,7 @@ export const JsonSchemaForm = React.forwardRef<
   const properties = schema.properties || {};
   const required = new Set(schema.required || []);
   const nameSchema = properties.name as JSONSchema7 | undefined;
+  const descriptionSchema = properties.description as JSONSchema7 | undefined;
   const getBlockEntry = (aliases: string[]) => {
     for (const key of aliases) {
       const candidate = properties[key] as JSONSchema7 | undefined;
@@ -2228,6 +2229,7 @@ export const JsonSchemaForm = React.forwardRef<
     .filter(
       ([key, value]) =>
         key !== "name" &&
+        key !== "description" &&
         !reservedBlockKeys.has(key) &&
         !isConstField(value as JSONSchema7),
     )
@@ -2317,14 +2319,26 @@ export const JsonSchemaForm = React.forwardRef<
                     : undefined
                 }
               >
-                <SchemaField
-                  name="name"
-                  schema={nameSchema}
-                  control={form.control}
-                  required={required.has("name")}
-                  disabled={disabled}
-                  autoDetectSensitiveFields={autoDetectSensitiveFields}
-                />
+                <div className="space-y-4">
+                  <SchemaField
+                    name="name"
+                    schema={nameSchema}
+                    control={form.control}
+                    required={required.has("name")}
+                    disabled={disabled}
+                    autoDetectSensitiveFields={autoDetectSensitiveFields}
+                  />
+                  {descriptionSchema && (
+                    <SchemaField
+                      name="description"
+                      schema={descriptionSchema}
+                      control={form.control}
+                      required={required.has("description")}
+                      disabled={disabled}
+                      autoDetectSensitiveFields={autoDetectSensitiveFields}
+                    />
+                  )}
+                </div>
               </AiAssistedCard>
             );
           })()}
