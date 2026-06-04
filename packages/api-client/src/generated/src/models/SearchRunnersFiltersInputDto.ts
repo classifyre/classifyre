@@ -99,6 +99,7 @@ export const SearchRunnersFiltersInputDtoSourceTypeEnum = {
     Mongodb: 'MONGODB',
     Neo4J: 'NEO4J',
     Sqlite: 'SQLITE',
+    Notion: 'NOTION',
     Powerbi: 'POWERBI',
     Tableau: 'TABLEAU',
     Custom: 'CUSTOM'

@@ -203,6 +203,13 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     category: "DATABASES",
     keywords: ["sql", "file", "embedded", "local", "rdbms"],
   },
+  NOTION: {
+    description:
+      "Scan Notion pages, data sources, comments, and file attachments.",
+    icon: CreateSourceDtoTypeEnum.Notion,
+    category: "COLLABORATION",
+    keywords: ["wiki", "pages", "databases", "blocks", "notes"],
+  },
 };
 
 export function resolveSourceCatalogMeta(

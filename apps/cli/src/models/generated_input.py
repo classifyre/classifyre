@@ -42,6 +42,7 @@ class AssetType(StrEnum):
     JIRA = 'JIRA'
     SERVICEDESK = 'SERVICEDESK'
     SQLITE = 'SQLITE'
+    NOTION = 'NOTION'
 
 
 class SourceCategory(StrEnum):
@@ -1870,6 +1871,7 @@ class Type(StrEnum):
     JIRA = 'JIRA'
     SERVICEDESK = 'SERVICEDESK'
     SQLITE = 'SQLITE'
+    NOTION = 'NOTION'
 
 
 class SlackInput(CoreInput):
@@ -2657,6 +2659,7 @@ class Type17(StrEnum):
     JIRA = 'JIRA'
     SERVICEDESK = 'SERVICEDESK'
     SQLITE = 'SQLITE'
+    NOTION = 'NOTION'
 
 
 class ConfluenceInput(CoreInput):
@@ -2765,6 +2768,135 @@ class SQLiteInput(CoreInput):
     resources: ResourceOverrides | None = None
 
 
+class NotionRequired(BaseModel):
+    """
+    Notion has no required connection fields; the integration token lives in the masked section.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class NotionMasked(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    notion_token: str = Field(
+        ...,
+        description='Notion API token used as a Bearer credential. Accepts an internal integration secret (ntn_...) or an OAuth public-integration access token.',
+    )
+
+
+class NotionOptionalConnection(BaseModel):
+    """
+    HTTP, version, and retry settings for Notion API calls.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    notion_version: str | None = Field(
+        '2025-09-03',
+        description='Notion-Version header sent with every request. Defaults to the data-sources API version.',
+    )
+    request_timeout_seconds: float | None = Field(
+        30, description='HTTP request timeout for Notion API calls', ge=1.0
+    )
+    rate_limit_delay_seconds: float | None = Field(
+        0,
+        description='Additional delay between API requests to reduce rate-limit pressure',
+        ge=0.0,
+    )
+    max_retries: int | None = Field(
+        3,
+        description='Maximum retry attempts for transient API failures and rate limits',
+        ge=0,
+        le=10,
+    )
+
+
+class NotionOptionalScope(BaseModel):
+    """
+    Optional Notion scope filters. When omitted, all content shared with the integration is eligible for sampling.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    page_ids: list[str] | None = Field(
+        None,
+        description='Restrict extraction to specific page IDs (up to 250)',
+        max_length=250,
+    )
+    data_source_ids: list[str] | None = Field(
+        None,
+        description='Restrict extraction to specific data source IDs (up to 250)',
+        max_length=250,
+    )
+    search_query: str | None = Field(
+        None,
+        description='Optional full-text query passed to the Notion search endpoint to narrow discovery',
+        min_length=1,
+    )
+
+
+class NotionOptionalContent(BaseModel):
+    """
+    Notion content extraction controls.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_comments: bool | None = Field(
+        True,
+        description='Include page and block comments and aggregate them into a per-page comments asset',
+    )
+    include_files: bool | None = Field(
+        True,
+        description='Materialize files from file/image/pdf/video blocks, file properties, and page icon/cover as related assets',
+    )
+    include_linked_pages: bool | None = Field(
+        True,
+        description='Wire parent, relation, and mention references between pages into the asset links graph',
+    )
+    include_data_sources: bool | None = Field(
+        True,
+        description='Emit Notion data sources (databases) as assets with their schema and link their row pages',
+    )
+    file_max_bytes: int | None = Field(
+        5242880,
+        description='Maximum bytes downloaded per file for MIME inference and text extraction',
+        ge=1024,
+    )
+
+
+class NotionOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: NotionOptionalConnection | None = None
+    scope: NotionOptionalScope | None = None
+    content: NotionOptionalContent | None = None
+
+
+class NotionInput(CoreInput):
+    type: Literal['NOTION'] = Field('NOTION', description='Type of the asset or source')
+    required: NotionRequired
+    masked: NotionMasked
+    optional: NotionOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
 class SourceInput(
     RootModel[
         SlackInput
@@ -2787,6 +2919,7 @@ class SourceInput(
         | JiraInput
         | ServiceDeskInput
         | SQLiteInput
+        | NotionInput
     ]
 ):
     root: (
@@ -2810,6 +2943,7 @@ class SourceInput(
         | JiraInput
         | ServiceDeskInput
         | SQLiteInput
+        | NotionInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

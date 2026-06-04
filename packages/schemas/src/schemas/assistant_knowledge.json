@@ -965,6 +965,53 @@
           ]
         }
       }
+    },
+    "NOTION": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Name the source after the Notion workspace and scope so coverage is easy to identify.",
+          "suggestions": [
+            "Include the workspace name (example: Acme Notion Product).",
+            "If scoped to specific databases, mention the scope in the name."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Notion has no required connection fields; authentication is the integration token in the masked section.",
+          "suggestions": [
+            "Leave required empty ({}); all access is driven by the token and what is shared with the integration."
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Notion uses a Bearer token (internal integration secret or OAuth access token); the token stays in masked config only.",
+          "suggestions": [
+            "Create an internal integration at notion.so/my-integrations and copy its secret into masked.notion_token.",
+            "Share the pages and databases you want scanned with the integration — the API only returns shared content.",
+            "OAuth public-integration access tokens work identically; paste them into masked.notion_token."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.connection, optional.scope, and optional.content to tune API behavior and extraction depth.",
+          "suggestions": [
+            "Use optional.scope.page_ids / data_source_ids to constrain ingestion to specific content.",
+            "Enable comments and files for detector context and richer lineage.",
+            "Override notion_version only if you need a different Notion API version than 2025-09-03."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many Notion pages and data sources are processed per run.",
+          "suggestions": [
+            "Use LATEST for frequent syncs focused on recently edited pages.",
+            "Use RANDOM for broad health checks across the workspace.",
+            "Use ALL only when full workspace scanning is required.",
+            "Enable enable_ocr to extract text from PDF and image files before detection."
+          ]
+        }
+      }
     }
   },
   "schedule": {
