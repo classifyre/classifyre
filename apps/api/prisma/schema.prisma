@@ -461,6 +461,7 @@ enum AssetType {
   MONGODB
   NEO4J
   SQLITE
+  NOTION
   POWERBI
   TABLEAU
   CUSTOM
