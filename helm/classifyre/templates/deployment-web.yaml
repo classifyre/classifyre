@@ -82,7 +82,7 @@ spec:
               value: {{ $value | quote }}
             {{- end }}
             {{- if .Values.frontend.posthog.enabled }}
-            - name: NEXT_PUBLIC_POSTHOG_TOKEN
+            - name: NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
               value: {{ .Values.frontend.posthog.token | quote }}
             - name: NEXT_PUBLIC_POSTHOG_HOST
               value: {{ .Values.frontend.posthog.host | quote }}
