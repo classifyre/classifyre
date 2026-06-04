@@ -95,6 +95,7 @@ class BaseTabularSource(BaseSource):
         self._table_lookup: dict[str, TableRef] = {}
         self._content_cache: dict[str, tuple[str, str]] = {}
         self._pk_columns_cache: dict[tuple[str, ...], list[str]] = {}
+        self._columns_meta_cache: dict[tuple[str, ...], list[str]] = {}
 
     def _get_cached_connection(self, database: str | None = None) -> Any:
         """Return a cached DBAPI connection, creating one if needed."""
@@ -319,6 +320,30 @@ class BaseTabularSource(BaseSource):
 
     # ── Column metadata ──────────────────────────────────────────────────
 
+    def _cached_columns(self, table_ref: TableRef) -> list[str]:
+        """Best-effort column names for asset metadata (cached, never raises)."""
+        key = table_ref.table_key
+        cached = self._columns_meta_cache.get(key)
+        if cached is not None:
+            return cached
+        try:
+            columns = self._available_columns(table_ref)
+        except Exception as exc:
+            logger.debug("Could not read columns for %s: %s", table_ref.display_name, exc)
+            columns = []
+        self._columns_meta_cache[key] = columns
+        return columns
+
+    def _estimate_row_count(self, table_ref: TableRef) -> int | None:
+        """Cheap row-count estimate for asset metadata.
+
+        Default returns ``None`` (omitted). Dialects with a cheap catalog
+        estimate (e.g. PostgreSQL ``pg_class.reltuples``) override this; a full
+        ``COUNT(*)`` is intentionally avoided so discovery stays fast on large
+        tables.
+        """
+        return None
+
     def _available_columns(self, table_ref: TableRef) -> list[str]:
         """Return column names in ordinal order.  Uses ``information_schema``."""
         ph = self._param_placeholder()
@@ -533,7 +558,7 @@ class BaseTabularSource(BaseSource):
 
         # Normalized asset metadata persisted on the asset (consistent keys
         # across all DB/warehouse sources). _extra_asset_metadata contributes
-        # source-specific fields (e.g. row-count estimates, catalog).
+        # source-specific fields (e.g. catalog/account).
         asset_metadata: dict[str, Any] = {
             "database": table_ref.database,
             "table_name": table_ref.table,
@@ -541,6 +566,13 @@ class BaseTabularSource(BaseSource):
         }
         if table_ref.schema is not None:
             asset_metadata["schema"] = table_ref.schema
+        columns = self._cached_columns(table_ref)
+        if columns:
+            asset_metadata["column_names"] = columns
+            asset_metadata["column_count"] = len(columns)
+        row_count = self._estimate_row_count(table_ref)
+        if row_count is not None and row_count >= 0:
+            asset_metadata["row_count"] = row_count
         asset_metadata.update(self._extra_asset_metadata(table_ref))
 
         now = datetime.now(UTC)
