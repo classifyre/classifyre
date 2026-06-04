@@ -278,6 +278,20 @@ class ServiceDeskSource(BaseSource):
         request_text = "\n".join(line for line in request_text_lines if line).strip()
         self._asset_content_cache[request_hash] = (json_dumps(request_metadata), request_text)
 
+        asset_metadata: dict[str, Any] = {
+            "issue_key": issue_key,
+            "links_count": len(request_links),
+        }
+        status = self._status_name(request)
+        if status:
+            asset_metadata["status"] = status
+        request_type = self._name_from_obj(request.get("requestType"))
+        if request_type:
+            asset_metadata["request_type"] = request_type
+        service_desk = self._name_from_obj(request.get("serviceDesk"))
+        if service_desk:
+            asset_metadata["service_desk_name"] = service_desk
+
         request_asset = SingleAssetScanResults(
             hash=request_hash,
             checksum=self.calculate_checksum(request_metadata),
@@ -289,6 +303,7 @@ class ServiceDeskSource(BaseSource):
             created_at=self._parse_date_dto(request.get("createdDate")) or now,
             updated_at=self._request_sort_timestamp(request),
             runner_id=self.runner_id,
+            metadata=asset_metadata,
         )
 
         assets: list[SingleAssetScanResults] = [request_asset]
@@ -384,6 +399,10 @@ class ServiceDeskSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
+            metadata={
+                "issue_key": issue_key,
+                "comments_count": len(comments),
+            },
         )
         return asset, [comments_hash], urls
 
@@ -424,6 +443,15 @@ class ServiceDeskSource(BaseSource):
                 "size": attachment.get("size"),
                 "filename": filename,
             }
+            attachment_metadata: dict[str, Any] = {
+                "request_hash": request_hash,
+                "filename": filename,
+            }
+            if mime:
+                attachment_metadata["mime_type"] = mime
+            size = attachment.get("size")
+            if isinstance(size, int):
+                attachment_metadata["size_bytes"] = size
             assets.append(
                 SingleAssetScanResults(
                     hash=attachment_hash,
@@ -436,6 +464,7 @@ class ServiceDeskSource(BaseSource):
                     created_at=now,
                     updated_at=now,
                     runner_id=self.runner_id,
+                    metadata=attachment_metadata,
                 )
             )
             hashes.append(attachment_hash)

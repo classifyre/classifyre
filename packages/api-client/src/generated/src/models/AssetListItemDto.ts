@@ -103,6 +103,12 @@ export interface AssetListItemDto {
      * @memberof AssetListItemDto
      */
     updatedAt: Date;
+    /**
+     * Source-specific asset metadata
+     * @type {{ [key: string]: any; }}
+     * @memberof AssetListItemDto
+     */
+    metadata?: { [key: string]: any; };
 }
 
 
@@ -212,6 +218,7 @@ export function AssetListItemDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'status': json['status'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
+        'metadata': json['metadata'] == null ? undefined : json['metadata'],
     };
 }
 
@@ -240,6 +247,7 @@ export function AssetListItemDtoToJSONTyped(value?: AssetListItemDto | null, ign
         'status': value['status'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
+        'metadata': value['metadata'],
     };
 }
 

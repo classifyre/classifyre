@@ -6180,6 +6180,11 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Source-specific asset metadata",
+            "additionalProperties": true
           }
         },
         "required": [
@@ -10514,6 +10519,12 @@
           },
           "findingsByDetector": {
             "type": "object",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Source-specific asset metadata (denormalized from the asset)",
+            "additionalProperties": true,
             "nullable": true
           },
           "asset": {

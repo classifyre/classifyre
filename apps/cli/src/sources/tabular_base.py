@@ -531,6 +531,18 @@ class BaseTabularSource(BaseSource):
             metadata["schema"] = table_ref.schema
         metadata.update(self._extra_asset_metadata(table_ref))
 
+        # Normalized asset metadata persisted on the asset (consistent keys
+        # across all DB/warehouse sources). _extra_asset_metadata contributes
+        # source-specific fields (e.g. row-count estimates, catalog).
+        asset_metadata: dict[str, Any] = {
+            "database": table_ref.database,
+            "table_name": table_ref.table,
+            "table_type": table_ref.object_type,
+        }
+        if table_ref.schema is not None:
+            asset_metadata["schema"] = table_ref.schema
+        asset_metadata.update(self._extra_asset_metadata(table_ref))
+
         now = datetime.now(UTC)
         return SingleAssetScanResults(
             hash=asset_hash,
@@ -543,6 +555,7 @@ class BaseTabularSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
+            metadata=asset_metadata,
         )
 
     # ── extract_raw (discovery) ──────────────────────────────────────────

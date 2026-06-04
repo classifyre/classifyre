@@ -19,6 +19,7 @@ import {
   Spinner,
 } from "@workspace/ui/components";
 import { FindingsTable } from "@/components/findings-table";
+import { AssetMetadataCard } from "@/components/asset-metadata-card";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -263,6 +264,11 @@ export default function AssetDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {assetDetails.metadata &&
+        Object.keys(assetDetails.metadata).length > 0 && (
+          <AssetMetadataCard metadata={assetDetails.metadata} />
+        )}
 
       {lockedFilters && (
         <Suspense>

@@ -634,6 +634,24 @@ class TableauSource(BaseSource):
             "metadata": ref.metadata,
         }
 
+        asset_metadata: dict[str, Any] = {
+            "site": ref.site,
+            "report_type": ref.kind,
+            "workbook_id": ref.asset_id,
+        }
+        if ref.project_name:
+            asset_metadata["project_name"] = ref.project_name
+        tags = ref.metadata.get("tags")
+        if isinstance(tags, list):
+            tag_names = [str(tag) for tag in tags if tag]
+            if tag_names:
+                asset_metadata["tags"] = tag_names
+        owner = ref.metadata.get("owner")
+        if isinstance(owner, dict):
+            author = owner.get("name") or owner.get("fullname") or owner.get("email")
+            if isinstance(author, str) and author:
+                asset_metadata["author"] = author
+
         return SingleAssetScanResults(
             hash=asset_hash,
             checksum=self.calculate_checksum(checksum_payload),
@@ -645,6 +663,7 @@ class TableauSource(BaseSource):
             created_at=ref.created_at,
             updated_at=ref.updated_at,
             runner_id=self.runner_id,
+            metadata=asset_metadata,
         )
 
     def _auth_mode(self) -> str:
