@@ -1522,6 +1522,14 @@ export class AssetService {
         const assetsToCreate: Prisma.AssetCreateManyInput[] = [];
         const assetsToUpdate: { id: string; data: any }[] = [];
         const assetsUnchanged: string[] = [];
+        // Metadata isn't part of the checksum, so an asset whose only change is
+        // richer metadata stays UNCHANGED — the bulk updateMany below can't
+        // carry per-asset data. Patch those rows individually so asset.metadata
+        // is backfilled even when the asset is otherwise unchanged.
+        const unchangedMetadataUpdates: {
+          id: string;
+          metadata: Prisma.InputJsonValue;
+        }[] = [];
 
         for (const asset of batch) {
           const { hash, checksum, name, external_url, links, asset_type } =
@@ -1584,6 +1592,9 @@ export class AssetService {
           } else {
             // Asset is UNCHANGED
             assetsUnchanged.push(existingAsset.id);
+            if (metadata !== undefined) {
+              unchangedMetadataUpdates.push({ id: existingAsset.id, metadata });
+            }
             existingAssetsMap.set(assetHash, {
               ...existingAsset,
               ...assetData,
@@ -1628,6 +1639,11 @@ export class AssetService {
               lastScannedAt: scannedAt,
             },
           });
+        }
+
+        // Backfill metadata on UNCHANGED assets (per-asset, since values differ).
+        for (const { id, metadata } of unchangedMetadataUpdates) {
+          await tx.asset.update({ where: { id }, data: { metadata } });
         }
 
         // Denormalize metadata onto the runner_asset row (keyed by runnerId +
