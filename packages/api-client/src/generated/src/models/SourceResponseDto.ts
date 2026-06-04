@@ -36,6 +36,12 @@ export interface SourceResponseDto {
      * @type {string}
      * @memberof SourceResponseDto
      */
+    description?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof SourceResponseDto
+     */
     type: string;
     /**
      * 
@@ -149,6 +155,7 @@ export function SourceResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         
         'id': json['id'],
         'name': json['name'],
+        'description': json['description'] == null ? undefined : json['description'],
         'type': json['type'],
         'config': json['config'],
         'currentRunnerId': json['currentRunnerId'],
@@ -179,6 +186,7 @@ export function SourceResponseDtoToJSONTyped(value?: SourceResponseDto | null, i
         
         'id': value['id'],
         'name': value['name'],
+        'description': value['description'],
         'type': value['type'],
         'config': value['config'],
         'currentRunnerId': value['currentRunnerId'],

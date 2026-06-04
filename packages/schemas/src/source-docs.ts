@@ -223,6 +223,10 @@ function sourceTypeToLabel(
   schema: SchemaNode,
   definitionName: string,
 ): string {
+  if (typeof schema.label === "string" && schema.label.trim().length > 0) {
+    return schema.label;
+  }
+
   const rawTitle =
     typeof schema.title === "string" ? schema.title : definitionName;
   const withoutSuffix = rawTitle.endsWith("Input")

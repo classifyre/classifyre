@@ -7,6 +7,12 @@ export class SourceResponseDto {
   @ApiProperty({ example: 'Production WordPress' })
   name: string;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    example: 'Primary marketing blog, scanned nightly for leaked secrets',
+  })
+  description?: string | null;
+
   @ApiProperty({ example: 'WORDPRESS' })
   type: string;
 

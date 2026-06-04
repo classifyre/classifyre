@@ -32,6 +32,12 @@ export interface UpdateSourceDto {
      */
     name?: string;
     /**
+     * Optional human-readable description of this source
+     * @type {string}
+     * @memberof UpdateSourceDto
+     */
+    description?: string;
+    /**
      * Configuration for the source (depends on type)
      * @type {object}
      * @memberof UpdateSourceDto
@@ -105,6 +111,7 @@ export function UpdateSourceDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         
         'type': json['type'] == null ? undefined : json['type'],
         'name': json['name'] == null ? undefined : json['name'],
+        'description': json['description'] == null ? undefined : json['description'],
         'config': json['config'] == null ? undefined : json['config'],
         'scheduleEnabled': json['scheduleEnabled'] == null ? undefined : json['scheduleEnabled'],
         'scheduleCron': json['scheduleCron'] == null ? undefined : json['scheduleCron'],
@@ -125,6 +132,7 @@ export function UpdateSourceDtoToJSONTyped(value?: UpdateSourceDto | null, ignor
         
         'type': value['type'],
         'name': value['name'],
+        'description': value['description'],
         'config': value['config'],
         'scheduleEnabled': value['scheduleEnabled'],
         'scheduleCron': value['scheduleCron'],

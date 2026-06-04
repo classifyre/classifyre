@@ -2890,6 +2890,7 @@
     },
     "SlackInput": {
       "title": "SlackInput",
+      "label": "Slack",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -2933,6 +2934,7 @@
     },
     "S3CompatibleStorageInput": {
       "title": "S3CompatibleStorageInput",
+      "label": "S3-Compatible Storage",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -2975,6 +2977,7 @@
     },
     "AzureBlobStorageInput": {
       "title": "AzureBlobStorageInput",
+      "label": "Azure Blob Storage",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3017,6 +3020,7 @@
     },
     "GoogleCloudStorageInput": {
       "title": "GoogleCloudStorageInput",
+      "label": "Google Cloud Storage",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3059,6 +3063,7 @@
     },
     "WordPressInput": {
       "title": "WordPressInput",
+      "label": "WordPress",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3102,6 +3107,7 @@
     },
     "PostgreSQLInput": {
       "title": "PostgreSQLInput",
+      "label": "PostgreSQL",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3145,6 +3151,7 @@
     },
     "MySQLInput": {
       "title": "MySQLInput",
+      "label": "MySQL",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3188,6 +3195,7 @@
     },
     "MSSQLInput": {
       "title": "MSSQLInput",
+      "label": "Microsoft SQL Server",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3231,6 +3239,7 @@
     },
     "OracleInput": {
       "title": "OracleInput",
+      "label": "Oracle",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3274,6 +3283,7 @@
     },
     "HiveInput": {
       "title": "HiveInput",
+      "label": "Apache Hive",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3317,6 +3327,7 @@
     },
     "DatabricksInput": {
       "title": "DatabricksInput",
+      "label": "Databricks",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3360,6 +3371,7 @@
     },
     "SnowflakeInput": {
       "title": "SnowflakeInput",
+      "label": "Snowflake",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3403,6 +3415,7 @@
     },
     "MongoDBInput": {
       "title": "MongoDBInput",
+      "label": "MongoDB",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3580,6 +3593,7 @@
     },
     "Neo4jInput": {
       "title": "Neo4jInput",
+      "label": "Neo4j",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3623,6 +3637,7 @@
     },
     "PowerBIInput": {
       "title": "PowerBIInput",
+      "label": "Power BI",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3666,6 +3681,7 @@
     },
     "TableauInput": {
       "title": "TableauInput",
+      "label": "Tableau",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -4165,6 +4181,7 @@
     },
     "ConfluenceInput": {
       "title": "ConfluenceInput",
+      "label": "Confluence",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -4208,6 +4225,7 @@
     },
     "JiraInput": {
       "title": "JiraInput",
+      "label": "Jira",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -4251,6 +4269,7 @@
     },
     "ServiceDeskInput": {
       "title": "ServiceDeskInput",
+      "label": "Jira Service Management",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -4338,6 +4357,7 @@
     },
     "SQLiteInput": {
       "title": "SQLiteInput",
+      "label": "SQLite",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"

@@ -9,6 +9,7 @@ datasource db {
 model Source {
   id                  String         @id @default(uuid())
   name                String
+  description         String?        @db.Text
   type                AssetType
   sourceCategory      SourceCategory @default(UNSTRUCTURED) @map("source_category")
   config              Json
