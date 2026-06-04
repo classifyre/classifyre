@@ -92,7 +92,12 @@
     "statusPending": "Ausstehend",
     "statusWarning": "Warnung",
     "notSet": "Nicht festgelegt",
-    "language": "Sprache"
+    "language": "Sprache",
+    "pagination": {
+      "previous": "Vorherige",
+      "next": "Nächste",
+      "morePages": "Weitere Seiten"
+    }
   },
   "settings": {
     "title": "Einstellungen",
@@ -120,6 +125,17 @@
       "aiProviders": "KI-Anbieter",
       "mcp": "MCP-Server"
     },
+    "version": {
+      "heading": "Softwareversion",
+      "desc": "Die aktuell installierte Version von Classifyre auf dieser Instanz.",
+      "current": "Aktuelle Version",
+      "upToDate": "Aktuell",
+      "updateAvailable": "Update verfügbar",
+      "updateDesc": "Eine neuere Version von Classifyre ist verfügbar.",
+      "latest": "Neueste",
+      "viewReleaseNotes": "Release-Hinweise ansehen",
+      "newRelease": "Neues Release"
+    },
     "regionHeading": "Region & Format",
     "regionDesc": "Sprache, Uhrzeit und Zeitzone für die gesamte Instanz.",
     "assistant": {
@@ -144,6 +160,12 @@
     "title": "Quellen",
     "description": "Datenquellen und Verbindungen verwalten",
     "addSource": "Quelle hinzufügen",
+    "form": {
+      "nameLabel": "Quellenname",
+      "nameHelp": "Geben Sie Ihrer Quelle einen einprägsamen Namen zur Identifizierung",
+      "descriptionLabel": "Beschreibung",
+      "descriptionHelp": "Optional. Fügen Sie Notizen hinzu, wofür diese Quelle dient."
+    },
     "totalSources": "Quellen gesamt",
     "connectedSources": "Verbundene Quellen",
     "healthy": "Fehlerfrei",
@@ -367,6 +389,8 @@
   },
   "findings": {
     "title": "Befunde",
+    "description": "Einheitliche Befundtabelle mit serverseitiger Filterung, plus Übersichtsdiagramme und Statistiken.",
+    "totalFindings": "Befunde Gesamt",
     "findingsTrend": "Befund-Trend",
     "severityTimeline": "Schweregrad-Verlauf für das gewählte Zeitfenster.",
     "noTrendData": "Keine Trenddaten für den gewählten Bereich verfügbar.",
@@ -1035,6 +1059,7 @@
     "detail": {
       "title": "Scan-Details"
     },
+    "loading": "Scan-Visualisierungen werden geladen...",
     "subtitle": "Ausführungsverlauf durchsuchen und nach operativem Status filtern.",
     "runTrend": "Ausführungstrend",
     "runTrendDescription": "Statusverteilung über den gewählten Zeitraum.",
@@ -1523,6 +1548,15 @@
       "CLAUDE": "Claude (Anthropic)",
       "GEMINI": "Gemini (Google)"
     }
+  },
+  "csvExport": {
+    "label": "CSV herunterladen",
+    "title": "Nach CSV exportieren",
+    "cancel": "Abbrechen",
+    "download": "Herunterladen",
+    "description": "{{count}} {{entityLabel}}, die den aktuellen Filtern entsprechen, werden exportiert. Große Exporte werden direkt in Ihren Download gestreamt. Sie können auch live mit Excel verbinden, um diese Daten direkt abzurufen — siehe die",
+    "descriptionLink": "Dokumentation",
+    "descriptionSuffix": "für Einrichtungsanweisungen."
   },
   "clipboard": {
     "copied": "{{label}} kopiert",

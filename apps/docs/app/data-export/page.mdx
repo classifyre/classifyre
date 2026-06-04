@@ -1,0 +1,194 @@
+---
+title: Data Export
+sidebarTitle: Data Export
+description: Download findings and assets as CSV, or connect Excel, Google Sheets, and BI tools to a live, auto-refreshing feed of your Classifyre data.
+---
+
+import { Callout, Steps, Tabs } from "nextra/components"
+
+# Data Export
+
+Classifyre lets you take your findings and assets out of the app and into the tools your team already lives in — Excel, Google Sheets, Power BI, or any spreadsheet. There are two ways to do it:
+
+- **Download a CSV** — a one-time snapshot of exactly what you're looking at right now. Best for sharing, archiving, or a quick pivot table.
+- **Connect a live feed** — a link your spreadsheet refreshes on demand, so the numbers update themselves. Best for recurring reports and dashboards.
+
+Both honor the same search and filters you've set on screen, so you only export the rows you actually want.
+
+---
+
+## Download a CSV
+
+Every major table has a **Download CSV** button:
+
+- **Findings** — one row per finding (category, asset, source, severity, status, confidence, matched content, detection dates, and metadata).
+- **Assets** — one row per asset-with-finding, so an asset that triggered five findings appears as five rows. Great for slicing findings by asset attributes.
+- **Scan assets** (inside a scan run) — one row per processed asset, with its status, finding totals, and any error.
+
+<Steps>
+
+### Narrow down to what you want
+
+Use the search box and filters above the table — severity, status, source, detector, and so on. Whatever is currently shown is what gets exported.
+
+### Click **Download CSV**
+
+A dialog tells you **how many rows** will be exported, so there are no surprises.
+
+### Confirm
+
+The file downloads straight to your computer and opens in Excel, Google Sheets, or Numbers. Even very large exports download smoothly — Classifyre streams the file rather than building it all in memory first.
+
+</Steps>
+
+<Callout type="info">
+The CSV is a **snapshot**. It reflects the data at the moment you clicked Download. To get fresh numbers later, download again — or set up a live connection below.
+</Callout>
+
+---
+
+## Connect a live feed (auto-refresh)
+
+If you build the same report every week, a live connection saves you the repeat work. Your spreadsheet holds a link to Classifyre; you click **Refresh** and the latest data flows in.
+
+Classifyre exposes a **query** link for each dataset that returns data in pages. Your spreadsheet walks through the pages automatically, so even large datasets come through in full.
+
+| Dataset | Link |
+| --- | --- |
+| Findings | `https://<your-classifyre-host>/api/search/findings/query` |
+| Assets (with findings) | `https://<your-classifyre-host>/api/search/assets/query` |
+| Scan assets | `https://<your-classifyre-host>/api/search/runner-assets/query` |
+
+<Callout type="info">
+Your administrator can give you the exact host name (the part shown as `<your-classifyre-host>`) and tell you whether a sign-in or access token is required for connections from outside the app.
+</Callout>
+
+### Choosing what comes through
+
+Add filters to the link exactly like the on-screen filters. A few examples:
+
+- High and critical findings only:
+  `…/search/findings/query?severity=HIGH&severity=CRITICAL`
+- Open PII findings for one source:
+  `…/search/findings/query?detectorType=PII&status=OPEN&sourceId=<source-id>`
+- Critical findings grouped by asset:
+  `…/search/assets/query?finding_severity=CRITICAL`
+
+Repeat a parameter to select several values (e.g. `severity=HIGH&severity=CRITICAL`). You can also set `limit` (rows per page, up to 10,000; default 1,000).
+
+<details>
+<summary>All available filters</summary>
+
+**Findings** (`/search/findings/query`)
+`search`, `sourceId`, `detectorType`, `customDetectorKey`, `findingType`, `category`, `severity`, `status`, `includeResolved`
+
+**Assets** (`/search/assets/query`)
+`asset_search`, `asset_sourceId`, `asset_status`, `asset_sourceType`, `finding_detectorType`, `finding_severity`, `finding_status`, `finding_includeResolved`, `excludeFindings`, `includeAssetsWithoutFindings`
+
+**Scan assets** (`/search/runner-assets/query`)
+`runnerId` (required), `search`, `status`
+
+Common values — **Severity:** `INFO`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` · **Finding status:** `OPEN`, `FALSE_POSITIVE`, `IGNORED`, `RESOLVED` · **Detector:** `SECRETS`, `PII`, `YARA`, `BROKEN_LINKS`, `CUSTOM`.
+
+</details>
+
+### Set it up
+
+<Tabs items={["Excel (Power Query)", "Google Sheets", "Power BI / other BI"]}>
+
+<Tabs.Tab>
+
+Excel's **Power Query** can read the feed and page through it for you.
+
+<Steps>
+
+### Open the query editor
+
+In Excel: **Data → Get Data → From Other Sources → Blank Query**, then **Advanced Editor**.
+
+### Paste this, editing the host and filters
+
+```m
+let
+    BaseUrl = "https://<your-classifyre-host>/api/search/findings/query",
+    Query   = "limit=5000&severity=HIGH&severity=CRITICAL",
+
+    // Fetch one page; cursor = null for the first page
+    GetPage = (cursor as nullable text) =>
+        let
+            Url  = BaseUrl & "?" & Query &
+                   (if cursor <> null then "&cursor=" & cursor else ""),
+            Resp = Json.Document(Web.Contents(Url))
+        in
+            Resp,
+
+    // Keep fetching while the response hands back a nextCursor
+    Pages = List.Generate(
+        () => GetPage(null),
+        each _ <> null,
+        each if [nextCursor] <> null then GetPage([nextCursor]) else null
+    ),
+
+    Rows  = List.Combine(List.Transform(Pages, each [items])),
+    Result = Table.FromRecords(Rows)
+in
+    Result
+```
+
+### Load and refresh
+
+Click **Done**, then **Close & Load**. Whenever you want fresh data, hit **Refresh** (or set an automatic refresh schedule in Excel).
+
+</Steps>
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+The quickest option in Google Sheets is to point `IMPORTDATA` at the **CSV download link** for a filtered view (it refreshes periodically on its own):
+
+```
+=IMPORTDATA("https://<your-classifyre-host>/api/search/findings/export?severity=CRITICAL")
+```
+
+For larger datasets or full control over paging, use **Apps Script** to call the `…/query` link and follow `nextCursor` the same way the Excel example does, writing rows into the sheet.
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+Any tool that can read a JSON web API works the same way: call the `…/query` link, read the `items` array, and keep calling with `?cursor=<nextCursor>` until `nextCursor` comes back empty. Point the tool's scheduled refresh at the query and your report stays current.
+
+</Tabs.Tab>
+
+</Tabs>
+
+### How paging works
+
+Each response looks like this:
+
+```json
+{
+  "items": [ /* up to `limit` rows */ ],
+  "nextCursor": "eyJ..."   // null when you've reached the last page
+}
+```
+
+Keep requesting with `?cursor=<nextCursor>` until `nextCursor` is `null`. The order stays stable between pages, so you never miss or double-count a row — sort and filter inside your spreadsheet once everything has loaded.
+
+<Callout type="warning">
+The live feed returns data in a fixed, stable order built for reliable paging — it is **not** sorted by severity or date. Apply your preferred sort in Excel, Sheets, or your BI tool after the data lands.
+</Callout>
+
+---
+
+## Which should I use?
+
+| | Download CSV | Live feed |
+| --- | --- | --- |
+| Best for | Sharing, archiving, one-off analysis | Recurring reports, dashboards |
+| Freshness | Snapshot at download time | Refreshes on demand |
+| Setup | One click | One-time connection in your tool |
+| Tools | Excel, Sheets, Numbers | Excel (Power Query), Sheets, Power BI, BI tools |
+
+Both always reflect the filters you choose — so whichever you pick, you're working with exactly the slice of findings or assets you care about.

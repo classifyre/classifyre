@@ -62,6 +62,7 @@ export * from "./asset-card";
 export * from "./detector-card";
 export * from "./detector-catalog-utils";
 export * from "./detector-catalog";
+export * from "./custom-detector-types-grid";
 export * from "./empty-state";
 export * from "./stats-card";
 export * from "./ai-assisted-card";

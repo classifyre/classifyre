@@ -12,7 +12,7 @@ import {
   TransformerDetectorEditor,
   type TransformerPipelineType,
 } from "@/components/transformer-detector-editor";
-import { getDetectorExamples, type DetectorExample } from "@/lib/detector-examples-loader";
+import { type DetectorExample } from "@/lib/detector-examples-loader";
 import { useTranslation } from "@/hooks/use-translation";
 import {
   DetectorTypeSelector,

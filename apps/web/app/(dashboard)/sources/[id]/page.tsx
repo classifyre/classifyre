@@ -29,7 +29,6 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
-import { Spinner } from "@workspace/ui/components/spinner";
 import { Separator } from "@workspace/ui/components/separator";
 import {
   Tabs,
@@ -38,6 +37,7 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
 import { isIngestionSourceType } from "@workspace/ui/components/source-icon";
+import { getSourceLabel } from "@workspace/schemas/source-labels";
 import { AssetsTable } from "@/components/assets-table";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { DeleteSourceAction } from "@/components/delete-source-action";
@@ -397,8 +397,13 @@ export default function SourceViewPage() {
                 {source.name}
               </h1>
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <span>{source.type} source</span>
+                <span>{getSourceLabel(source.type)} source</span>
               </div>
+              {source.description && (
+                <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+                  {source.description}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -484,7 +489,7 @@ export default function SourceViewPage() {
                     <div className="inline-flex items-center gap-2">
                       <SourceTypeIcon className="h-4 w-4 text-muted-foreground" />
                       <Badge variant="outline" className="rounded-[4px]">
-                        {source.type ?? "—"}
+                        {source.type ? getSourceLabel(source.type) : "—"}
                       </Badge>
                     </div>
                   </div>

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef } from "react";
 import * as echarts from "echarts";
 import { format } from "date-fns";
 import { cn } from "@workspace/ui/lib/utils";
+import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
 
 type SeverityKey = "critical" | "high" | "medium" | "low" | "info";
 
@@ -19,14 +21,14 @@ type TimelineBucket = {
 
 const severityConfig: Array<{
   key: SeverityKey;
-  label: string;
+  labelKey: TranslationKey;
   color: string;
 }> = [
-  { key: "critical", label: "Critical", color: "#DC2626" },
-  { key: "high", label: "High", color: "#EA580C" },
-  { key: "medium", label: "Medium", color: "#CA8A04" },
-  { key: "low", label: "Low", color: "#3B82F6" },
-  { key: "info", label: "Info", color: "#6B7280" },
+  { key: "critical", labelKey: "findings.severityLabels.CRITICAL", color: "#DC2626" },
+  { key: "high", labelKey: "findings.severityLabels.HIGH", color: "#EA580C" },
+  { key: "medium", labelKey: "findings.severityLabels.MEDIUM", color: "#CA8A04" },
+  { key: "low", labelKey: "findings.severityLabels.LOW", color: "#3B82F6" },
+  { key: "info", labelKey: "findings.severityLabels.INFO", color: "#6B7280" },
 ];
 
 function buildGradient(color: string) {
@@ -52,10 +54,13 @@ export function FindingsTrendChart({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<echarts.ECharts | null>(null);
 
+  const { t } = useTranslation();
+  const themeRef = useRef<HTMLDivElement | null>(null);
+
   const { labels, series } = useMemo(() => {
     const dayLabels = timeline.map((bucket) => formatLabel(bucket.date));
     const seriesData = severityConfig.map((severity) => ({
-      name: severity.label,
+      name: t(severity.labelKey),
       type: "line" as const,
       smooth: true,
       showSymbol: false,
@@ -67,7 +72,49 @@ export function FindingsTrendChart({
     }));
 
     return { labels: dayLabels, series: seriesData };
-  }, [timeline]);
+  }, [timeline, t]);
+
+  function readCSSVar(name: string, fallback: string) {
+    if (!themeRef.current) return fallback;
+    return getComputedStyle(themeRef.current).getPropertyValue(name).trim() || fallback;
+  }
+
+  function buildChartOption() {
+    const axisLabelColor = readCSSVar("--muted-foreground", "#64748B");
+    const axisLineColor = readCSSVar("--border", "#CBD5F5");
+    const splitLineColor = readCSSVar("--border", "#E2E8F0");
+
+    return {
+      grid: {
+        left: 12,
+        right: 12,
+        top: 36,
+        bottom: 12,
+        containLabel: true,
+      },
+      tooltip: {
+        trigger: "axis" as const,
+      },
+      legend: {
+        top: 0,
+        left: 0,
+        textStyle: { color: axisLabelColor },
+      },
+      xAxis: {
+        type: "category" as const,
+        boundaryGap: false,
+        data: labels,
+        axisLine: { lineStyle: { color: axisLineColor } },
+        axisLabel: { color: axisLabelColor, fontSize: 11 },
+      },
+      yAxis: {
+        type: "value" as const,
+        axisLabel: { color: axisLabelColor, fontSize: 11 },
+        splitLine: { lineStyle: { color: splitLineColor } },
+      },
+      series,
+    };
+  }
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -79,8 +126,17 @@ export function FindingsTrendChart({
     });
     resizeObserver.observe(containerRef.current);
 
+    const themeObserver = new MutationObserver(() => {
+      chart.setOption(buildChartOption(), { notMerge: true });
+    });
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
     return () => {
       resizeObserver.disconnect();
+      themeObserver.disconnect();
       chart.dispose();
       chartRef.current = null;
     };
@@ -88,41 +144,16 @@ export function FindingsTrendChart({
 
   useEffect(() => {
     if (!chartRef.current) return;
-    chartRef.current.setOption(
-      {
-        grid: {
-          left: 12,
-          right: 12,
-          top: 36,
-          bottom: 12,
-          containLabel: true,
-        },
-        tooltip: {
-          trigger: "axis",
-        },
-        legend: {
-          top: 0,
-          left: 0,
-        },
-        xAxis: {
-          type: "category",
-          boundaryGap: false,
-          data: labels,
-          axisLine: { lineStyle: { color: "#CBD5F5" } },
-          axisLabel: { color: "#64748B", fontSize: 11 },
-        },
-        yAxis: {
-          type: "value",
-          axisLabel: { color: "#64748B", fontSize: 11 },
-          splitLine: { lineStyle: { color: "#E2E8F0" } },
-        },
-        series,
-      },
-      { notMerge: true },
-    );
+    chartRef.current.setOption(buildChartOption(), { notMerge: true });
   }, [labels, series]);
 
   return (
-    <div ref={containerRef} className={cn("h-[320px] w-full", className)} />
+    <div
+      ref={(el) => {
+        containerRef.current = el;
+        themeRef.current = el;
+      }}
+      className={cn("h-[320px] w-full", className)}
+    />
   );
 }

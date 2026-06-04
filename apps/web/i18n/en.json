@@ -92,7 +92,12 @@
     "statusPending": "Pending",
     "statusWarning": "Warning",
     "notSet": "Not set",
-    "language": "Language"
+    "language": "Language",
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "morePages": "More pages"
+    }
   },
   "settings": {
     "title": "Settings",
@@ -120,6 +125,17 @@
       "aiProviders": "AI Providers",
       "mcp": "MCP Servers"
     },
+    "version": {
+      "heading": "Software Version",
+      "desc": "The currently installed version of Classifyre running on this instance.",
+      "current": "Current version",
+      "upToDate": "Up to date",
+      "updateAvailable": "Update Available",
+      "updateDesc": "A newer version of Classifyre is available.",
+      "latest": "Latest",
+      "viewReleaseNotes": "View release notes",
+      "newRelease": "New Release"
+    },
     "regionHeading": "Region & Format",
     "regionDesc": "Language, clock, and timezone used across the instance.",
     "assistant": {
@@ -144,6 +160,12 @@
     "title": "Sources",
     "description": "Manage your data sources and connections",
     "addSource": "Add Source",
+    "form": {
+      "nameLabel": "Source name",
+      "nameHelp": "Give your source a memorable name to identify it",
+      "descriptionLabel": "Description",
+      "descriptionHelp": "Optional. Add notes about what this source is for."
+    },
     "totalSources": "Total Sources",
     "connectedSources": "Connected sources",
     "healthy": "Healthy",
@@ -367,6 +389,8 @@
   },
   "findings": {
     "title": "Findings",
+    "description": "Unified findings table with server-side filtering, plus overview charts and stats.",
+    "totalFindings": "Total Findings",
     "findingsTrend": "Findings Trend",
     "severityTimeline": "Severity timeline for the selected window.",
     "noTrendData": "No trend data available for the selected scope.",
@@ -1035,6 +1059,7 @@
     "detail": {
       "title": "Scan Details"
     },
+    "loading": "Loading scans visualizations...",
     "subtitle": "Search run history and filter by operational status from one surface.",
     "runTrend": "Run Trend",
     "runTrendDescription": "Status distribution over the selected timeline.",
@@ -1492,6 +1517,15 @@
       "CLAUDE": "Claude (Anthropic)",
       "GEMINI": "Gemini (Google)"
     }
+  },
+  "csvExport": {
+    "label": "Download CSV",
+    "title": "Export to CSV",
+    "cancel": "Cancel",
+    "download": "Download",
+    "description": "{{count}} {{entityLabel}} matching the current filters will be exported. Large exports stream directly to your download. You can also connect live with Excel to pull this data — see the",
+    "descriptionLink": "documentation",
+    "descriptionSuffix": "for setup instructions."
   },
   "clipboard": {
     "copied": "{{label}} copied",

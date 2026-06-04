@@ -32,6 +32,12 @@ export interface CreateSourceDto {
      */
     name: string;
     /**
+     * Optional human-readable description of this source
+     * @type {string}
+     * @memberof CreateSourceDto
+     */
+    description?: string;
+    /**
      * Configuration for the source (depends on type)
      * @type {object}
      * @memberof CreateSourceDto
@@ -108,6 +114,7 @@ export function CreateSourceDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         
         'type': json['type'],
         'name': json['name'],
+        'description': json['description'] == null ? undefined : json['description'],
         'config': json['config'],
         'scheduleEnabled': json['scheduleEnabled'] == null ? undefined : json['scheduleEnabled'],
         'scheduleCron': json['scheduleCron'] == null ? undefined : json['scheduleCron'],
@@ -128,6 +135,7 @@ export function CreateSourceDtoToJSONTyped(value?: CreateSourceDto | null, ignor
         
         'type': value['type'],
         'name': value['name'],
+        'description': value['description'],
         'config': value['config'],
         'scheduleEnabled': value['scheduleEnabled'],
         'scheduleCron': value['scheduleCron'],

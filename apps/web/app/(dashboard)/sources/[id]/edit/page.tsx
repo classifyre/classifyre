@@ -71,6 +71,7 @@ export default function EditSourcePage() {
   const [source, setSource] = useState<{
     id: string;
     name: string;
+    description: string;
     type: SourceType;
     config?: Record<string, unknown>;
   } | null>(null);
@@ -107,6 +108,7 @@ export default function EditSourcePage() {
         setSource({
           id: data.id || sourceId,
           name: data.name || "",
+          description: data.description ?? "",
           type: (data.type as SourceType) || "WORDPRESS",
           config: data.config as Record<string, unknown> | undefined,
         });
@@ -147,8 +149,12 @@ export default function EditSourcePage() {
       custom_detectors: _customDetectors,
       ...configFields
     } = (source?.config || {}) as Record<string, unknown>;
-    return { ...configFields, name: source?.name || "" };
-  }, [source?.config, source?.name]);
+    return {
+      ...configFields,
+      name: source?.name || "",
+      description: source?.description || "",
+    };
+  }, [source?.config, source?.name, source?.description]);
 
   const defaultDetectors = useMemo(() => {
     const configDetectors = (source?.config as { detectors?: unknown })
@@ -295,6 +301,7 @@ export default function EditSourcePage() {
 
       const {
         name,
+        description,
         type: _type,
         detectors: _detectors,
         ...configFields
@@ -322,6 +329,7 @@ export default function EditSourcePage() {
         id: sourceId,
         updateSourceDto: {
           name: name ? String(name) : undefined,
+          description: typeof description === "string" ? description : undefined,
           config,
           ...scheduleFields,
         },
@@ -331,6 +339,7 @@ export default function EditSourcePage() {
         setSource({
           id: updated.id || sourceId,
           name: updated.name || source.name,
+          description: updated.description ?? "",
           type: (updated.type as SourceType) || source.type,
           config: updated.config as Record<string, unknown> | undefined,
         });

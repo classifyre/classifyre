@@ -157,12 +157,23 @@ export default function NewSourcePage() {
       return null;
     }
 
-    const { name, type: _type, detectors: _detectors, ...configFields } = data;
+    const {
+      name,
+      description,
+      type: _type,
+      detectors: _detectors,
+      ...configFields
+    } = data;
 
     if (!name) {
       toast.error(t("sources.nameRequired"));
       return null;
     }
+
+    const descriptionValue =
+      typeof description === "string" && description.trim().length > 0
+        ? description
+        : undefined;
 
     const detectorPayload = normalizeDetectors(detectors);
     const config = {
@@ -188,6 +199,7 @@ export default function NewSourcePage() {
         id: sourceId,
         updateSourceDto: {
           name: String(name),
+          description: descriptionValue ?? "",
           config,
           ...scheduleFields,
         },
@@ -197,6 +209,7 @@ export default function NewSourcePage() {
 
     const createPayload = {
       name: String(name),
+      ...(descriptionValue ? { description: descriptionValue } : {}),
       type: selectedSourceType,
       config,
       ...scheduleFields,

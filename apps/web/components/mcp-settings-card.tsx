@@ -54,7 +54,6 @@ import { formatDate, formatRelative } from "@/lib/date";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { useServerConfig } from "@/components/dashboard-layout";
 import { useTranslation } from "@/hooks/use-translation";
-import type { TranslationKey } from "@/i18n";
 
 type RevealState = {
   name: string;

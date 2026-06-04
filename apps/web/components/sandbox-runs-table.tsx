@@ -1067,6 +1067,7 @@ export function SandboxRunsTable({
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
+                  label={t("common.pagination.previous")}
                   href="#"
                   onClick={(event) => {
                     event.preventDefault();
@@ -1084,7 +1085,7 @@ export function SandboxRunsTable({
                   <Fragment key={`page-group-${pageNumber}`}>
                     {showEllipsis ? (
                       <PaginationItem>
-                        <PaginationEllipsis />
+                        <PaginationEllipsis label={t("common.pagination.morePages")} />
                       </PaginationItem>
                     ) : null}
                     <PaginationItem>
@@ -1104,6 +1105,7 @@ export function SandboxRunsTable({
               })}
               <PaginationItem>
                 <PaginationNext
+                  label={t("common.pagination.next")}
                   href="#"
                   onClick={(event) => {
                     event.preventDefault();

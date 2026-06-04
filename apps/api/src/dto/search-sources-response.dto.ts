@@ -45,6 +45,9 @@ export class SearchSourceItemDto {
   @ApiProperty()
   name: string;
 
+  @ApiPropertyOptional({ nullable: true })
+  description?: string | null;
+
   @ApiProperty()
   type: string;
 

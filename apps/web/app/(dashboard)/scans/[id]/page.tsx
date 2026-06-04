@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import {
   formatDate,
   formatRelative,
-  formatShortUTC,
 } from "@/lib/date";
 import {
   AlertCircle,
@@ -44,7 +43,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  Spinner,
   Tabs,
   TabsContent,
   TabsList,

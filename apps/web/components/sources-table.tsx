@@ -51,7 +51,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Spinner,
   Table,
   TableBody,
   TableCell,
@@ -62,6 +61,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components";
+import { getSourceLabel } from "@workspace/schemas/source-labels";
 import { getSourceIcon } from "../lib/source-type-icon";
 import { RunnerStatusBadge } from "./runner-status-badge";
 import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
@@ -124,14 +124,6 @@ function formatDuration(ms?: number | null) {
   const minutes = Math.floor(ms / 60_000);
   const seconds = Math.round((ms % 60_000) / 1000);
   return `${minutes}m ${seconds}s`;
-}
-
-function formatEnumLabel(value: string) {
-  return value
-    .toLowerCase()
-    .split("_")
-    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
-    .join(" ");
 }
 
 function getPageItems(current: number, total: number) {
@@ -488,7 +480,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             <MultiSelectGroup>
               {SOURCE_TYPE_OPTIONS.map((type) => (
                 <MultiSelectItem key={type} value={type}>
-                  {formatEnumLabel(type)}
+                  {getSourceLabel(type)}
                 </MultiSelectItem>
               ))}
             </MultiSelectGroup>
@@ -617,6 +609,22 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                             {source.name}
                           </TooltipContent>
                         </Tooltip>
+                        {source.description && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <p className="mt-0.5 max-w-[260px] cursor-default truncate text-[11px] text-muted-foreground">
+                                {source.description}
+                              </p>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="bottom"
+                              sideOffset={6}
+                              className="max-w-[300px] break-words"
+                            >
+                              {source.description}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </TableCell>
 
                       {/* Type */}
@@ -625,7 +633,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                           <div className="flex items-center gap-1.5">
                             <SourceTypeIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                             <Badge variant="outline" className="rounded-[4px]">
-                              {formatEnumLabel(source.type)}
+                              {getSourceLabel(source.type)}
                             </Badge>
                           </div>
                           {source.scheduleEnabled && (
@@ -904,6 +912,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
+                  label={t("common.pagination.previous")}
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
@@ -921,7 +930,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                   <Fragment key={`page-group-${pageNumber}`}>
                     {showEllipsis && (
                       <PaginationItem>
-                        <PaginationEllipsis />
+                        <PaginationEllipsis label={t("common.pagination.morePages")} />
                       </PaginationItem>
                     )}
                     <PaginationItem>
@@ -941,6 +950,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
               })}
               <PaginationItem>
                 <PaginationNext
+                  label={t("common.pagination.next")}
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
