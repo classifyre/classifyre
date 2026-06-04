@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn } from 'class-validator';
 import { SOURCE_TYPE_ENUM, type SourceType } from './source-type-schema';
 
@@ -16,6 +16,12 @@ export class CreateSourceDto {
     example: 'Production WordPress',
   })
   name: string;
+
+  @ApiPropertyOptional({
+    description: 'Optional human-readable description of this source',
+    example: 'Primary marketing blog, scanned nightly for leaked secrets',
+  })
+  description?: string;
 
   @ApiProperty({
     description: 'Configuration for the source (depends on type)',

@@ -21,6 +21,14 @@ export class UpdateSourceDto {
   name?: string;
 
   @ApiProperty({
+    description: 'Optional human-readable description of this source',
+    example: 'Primary marketing blog, scanned nightly for leaked secrets',
+    required: false,
+  })
+  @IsOptional()
+  description?: string;
+
+  @ApiProperty({
     description: 'Configuration for the source (depends on type)',
     example: {
       type: 'WORDPRESS',

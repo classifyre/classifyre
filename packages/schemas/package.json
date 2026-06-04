@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./source-docs": "./src/source-docs.ts",
+    "./source-labels": "./src/source-labels.ts",
     "./detector-docs": "./src/detector-docs.ts",
     "./pipeline-schema-utils": "./src/pipeline-schema-utils.ts",
     "./assistant": "./src/assistant.ts",

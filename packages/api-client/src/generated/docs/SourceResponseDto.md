@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `id` | string
 `name` | string
+`description` | string
 `type` | string
 `config` | object
 `currentRunnerId` | string
@@ -32,6 +33,7 @@ import type { SourceResponseDto } from '@workspace/api-client'
 const example = {
   "id": a1b2c3d4-e5f6-7890-abcd-ef1234567890,
   "name": Production WordPress,
+  "description": Primary marketing blog, scanned nightly for leaked secrets,
   "type": WORDPRESS,
   "config": null,
   "currentRunnerId": null,

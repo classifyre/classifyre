@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `id` | string
 `name` | string
+`description` | string
 `type` | string
 `runnerStatus` | string
 `latestRunner` | [LatestRunnerSummaryDto](LatestRunnerSummaryDto.md)
@@ -27,6 +28,7 @@ import type { SearchSourceItemDto } from '@workspace/api-client'
 const example = {
   "id": null,
   "name": null,
+  "description": null,
   "type": null,
   "runnerStatus": null,
   "latestRunner": null,
