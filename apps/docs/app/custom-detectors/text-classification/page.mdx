@@ -1,0 +1,72 @@
+---
+title: Text Classification
+description: Run any HuggingFace text-classification model and map predicted labels to findings.
+---
+
+import { PipelineSchemaTable } from "@/components/pipeline-schema-table"
+import { Badge, Separator } from "@workspace/ui/components"
+
+# Text Classification
+
+<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+  Text · HuggingFace · Fine-tuned
+</Badge>
+
+The Text Classification detector runs any HuggingFace `text-classification` pipeline model on asset content. You control the model checkpoint, confidence threshold, and a severity map that translates predicted labels into finding severity levels.
+
+<Separator className="my-6" />
+
+## When to use
+
+- **Spam and phishing detection** — run a dedicated spam classifier on email content or support tickets.
+- **Toxicity and content moderation** — flag harmful language in user-generated text before it reaches moderation queues.
+- **Sentiment analysis** — score feedback, reviews, or support interactions to identify negative patterns.
+- **Custom topic labelling** — deploy a fine-tuned model trained on your own labelled data to detect domain-specific categories.
+- **Confidence-gated findings** — use `confidence_threshold` to surface only high-confidence predictions and reduce noise.
+
+## How it works
+
+At scan time, Classifyre loads the specified HuggingFace model (either from the Hub or a local path) and runs the `text-classification` pipeline on the asset content. The top-k predicted labels above the `confidence_threshold` become findings. The `severity_map` translates specific label names to severity levels; unmatched labels fall back to the `severity` default.
+
+For long documents, set `chunk_size` to split the text before classification. Each chunk is scored independently; findings reference the originating chunk position.
+
+<Separator className="my-6" />
+
+## Configuration
+
+<PipelineSchemaTable definition="TextClassificationPipelineSchema" />
+
+<Separator className="my-6" />
+
+## Examples
+
+### SMS spam detection
+
+```json
+{
+  "type": "TEXT_CLASSIFICATION",
+  "model": "mrm8488/bert-tiny-finetuned-sms-spam-detection",
+  "confidence_threshold": 0.85,
+  "severity_map": [
+    { "label": "spam", "severity": "high" }
+  ],
+  "severity": "info"
+}
+```
+
+### Toxicity classifier with chunking for long documents
+
+```json
+{
+  "type": "TEXT_CLASSIFICATION",
+  "model": "unitary/toxic-bert",
+  "device": "cpu",
+  "confidence_threshold": 0.7,
+  "chunk_size": 512,
+  "chunk_overlap": 64,
+  "severity_map": [
+    { "label": "toxic", "severity": "high" },
+    { "label": "obscene", "severity": "medium" }
+  ]
+}
+```

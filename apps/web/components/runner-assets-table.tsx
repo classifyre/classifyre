@@ -50,6 +50,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components";
 import { getAssetTypeIcon } from "../lib/asset-type-icon";
+import { CsvExportButton, filtersToSearchParams } from "./csv-export-button";
 import { useTranslation } from "../hooks/use-translation";
 import type { TranslationKey } from "../i18n";
 
@@ -403,6 +404,21 @@ export function RunnerAssetsTable({
               </MultiSelectGroup>
             </MultiSelectContent>
           </MultiSelect>
+
+          <div className="ml-auto">
+            <CsvExportButton
+              exportPath="search/runner-assets/export"
+              total={total}
+              entityLabel="assets"
+              buildQuery={() =>
+                filtersToSearchParams({
+                  runnerId,
+                  search: draft.search.trim() || undefined,
+                  status: draft.statuses.length > 0 ? draft.statuses : undefined,
+                })
+              }
+            />
+          </div>
         </div>
 
         {error && (
@@ -498,6 +514,7 @@ export function RunnerAssetsTable({
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
+                    label={t("common.pagination.previous")}
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
@@ -516,7 +533,7 @@ export function RunnerAssetsTable({
                     <Fragment key={`page-group-${pageNumber}`}>
                       {showEllipsis && (
                         <PaginationItem>
-                          <PaginationEllipsis />
+                          <PaginationEllipsis label={t("common.pagination.morePages")} />
                         </PaginationItem>
                       )}
                       <PaginationItem>
@@ -537,6 +554,7 @@ export function RunnerAssetsTable({
 
                 <PaginationItem>
                   <PaginationNext
+                    label={t("common.pagination.next")}
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();

@@ -68,6 +68,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
     const enhancedSchema = React.useMemo(() => {
       const {
         name: existingName,
+        description: existingDescription,
         detectors: _detectors,
         custom_detectors: _customDetectors,
         ...restProperties
@@ -78,9 +79,16 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
         properties: {
           name: {
             type: "string" as const,
-            title: "Source name",
-            description: "Give your source a memorable name to identify it",
+            title: t("sources.form.nameLabel"),
+            description: t("sources.form.nameHelp"),
             ...(existingName as JSONSchema7 | undefined),
+          },
+          description: {
+            type: "string" as const,
+            title: t("sources.form.descriptionLabel"),
+            description: t("sources.form.descriptionHelp"),
+            maxLength: 500,
+            ...(existingDescription as JSONSchema7 | undefined),
           },
           ...restProperties,
         },
@@ -88,7 +96,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
           new Set(["name", ...(schema.required || [])]),
         ) as string[],
       };
-    }, [schema]);
+    }, [schema, t]);
 
     const formDefaultValues = React.useMemo(
       () => ({

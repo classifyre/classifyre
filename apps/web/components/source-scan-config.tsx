@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import * as React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Check, FlaskConical, Pencil, Plus, Search, X } from "lucide-react";
 import { api, type CustomDetectorResponseDto } from "@workspace/api-client";

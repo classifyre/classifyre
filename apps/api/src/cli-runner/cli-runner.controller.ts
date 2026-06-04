@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,7 +18,16 @@ import {
   ApiQuery,
   ApiBody,
   ApiResponse,
+  ApiProduces,
 } from '@nestjs/swagger';
+import type { FastifyReply } from 'fastify';
+import { PgStreamService } from '../export/pg-stream.service';
+import { ExportQueryService } from '../export/export-query.service';
+import { LiveQueryService } from '../export/live-query.service';
+import {
+  ExportRunnerAssetsQueryDto,
+  LiveQueryResponseDto,
+} from '../dto/export-query.dto';
 import { CliRunnerService } from './cli-runner.service';
 import { RunnerStatus } from '@prisma/client';
 import { AllowInDemoMode } from '../demo-mode.decorator';
@@ -226,7 +236,59 @@ export class CliRunnerController {
 @ApiTags('Runners')
 @Controller('search')
 export class SearchRunnersController {
-  constructor(private cliRunnerService: CliRunnerService) {}
+  constructor(
+    private cliRunnerService: CliRunnerService,
+    private readonly pgStreamService: PgStreamService,
+    private readonly exportQueryService: ExportQueryService,
+    private readonly liveQueryService: LiveQueryService,
+  ) {}
+
+  @Get('runner-assets/query')
+  @ApiOperation({
+    summary: 'Query runner assets (cursor-paginated JSON)',
+    description:
+      'Returns a page of runner_assets rows as JSON for live consumption (e.g. Excel Power Query). Follow `nextCursor` to page through the full result set.',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Page size (default 1000, max 10000)',
+  })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    description: 'Opaque cursor from a previous page',
+  })
+  @ApiResponse({ status: 200, type: LiveQueryResponseDto })
+  async queryRunnerAssets(
+    @Query() query: ExportRunnerAssetsQueryDto,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ): Promise<LiveQueryResponseDto> {
+    return this.liveQueryService.queryRunnerAssets(query, { limit, cursor });
+  }
+
+  @Get('runner-assets/export')
+  @ApiOperation({
+    summary: 'Export runner assets as CSV',
+    description:
+      'Streams runner_assets rows for a runner matching the current filters as a CSV download.',
+  })
+  @ApiProduces('text/csv')
+  @ApiResponse({
+    status: 200,
+    description: 'CSV stream of runner assets',
+    content: { 'text/csv': { schema: { type: 'string', format: 'binary' } } },
+  })
+  async exportRunnerAssets(
+    @Query() query: ExportRunnerAssetsQueryDto,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    await this.pgStreamService.streamCsv(
+      reply,
+      this.exportQueryService.buildRunnerAssetsQuery(query),
+    );
+  }
 
   @Post('runners')
   @HttpCode(HttpStatus.OK)

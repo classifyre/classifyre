@@ -1579,12 +1579,13 @@
       "type": "string",
       "enum": [
         "PAT_TOKEN",
-        "SERVICE_PRINCIPAL"
+        "SERVICE_PRINCIPAL",
+        "AZURE_SERVICE_PRINCIPAL"
       ],
       "description": "Databricks authentication mode"
     },
     "DatabricksRequiredPat": {
-      "title": "DatabricksRequiredPat",
+      "title": "Personal Access Token",
       "type": "object",
       "properties": {
         "auth_mode": {
@@ -1608,7 +1609,7 @@
       "additionalProperties": false
     },
     "DatabricksRequiredServicePrincipal": {
-      "title": "DatabricksRequiredServicePrincipal",
+      "title": "Service Principal (OAuth M2M)",
       "type": "object",
       "properties": {
         "auth_mode": {
@@ -1636,6 +1637,40 @@
       ],
       "additionalProperties": false
     },
+    "DatabricksRequiredAzureServicePrincipal": {
+      "title": "Azure Service Principal",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "AZURE_SERVICE_PRINCIPAL"
+        },
+        "workspace_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Azure Databricks workspace URL (for example, https://adb-1234567890123456.7.azuredatabricks.net)"
+        },
+        "warehouse_id": {
+          "type": "string",
+          "description": "Databricks SQL warehouse ID used for sampling queries"
+        },
+        "client_id": {
+          "type": "string",
+          "description": "Azure AD application (client) ID for the service principal"
+        },
+        "tenant_id": {
+          "type": "string",
+          "description": "Azure AD tenant ID"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "workspace_url",
+        "warehouse_id",
+        "client_id",
+        "tenant_id"
+      ],
+      "additionalProperties": false
+    },
     "DatabricksRequired": {
       "title": "DatabricksRequired",
       "oneOf": [
@@ -1644,6 +1679,9 @@
         },
         {
           "$ref": "#/definitions/DatabricksRequiredServicePrincipal"
+        },
+        {
+          "$ref": "#/definitions/DatabricksRequiredAzureServicePrincipal"
         }
       ]
     },
@@ -1668,6 +1706,20 @@
         "client_secret": {
           "type": "string",
           "description": "Databricks service principal client secret"
+        }
+      },
+      "required": [
+        "client_secret"
+      ],
+      "additionalProperties": false
+    },
+    "DatabricksMaskedAzureServicePrincipal": {
+      "title": "DatabricksMaskedAzureServicePrincipal",
+      "type": "object",
+      "properties": {
+        "client_secret": {
+          "type": "string",
+          "description": "Azure AD client secret for the service principal"
         }
       },
       "required": [
@@ -2838,6 +2890,7 @@
     },
     "SlackInput": {
       "title": "SlackInput",
+      "label": "Slack",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -2881,6 +2934,7 @@
     },
     "S3CompatibleStorageInput": {
       "title": "S3CompatibleStorageInput",
+      "label": "S3-Compatible Storage",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -2923,6 +2977,7 @@
     },
     "AzureBlobStorageInput": {
       "title": "AzureBlobStorageInput",
+      "label": "Azure Blob Storage",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -2965,6 +3020,7 @@
     },
     "GoogleCloudStorageInput": {
       "title": "GoogleCloudStorageInput",
+      "label": "Google Cloud Storage",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3007,6 +3063,7 @@
     },
     "WordPressInput": {
       "title": "WordPressInput",
+      "label": "WordPress",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3050,6 +3107,7 @@
     },
     "PostgreSQLInput": {
       "title": "PostgreSQLInput",
+      "label": "PostgreSQL",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3093,6 +3151,7 @@
     },
     "MySQLInput": {
       "title": "MySQLInput",
+      "label": "MySQL",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3136,6 +3195,7 @@
     },
     "MSSQLInput": {
       "title": "MSSQLInput",
+      "label": "Microsoft SQL Server",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3179,6 +3239,7 @@
     },
     "OracleInput": {
       "title": "OracleInput",
+      "label": "Oracle",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3222,6 +3283,7 @@
     },
     "HiveInput": {
       "title": "HiveInput",
+      "label": "Apache Hive",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3265,6 +3327,7 @@
     },
     "DatabricksInput": {
       "title": "DatabricksInput",
+      "label": "Databricks",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3308,6 +3371,7 @@
     },
     "SnowflakeInput": {
       "title": "SnowflakeInput",
+      "label": "Snowflake",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3351,6 +3415,7 @@
     },
     "MongoDBInput": {
       "title": "MongoDBInput",
+      "label": "MongoDB",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3528,6 +3593,7 @@
     },
     "Neo4jInput": {
       "title": "Neo4jInput",
+      "label": "Neo4j",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3571,6 +3637,7 @@
     },
     "PowerBIInput": {
       "title": "PowerBIInput",
+      "label": "Power BI",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -3614,6 +3681,7 @@
     },
     "TableauInput": {
       "title": "TableauInput",
+      "label": "Tableau",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -4113,6 +4181,7 @@
     },
     "ConfluenceInput": {
       "title": "ConfluenceInput",
+      "label": "Confluence",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -4156,6 +4225,7 @@
     },
     "JiraInput": {
       "title": "JiraInput",
+      "label": "Jira",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -4199,6 +4269,7 @@
     },
     "ServiceDeskInput": {
       "title": "ServiceDeskInput",
+      "label": "Jira Service Management",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -4286,6 +4357,7 @@
     },
     "SQLiteInput": {
       "title": "SQLiteInput",
+      "label": "SQLite",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"

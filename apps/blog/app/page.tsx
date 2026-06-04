@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
+  CustomDetectorTypesGrid,
   DetectorCatalog,
   detectorCatalogGroups,
   resolveDetectorGroupId,
@@ -50,12 +51,10 @@ export const metadata: Metadata = {
   },
 };
 
-const sourceEntries = Object.entries(SOURCE_TYPE_CATALOG_META).map(
-  ([type, meta]) => ({
-    type,
-    ...meta,
-  }),
-);
+const sourceEntries = Object.keys(SOURCE_TYPE_CATALOG_META).map((type) => ({
+  type,
+  ...resolveSourceCatalogMeta(type),
+}));
 
 const marqueeEntries = [...sourceEntries, ...sourceEntries];
 const dockerRunCommand = [
@@ -602,6 +601,46 @@ export default function HomePage() {
           </div>
         </LandingSectionShell>
       </section>
+      <section aria-labelledby="detector-methods-title">
+        <LandingSectionShell tone="plain">
+          <div className="space-y-6">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div className="space-y-3">
+                <h2
+                  id="detector-methods-title"
+                  className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
+                >
+                  Seven methods to match any signal
+                </h2>
+                <p className="max-w-3xl text-muted-foreground">
+                  Every custom detector you build runs on one of these engines.
+                  Choose a deterministic ruleset for exact patterns, a fine-tuned
+                  model for nuanced classification, or an LLM prompt for signals
+                  that are hard to define explicitly.
+                </p>
+              </div>
+              <Button
+                asChild
+                variant="secondary"
+                className="border-2 border-border"
+              >
+                <a
+                  href="https://docs.classifyre.com/custom-detectors/"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Detector method docs
+                </a>
+              </Button>
+            </div>
+            <CustomDetectorTypesGrid
+              hrefBase="https://docs.classifyre.com/custom-detectors/"
+              variant="marketing"
+            />
+          </div>
+        </LandingSectionShell>
+      </section>
+
       <section>
         <LandingSectionShell tone="plain">
           <Card className="bg-background border-0 shadow-none">

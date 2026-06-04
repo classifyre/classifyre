@@ -55,6 +55,7 @@ export * from './HealthControllerGetHealth200Response';
 export * from './InstanceSettingsResponseDto';
 export * from './LatestRunnerSummaryDto';
 export * from './ListRunnersResponseDto';
+export * from './LiveQueryResponseDto';
 export * from './LocationDto';
 export * from './MarkAllReadDto';
 export * from './McpCapabilityGroupDto';

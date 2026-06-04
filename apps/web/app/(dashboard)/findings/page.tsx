@@ -171,31 +171,31 @@ function FindingsPageContent() {
     () => [
       {
         key: "TOTAL" as const,
-        label: "Total Findings",
+        label: t("findings.totalFindings"),
         value: baseCharts.totals.total,
       },
       {
         key: SearchFindingsFiltersInputDtoSeverityEnum.Critical as SeverityPanelKey,
-        label: "Critical",
+        label: t("findings.severityLabels.CRITICAL"),
         value: baseCharts.totals.critical,
       },
       {
         key: SearchFindingsFiltersInputDtoSeverityEnum.High as SeverityPanelKey,
-        label: "High",
+        label: t("findings.severityLabels.HIGH"),
         value: baseCharts.totals.high,
       },
       {
         key: SearchFindingsFiltersInputDtoSeverityEnum.Medium as SeverityPanelKey,
-        label: "Medium",
+        label: t("findings.severityLabels.MEDIUM"),
         value: baseCharts.totals.medium,
       },
       {
         key: SearchFindingsFiltersInputDtoSeverityEnum.Low as SeverityPanelKey,
-        label: "Low",
+        label: t("findings.severityLabels.LOW"),
         value: baseCharts.totals.low,
       },
     ],
-    [baseCharts],
+    [baseCharts, t],
   );
 
   const handleSelectionChange = useCallback((s: FindingSelection | null) => {
@@ -224,8 +224,7 @@ function FindingsPageContent() {
           {t("findings.title")}
         </h1>
         <p className="text-muted-foreground">
-          Unified findings table with server-side filtering, plus overview
-          charts and stats.
+          {t("findings.description")}
         </p>
       </div>
 
@@ -238,7 +237,7 @@ function FindingsPageContent() {
       {isLoading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="ml-2 text-sm">Loading findings…</span>
+          <span className="ml-2 text-sm">{t("findings.loading")}</span>
         </div>
       ) : (
         <>
@@ -265,7 +264,7 @@ function FindingsPageContent() {
                   <Card
                     className={
                       isActive
-                        ? "overflow-hidden border-2 border-accent/30 bg-background text-accent rounded-[6px]"
+                        ? "overflow-hidden border-2 border-accent/30 bg-background rounded-[6px]"
                         : "border-2 border-border rounded-[6px] transition-all group-hover:bg-secondary/40"
                     }
                   >
@@ -273,7 +272,7 @@ function FindingsPageContent() {
                       <p
                         className={
                           isActive
-                            ? "text-[11px] font-mono uppercase tracking-[0.16em] text-accent/80"
+                            ? "text-[11px] font-mono uppercase tracking-[0.16em]"
                             : "text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground"
                         }
                       >

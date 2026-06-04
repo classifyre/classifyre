@@ -1,12 +1,14 @@
 {
   "name": "@workspace/schemas",
-  "version": "0.4.11",
+  "version": "0.4.12",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./source-docs": "./src/source-docs.ts",
+    "./source-labels": "./src/source-labels.ts",
     "./detector-docs": "./src/detector-docs.ts",
+    "./pipeline-schema-utils": "./src/pipeline-schema-utils.ts",
     "./assistant": "./src/assistant.ts",
     "./package.json": "./package.json",
     "./all_input_sources": "./src/schemas/all_input_sources.json",

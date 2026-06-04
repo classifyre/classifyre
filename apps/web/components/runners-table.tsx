@@ -25,7 +25,6 @@ import {
   type SourceListItem,
 } from "@workspace/api-client";
 import {
-  Badge,
   Button,
   EmptyState,
   Input,
@@ -47,7 +46,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Spinner,
   Table,
   TableBody,
   TableCell,
@@ -666,6 +664,7 @@ export function RunnersTable({
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
+                  label={t("common.pagination.previous")}
                   href="#"
                   onClick={(event) => {
                     event.preventDefault();
@@ -683,7 +682,7 @@ export function RunnersTable({
                   <Fragment key={`page-group-${pageNumber}`}>
                     {showEllipsis && (
                       <PaginationItem key={`ellipsis-${pageNumber}`}>
-                        <PaginationEllipsis />
+                        <PaginationEllipsis label={t("common.pagination.morePages")} />
                       </PaginationItem>
                     )}
                     <PaginationItem key={`page-${pageNumber}`}>
@@ -703,6 +702,7 @@ export function RunnersTable({
               })}
               <PaginationItem>
                 <PaginationNext
+                  label={t("common.pagination.next")}
                   href="#"
                   onClick={(event) => {
                     event.preventDefault();

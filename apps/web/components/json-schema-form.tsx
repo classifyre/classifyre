@@ -6,6 +6,7 @@ import Editor from "@monaco-editor/react";
 import {
   useForm,
   useFieldArray,
+  useFormContext,
   type Control,
   type FieldPath,
   type FieldValues,
@@ -858,6 +859,211 @@ function OneOfFieldInner({
       </div>
       <FormMessage />
     </FormItem>
+  );
+}
+
+function CoupledOneOfAuthBlockInner({
+  field: requiredField,
+  requiredKey,
+  maskedKey,
+  requiredOptions,
+  maskedOptions,
+  control,
+  isRequired,
+  disabled,
+  autoDetectSensitiveFields,
+}: {
+  field: { value: unknown; onChange: (v: unknown) => void };
+  requiredKey: string;
+  maskedKey: string;
+  requiredOptions: JSONSchema7[];
+  maskedOptions: JSONSchema7[];
+  control: Control<FieldValues>;
+  isRequired: boolean;
+  disabled: boolean;
+  autoDetectSensitiveFields: boolean;
+}) {
+  const { t } = useTranslation();
+  const { setValue } = useFormContext<FieldValues>();
+  const [hasMounted, setHasMounted] = React.useState(false);
+  const hasInitializedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  // Initialize both required and masked to the first option after mount
+  React.useEffect(() => {
+    if (!isRequired || !hasMounted || hasInitializedRef.current) return;
+    if (requiredField.value !== undefined || requiredOptions.length === 0) return;
+    requiredField.onChange(createOneOfValue(requiredOptions[0]!));
+    setValue(
+      maskedKey as FieldPath<FieldValues>,
+      createOneOfValue(maskedOptions[0]!) as PathValue<FieldValues, FieldPath<FieldValues>>,
+    );
+    hasInitializedRef.current = true;
+  }, [hasMounted, isRequired, maskedKey, maskedOptions, requiredField, requiredOptions, setValue]);
+
+  const requiredValue = isPlainObject(requiredField.value) ? requiredField.value : null;
+
+  // Find which option is selected by matching the const discriminator
+  const selectedIdx = React.useMemo(() => {
+    if (requiredValue === null) return -1;
+    return requiredOptions.findIndex((opt) => {
+      const disc = getOneOfDiscriminator(opt as JSONSchema7);
+      return disc !== null && Object.is(requiredValue[disc.key], disc.value);
+    });
+  }, [requiredValue, requiredOptions]);
+
+  const effectiveIdx =
+    selectedIdx >= 0
+      ? selectedIdx
+      : isRequired && hasMounted
+        ? 0
+        : -1;
+
+  const activeRequired =
+    effectiveIdx >= 0 ? (requiredOptions[effectiveIdx] as JSONSchema7) : null;
+  const activeMasked =
+    effectiveIdx >= 0 ? (maskedOptions[effectiveIdx] as JSONSchema7) : null;
+
+  const selectedKey =
+    effectiveIdx >= 0
+      ? getOneOfOptionIdentity(
+          requiredOptions[effectiveIdx] as JSONSchema7,
+          effectiveIdx,
+        )
+      : "";
+
+  const hasMaskedFields =
+    activeMasked?.properties !== undefined &&
+    Object.entries(activeMasked.properties).filter(
+      ([, v]) => !isConstField(v as JSONSchema7),
+    ).length > 0;
+
+  return (
+    <FormItem>
+      <div className="space-y-4">
+        <Select
+          value={selectedKey || (!isRequired ? "__none__" : "")}
+          onValueChange={(value) => {
+            if (value === "__none__") {
+              requiredField.onChange(null);
+              setValue(
+                maskedKey as FieldPath<FieldValues>,
+                null as PathValue<FieldValues, FieldPath<FieldValues>>,
+              );
+              return;
+            }
+            const idx = requiredOptions.findIndex(
+              (opt, i) =>
+                getOneOfOptionIdentity(opt as JSONSchema7, i) === value,
+            );
+            if (idx >= 0) {
+              requiredField.onChange(
+                createOneOfValue(requiredOptions[idx] as JSONSchema7),
+              );
+              setValue(
+                maskedKey as FieldPath<FieldValues>,
+                createOneOfValue(
+                  maskedOptions[idx] as JSONSchema7,
+                ) as PathValue<FieldValues, FieldPath<FieldValues>>,
+              );
+            }
+          }}
+          disabled={disabled}
+        >
+          <FormControl>
+            <SelectTrigger
+              data-testid="select-auth-mode"
+            >
+              <SelectValue placeholder={t("common.selectOption")} />
+            </SelectTrigger>
+          </FormControl>
+          <SelectContent>
+            {!isRequired && (
+              <SelectItem value="__none__">{t("common.notSet")}</SelectItem>
+            )}
+            {requiredOptions.map((opt, idx) => {
+              const optKey = getOneOfOptionIdentity(opt as JSONSchema7, idx);
+              const optLabel = getOneOfOptionLabel(opt as JSONSchema7, idx);
+              return (
+                <SelectItem key={idx} value={optKey}>
+                  {optLabel}
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+
+        {activeRequired && (
+          <div className="rounded-md border border-muted/40 bg-muted/10 p-4 space-y-4">
+            <SchemaObjectFields
+              schema={activeRequired}
+              control={control}
+              path={requiredKey}
+              disabled={disabled}
+              autoDetectSensitiveFields={autoDetectSensitiveFields}
+            />
+            {hasMaskedFields ? (
+              <SchemaObjectFields
+                schema={activeMasked!}
+                control={control}
+                path={maskedKey}
+                disabled={disabled}
+                forceMasked
+                autoDetectSensitiveFields={autoDetectSensitiveFields}
+              />
+            ) : activeMasked?.description ? (
+              <p className="text-sm text-muted-foreground">
+                {activeMasked.description}
+              </p>
+            ) : null}
+          </div>
+        )}
+      </div>
+      <FormMessage />
+    </FormItem>
+  );
+}
+
+function CoupledOneOfAuthBlock({
+  requiredKey,
+  maskedKey,
+  requiredOptions,
+  maskedOptions,
+  control,
+  required: isRequired,
+  disabled,
+  autoDetectSensitiveFields,
+}: {
+  requiredKey: string;
+  maskedKey: string;
+  requiredOptions: JSONSchema7[];
+  maskedOptions: JSONSchema7[];
+  control: Control<FieldValues>;
+  required: boolean;
+  disabled: boolean;
+  autoDetectSensitiveFields: boolean;
+}) {
+  return (
+    <FormField
+      control={control}
+      name={requiredKey as FieldPath<FieldValues>}
+      render={({ field }) => (
+        <CoupledOneOfAuthBlockInner
+          field={field}
+          requiredKey={requiredKey}
+          maskedKey={maskedKey}
+          requiredOptions={requiredOptions}
+          maskedOptions={maskedOptions}
+          control={control}
+          isRequired={isRequired}
+          disabled={disabled}
+          autoDetectSensitiveFields={autoDetectSensitiveFields}
+        />
+      )}
+    />
   );
 }
 
@@ -1938,6 +2144,7 @@ export const JsonSchemaForm = React.forwardRef<
   const properties = schema.properties || {};
   const required = new Set(schema.required || []);
   const nameSchema = properties.name as JSONSchema7 | undefined;
+  const descriptionSchema = properties.description as JSONSchema7 | undefined;
   const getBlockEntry = (aliases: string[]) => {
     for (const key of aliases) {
       const candidate = properties[key] as JSONSchema7 | undefined;
@@ -1966,6 +2173,20 @@ export const JsonSchemaForm = React.forwardRef<
   const optionalBlock = getBlockEntry(["optional", "optional_fields"]);
   const samplingBlock = getBlockEntry(["sampling"]);
   const resourcesBlock = getBlockEntry(["resources"]);
+
+  // Detect coupled auth: both required and masked are parallel oneOf unions where
+  // every required option has a const discriminator (auth_mode, authentication_type, …).
+  // When detected, render them as a single card with one dropdown instead of two.
+  const requiredOneOf = (requiredBlock?.schema.oneOf ?? []) as JSONSchema7[];
+  const maskedOneOf = (maskedBlock?.schema.oneOf ?? []) as JSONSchema7[];
+  const hasCoupledAuth =
+    requiredBlock !== null &&
+    maskedBlock !== null &&
+    requiredOneOf.length > 0 &&
+    maskedOneOf.length === requiredOneOf.length &&
+    requiredOneOf.every(
+      (opt) => getOneOfDiscriminator(opt as JSONSchema7) !== null,
+    );
 
   const TABULAR_SOURCE_TYPE_MAP: Record<IngestionSourceType, boolean> = {
     WORDPRESS: false,
@@ -2008,6 +2229,7 @@ export const JsonSchemaForm = React.forwardRef<
     .filter(
       ([key, value]) =>
         key !== "name" &&
+        key !== "description" &&
         !reservedBlockKeys.has(key) &&
         !isConstField(value as JSONSchema7),
     )
@@ -2097,19 +2319,50 @@ export const JsonSchemaForm = React.forwardRef<
                     : undefined
                 }
               >
-                <SchemaField
-                  name="name"
-                  schema={nameSchema}
-                  control={form.control}
-                  required={required.has("name")}
-                  disabled={disabled}
-                  autoDetectSensitiveFields={autoDetectSensitiveFields}
-                />
+                <div className="space-y-4">
+                  <SchemaField
+                    name="name"
+                    schema={nameSchema}
+                    control={form.control}
+                    required={required.has("name")}
+                    disabled={disabled}
+                    autoDetectSensitiveFields={autoDetectSensitiveFields}
+                  />
+                  {descriptionSchema && (
+                    <SchemaField
+                      name="description"
+                      schema={descriptionSchema}
+                      control={form.control}
+                      required={required.has("description")}
+                      disabled={disabled}
+                      autoDetectSensitiveFields={autoDetectSensitiveFields}
+                    />
+                  )}
+                </div>
               </AiAssistedCard>
             );
           })()}
 
-        {requiredBlock &&
+        {hasCoupledAuth && requiredBlock && maskedBlock && (
+          <AiAssistedCard
+            title={t("forms.authentication")}
+            description={undefined}
+            knowledge={null}
+          >
+            <CoupledOneOfAuthBlock
+              requiredKey={requiredBlock.key}
+              maskedKey={maskedBlock.key}
+              requiredOptions={requiredOneOf}
+              maskedOptions={maskedOneOf}
+              control={form.control}
+              required={required.has(requiredBlock.key)}
+              disabled={disabled}
+              autoDetectSensitiveFields={autoDetectSensitiveFields}
+            />
+          </AiAssistedCard>
+        )}
+
+        {!hasCoupledAuth && requiredBlock &&
           (() => {
             const section = resolveKnowledge(
               requiredBlock.key,
@@ -2150,7 +2403,7 @@ export const JsonSchemaForm = React.forwardRef<
             );
           })()}
 
-        {maskedBlock &&
+        {!hasCoupledAuth && maskedBlock &&
           (() => {
             const section = resolveKnowledge(
               maskedBlock.key,

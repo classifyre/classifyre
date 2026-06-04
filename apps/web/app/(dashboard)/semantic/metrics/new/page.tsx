@@ -144,7 +144,7 @@ export default function NewMetricPage() {
   const applyPatches = useCallback(
     (patches: Array<{ path: string; value: unknown }>) => {
       setForm((prev) => {
-        let next = { ...prev };
+        const next = { ...prev };
         for (const patch of patches) {
           const { path, value } = patch;
           if (path === "displayName" && typeof value === "string") {
