@@ -5,10 +5,10 @@ const config = {
     </span>
   ),
   project: {
-    link: "https://github.com/andrebanandre/unstructured",
+    link: "https://github.com/classifyre-com/classifyre",
   },
   docsRepositoryBase:
-    "https://github.com/andrebanandre/unstructured/tree/main/apps/docs",
+    "https://github.com/classifyre-com/classifyre/tree/main/apps/docs",
   useNextSeoProps() {
     return { titleTemplate: "%s – Classifyre Docs" };
   },

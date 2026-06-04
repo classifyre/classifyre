@@ -13,6 +13,7 @@ import {
   siMongodb,
   siMysql,
   siNeo4j,
+  siNotion,
   siPostgresql,
   siSnowflake,
   siWordpress,
@@ -120,6 +121,7 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.Jira]: siJira,
   [CreateSourceDtoTypeEnum.Servicedesk]: null,
   [CreateSourceDtoTypeEnum.Sqlite]: null,
+  [CreateSourceDtoTypeEnum.Notion]: siNotion,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -159,6 +161,7 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Jira]: createSimpleIconComponent(siJira),
   [CreateSourceDtoTypeEnum.Servicedesk]: Monitor,
   [CreateSourceDtoTypeEnum.Sqlite]: FALLBACK_SOURCE_ICON,
+  [CreateSourceDtoTypeEnum.Notion]: createSimpleIconComponent(siNotion),
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =
