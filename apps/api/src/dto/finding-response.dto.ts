@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  AssetContentType,
   Severity,
   FindingStatus,
   DetectorType,
@@ -98,8 +97,8 @@ export class AssetResponseDto {
   @ApiProperty({ type: [String] })
   links: string[];
 
-  @ApiProperty({ enum: AssetContentType })
-  assetType: AssetContentType;
+  @ApiProperty({ description: 'Catalog asset kind of the parent asset' })
+  assetType: string;
 
   @ApiProperty({ enum: AssetType })
   sourceType: AssetType;

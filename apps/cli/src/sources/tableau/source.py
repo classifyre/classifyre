@@ -663,7 +663,7 @@ class TableauSource(BaseSource):
             created_at=ref.created_at,
             updated_at=ref.updated_at,
             runner_id=self.runner_id,
-            metadata=self.validated_metadata("item", asset_metadata),
+            **self.metadata_fields("item", asset_metadata),
         )
 
     def _auth_mode(self) -> str:

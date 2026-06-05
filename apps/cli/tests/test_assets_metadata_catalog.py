@@ -1,11 +1,11 @@
-"""Conformance tests for the x-assets-metadata catalog.
+"""Conformance tests for the x-asset-metadata catalog.
 
-These guard the contract between the declarative catalog (in
-all_input_sources.json) and the CLI code: structure validity, full source
-coverage, and that the two shared producers (file_metadata, tabular_base) match
-their declared field groups. Per-source emitted-vs-declared enforcement happens
-"for free" because every source builds assets through
-``BaseSource.validated_metadata`` which raises under pytest.
+Guards the contract between the declarative catalog (in all_input_sources.json)
+and the CLI code: structure validity, full source coverage, and that the two
+shared producers (file_metadata, tabular_base) match their declared content
+types. Per-source emitted-vs-declared enforcement happens "for free" because
+every source builds assets through ``BaseSource.validated_metadata`` which
+raises under pytest.
 """
 
 from __future__ import annotations
@@ -15,30 +15,26 @@ from src.sources.tabular_base import TABULAR_METADATA_KEYS
 from src.utils.file_metadata import FILE_METADATA_KEYS
 from src.utils.validation import _load_schema
 
-_VALID_TYPES = {"string", "number", "boolean", "string[]", "object"}
+# Content types whose union backs the object-storage "file" asset.
+_FILE_CONTENT_TYPES = ["file", "image", "document", "spreadsheet", "text", "json"]
 
 
-def test_catalog_present_and_field_types_declared() -> None:
+def test_catalog_present_with_content_types_and_sources() -> None:
     catalog = load_catalog()
-    assert set(catalog["fieldTypes"]) == _VALID_TYPES
+    assert isinstance(catalog.get("contentTypes"), dict)
+    assert isinstance(catalog.get("sources"), dict)
 
 
-def test_common_fields_well_formed() -> None:
+def test_content_types_are_well_formed_object_schemas() -> None:
     catalog = load_catalog()
-    for name, field in catalog["commonFields"].items():
-        assert field.get("type") in _VALID_TYPES, name
-        assert isinstance(field.get("description"), str) and field["description"], name
-
-
-def test_field_groups_resolve_with_valid_types() -> None:
-    catalog = load_catalog()
-    common = catalog["commonFields"]
-    for group_name, fields in catalog["fieldGroups"].items():
-        for field in fields:
-            name = field["name"]
-            # Type comes from the field itself or is inherited from commonFields.
-            field_type = field.get("type") or common.get(name, {}).get("type")
-            assert field_type in _VALID_TYPES, f"{group_name}.{name}"
+    for name, content_type in catalog["contentTypes"].items():
+        assert content_type.get("type") == "object", name
+        properties = content_type.get("properties", {})
+        assert properties, f"{name} has no properties"
+        for prop_name, prop in properties.items():
+            assert isinstance(prop.get("type"), str), f"{name}.{prop_name} missing type"
+        for required_name in content_type.get("required", []):
+            assert required_name in properties, f"{name} requires unknown {required_name}"
 
 
 def test_every_source_and_asset_kind_resolves() -> None:
@@ -48,10 +44,10 @@ def test_every_source_and_asset_kind_resolves() -> None:
         for asset_kind in asset_kinds:
             fields = resolve_fields(source_key.lower(), asset_kind)
             assert fields, f"{source_key}/{asset_kind} resolved to no fields"
-            names = [f["name"] for f in fields]
+            names = [field["name"] for field in fields]
             assert len(names) == len(set(names)), f"duplicate field in {source_key}/{asset_kind}"
             for field in fields:
-                assert field["type"] in _VALID_TYPES
+                assert isinstance(field["type"], str)
                 assert isinstance(field["required"], bool)
                 assert isinstance(field["description"], str)
 
@@ -63,13 +59,15 @@ def test_catalog_covers_every_asset_type() -> None:
     assert catalog_sources == asset_types
 
 
-def test_file_extracted_group_matches_producer() -> None:
+def test_file_content_types_match_producer() -> None:
     catalog = load_catalog()
-    group_keys = {field["name"] for field in catalog["fieldGroups"]["fileExtracted"]}
-    assert group_keys == set(FILE_METADATA_KEYS)
+    union: set[str] = set()
+    for name in _FILE_CONTENT_TYPES:
+        union |= set(catalog["contentTypes"][name]["properties"])
+    assert union == set(FILE_METADATA_KEYS)
 
 
-def test_tabular_table_group_matches_producer() -> None:
+def test_tabular_content_type_matches_producer() -> None:
     catalog = load_catalog()
-    group_keys = {field["name"] for field in catalog["fieldGroups"]["tabularTable"]}
-    assert group_keys == set(TABULAR_METADATA_KEYS)
+    table_keys = set(catalog["contentTypes"]["tabularTable"]["properties"])
+    assert table_keys == set(TABULAR_METADATA_KEYS)

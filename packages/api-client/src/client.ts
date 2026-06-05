@@ -141,7 +141,6 @@ export type FindingResponseDto = GeneratedFindingResponseDto & {
 };
 
 export {
-  AssetListItemDtoAssetTypeEnum,
   AssetListItemDtoSourceTypeEnum,
   AssetListItemDtoStatusEnum,
 } from "./generated/src/models";

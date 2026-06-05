@@ -415,7 +415,7 @@ class SlackSource(BaseSource):
             updated_at=updated_at,
             source_id=self.source_id,
             runner_id=self.runner_id,
-            metadata=self.validated_metadata("message", asset_metadata),
+            **self.metadata_fields("message", asset_metadata),
         )
 
     def _message_snippet(self, text: str, max_length: int = 120) -> str:

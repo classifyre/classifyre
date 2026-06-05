@@ -210,7 +210,14 @@ class SingleAssetScanResults(BaseModel):
         ..., description='Linked asset hashes referenced by this asset', title='Links'
     )
     asset_type: AssetType = Field(
-        ..., description='Canonical asset content type', title='Asset Type'
+        ...,
+        description='Canonical asset content type (used for detector routing)',
+        title='Asset Type',
+    )
+    asset_kind: str | None = Field(
+        None,
+        description='Catalog asset kind discriminator (file, image, page, comment, table, ...). Persisted as the asset type for display/filtering.',
+        title='Asset Kind',
     )
     source_id: str | None = Field(
         None,

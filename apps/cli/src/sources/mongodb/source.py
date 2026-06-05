@@ -294,6 +294,15 @@ class MongoDBSource(BaseSource):
         }
         now = datetime.now(UTC)
 
+        asset_metadata: dict[str, Any] = {
+            "database": collection_ref.database,
+            "collection": collection_ref.collection,
+            "deployment": "ATLAS" if self._is_atlas() else "ON_PREM",
+        }
+        document_count = self._estimate_document_count(collection_ref)
+        if document_count is not None:
+            asset_metadata["document_count"] = document_count
+
         return SingleAssetScanResults(
             hash=asset_hash,
             checksum=self.calculate_checksum(metadata),
@@ -305,14 +314,7 @@ class MongoDBSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata=self.validated_metadata(
-                "collection",
-                {
-                    "database": collection_ref.database,
-                    "collection": collection_ref.collection,
-                    "deployment": "ATLAS" if self._is_atlas() else "ON_PREM",
-                },
-            ),
+            **self.metadata_fields("collection", asset_metadata),
         )
 
     def _collection_external_url(self, collection_ref: CollectionRef) -> str:
@@ -385,6 +387,14 @@ class MongoDBSource(BaseSource):
         try:
             collection = self._client()[collection_ref.database][collection_ref.collection]
             return int(collection.count_documents({}))
+        except Exception:
+            return None
+
+    def _estimate_document_count(self, collection_ref: CollectionRef) -> int | None:
+        """Cheap document-count estimate for asset metadata (collection stats)."""
+        try:
+            collection = self._client()[collection_ref.database][collection_ref.collection]
+            return int(collection.estimated_document_count())
         except Exception:
             return None
 

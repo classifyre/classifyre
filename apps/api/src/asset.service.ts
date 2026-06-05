@@ -8,7 +8,6 @@ import {
   Asset,
   Prisma,
   AssetType,
-  AssetContentType,
   AssetStatus,
   DetectorType,
   FindingStatus,
@@ -164,26 +163,19 @@ export class AssetService {
     return { source, runner };
   }
 
-  private normalizeAssetType(value: unknown): AssetContentType {
-    if (typeof value !== 'string') {
-      return AssetContentType.OTHER;
-    }
-
-    const normalized = value.trim().toUpperCase();
-    if (
-      normalized === AssetContentType.TXT ||
-      normalized === AssetContentType.IMAGE ||
-      normalized === AssetContentType.VIDEO ||
-      normalized === AssetContentType.AUDIO ||
-      normalized === AssetContentType.URL ||
-      normalized === AssetContentType.TABLE ||
-      normalized === AssetContentType.BINARY ||
-      normalized === AssetContentType.OTHER
-    ) {
-      return normalized;
-    }
-
-    return AssetContentType.OTHER;
+  /**
+   * The persisted asset type is the catalog asset kind (file, image, page,
+   * comment, table, ...). Prefer `asset_kind`; fall back to the content type
+   * string for older payloads. Free-form lowercase string (no enum).
+   */
+  private normalizeAssetKind(assetKind: unknown, assetType: unknown): string {
+    const candidate =
+      typeof assetKind === 'string' && assetKind.trim()
+        ? assetKind
+        : typeof assetType === 'string' && assetType.trim()
+          ? assetType
+          : 'other';
+    return candidate.trim().toLowerCase();
   }
 
   private normalizeLinks(value: unknown): string[] {
@@ -1557,7 +1549,7 @@ export class AssetService {
             name: String(name),
             externalUrl: String(external_url),
             links: mergedLinks,
-            assetType: this.normalizeAssetType(asset_type),
+            assetType: this.normalizeAssetKind(asset.asset_kind, asset_type),
             sourceType,
             runnerId,
             sourceId,

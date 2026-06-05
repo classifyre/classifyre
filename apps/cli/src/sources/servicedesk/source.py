@@ -303,7 +303,7 @@ class ServiceDeskSource(BaseSource):
             created_at=self._parse_date_dto(request.get("createdDate")) or now,
             updated_at=self._request_sort_timestamp(request),
             runner_id=self.runner_id,
-            metadata=self.validated_metadata("issue", asset_metadata),
+            **self.metadata_fields("issue", asset_metadata),
         )
 
         assets: list[SingleAssetScanResults] = [request_asset]
@@ -399,7 +399,7 @@ class ServiceDeskSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata=self.validated_metadata(
+            **self.metadata_fields(
                 "comments",
                 {"issue_key": issue_key, "comments_count": len(comments)},
             ),
@@ -464,7 +464,7 @@ class ServiceDeskSource(BaseSource):
                     created_at=now,
                     updated_at=now,
                     runner_id=self.runner_id,
-                    metadata=self.validated_metadata("attachment", attachment_metadata),
+                    **self.metadata_fields("attachment", attachment_metadata),
                 )
             )
             hashes.append(attachment_hash)

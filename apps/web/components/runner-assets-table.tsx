@@ -16,7 +16,6 @@ import {
 } from "@workspace/api-client";
 import { FINDING_SEVERITY_COLOR_BY_ENUM } from "@workspace/ui/lib/finding-severity";
 import {
-  Badge,
   Button,
   EmptyState,
   Input,
@@ -49,7 +48,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@workspace/ui/components";
-import { getAssetTypeIcon } from "../lib/asset-type-icon";
+import { AssetKindBadge } from "./asset-kind-badge";
 import { CsvExportButton, filtersToSearchParams } from "./csv-export-button";
 import { useTranslation } from "../hooks/use-translation";
 import type { TranslationKey } from "../i18n";
@@ -586,7 +585,6 @@ function RunnerAssetRow({
   const highestSeverity = getHighestSeverityFromMap(item.findingsBySeverity);
   const totalFindings =
     typeof item.findingsTotal === "number" ? item.findingsTotal : null;
-  const AssetIcon = item.asset ? getAssetTypeIcon(item.asset.assetType) : null;
 
   return (
     <TableRow data-testid="asset-row">
@@ -617,14 +615,7 @@ function RunnerAssetRow({
       </TableCell>
 
       <TableCell>
-        {item.asset && AssetIcon ? (
-          <Badge variant="outline" className="gap-1.5">
-            <AssetIcon className="h-3 w-3 text-muted-foreground" />
-            {formatEnumLabel(item.asset.assetType)}
-          </Badge>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )}
+        <AssetKindBadge kind={item.asset?.assetType} />
       </TableCell>
 
       <TableCell>

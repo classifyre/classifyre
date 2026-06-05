@@ -1,5 +1,5 @@
 """Asset-metadata contract: the single source of truth for what each source
-extracts is the ``x-assets-metadata`` catalog embedded in
+extracts is the ``x-asset-metadata`` catalog embedded in
 ``packages/schemas/src/schemas/all_input_sources.json``.
 
 This module loads/resolves that catalog and validates metadata dicts against it.
@@ -19,24 +19,7 @@ from ..utils.validation import _load_schema
 
 logger = logging.getLogger(__name__)
 
-# ── Normalized metadata key constants (reused across sources) ────────────────
-SIZE_BYTES = "size_bytes"
-MIME_TYPE = "mime_type"
-ROW_COUNT = "row_count"
-COLUMN_COUNT = "column_count"
-COLUMN_NAMES = "column_names"
-COLUMN_TYPES = "column_types"
-PAGE_COUNT = "page_count"
-ENCODING = "encoding"
-IMAGE_WIDTH = "image_width"
-IMAGE_HEIGHT = "image_height"
-PARSE_ERROR = "parse_error"
-AUTHOR = "author"
-STATUS = "status"
-TAGS = "tags"
-
-_CATALOG_KEY = "x-assets-metadata"
-_DEFAULT_TYPE = "string"
+_CATALOG_KEY = "x-asset-metadata"
 
 ResolvedField = dict[str, Any]  # {name, type, description, required}
 
@@ -53,7 +36,7 @@ def _strict_mode() -> bool:
 
 @cache
 def load_catalog() -> dict[str, Any]:
-    """Load and cache the ``x-assets-metadata`` catalog from the merged schema."""
+    """Load and cache the ``x-asset-metadata`` catalog from the merged schema."""
     schema = _load_schema("all_input_sources.json")
     catalog = schema.get(_CATALOG_KEY)
     if not isinstance(catalog, dict):
@@ -68,12 +51,22 @@ def _source_key(source_type: str) -> str:
     return source_type.upper()
 
 
+def describe_type(prop_schema: dict[str, Any]) -> str:
+    """Render a JSON-Schema property type as a short display string."""
+    json_type = prop_schema.get("type")
+    if json_type == "array":
+        items = prop_schema.get("items", {})
+        item_type = items.get("type", "string") if isinstance(items, dict) else "string"
+        return f"{item_type}[]"
+    return str(json_type) if json_type else "string"
+
+
 def resolve_fields(source_type: str, asset_kind: str) -> list[ResolvedField]:
     """Resolve the declared fields for a (source, asset kind).
 
-    Resolution: concat ``use`` groups, then inline ``fields`` (inheriting
-    type/description from ``commonFields`` when omitted); deduped by name with
-    inline entries overriding group entries. Raises if the entry is absent.
+    The asset entry composes one or more reusable ``contentTypes`` via ``use``
+    plus its own ``properties``; ``required`` is the union of each used content
+    type's required list and the entry's own. Raises if the entry is absent.
     """
     catalog = load_catalog()
     sources = catalog.get("sources", {})
@@ -83,31 +76,28 @@ def resolve_fields(source_type: str, asset_kind: str) -> list[ResolvedField]:
             f"No catalog entry for source '{source_type}' asset kind '{asset_kind}'"
         )
     entry = source_entry[asset_kind]
-    common_fields = catalog.get("commonFields", {})
-    field_groups = catalog.get("fieldGroups", {})
+    content_types = catalog.get("contentTypes", {})
 
-    resolved: dict[str, ResolvedField] = {}
+    properties: dict[str, dict[str, Any]] = {}
+    required: set[str] = set()
 
-    for group_name in entry.get("use", []):
-        for field in field_groups.get(group_name, []):
-            resolved[field["name"]] = {
-                "name": field["name"],
-                "type": field.get("type", _DEFAULT_TYPE),
-                "description": field.get("description", ""),
-                "required": bool(field.get("required", False)),
-            }
+    for content_type_name in entry.get("use", []):
+        content_type = content_types.get(content_type_name, {})
+        properties.update(content_type.get("properties", {}))
+        required.update(content_type.get("required", []))
 
-    for field in entry.get("fields", []):
-        name = field["name"]
-        common = common_fields.get(name, {})
-        resolved[name] = {
+    properties.update(entry.get("properties", {}))
+    required.update(entry.get("required", []))
+
+    return [
+        {
             "name": name,
-            "type": field.get("type") or common.get("type") or _DEFAULT_TYPE,
-            "description": field.get("description") or common.get("description") or "",
-            "required": bool(field.get("required", False)),
+            "type": describe_type(prop),
+            "description": prop.get("description", ""),
+            "required": name in required,
         }
-
-    return list(resolved.values())
+        for name, prop in properties.items()
+    ]
 
 
 def validate_metadata(

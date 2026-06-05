@@ -34,8 +34,21 @@
     },
     "asset_type": {
       "$ref": "#/definitions/AssetType",
-      "description": "Canonical asset content type",
+      "description": "Canonical asset content type (used for detector routing)",
       "title": "Asset Type"
+    },
+    "asset_kind": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Catalog asset kind discriminator (file, image, page, comment, table, ...). Persisted as the asset type for display/filtering.",
+      "title": "Asset Kind"
     },
     "source_id": {
       "anyOf": [
