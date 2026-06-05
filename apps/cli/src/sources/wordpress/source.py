@@ -382,7 +382,7 @@ class WordPressSource(BaseSource):
             created_at=created_dt,
             updated_at=updated_dt,
             runner_id=self.runner_id,
-            metadata=asset_metadata,
+            metadata=self.validated_metadata("post", asset_metadata),
         )
 
         image_assets = [
@@ -467,7 +467,7 @@ class WordPressSource(BaseSource):
             created_at=created_at,
             updated_at=updated_at,
             runner_id=self.runner_id,
-            metadata={"referenced_by": page_hash},
+            metadata=self.validated_metadata("image", {"referenced_by": page_hash}),
         )
 
     def _image_name_from_url(self, image_url: str) -> str:

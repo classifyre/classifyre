@@ -286,7 +286,10 @@ class JiraSource(BaseSource):
             created_at=parse_datetime(str(fields.get("created") or "")),
             updated_at=parse_datetime(str(fields.get("updated") or "")),
             runner_id=self.runner_id,
-            metadata=self._normalized_issue_metadata(issue_key, fields, len(issue_links)),
+            metadata=self.validated_metadata(
+                "issue",
+                self._normalized_issue_metadata(issue_key, fields, len(issue_links)),
+            ),
         )
 
         assets: list[SingleAssetScanResults] = [issue_asset]
@@ -352,6 +355,10 @@ class JiraSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
+            metadata=self.validated_metadata(
+                "comments",
+                {"issue_key": issue_key, "comments_count": len(comments)},
+            ),
         )
         return asset, [comments_hash], urls
 
@@ -438,7 +445,7 @@ class JiraSource(BaseSource):
                     created_at=now,
                     updated_at=now,
                     runner_id=self.runner_id,
-                    metadata=attachment_metadata,
+                    metadata=self.validated_metadata("attachment", attachment_metadata),
                 )
             )
             hashes.append(attachment_hash)

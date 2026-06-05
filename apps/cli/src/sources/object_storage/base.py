@@ -444,7 +444,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             created_at=ref.last_modified,
             updated_at=ref.last_modified,
             runner_id=self.runner_id,
-            metadata=asset_metadata,
+            metadata=self.validated_metadata("file", asset_metadata),
         )
         self._hash_to_uri[asset_hash] = external_url
         self._object_ref_by_hash[asset_hash] = ref
@@ -517,6 +517,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             created_at=ref.last_modified,
             updated_at=ref.last_modified,
             runner_id=self.runner_id,
+            metadata=self.validated_metadata("image", metadata),
         )
 
     def test_connection(self) -> dict[str, Any]:

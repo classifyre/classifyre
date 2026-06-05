@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote, urlsplit
 
+import requests
+
 from ...models.generated_input import (
     NotionInput,
     NotionOptional,
@@ -419,7 +421,7 @@ class NotionSource(BaseSource):
             created_at=parse_datetime(str(page.get("created_time") or "")),
             updated_at=parse_datetime(str(page.get("last_edited_time") or "")),
             runner_id=self.runner_id,
-            metadata=asset_metadata,
+            metadata=self.validated_metadata("page", asset_metadata),
         )
 
         return [page_asset, *related_assets]
@@ -599,6 +601,9 @@ class NotionSource(BaseSource):
         }
         if column_names:
             asset_metadata["column_names"] = column_names
+        column_types = {key: str(value) for key, value in schema.items() if isinstance(value, str)}
+        if column_types:
+            asset_metadata["column_types"] = column_types
         asset_metadata.update(_parent_signals(data_source.get("parent")))
         ds_asset = SingleAssetScanResults(
             hash=ds_hash,
@@ -611,7 +616,7 @@ class NotionSource(BaseSource):
             created_at=parse_datetime(str(data_source.get("created_time") or "")),
             updated_at=parse_datetime(str(data_source.get("last_edited_time") or "")),
             runner_id=self.runner_id,
-            metadata=asset_metadata,
+            metadata=self.validated_metadata("data_source", asset_metadata),
         )
 
         return [ds_asset, *row_assets]
@@ -726,11 +731,10 @@ class NotionSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata={
-                "selector": selector,
-                "name": name,
-                "is_external": is_external,
-            },
+            metadata=self.validated_metadata(
+                "file",
+                {"selector": selector, "name": name, "is_external": is_external},
+            ),
         )
 
     # ---------------------------------------------------------------- comments
@@ -742,6 +746,19 @@ class NotionSource(BaseSource):
     ) -> tuple[SingleAssetScanResults | None, list[str]]:
         try:
             comments = self.client.iter_comments(page_id)
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 403:
+                logger.warning(
+                    "Failed to fetch Notion comments for %s: 403 Forbidden — "
+                    'your integration token lacks the "Read comments" capability. '
+                    "Enable it in the Notion Developer portal at "
+                    "https://www.notion.so/my-integrations, "
+                    "then re-authorize the integration with the workspace.",
+                    page_id,
+                )
+            else:
+                logger.warning("Failed to fetch Notion comments for %s: %s", page_id, exc)
+            return None, []
         except Exception as exc:
             logger.warning("Failed to fetch Notion comments for %s: %s", page_id, exc)
             return None, []
@@ -780,10 +797,10 @@ class NotionSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata={
-                "page_id": page_id,
-                "comments_count": len(comments),
-            },
+            metadata=self.validated_metadata(
+                "comments",
+                {"page_id": page_id, "comments_count": len(comments)},
+            ),
         )
         return comments_asset, [comments_hash]
 

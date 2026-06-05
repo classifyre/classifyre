@@ -26,6 +26,24 @@ logger = logging.getLogger(__name__)
 # Cap CSV sniffing so a huge file does not force a full read just for metadata.
 _CSV_MAX_SCAN_BYTES = 5 * 1024 * 1024
 
+# Every key extract_file_metadata may emit. Mirrors the "fileExtracted" group in
+# the x-assets-metadata catalog; the catalog conformance test asserts equality.
+FILE_METADATA_KEYS: frozenset[str] = frozenset(
+    {
+        "size_bytes",
+        "mime_type",
+        "row_count",
+        "column_count",
+        "column_names",
+        "column_types",
+        "page_count",
+        "encoding",
+        "image_width",
+        "image_height",
+        "parse_error",
+    }
+)
+
 
 def _normalize_mime(mime_type: str) -> str:
     return (mime_type or "").split(";", 1)[0].strip().lower()
@@ -111,10 +129,12 @@ def _parquet_metadata(file_bytes: bytes) -> dict[str, Any]:
     parquet_file = pq.ParquetFile(io.BytesIO(file_bytes))
     schema = parquet_file.schema_arrow
     column_names = list(schema.names)
+    column_types = {field.name: str(field.type) for field in schema}
     return {
         "row_count": parquet_file.metadata.num_rows,
         "column_count": len(column_names),
         "column_names": column_names,
+        "column_types": column_types,
     }
 
 
