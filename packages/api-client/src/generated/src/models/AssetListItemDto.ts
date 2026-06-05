@@ -56,11 +56,11 @@ export interface AssetListItemDto {
      */
     links: Array<string>;
     /**
-     * 
+     * Catalog asset kind (file, image, page, comment, table, ...)
      * @type {string}
      * @memberof AssetListItemDto
      */
-    assetType: AssetListItemDtoAssetTypeEnum;
+    assetType: string;
     /**
      * 
      * @type {string}
@@ -111,21 +111,6 @@ export interface AssetListItemDto {
     metadata?: { [key: string]: any; };
 }
 
-
-/**
- * @export
- */
-export const AssetListItemDtoAssetTypeEnum = {
-    Txt: 'TXT',
-    Table: 'TABLE',
-    Image: 'IMAGE',
-    Video: 'VIDEO',
-    Audio: 'AUDIO',
-    Url: 'URL',
-    Binary: 'BINARY',
-    Other: 'OTHER'
-} as const;
-export type AssetListItemDtoAssetTypeEnum = typeof AssetListItemDtoAssetTypeEnum[keyof typeof AssetListItemDtoAssetTypeEnum];
 
 /**
  * @export

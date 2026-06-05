@@ -68,13 +68,10 @@ const assistantKnowledgeRoot = toSchemaNode(assistantKnowledge);
 const assistantKnowledgeSources = toSchemaNode(assistantKnowledgeRoot.sources);
 
 const assetsMetadataCatalog = toSchemaNode(
-  (allInputSources as Record<string, unknown>)["x-assets-metadata"],
+  (allInputSources as Record<string, unknown>)["x-asset-metadata"],
 );
-const assetsMetadataCommonFields = toSchemaNode(
-  assetsMetadataCatalog.commonFields,
-);
-const assetsMetadataFieldGroups = toSchemaNode(
-  assetsMetadataCatalog.fieldGroups,
+const assetsMetadataContentTypes = toSchemaNode(
+  assetsMetadataCatalog.contentTypes,
 );
 const assetsMetadataSources = toSchemaNode(assetsMetadataCatalog.sources);
 
@@ -644,49 +641,51 @@ function extractSourceDefinitions(): SourceDefinition[] {
   return sourceDefinitions;
 }
 
-function resolveMetadataField(
-  raw: Record<string, unknown>,
-): SourceMetadataField {
-  const name = typeof raw.name === "string" ? raw.name : "";
-  const common = toSchemaNode(assetsMetadataCommonFields[name]);
-  const type =
-    (typeof raw.type === "string" ? raw.type : undefined) ??
-    (typeof common.type === "string" ? common.type : undefined) ??
-    "string";
-  const description =
-    (typeof raw.description === "string" ? raw.description : undefined) ??
-    (typeof common.description === "string" ? common.description : undefined) ??
-    "";
-  return { name, type, description, required: raw.required === true };
+function describeMetadataType(propSchema: Record<string, unknown>): string {
+  const jsonType =
+    typeof propSchema.type === "string" ? propSchema.type : "string";
+  if (jsonType === "array") {
+    const items = toSchemaNode(propSchema.items);
+    const itemType = typeof items.type === "string" ? items.type : "string";
+    return `${itemType}[]`;
+  }
+  return jsonType;
 }
 
 function resolveAssetFields(
   entry: Record<string, unknown>,
 ): SourceMetadataField[] {
-  const resolved = new Map<string, SourceMetadataField>();
+  // Compose the reusable content types referenced by `use`, then the entry's
+  // own `properties`; `required` is the union of each source.
+  const properties = new Map<string, Record<string, unknown>>();
+  const required = new Set<string>();
 
-  const useGroups = toStringArray(entry.use);
-  for (const groupName of useGroups) {
-    const group = assetsMetadataFieldGroups[groupName];
-    if (Array.isArray(group)) {
-      for (const groupField of group) {
-        if (isRecord(groupField)) {
-          const field = resolveMetadataField(groupField);
-          resolved.set(field.name, field);
-        }
+  const collect = (objectSchema: Record<string, unknown>) => {
+    const props = toSchemaNode(objectSchema.properties);
+    for (const [name, prop] of Object.entries(props)) {
+      if (isRecord(prop)) {
+        properties.set(name, prop);
       }
     }
-  }
+    for (const name of toStringArray(objectSchema.required)) {
+      required.add(name);
+    }
+  };
 
-  const inlineFields = Array.isArray(entry.fields) ? entry.fields : [];
-  for (const inlineField of inlineFields) {
-    if (isRecord(inlineField)) {
-      const field = resolveMetadataField(inlineField);
-      resolved.set(field.name, field);
+  for (const contentTypeName of toStringArray(entry.use)) {
+    const contentType = assetsMetadataContentTypes[contentTypeName];
+    if (isRecord(contentType)) {
+      collect(contentType);
     }
   }
+  collect(entry);
 
-  return Array.from(resolved.values());
+  return Array.from(properties.entries()).map(([name, prop]) => ({
+    name,
+    type: describeMetadataType(prop),
+    description: typeof prop.description === "string" ? prop.description : "",
+    required: required.has(name),
+  }));
 }
 
 function extractAssetsMetadataForSource(

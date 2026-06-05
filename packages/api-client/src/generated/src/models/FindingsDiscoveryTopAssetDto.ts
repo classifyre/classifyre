@@ -32,11 +32,11 @@ export interface FindingsDiscoveryTopAssetDto {
      */
     assetName: string;
     /**
-     * 
+     * Catalog asset kind of the parent asset
      * @type {string}
      * @memberof FindingsDiscoveryTopAssetDto
      */
-    assetType: FindingsDiscoveryTopAssetDtoAssetTypeEnum;
+    assetType: string;
     /**
      * 
      * @type {string}
@@ -75,21 +75,6 @@ export interface FindingsDiscoveryTopAssetDto {
     lastDetectedAt?: Date | null;
 }
 
-
-/**
- * @export
- */
-export const FindingsDiscoveryTopAssetDtoAssetTypeEnum = {
-    Txt: 'TXT',
-    Table: 'TABLE',
-    Image: 'IMAGE',
-    Video: 'VIDEO',
-    Audio: 'AUDIO',
-    Url: 'URL',
-    Binary: 'BINARY',
-    Other: 'OTHER'
-} as const;
-export type FindingsDiscoveryTopAssetDtoAssetTypeEnum = typeof FindingsDiscoveryTopAssetDtoAssetTypeEnum[keyof typeof FindingsDiscoveryTopAssetDtoAssetTypeEnum];
 
 /**
  * @export

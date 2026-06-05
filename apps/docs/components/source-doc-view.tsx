@@ -146,9 +146,10 @@ function AssetsMetadataSection({ assets }: { assets: SourceAssetMetadata[] }) {
       <CardHeader>
         <CardTitle className="text-lg">Extracted Metadata</CardTitle>
         <CardDescription>
-          Metadata attached to each asset this source produces. Declared in{" "}
-          <code>all_input_sources.json</code> (
-          <code>x-assets-metadata</code>) and enforced by the CLI.
+          Metadata attached to each asset this source produces, composed from
+          reusable content types. Declared in{" "}
+          <code>all_input_sources.json</code> (<code>x-asset-metadata</code>)
+          and enforced by the CLI.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

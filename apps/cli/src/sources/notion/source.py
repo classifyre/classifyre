@@ -421,7 +421,7 @@ class NotionSource(BaseSource):
             created_at=parse_datetime(str(page.get("created_time") or "")),
             updated_at=parse_datetime(str(page.get("last_edited_time") or "")),
             runner_id=self.runner_id,
-            metadata=self.validated_metadata("page", asset_metadata),
+            **self.metadata_fields("page", asset_metadata),
         )
 
         return [page_asset, *related_assets]
@@ -592,18 +592,17 @@ class NotionSource(BaseSource):
             "schema": schema,
             "row_count": len(row_hashes),
         }
-        column_names = list(schema.keys())
         asset_metadata: dict[str, Any] = {
             "data_source_id": ds_id,
             "name": name,
             "row_count": len(row_hashes),
-            "column_count": len(column_names),
         }
-        if column_names:
-            asset_metadata["column_names"] = column_names
-        column_types = {key: str(value) for key, value in schema.items() if isinstance(value, str)}
-        if column_types:
-            asset_metadata["column_types"] = column_types
+        columns = [
+            {"name": key, "type": str(value) if isinstance(value, str) else ""}
+            for key, value in schema.items()
+        ]
+        if columns:
+            asset_metadata["columns"] = columns
         asset_metadata.update(_parent_signals(data_source.get("parent")))
         ds_asset = SingleAssetScanResults(
             hash=ds_hash,
@@ -616,7 +615,7 @@ class NotionSource(BaseSource):
             created_at=parse_datetime(str(data_source.get("created_time") or "")),
             updated_at=parse_datetime(str(data_source.get("last_edited_time") or "")),
             runner_id=self.runner_id,
-            metadata=self.validated_metadata("data_source", asset_metadata),
+            **self.metadata_fields("data_source", asset_metadata),
         )
 
         return [ds_asset, *row_assets]
@@ -731,7 +730,7 @@ class NotionSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata=self.validated_metadata(
+            **self.metadata_fields(
                 "file",
                 {"selector": selector, "name": name, "is_external": is_external},
             ),
@@ -797,7 +796,7 @@ class NotionSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata=self.validated_metadata(
+            **self.metadata_fields(
                 "comments",
                 {"page_id": page_id, "comments_count": len(comments)},
             ),

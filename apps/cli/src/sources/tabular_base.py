@@ -24,6 +24,7 @@ from ..models.generated_single_asset_scan_results import (
     DetectionResult,
     SingleAssetScanResults,
 )
+from ..utils.file_metadata import build_columns
 from ..utils.hashing import hash_id, unhash_id
 from .base import BaseSource
 from .tabular_utils import TableRef, build_tabular_location, format_tabular_sample_content
@@ -31,7 +32,7 @@ from .tabular_utils import TableRef, build_tabular_location, format_tabular_samp
 logger = logging.getLogger(__name__)
 
 # Every key _table_to_asset emits (before per-dialect _extra_asset_metadata).
-# Mirrors the "tabularTable" group in the x-assets-metadata catalog; the catalog
+# Mirrors the "tabularTable" group in the x-asset-metadata catalog; the catalog
 # conformance test asserts equality.
 TABULAR_METADATA_KEYS: frozenset[str] = frozenset(
     {
@@ -39,9 +40,7 @@ TABULAR_METADATA_KEYS: frozenset[str] = frozenset(
         "table_name",
         "table_type",
         "schema",
-        "column_names",
-        "column_count",
-        "column_types",
+        "columns",
         "row_count",
     }
 )
@@ -624,14 +623,14 @@ class BaseTabularSource(BaseSource):
         if table_ref.schema is not None:
             asset_metadata["schema"] = table_ref.schema
         # Prefer the name→type map (one catalog query gives both); fall back to
-        # names-only for dialects without a supported column-types query.
+        # names-only (empty types) for dialects without a column-types query.
         column_types = self._cached_column_types(table_ref)
-        columns = list(column_types.keys()) if column_types else self._cached_columns(table_ref)
-        if columns:
-            asset_metadata["column_names"] = columns
-            asset_metadata["column_count"] = len(columns)
         if column_types:
-            asset_metadata["column_types"] = column_types
+            columns = build_columns(list(column_types.keys()), column_types)
+        else:
+            columns = build_columns(self._cached_columns(table_ref))
+        if columns:
+            asset_metadata["columns"] = columns
         row_count = self._estimate_row_count(table_ref)
         if row_count is not None and row_count >= 0:
             asset_metadata["row_count"] = row_count
@@ -649,7 +648,7 @@ class BaseTabularSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata=self.validated_metadata("table", asset_metadata),
+            **self.metadata_fields("table", asset_metadata),
         )
 
     # ── extract_raw (discovery) ──────────────────────────────────────────

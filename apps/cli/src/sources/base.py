@@ -19,7 +19,7 @@ class BaseSource(ABC):
 
     # Stable source identifier, overridden by each concrete source (e.g.
     # "postgresql", "wordpress"). Uppercased it maps to the AssetType enum and
-    # the x-assets-metadata catalog key.
+    # the x-asset-metadata catalog key.
     source_type: str = ""
 
     # Default batch size for streaming asset results
@@ -135,17 +135,21 @@ class BaseSource(ABC):
         """
         return calculate_checksum(data)
 
-    def validated_metadata(self, asset_kind: str, data: dict[str, Any]) -> dict[str, Any]:
-        """Validate an emitted asset-metadata dict against the declared catalog.
+    def metadata_fields(self, asset_kind: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Build the ``asset_kind`` + ``metadata`` kwargs for SingleAssetScanResults.
 
-        Pass the dict you set on ``SingleAssetScanResults(metadata=...)`` through
-        this so it is checked against ``x-assets-metadata`` for this source and
-        asset kind. Strict (raises) under pytest / ``CLASSIFYRE_STRICT_METADATA``,
-        otherwise logs a warning. Returns ``data`` unchanged.
+        Spread into the constructor: ``**self.metadata_fields("page", {...})``.
+        ``asset_kind`` is the catalog discriminator (persisted as the asset type
+        for display); ``metadata`` is validated against ``x-asset-metadata`` for
+        this source/kind — strict (raises) under pytest / ``CLASSIFYRE_STRICT_METADATA``,
+        otherwise a warning.
         """
         from .asset_metadata import validate_metadata
 
-        return validate_metadata(self.source_type, asset_kind, data)
+        return {
+            "asset_kind": asset_kind,
+            "metadata": validate_metadata(self.source_type, asset_kind, data),
+        }
 
     @abstractmethod
     def abort(self) -> None:

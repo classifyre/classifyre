@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -23,25 +24,22 @@ from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
 
-# Cap CSV sniffing so a huge file does not force a full read just for metadata.
+# Cap byte scanning so a huge file does not force a full read just for metadata.
 _CSV_MAX_SCAN_BYTES = 5 * 1024 * 1024
 
-# Every key extract_file_metadata may emit. Mirrors the "fileExtracted" group in
-# the x-assets-metadata catalog; the catalog conformance test asserts equality.
-FILE_METADATA_KEYS: frozenset[str] = frozenset(
-    {
-        "size_bytes",
-        "mime_type",
-        "row_count",
-        "column_count",
-        "column_names",
-        "column_types",
-        "page_count",
-        "encoding",
-        "image_width",
-        "image_height",
-        "parse_error",
-    }
+# Per-content-type key sets. These line up 1:1 with the reusable contentTypes in
+# the x-asset-metadata catalog; the conformance test asserts the union equals
+# the catalog's file content types.
+FILE_BASE_KEYS: frozenset[str] = frozenset({"size_bytes", "mime_type", "parse_error"})
+IMAGE_KEYS: frozenset[str] = frozenset({"image_width", "image_height"})
+DOCUMENT_KEYS: frozenset[str] = frozenset({"page_count", "paragraph_count", "table_count"})
+SPREADSHEET_KEYS: frozenset[str] = frozenset({"row_count", "columns", "encoding"})
+TEXT_KEYS: frozenset[str] = frozenset({"encoding"})
+JSON_KEYS: frozenset[str] = frozenset({"json_root_type", "top_level_keys", "array_length"})
+
+# Every key extract_file_metadata may emit (union of all content-type key sets).
+FILE_METADATA_KEYS: frozenset[str] = (
+    FILE_BASE_KEYS | IMAGE_KEYS | DOCUMENT_KEYS | SPREADSHEET_KEYS | TEXT_KEYS | JSON_KEYS
 )
 
 
@@ -80,6 +78,8 @@ def extract_file_metadata(
     try:
         if normalized == "application/pdf" or extension == ".pdf":
             metadata.update(_pdf_metadata(file_bytes))
+        elif _is_docx(normalized, extension):
+            metadata.update(_docx_metadata(file_bytes))
         elif _is_parquet(normalized, extension):
             metadata.update(_parquet_metadata(file_bytes))
         elif _is_xlsx(normalized, extension):
@@ -88,6 +88,8 @@ def extract_file_metadata(
             metadata.update(_csv_metadata(file_bytes, extension))
         elif normalized.startswith("image/") or extension in _IMAGE_EXTENSIONS:
             metadata.update(_image_metadata(file_bytes))
+        elif _is_json(normalized, extension):
+            metadata.update(_json_metadata(file_bytes))
         elif normalized.startswith("text/") or extension in _TEXT_EXTENSIONS:
             metadata.update(_encoding_metadata(file_bytes))
     except Exception as exc:  # never raise - metadata is best-effort
@@ -98,7 +100,7 @@ def extract_file_metadata(
 
 
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".ico"}
-_TEXT_EXTENSIONS = {".txt", ".md", ".json", ".xml", ".log", ".yaml", ".yml"}
+_TEXT_EXTENSIONS = {".txt", ".md", ".xml", ".log", ".yaml", ".yml"}
 
 
 def _is_parquet(mime: str, extension: str) -> bool:
@@ -112,8 +114,39 @@ def _is_xlsx(mime: str, extension: str) -> bool:
     )
 
 
+def _is_docx(mime: str, extension: str) -> bool:
+    return (
+        mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        or extension == ".docx"
+    )
+
+
 def _is_delimited(mime: str, extension: str) -> bool:
     return mime in ("text/csv", "text/tab-separated-values") or extension in (".csv", ".tsv")
+
+
+def _is_json(mime: str, extension: str) -> bool:
+    return mime in ("application/json", "text/json") or extension == ".json"
+
+
+def _docx_metadata(file_bytes: bytes) -> dict[str, Any]:
+    import docx  # type: ignore[import-untyped]
+
+    document = docx.Document(io.BytesIO(file_bytes))
+    return {
+        "paragraph_count": len(document.paragraphs),
+        "table_count": len(document.tables),
+    }
+
+
+def _json_metadata(file_bytes: bytes) -> dict[str, Any]:
+    text = file_bytes[:_CSV_MAX_SCAN_BYTES].decode("utf-8", errors="replace")
+    data = json.loads(text)
+    if isinstance(data, dict):
+        return {"json_root_type": "object", "top_level_keys": len(data)}
+    if isinstance(data, list):
+        return {"json_root_type": "array", "array_length": len(data)}
+    return {"json_root_type": "scalar"}
 
 
 def _pdf_metadata(file_bytes: bytes) -> dict[str, Any]:
@@ -121,6 +154,15 @@ def _pdf_metadata(file_bytes: bytes) -> dict[str, Any]:
 
     with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
         return {"page_count": len(pdf.pages)}
+
+
+def build_columns(names: list[str], types: dict[str, str] | None = None) -> list[dict[str, str]]:
+    """Build the normalized ``columns`` list of ``{name, type}`` objects.
+
+    ``type`` is "" when the format does not expose column types (csv/xlsx).
+    """
+    type_map = types or {}
+    return [{"name": name, "type": type_map.get(name, "")} for name in names]
 
 
 def _parquet_metadata(file_bytes: bytes) -> dict[str, Any]:
@@ -132,9 +174,7 @@ def _parquet_metadata(file_bytes: bytes) -> dict[str, Any]:
     column_types = {field.name: str(field.type) for field in schema}
     return {
         "row_count": parquet_file.metadata.num_rows,
-        "column_count": len(column_names),
-        "column_names": column_names,
-        "column_types": column_types,
+        "columns": build_columns(column_names, column_types),
     }
 
 
@@ -148,12 +188,9 @@ def _xlsx_metadata(file_bytes: bytes) -> dict[str, Any]:
         column_names = [str(cell) for cell in header_row if cell is not None] if header_row else []
         # max_row/max_column are reliable on read-only sheets after dimension scan.
         row_count = (sheet.max_row or 1) - 1  # exclude header row
-        result: dict[str, Any] = {
-            "row_count": max(row_count, 0),
-            "column_count": len(column_names) or (sheet.max_column or 0),
-        }
+        result: dict[str, Any] = {"row_count": max(row_count, 0)}
         if column_names:
-            result["column_names"] = column_names
+            result["columns"] = build_columns(column_names)
         return result
     finally:
         workbook.close()
@@ -173,12 +210,9 @@ def _csv_metadata(file_bytes: bytes, extension: str) -> dict[str, Any]:
             column_names = [cell.strip() for cell in row]
             continue
         row_count += 1
-    result: dict[str, Any] = {
-        "row_count": row_count,
-        "column_count": len(column_names),
-    }
+    result: dict[str, Any] = {"row_count": row_count}
     if column_names:
-        result["column_names"] = column_names
+        result["columns"] = build_columns(column_names)
     result.update(encoding_meta)
     return result
 

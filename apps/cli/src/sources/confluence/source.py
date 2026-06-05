@@ -344,7 +344,7 @@ class ConfluenceSource(BaseSource):
                 )
             ),
             runner_id=self.runner_id,
-            metadata=self.validated_metadata("page", asset_metadata),
+            **self.metadata_fields("page", asset_metadata),
         )
 
         return [page_asset, *related_assets]
@@ -404,7 +404,7 @@ class ConfluenceSource(BaseSource):
                     created_at=now,
                     updated_at=now,
                     runner_id=self.runner_id,
-                    metadata=self.validated_metadata("attachment", attachment_metadata),
+                    **self.metadata_fields("attachment", attachment_metadata),
                 )
             )
             hashes.append(attachment_hash)
@@ -478,7 +478,7 @@ class ConfluenceSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata=self.validated_metadata(
+            **self.metadata_fields(
                 "comments",
                 {"page_id": page_id, "comments_count": len(comment_items)},
             ),
@@ -607,7 +607,7 @@ class ConfluenceSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata=self.validated_metadata("linked_file", {"referenced_by": page_hash}),
+            **self.metadata_fields("linked_file", {"referenced_by": page_hash}),
         )
 
     def _display_name_from_url(self, url: str) -> str:

@@ -20,6 +20,8 @@ import {
 } from "@workspace/ui/components";
 import { FindingsTable } from "@/components/findings-table";
 import { AssetMetadataCard } from "@/components/asset-metadata-card";
+import { AssetKindBadge } from "@/components/asset-kind-badge";
+import { formatAssetKind } from "@/lib/asset-kind";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -176,7 +178,7 @@ export default function AssetDetailPage() {
               <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
                 {t("assets.detail.title")}
               </h1>
-              <Badge variant="outline">{assetDetails.assetType}</Badge>
+              <AssetKindBadge kind={assetDetails.assetType} />
               <Badge variant="outline">{assetDetails.sourceType}</Badge>
             </div>
             <p className="text-muted-foreground">
@@ -233,7 +235,7 @@ export default function AssetDetailPage() {
                 {t("assets.detail.assetType")}
               </div>
               <div className="text-sm font-semibold">
-                {assetDetails.assetType}
+                {formatAssetKind(assetDetails.assetType)}
               </div>
             </div>
             <div>

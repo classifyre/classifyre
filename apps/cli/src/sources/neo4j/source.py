@@ -222,6 +222,13 @@ class Neo4jSource(BaseSource):
         }
         now = datetime.now(UTC)
 
+        asset_metadata: dict[str, Any] = {"label": ref.label, "database": ref.database}
+        node_count, property_keys = self._label_stats(ref)
+        if node_count is not None:
+            asset_metadata["node_count"] = node_count
+        if property_keys:
+            asset_metadata["sample_property_keys"] = property_keys
+
         return SingleAssetScanResults(
             hash=asset_hash,
             checksum=self.calculate_checksum(metadata),
@@ -233,11 +240,27 @@ class Neo4jSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata=self.validated_metadata(
-                "label",
-                {"label": ref.label, "database": ref.database},
-            ),
+            **self.metadata_fields("label", asset_metadata),
         )
+
+    def _label_stats(self, ref: LabelRef) -> tuple[int | None, list[str]]:
+        """Best-effort node count + sampled property keys for a label (cheap)."""
+        node_count: int | None = None
+        keys: list[str] = []
+        label = _escape_label(ref.label)
+        try:
+            with self._session() as session:
+                record = session.run(f"MATCH (n:{label}) RETURN count(n) AS c").single()
+                if record is not None and record["c"] is not None:
+                    node_count = int(record["c"])
+                rows = session.run(
+                    f"MATCH (n:{label}) WITH n LIMIT 100 "
+                    "UNWIND keys(n) AS k RETURN DISTINCT k AS k LIMIT 50"
+                )
+                keys = [row["k"] for row in rows if isinstance(row["k"], str)]
+        except Exception as exc:
+            logger.debug("Could not read stats for label %s: %s", ref.label, exc)
+        return node_count, keys
 
     def test_connection(self) -> dict[str, Any]:
         logger.info("Testing connection to Neo4j at %s...", self._uri())

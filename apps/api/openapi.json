@@ -6109,16 +6109,7 @@
           },
           "assetType": {
             "type": "string",
-            "enum": [
-              "TXT",
-              "TABLE",
-              "IMAGE",
-              "VIDEO",
-              "AUDIO",
-              "URL",
-              "BINARY",
-              "OTHER"
-            ]
+            "description": "Catalog asset kind (file, image, page, comment, table, ...)"
           },
           "sourceType": {
             "type": "string",
@@ -7010,16 +7001,7 @@
           },
           "assetType": {
             "type": "string",
-            "enum": [
-              "TXT",
-              "TABLE",
-              "IMAGE",
-              "VIDEO",
-              "AUDIO",
-              "URL",
-              "BINARY",
-              "OTHER"
-            ]
+            "description": "Catalog asset kind of the parent asset"
           },
           "sourceType": {
             "type": "string",
@@ -8473,16 +8455,7 @@
           },
           "assetType": {
             "type": "string",
-            "enum": [
-              "TXT",
-              "TABLE",
-              "IMAGE",
-              "VIDEO",
-              "AUDIO",
-              "URL",
-              "BINARY",
-              "OTHER"
-            ]
+            "description": "Catalog asset kind of the parent asset"
           },
           "sourceId": {
             "type": "string",
