@@ -199,10 +199,12 @@ def _xlsx_metadata(file_bytes: bytes) -> dict[str, Any]:
 def _csv_metadata(file_bytes: bytes, extension: str) -> dict[str, Any]:
     encoding_meta = _encoding_metadata(file_bytes)
     encoding = encoding_meta.get("encoding") or "utf-8"
-    scan = file_bytes[:_CSV_MAX_SCAN_BYTES]
-    text = scan.decode(encoding, errors="replace")
     delimiter = "\t" if extension == ".tsv" else ","
-    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
+    # Wrap bytes in a TextIOWrapper so csv.reader decodes lazily line-by-line,
+    # counting every row in the file without building one large decoded string.
+    # This also handles multi-line quoted fields correctly across chunk boundaries.
+    stream = io.TextIOWrapper(io.BytesIO(file_bytes), encoding=encoding, errors="replace")
+    reader = csv.reader(stream, delimiter=delimiter)
     column_names: list[str] = []
     row_count = 0
     for index, row in enumerate(reader):
