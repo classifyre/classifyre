@@ -1080,7 +1080,7 @@ class LLMPipelineSchema(BaseModel):
         False, description='Allow more than one label per asset.'
     )
     severity: Severity | None = Field(
-        'info',
+        Severity.info,
         description='Default severity when no severity_map rule matches a predicted label.',
     )
     severity_map: list[PipelineSeverityRule] | None = Field(
@@ -1177,7 +1177,7 @@ class TextClassificationPipelineSchema(BaseModel):
         le=1.0,
     )
     severity: Severity | None = Field(
-        'info', description='Default severity when no severity_map rule matches.'
+        Severity.info, description='Default severity when no severity_map rule matches.'
     )
     severity_map: list[PipelineSeverityRule] | None = Field(
         None,

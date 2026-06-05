@@ -393,6 +393,17 @@ class SlackSource(BaseSource):
             fallback=f"slack://channel?channel={channel_id}&message={ts}",
         )
 
+        asset_metadata: dict[str, Any] = {
+            "channel_id": channel_id,
+            "ts": ts,
+        }
+        if channel_name:
+            asset_metadata["channel_name"] = channel_name
+        if isinstance(user, str) and user:
+            asset_metadata["author"] = user
+        if isinstance(thread_ts, str) and thread_ts:
+            asset_metadata["thread_ts"] = thread_ts
+
         return SingleAssetScanResults(
             hash=hashed_id,
             checksum=self.calculate_checksum(metadata),
@@ -404,6 +415,7 @@ class SlackSource(BaseSource):
             updated_at=updated_at,
             source_id=self.source_id,
             runner_id=self.runner_id,
+            **self.metadata_fields("message", asset_metadata),
         )
 
     def _message_snippet(self, text: str, max_length: int = 120) -> str:

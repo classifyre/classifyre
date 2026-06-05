@@ -156,6 +156,10 @@ class BrokenLinksDetector(BaseDetector):
             if status_code in {405, 501}:
                 return self._scan_with_get(url, line, start, end, "head_not_supported")
 
+            # Some servers block HEAD (403) but serve content via GET.
+            if status_code == 403:
+                return self._scan_with_get(url, line, start, end, "head_forbidden")
+
             if status_code >= 400:
                 return LinkScanResult(
                     url=url,
@@ -169,17 +173,10 @@ class BrokenLinksDetector(BaseDetector):
 
             content_length = self._parse_content_length(head_response.headers)
             if content_length == 0:
-                return LinkScanResult(
-                    url=url,
-                    line=line,
-                    start=start,
-                    end=end,
-                    finding_type="empty_content",
-                    confidence=0.9,
-                    metadata={"status_code": status_code, "reason": "empty_head_content_length"},
-                )
+                # Content-Length: 0 on HEAD can be misleading (e.g., YouTube, TikTok).
+                # Fall back to GET to verify the page truly has no content.
+                return self._scan_with_get(url, line, start, end, "empty_head_content_length")
 
-            # Some servers omit Content-Length, so perform a lightweight GET check.
             if content_length is None:
                 return self._scan_with_get(url, line, start, end, "missing_content_length")
 

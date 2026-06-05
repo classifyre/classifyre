@@ -66,7 +66,7 @@ class TextClassificationRunner(BaseRunner):
         chunk_overlap: int = getattr(schema.chunk_overlap, "root", schema.chunk_overlap) or 0
         max_length: int | None = getattr(schema.max_length, "root", schema.max_length)
         threshold = schema.confidence_threshold if schema.confidence_threshold is not None else 0.7
-        default_severity = schema.severity or Severity.info
+        default_severity = schema.severity if schema.severity is not None else Severity.info
 
         best_scores: dict[str, float] = {}
         try:

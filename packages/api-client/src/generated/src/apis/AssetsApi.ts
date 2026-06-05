@@ -904,6 +904,7 @@ export const SearchAssetsControllerExportAssetsAssetSourceTypeEnum = {
     Mongodb: 'MONGODB',
     Neo4J: 'NEO4J',
     Sqlite: 'SQLITE',
+    Notion: 'NOTION',
     Powerbi: 'POWERBI',
     Tableau: 'TABLEAU',
     Custom: 'CUSTOM'
@@ -1014,6 +1015,7 @@ export const SearchAssetsControllerQueryAssetsAssetSourceTypeEnum = {
     Mongodb: 'MONGODB',
     Neo4J: 'NEO4J',
     Sqlite: 'SQLITE',
+    Notion: 'NOTION',
     Powerbi: 'POWERBI',
     Tableau: 'TABLEAU',
     Custom: 'CUSTOM'
@@ -1124,6 +1126,7 @@ export const SourceAssetsControllerListSourceAssetsSourceTypesEnum = {
     Mongodb: 'MONGODB',
     Neo4J: 'NEO4J',
     Sqlite: 'SQLITE',
+    Notion: 'NOTION',
     Powerbi: 'POWERBI',
     Tableau: 'TABLEAU',
     Custom: 'CUSTOM'

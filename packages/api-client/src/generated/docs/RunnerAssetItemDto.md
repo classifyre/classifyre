@@ -16,6 +16,7 @@ Name | Type
 `findingsTotal` | number
 `findingsBySeverity` | object
 `findingsByDetector` | object
+`metadata` | { [key: string]: any; }
 `asset` | [AssetListItemDto](AssetListItemDto.md)
 
 ## Example
@@ -35,6 +36,7 @@ const example = {
   "findingsTotal": null,
   "findingsBySeverity": null,
   "findingsByDetector": null,
+  "metadata": null,
   "asset": null,
 } satisfies RunnerAssetItemDto
 

@@ -1676,5 +1676,112 @@
         }
       }
     }
+  ],
+  "NOTION": [
+    {
+      "name": "Internal integration workspace scan",
+      "description": "Scan all pages, data sources, and comments shared with an internal Notion integration using its token",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "28 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "NOTION",
+        "required": {},
+        "masked": {
+          "notion_token": "ntn_your-internal-integration-token"
+        },
+        "optional": {
+          "content": {
+            "include_comments": true,
+            "include_files": true,
+            "include_data_sources": true
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "OAuth data-source compliance scan",
+      "description": "Scan specific Notion data sources via an OAuth access token and run PII and secrets detection",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "41 7 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "NOTION",
+        "required": {},
+        "masked": {
+          "notion_token": "secret_your-oauth-access-token"
+        },
+        "optional": {
+          "scope": {
+            "data_source_ids": [
+              "11111111-2222-3333-4444-555555555555"
+            ]
+          },
+          "content": {
+            "include_comments": true,
+            "include_files": true
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 30
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Full workspace crawl with OCR",
+      "description": "Crawl every shared page with OCR enabled to extract text from PDF and image attachments, with PII detection",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekly",
+        "cron": "9 3 * * 0",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "NOTION",
+        "required": {},
+        "masked": {
+          "notion_token": "ntn_your-internal-integration-token"
+        },
+        "optional": {
+          "content": {
+            "include_comments": true,
+            "include_files": true,
+            "include_linked_pages": true,
+            "include_data_sources": true
+          }
+        },
+        "sampling": {
+          "strategy": "ALL",
+          "enable_ocr": true
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    }
   ]
 }

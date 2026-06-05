@@ -33,6 +33,14 @@ export class RunnerAssetItemDto {
   @ApiPropertyOptional({ nullable: true })
   findingsByDetector: Record<string, Record<string, number>> | null;
 
+  @ApiPropertyOptional({
+    description: 'Source-specific asset metadata (denormalized from the asset)',
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+  })
+  metadata?: Record<string, unknown> | null;
+
   @ApiPropertyOptional({ type: AssetListItemDto, nullable: true })
   asset: AssetListItemDto | null;
 }

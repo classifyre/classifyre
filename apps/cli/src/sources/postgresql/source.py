@@ -203,6 +203,33 @@ class PostgreSQLSource(BaseTabularSource):
             f"{table_ref.database}/{table_ref.schema}.{table_ref.table}"
         )
 
+    def _estimate_row_count(self, table_ref: TableRef) -> int | None:
+        """Planner row estimate from ``pg_class.reltuples`` (no full COUNT(*)).
+
+        ``reltuples`` is -1 for tables that have never been analyzed/vacuumed;
+        those are reported as unknown (``None``).
+        """
+        try:
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT c.reltuples::bigint
+                    FROM pg_class c
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE n.nspname = %s AND c.relname = %s
+                    """,
+                    (table_ref.schema, table_ref.table),
+                )
+                row = cursor.fetchone()
+        except Exception as exc:
+            logger.debug("Row estimate failed for %s: %s", table_ref.display_name, exc)
+            return None
+        if not row or row[0] is None:
+            return None
+        estimate = int(row[0])
+        return estimate if estimate >= 0 else None
+
     # ── Parse table ref from asset ID ────────────────────────────────────
 
     def _table_ref_from_parts(self, parts: list[str]) -> TableRef | None:
