@@ -241,7 +241,7 @@ class LLMRunner(BaseRunner):
     ) -> list[DetectionResult]:
         schema = self._schema
         threshold = schema.confidence_threshold if schema.confidence_threshold is not None else 0.5
-        default_severity = schema.severity or Severity.info
+        default_severity = schema.severity if schema.severity is not None else Severity.info
         extracted = self._coerce_fields(payload.get("fields"))
 
         raw_labels = payload.get("labels")
