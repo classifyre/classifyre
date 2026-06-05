@@ -7,6 +7,7 @@ import {
   useForm,
   useFieldArray,
   useFormContext,
+  Controller,
   type Control,
   type FieldPath,
   type FieldValues,
@@ -1427,6 +1428,34 @@ function SchemaField({
     isStructuredObjectSchema(normalizedSchema) &&
     normalizedSchema.properties
   ) {
+    const isEmptyObject = Object.keys(normalizedSchema.properties).length === 0;
+
+    if (isEmptyObject) {
+      return (
+        <Controller
+          control={control}
+          name={fieldName}
+          defaultValue={{}}
+          render={() => (
+            <FormItem>
+              {!hideLabel && (
+                <FormLabel className="capitalize">
+                  {label}
+                  {required && <span className="text-destructive"> *</span>}
+                </FormLabel>
+              )}
+              {description && (
+                <p className="text-xs text-muted-foreground">{description}</p>
+              )}
+              <div className="text-sm text-muted-foreground">
+                {t("sources.detail.noRequiredDetails")}
+              </div>
+            </FormItem>
+          )}
+        />
+      );
+    }
+
     const content = (
       <SchemaObjectFields
         schema={normalizedSchema}
@@ -2119,13 +2148,17 @@ export const JsonSchemaForm = React.forwardRef<
       validate: async () => {
         const isValid = await form.trigger();
         const values = form.getValues() as Record<string, unknown>;
-        return {
-          isValid,
-          missingFields: collectMissingRequiredFields(schema, values),
-          errors: flattenFormErrors(
-            form.formState.errors as Record<string, unknown>,
-          ),
-        };
+        const missingFields = collectMissingRequiredFields(schema, values);
+        const errors = flattenFormErrors(
+          form.formState.errors as Record<string, unknown>,
+        );
+        if (!isValid || missingFields.length > 0) {
+          console.warn(
+            "[JsonSchemaForm] Validation failed",
+            { isValid, missingFields, errors, values },
+          );
+        }
+        return { isValid, missingFields, errors };
       },
     }),
     [form, schema],
@@ -2209,6 +2242,7 @@ export const JsonSchemaForm = React.forwardRef<
     JIRA: false,
     SERVICEDESK: false,
     SQLITE: true,
+    NOTION: false,
   };
   const isTabular =
     assistantSourceType && isIngestionSourceType(assistantSourceType)

@@ -87,7 +87,8 @@ export const UpdateSourceDtoTypeEnum = {
     Confluence: 'CONFLUENCE',
     Jira: 'JIRA',
     Servicedesk: 'SERVICEDESK',
-    Sqlite: 'SQLITE'
+    Sqlite: 'SQLITE',
+    Notion: 'NOTION'
 } as const;
 export type UpdateSourceDtoTypeEnum = typeof UpdateSourceDtoTypeEnum[keyof typeof UpdateSourceDtoTypeEnum];
 

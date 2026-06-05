@@ -354,6 +354,31 @@
                     }
                   }
                 },
+                "notion": {
+                  "summary": "Notion Source",
+                  "value": {
+                    "type": "NOTION",
+                    "name": "Product Notion",
+                    "config": {
+                      "type": "NOTION",
+                      "required": {},
+                      "masked": {
+                        "notion_token": "ntn_your-internal-integration-token"
+                      },
+                      "optional": {
+                        "content": {
+                          "include_comments": true,
+                          "include_files": true,
+                          "include_data_sources": true
+                        }
+                      },
+                      "sampling": {
+                        "strategy": "LATEST",
+                        "rows_per_page": 50
+                      }
+                    }
+                  }
+                },
                 "servicedesk": {
                   "summary": "Service Desk Source",
                   "value": {
@@ -1114,6 +1139,7 @@
                   "MONGODB",
                   "NEO4J",
                   "SQLITE",
+                  "NOTION",
                   "POWERBI",
                   "TABLEAU",
                   "CUSTOM"
@@ -1454,6 +1480,7 @@
                   "MONGODB",
                   "NEO4J",
                   "SQLITE",
+                  "NOTION",
                   "POWERBI",
                   "TABLEAU",
                   "CUSTOM"
@@ -1816,6 +1843,7 @@
                   "MONGODB",
                   "NEO4J",
                   "SQLITE",
+                  "NOTION",
                   "POWERBI",
                   "TABLEAU",
                   "CUSTOM"
@@ -5499,7 +5527,8 @@
               "CONFLUENCE",
               "JIRA",
               "SERVICEDESK",
-              "SQLITE"
+              "SQLITE",
+              "NOTION"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -5681,7 +5710,8 @@
               "CONFLUENCE",
               "JIRA",
               "SERVICEDESK",
-              "SQLITE"
+              "SQLITE",
+              "NOTION"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -5803,6 +5833,7 @@
                 "MONGODB",
                 "NEO4J",
                 "SQLITE",
+                "NOTION",
                 "POWERBI",
                 "TABLEAU",
                 "CUSTOM"
@@ -6078,16 +6109,7 @@
           },
           "assetType": {
             "type": "string",
-            "enum": [
-              "TXT",
-              "TABLE",
-              "IMAGE",
-              "VIDEO",
-              "AUDIO",
-              "URL",
-              "BINARY",
-              "OTHER"
-            ]
+            "description": "Catalog asset kind (file, image, page, comment, table, ...)"
           },
           "sourceType": {
             "type": "string",
@@ -6117,6 +6139,7 @@
               "MONGODB",
               "NEO4J",
               "SQLITE",
+              "NOTION",
               "POWERBI",
               "TABLEAU",
               "CUSTOM"
@@ -6148,6 +6171,11 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Source-specific asset metadata",
+            "additionalProperties": true
           }
         },
         "required": [
@@ -6246,6 +6274,7 @@
                 "MONGODB",
                 "NEO4J",
                 "SQLITE",
+                "NOTION",
                 "POWERBI",
                 "TABLEAU",
                 "CUSTOM"
@@ -6972,16 +7001,7 @@
           },
           "assetType": {
             "type": "string",
-            "enum": [
-              "TXT",
-              "TABLE",
-              "IMAGE",
-              "VIDEO",
-              "AUDIO",
-              "URL",
-              "BINARY",
-              "OTHER"
-            ]
+            "description": "Catalog asset kind of the parent asset"
           },
           "sourceType": {
             "type": "string",
@@ -7011,6 +7031,7 @@
               "MONGODB",
               "NEO4J",
               "SQLITE",
+              "NOTION",
               "POWERBI",
               "TABLEAU",
               "CUSTOM"
@@ -8434,16 +8455,7 @@
           },
           "assetType": {
             "type": "string",
-            "enum": [
-              "TXT",
-              "TABLE",
-              "IMAGE",
-              "VIDEO",
-              "AUDIO",
-              "URL",
-              "BINARY",
-              "OTHER"
-            ]
+            "description": "Catalog asset kind of the parent asset"
           },
           "sourceId": {
             "type": "string",
@@ -9984,6 +9996,7 @@
                 "MONGODB",
                 "NEO4J",
                 "SQLITE",
+                "NOTION",
                 "POWERBI",
                 "TABLEAU",
                 "CUSTOM"
@@ -10479,6 +10492,12 @@
           },
           "findingsByDetector": {
             "type": "object",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Source-specific asset metadata (denormalized from the asset)",
+            "additionalProperties": true,
             "nullable": true
           },
           "asset": {

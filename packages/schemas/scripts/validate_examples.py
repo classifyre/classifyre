@@ -29,6 +29,7 @@ TYPE_TO_DEFINITION = {
     "JIRA": "JiraInput",
     "SERVICEDESK": "ServiceDeskInput",
     "SQLITE": "SQLiteInput",
+    "NOTION": "NotionInput",
 }
 
 SCHEMAS_DIR = Path(__file__).parent.parent / "src" / "schemas"

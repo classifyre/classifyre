@@ -116,9 +116,5 @@ function isEmptyValue(value: unknown) {
     return value.length === 0;
   }
 
-  if (typeof value === "object") {
-    return Object.keys(value as Record<string, unknown>).length === 0;
-  }
-
   return false;
 }

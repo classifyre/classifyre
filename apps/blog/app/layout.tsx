@@ -13,6 +13,7 @@ import {
     normalizeSiteUrl,
     safeJsonLdStringify,
 } from "@/lib/seo";
+import {PostHogProvider} from "./providers";
 
 import "@workspace/ui/globals.css";
 import "@workspace/ui/nextra-overrides.css";
@@ -304,26 +305,28 @@ export default async function RootLayout({
         <body
             className={`${fontSerif.variable} ${fontSans.variable} ${fontMono.variable} ${fontHero.variable} font-sans antialiased`}
         >
-        <Layout
-            // banner={banner} //Enable when needed
-            navbar={navbar}
-            footer={footer}
-            pageMap={pageMap}
-            docsRepositoryBase="https://github.com/Ostap-Bender/unstructured/tree/main/apps/blog"
-            sidebar={{
-                defaultMenuCollapseLevel: 2,
-                defaultOpen: true,
-                toggleButton: true,
-            }}
-            nextThemes={{
-                attribute: "class",
-                defaultTheme: "system",
-                disableTransitionOnChange: true,
-                storageKey: "classifyre-blog-theme-v2",
-            }}
-        >
-            {children}
-        </Layout>
+        <PostHogProvider>
+            <Layout
+                // banner={banner} //Enable when needed
+                navbar={navbar}
+                footer={footer}
+                pageMap={pageMap}
+                docsRepositoryBase="https://github.com/classifyre-com/classifyre/tree/main/apps/blog"
+                sidebar={{
+                    defaultMenuCollapseLevel: 2,
+                    defaultOpen: true,
+                    toggleButton: true,
+                }}
+                nextThemes={{
+                    attribute: "class",
+                    defaultTheme: "system",
+                    disableTransitionOnChange: true,
+                    storageKey: "classifyre-blog-theme-v2",
+                }}
+            >
+                {children}
+            </Layout>
+        </PostHogProvider>
         </body>
         </html>
     );

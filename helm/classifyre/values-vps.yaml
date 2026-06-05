@@ -6,7 +6,7 @@
 api:
   image:
     repository: classifyre/api
-    tag: "fix-deployment_cli"
+    tag: "main"
     pullPolicy: Always
 
   env:
@@ -30,15 +30,21 @@ api:
   cliJobs:
     image:
       repository: classifyre/cli
-      tag: "fix-deployment_cli"
+      tag: "main"
       pullPolicy: Always
 
 
 frontend:
   image:
     repository: classifyre/web
-    tag: "fix-deployment_cli"
+    tag: "main"
     pullPolicy: IfNotPresent
+  posthog:
+    enabled: true
+    token: "phc_ocaaqUW6YaGFTFqKTvydnaEHmouSWnHnTuKuPQtjmfLe"
+    host: "/classifyre-usr"
+    uiHost: "https://eu.posthog.com"
+    ingestHost: "https://eu.i.posthog.com"
 
   service:
     type: NodePort

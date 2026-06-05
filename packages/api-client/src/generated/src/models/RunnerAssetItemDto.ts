@@ -88,6 +88,12 @@ export interface RunnerAssetItemDto {
      */
     findingsByDetector?: object | null;
     /**
+     * Source-specific asset metadata (denormalized from the asset)
+     * @type {{ [key: string]: any; }}
+     * @memberof RunnerAssetItemDto
+     */
+    metadata?: { [key: string]: any; } | null;
+    /**
      * 
      * @type {AssetListItemDto}
      * @memberof RunnerAssetItemDto
@@ -139,6 +145,7 @@ export function RunnerAssetItemDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'findingsTotal': json['findingsTotal'] == null ? undefined : json['findingsTotal'],
         'findingsBySeverity': json['findingsBySeverity'] == null ? undefined : json['findingsBySeverity'],
         'findingsByDetector': json['findingsByDetector'] == null ? undefined : json['findingsByDetector'],
+        'metadata': json['metadata'] == null ? undefined : json['metadata'],
         'asset': json['asset'] == null ? undefined : AssetListItemDtoFromJSON(json['asset']),
     };
 }
@@ -164,6 +171,7 @@ export function RunnerAssetItemDtoToJSONTyped(value?: RunnerAssetItemDto | null,
         'findingsTotal': value['findingsTotal'],
         'findingsBySeverity': value['findingsBySeverity'],
         'findingsByDetector': value['findingsByDetector'],
+        'metadata': value['metadata'],
         'asset': AssetListItemDtoToJSON(value['asset']),
     };
 }

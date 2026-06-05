@@ -16,6 +16,14 @@ _PIPELINE_TYPE_DEFAULTS: dict[str, str] = {
     "LLMPipelineSchema": "LLM",
 }
 
+# Pipeline schema classes whose `severity` field has a string default from JSON schema
+# ('info') but must be an enum instance to avoid Pydantic serialization warnings
+# ("Expected `enum` - serialized value may not be as expected").
+_SEVERITY_ENUM_DEFAULT_CLASSES = {
+    "LLMPipelineSchema",
+    "TextClassificationPipelineSchema",
+}
+
 
 def _patch_pipeline_type_defaults(source: str) -> str:
     """Add `= 'X'` default to discriminator `type` fields on pipeline schemas."""
@@ -24,6 +32,22 @@ def _patch_pipeline_type_defaults(source: str) -> str:
         # `type: Literal['X'] = 'X'` so callers don't have to pass the type field.
         pattern = rf"(class {re.escape(cls_name)}\(.*?\):.*?type:\s*Literal\['{re.escape(default_val)}'\])(\s)"
         replacement = rf"\1 = '{default_val}'\2"
+        source = re.sub(pattern, replacement, source, flags=re.DOTALL)
+    return source
+
+
+def _patch_severity_enum_defaults(source: str) -> str:
+    """Replace string 'info' severity Field defaults with Severity.info enum instances.
+
+    datamodel-codegen emits Field('info', ...) from the JSON schema default, but
+    Pydantic v2 warns at serialization time when the stored value is a plain string
+    rather than a Severity enum member.  This patch rewrites only the severity field
+    inside each affected class so the fix survives future codegen runs.
+    """
+    for cls_name in _SEVERITY_ENUM_DEFAULT_CLASSES:
+        # Match from the class definition up through the severity Field default string.
+        pattern = rf"(class {re.escape(cls_name)}\(.*?severity: Severity \| None = Field\(\n\s+)'info'(\s*,)"
+        replacement = rf"\1Severity.info\2"
         source = re.sub(pattern, replacement, source, flags=re.DOTALL)
     return source
 
@@ -74,6 +98,7 @@ def main():
     detector_schema = SCHEMA_DIR / "all_detectors.json"
     content = run_codegen(detector_schema)
     content = _patch_pipeline_type_defaults(content)
+    content = _patch_severity_enum_defaults(content)
     (MODEL_DIR / "generated_detectors.py").write_text(content)
     print("Wrote src/models/generated_detectors.py")
 

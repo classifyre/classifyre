@@ -12,7 +12,9 @@
 export interface ServerConfig {
   /**
    * True when S3-compatible object storage is configured.
-   * Set by Helm from objectStorage.enabled.
+   * Set by Helm from objectStorage.enabled (S3_CONFIGURED env var), or
+   * inferred from the presence of S3_BUCKET when S3_CONFIGURED is not
+   * explicitly set (non-Helm deployments).
    * When false, runner logs are streamed live but not persisted after the run.
    */
   s3Configured: boolean;
@@ -31,7 +33,9 @@ export interface ServerConfig {
  */
 export function getServerConfig(): ServerConfig {
   return {
-    s3Configured: process.env.S3_CONFIGURED === "true",
+    s3Configured:
+      process.env.S3_CONFIGURED === "true" ||
+      (process.env.S3_CONFIGURED !== "false" && !!process.env.S3_BUCKET),
     demoMode: process.env.DEMO_MODE === "true",
   };
 }

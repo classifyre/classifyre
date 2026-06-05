@@ -32,6 +32,9 @@ async def test_broken_links_detector_reports_unreachable_and_empty_links() -> No
     head_ok = _mock_response(200, headers={"Content-Length": "12"})
     detector._session.head = MagicMock(side_effect=[head_unreachable, head_empty, head_ok])
 
+    get_empty = _mock_response(200, headers={"Content-Length": "0"}, chunks=[])
+    detector._session.get = MagicMock(return_value=get_empty)
+
     links_payload = (
         "https://example.com/missing\nhttps://example.com/empty\nhttps://example.com/ok\n"
     )
@@ -82,6 +85,64 @@ async def test_broken_links_detector_handles_request_exception() -> None:
 
 
 @pytest.mark.asyncio
+async def test_broken_links_detector_falls_back_to_get_when_head_forbidden() -> None:
+    """HEAD returns 403, GET finds content -> no finding (public page fix)."""
+    detector = BrokenLinksDetector()
+
+    head_forbidden = _mock_response(403)
+    get_ok = _mock_response(200, headers={"Content-Length": "10"})
+
+    detector._session.head = MagicMock(return_value=head_forbidden)
+    detector._session.get = MagicMock(return_value=get_ok)
+
+    findings = await detector.detect(
+        "https://example.com/blocked-head",
+        "application/x.asset-links",
+    )
+
+    assert len(findings) == 0
+
+
+@pytest.mark.asyncio
+async def test_broken_links_detector_falls_back_to_get_when_head_content_length_zero() -> None:
+    """HEAD returns Content-Length: 0, GET finds content -> no finding (public page fix)."""
+    detector = BrokenLinksDetector()
+
+    head_empty = _mock_response(200, headers={"Content-Length": "0"})
+    get_ok = _mock_response(200, headers={"Content-Length": "10"})
+
+    detector._session.head = MagicMock(return_value=head_empty)
+    detector._session.get = MagicMock(return_value=get_ok)
+
+    findings = await detector.detect(
+        "https://example.com/appears-empty",
+        "application/x.asset-links",
+    )
+
+    assert len(findings) == 0
+
+
+@pytest.mark.asyncio
+async def test_broken_links_detector_still_reports_empty_when_get_confirms() -> None:
+    """HEAD returns Content-Length: 0, GET also empty -> still reports finding."""
+    detector = BrokenLinksDetector()
+
+    head_empty = _mock_response(200, headers={"Content-Length": "0"})
+    get_empty = _mock_response(200, headers={"Content-Length": "0"}, chunks=[])
+
+    detector._session.head = MagicMock(return_value=head_empty)
+    detector._session.get = MagicMock(return_value=get_empty)
+
+    findings = await detector.detect(
+        "https://example.com/truly-empty",
+        "application/x.asset-links",
+    )
+
+    assert len(findings) == 1
+    assert findings[0].finding_type == "empty_content"
+
+
+@pytest.mark.asyncio
 async def test_broken_links_detector_ignores_non_http_lines() -> None:
     detector = BrokenLinksDetector()
     head_ok = _mock_response(200, headers={"Content-Length": "10"})
@@ -98,3 +159,29 @@ async def test_broken_links_detector_ignores_non_http_lines() -> None:
         allow_redirects=True,
         timeout=detector._REQUEST_TIMEOUT_SECONDS,
     )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_broken_links_detector_does_not_flag_real_public_pages() -> None:
+    """Real-network regression for CLASSIFYRE-2.
+
+    Public pages such as YouTube and Wikipedia return ``Content-Length: 0`` or
+    ``403`` on HEAD, which previously produced false ``empty_content`` /
+    ``unreachable`` findings. With the GET fallback they must not be flagged.
+
+    Gated behind the ``integration`` marker (RUN_INTEGRATION_TESTS=1) so the
+    default offline suite stays hermetic.
+    """
+    detector = BrokenLinksDetector()
+
+    payload = "\n".join(
+        [
+            "https://www.youtube.com/watch?v=6mswO8cf0kw",
+            "https://en.wikipedia.org/wiki/Microsoft_PowerPoint",
+        ]
+    )
+
+    findings = await detector.detect(payload, "application/x.asset-links")
+
+    assert findings == [], f"public pages incorrectly flagged: {[f.matched_content for f in findings]}"
