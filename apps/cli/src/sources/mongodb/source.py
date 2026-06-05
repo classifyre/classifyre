@@ -305,11 +305,14 @@ class MongoDBSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata={
-                "database": collection_ref.database,
-                "collection": collection_ref.collection,
-                "deployment": "ATLAS" if self._is_atlas() else "ON_PREM",
-            },
+            metadata=self.validated_metadata(
+                "collection",
+                {
+                    "database": collection_ref.database,
+                    "collection": collection_ref.collection,
+                    "deployment": "ATLAS" if self._is_atlas() else "ON_PREM",
+                },
+            ),
         )
 
     def _collection_external_url(self, collection_ref: CollectionRef) -> str:

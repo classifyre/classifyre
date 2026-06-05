@@ -67,6 +67,295 @@
       "$ref": "#/definitions/NotionInput"
     }
   ],
+  "x-assets-metadata": {
+    "description": "Declares the metadata fields each source attaches to every asset kind it produces. Single source of truth for docs rendering and CLI conformance (see apps/cli/src/sources/asset_metadata.py).",
+    "fieldTypes": ["string", "number", "boolean", "string[]", "object"],
+    "commonFields": {
+      "author": { "type": "string", "description": "Creator/author display name or email" },
+      "status": { "type": "string", "description": "Entity status" },
+      "tags": { "type": "string[]", "description": "Labels or tags" },
+      "size_bytes": { "type": "number", "description": "Raw byte size of the asset content" },
+      "mime_type": { "type": "string", "description": "Resolved MIME type" },
+      "row_count": { "type": "number", "description": "Number of data rows (exact or estimate)" },
+      "column_count": { "type": "number", "description": "Number of columns" },
+      "column_names": { "type": "string[]", "description": "Column header names" },
+      "column_types": { "type": "object", "description": "Map of column name to data type" },
+      "page_count": { "type": "number", "description": "Number of document pages" },
+      "encoding": { "type": "string", "description": "Detected character encoding" },
+      "image_width": { "type": "number", "description": "Image width in pixels" },
+      "image_height": { "type": "number", "description": "Image height in pixels" },
+      "parse_error": { "type": "string", "description": "Set (non-null) when content extraction failed" },
+      "comments_count": { "type": "number", "description": "Number of comments" },
+      "links_count": { "type": "number", "description": "Number of linked or related assets" },
+      "title": { "type": "string", "description": "Title of the asset" },
+      "object_type": { "type": "string", "description": "Source-native object type (e.g. TABLE, VIEW)" },
+      "parent_type": { "type": "string", "description": "Parent object type" },
+      "parent_id": { "type": "string", "description": "Parent object id" }
+    },
+    "fieldGroups": {
+      "tabularTable": [
+        { "name": "database", "type": "string", "description": "Database or catalog name", "required": true },
+        { "name": "table_name", "type": "string", "description": "Table name", "required": true },
+        { "name": "table_type", "type": "string", "description": "Object type (TABLE/VIEW)", "required": true },
+        { "name": "schema", "type": "string", "description": "Schema name", "required": false },
+        { "name": "column_names", "required": false },
+        { "name": "column_count", "required": false },
+        { "name": "column_types", "required": false },
+        { "name": "row_count", "required": false }
+      ],
+      "fileExtracted": [
+        { "name": "size_bytes", "required": true },
+        { "name": "mime_type", "required": true },
+        { "name": "row_count", "required": false },
+        { "name": "column_count", "required": false },
+        { "name": "column_names", "required": false },
+        { "name": "column_types", "required": false },
+        { "name": "page_count", "required": false },
+        { "name": "encoding", "required": false },
+        { "name": "image_width", "required": false },
+        { "name": "image_height", "required": false },
+        { "name": "parse_error", "required": false }
+      ],
+      "attachmentFile": [
+        { "name": "mime_type", "required": false },
+        { "name": "size_bytes", "required": false }
+      ],
+      "comments": [
+        { "name": "comments_count", "required": true }
+      ]
+    },
+    "sources": {
+      "S3_COMPATIBLE_STORAGE": {
+        "file": { "use": ["fileExtracted"], "fields": [
+          { "name": "provider", "type": "string", "description": "Storage provider label", "required": true },
+          { "name": "object_key", "type": "string", "description": "Object key/path", "required": true },
+          { "name": "etag", "type": "string", "description": "Object entity tag", "required": false }
+        ] },
+        "image": { "fields": [
+          { "name": "source_hash", "type": "string", "description": "Hash of the parent object asset", "required": true },
+          { "name": "location", "type": "string", "description": "Location of the embedded image within the parent", "required": true },
+          { "name": "mime_type", "required": true },
+          { "name": "size_bytes", "required": true }
+        ] }
+      },
+      "AZURE_BLOB_STORAGE": {
+        "file": { "use": ["fileExtracted"], "fields": [
+          { "name": "provider", "type": "string", "description": "Storage provider label", "required": true },
+          { "name": "object_key", "type": "string", "description": "Object key/path", "required": true },
+          { "name": "etag", "type": "string", "description": "Object entity tag", "required": false }
+        ] },
+        "image": { "fields": [
+          { "name": "source_hash", "type": "string", "description": "Hash of the parent object asset", "required": true },
+          { "name": "location", "type": "string", "description": "Location of the embedded image within the parent", "required": true },
+          { "name": "mime_type", "required": true },
+          { "name": "size_bytes", "required": true }
+        ] }
+      },
+      "GOOGLE_CLOUD_STORAGE": {
+        "file": { "use": ["fileExtracted"], "fields": [
+          { "name": "provider", "type": "string", "description": "Storage provider label", "required": true },
+          { "name": "object_key", "type": "string", "description": "Object key/path", "required": true },
+          { "name": "etag", "type": "string", "description": "Object entity tag", "required": false }
+        ] },
+        "image": { "fields": [
+          { "name": "source_hash", "type": "string", "description": "Hash of the parent object asset", "required": true },
+          { "name": "location", "type": "string", "description": "Location of the embedded image within the parent", "required": true },
+          { "name": "mime_type", "required": true },
+          { "name": "size_bytes", "required": true }
+        ] }
+      },
+      "POSTGRESQL": { "table": { "use": ["tabularTable"] } },
+      "MYSQL": { "table": { "use": ["tabularTable"] } },
+      "MSSQL": {
+        "table": { "use": ["tabularTable"], "fields": [
+          { "name": "object_type", "required": false },
+          { "name": "is_aws_rds", "type": "boolean", "description": "Whether the server is AWS RDS SQL Server", "required": false }
+        ] }
+      },
+      "ORACLE": {
+        "table": { "use": ["tabularTable"], "fields": [
+          { "name": "object_type", "required": false },
+          { "name": "lineage", "type": "object", "description": "View lineage extraction settings", "required": false }
+        ] }
+      },
+      "HIVE": {
+        "table": { "use": ["tabularTable"], "fields": [
+          { "name": "object_type", "required": false }
+        ] }
+      },
+      "SQLITE": { "table": { "use": ["tabularTable"] } },
+      "SNOWFLAKE": {
+        "table": { "use": ["tabularTable"], "fields": [
+          { "name": "account_id", "type": "string", "description": "Snowflake account identifier", "required": false },
+          { "name": "object_type", "required": false },
+          { "name": "lineage", "type": "object", "description": "Lineage extraction settings and time window", "required": false }
+        ] }
+      },
+      "DATABRICKS": {
+        "table": { "use": ["tabularTable"], "fields": [
+          { "name": "catalog", "type": "string", "description": "Unity Catalog name", "required": false },
+          { "name": "object_type", "required": false }
+        ] },
+        "notebook": { "fields": [
+          { "name": "kind", "type": "string", "description": "Asset kind discriminator (notebook)", "required": true },
+          { "name": "path", "type": "string", "description": "Notebook workspace path", "required": true },
+          { "name": "object_id", "type": "string", "description": "Workspace object id", "required": false },
+          { "name": "language", "type": "string", "description": "Notebook language", "required": false },
+          { "name": "created_at_ms", "type": "number", "description": "Creation time (epoch ms)", "required": false },
+          { "name": "modified_at_ms", "type": "number", "description": "Last modified time (epoch ms)", "required": false }
+        ] },
+        "pipeline": { "fields": [
+          { "name": "kind", "type": "string", "description": "Asset kind discriminator (pipeline)", "required": true },
+          { "name": "pipeline_id", "type": "string", "description": "Delta Live Tables pipeline id", "required": true },
+          { "name": "name", "type": "string", "description": "Pipeline name", "required": true },
+          { "name": "state", "type": "string", "description": "Pipeline state", "required": false }
+        ] }
+      },
+      "MONGODB": {
+        "collection": { "fields": [
+          { "name": "database", "type": "string", "description": "Database name", "required": true },
+          { "name": "collection", "type": "string", "description": "Collection name", "required": true },
+          { "name": "deployment", "type": "string", "description": "ATLAS or ON_PREM", "required": true }
+        ] }
+      },
+      "NEO4J": {
+        "label": { "fields": [
+          { "name": "label", "type": "string", "description": "Node label", "required": true },
+          { "name": "database", "type": "string", "description": "Database name", "required": true }
+        ] }
+      },
+      "POWERBI": {
+        "item": { "fields": [
+          { "name": "workspace_id", "type": "string", "description": "Power BI workspace id", "required": true },
+          { "name": "workspace_name", "type": "string", "description": "Workspace name", "required": true },
+          { "name": "report_type", "type": "string", "description": "Asset kind (report/dataset/dashboard)", "required": true },
+          { "name": "dataset_id", "type": "string", "description": "Dataset id", "required": false },
+          { "name": "author", "required": false }
+        ] }
+      },
+      "TABLEAU": {
+        "item": { "fields": [
+          { "name": "site", "type": "string", "description": "Tableau site", "required": true },
+          { "name": "report_type", "type": "string", "description": "Asset kind (workbook/view/datasource)", "required": true },
+          { "name": "workbook_id", "type": "string", "description": "Asset/object id", "required": true },
+          { "name": "project_name", "type": "string", "description": "Project name", "required": false },
+          { "name": "tags", "required": false },
+          { "name": "author", "required": false }
+        ] }
+      },
+      "WORDPRESS": {
+        "post": { "fields": [
+          { "name": "wp_id", "type": "string", "description": "WordPress object id", "required": true },
+          { "name": "title", "required": true },
+          { "name": "links_count", "required": true },
+          { "name": "slug", "type": "string", "description": "URL slug", "required": false },
+          { "name": "status", "required": false },
+          { "name": "post_type", "type": "string", "description": "Post type (post/page)", "required": false },
+          { "name": "author", "required": false },
+          { "name": "tags", "required": false },
+          { "name": "categories", "type": "string[]", "description": "Category ids", "required": false }
+        ] },
+        "image": { "fields": [
+          { "name": "referenced_by", "type": "string", "description": "Hash of the referencing post asset", "required": true }
+        ] }
+      },
+      "SLACK": {
+        "message": { "fields": [
+          { "name": "channel_id", "type": "string", "description": "Slack channel id", "required": true },
+          { "name": "ts", "type": "string", "description": "Message timestamp", "required": true },
+          { "name": "channel_name", "type": "string", "description": "Channel name", "required": false },
+          { "name": "author", "required": false },
+          { "name": "thread_ts", "type": "string", "description": "Parent thread timestamp", "required": false }
+        ] }
+      },
+      "CONFLUENCE": {
+        "page": { "fields": [
+          { "name": "page_id", "type": "string", "description": "Confluence page id", "required": true },
+          { "name": "title", "required": true },
+          { "name": "links_count", "required": true },
+          { "name": "space_key", "type": "string", "description": "Space id/key", "required": false },
+          { "name": "status", "required": false },
+          { "name": "author", "required": false }
+        ] },
+        "attachment": { "use": ["attachmentFile"], "fields": [
+          { "name": "title", "required": true },
+          { "name": "page_hash", "type": "string", "description": "Hash of the parent page asset", "required": true }
+        ] },
+        "comments": { "use": ["comments"], "fields": [
+          { "name": "page_id", "type": "string", "description": "Parent page id", "required": true }
+        ] },
+        "linked_file": { "fields": [
+          { "name": "referenced_by", "type": "string", "description": "Hash of the referencing page asset", "required": true }
+        ] }
+      },
+      "JIRA": {
+        "issue": { "fields": [
+          { "name": "issue_key", "type": "string", "description": "Jira issue key", "required": true },
+          { "name": "links_count", "required": true },
+          { "name": "issue_type", "type": "string", "description": "Issue type", "required": false },
+          { "name": "priority", "type": "string", "description": "Priority", "required": false },
+          { "name": "project_key", "type": "string", "description": "Project key", "required": false },
+          { "name": "assignee", "type": "string", "description": "Assignee display name/email", "required": false },
+          { "name": "author", "required": false },
+          { "name": "status", "required": false },
+          { "name": "tags", "required": false }
+        ] },
+        "attachment": { "use": ["attachmentFile"], "fields": [
+          { "name": "filename", "type": "string", "description": "Original file name", "required": true },
+          { "name": "issue_hash", "type": "string", "description": "Hash of the parent issue asset", "required": true },
+          { "name": "author", "required": false }
+        ] },
+        "comments": { "use": ["comments"], "fields": [
+          { "name": "issue_key", "type": "string", "description": "Parent issue key", "required": true }
+        ] }
+      },
+      "SERVICEDESK": {
+        "issue": { "fields": [
+          { "name": "issue_key", "type": "string", "description": "Service desk request key", "required": true },
+          { "name": "links_count", "required": true },
+          { "name": "status", "required": false },
+          { "name": "request_type", "type": "string", "description": "Service desk request type", "required": false },
+          { "name": "service_desk_name", "type": "string", "description": "Service desk name", "required": false }
+        ] },
+        "attachment": { "use": ["attachmentFile"], "fields": [
+          { "name": "filename", "type": "string", "description": "Original file name", "required": true },
+          { "name": "request_hash", "type": "string", "description": "Hash of the parent request asset", "required": true }
+        ] },
+        "comments": { "use": ["comments"], "fields": [
+          { "name": "issue_key", "type": "string", "description": "Parent request key", "required": true }
+        ] }
+      },
+      "NOTION": {
+        "page": { "fields": [
+          { "name": "page_id", "type": "string", "description": "Notion page id", "required": true },
+          { "name": "title", "required": true },
+          { "name": "links_count", "required": true },
+          { "name": "parent_type", "required": false },
+          { "name": "parent_id", "required": false },
+          { "name": "status", "required": false },
+          { "name": "tags", "required": false }
+        ] },
+        "data_source": { "fields": [
+          { "name": "data_source_id", "type": "string", "description": "Notion data source id", "required": true },
+          { "name": "name", "type": "string", "description": "Data source name", "required": true },
+          { "name": "row_count", "required": true },
+          { "name": "column_count", "required": true },
+          { "name": "column_names", "required": false },
+          { "name": "column_types", "required": false },
+          { "name": "parent_type", "required": false },
+          { "name": "parent_id", "required": false }
+        ] },
+        "file": { "fields": [
+          { "name": "selector", "type": "string", "description": "Selector for the file within the page", "required": true },
+          { "name": "name", "type": "string", "description": "File name", "required": true },
+          { "name": "is_external", "type": "boolean", "description": "Whether the file is externally hosted", "required": true }
+        ] },
+        "comments": { "use": ["comments"], "fields": [
+          { "name": "page_id", "type": "string", "description": "Parent page id", "required": true }
+        ] }
+      }
+    }
+  },
   "definitions": {
     "AssetType": {
       "type": "string",

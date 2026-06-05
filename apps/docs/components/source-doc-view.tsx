@@ -28,6 +28,7 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
 import type {
+  SourceAssetMetadata,
   SourceDocFieldRow,
   SourceDocModel,
 } from "@workspace/schemas/source-docs";
@@ -127,6 +128,74 @@ function SectionTable({
             </Table>
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AssetsMetadataSection({ assets }: { assets: SourceAssetMetadata[] }) {
+  if (assets.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card
+      id="extracted-metadata"
+      className="panel-card scroll-mt-24 rounded-[6px]"
+    >
+      <CardHeader>
+        <CardTitle className="text-lg">Extracted Metadata</CardTitle>
+        <CardDescription>
+          Metadata attached to each asset this source produces. Declared in{" "}
+          <code>all_input_sources.json</code> (
+          <code>x-assets-metadata</code>) and enforced by the CLI.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {assets.map((asset) => (
+          <div key={asset.assetKind} className="space-y-2">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold">{asset.label}</h3>
+              <Badge variant="outline" className="font-mono text-[10px]">
+                {asset.assetKind}
+              </Badge>
+            </div>
+            <div className="overflow-x-auto rounded-[4px] border-2 border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Field</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Required</TableHead>
+                    <TableHead>Description</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {asset.fields.map((field) => (
+                    <TableRow key={`${asset.assetKind}-${field.name}`}>
+                      <TableCell className="font-mono text-xs">
+                        {field.name}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {field.type}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={field.required ? "secondary" : "outline"}
+                        >
+                          {field.required ? "Yes" : "No"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[28rem] whitespace-normal break-words text-xs text-muted-foreground">
+                        {field.description || "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        ))}
       </CardContent>
     </Card>
   );
@@ -257,6 +326,8 @@ export function SourceDocView({ source }: SourceDocViewProps) {
             description="Optional configuration fields under `config.optional`."
             rows={optionalRows}
           />
+
+          <AssetsMetadataSection assets={source.assetsMetadata} />
 
           {source.examples.length === 0 ? (
             <Card

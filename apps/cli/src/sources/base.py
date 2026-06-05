@@ -17,6 +17,11 @@ class BaseSource(ABC):
     Abstract base class for all metadata extraction sources.
     """
 
+    # Stable source identifier, overridden by each concrete source (e.g.
+    # "postgresql", "wordpress"). Uppercased it maps to the AssetType enum and
+    # the x-assets-metadata catalog key.
+    source_type: str = ""
+
     # Default batch size for streaming asset results
     BATCH_SIZE: int = 50
     HAS_SUCCESSFUL_RUN_ENV = "CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN"
@@ -129,6 +134,18 @@ class BaseSource(ABC):
         Calculate a stable SHA-256 checksum for a dictionary.
         """
         return calculate_checksum(data)
+
+    def validated_metadata(self, asset_kind: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Validate an emitted asset-metadata dict against the declared catalog.
+
+        Pass the dict you set on ``SingleAssetScanResults(metadata=...)`` through
+        this so it is checked against ``x-assets-metadata`` for this source and
+        asset kind. Strict (raises) under pytest / ``CLASSIFYRE_STRICT_METADATA``,
+        otherwise logs a warning. Returns ``data`` unchanged.
+        """
+        from .asset_metadata import validate_metadata
+
+        return validate_metadata(self.source_type, asset_kind, data)
 
     @abstractmethod
     def abort(self) -> None:

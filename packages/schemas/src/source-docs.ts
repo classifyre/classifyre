@@ -22,6 +22,19 @@ export type SourceDocExample = {
   config: unknown;
 };
 
+export type SourceMetadataField = {
+  name: string;
+  type: string;
+  description: string;
+  required: boolean;
+};
+
+export type SourceAssetMetadata = {
+  assetKind: string;
+  label: string;
+  fields: SourceMetadataField[];
+};
+
 export type SourceDocModel = {
   sourceType: string;
   slug: string;
@@ -31,6 +44,7 @@ export type SourceDocModel = {
   fieldRows: SourceDocFieldRow[];
   examples: SourceDocExample[];
   knowledgeSections: SourceKnowledgeSection[];
+  assetsMetadata: SourceAssetMetadata[];
 };
 
 export type SourceKnowledgeSection = {
@@ -52,6 +66,17 @@ const definitions = toSchemaNode(rootSchema.definitions);
 const allExamples = toSchemaNode(allInputExamples);
 const assistantKnowledgeRoot = toSchemaNode(assistantKnowledge);
 const assistantKnowledgeSources = toSchemaNode(assistantKnowledgeRoot.sources);
+
+const assetsMetadataCatalog = toSchemaNode(
+  (allInputSources as Record<string, unknown>)["x-assets-metadata"],
+);
+const assetsMetadataCommonFields = toSchemaNode(
+  assetsMetadataCatalog.commonFields,
+);
+const assetsMetadataFieldGroups = toSchemaNode(
+  assetsMetadataCatalog.fieldGroups,
+);
+const assetsMetadataSources = toSchemaNode(assetsMetadataCatalog.sources);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -619,6 +644,64 @@ function extractSourceDefinitions(): SourceDefinition[] {
   return sourceDefinitions;
 }
 
+function resolveMetadataField(
+  raw: Record<string, unknown>,
+): SourceMetadataField {
+  const name = typeof raw.name === "string" ? raw.name : "";
+  const common = toSchemaNode(assetsMetadataCommonFields[name]);
+  const type =
+    (typeof raw.type === "string" ? raw.type : undefined) ??
+    (typeof common.type === "string" ? common.type : undefined) ??
+    "string";
+  const description =
+    (typeof raw.description === "string" ? raw.description : undefined) ??
+    (typeof common.description === "string" ? common.description : undefined) ??
+    "";
+  return { name, type, description, required: raw.required === true };
+}
+
+function resolveAssetFields(
+  entry: Record<string, unknown>,
+): SourceMetadataField[] {
+  const resolved = new Map<string, SourceMetadataField>();
+
+  const useGroups = toStringArray(entry.use);
+  for (const groupName of useGroups) {
+    const group = assetsMetadataFieldGroups[groupName];
+    if (Array.isArray(group)) {
+      for (const groupField of group) {
+        if (isRecord(groupField)) {
+          const field = resolveMetadataField(groupField);
+          resolved.set(field.name, field);
+        }
+      }
+    }
+  }
+
+  const inlineFields = Array.isArray(entry.fields) ? entry.fields : [];
+  for (const inlineField of inlineFields) {
+    if (isRecord(inlineField)) {
+      const field = resolveMetadataField(inlineField);
+      resolved.set(field.name, field);
+    }
+  }
+
+  return Array.from(resolved.values());
+}
+
+function extractAssetsMetadataForSource(
+  sourceType: string,
+): SourceAssetMetadata[] {
+  const sourceEntry = toSchemaNode(assetsMetadataSources[sourceType]);
+  return Object.entries(sourceEntry)
+    .filter(([, value]) => isRecord(value))
+    .map(([assetKind, value]) => ({
+      assetKind,
+      label: humanizeIdentifier(assetKind),
+      fields: resolveAssetFields(value as Record<string, unknown>),
+    }));
+}
+
 function buildSourceDocs(): SourceDocModel[] {
   const sourceDefinitions = extractSourceDefinitions();
 
@@ -635,6 +718,7 @@ function buildSourceDocs(): SourceDocModel[] {
     fieldRows: extractFieldRows(sourceDefinition.schema),
     examples: extractExamplesForSource(sourceDefinition.sourceType),
     knowledgeSections: extractKnowledgeForSource(sourceDefinition.sourceType),
+    assetsMetadata: extractAssetsMetadataForSource(sourceDefinition.sourceType),
   }));
 
   return docs.sort((left, right) => left.label.localeCompare(right.label));

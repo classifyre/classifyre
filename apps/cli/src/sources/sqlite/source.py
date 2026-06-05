@@ -154,6 +154,16 @@ class SQLiteSource(BaseTabularSource):
         cursor = conn.execute(f"PRAGMA table_info({self._quote_identifier(table_ref.table)})")
         return [row[1] for row in cursor.fetchall() if isinstance(row[1], str)]
 
+    def _available_column_types(self, table_ref: TableRef) -> dict[str, str]:
+        # PRAGMA table_info row: (cid, name, type, notnull, dflt_value, pk)
+        conn = self._get_cached_connection(table_ref.database)
+        cursor = conn.execute(f"PRAGMA table_info({self._quote_identifier(table_ref.table)})")
+        result: dict[str, str] = {}
+        for row in cursor.fetchall():
+            if isinstance(row[1], str):
+                result[row[1]] = str(row[2]) if row[2] else ""
+        return result
+
     # ── Primary keys ─────────────────────────────────────────────────────
 
     def _query_primary_key_columns(self, table_ref: TableRef) -> list[str]:

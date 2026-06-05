@@ -30,6 +30,22 @@ from .tabular_utils import TableRef, build_tabular_location, format_tabular_samp
 
 logger = logging.getLogger(__name__)
 
+# Every key _table_to_asset emits (before per-dialect _extra_asset_metadata).
+# Mirrors the "tabularTable" group in the x-assets-metadata catalog; the catalog
+# conformance test asserts equality.
+TABULAR_METADATA_KEYS: frozenset[str] = frozenset(
+    {
+        "database",
+        "table_name",
+        "table_type",
+        "schema",
+        "column_names",
+        "column_count",
+        "column_types",
+        "row_count",
+    }
+)
+
 # ── Timestamp columns tried (in priority order) for the LATEST strategy ──
 _LATEST_COLUMN_CANDIDATES = (
     "updated_at",
@@ -96,6 +112,7 @@ class BaseTabularSource(BaseSource):
         self._content_cache: dict[str, tuple[str, str]] = {}
         self._pk_columns_cache: dict[tuple[str, ...], list[str]] = {}
         self._columns_meta_cache: dict[tuple[str, ...], list[str]] = {}
+        self._column_types_cache: dict[tuple[str, ...], dict[str, str]] = {}
 
     def _get_cached_connection(self, database: str | None = None) -> Any:
         """Return a cached DBAPI connection, creating one if needed."""
@@ -334,6 +351,46 @@ class BaseTabularSource(BaseSource):
         self._columns_meta_cache[key] = columns
         return columns
 
+    def _cached_column_types(self, table_ref: TableRef) -> dict[str, str]:
+        """Best-effort ordered ``{column_name: data_type}`` map (cached)."""
+        key = table_ref.table_key
+        cached = self._column_types_cache.get(key)
+        if cached is not None:
+            return cached
+        try:
+            types = self._available_column_types(table_ref)
+        except Exception as exc:
+            logger.debug("Could not read column types for %s: %s", table_ref.display_name, exc)
+            types = {}
+        self._column_types_cache[key] = types
+        return types
+
+    def _available_column_types(self, table_ref: TableRef) -> dict[str, str]:
+        """Return ordered ``{column_name: data_type}`` via ``information_schema``.
+
+        Default works for dialects exposing ``information_schema.columns`` keyed
+        by ``table_schema``/``table_name`` (PostgreSQL, MSSQL). Dialects with a
+        different catalog override this; failures degrade to names-only.
+        """
+        ph = self._param_placeholder()
+        conn = self._get_cached_connection(table_ref.database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_schema = {ph} AND table_name = {ph}
+                ORDER BY ordinal_position
+                """,
+                (table_ref.schema, table_ref.table),
+            )
+            result: dict[str, str] = {}
+            for row in cursor.fetchall():
+                if not row or not isinstance(row[0], str):
+                    continue
+                result[row[0]] = str(row[1]) if row[1] is not None else ""
+            return result
+
     def _estimate_row_count(self, table_ref: TableRef) -> int | None:
         """Cheap row-count estimate for asset metadata.
 
@@ -566,10 +623,15 @@ class BaseTabularSource(BaseSource):
         }
         if table_ref.schema is not None:
             asset_metadata["schema"] = table_ref.schema
-        columns = self._cached_columns(table_ref)
+        # Prefer the name→type map (one catalog query gives both); fall back to
+        # names-only for dialects without a supported column-types query.
+        column_types = self._cached_column_types(table_ref)
+        columns = list(column_types.keys()) if column_types else self._cached_columns(table_ref)
         if columns:
             asset_metadata["column_names"] = columns
             asset_metadata["column_count"] = len(columns)
+        if column_types:
+            asset_metadata["column_types"] = column_types
         row_count = self._estimate_row_count(table_ref)
         if row_count is not None and row_count >= 0:
             asset_metadata["row_count"] = row_count
@@ -587,7 +649,7 @@ class BaseTabularSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata=asset_metadata,
+            metadata=self.validated_metadata("table", asset_metadata),
         )
 
     # ── extract_raw (discovery) ──────────────────────────────────────────

@@ -233,10 +233,10 @@ class Neo4jSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
-            metadata={
-                "label": ref.label,
-                "database": ref.database,
-            },
+            metadata=self.validated_metadata(
+                "label",
+                {"label": ref.label, "database": ref.database},
+            ),
         )
 
     def test_connection(self) -> dict[str, Any]:

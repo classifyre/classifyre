@@ -244,6 +244,25 @@ class MySQLSource(BaseTabularSource):
                 if isinstance(row, tuple) and row and isinstance(row[0], str)
             ]
 
+    def _available_column_types(self, table_ref: TableRef) -> dict[str, str]:
+        # MySQL is 2-level: the database lives in ``table_schema``.
+        conn = self._get_cached_connection(table_ref.database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT column_name, column_type
+                FROM information_schema.columns
+                WHERE table_schema = %s AND table_name = %s
+                ORDER BY ordinal_position
+                """,
+                (table_ref.database, table_ref.table),
+            )
+            result: dict[str, str] = {}
+            for row in cursor.fetchall():
+                if isinstance(row, tuple) and row and isinstance(row[0], str):
+                    result[row[0]] = str(row[1]) if len(row) > 1 and row[1] is not None else ""
+            return result
+
     # ── Foreign key links ────────────────────────────────────────────────
 
     def _collect_foreign_key_links(
