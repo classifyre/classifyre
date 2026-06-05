@@ -159,3 +159,29 @@ async def test_broken_links_detector_ignores_non_http_lines() -> None:
         allow_redirects=True,
         timeout=detector._REQUEST_TIMEOUT_SECONDS,
     )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_broken_links_detector_does_not_flag_real_public_pages() -> None:
+    """Real-network regression for CLASSIFYRE-2.
+
+    Public pages such as YouTube and Wikipedia return ``Content-Length: 0`` or
+    ``403`` on HEAD, which previously produced false ``empty_content`` /
+    ``unreachable`` findings. With the GET fallback they must not be flagged.
+
+    Gated behind the ``integration`` marker (RUN_INTEGRATION_TESTS=1) so the
+    default offline suite stays hermetic.
+    """
+    detector = BrokenLinksDetector()
+
+    payload = "\n".join(
+        [
+            "https://www.youtube.com/watch?v=6mswO8cf0kw",
+            "https://en.wikipedia.org/wiki/Microsoft_PowerPoint",
+        ]
+    )
+
+    findings = await detector.detect(payload, "application/x.asset-links")
+
+    assert findings == [], f"public pages incorrectly flagged: {[f.matched_content for f in findings]}"
