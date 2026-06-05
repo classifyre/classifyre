@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AssetContentType, AssetStatus, AssetType } from '@prisma/client';
+import { AssetStatus, AssetType } from '@prisma/client';
 
 export class AssetListItemDto {
   @ApiProperty()
@@ -20,8 +20,10 @@ export class AssetListItemDto {
   @ApiProperty({ type: [String] })
   links: string[];
 
-  @ApiProperty({ enum: AssetContentType })
-  assetType: AssetContentType;
+  @ApiProperty({
+    description: 'Catalog asset kind (file, image, page, comment, table, ...)',
+  })
+  assetType: string;
 
   @ApiProperty({ enum: AssetType })
   sourceType: AssetType;
@@ -43,4 +45,11 @@ export class AssetListItemDto {
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiPropertyOptional({
+    description: 'Source-specific asset metadata',
+    type: 'object',
+    additionalProperties: true,
+  })
+  metadata?: Record<string, unknown>;
 }

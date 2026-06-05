@@ -24,11 +24,26 @@ from ..models.generated_single_asset_scan_results import (
     DetectionResult,
     SingleAssetScanResults,
 )
+from ..utils.file_metadata import build_columns
 from ..utils.hashing import hash_id, unhash_id
 from .base import BaseSource
 from .tabular_utils import TableRef, build_tabular_location, format_tabular_sample_content
 
 logger = logging.getLogger(__name__)
+
+# Every key _table_to_asset emits (before per-dialect _extra_asset_metadata).
+# Mirrors the "tabularTable" group in the x-asset-metadata catalog; the catalog
+# conformance test asserts equality.
+TABULAR_METADATA_KEYS: frozenset[str] = frozenset(
+    {
+        "database",
+        "table_name",
+        "table_type",
+        "schema",
+        "columns",
+        "row_count",
+    }
+)
 
 # ── Timestamp columns tried (in priority order) for the LATEST strategy ──
 _LATEST_COLUMN_CANDIDATES = (
@@ -95,6 +110,8 @@ class BaseTabularSource(BaseSource):
         self._table_lookup: dict[str, TableRef] = {}
         self._content_cache: dict[str, tuple[str, str]] = {}
         self._pk_columns_cache: dict[tuple[str, ...], list[str]] = {}
+        self._columns_meta_cache: dict[tuple[str, ...], list[str]] = {}
+        self._column_types_cache: dict[tuple[str, ...], dict[str, str]] = {}
 
     def _get_cached_connection(self, database: str | None = None) -> Any:
         """Return a cached DBAPI connection, creating one if needed."""
@@ -319,6 +336,70 @@ class BaseTabularSource(BaseSource):
 
     # ── Column metadata ──────────────────────────────────────────────────
 
+    def _cached_columns(self, table_ref: TableRef) -> list[str]:
+        """Best-effort column names for asset metadata (cached, never raises)."""
+        key = table_ref.table_key
+        cached = self._columns_meta_cache.get(key)
+        if cached is not None:
+            return cached
+        try:
+            columns = self._available_columns(table_ref)
+        except Exception as exc:
+            logger.debug("Could not read columns for %s: %s", table_ref.display_name, exc)
+            columns = []
+        self._columns_meta_cache[key] = columns
+        return columns
+
+    def _cached_column_types(self, table_ref: TableRef) -> dict[str, str]:
+        """Best-effort ordered ``{column_name: data_type}`` map (cached)."""
+        key = table_ref.table_key
+        cached = self._column_types_cache.get(key)
+        if cached is not None:
+            return cached
+        try:
+            types = self._available_column_types(table_ref)
+        except Exception as exc:
+            logger.debug("Could not read column types for %s: %s", table_ref.display_name, exc)
+            types = {}
+        self._column_types_cache[key] = types
+        return types
+
+    def _available_column_types(self, table_ref: TableRef) -> dict[str, str]:
+        """Return ordered ``{column_name: data_type}`` via ``information_schema``.
+
+        Default works for dialects exposing ``information_schema.columns`` keyed
+        by ``table_schema``/``table_name`` (PostgreSQL, MSSQL). Dialects with a
+        different catalog override this; failures degrade to names-only.
+        """
+        ph = self._param_placeholder()
+        conn = self._get_cached_connection(table_ref.database)
+        with conn.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_schema = {ph} AND table_name = {ph}
+                ORDER BY ordinal_position
+                """,
+                (table_ref.schema, table_ref.table),
+            )
+            result: dict[str, str] = {}
+            for row in cursor.fetchall():
+                if not row or not isinstance(row[0], str):
+                    continue
+                result[row[0]] = str(row[1]) if row[1] is not None else ""
+            return result
+
+    def _estimate_row_count(self, table_ref: TableRef) -> int | None:
+        """Cheap row-count estimate for asset metadata.
+
+        Default returns ``None`` (omitted). Dialects with a cheap catalog
+        estimate (e.g. PostgreSQL ``pg_class.reltuples``) override this; a full
+        ``COUNT(*)`` is intentionally avoided so discovery stays fast on large
+        tables.
+        """
+        return None
+
     def _available_columns(self, table_ref: TableRef) -> list[str]:
         """Return column names in ordinal order.  Uses ``information_schema``."""
         ph = self._param_placeholder()
@@ -531,6 +612,30 @@ class BaseTabularSource(BaseSource):
             metadata["schema"] = table_ref.schema
         metadata.update(self._extra_asset_metadata(table_ref))
 
+        # Normalized asset metadata persisted on the asset (consistent keys
+        # across all DB/warehouse sources). _extra_asset_metadata contributes
+        # source-specific fields (e.g. catalog/account).
+        asset_metadata: dict[str, Any] = {
+            "database": table_ref.database,
+            "table_name": table_ref.table,
+            "table_type": table_ref.object_type,
+        }
+        if table_ref.schema is not None:
+            asset_metadata["schema"] = table_ref.schema
+        # Prefer the name→type map (one catalog query gives both); fall back to
+        # names-only (empty types) for dialects without a column-types query.
+        column_types = self._cached_column_types(table_ref)
+        if column_types:
+            columns = build_columns(list(column_types.keys()), column_types)
+        else:
+            columns = build_columns(self._cached_columns(table_ref))
+        if columns:
+            asset_metadata["columns"] = columns
+        row_count = self._estimate_row_count(table_ref)
+        if row_count is not None and row_count >= 0:
+            asset_metadata["row_count"] = row_count
+        asset_metadata.update(self._extra_asset_metadata(table_ref))
+
         now = datetime.now(UTC)
         return SingleAssetScanResults(
             hash=asset_hash,
@@ -543,6 +648,7 @@ class BaseTabularSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
+            **self.metadata_fields("table", asset_metadata),
         )
 
     # ── extract_raw (discovery) ──────────────────────────────────────────

@@ -541,6 +541,20 @@ class PowerBISource(BaseSource):
 
         return refs
 
+    def _meta_field(self, ref: PowerBIAssetRef, field_name: str) -> Any:
+        """Look up a field across the top-level and nested PowerBI metadata dicts."""
+        candidates = [
+            ref.metadata.get(field_name),
+            ref.metadata.get("report", {}).get(field_name),
+            ref.metadata.get("dataset", {}).get(field_name),
+            ref.metadata.get("dashboard", {}).get(field_name),
+            ref.metadata.get("workspace", {}).get(field_name),
+        ]
+        for value in candidates:
+            if value is not None:
+                return value
+        return None
+
     def _sampling_sort_datetime(self, ref: PowerBIAssetRef, field_name: str) -> datetime | None:
         candidates = [
             ref.metadata.get(field_name),
@@ -603,6 +617,18 @@ class PowerBISource(BaseSource):
             "metadata": ref.metadata,
         }
 
+        asset_metadata: dict[str, Any] = {
+            "workspace_id": ref.workspace_id,
+            "workspace_name": ref.workspace_name,
+            "report_type": ref.kind,
+        }
+        dataset_id = self._meta_field(ref, "datasetId") or self._meta_field(ref, "id")
+        if isinstance(dataset_id, str) and dataset_id:
+            asset_metadata["dataset_id"] = dataset_id
+        author = self._meta_field(ref, "configuredBy")
+        if isinstance(author, str) and author:
+            asset_metadata["author"] = author
+
         return SingleAssetScanResults(
             hash=asset_hash,
             checksum=self.calculate_checksum(checksum_payload),
@@ -617,6 +643,7 @@ class PowerBISource(BaseSource):
             created_at=ref.created_at,
             updated_at=ref.updated_at,
             runner_id=self.runner_id,
+            **self.metadata_fields("item", asset_metadata),
         )
 
     def test_connection(self) -> dict[str, Any]:
