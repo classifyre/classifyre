@@ -58,9 +58,7 @@ updates:
       # Unpin when the package adds a typeof Element guard (SSR-safe check)
       - dependency-name: react-medium-image-zoom
         update-types: ["version-update:semver-patch"]
-      # Next 16.2 broke Nextra MDX metadata exports — unpin when Nextra fixes it
-      - dependency-name: next
-        update-types: ["version-update:semver-patch"]
+      # Next 16.2.5+ fixed MDX metadata export compatibility with Nextra
       - dependency-name: "@next/eslint-plugin-next"
         update-types: ["version-update:semver-patch"]
 
