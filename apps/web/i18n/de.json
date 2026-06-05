@@ -661,6 +661,25 @@
       "title": "Asset-Details",
       "metadata": "Asset-Metadaten",
       "metadataDesc": "Kernmetadaten und Quellkontext für dieses Asset.",
+      "assetMetadata": {
+        "title": "Quelleneigenschaften",
+        "desc": "Quellenspezifische Eigenschaften, die bei der Erfassung erfasst wurden.",
+        "keys": {
+          "size_bytes": "Größe",
+          "row_count": "Zeilenanzahl",
+          "column_count": "Spaltenanzahl",
+          "column_names": "Spalten",
+          "page_count": "Seiten",
+          "mime_type": "Typ",
+          "encoding": "Kodierung",
+          "author": "Autor",
+          "status": "Status",
+          "tags": "Tags",
+          "image_width": "Breite",
+          "image_height": "Höhe",
+          "parse_error": "Parse-Fehler"
+        }
+      },
       "unknownSource": "Unbekannte Quelle",
       "assetName": "Asset-Name",
       "assetType": "Asset-Typ",

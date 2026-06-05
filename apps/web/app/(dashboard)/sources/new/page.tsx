@@ -573,6 +573,10 @@ function SourceStepperContent({
   ) => {
     const validation = await sourceFormRef.current?.validate();
     if (!validation?.isValid) {
+      console.warn(
+        "[SourcesNew] Validation failed",
+        { missingFields: validation?.missingFields, errors: validation?.errors },
+      );
       toast.error(t("sources.new.incompleteSettings"));
       scrollToSection("config");
       return;

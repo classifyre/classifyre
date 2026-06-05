@@ -45,7 +45,9 @@ model Asset {
   name          String
   externalUrl   String      @map("external_url")
   links         Json        @default("[]") @db.JsonB
-  assetType     AssetContentType @map("asset_type")
+  // Catalog asset kind (file, image, page, comment, table, ...) — free-form
+  // string, not the AssetContentType enum (which is kept for SandboxRun).
+  assetType     String      @map("asset_type")
   sourceType    AssetType   @map("source_type")
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
@@ -53,6 +55,7 @@ model Asset {
   lastScannedAt DateTime?   @map("last_scanned_at")
   runnerId      String?     @map("runner_id")
   status        AssetStatus @default(NEW)
+  metadata      Json?       @db.JsonB
   runner        Runner?     @relation(fields: [runnerId], references: [id])
   source        Source      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   findings      Finding[]
@@ -331,6 +334,7 @@ model RunnerAsset {
   findingsTotal      Int?  @map("findings_total")
   findingsBySeverity Json? @map("findings_by_severity")
   findingsByDetector Json? @map("findings_by_detector")
+  metadata           Json? @map("metadata") @db.JsonB
   createdAt        DateTime          @default(now()) @map("created_at")
 
   runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)

@@ -37,6 +37,12 @@ frontend:
   autoscaling:
     minReplicas: 1
     maxReplicas: 1
+  posthog:
+    enabled: true
+    token: "phc_ocaaqUW6YaGFTFqKTvydnaEHmouSWnHnTuKuPQtjmfLe"
+    host: "/classifyre-usr"
+    uiHost: "https://eu.posthog.com"
+    ingestHost: "https://eu.i.posthog.com"
 
   service:
     type: NodePort

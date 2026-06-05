@@ -50,11 +50,11 @@ export interface AssetResponseDto {
      */
     links: Array<string>;
     /**
-     * 
+     * Catalog asset kind of the parent asset
      * @type {string}
      * @memberof AssetResponseDto
      */
-    assetType: AssetResponseDtoAssetTypeEnum;
+    assetType: string;
     /**
      * 
      * @type {string}
@@ -63,21 +63,6 @@ export interface AssetResponseDto {
     sourceType: AssetResponseDtoSourceTypeEnum;
 }
 
-
-/**
- * @export
- */
-export const AssetResponseDtoAssetTypeEnum = {
-    Txt: 'TXT',
-    Table: 'TABLE',
-    Image: 'IMAGE',
-    Video: 'VIDEO',
-    Audio: 'AUDIO',
-    Url: 'URL',
-    Binary: 'BINARY',
-    Other: 'OTHER'
-} as const;
-export type AssetResponseDtoAssetTypeEnum = typeof AssetResponseDtoAssetTypeEnum[keyof typeof AssetResponseDtoAssetTypeEnum];
 
 /**
  * @export

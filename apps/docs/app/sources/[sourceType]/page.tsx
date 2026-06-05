@@ -58,6 +58,9 @@ export default async function SourceTypePage({ params }: SourcePageProps) {
     { id: "required-fields", value: "Required Fields" },
     { id: "masked-fields", value: "Masked Fields" },
     { id: "optional-fields", value: "Optional Fields" },
+    ...(sourceDoc.assetsMetadata.length > 0
+      ? [{ id: "extracted-metadata", value: "Extracted Metadata" }]
+      : []),
     { id: "source-examples", value: "Examples" },
   ];
   const sourceCode = buildSourceDetailsCopy(sourceDoc);

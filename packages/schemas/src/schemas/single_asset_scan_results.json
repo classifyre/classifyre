@@ -34,8 +34,21 @@
     },
     "asset_type": {
       "$ref": "#/definitions/AssetType",
-      "description": "Canonical asset content type",
+      "description": "Canonical asset content type (used for detector routing)",
       "title": "Asset Type"
+    },
+    "asset_kind": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Catalog asset kind discriminator (file, image, page, comment, table, ...). Persisted as the asset type for display/filtering.",
+      "title": "Asset Kind"
     },
     "source_id": {
       "anyOf": [
@@ -103,6 +116,20 @@
       "default": null,
       "description": "Statistics about the detector scan for this asset",
       "title": "Scan Stats"
+    },
+    "metadata": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Source-specific asset metadata using normalized keys (size_bytes, row_count, etc.) where applicable",
+      "title": "Metadata"
     }
   },
   "required": [

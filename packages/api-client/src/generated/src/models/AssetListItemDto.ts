@@ -56,11 +56,11 @@ export interface AssetListItemDto {
      */
     links: Array<string>;
     /**
-     * 
+     * Catalog asset kind (file, image, page, comment, table, ...)
      * @type {string}
      * @memberof AssetListItemDto
      */
-    assetType: AssetListItemDtoAssetTypeEnum;
+    assetType: string;
     /**
      * 
      * @type {string}
@@ -103,23 +103,14 @@ export interface AssetListItemDto {
      * @memberof AssetListItemDto
      */
     updatedAt: Date;
+    /**
+     * Source-specific asset metadata
+     * @type {{ [key: string]: any; }}
+     * @memberof AssetListItemDto
+     */
+    metadata?: { [key: string]: any; };
 }
 
-
-/**
- * @export
- */
-export const AssetListItemDtoAssetTypeEnum = {
-    Txt: 'TXT',
-    Table: 'TABLE',
-    Image: 'IMAGE',
-    Video: 'VIDEO',
-    Audio: 'AUDIO',
-    Url: 'URL',
-    Binary: 'BINARY',
-    Other: 'OTHER'
-} as const;
-export type AssetListItemDtoAssetTypeEnum = typeof AssetListItemDtoAssetTypeEnum[keyof typeof AssetListItemDtoAssetTypeEnum];
 
 /**
  * @export
@@ -212,6 +203,7 @@ export function AssetListItemDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'status': json['status'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
+        'metadata': json['metadata'] == null ? undefined : json['metadata'],
     };
 }
 
@@ -240,6 +232,7 @@ export function AssetListItemDtoToJSONTyped(value?: AssetListItemDto | null, ign
         'status': value['status'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
+        'metadata': value['metadata'],
     };
 }
 

@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote, urlsplit
 
+import requests
+
 from ...models.generated_input import (
     NotionInput,
     NotionOptional,
@@ -124,6 +126,54 @@ def _rich_text_urls(rich_text: Any) -> list[str]:
         if isinstance(rt, dict) and isinstance(rt.get("href"), str) and rt["href"]:
             urls.append(rt["href"])
     return urls
+
+
+def _parent_signals(parent: Any) -> dict[str, Any]:
+    """Flatten a Notion parent object into ``parent_type`` / ``parent_id`` keys."""
+    if not isinstance(parent, dict):
+        return {}
+    ptype = parent.get("type")
+    signals: dict[str, Any] = {}
+    if isinstance(ptype, str):
+        signals["parent_type"] = ptype
+        value = parent.get(ptype)
+        if isinstance(value, str) and value:
+            signals["parent_id"] = value
+    return signals
+
+
+def _property_signals(properties: Any) -> dict[str, Any]:
+    """Extract normalized ``tags`` / ``status`` from a page's properties.
+
+    ``tags`` aggregates all multi_select option names; ``status`` is taken from
+    the first ``status`` or ``select`` typed property.
+    """
+    if not isinstance(properties, dict):
+        return {}
+    tags: list[str] = []
+    status: str | None = None
+    for prop in properties.values():
+        if not isinstance(prop, dict):
+            continue
+        ptype = prop.get("type")
+        if ptype == "multi_select":
+            options = prop.get("multi_select")
+            if isinstance(options, list):
+                tags.extend(
+                    opt["name"]
+                    for opt in options
+                    if isinstance(opt, dict) and isinstance(opt.get("name"), str)
+                )
+        elif ptype in ("status", "select") and status is None:
+            selected = prop.get(ptype)
+            if isinstance(selected, dict) and isinstance(selected.get("name"), str):
+                status = selected["name"]
+    signals: dict[str, Any] = {}
+    if tags:
+        signals["tags"] = dedupe_preserve_order(tags)
+    if status:
+        signals["status"] = status
+    return signals
 
 
 def _file_url_and_external(file_obj: Any) -> tuple[str | None, bool]:
@@ -353,6 +403,13 @@ class NotionSource(BaseSource):
             "parent": page.get("parent"),
             "links_count": len(related_hashes),
         }
+        asset_metadata: dict[str, Any] = {
+            "page_id": page_id,
+            "title": title,
+            "links_count": len(related_hashes),
+        }
+        asset_metadata.update(_parent_signals(page.get("parent")))
+        asset_metadata.update(_property_signals(page.get("properties")))
         page_asset = SingleAssetScanResults(
             hash=page_hash,
             checksum=self.calculate_checksum(metadata),
@@ -364,6 +421,7 @@ class NotionSource(BaseSource):
             created_at=parse_datetime(str(page.get("created_time") or "")),
             updated_at=parse_datetime(str(page.get("last_edited_time") or "")),
             runner_id=self.runner_id,
+            **self.metadata_fields("page", asset_metadata),
         )
 
         return [page_asset, *related_assets]
@@ -534,6 +592,18 @@ class NotionSource(BaseSource):
             "schema": schema,
             "row_count": len(row_hashes),
         }
+        asset_metadata: dict[str, Any] = {
+            "data_source_id": ds_id,
+            "name": name,
+            "row_count": len(row_hashes),
+        }
+        columns = [
+            {"name": key, "type": str(value) if isinstance(value, str) else ""}
+            for key, value in schema.items()
+        ]
+        if columns:
+            asset_metadata["columns"] = columns
+        asset_metadata.update(_parent_signals(data_source.get("parent")))
         ds_asset = SingleAssetScanResults(
             hash=ds_hash,
             checksum=self.calculate_checksum(metadata),
@@ -545,6 +615,7 @@ class NotionSource(BaseSource):
             created_at=parse_datetime(str(data_source.get("created_time") or "")),
             updated_at=parse_datetime(str(data_source.get("last_edited_time") or "")),
             runner_id=self.runner_id,
+            **self.metadata_fields("data_source", asset_metadata),
         )
 
         return [ds_asset, *row_assets]
@@ -659,6 +730,10 @@ class NotionSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
+            **self.metadata_fields(
+                "file",
+                {"selector": selector, "name": name, "is_external": is_external},
+            ),
         )
 
     # ---------------------------------------------------------------- comments
@@ -670,6 +745,19 @@ class NotionSource(BaseSource):
     ) -> tuple[SingleAssetScanResults | None, list[str]]:
         try:
             comments = self.client.iter_comments(page_id)
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 403:
+                logger.warning(
+                    "Failed to fetch Notion comments for %s: 403 Forbidden — "
+                    'your integration token lacks the "Read comments" capability. '
+                    "Enable it in the Notion Developer portal at "
+                    "https://www.notion.so/my-integrations, "
+                    "then re-authorize the integration with the workspace.",
+                    page_id,
+                )
+            else:
+                logger.warning("Failed to fetch Notion comments for %s: %s", page_id, exc)
+            return None, []
         except Exception as exc:
             logger.warning("Failed to fetch Notion comments for %s: %s", page_id, exc)
             return None, []
@@ -708,6 +796,10 @@ class NotionSource(BaseSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
+            **self.metadata_fields(
+                "comments",
+                {"page_id": page_id, "comments_count": len(comments)},
+            ),
         )
         return comments_asset, [comments_hash]
 
