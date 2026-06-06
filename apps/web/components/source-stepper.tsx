@@ -4,10 +4,10 @@ import { defineStepper } from "@stepperize/react";
 import { useTranslation } from "@/hooks/use-translation";
 import { cn } from "@workspace/ui/lib/utils";
 
-export const sourceStepper = defineStepper(
+export const sourceStepper = defineStepper([
   { id: "config" },
   { id: "detectors" },
-);
+]);
 
 export type SourceStepId = "config" | "detectors";
 
