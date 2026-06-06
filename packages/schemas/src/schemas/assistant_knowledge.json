@@ -1,5 +1,59 @@
 {
   "sources": {
+    "EMAIL": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Name the source after the mailbox or provider so coverage is obvious.",
+          "suggestions": [
+            "Include the account and provider (example: Support Inbox (Gmail)).",
+            "If you scan several mailboxes, make each name distinct."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Provide the IMAP server host and port for the mailbox provider.",
+          "suggestions": [
+            "Gmail: imap.gmail.com, port 993.",
+            "Outlook / Microsoft 365: outlook.office365.com, port 993.",
+            "Most providers use port 993 for IMAP over TLS."
+          ],
+          "questions": [
+            "Which email provider or IMAP host are you connecting to?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Authenticate with the mailbox username and an app password (stored masked).",
+          "suggestions": [
+            "Use the full email address as the username.",
+            "Generate an app password — Gmail and Outlook block normal passwords over IMAP when 2FA is on.",
+            "The password is stored only in masked config."
+          ],
+          "questions": [
+            "Do you have an app password for this mailbox?"
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.scope to choose folders, date ranges, and attachment handling, and optional.connection for transport tuning.",
+          "suggestions": [
+            "Set optional.scope.folders (default INBOX) to target specific mailboxes.",
+            "Use unseen_only or since_date/before_date to limit the message set.",
+            "Keep include_attachments on so attachments become linked, separately scanned assets."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many messages are processed per run.",
+          "suggestions": [
+            "Use LATEST for frequent syncs focused on the newest messages.",
+            "Use RANDOM for broad spot checks across the mailbox.",
+            "Use ALL only when a full historical scan is required."
+          ]
+        }
+      }
+    },
     "SLACK": {
       "sections": {
         "name": {
