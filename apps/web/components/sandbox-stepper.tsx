@@ -4,7 +4,7 @@ import { defineStepper } from "@stepperize/react";
 import { useTranslation } from "@/hooks/use-translation";
 import { cn } from "@workspace/ui/lib/utils";
 
-export const sandboxStepper = defineStepper(
+export const sandboxStepper = defineStepper([
   {
     id: "upload",
     title: "sandbox.uploadFiles",
@@ -15,7 +15,7 @@ export const sandboxStepper = defineStepper(
     title: "sandbox.detectors",
     description: "sandbox.detectorsDesc",
   },
-);
+]);
 
 export type SandboxStepId = "upload" | "detectors";
 
