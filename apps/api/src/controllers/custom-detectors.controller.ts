@@ -89,7 +89,7 @@ export class CustomDetectorsController {
   @ApiOperation({
     summary: 'Parse uploaded training examples file',
     description:
-      'Accepts csv/tsv/txt/md/log/json/xlsx and returns normalized label/text training examples.',
+      'Accepts csv/tsv/txt/md/log/json and returns normalized label/text training examples.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({

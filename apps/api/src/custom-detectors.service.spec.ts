@@ -572,22 +572,14 @@ describe('CustomDetectorsService', () => {
     ]);
   });
 
-  it('parses xlsx uploads for training examples using detected columns', () => {
+  it('rejects xlsx uploads as an unsupported file type', () => {
     const { service } = createService();
     const payload = fs.readFileSync(
       path.resolve(__dirname, '../../e2e/assets/phishing_dataset.xlsx'),
     );
 
-    const parsed = service.parseTrainingExamplesUpload(
-      payload,
-      'phishing_dataset.xlsx',
-    );
-
-    expect(parsed.format).toBe('xlsx');
-    expect(parsed.importedRows).toBeGreaterThan(0);
-    expect(parsed.examples[0]?.label).toBe('legitimate');
-    expect(parsed.examples[0]?.text).toContain('monthly report');
-    expect(parsed.warnings[0]).toContain('label');
-    expect(parsed.warnings[0]).toContain('email_text');
+    expect(() =>
+      service.parseTrainingExamplesUpload(payload, 'phishing_dataset.xlsx'),
+    ).toThrow(/Unsupported file type/);
   });
 });
