@@ -21,8 +21,8 @@
     "@vercel/otel": "^2.1.2",
     "@hookform/resolvers": "^5.2.2",
     "@monaco-editor/react": "^4.7.0",
-    "@stepperize/core": "^2.1.0",
-    "@stepperize/react": "^6.1.0",
+    "@stepperize/core": "^3.0.0",
+    "@stepperize/react": "^7.0.0",
     "@workspace/api-client": "workspace:*",
     "@workspace/schemas": "workspace:*",
     "@workspace/ui": "workspace:*",
@@ -44,7 +44,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@playwright/experimental-ct-react": "^1.59.1",
+    "@playwright/experimental-ct-react": "^1.60.0",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/jest": "^30.0.0",
@@ -57,12 +57,12 @@
     "eslint": "^9.39.4",
     "eslint-plugin-unused-imports": "^4.4.1",
     "jest": "^30.3.0",
-    "playwright": "^1.59.1",
+    "playwright": "^1.60.0",
     "ts-jest": "^29.4.9",
     "typescript": "^5.9.3",
     "vite-tsconfig-paths": "^6.1.1"
   },
   "overrides": {
-    "@playwright/test": "1.59.1"
+    "@playwright/test": "1.60.0"
   }
 }
