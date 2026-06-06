@@ -43,16 +43,17 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import {
   ArrowUpRight,
-  Bell,
   CheckCheck,
   Clock3,
   Loader2,
+  LucideIcon,
   Search,
   Star,
   StarOff,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
+import { AppIcon, type IconName } from "@/components/app-icon";
 import { formatRelative, formatShortUTC } from "@/lib/date";
 import { useNotificationsWebSocket } from "@/hooks/use-notifications-websocket";
 import { useTranslation } from "@/hooks/use-translation";
@@ -65,6 +66,14 @@ type ListNotificationsRequest = NonNullable<
 type MarkAllReadDto = Parameters<
   typeof api.notifications.notificationsControllerMarkAllRead
 >[0]["markAllReadDto"];
+
+const BellCardIcon: ComponentType<{ className?: string }> = ({ className }) => (
+  <AppIcon name="bell" size={14} className={className} />
+);
+
+const BellEmptyIcon = (({ className }: { className?: string }) => (
+  <AppIcon name="bell" size={48} className={className} />
+)) as LucideIcon;
 
 const ALL = "ALL" as const;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
@@ -357,12 +366,14 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
-        <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
-          {t("notifications.title")}
-        </h1>
+        <div className="flex items-center gap-3">
+          <AppIcon name="bell" active size={28} />
+          <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
+            {t("notifications.title")}
+          </h1>
+        </div>
         <p className="text-muted-foreground">
-          Operational feed for scan events, findings, source changes, and system
-          signals.
+          {t("notifications.description")}
         </p>
       </div>
 
@@ -370,7 +381,7 @@ export default function NotificationsPage() {
         <QuickFilterCard
           label={t("notifications.total")}
           value={total}
-          icon={Bell}
+          icon={BellCardIcon}
           active={activeQuickFilter === "TOTAL"}
           onClick={() => handleQuickFilterClick("TOTAL")}
         />
@@ -406,7 +417,7 @@ export default function NotificationsPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
             {search
               ? t("notifications.searchNote")
-              : `Showing ${rangeStart.toLocaleString()}-${rangeEnd.toLocaleString()} of ${total.toLocaleString()} notifications`}
+              : t("notifications.showingRange", { start: rangeStart.toLocaleString(), end: rangeEnd.toLocaleString(), total: total.toLocaleString() })}
           </div>
           <Button
             onClick={() => void handleMarkAllRead()}
@@ -418,7 +429,7 @@ export default function NotificationsPage() {
             ) : (
               <CheckCheck className="mr-2 h-4 w-4" />
             )}
-            Mark all read
+            {t("notifications.markAllRead")}
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -462,7 +473,7 @@ export default function NotificationsPage() {
               <SelectValue placeholder={t("common.type")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>All types</SelectItem>
+                  <SelectItem value={ALL}>{t("notifications.allTypes")}</SelectItem>
               {Object.values(NotificationResponseDtoTypeEnum).map((value) => (
                 <SelectItem key={value} value={value}>
                   {TYPE_LABELS[value]}
@@ -483,7 +494,7 @@ export default function NotificationsPage() {
               <SelectValue placeholder={t("common.severity")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>All severities</SelectItem>
+              <SelectItem value={ALL}>{t("notifications.allSeverities")}</SelectItem>
               {Object.values(NotificationResponseDtoSeverityEnum).map(
                 (value) => (
                   <SelectItem key={value} value={value}>
@@ -504,7 +515,7 @@ export default function NotificationsPage() {
             <SelectContent>
               {PAGE_SIZE_OPTIONS.map((value) => (
                 <SelectItem key={value} value={String(value)}>
-                  {value} / page
+                  {t("notifications.perPage", { count: value })}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -513,7 +524,7 @@ export default function NotificationsPage() {
           {isLoading ? (
             <div className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Syncing…
+              {t("notifications.syncing")}
             </div>
           ) : null}
         </div>
@@ -527,7 +538,7 @@ export default function NotificationsPage() {
           </div>
         ) : visibleNotifications.length === 0 ? (
           <EmptyState
-            icon={Bell}
+          icon={BellEmptyIcon}
             title={t("notifications.noNotifications")}
             description={t("notifications.noNotificationsHint")}
             className="min-h-[320px]"
@@ -539,19 +550,19 @@ export default function NotificationsPage() {
                 <TableHeader>
                   <TableRow className="bg-muted/30">
                     <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-                      Signal
+                      {t("notifications.signal")}
                     </TableHead>
                     <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-                      Message
+                      {t("notifications.message")}
                     </TableHead>
                     <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-                      Context
+                      {t("notifications.context")}
                     </TableHead>
                     <TableHead className="text-[10px] uppercase tracking-[0.14em]">
-                      Detected
+                      {t("notifications.detected")}
                     </TableHead>
                     <TableHead className="text-right text-[10px] uppercase tracking-[0.14em]">
-                      Actions
+                      {t("notifications.actions")}
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -576,7 +587,7 @@ export default function NotificationsPage() {
                           </Badge>
                           {!item.read && (
                             <Badge className="px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.12em]">
-                              Unread
+                              {t("notifications.unreadBadge")}
                             </Badge>
                           )}
                           {item.important && (
@@ -585,7 +596,7 @@ export default function NotificationsPage() {
                               className="gap-1 px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.12em]"
                             >
                               <Star className="h-3 w-3" />
-                              Important
+                              {t("notifications.importantBadge")}
                             </Badge>
                           )}
                         </div>
@@ -604,20 +615,22 @@ export default function NotificationsPage() {
                         <div className="max-w-[220px] space-y-1 overflow-hidden text-[11px] text-muted-foreground">
                           {item.sourceName && (
                             <p className="break-words">
-                              Source: {item.sourceName}
+                              {t("notifications.sourceLabel", { name: item.sourceName })}
                             </p>
                           )}
                           {item.event && (
-                            <p className="break-words">Event: {item.event}</p>
+                            <p className="break-words">
+                              {t("notifications.eventLabel", { name: item.event })}
+                            </p>
                           )}
                           {item.triggeredBy && (
                             <p className="break-words">
-                              By: {item.triggeredBy}
+                              {t("notifications.triggeredByLabel", { name: item.triggeredBy })}
                             </p>
                           )}
                           {!item.sourceName &&
                             !item.event &&
-                            !item.triggeredBy && <p>System context</p>}
+                            !item.triggeredBy && <p>{t("notifications.systemContext")}</p>}
                         </div>
                       </TableCell>
                       <TableCell className="align-top">
@@ -640,7 +653,7 @@ export default function NotificationsPage() {
                               className="h-8 rounded-[4px] border-2 border-border"
                               onClick={() => void handleMarkRead(item.id)}
                             >
-                              Read
+                              {t("notifications.markRead")}
                             </Button>
                           )}
 
@@ -689,7 +702,7 @@ export default function NotificationsPage() {
             {total > pageSize && (
               <div className="flex flex-wrap items-center justify-between gap-3 border-t-2 border-border px-4 py-3">
                 <p className="text-[11px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
-                  Page {page} of {totalPages}
+                  {t("notifications.pageOf", { current: page, total: totalPages })}
                 </p>
 
                 <Pagination className="mx-0 w-auto justify-end">
@@ -789,7 +802,7 @@ function QuickFilterCard({
         className={cn(
           "rounded-[6px] border-2",
           active
-            ? "overflow-hidden border-accent/30 bg-background text-accent"
+            ? "overflow-hidden border-accent/30 bg-background"
             : "border-border bg-card transition-all group-hover:bg-secondary/40",
         )}
       >
@@ -797,16 +810,14 @@ function QuickFilterCard({
           <div className="flex items-center justify-between gap-2">
             <p
               className={cn(
-                "text-[11px] font-mono uppercase tracking-[0.16em]",
-                active ? "text-accent/80" : "text-muted-foreground",
+                "text-[11px] font-mono uppercase tracking-[0.16em]"
               )}
             >
               {label}
             </p>
             <Icon
               className={cn(
-                "h-3.5 w-3.5",
-                active ? "text-accent/80" : "text-muted-foreground",
+                "h-3.5 w-3.5"
               )}
             />
           </div>
