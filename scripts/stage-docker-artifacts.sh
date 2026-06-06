@@ -43,23 +43,3 @@ cp -r apps/web/.next/static/. "${WEB_DIST}/static/"
 # Preserve empty public dirs in the staged context.
 touch "${WEB_DIST}/public/_ci_dir_marker"
 cp -r apps/web/public/. "${WEB_DIST}/public/" 2>/dev/null || true
-
-# @next/env is loaded by next's require-hook at runtime, not via a static import,
-# so NFT only traces its package.json (needed for module resolution metadata) but
-# not dist/index.js.  The Docker .bun/ fixup then installs the incomplete entry at
-# the top-level, causing "Cannot find module @next/env/dist/index.js" at startup.
-# Patch it here while the full bun install is still available on the CI runner.
-STANDALONE_NM="${WEB_DIST}/standalone/node_modules"
-if [[ -f "${STANDALONE_NM}/@next/env/package.json" && ! -f "${STANDALONE_NM}/@next/env/dist/index.js" ]]; then
-  echo "Patching incomplete @next/env in standalone (NFT missed dist/ — copying from bun install)..."
-  for _src in \
-    "apps/web/node_modules/next/node_modules/@next/env" \
-    "apps/web/node_modules/@next/env" \
-    "node_modules/@next/env"; do
-    if [[ -f "${_src}/dist/index.js" ]]; then
-      cp -rL "${_src}/." "${STANDALONE_NM}/@next/env/"
-      echo "  patched from ${_src} ($(node -p "require('./${_src}/package.json').version" 2>/dev/null || echo unknown))"
-      break
-    fi
-  done
-fi
