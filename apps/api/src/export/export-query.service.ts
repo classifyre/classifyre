@@ -406,7 +406,8 @@ const ASSETS_SELECT = `
   a.source_type AS source_type,
   s.name AS source_name,
   a.status AS asset_status,
-  a.last_scanned_at AS last_scanned_at`;
+  a.last_scanned_at AS last_scanned_at,
+  a.metadata::text AS metadata`;
 
 const ASSETS_COLUMNS: CsvStreamColumn[] = [
   { key: 'asset_name', header: 'Asset' },
@@ -422,6 +423,7 @@ const ASSETS_COLUMNS: CsvStreamColumn[] = [
   { key: 'finding_status', header: 'Finding Status' },
   { key: 'confidence', header: 'Confidence' },
   { key: 'matched_content', header: 'Matched Content' },
+  { key: 'metadata', header: 'Metadata' },
 ];
 
 const RUNNER_ASSETS_SELECT = `
@@ -432,7 +434,8 @@ const RUNNER_ASSETS_SELECT = `
   ra.findings_total AS findings_total,
   ra.started_at AS started_at,
   ra.completed_at AS completed_at,
-  ra.error_message AS error_message`;
+  ra.error_message AS error_message,
+  COALESCE(ra.metadata, a.metadata)::text AS metadata`;
 
 const RUNNER_ASSETS_COLUMNS: CsvStreamColumn[] = [
   { key: 'asset_name', header: 'Asset' },
@@ -443,6 +446,7 @@ const RUNNER_ASSETS_COLUMNS: CsvStreamColumn[] = [
   { key: 'started_at', header: 'Started' },
   { key: 'completed_at', header: 'Completed' },
   { key: 'error_message', header: 'Error' },
+  { key: 'metadata', header: 'Metadata' },
 ];
 
 // ── SQL helpers ────────────────────────────────────────────────────────────────

@@ -22,6 +22,19 @@ export type SourceDocExample = {
   config: unknown;
 };
 
+export type SourceMetadataField = {
+  name: string;
+  type: string;
+  description: string;
+  required: boolean;
+};
+
+export type SourceAssetMetadata = {
+  assetKind: string;
+  label: string;
+  fields: SourceMetadataField[];
+};
+
 export type SourceDocModel = {
   sourceType: string;
   slug: string;
@@ -31,6 +44,7 @@ export type SourceDocModel = {
   fieldRows: SourceDocFieldRow[];
   examples: SourceDocExample[];
   knowledgeSections: SourceKnowledgeSection[];
+  assetsMetadata: SourceAssetMetadata[];
 };
 
 export type SourceKnowledgeSection = {
@@ -52,6 +66,14 @@ const definitions = toSchemaNode(rootSchema.definitions);
 const allExamples = toSchemaNode(allInputExamples);
 const assistantKnowledgeRoot = toSchemaNode(assistantKnowledge);
 const assistantKnowledgeSources = toSchemaNode(assistantKnowledgeRoot.sources);
+
+const assetsMetadataCatalog = toSchemaNode(
+  (allInputSources as Record<string, unknown>)["x-asset-metadata"],
+);
+const assetsMetadataContentTypes = toSchemaNode(
+  assetsMetadataCatalog.contentTypes,
+);
+const assetsMetadataSources = toSchemaNode(assetsMetadataCatalog.sources);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -619,6 +641,66 @@ function extractSourceDefinitions(): SourceDefinition[] {
   return sourceDefinitions;
 }
 
+function describeMetadataType(propSchema: Record<string, unknown>): string {
+  const jsonType =
+    typeof propSchema.type === "string" ? propSchema.type : "string";
+  if (jsonType === "array") {
+    const items = toSchemaNode(propSchema.items);
+    const itemType = typeof items.type === "string" ? items.type : "string";
+    return `${itemType}[]`;
+  }
+  return jsonType;
+}
+
+function resolveAssetFields(
+  entry: Record<string, unknown>,
+): SourceMetadataField[] {
+  // Compose the reusable content types referenced by `use`, then the entry's
+  // own `properties`; `required` is the union of each source.
+  const properties = new Map<string, Record<string, unknown>>();
+  const required = new Set<string>();
+
+  const collect = (objectSchema: Record<string, unknown>) => {
+    const props = toSchemaNode(objectSchema.properties);
+    for (const [name, prop] of Object.entries(props)) {
+      if (isRecord(prop)) {
+        properties.set(name, prop);
+      }
+    }
+    for (const name of toStringArray(objectSchema.required)) {
+      required.add(name);
+    }
+  };
+
+  for (const contentTypeName of toStringArray(entry.use)) {
+    const contentType = assetsMetadataContentTypes[contentTypeName];
+    if (isRecord(contentType)) {
+      collect(contentType);
+    }
+  }
+  collect(entry);
+
+  return Array.from(properties.entries()).map(([name, prop]) => ({
+    name,
+    type: describeMetadataType(prop),
+    description: typeof prop.description === "string" ? prop.description : "",
+    required: required.has(name),
+  }));
+}
+
+function extractAssetsMetadataForSource(
+  sourceType: string,
+): SourceAssetMetadata[] {
+  const sourceEntry = toSchemaNode(assetsMetadataSources[sourceType]);
+  return Object.entries(sourceEntry)
+    .filter(([, value]) => isRecord(value))
+    .map(([assetKind, value]) => ({
+      assetKind,
+      label: humanizeIdentifier(assetKind),
+      fields: resolveAssetFields(value as Record<string, unknown>),
+    }));
+}
+
 function buildSourceDocs(): SourceDocModel[] {
   const sourceDefinitions = extractSourceDefinitions();
 
@@ -635,6 +717,7 @@ function buildSourceDocs(): SourceDocModel[] {
     fieldRows: extractFieldRows(sourceDefinition.schema),
     examples: extractExamplesForSource(sourceDefinition.sourceType),
     knowledgeSections: extractKnowledgeForSource(sourceDefinition.sourceType),
+    assetsMetadata: extractAssetsMetadataForSource(sourceDefinition.sourceType),
   }));
 
   return docs.sort((left, right) => left.label.localeCompare(right.label));

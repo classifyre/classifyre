@@ -71,7 +71,7 @@ export interface ParseTrainingExamplesResponseDto {
      */
     examples: Array<ParsedTrainingExampleDto>;
     /**
-     * All column headers found in the file (xlsx/csv only)
+     * All column headers found in the file (csv/tsv only)
      * @type {Array<string>}
      * @memberof ParseTrainingExamplesResponseDto
      */

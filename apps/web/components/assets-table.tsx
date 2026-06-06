@@ -67,7 +67,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components";
 import { getSourceIcon } from "../lib/source-type-icon";
-import { getAssetTypeIcon } from "../lib/asset-type-icon";
+import { AssetKindBadge } from "./asset-kind-badge";
 import { CsvExportButton, filtersToSearchParams } from "./csv-export-button";
 import { useUrlParams } from "../lib/url-filters";
 import {
@@ -1071,15 +1071,7 @@ export function AssetsTable({
                         </TableCell>
 
                         <TableCell>
-                          {(() => {
-                            const AssetIcon = getAssetTypeIcon(asset.assetType);
-                            return (
-                              <Badge variant="outline" className="gap-1.5">
-                                <AssetIcon className="h-3 w-3 text-muted-foreground" />
-                                {formatEnumLabel(asset.assetType)}
-                              </Badge>
-                            );
-                          })()}
+                          <AssetKindBadge kind={asset.assetType} />
                         </TableCell>
 
                         <TableCell>

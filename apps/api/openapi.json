@@ -2128,7 +2128,7 @@
     },
     "/custom-detectors/training-examples/parse": {
       "post": {
-        "description": "Accepts csv/tsv/txt/md/log/json/xlsx and returns normalized label/text training examples.",
+        "description": "Accepts csv/tsv/txt/md/log/json and returns normalized label/text training examples.",
         "operationId": "CustomDetectorsController_parseTrainingExamples",
         "parameters": [],
         "requestBody": {
@@ -6109,16 +6109,7 @@
           },
           "assetType": {
             "type": "string",
-            "enum": [
-              "TXT",
-              "TABLE",
-              "IMAGE",
-              "VIDEO",
-              "AUDIO",
-              "URL",
-              "BINARY",
-              "OTHER"
-            ]
+            "description": "Catalog asset kind (file, image, page, comment, table, ...)"
           },
           "sourceType": {
             "type": "string",
@@ -6180,6 +6171,11 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Source-specific asset metadata",
+            "additionalProperties": true
           }
         },
         "required": [
@@ -7005,16 +7001,7 @@
           },
           "assetType": {
             "type": "string",
-            "enum": [
-              "TXT",
-              "TABLE",
-              "IMAGE",
-              "VIDEO",
-              "AUDIO",
-              "URL",
-              "BINARY",
-              "OTHER"
-            ]
+            "description": "Catalog asset kind of the parent asset"
           },
           "sourceType": {
             "type": "string",
@@ -7835,7 +7822,7 @@
             }
           },
           "availableColumns": {
-            "description": "All column headers found in the file (xlsx/csv only)",
+            "description": "All column headers found in the file (csv/tsv only)",
             "type": "array",
             "items": {
               "type": "string"
@@ -8468,16 +8455,7 @@
           },
           "assetType": {
             "type": "string",
-            "enum": [
-              "TXT",
-              "TABLE",
-              "IMAGE",
-              "VIDEO",
-              "AUDIO",
-              "URL",
-              "BINARY",
-              "OTHER"
-            ]
+            "description": "Catalog asset kind of the parent asset"
           },
           "sourceId": {
             "type": "string",
@@ -10514,6 +10492,12 @@
           },
           "findingsByDetector": {
             "type": "object",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Source-specific asset metadata (denormalized from the asset)",
+            "additionalProperties": true,
             "nullable": true
           },
           "asset": {

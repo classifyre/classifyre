@@ -1,187 +1,49 @@
-# Classifyre Monorepo
+<div align="center">
+  <img src=".github/assets/classifyre_icon.png" alt="Classifyre" width="96" />
 
-This repo now includes:
+  # Classifyre, Detection Platform
 
-- `web` (Next.js)
-- `api` (NestJS + Prisma)
-- `cli` (Python, lazy optional deps)
-- PostgreSQL runtime support
-- one all-in-one Docker image (single exposed endpoint via frontend reverse proxy)
-- production Helm chart (api/web as Deployments, cli as Kubernetes Jobs)
-- Turborepo-integrated DevOps commands
+  **Detect. Classify. Label.**
 
-## What Was Implemented
+  Classifyre turns messy, distributed source data into governed signals. Connect the systems you already run, detect what matters, classify content and findings, and label data for security, privacy, moderation, and operational workflows.
 
-### 1) All-in-one Docker runtime
+  [Documentation](https://docs.classifyre.com/) · [Live Demo](https://demo.classifyre.com/)
 
-- Single container runs PostgreSQL, API, Web, and Caddy reverse proxy via `s6-overlay`.
-- Only one public port is exposed: `3000` (frontend entrypoint).
-- `/api/*` and `/socket.io*` are reverse-proxied to the backend.
-- Prisma migration (`prisma migrate deploy`) runs on API start, so it also runs after container restart.
+</div>
 
-Key file:
+---
 
-- `/Dockerfile`
+## Try it locally
 
-### 2) CLI job runtime fixes
-
-- Kubernetes CLI jobs now use `.venv/bin/python` directly (no shell activate side effects).
-- This removed `OSTYPE`/shell activation issues in job pods.
-
-Key file:
-
-- `/apps/api/src/cli-runner/kubernetes-cli-job.service.ts`
-
-### 3) Helm production chart
-
-- One chart in `/helm/classifyre`.
-- `web` and `api` are separate stateless Deployments.
-- `cli` runs as per-request Kubernetes Jobs created by backend.
-- Supports external PostgreSQL and CNPG modes.
-- Includes RBAC, affinity/topology defaults, HPAs, PDBs, optional cache PVCs.
-
-Key docs:
-
-- `/helm/README.md`
-
-### 4) Turborepo DevOps integration
-
-- Added `@workspace/devops` workspace with Docker/Helm scripts.
-- Added root `ops:*` scripts so DevOps flows run via Turbo.
-- Added Helm manifest snapshots and snapshot-check command.
-
-Key files:
-
-- `/packages/devops/package.json`
-- `/packages/devops/turbo.json`
-- `/scripts/docker-build-allinone.sh`
-- `/scripts/docker-build-multiarch.sh`
-- `/scripts/helm-lint.sh`
-- `/scripts/helm-snapshot.sh`
-- `/helm/snapshots/default.yaml`
-- `/helm/snapshots/minikube.yaml`
-
-## Prerequisites
-
-- `bun` (workspace package manager)
-- `docker` (for local all-in-one image)
-- `helm` + `kubectl` + `minikube` (for Helm test/deploy)
-
-## How To Run
-
-### A) Local all-in-one Docker (single command style)
-
-The all-in-one image is for demos, evaluation, and local validation. It is not the production topology.
-
-Build:
+Bring up the full product locally in one Docker command. Use it for testing, demos, and first-touch evaluation. Not the production topology, fastest way to explore everything Classifyre can do.
 
 ```bash
-bun run ops:docker:build
+docker pull classifyre/all-in-one:latest
+docker run --rm -p 3000:3000 \
+  classifyre/all-in-one:latest
 ```
 
-Run:
+Open [http://localhost:3000](http://localhost:3000). Full product, zero config.
+
+> More options: [docs.classifyre.com/deployment/docker](https://docs.classifyre.com/deployment/docker/)
+
+## Production deployment
+
+Deploy to Kubernetes with the official Helm chart. See the production deployment guide for values, secrets management, external PostgreSQL, RBAC, HPA, and PDB configuration.
 
 ```bash
-docker run --rm -p 3000:3000 classifyre-all-in-one:local
+helm install classifyre \
+  oci://registry-1.docker.io/classifyre/classifyre-core
 ```
 
-Verify:
+> Full guide: [docs.classifyre.com/deployment/kubernetes](https://docs.classifyre.com/deployment/kubernetes/)
 
-```bash
-curl -i http://127.0.0.1:3000/
-curl -i http://127.0.0.1:3000/api/ping
-```
+## Contributing
 
-Smoke test the real runtime, including a non-root optional dependency install:
+1. Fork and create a feature branch from `develop`
+2. Follow the code style: `bun lint` must pass, TypeScript strict mode, Python mypy strict
+3. Add tests alongside implementation (`.spec.ts` for API, pytest for CLI)
+4. Run `bun build` from root to verify all apps compile before opening a PR
+5. Target `develop`; `main` is the release branch
 
-```bash
-bun run ops:docker:smoke
-```
-
-### B) Multi-platform image build (amd64/arm64)
-
-```bash
-IMAGE=ghcr.io/<org>/classifyre-all-in-one TAG=v1.0.0 bun run ops:docker:build:multiarch
-```
-
-Optional envs:
-
-- `PLATFORMS` (default `linux/amd64,linux/arm64`)
-- `MODE` (`push` or `load`)
-- `LATEST=1` to also tag/push `:latest`
-
-### C) Helm quality checks and snapshots
-
-Lint chart + template render sanity:
-
-```bash
-bun run ops:helm:lint
-```
-
-Generate snapshots:
-
-```bash
-bun run ops:helm:snapshot
-```
-
-Verify snapshots are up-to-date:
-
-```bash
-bun run ops:helm:snapshot:check
-```
-
-Combined Helm test flow:
-
-```bash
-bun run ops:helm:test
-```
-
-Post-deploy, fail the rollout if any source is stuck `RUNNING` without a valid runner:
-
-```bash
-bash ./scripts/check-k8s-runner-invariants.sh
-```
-
-Repair those source states in-place when needed:
-
-```bash
-bash ./scripts/check-k8s-runner-invariants.sh --repair
-```
-
-### D) Minikube deployment validation
-
-```bash
-bash ./helm/test-minikube.sh
-```
-
-This builds local image, installs chart, waits for rollout, and validates:
-
-- `GET /`
-- `GET /api/ping`
-
-## Turborepo Commands
-
-Dev app commands (default monorepo behavior):
-
-- `bun run build`
-- `bun run lint`
-- `bun run test`
-
-DevOps-only commands:
-
-- `bun run ops:build`
-- `bun run ops:lint`
-- `bun run ops:test`
-- `bun run ops:docker:build`
-- `bun run ops:docker:build:multiarch`
-- `bun run ops:helm:lint`
-- `bun run ops:helm:snapshot`
-- `bun run ops:helm:snapshot:check`
-- `bun run ops:helm:test`
-
-## Runtime Behavior Notes
-
-- Public endpoint is frontend only (`:3000`); backend is internal and reached through reverse proxy.
-- `/notifications` serves frontend page HTML as expected.
-- Prisma migrations execute on each API start in container and via Helm init container in k8s.
-- CLI optional heavy dependencies are still lazy-loaded on demand by the Python runtime logic.
+For larger changes, open an issue first to align on approach. Plugin architecture guidance is in `docs/architecture/PLUGIN_SYSTEM.md`.

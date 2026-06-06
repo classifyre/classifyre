@@ -54,7 +54,7 @@ export class ParseTrainingExamplesResponseDto {
 
   @ApiPropertyOptional({
     type: [String],
-    description: 'All column headers found in the file (xlsx/csv only)',
+    description: 'All column headers found in the file (csv/tsv only)',
   })
   availableColumns?: string[];
 

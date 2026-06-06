@@ -719,6 +719,7 @@ class DatabricksSource(BaseTabularSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
+            **self.metadata_fields("notebook", metadata),
         )
 
     # ── Pipelines ────────────────────────────────────────────────────────
@@ -789,6 +790,7 @@ class DatabricksSource(BaseTabularSource):
             created_at=now,
             updated_at=now,
             runner_id=self.runner_id,
+            **self.metadata_fields("pipeline", metadata),
         )
 
     # ── Custom extract_raw (tables + notebooks + pipelines) ──────────────

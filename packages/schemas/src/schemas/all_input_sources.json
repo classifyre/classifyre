@@ -67,6 +67,1077 @@
       "$ref": "#/definitions/NotionInput"
     }
   ],
+  "x-asset-metadata": {
+    "description": "Declares the metadata each source attaches to every asset kind it produces, composed from reusable contentTypes. Single source of truth for docs rendering and CLI conformance (apps/cli/src/sources/asset_metadata.py).",
+    "contentTypes": {
+      "file": {
+        "type": "object",
+        "description": "Base metadata for any downloaded file or object",
+        "properties": {
+          "size_bytes": {
+            "type": "integer",
+            "description": "Raw byte size of the content"
+          },
+          "mime_type": {
+            "type": "string",
+            "description": "Resolved MIME type"
+          },
+          "parse_error": {
+            "type": "string",
+            "description": "Set when content extraction failed"
+          }
+        },
+        "required": [
+          "size_bytes",
+          "mime_type"
+        ]
+      },
+      "image": {
+        "type": "object",
+        "description": "Image dimensions (png, jpg, gif, webp, \u2026)",
+        "properties": {
+          "image_width": {
+            "type": "integer",
+            "description": "Width in pixels"
+          },
+          "image_height": {
+            "type": "integer",
+            "description": "Height in pixels"
+          }
+        }
+      },
+      "document": {
+        "type": "object",
+        "description": "Paged / word-processing document metadata (pdf, docx)",
+        "properties": {
+          "page_count": {
+            "type": "integer",
+            "description": "Number of pages (pdf)"
+          },
+          "paragraph_count": {
+            "type": "integer",
+            "description": "Number of paragraphs (docx)"
+          },
+          "table_count": {
+            "type": "integer",
+            "description": "Number of tables (docx)"
+          }
+        }
+      },
+      "spreadsheet": {
+        "type": "object",
+        "description": "Tabular file metadata (csv, tsv, xlsx, parquet)",
+        "properties": {
+          "row_count": {
+            "type": "integer",
+            "description": "Number of data rows"
+          },
+          "columns": {
+            "type": "array",
+            "description": "Columns as {name, type} objects (type may be empty for csv/xlsx)",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Column name"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Column data type"
+                }
+              }
+            }
+          },
+          "encoding": {
+            "type": "string",
+            "description": "Detected character encoding (csv/tsv)"
+          }
+        }
+      },
+      "text": {
+        "type": "object",
+        "description": "Plain-text metadata (txt, xml, md)",
+        "properties": {
+          "encoding": {
+            "type": "string",
+            "description": "Detected character encoding"
+          }
+        }
+      },
+      "json": {
+        "type": "object",
+        "description": "JSON structure metadata",
+        "properties": {
+          "json_root_type": {
+            "type": "string",
+            "description": "Root JSON type: object, array, or scalar"
+          },
+          "top_level_keys": {
+            "type": "integer",
+            "description": "Number of top-level keys when the root is an object"
+          },
+          "array_length": {
+            "type": "integer",
+            "description": "Length when the root is an array"
+          }
+        }
+      },
+      "tabularTable": {
+        "type": "object",
+        "description": "Database or warehouse table metadata",
+        "properties": {
+          "database": {
+            "type": "string",
+            "description": "Database or catalog name"
+          },
+          "table_name": {
+            "type": "string",
+            "description": "Table name"
+          },
+          "table_type": {
+            "type": "string",
+            "description": "Object type (TABLE/VIEW)"
+          },
+          "schema": {
+            "type": "string",
+            "description": "Schema name"
+          },
+          "columns": {
+            "type": "array",
+            "description": "Columns as {name, type} objects",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Column name"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Column data type"
+                }
+              }
+            }
+          },
+          "row_count": {
+            "type": "integer",
+            "description": "Estimated number of rows"
+          }
+        },
+        "required": [
+          "database",
+          "table_name",
+          "table_type"
+        ]
+      },
+      "comments": {
+        "type": "object",
+        "description": "Comment thread metadata",
+        "properties": {
+          "comments_count": {
+            "type": "integer",
+            "description": "Number of comments"
+          }
+        },
+        "required": [
+          "comments_count"
+        ]
+      },
+      "attachment": {
+        "type": "object",
+        "description": "Attachment file basics (no byte download at discovery)",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Original file name"
+          },
+          "mime_type": {
+            "type": "string",
+            "description": "MIME type"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "description": "Raw byte size"
+          }
+        }
+      }
+    },
+    "sources": {
+      "S3_COMPATIBLE_STORAGE": {
+        "file": {
+          "use": [
+            "file",
+            "image",
+            "document",
+            "spreadsheet",
+            "text",
+            "json"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Object entity tag"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key"
+          ]
+        },
+        "image": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent object asset"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location of the embedded image within the parent"
+            }
+          },
+          "required": [
+            "source_hash",
+            "location"
+          ]
+        }
+      },
+      "AZURE_BLOB_STORAGE": {
+        "file": {
+          "use": [
+            "file",
+            "image",
+            "document",
+            "spreadsheet",
+            "text",
+            "json"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Object entity tag"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key"
+          ]
+        },
+        "image": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent object asset"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location of the embedded image within the parent"
+            }
+          },
+          "required": [
+            "source_hash",
+            "location"
+          ]
+        }
+      },
+      "GOOGLE_CLOUD_STORAGE": {
+        "file": {
+          "use": [
+            "file",
+            "image",
+            "document",
+            "spreadsheet",
+            "text",
+            "json"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Object entity tag"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key"
+          ]
+        },
+        "image": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent object asset"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location of the embedded image within the parent"
+            }
+          },
+          "required": [
+            "source_hash",
+            "location"
+          ]
+        }
+      },
+      "POSTGRESQL": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ]
+        }
+      },
+      "MYSQL": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ]
+        }
+      },
+      "SQLITE": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ]
+        }
+      },
+      "MSSQL": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "object_type": {
+              "type": "string",
+              "description": "Source object type"
+            },
+            "is_aws_rds": {
+              "type": "boolean",
+              "description": "Whether the server is AWS RDS SQL Server"
+            }
+          }
+        }
+      },
+      "ORACLE": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "object_type": {
+              "type": "string",
+              "description": "Source object type"
+            },
+            "lineage": {
+              "type": "object",
+              "description": "View lineage extraction settings"
+            }
+          }
+        }
+      },
+      "HIVE": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "object_type": {
+              "type": "string",
+              "description": "Source object type"
+            }
+          }
+        }
+      },
+      "SNOWFLAKE": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "account_id": {
+              "type": "string",
+              "description": "Snowflake account identifier"
+            },
+            "object_type": {
+              "type": "string",
+              "description": "Source object type"
+            },
+            "lineage": {
+              "type": "object",
+              "description": "Lineage extraction settings and time window"
+            }
+          }
+        }
+      },
+      "DATABRICKS": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "catalog": {
+              "type": "string",
+              "description": "Unity Catalog name"
+            },
+            "object_type": {
+              "type": "string",
+              "description": "Source object type"
+            }
+          }
+        },
+        "notebook": {
+          "properties": {
+            "kind": {
+              "type": "string",
+              "description": "Asset kind discriminator (notebook)"
+            },
+            "path": {
+              "type": "string",
+              "description": "Notebook workspace path"
+            },
+            "object_id": {
+              "type": "string",
+              "description": "Workspace object id"
+            },
+            "language": {
+              "type": "string",
+              "description": "Notebook language"
+            },
+            "created_at_ms": {
+              "type": "integer",
+              "description": "Creation time (epoch ms)"
+            },
+            "modified_at_ms": {
+              "type": "integer",
+              "description": "Last modified time (epoch ms)"
+            }
+          },
+          "required": [
+            "kind",
+            "path"
+          ]
+        },
+        "pipeline": {
+          "properties": {
+            "kind": {
+              "type": "string",
+              "description": "Asset kind discriminator (pipeline)"
+            },
+            "pipeline_id": {
+              "type": "string",
+              "description": "Delta Live Tables pipeline id"
+            },
+            "name": {
+              "type": "string",
+              "description": "Pipeline name"
+            },
+            "state": {
+              "type": "string",
+              "description": "Pipeline state"
+            }
+          },
+          "required": [
+            "kind",
+            "pipeline_id",
+            "name"
+          ]
+        }
+      },
+      "MONGODB": {
+        "collection": {
+          "properties": {
+            "database": {
+              "type": "string",
+              "description": "Database name"
+            },
+            "collection": {
+              "type": "string",
+              "description": "Collection name"
+            },
+            "deployment": {
+              "type": "string",
+              "description": "ATLAS or ON_PREM"
+            },
+            "document_count": {
+              "type": "integer",
+              "description": "Estimated number of documents in the collection"
+            }
+          },
+          "required": [
+            "database",
+            "collection",
+            "deployment"
+          ]
+        }
+      },
+      "NEO4J": {
+        "label": {
+          "properties": {
+            "label": {
+              "type": "string",
+              "description": "Node label"
+            },
+            "database": {
+              "type": "string",
+              "description": "Database name"
+            },
+            "node_count": {
+              "type": "integer",
+              "description": "Number of nodes with this label"
+            },
+            "sample_property_keys": {
+              "type": "array",
+              "description": "Sampled property keys present on nodes with this label",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "label",
+            "database"
+          ]
+        }
+      },
+      "POWERBI": {
+        "item": {
+          "properties": {
+            "workspace_id": {
+              "type": "string",
+              "description": "Power BI workspace id"
+            },
+            "workspace_name": {
+              "type": "string",
+              "description": "Workspace name"
+            },
+            "report_type": {
+              "type": "string",
+              "description": "Asset kind (report/dataset/dashboard)"
+            },
+            "dataset_id": {
+              "type": "string",
+              "description": "Dataset id"
+            },
+            "author": {
+              "type": "string",
+              "description": "Author display name or email"
+            }
+          },
+          "required": [
+            "workspace_id",
+            "workspace_name",
+            "report_type"
+          ]
+        }
+      },
+      "TABLEAU": {
+        "item": {
+          "properties": {
+            "site": {
+              "type": "string",
+              "description": "Tableau site"
+            },
+            "report_type": {
+              "type": "string",
+              "description": "Asset kind (workbook/view/datasource)"
+            },
+            "workbook_id": {
+              "type": "string",
+              "description": "Asset/object id"
+            },
+            "project_name": {
+              "type": "string",
+              "description": "Project name"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Tags"
+            },
+            "author": {
+              "type": "string",
+              "description": "Owner display name or email"
+            }
+          },
+          "required": [
+            "site",
+            "report_type",
+            "workbook_id"
+          ]
+        }
+      },
+      "WORDPRESS": {
+        "post": {
+          "properties": {
+            "wp_id": {
+              "type": "string",
+              "description": "WordPress object id"
+            },
+            "title": {
+              "type": "string",
+              "description": "Title of the post"
+            },
+            "links_count": {
+              "type": "integer",
+              "description": "Number of linked or related assets"
+            },
+            "slug": {
+              "type": "string",
+              "description": "URL slug"
+            },
+            "status": {
+              "type": "string",
+              "description": "Post status"
+            },
+            "post_type": {
+              "type": "string",
+              "description": "Post type (post/page)"
+            },
+            "author": {
+              "type": "string",
+              "description": "Author id or name"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Tag ids"
+            },
+            "categories": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Category ids"
+            }
+          },
+          "required": [
+            "wp_id",
+            "title",
+            "links_count"
+          ]
+        },
+        "image": {
+          "properties": {
+            "referenced_by": {
+              "type": "string",
+              "description": "Hash of the referencing post asset"
+            }
+          },
+          "required": [
+            "referenced_by"
+          ]
+        }
+      },
+      "SLACK": {
+        "message": {
+          "properties": {
+            "channel_id": {
+              "type": "string",
+              "description": "Slack channel id"
+            },
+            "ts": {
+              "type": "string",
+              "description": "Message timestamp"
+            },
+            "channel_name": {
+              "type": "string",
+              "description": "Channel name"
+            },
+            "author": {
+              "type": "string",
+              "description": "User id or bot name"
+            },
+            "thread_ts": {
+              "type": "string",
+              "description": "Parent thread timestamp"
+            }
+          },
+          "required": [
+            "channel_id",
+            "ts"
+          ]
+        }
+      },
+      "CONFLUENCE": {
+        "page": {
+          "properties": {
+            "page_id": {
+              "type": "string",
+              "description": "Confluence page id"
+            },
+            "title": {
+              "type": "string",
+              "description": "Title of the page"
+            },
+            "links_count": {
+              "type": "integer",
+              "description": "Number of linked or related assets"
+            },
+            "space_key": {
+              "type": "string",
+              "description": "Space id/key"
+            },
+            "status": {
+              "type": "string",
+              "description": "Page status"
+            },
+            "author": {
+              "type": "string",
+              "description": "Author id"
+            }
+          },
+          "required": [
+            "page_id",
+            "title",
+            "links_count"
+          ]
+        },
+        "attachment": {
+          "use": [
+            "attachment"
+          ],
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Attachment title"
+            },
+            "page_hash": {
+              "type": "string",
+              "description": "Hash of the parent page asset"
+            }
+          },
+          "required": [
+            "title",
+            "page_hash"
+          ]
+        },
+        "comments": {
+          "use": [
+            "comments"
+          ],
+          "properties": {
+            "page_id": {
+              "type": "string",
+              "description": "Parent page id"
+            }
+          },
+          "required": [
+            "page_id"
+          ]
+        },
+        "linked_file": {
+          "properties": {
+            "referenced_by": {
+              "type": "string",
+              "description": "Hash of the referencing page asset"
+            }
+          },
+          "required": [
+            "referenced_by"
+          ]
+        }
+      },
+      "JIRA": {
+        "issue": {
+          "properties": {
+            "issue_key": {
+              "type": "string",
+              "description": "Jira issue key"
+            },
+            "links_count": {
+              "type": "integer",
+              "description": "Number of linked or related assets"
+            },
+            "issue_type": {
+              "type": "string",
+              "description": "Issue type"
+            },
+            "priority": {
+              "type": "string",
+              "description": "Priority"
+            },
+            "project_key": {
+              "type": "string",
+              "description": "Project key"
+            },
+            "assignee": {
+              "type": "string",
+              "description": "Assignee display name/email"
+            },
+            "author": {
+              "type": "string",
+              "description": "Reporter display name/email"
+            },
+            "status": {
+              "type": "string",
+              "description": "Current status"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Labels"
+            }
+          },
+          "required": [
+            "issue_key",
+            "links_count"
+          ]
+        },
+        "attachment": {
+          "use": [
+            "attachment"
+          ],
+          "properties": {
+            "issue_hash": {
+              "type": "string",
+              "description": "Hash of the parent issue asset"
+            },
+            "author": {
+              "type": "string",
+              "description": "Uploader display name/email"
+            }
+          },
+          "required": [
+            "filename",
+            "issue_hash"
+          ]
+        },
+        "comments": {
+          "use": [
+            "comments"
+          ],
+          "properties": {
+            "issue_key": {
+              "type": "string",
+              "description": "Parent issue key"
+            }
+          },
+          "required": [
+            "issue_key"
+          ]
+        }
+      },
+      "SERVICEDESK": {
+        "issue": {
+          "properties": {
+            "issue_key": {
+              "type": "string",
+              "description": "Service desk request key"
+            },
+            "links_count": {
+              "type": "integer",
+              "description": "Number of linked or related assets"
+            },
+            "status": {
+              "type": "string",
+              "description": "Current status"
+            },
+            "request_type": {
+              "type": "string",
+              "description": "Service desk request type"
+            },
+            "service_desk_name": {
+              "type": "string",
+              "description": "Service desk name"
+            }
+          },
+          "required": [
+            "issue_key",
+            "links_count"
+          ]
+        },
+        "attachment": {
+          "use": [
+            "attachment"
+          ],
+          "properties": {
+            "request_hash": {
+              "type": "string",
+              "description": "Hash of the parent request asset"
+            }
+          },
+          "required": [
+            "filename",
+            "request_hash"
+          ]
+        },
+        "comments": {
+          "use": [
+            "comments"
+          ],
+          "properties": {
+            "issue_key": {
+              "type": "string",
+              "description": "Parent request key"
+            }
+          },
+          "required": [
+            "issue_key"
+          ]
+        }
+      },
+      "NOTION": {
+        "page": {
+          "properties": {
+            "page_id": {
+              "type": "string",
+              "description": "Notion page id"
+            },
+            "title": {
+              "type": "string",
+              "description": "Title of the page"
+            },
+            "links_count": {
+              "type": "integer",
+              "description": "Number of linked or related assets"
+            },
+            "parent_type": {
+              "type": "string",
+              "description": "Parent object type"
+            },
+            "parent_id": {
+              "type": "string",
+              "description": "Parent object id"
+            },
+            "status": {
+              "type": "string",
+              "description": "Status from properties"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Multi-select property values"
+            }
+          },
+          "required": [
+            "page_id",
+            "title",
+            "links_count"
+          ]
+        },
+        "data_source": {
+          "properties": {
+            "data_source_id": {
+              "type": "string",
+              "description": "Notion data source id"
+            },
+            "name": {
+              "type": "string",
+              "description": "Data source name"
+            },
+            "row_count": {
+              "type": "integer",
+              "description": "Number of rows"
+            },
+            "columns": {
+              "type": "array",
+              "description": "Columns as {name, type} objects (Notion property name and type)",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Property name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Property type"
+                  }
+                }
+              }
+            },
+            "parent_type": {
+              "type": "string",
+              "description": "Parent object type"
+            },
+            "parent_id": {
+              "type": "string",
+              "description": "Parent object id"
+            }
+          },
+          "required": [
+            "data_source_id",
+            "name",
+            "row_count"
+          ]
+        },
+        "file": {
+          "properties": {
+            "selector": {
+              "type": "string",
+              "description": "Selector for the file within the page"
+            },
+            "name": {
+              "type": "string",
+              "description": "File name"
+            },
+            "is_external": {
+              "type": "boolean",
+              "description": "Whether the file is externally hosted"
+            }
+          },
+          "required": [
+            "selector",
+            "name",
+            "is_external"
+          ]
+        },
+        "comments": {
+          "use": [
+            "comments"
+          ],
+          "properties": {
+            "page_id": {
+              "type": "string",
+              "description": "Parent page id"
+            }
+          },
+          "required": [
+            "page_id"
+          ]
+        }
+      }
+    }
+  },
   "definitions": {
     "AssetType": {
       "type": "string",
