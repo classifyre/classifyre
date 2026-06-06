@@ -2128,7 +2128,7 @@
     },
     "/custom-detectors/training-examples/parse": {
       "post": {
-        "description": "Accepts csv/tsv/txt/md/log/json/xlsx and returns normalized label/text training examples.",
+        "description": "Accepts csv/tsv/txt/md/log/json and returns normalized label/text training examples.",
         "operationId": "CustomDetectorsController_parseTrainingExamples",
         "parameters": [],
         "requestBody": {
@@ -7822,7 +7822,7 @@
             }
           },
           "availableColumns": {
-            "description": "All column headers found in the file (xlsx/csv only)",
+            "description": "All column headers found in the file (csv/tsv only)",
             "type": "array",
             "items": {
               "type": "string"

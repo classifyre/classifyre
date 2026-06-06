@@ -58,11 +58,15 @@ updates:
       # Unpin when the package adds a typeof Element guard (SSR-safe check)
       - dependency-name: react-medium-image-zoom
         update-types: ["version-update:semver-patch"]
-      # Next 16.2 broke Nextra MDX metadata exports — unpin when Nextra fixes it
-      - dependency-name: next
-        update-types: ["version-update:semver-patch"]
       - dependency-name: "@next/eslint-plugin-next"
         update-types: ["version-update:semver-patch"]
+      # apps/blog and apps/docs are pinned to next 16.1.7 in their package.json:
+      # Next 16.2.x breaks Nextra's MDX `metadata` export (build fails). They are
+      # statically exported (output: "export"), so the Next 16.2.x server-runtime
+      # advisories (middleware/proxy bypass, SSRF, image-optimizer DoS, cache
+      # poisoning) are not exploitable — dismiss those alerts as risk-tolerable.
+      # apps/web (a real server app) tracks next freely and is NOT ignored here so
+      # it keeps receiving security patches. Unpin blog/docs once Nextra supports 16.2.x.
 
   # ── Python CLI ─────────────────────────────────────────────────────────────
   - package-ecosystem: uv
