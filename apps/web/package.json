@@ -22,7 +22,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@monaco-editor/react": "^4.7.0",
     "@stepperize/core": "^3.0.0",
-    "@stepperize/react": "^6.1.0",
+    "@stepperize/react": "^7.0.0",
     "@workspace/api-client": "workspace:*",
     "@workspace/schemas": "workspace:*",
     "@workspace/ui": "workspace:*",
