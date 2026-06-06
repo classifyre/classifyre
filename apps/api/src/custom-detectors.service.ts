@@ -16,7 +16,6 @@ import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import * as XLSX from 'xlsx';
 import { PrismaService } from './prisma.service';
 import { AiProviderConfigService } from './ai-provider-config.service';
 import { stableStringify } from './utils/masked-config.utils';
@@ -67,7 +66,6 @@ const TRAINING_FILE_ALLOWED_EXTENSIONS = new Set([
   '.md',
   '.log',
   '.json',
-  '.xlsx',
 ]);
 const TRAINING_LABEL_HEADERS = new Set([
   'label',
@@ -104,22 +102,6 @@ function asString(value: unknown): string | null {
 
 function normalizeHeaderCell(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, '_');
-}
-
-function stringifySpreadsheetCell(value: unknown): string {
-  if (value === null || value === undefined) {
-    return '';
-  }
-  if (typeof value === 'string') {
-    return value.trim();
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value).trim();
-  }
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  return JSON.stringify(value);
 }
 
 @Injectable()
@@ -426,160 +408,6 @@ export class CustomDetectorsService {
     });
   }
 
-  private parseXlsxTrainingExamples(
-    fileBuffer: Buffer,
-    opts: { labelColumn?: string; textColumn?: string } = {},
-  ): ParsedTrainingExamplesDraft {
-    let workbook: XLSX.WorkBook;
-    try {
-      workbook = XLSX.read(fileBuffer, {
-        type: 'buffer',
-        cellDates: true,
-      });
-    } catch {
-      throw new BadRequestException('Excel file could not be parsed.');
-    }
-
-    for (const sheetName of workbook.SheetNames) {
-      const sheet = workbook.Sheets[sheetName];
-      if (!sheet) {
-        continue;
-      }
-
-      const rawRows = XLSX.utils.sheet_to_json<
-        (string | number | boolean | Date)[]
-      >(sheet, {
-        header: 1,
-        defval: '',
-        blankrows: false,
-        raw: false,
-      });
-
-      const rows = rawRows
-        .map((cells, index) => ({
-          lineNumber: index + 1,
-          cells: cells.map((cell) => stringifySpreadsheetCell(cell)),
-        }))
-        .filter((row) => row.cells.some((cell) => cell.length > 0));
-
-      if (rows.length === 0) {
-        continue;
-      }
-
-      const firstRow = rows[0];
-      const originalHeaders = firstRow?.cells ?? [];
-      const normalizedHeaders = originalHeaders.map(normalizeHeaderCell);
-      const availableColumns = originalHeaders.filter((h) => h.length > 0);
-
-      let labelIndex: number;
-      let textIndex: number;
-
-      if (opts.labelColumn) {
-        const norm = normalizeHeaderCell(opts.labelColumn);
-        labelIndex = normalizedHeaders.findIndex((h) => h === norm);
-        if (labelIndex < 0) {
-          throw new BadRequestException(
-            `Label column "${opts.labelColumn}" not found in Excel sheet "${sheetName}". Available columns: ${availableColumns.join(', ')}.`,
-          );
-        }
-      } else {
-        labelIndex = this.findTrainingHeaderIndex(
-          normalizedHeaders,
-          TRAINING_LABEL_HEADERS,
-        );
-      }
-
-      if (opts.textColumn) {
-        const norm = normalizeHeaderCell(opts.textColumn);
-        textIndex = normalizedHeaders.findIndex((h) => h === norm);
-        if (textIndex < 0) {
-          throw new BadRequestException(
-            `Text column "${opts.textColumn}" not found in Excel sheet "${sheetName}". Available columns: ${availableColumns.join(', ')}.`,
-          );
-        }
-      } else {
-        textIndex = this.findTrainingHeaderIndex(
-          normalizedHeaders,
-          TRAINING_TEXT_HEADERS,
-        );
-      }
-
-      if (labelIndex < 0 || textIndex < 0) {
-        const missing: string[] = [];
-        if (labelIndex < 0)
-          missing.push(
-            `label column (${Array.from(TRAINING_LABEL_HEADERS).join(', ')})`,
-          );
-        if (textIndex < 0)
-          missing.push(
-            `text column (${Array.from(TRAINING_TEXT_HEADERS).join(', ')})`,
-          );
-        throw new BadRequestException(
-          `Excel sheet "${sheetName}" is missing: ${missing.join(' and ')}. Available columns: ${availableColumns.join(', ')}.`,
-        );
-      }
-
-      const examples: ParsedTrainingExampleDto[] = [];
-      let skippedMissingLabel = 0;
-      let skippedMissingText = 0;
-
-      for (let index = 1; index < rows.length; index += 1) {
-        const row = rows[index];
-        if (!row) {
-          continue;
-        }
-
-        const label = asString(row.cells[labelIndex]);
-        const text = asString(row.cells[textIndex]);
-
-        if (!label && !text) {
-          skippedMissingLabel += 1;
-          skippedMissingText += 1;
-          continue;
-        }
-        if (!label) {
-          skippedMissingLabel += 1;
-          continue;
-        }
-        if (!text) {
-          skippedMissingText += 1;
-          continue;
-        }
-
-        examples.push({
-          label,
-          text,
-          accepted: true,
-          source: 'upload',
-          lineNumber: row.lineNumber,
-        });
-      }
-
-      const detectedLabelColumn = originalHeaders[labelIndex] ?? 'label';
-      const detectedTextColumn = originalHeaders[textIndex] ?? 'text';
-
-      return {
-        format: 'xlsx',
-        totalRows: Math.max(rows.length - 1, 0),
-        skippedRows: rows.length - 1 - examples.length,
-        warnings: [
-          `Detected Excel sheet "${sheetName}" and used "${detectedLabelColumn}" as label column plus "${detectedTextColumn}" as text column.`,
-        ],
-        examples,
-        availableColumns,
-        detectedLabelColumn,
-        detectedTextColumn,
-        skippedReasons: {
-          missingLabel: skippedMissingLabel,
-          missingText: skippedMissingText,
-          duplicates: 0,
-        },
-      };
-    }
-
-    throw new BadRequestException('Uploaded Excel file has no parseable rows.');
-  }
-
   private dedupeTrainingExamples(examples: ParsedTrainingExampleDto[]): {
     deduped: ParsedTrainingExampleDto[];
     duplicateCount: number;
@@ -623,32 +451,19 @@ export class CustomDetectorsService {
       );
     }
 
-    const content =
-      extension === '.xlsx'
-        ? null
-        : fileBuffer.toString('utf8').replace(/^\uFEFF/, '');
-    if (content !== null && content.trim().length === 0) {
+    const content = fileBuffer.toString('utf8').replace(/^\uFEFF/, '');
+    if (content.trim().length === 0) {
       throw new BadRequestException('Uploaded file has no parseable text.');
     }
 
-    let parsed: ParsedTrainingExamplesDraft;
-    if (extension === '.xlsx') {
-      parsed = this.parseXlsxTrainingExamples(fileBuffer, opts);
-    } else {
-      const textContent = content;
-      if (textContent === null) {
-        throw new BadRequestException('Uploaded file has no parseable text.');
-      }
-
-      parsed =
-        extension === '.csv'
-          ? this.parseCsvLikeContent(textContent, ',', 'csv', opts)
-          : extension === '.tsv'
-            ? this.parseCsvLikeContent(textContent, '\t', 'tsv', opts)
-            : extension === '.json'
-              ? this.parseJsonTrainingExamples(textContent)
-              : this.parsePlainTextContent(textContent);
-    }
+    const parsed: ParsedTrainingExamplesDraft =
+      extension === '.csv'
+        ? this.parseCsvLikeContent(content, ',', 'csv', opts)
+        : extension === '.tsv'
+          ? this.parseCsvLikeContent(content, '\t', 'tsv', opts)
+          : extension === '.json'
+            ? this.parseJsonTrainingExamples(content)
+            : this.parsePlainTextContent(content);
 
     const deduped = this.dedupeTrainingExamples(parsed.examples);
     const warnings = [...parsed.warnings];
