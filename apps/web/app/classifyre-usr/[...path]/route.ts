@@ -3,32 +3,27 @@ import { type NextRequest } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Reverse proxy for PostHog analytics.
- *
- * Routed through /classifyre-usr/* to avoid ad-blocker detection
- * (paths containing "posthog", "analytics", "ingest", etc. are commonly blocked).
- *
- * Configure the upstream target via POSTHOG_INGEST_HOST (server-only, never exposed
- * to the client). Defaults to the PostHog US cloud ingest endpoint.
- *
- * Set NEXT_PUBLIC_POSTHOG_HOST=/classifyre-usr in your environment so the SDK
- * sends events through this proxy.
- */
-
 type RouteContext = {
   params: Promise<{
     path?: string[];
   }>;
 };
 
-// Server-only env var — not prefixed with NEXT_PUBLIC_ intentionally.
-// Set this to your managed reverse proxy subdomain (e.g. https://e.yourcompany.com)
-// or the regional PostHog ingest host (https://eu.i.posthog.com for EU Cloud).
 const UPSTREAM_HOST =
   process.env.POSTHOG_INGEST_HOST ?? "https://us.i.posthog.com";
 
 const upstreamHostname = new URL(UPSTREAM_HOST).hostname;
+
+const CORS_HEADERS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "Content-Type, Authorization",
+  "access-control-max-age": "86400",
+};
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
 
 async function proxyToPostHog(
   request: NextRequest,
@@ -52,9 +47,12 @@ async function proxyToPostHog(
     redirect: "follow",
   });
 
-  const responseHeaders = new Headers(response.headers);
-  // Transfer-encoding is hop-by-hop and must be stripped before forwarding.
-  responseHeaders.delete("transfer-encoding");
+  const responseHeaders = new Headers(CORS_HEADERS);
+  response.headers.forEach((value, key) => {
+    if (!CORS_HEADERS[key as keyof typeof CORS_HEADERS] && key !== "transfer-encoding") {
+      responseHeaders.set(key, value);
+    }
+  });
 
   return new Response(response.body, {
     status: response.status,

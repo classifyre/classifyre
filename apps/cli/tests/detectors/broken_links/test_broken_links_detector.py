@@ -184,4 +184,6 @@ async def test_broken_links_detector_does_not_flag_real_public_pages() -> None:
 
     findings = await detector.detect(payload, "application/x.asset-links")
 
-    assert findings == [], f"public pages incorrectly flagged: {[f.matched_content for f in findings]}"
+    assert findings == [], (
+        f"public pages incorrectly flagged: {[f.matched_content for f in findings]}"
+    )
