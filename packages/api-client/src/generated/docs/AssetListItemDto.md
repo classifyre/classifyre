@@ -20,6 +20,7 @@ Name | Type
 `status` | string
 `createdAt` | Date
 `updatedAt` | Date
+`metadata` | { [key: string]: any; }
 
 ## Example
 
@@ -42,6 +43,7 @@ const example = {
   "status": null,
   "createdAt": null,
   "updatedAt": null,
+  "metadata": null,
 } satisfies AssetListItemDto
 
 console.log(example)

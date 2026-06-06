@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { CustomDetectorsTable } from "@/components/custom-detectors-table";
+import { AppIcon } from "@/components/app-icon";
 import { useTranslation } from "@/hooks/use-translation";
 
 export default function CustomDetectorsPage() {
@@ -13,9 +14,12 @@ export default function CustomDetectorsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
-            {t("detectors.title")}
-          </h1>
+          <div className="flex items-center gap-3">
+            <AppIcon name="single-probe" active size={28} />
+            <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
+              {t("detectors.title")}
+            </h1>
+          </div>
           <p className="text-muted-foreground">{t("detectors.description")}</p>
         </div>
         <Button asChild className="rounded-[4px] border-2 border-border">

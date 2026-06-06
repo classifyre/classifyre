@@ -1,10 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  AssetContentType,
-  RunnerStatus,
-  Severity,
-  TriggerType,
-} from '@prisma/client';
+import { RunnerStatus, Severity, TriggerType } from '@prisma/client';
 
 export class FindingsDiscoverySeverityBreakdownDto {
   @ApiProperty()
@@ -66,8 +61,8 @@ export class FindingsDiscoveryTopAssetDto {
   @ApiProperty()
   assetName: string;
 
-  @ApiProperty({ enum: AssetContentType })
-  assetType: AssetContentType;
+  @ApiProperty({ description: 'Catalog asset kind of the parent asset' })
+  assetType: string;
 
   @ApiProperty({ required: false, nullable: true })
   sourceId?: string | null;

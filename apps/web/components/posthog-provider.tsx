@@ -4,7 +4,7 @@ import * as React from "react";
 import posthog from "posthog-js";
 import { PostHogProvider as PHProvider } from "posthog-js/react";
 
-const POSTHOG_TOKEN = process.env.NEXT_PUBLIC_POSTHOG_TOKEN;
+const POSTHOG_TOKEN = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
 const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "/classifyre-usr";
 const POSTHOG_UI_HOST =
   process.env.NEXT_PUBLIC_POSTHOG_UI_HOST ?? "https://us.posthog.com";

@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/api",
-  "version": "0.4.13-SNAPSHOT",
+  "version": "0.4.15-SNAPSHOT",
   "description": "",
   "author": "",
   "private": true,
@@ -69,7 +69,6 @@
     "rxjs": "^7.8.2",
     "socket.io": "^4.8.3",
     "uuid": "^14.0.0",
-    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -33,6 +33,7 @@ import { McpSettingsCard } from "@/components/mcp-settings-card";
 import { AiProvidersCard } from "@/components/ai-providers-card";
 import { AiAssistantSettingsCard } from "@/components/ai-assistant-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
+import { AppIcon } from "@/components/app-icon";
 import { useTranslation } from "@/hooks/use-translation";
 
 type SettingsDraft = {
@@ -165,9 +166,12 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
-            {t("settings.title")}
-          </h1>
+          <div className="flex items-center gap-3">
+            <AppIcon name="settings" active size={28} />
+            <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
+              {t("settings.title")}
+            </h1>
+          </div>
           <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
             {saving
               ? t("settings.saving")

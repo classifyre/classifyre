@@ -4,7 +4,6 @@ import { PrismaService } from './prisma.service';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
 import {
   AssetStatus,
-  AssetContentType,
   AssetType,
   FindingStatus,
   Severity,
@@ -884,7 +883,7 @@ describe('AssetService', () => {
       expect(result.deleted).toBe(0);
     });
 
-    it('should accept TABLE asset type when ingesting assets', async () => {
+    it('persists the asset kind (lowercased) as the asset type', async () => {
       const incomingAssets = [
         {
           hash: 'asset-table-1',
@@ -893,6 +892,7 @@ describe('AssetService', () => {
           external_url: 'https://example.com/table.csv',
           links: [],
           asset_type: 'TABLE',
+          asset_kind: 'table',
           findings: [],
         },
       ];
@@ -941,7 +941,7 @@ describe('AssetService', () => {
           data: expect.arrayContaining([
             expect.objectContaining({
               hash: 'asset-table-1',
-              assetType: AssetContentType.TABLE,
+              assetType: 'table',
             }),
           ]),
         }),
