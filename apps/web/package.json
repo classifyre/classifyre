@@ -21,7 +21,7 @@
     "@vercel/otel": "^2.1.2",
     "@hookform/resolvers": "^5.2.2",
     "@monaco-editor/react": "^4.7.0",
-    "@stepperize/core": "^2.1.0",
+    "@stepperize/core": "^3.0.0",
     "@stepperize/react": "^6.1.0",
     "@workspace/api-client": "workspace:*",
     "@workspace/schemas": "workspace:*",
