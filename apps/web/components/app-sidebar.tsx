@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   FileText,
   FlaskConical,
+  Network,
 } from "lucide-react";
 import {
   Sidebar,
@@ -38,6 +39,7 @@ export function AppSidebar() {
     { title: t("nav.assets"), href: "/assets", icon: FileText },
     { title: t("nav.sources"), href: "/sources", icon: Database },
     { title: t("nav.detectors"), href: "/detectors", icon: FlaskConical },
+    { title: t("nav.investigations"), href: "/investigations", icon: Network },
     // { title: t("nav.semantic"), href: "/semantic", icon: Layers }, TODO add it when semantic layer is ready to be productized
   ];
 

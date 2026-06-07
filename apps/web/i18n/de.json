@@ -16,6 +16,7 @@
     "assets": "Assets",
     "sources": "Quellen",
     "detectors": "Custom-Detektoren",
+    "investigations": "Ermittlungen",
     "scans": "Scans",
     "sandbox": "Sandbox",
     "operations": "Operationen",
