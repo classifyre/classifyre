@@ -4,16 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Database,
-  ScanSearch,
-  Settings,
-  AlertTriangle,
-  FileText,
-  FlaskConical,
-  Network,
-} from "lucide-react";
+
 import {
   Sidebar,
   SidebarContent,
@@ -28,24 +19,24 @@ import {
 } from "@workspace/ui/components/sidebar";
 import { useTranslation } from "@/hooks/use-translation";
 import { VersionSidebarNotifier } from "./version-update-notifier";
+import { AppIcon, type IconName } from "./app-icon";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { t } = useTranslation();
 
-  const mainNavigation = [
-    { title: t("nav.overview"), href: "/discovery", icon: LayoutDashboard },
-    { title: t("nav.findings"), href: "/findings", icon: AlertTriangle },
-    { title: t("nav.assets"), href: "/assets", icon: FileText },
-    { title: t("nav.sources"), href: "/sources", icon: Database },
-    { title: t("nav.detectors"), href: "/detectors", icon: FlaskConical },
-    { title: t("nav.investigations"), href: "/investigations", icon: Network },
-    // { title: t("nav.semantic"), href: "/semantic", icon: Layers }, TODO add it when semantic layer is ready to be productized
+  const mainNavigation: { title: string; href: string; iconName: IconName }[] = [
+    { title: t("nav.overview"), href: "/discovery", iconName: "people" },
+    { title: t("nav.findings"), href: "/findings", iconName: "finger-print" },
+    { title: t("nav.assets"), href: "/assets", iconName: "docs" },
+    { title: t("nav.sources"), href: "/sources", iconName: "binders" },
+    { title: t("nav.detectors"), href: "/detectors", iconName: "single-probe" },
+    { title: t("nav.investigations"), href: "/investigations", iconName: "dna" },
   ];
 
-  const operationsNavigation = [
-    { title: t("nav.scans"), href: "/scans", icon: ScanSearch },
-    { title: t("nav.sandbox"), href: "/sandbox", icon: FlaskConical },
+  const operationsNavigation: { title: string; href: string; iconName: IconName }[] = [
+    { title: t("nav.scans"), href: "/scans", iconName: "check-list" },
+    { title: t("nav.sandbox"), href: "/sandbox", iconName: "probe" },
   ];
 
   return (
@@ -93,7 +84,7 @@ export function AppSidebar() {
                       tooltip={item.title}
                     >
                       <Link href={item.href}>
-                        <item.icon className="h-4 w-4" />
+                        <AppIcon name={item.iconName} active={isActive} size={20} />
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -119,7 +110,7 @@ export function AppSidebar() {
                       tooltip={item.title}
                     >
                       <Link href={item.href}>
-                        <item.icon className="h-4 w-4" />
+                        <AppIcon name={item.iconName} active={isActive} size={20} />
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -135,7 +126,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip={t("nav.settings")}>
               <Link href="/settings">
-                <Settings className="h-4 w-4" />
+                <AppIcon name="settings" size={24} />
                 <span>{t("nav.settings")}</span>
               </Link>
             </SidebarMenuButton>

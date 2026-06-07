@@ -4,8 +4,6 @@ export const assistantContextKeySchema = z.enum([
   "source.create",
   "source.edit",
   "detector.create",
-  "semantic.glossary",
-  "semantic.metrics",
 ]);
 
 export type AssistantContextKey = z.infer<typeof assistantContextKeySchema>;
@@ -16,9 +14,6 @@ export const assistantOperationSchema = z.enum([
   "test_source_connection",
   "create_custom_detector",
   "train_custom_detector",
-  "create_glossary_term",
-  "create_metric_definition",
-  "certify_metric",
 ]);
 
 export type AssistantOperation = z.infer<typeof assistantOperationSchema>;
@@ -102,18 +97,6 @@ const assistantSyncDetectorActionSchema = z.object({
   values: z.record(z.string(), z.unknown()),
 });
 
-const assistantSyncGlossaryTermActionSchema = z.object({
-  type: z.literal("sync_glossary_term"),
-  termId: z.string(),
-  values: z.record(z.string(), z.unknown()),
-});
-
-const assistantSyncMetricActionSchema = z.object({
-  type: z.literal("sync_metric"),
-  metricId: z.string(),
-  values: z.record(z.string(), z.unknown()),
-});
-
 const assistantAttachResultActionSchema = z.object({
   type: z.literal("attach_result"),
   kind: z.enum(["source_test", "detector_train", "operation"]),
@@ -126,8 +109,6 @@ export const assistantUiActionSchema = z.discriminatedUnion("type", [
   assistantPatchFieldsActionSchema,
   assistantSyncSourceActionSchema,
   assistantSyncDetectorActionSchema,
-  assistantSyncGlossaryTermActionSchema,
-  assistantSyncMetricActionSchema,
   assistantAttachResultActionSchema,
 ]);
 
@@ -191,18 +172,6 @@ export const assistantContexts = assistantContextRegistrySchema.parse({
     summary:
       "Brainstorm detector structure, patch detector fields, and confirm detector creation or training.",
     supportedOperations: ["create_custom_detector", "train_custom_detector"],
-  },
-  "semantic.glossary": {
-    title: "Glossary Assistant",
-    summary:
-      "Help users define business glossary terms by describing what they want to track in plain language. Translate business intent into detector type filters, severity filters, and status filters.",
-    supportedOperations: ["create_glossary_term"],
-  },
-  "semantic.metrics": {
-    title: "Metrics Assistant",
-    summary:
-      "Help users create governed metrics by describing what they want to measure in plain language. Choose the right metric type (SIMPLE, RATIO, DERIVED, TREND) and build the definition.",
-    supportedOperations: ["create_metric_definition", "certify_metric"],
   },
 });
 

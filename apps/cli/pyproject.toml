@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-cli"
-version = "0.4.14"
+version = "0.4.15.dev0"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -21,6 +21,18 @@ dependencies = [
 # Local editable install for development — ignored when published to PyPI
 classifyre-schemas = { path = "../../packages/schemas", editable = true }
 en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+# CPU-only torch on Linux. The default PyPI Linux wheels bundle the full NVIDIA
+# CUDA stack (~5-7 GB) which is dead weight on our CPU-only CLI jobs (no GPU
+# requested). Pull torch/torchvision from the PyTorch CPU index on Linux so the
+# nvidia-* packages drop out entirely. macOS/other platforms already use CPU
+# wheels from PyPI. (A GPU image can override this in the future.)
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [project.scripts]
 classifyre = "src.main:main"
@@ -166,6 +178,9 @@ azure-blob-storage = [
 ]
 google-cloud-storage = [
     "google-cloud-storage>=3.10.1,<4.0.0",
+]
+email = [
+    "imap-tools>=1.10.0,<2.0.0",
 ]
 otel = [
     "opentelemetry-sdk>=1.42.0",

@@ -18,7 +18,6 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import {
   ArrowUpRight,
-  Bell,
   CheckCheck,
   Clock3,
   Loader2,
@@ -26,6 +25,7 @@ import {
   StarOff,
   Trash2,
 } from "lucide-react";
+import { AppIcon } from "@/components/app-icon";
 import { formatRelative } from "@/lib/date";
 import { useNotificationsWebSocket } from "@/hooks/use-notifications-websocket";
 import { useTranslation } from "@/hooks/use-translation";
@@ -193,7 +193,7 @@ export function NotificationCenter() {
           size="icon"
           className="relative rounded-[4px] border-2 border-transparent hover:border-border"
         >
-          <Bell className="h-5 w-5" />
+          <AppIcon name="bell" size={20} active={unreadCount > 0} />
           {unreadCount > 0 && (
             <Badge className="absolute -right-2 -top-2 min-w-5 rounded-[3px] border border-border bg-accent px-1.5 text-[10px] font-mono text-accent-foreground">
               {unreadCount > 99 ? "99+" : unreadCount}
@@ -244,7 +244,7 @@ export function NotificationCenter() {
             </div>
           ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 p-10 text-center">
-              <Bell className="h-10 w-10 text-muted-foreground" />
+              <AppIcon name="bell" size={40} />
               <p className="text-sm font-medium">
                 {t("notifications.noNotifications")}
               </p>
