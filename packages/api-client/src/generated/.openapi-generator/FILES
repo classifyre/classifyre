@@ -30,9 +30,7 @@ docs/CreateAiProviderConfigDto.md
 docs/CreateCustomDetectorDto.md
 docs/CreateExternalRunnerDto.md
 docs/CreateFindingDto.md
-docs/CreateGlossaryTermDto.md
 docs/CreateMcpTokenDto.md
-docs/CreateMetricDefinitionDto.md
 docs/CreateSourceDto.md
 docs/CustomDetectorExampleDto.md
 docs/CustomDetectorExtractionsApi.md
@@ -59,7 +57,6 @@ docs/FindingsDiscoverySeverityBreakdownDto.md
 docs/FindingsDiscoveryStatusBreakdownDto.md
 docs/FindingsDiscoveryTopAssetDto.md
 docs/FindingsDiscoveryTotalsDto.md
-docs/GlossaryFilterMappingDto.md
 docs/HealthApi.md
 docs/HealthControllerGetHealth200Response.md
 docs/InstanceSettingsApi.md
@@ -82,9 +79,7 @@ docs/NotificationsControllerMarkAllRead200Response.md
 docs/ParseTrainingExamplesResponseDto.md
 docs/ParseTrainingExamplesSkippedReasonsDto.md
 docs/ParsedTrainingExampleDto.md
-docs/QueryDashboardMetricsDto.md
-docs/QueryMetricDto.md
-docs/QueryMetricTimeSeriesDto.md
+
 docs/RegisterDiscoveredAssetsDto.md
 docs/RegisterDiscoveredAssetsResponseDto.md
 docs/RerunSandboxRunDto.md
@@ -143,9 +138,7 @@ docs/SearchSourcesPageDto.md
 docs/SearchSourcesRequestDto.md
 docs/SearchSourcesResponseDto.md
 docs/SearchSourcesTotalsDto.md
-docs/SemanticLayerGlossaryApi.md
-docs/SemanticLayerMetricsApi.md
-docs/SemanticLayerQueryApi.md
+
 docs/SourceAssetsControllerBulkIngest201Response.md
 docs/SourceInfoDto.md
 docs/SourceResponseDto.md
@@ -163,10 +156,8 @@ docs/TrainingExamplesStatsDtoByLabelValue.md
 docs/UpdateAiProviderConfigDto.md
 docs/UpdateCustomDetectorDto.md
 docs/UpdateFindingDto.md
-docs/UpdateGlossaryTermDto.md
 docs/UpdateInstanceSettingsDto.md
 docs/UpdateMcpTokenDto.md
-docs/UpdateMetricDefinitionDto.md
 docs/UpdateNotificationImportanceDto.md
 docs/UpdateRunnerAssetStatusDto.md
 docs/UpdateSourceDto.md
@@ -184,9 +175,6 @@ src/apis/InstanceSettingsApi.ts
 src/apis/NotificationsApi.ts
 src/apis/RunnersApi.ts
 src/apis/SandboxApi.ts
-src/apis/SemanticLayerGlossaryApi.ts
-src/apis/SemanticLayerMetricsApi.ts
-src/apis/SemanticLayerQueryApi.ts
 src/apis/SourcesApi.ts
 src/apis/index.ts
 src/index.ts
@@ -215,9 +203,7 @@ src/models/CreateAiProviderConfigDto.ts
 src/models/CreateCustomDetectorDto.ts
 src/models/CreateExternalRunnerDto.ts
 src/models/CreateFindingDto.ts
-src/models/CreateGlossaryTermDto.ts
 src/models/CreateMcpTokenDto.ts
-src/models/CreateMetricDefinitionDto.ts
 src/models/CreateSourceDto.ts
 src/models/CustomDetectorExampleDto.ts
 src/models/CustomDetectorResponseDto.ts
@@ -240,7 +226,6 @@ src/models/FindingsDiscoverySeverityBreakdownDto.ts
 src/models/FindingsDiscoveryStatusBreakdownDto.ts
 src/models/FindingsDiscoveryTopAssetDto.ts
 src/models/FindingsDiscoveryTotalsDto.ts
-src/models/GlossaryFilterMappingDto.ts
 src/models/HealthControllerGetHealth200Response.ts
 src/models/InstanceSettingsResponseDto.ts
 src/models/LatestRunnerSummaryDto.ts
@@ -260,9 +245,6 @@ src/models/NotificationsControllerMarkAllRead200Response.ts
 src/models/ParseTrainingExamplesResponseDto.ts
 src/models/ParseTrainingExamplesSkippedReasonsDto.ts
 src/models/ParsedTrainingExampleDto.ts
-src/models/QueryDashboardMetricsDto.ts
-src/models/QueryMetricDto.ts
-src/models/QueryMetricTimeSeriesDto.ts
 src/models/RegisterDiscoveredAssetsDto.ts
 src/models/RegisterDiscoveredAssetsResponseDto.ts
 src/models/RerunSandboxRunDto.ts
@@ -335,10 +317,8 @@ src/models/TrainingExamplesStatsDtoByLabelValue.ts
 src/models/UpdateAiProviderConfigDto.ts
 src/models/UpdateCustomDetectorDto.ts
 src/models/UpdateFindingDto.ts
-src/models/UpdateGlossaryTermDto.ts
 src/models/UpdateInstanceSettingsDto.ts
 src/models/UpdateMcpTokenDto.ts
-src/models/UpdateMetricDefinitionDto.ts
 src/models/UpdateNotificationImportanceDto.ts
 src/models/UpdateRunnerAssetStatusDto.ts
 src/models/UpdateSourceDto.ts

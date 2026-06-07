@@ -5049,163 +5049,6 @@
         ]
       }
     },
-    "/semantic/glossary": {
-      "post": {
-        "operationId": "GlossaryController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateGlossaryTermDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Create a new glossary term",
-        "tags": [
-          "Semantic Layer - Glossary"
-        ]
-      },
-      "get": {
-        "operationId": "GlossaryController_findAll",
-        "parameters": [
-          {
-            "name": "category",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "isActive",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "List all glossary terms",
-        "tags": [
-          "Semantic Layer - Glossary"
-        ]
-      }
-    },
-    "/semantic/glossary/{id}": {
-      "get": {
-        "operationId": "GlossaryController_findById",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get a glossary term by id",
-        "tags": [
-          "Semantic Layer - Glossary"
-        ]
-      },
-      "put": {
-        "operationId": "GlossaryController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateGlossaryTermDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Update a glossary term",
-        "tags": [
-          "Semantic Layer - Glossary"
-        ]
-      },
-      "delete": {
-        "operationId": "GlossaryController_delete",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Delete a glossary term",
-        "tags": [
-          "Semantic Layer - Glossary"
-        ]
-      }
-    },
-    "/semantic/glossary/{id}/preview": {
-      "post": {
-        "operationId": "GlossaryController_preview",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Preview the number of findings matching this glossary term",
-        "tags": [
-          "Semantic Layer - Glossary"
-        ]
-      }
-    },
     "/semantic/metrics": {
       "post": {
         "operationId": "MetricsController_create",
@@ -5416,46 +5259,6 @@
           }
         },
         "summary": "Evaluate a metric as a time series",
-        "tags": [
-          "Semantic Layer - Query"
-        ]
-      }
-    },
-    "/semantic/query/dashboard": {
-      "post": {
-        "operationId": "MetricQueryController_queryDashboard",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QueryDashboardMetricsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Batch-evaluate all metrics placed on a dashboard",
-        "tags": [
-          "Semantic Layer - Query"
-        ]
-      }
-    },
-    "/semantic/query/explore": {
-      "post": {
-        "operationId": "MetricQueryController_explore",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Explore detection data through a glossary term with metric breakdown",
         "tags": [
           "Semantic Layer - Query"
         ]
@@ -10683,132 +10486,6 @@
           "detectors"
         ]
       },
-      "GlossaryFilterMappingDto": {
-        "type": "object",
-        "properties": {
-          "detectorTypes": {
-            "description": "Detector types to include",
-            "example": [
-              "SECRETS",
-              "PII"
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "severities": {
-            "description": "Severity levels to include",
-            "example": [
-              "CRITICAL",
-              "HIGH"
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "findingTypes": {
-            "description": "Finding types to include",
-            "example": [
-              "aws_key",
-              "ssn"
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "customDetectorKeys": {
-            "description": "Custom detector keys to include",
-            "example": [
-              "gdpr-scanner"
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "statuses": {
-            "description": "Finding statuses to include",
-            "example": [
-              "OPEN"
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "CreateGlossaryTermDto": {
-        "type": "object",
-        "properties": {
-          "displayName": {
-            "type": "string",
-            "description": "Human-readable display name",
-            "example": "Security Threats"
-          },
-          "description": {
-            "type": "string",
-            "description": "Plain-language explanation of what this term means",
-            "example": "All findings related to security vulnerabilities including exposed secrets and malware signatures"
-          },
-          "category": {
-            "type": "string",
-            "description": "Grouping category",
-            "example": "Security"
-          },
-          "filterMapping": {
-            "description": "Mapping to technical detection filters",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/GlossaryFilterMappingDto"
-              }
-            ]
-          },
-          "color": {
-            "type": "string",
-            "description": "Hex color for UI display",
-            "example": "#ff2b2b"
-          },
-          "icon": {
-            "type": "string",
-            "description": "Lucide icon name",
-            "example": "shield-alert"
-          }
-        },
-        "required": [
-          "displayName",
-          "filterMapping"
-        ]
-      },
-      "UpdateGlossaryTermDto": {
-        "type": "object",
-        "properties": {
-          "displayName": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "category": {
-            "type": "string"
-          },
-          "filterMapping": {
-            "$ref": "#/components/schemas/GlossaryFilterMappingDto"
-          },
-          "color": {
-            "type": "string"
-          },
-          "icon": {
-            "type": "string"
-          },
-          "isActive": {
-            "type": "boolean"
-          }
-        }
-      },
       "CreateMetricDefinitionDto": {
         "type": "object",
         "properties": {
@@ -10864,10 +10541,6 @@
               "type": "string"
             }
           },
-          "glossaryTermId": {
-            "type": "string",
-            "description": "Associated glossary term id"
-          },
           "format": {
             "type": "string",
             "description": "Display format",
@@ -10908,9 +10581,6 @@
             "items": {
               "type": "string"
             }
-          },
-          "glossaryTermId": {
-            "type": "string"
           },
           "format": {
             "type": "string"
@@ -10968,10 +10638,6 @@
           "to": {
             "type": "string",
             "description": "Time range end"
-          },
-          "glossaryTermId": {
-            "type": "string",
-            "description": "Glossary term id to scope the query"
           }
         },
         "required": [
@@ -11018,10 +10684,6 @@
             "type": "string",
             "description": "Time range end"
           },
-          "glossaryTermId": {
-            "type": "string",
-            "description": "Glossary term id to scope the query"
-          },
           "granularity": {
             "type": "string",
             "description": "Time bucket granularity",
@@ -11037,31 +10699,6 @@
         "required": [
           "metricId",
           "granularity"
-        ]
-      },
-      "QueryDashboardMetricsDto": {
-        "type": "object",
-        "properties": {
-          "dashboard": {
-            "type": "string",
-            "description": "Dashboard identifier",
-            "example": "discovery"
-          },
-          "filters": {
-            "type": "object",
-            "description": "Global filters applied to all metrics"
-          },
-          "from": {
-            "type": "string",
-            "description": "Time range start"
-          },
-          "to": {
-            "type": "string",
-            "description": "Time range end"
-          }
-        },
-        "required": [
-          "dashboard"
         ]
       }
     }

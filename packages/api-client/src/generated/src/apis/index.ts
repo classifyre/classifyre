@@ -13,7 +13,4 @@ export { InstanceSettingsApi } from './InstanceSettingsApi';
 export { NotificationsApi } from './NotificationsApi';
 export { RunnersApi } from './RunnersApi';
 export { SandboxApi } from './SandboxApi';
-export { SemanticLayerGlossaryApi } from './SemanticLayerGlossaryApi';
-export { SemanticLayerMetricsApi } from './SemanticLayerMetricsApi';
-export { SemanticLayerQueryApi } from './SemanticLayerQueryApi';
 export { SourcesApi } from './SourcesApi';
