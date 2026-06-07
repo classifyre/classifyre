@@ -275,11 +275,10 @@ api:
     # -- Working directory inside CLI job container.
     workDir: /app/apps/cli
     # -- Allow CLI to auto-install optional detector dependencies at runtime.
-    # -- Default false: the cli-final image (used for jobs) pre-bakes ALL optional
-    # -- groups, so no runtime `uv sync` is needed. Keeping this false avoids the
-    # -- concurrent/interrupted-sync venv corruption and removes the need for a
-    # -- shared uv cache PVC. Only set true if you deploy the slim base image.
-    autoInstallOptionalDeps: false
+    # -- The slim cli image installs detector/source groups on demand into a
+    # -- per-pod venv; concurrent/interrupted syncs are made safe by the file
+    # -- lock + cross-process group accumulation + self-heal in uv_sync.py.
+    autoInstallOptionalDeps: true
     # -- Number of detector-processed assets to accumulate before pushing findings to the API.
     detectorFlushBatchSize: 5
     # -- HTTP read timeout (seconds) for CLI→API REST calls (bulk ingest, finalize, status updates).
@@ -343,11 +342,7 @@ api:
 
     uvCache:
       # -- Enable shared PVC for uv cache (pip package cache shared across CLI jobs).
-      # -- Default false: with the pre-baked cli-final image there are no runtime
-      # -- installs, so no cache is needed. This also removes the ReadWriteOnce
-      # -- multi-attach hang risk on multi-node clusters (no RWX required). Only
-      # -- enable alongside autoInstallOptionalDeps=true on the slim base image.
-      enabled: false
+      enabled: true
       # -- Mount path for uv cache in CLI job container.
       mountPath: /cache/uv
       # -- Existing PVC name for uv cache. Empty creates a new PVC.
@@ -366,8 +361,7 @@ api:
       size: 10Gi
       prune:
         # -- Enable a CronJob that runs `uv cache prune` on a schedule to prevent unbounded cache growth.
-        # -- Only relevant when uvCache.enabled=true (the cronjob is gated on it).
-        enabled: false
+        enabled: true
         # -- Cron schedule for cache pruning. Default: weekly on Sunday at 02:00.
         schedule: "0 2 * * 0"
         # -- Image used by the prune CronJob (defaults to the CLI job image).

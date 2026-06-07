@@ -92,8 +92,13 @@ RUN cd apps/api && bun run prisma:generate
 COPY --from=api-source / /repo/apps/api/dist/
 
 # ── cli-builder: install base Python dependencies (slim) ─────────────────────
-# Feeds the all-in-one `runtime` image, which stays slim and installs optional
-# detector/source groups on demand at runtime (CLASSIFYRE_CLI_AUTO_INSTALL...=1).
+# Ships only base deps (~150-230 MB). Optional detector/source groups install on
+# demand at runtime (CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1), cached via the
+# uv cache. Concurrent/interrupted runtime syncs are made safe by the file lock +
+# cross-process group accumulation + self-heal in src/utils/uv_sync.py, and the
+# parent process warms the run's groups before spawning the detector worker pool.
+# torch is CPU-only on Linux (pyproject [tool.uv.sources]) so runtime torch
+# installs pull ~0.5 GB instead of the ~6 GB NVIDIA CUDA stack.
 FROM python:${PYTHON_VERSION} AS cli-builder
 COPY --from=uv-bin /uv /uvx /usr/local/bin/
 WORKDIR /app
@@ -104,16 +109,6 @@ ENV UV_LINK_MODE=copy \
     UV_PYTHON_PREFERENCE=only-system
 RUN uv venv --python /usr/local/bin/python3 .venv \
     && uv sync --locked --no-dev
-
-# ── cli-builder-full: base + ALL optional groups pre-baked ────────────────────
-# Feeds the standalone `cli-final` image used by Kubernetes CLI jobs. Baking
-# every detector/source group means require_module() never shells out to
-# `uv sync` at runtime — eliminating the concurrent/interrupted-sync venv
-# corruption window and removing the need for a shared uv cache PVC entirely
-# (so ReadWriteOnce storage is fine, no RWX required). torch is CPU-only on
-# Linux (see pyproject [tool.uv.sources]), so no multi-GB NVIDIA CUDA stack.
-FROM cli-builder AS cli-builder-full
-RUN uv sync --locked --no-dev --all-groups
 
 # ── web-final: standalone Next.js server ──────────────────────────────────────
 FROM node:${NODE_VERSION}-bookworm-slim AS web-final
@@ -159,18 +154,16 @@ CMD ["node", "dist/src/main.js"]
 # ── cli-final: Python CLI ─────────────────────────────────────────────────────
 FROM python:${PYTHON_VERSION} AS cli-final
 COPY --from=uv-bin /uv /uvx /usr/local/bin/
-# venv comes from cli-builder-full: all optional groups are pre-baked, so the
-# runtime never mutates the venv. Auto-install is therefore disabled below.
-COPY --from=cli-builder-full /app/apps/cli/.venv /app/apps/cli/.venv
-COPY --from=cli-builder-full /app/apps/cli/src /app/apps/cli/src
-COPY --from=cli-builder-full /app/apps/cli/pyproject.toml /app/apps/cli/pyproject.toml
-COPY --from=cli-builder-full /app/apps/cli/uv.lock /app/apps/cli/uv.lock
-COPY --from=cli-builder-full /app/apps/cli/README.md /app/apps/cli/README.md
-COPY --from=cli-builder-full /app/packages/schemas /app/packages/schemas
+COPY --from=cli-builder /app/apps/cli/.venv /app/apps/cli/.venv
+COPY --from=cli-builder /app/apps/cli/src /app/apps/cli/src
+COPY --from=cli-builder /app/apps/cli/pyproject.toml /app/apps/cli/pyproject.toml
+COPY --from=cli-builder /app/apps/cli/uv.lock /app/apps/cli/uv.lock
+COPY --from=cli-builder /app/apps/cli/README.md /app/apps/cli/README.md
+COPY --from=cli-builder /app/packages/schemas /app/packages/schemas
 COPY --from=api-builder /repo/packages/schemas/node_modules /app/packages/schemas/node_modules
 ENV UV_LINK_MODE=copy \
     UV_CACHE_DIR=/cache/uv \
-    CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=0 \
+    CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1 \
     PATH="/app/apps/cli/.venv/bin:${PATH}"
 # libgl1 + libglib2.0-0 required by opencv-python (pulled in by rapidocr-onnxruntime for docling OCR)
 RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
