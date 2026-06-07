@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `title` | string
+`hypothesis` | string
 `description` | string
 `status` | string
 `severity` | string
@@ -21,6 +22,7 @@ import type { CreateCaseDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "title": null,
+  "hypothesis": null,
   "description": null,
   "status": null,
   "severity": null,

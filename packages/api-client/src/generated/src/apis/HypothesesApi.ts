@@ -17,7 +17,7 @@ import * as runtime from '../runtime';
 import type {
   CreateHypothesisDto,
   HypothesisResponseDto,
-  LinkEvidenceDto,
+  LinkSupportDto,
   UpdateHypothesisDto,
 } from '../models/index';
 import {
@@ -25,8 +25,8 @@ import {
     CreateHypothesisDtoToJSON,
     HypothesisResponseDtoFromJSON,
     HypothesisResponseDtoToJSON,
-    LinkEvidenceDtoFromJSON,
-    LinkEvidenceDtoToJSON,
+    LinkSupportDtoFromJSON,
+    LinkSupportDtoToJSON,
     UpdateHypothesisDtoFromJSON,
     UpdateHypothesisDtoToJSON,
 } from '../models/index';
@@ -36,9 +36,9 @@ export interface HypothesesControllerCreateRequest {
     createHypothesisDto: CreateHypothesisDto;
 }
 
-export interface HypothesesControllerLinkEvidenceRequest {
+export interface HypothesesControllerLinkSupportRequest {
     id: string;
-    linkEvidenceDto: LinkEvidenceDto;
+    linkSupportDto: LinkSupportDto;
 }
 
 export interface HypothesesControllerListRequest {
@@ -49,7 +49,7 @@ export interface HypothesesControllerRemoveRequest {
     id: string;
 }
 
-export interface HypothesesControllerUnlinkEvidenceRequest {
+export interface HypothesesControllerUnlinkSupportRequest {
     id: string;
     linkId: string;
 }
@@ -112,20 +112,20 @@ export class HypothesesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Link case evidence to a hypothesis with a stance
+     * Link evidence or a finding to a hypothesis with a stance
      */
-    async hypothesesControllerLinkEvidenceRaw(requestParameters: HypothesesControllerLinkEvidenceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HypothesisResponseDto>> {
+    async hypothesesControllerLinkSupportRaw(requestParameters: HypothesesControllerLinkSupportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HypothesisResponseDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
-                'Required parameter "id" was null or undefined when calling hypothesesControllerLinkEvidence().'
+                'Required parameter "id" was null or undefined when calling hypothesesControllerLinkSupport().'
             );
         }
 
-        if (requestParameters['linkEvidenceDto'] == null) {
+        if (requestParameters['linkSupportDto'] == null) {
             throw new runtime.RequiredError(
-                'linkEvidenceDto',
-                'Required parameter "linkEvidenceDto" was null or undefined when calling hypothesesControllerLinkEvidence().'
+                'linkSupportDto',
+                'Required parameter "linkSupportDto" was null or undefined when calling hypothesesControllerLinkSupport().'
             );
         }
 
@@ -136,7 +136,7 @@ export class HypothesesApi extends runtime.BaseAPI {
         headerParameters['Content-Type'] = 'application/json';
 
 
-        let urlPath = `/hypotheses/{id}/evidence`;
+        let urlPath = `/hypotheses/{id}/support`;
         urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
 
         const response = await this.request({
@@ -144,17 +144,17 @@ export class HypothesesApi extends runtime.BaseAPI {
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-            body: LinkEvidenceDtoToJSON(requestParameters['linkEvidenceDto']),
+            body: LinkSupportDtoToJSON(requestParameters['linkSupportDto']),
         }, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => HypothesisResponseDtoFromJSON(jsonValue));
     }
 
     /**
-     * Link case evidence to a hypothesis with a stance
+     * Link evidence or a finding to a hypothesis with a stance
      */
-    async hypothesesControllerLinkEvidence(requestParameters: HypothesesControllerLinkEvidenceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HypothesisResponseDto> {
-        const response = await this.hypothesesControllerLinkEvidenceRaw(requestParameters, initOverrides);
+    async hypothesesControllerLinkSupport(requestParameters: HypothesesControllerLinkSupportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HypothesisResponseDto> {
+        const response = await this.hypothesesControllerLinkSupportRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -232,20 +232,20 @@ export class HypothesesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Unlink evidence from a hypothesis
+     * Remove a support link from a hypothesis
      */
-    async hypothesesControllerUnlinkEvidenceRaw(requestParameters: HypothesesControllerUnlinkEvidenceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HypothesisResponseDto>> {
+    async hypothesesControllerUnlinkSupportRaw(requestParameters: HypothesesControllerUnlinkSupportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HypothesisResponseDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
-                'Required parameter "id" was null or undefined when calling hypothesesControllerUnlinkEvidence().'
+                'Required parameter "id" was null or undefined when calling hypothesesControllerUnlinkSupport().'
             );
         }
 
         if (requestParameters['linkId'] == null) {
             throw new runtime.RequiredError(
                 'linkId',
-                'Required parameter "linkId" was null or undefined when calling hypothesesControllerUnlinkEvidence().'
+                'Required parameter "linkId" was null or undefined when calling hypothesesControllerUnlinkSupport().'
             );
         }
 
@@ -254,7 +254,7 @@ export class HypothesesApi extends runtime.BaseAPI {
         const headerParameters: runtime.HTTPHeaders = {};
 
 
-        let urlPath = `/hypotheses/{id}/evidence/{linkId}`;
+        let urlPath = `/hypotheses/{id}/support/{linkId}`;
         urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
         urlPath = urlPath.replace(`{${"linkId"}}`, encodeURIComponent(String(requestParameters['linkId'])));
 
@@ -269,10 +269,10 @@ export class HypothesesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Unlink evidence from a hypothesis
+     * Remove a support link from a hypothesis
      */
-    async hypothesesControllerUnlinkEvidence(requestParameters: HypothesesControllerUnlinkEvidenceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HypothesisResponseDto> {
-        const response = await this.hypothesesControllerUnlinkEvidenceRaw(requestParameters, initOverrides);
+    async hypothesesControllerUnlinkSupport(requestParameters: HypothesesControllerUnlinkSupportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HypothesisResponseDto> {
+        const response = await this.hypothesesControllerUnlinkSupportRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

@@ -16,7 +16,9 @@
 import * as runtime from '../runtime';
 import type {
   AddEvidenceDto,
+  AddFindingDto,
   CaseEvidenceDto,
+  CaseFindingDto,
   CaseListResponseDto,
   CaseResponseDto,
   CreateCaseDto,
@@ -26,8 +28,12 @@ import type {
 import {
     AddEvidenceDtoFromJSON,
     AddEvidenceDtoToJSON,
+    AddFindingDtoFromJSON,
+    AddFindingDtoToJSON,
     CaseEvidenceDtoFromJSON,
     CaseEvidenceDtoToJSON,
+    CaseFindingDtoFromJSON,
+    CaseFindingDtoToJSON,
     CaseListResponseDtoFromJSON,
     CaseListResponseDtoToJSON,
     CaseResponseDtoFromJSON,
@@ -43,6 +49,12 @@ import {
 export interface CasesControllerAddEvidenceRequest {
     id: string;
     addEvidenceDto: AddEvidenceDto;
+}
+
+export interface CasesControllerAddFindingRequest {
+    id: string;
+    evidenceId: string;
+    addFindingDto: AddFindingDto;
 }
 
 export interface CasesControllerCreateRequest {
@@ -75,6 +87,11 @@ export interface CasesControllerRemoveEvidenceRequest {
     evidenceId: string;
 }
 
+export interface CasesControllerRemoveFindingRequest {
+    id: string;
+    caseFindingId: string;
+}
+
 export interface CasesControllerUpdateRequest {
     id: string;
     updateCaseDto: UpdateCaseDto;
@@ -86,7 +103,7 @@ export interface CasesControllerUpdateRequest {
 export class CasesApi extends runtime.BaseAPI {
 
     /**
-     * Attach an asset or finding to the case as evidence
+     * Attach an asset as evidence. Use /evidence/:id/findings for findings.
      */
     async casesControllerAddEvidenceRaw(requestParameters: CasesControllerAddEvidenceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseEvidenceDto>> {
         if (requestParameters['id'] == null) {
@@ -125,7 +142,7 @@ export class CasesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Attach an asset or finding to the case as evidence
+     * Attach an asset as evidence. Use /evidence/:id/findings for findings.
      */
     async casesControllerAddEvidence(requestParameters: CasesControllerAddEvidenceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseEvidenceDto> {
         const response = await this.casesControllerAddEvidenceRaw(requestParameters, initOverrides);
@@ -133,7 +150,62 @@ export class CasesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Create an investigation case
+     * Attach a finding to a piece of case evidence
+     */
+    async casesControllerAddFindingRaw(requestParameters: CasesControllerAddFindingRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseFindingDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling casesControllerAddFinding().'
+            );
+        }
+
+        if (requestParameters['evidenceId'] == null) {
+            throw new runtime.RequiredError(
+                'evidenceId',
+                'Required parameter "evidenceId" was null or undefined when calling casesControllerAddFinding().'
+            );
+        }
+
+        if (requestParameters['addFindingDto'] == null) {
+            throw new runtime.RequiredError(
+                'addFindingDto',
+                'Required parameter "addFindingDto" was null or undefined when calling casesControllerAddFinding().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/evidence/{evidenceId}/findings`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"evidenceId"}}`, encodeURIComponent(String(requestParameters['evidenceId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AddFindingDtoToJSON(requestParameters['addFindingDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseFindingDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Attach a finding to a piece of case evidence
+     */
+    async casesControllerAddFinding(requestParameters: CasesControllerAddFindingRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseFindingDto> {
+        const response = await this.casesControllerAddFindingRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Create an investigation case with an initial hypothesis
      */
     async casesControllerCreateRaw(requestParameters: CasesControllerCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseResponseDto>> {
         if (requestParameters['createCaseDto'] == null) {
@@ -164,7 +236,7 @@ export class CasesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Create an investigation case
+     * Create an investigation case with an initial hypothesis
      */
     async casesControllerCreate(requestParameters: CasesControllerCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseResponseDto> {
         const response = await this.casesControllerCreateRaw(requestParameters, initOverrides);
@@ -172,7 +244,7 @@ export class CasesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Get a case with hydrated evidence
+     * Get a case with hydrated evidence (and their findings)
      */
     async casesControllerFindOneRaw(requestParameters: CasesControllerFindOneRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseResponseDto>> {
         if (requestParameters['id'] == null) {
@@ -201,7 +273,7 @@ export class CasesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Get a case with hydrated evidence
+     * Get a case with hydrated evidence (and their findings)
      */
     async casesControllerFindOne(requestParameters: CasesControllerFindOneRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseResponseDto> {
         const response = await this.casesControllerFindOneRaw(requestParameters, initOverrides);
@@ -376,6 +448,50 @@ export class CasesApi extends runtime.BaseAPI {
      */
     async casesControllerRemoveEvidence(requestParameters: CasesControllerRemoveEvidenceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.casesControllerRemoveEvidenceRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Remove a finding from the case
+     */
+    async casesControllerRemoveFindingRaw(requestParameters: CasesControllerRemoveFindingRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling casesControllerRemoveFinding().'
+            );
+        }
+
+        if (requestParameters['caseFindingId'] == null) {
+            throw new runtime.RequiredError(
+                'caseFindingId',
+                'Required parameter "caseFindingId" was null or undefined when calling casesControllerRemoveFinding().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/cases/{id}/findings/{caseFindingId}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"caseFindingId"}}`, encodeURIComponent(String(requestParameters['caseFindingId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Remove a finding from the case
+     */
+    async casesControllerRemoveFinding(requestParameters: CasesControllerRemoveFindingRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.casesControllerRemoveFindingRaw(requestParameters, initOverrides);
     }
 
     /**

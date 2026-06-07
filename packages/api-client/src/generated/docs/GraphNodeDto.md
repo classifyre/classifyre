@@ -15,6 +15,10 @@ Name | Type
 `severity` | string
 `detectorType` | string
 `status` | string
+`matchedContent` | string
+`assetName` | string
+`assetId` | string
+`hypothesisIds` | Array&lt;string&gt;
 `missing` | boolean
 
 ## Example
@@ -33,6 +37,10 @@ const example = {
   "severity": null,
   "detectorType": null,
   "status": null,
+  "matchedContent": null,
+  "assetName": null,
+  "assetId": null,
+  "hypothesisIds": null,
   "missing": null,
 } satisfies GraphNodeDto
 

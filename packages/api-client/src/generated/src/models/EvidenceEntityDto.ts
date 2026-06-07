@@ -44,18 +44,6 @@ export interface EvidenceEntityDto {
      */
     sourceType?: string;
     /**
-     * 
-     * @type {string}
-     * @memberof EvidenceEntityDto
-     */
-    severity?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof EvidenceEntityDto
-     */
-    detectorType?: string;
-    /**
      * True when the referenced row no longer exists
      * @type {boolean}
      * @memberof EvidenceEntityDto
@@ -86,8 +74,6 @@ export function EvidenceEntityDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'label': json['label'],
         'assetType': json['assetType'] == null ? undefined : json['assetType'],
         'sourceType': json['sourceType'] == null ? undefined : json['sourceType'],
-        'severity': json['severity'] == null ? undefined : json['severity'],
-        'detectorType': json['detectorType'] == null ? undefined : json['detectorType'],
         'missing': json['missing'] == null ? undefined : json['missing'],
     };
 }
@@ -107,8 +93,6 @@ export function EvidenceEntityDtoToJSONTyped(value?: EvidenceEntityDto | null, i
         'label': value['label'],
         'assetType': value['assetType'],
         'sourceType': value['sourceType'],
-        'severity': value['severity'],
-        'detectorType': value['detectorType'],
         'missing': value['missing'],
     };
 }

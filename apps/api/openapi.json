@@ -3987,7 +3987,7 @@
             }
           }
         },
-        "summary": "Create an investigation case",
+        "summary": "Create an investigation case with an initial hypothesis",
         "tags": [
           "cases"
         ]
@@ -4103,7 +4103,7 @@
             "description": "Case not found"
           }
         },
-        "summary": "Get a case with hydrated evidence",
+        "summary": "Get a case with hydrated evidence (and their findings)",
         "tags": [
           "cases"
         ]
@@ -4205,7 +4205,7 @@
             }
           }
         },
-        "summary": "Attach an asset or finding to the case as evidence",
+        "summary": "Attach an asset as evidence. Use /evidence/:id/findings for findings.",
         "tags": [
           "cases"
         ]
@@ -4238,6 +4238,87 @@
           }
         },
         "summary": "Remove evidence from the case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/evidence/{evidenceId}/findings": {
+      "post": {
+        "operationId": "CasesController_addFinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "evidenceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddFindingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseFindingDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Attach a finding to a piece of case evidence",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/findings/{caseFindingId}": {
+      "delete": {
+        "operationId": "CasesController_removeFinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "caseFindingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Remove a finding from the case",
         "tags": [
           "cases"
         ]
@@ -4418,9 +4499,9 @@
         ]
       }
     },
-    "/hypotheses/{id}/evidence": {
+    "/hypotheses/{id}/support": {
       "post": {
-        "operationId": "HypothesesController_linkEvidence",
+        "operationId": "HypothesesController_linkSupport",
         "parameters": [
           {
             "name": "id",
@@ -4436,7 +4517,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LinkEvidenceDto"
+                "$ref": "#/components/schemas/LinkSupportDto"
               }
             }
           }
@@ -4453,15 +4534,15 @@
             }
           }
         },
-        "summary": "Link case evidence to a hypothesis with a stance",
+        "summary": "Link evidence or a finding to a hypothesis with a stance",
         "tags": [
           "hypotheses"
         ]
       }
     },
-    "/hypotheses/{id}/evidence/{linkId}": {
+    "/hypotheses/{id}/support/{linkId}": {
       "delete": {
-        "operationId": "HypothesesController_unlinkEvidence",
+        "operationId": "HypothesesController_unlinkSupport",
         "parameters": [
           {
             "name": "id",
@@ -4492,7 +4573,7 @@
             }
           }
         },
-        "summary": "Unlink evidence from a hypothesis",
+        "summary": "Remove a support link from a hypothesis",
         "tags": [
           "hypotheses"
         ]
@@ -4530,6 +4611,70 @@
         ]
       }
     },
+    "/graph/pivot": {
+      "post": {
+        "operationId": "GraphController_pivot",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PivotGraphDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Named pivot question on a node (e.g. who_touched, upstream_lineage, emails)",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
+    "/graph/edges": {
+      "post": {
+        "operationId": "GraphController_ingestEdges",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkIngestEdgesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkIngestEdgesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Bulk-upsert source-derived edges from a connector. Idempotent.",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
     "/graph/rebuild-edges": {
       "post": {
         "operationId": "GraphController_rebuildEdges",
@@ -4547,6 +4692,123 @@
           }
         },
         "summary": "Rebuild all inferred edges from existing assets and findings",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
+    "/graph/relation-types": {
+      "get": {
+        "operationId": "GraphController_relationTypes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationTypesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get all relation types in use + vocabulary suggestions",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
+    "/graph/edges/manual": {
+      "post": {
+        "operationId": "GraphController_createManualEdge",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateManualEdgeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a manual edge between two entities (user-defined relation type)",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
+    "/graph/edges/{id}": {
+      "patch": {
+        "operationId": "GraphController_updateEdge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEdgeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rename an edge relation type",
+        "tags": [
+          "graph"
+        ]
+      },
+      "delete": {
+        "operationId": "GraphController_deleteEdge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete an edge",
         "tags": [
           "graph"
         ]
@@ -9649,6 +9911,10 @@
           "title": {
             "type": "string"
           },
+          "hypothesis": {
+            "type": "string",
+            "description": "Initial hypothesis — what do you suspect?"
+          },
           "description": {
             "type": "string"
           },
@@ -9681,7 +9947,8 @@
           }
         },
         "required": [
-          "title"
+          "title",
+          "hypothesis"
         ]
       },
       "EvidenceEntityDto": {
@@ -9699,12 +9966,6 @@
           "sourceType": {
             "type": "string"
           },
-          "severity": {
-            "type": "string"
-          },
-          "detectorType": {
-            "type": "string"
-          },
           "missing": {
             "type": "boolean",
             "description": "True when the referenced row no longer exists"
@@ -9713,6 +9974,44 @@
         "required": [
           "id",
           "label"
+        ]
+      },
+      "CaseFindingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseEvidenceId": {
+            "type": "string"
+          },
+          "findingId": {
+            "type": "string"
+          },
+          "findingLabel": {
+            "type": "string",
+            "description": "Finding type label (e.g. \"Contains PII\")"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "caseEvidenceId",
+          "findingId",
+          "findingLabel",
+          "createdAt"
         ]
       },
       "CaseEvidenceDto": {
@@ -9745,6 +10044,12 @@
                 "$ref": "#/components/schemas/EvidenceEntityDto"
               }
             ]
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseFindingDto"
+            }
           }
         },
         "required": [
@@ -9893,11 +10198,18 @@
         "properties": {
           "entityType": {
             "type": "string",
-            "description": "Entity kind: \"asset\" | \"finding\""
+            "description": "Entity kind — must be \"asset\""
           },
           "entityId": {
             "type": "string",
-            "description": "Asset or finding UUID"
+            "description": "Asset UUID"
+          },
+          "hypothesisIds": {
+            "description": "At least one hypothesis UUID this evidence should be linked to. Evidence without a hypothesis is not allowed.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "note": {
             "type": "string"
@@ -9908,7 +10220,28 @@
         },
         "required": [
           "entityType",
-          "entityId"
+          "entityId",
+          "hypothesisIds"
+        ]
+      },
+      "AddFindingDto": {
+        "type": "object",
+        "properties": {
+          "caseEvidenceId": {
+            "type": "string",
+            "description": "CaseEvidence id the finding belongs to"
+          },
+          "findingId": {
+            "type": "string",
+            "description": "Finding UUID"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "caseEvidenceId",
+          "findingId"
         ]
       },
       "GraphNodeDto": {
@@ -9942,6 +10275,25 @@
           },
           "status": {
             "type": "string"
+          },
+          "matchedContent": {
+            "type": "string",
+            "description": "For finding nodes: truncated matched text"
+          },
+          "assetName": {
+            "type": "string",
+            "description": "For finding nodes: name of the parent asset"
+          },
+          "assetId": {
+            "type": "string",
+            "description": "For finding nodes: parent asset id"
+          },
+          "hypothesisIds": {
+            "description": "Hypothesis IDs this node is directly affiliated with (as evidence or case finding)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "missing": {
             "type": "boolean",
@@ -9983,8 +10335,13 @@
             "type": "string",
             "enum": [
               "SOURCE_DERIVED",
-              "INFERRED"
+              "INFERRED",
+              "MANUAL"
             ]
+          },
+          "crossHypothesis": {
+            "type": "boolean",
+            "description": "True when this edge bridges nodes affiliated with different hypotheses"
           }
         },
         "required": [
@@ -10024,13 +10381,20 @@
           "truncated"
         ]
       },
-      "HypothesisEvidenceLinkDto": {
+      "HypothesisSupportLinkDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
           },
-          "caseEvidenceId": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "evidence",
+              "finding"
+            ]
+          },
+          "targetId": {
             "type": "string"
           },
           "stance": {
@@ -10047,15 +10411,17 @@
           "note": {
             "type": "string"
           },
-          "evidenceLabel": {
+          "targetLabel": {
             "type": "string",
-            "description": "Display label for the linked evidence entity"
+            "description": "Display label for the linked target"
           }
         },
         "required": [
           "id",
-          "caseEvidenceId",
-          "stance"
+          "targetType",
+          "targetId",
+          "stance",
+          "targetLabel"
         ]
       },
       "HypothesisResponseDto": {
@@ -10087,11 +10453,11 @@
           },
           "supportingCount": {
             "type": "number",
-            "description": "Count of linked SUPPORTS evidence"
+            "description": "Count of SUPPORTS links"
           },
           "contradictingCount": {
             "type": "number",
-            "description": "Count of linked CONTRADICTS evidence"
+            "description": "Count of CONTRADICTS links"
           },
           "createdAt": {
             "format": "date-time",
@@ -10104,7 +10470,7 @@
           "links": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/HypothesisEvidenceLinkDto"
+              "$ref": "#/components/schemas/HypothesisSupportLinkDto"
             }
           }
         },
@@ -10172,12 +10538,20 @@
           }
         }
       },
-      "LinkEvidenceDto": {
+      "LinkSupportDto": {
         "type": "object",
         "properties": {
-          "caseEvidenceId": {
+          "targetType": {
             "type": "string",
-            "description": "CaseEvidence id to link to this hypothesis"
+            "enum": [
+              "evidence",
+              "finding"
+            ],
+            "description": "What is being linked"
+          },
+          "targetId": {
+            "type": "string",
+            "description": "CaseEvidence.id or CaseFinding.id"
           },
           "stance": {
             "type": "string",
@@ -10198,7 +10572,8 @@
           }
         },
         "required": [
-          "caseEvidenceId"
+          "targetType",
+          "targetId"
         ]
       },
       "ExpandGraphDto": {
@@ -10240,6 +10615,112 @@
           "entityId"
         ]
       },
+      "PivotGraphDto": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "description": "Entity kind: \"asset\" | \"finding\""
+          },
+          "entityId": {
+            "type": "string",
+            "description": "Entity UUID"
+          },
+          "pivot": {
+            "type": "string",
+            "enum": [
+              "who_touched",
+              "upstream_lineage",
+              "downstream_lineage",
+              "access",
+              "emails",
+              "similar_findings"
+            ],
+            "description": "Named investigation question"
+          },
+          "depth": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1,
+            "maximum": 3
+          }
+        },
+        "required": [
+          "entityType",
+          "entityId",
+          "pivot"
+        ]
+      },
+      "IngestEdgeDto": {
+        "type": "object",
+        "properties": {
+          "fromType": {
+            "type": "string",
+            "description": "Source entity kind: \"asset\" | \"finding\""
+          },
+          "fromId": {
+            "type": "string",
+            "description": "Source entity UUID (use fromId OR fromHash)"
+          },
+          "fromHash": {
+            "type": "string",
+            "description": "Source asset hash (alternative to fromId — API resolves to UUID)"
+          },
+          "toType": {
+            "type": "string",
+            "description": "Target entity kind: \"asset\" | \"finding\""
+          },
+          "toId": {
+            "type": "string",
+            "description": "Target entity UUID (use toId OR toHash)"
+          },
+          "toHash": {
+            "type": "string",
+            "description": "Target asset hash (alternative to toId — API resolves to UUID)"
+          },
+          "relationType": {
+            "type": "string",
+            "description": "Relation type: OWNS | ACCESSED | READS | WRITES | GENERATED_FROM | EXPORTED_TO | ATTACHED_TO | SENT_TO | EXECUTED | MENTIONS | CONTAINS | REFERENCES"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 1
+          }
+        },
+        "required": [
+          "fromType",
+          "toType",
+          "relationType"
+        ]
+      },
+      "BulkIngestEdgesDto": {
+        "type": "object",
+        "properties": {
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngestEdgeDto"
+            }
+          }
+        },
+        "required": [
+          "edges"
+        ]
+      },
+      "BulkIngestEdgesResponseDto": {
+        "type": "object",
+        "properties": {
+          "upserted": {
+            "type": "number",
+            "description": "Number of edges upserted"
+          }
+        },
+        "required": [
+          "upserted"
+        ]
+      },
       "RebuildEdgesResponseDto": {
         "type": "object",
         "properties": {
@@ -10250,6 +10731,123 @@
         },
         "required": [
           "edgeCount"
+        ]
+      },
+      "RelationTypesResponseDto": {
+        "type": "object",
+        "properties": {
+          "inUse": {
+            "description": "All relation types in use, sorted by frequency",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "suggestions": {
+            "description": "Vocabulary suggestions (built-in + inUse)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "inUse",
+          "suggestions"
+        ]
+      },
+      "CreateManualEdgeDto": {
+        "type": "object",
+        "properties": {
+          "fromType": {
+            "type": "string",
+            "description": "Source entity kind: \"asset\" | \"finding\""
+          },
+          "fromId": {
+            "type": "string",
+            "description": "Source entity UUID"
+          },
+          "toType": {
+            "type": "string",
+            "description": "Target entity kind: \"asset\" | \"finding\""
+          },
+          "toId": {
+            "type": "string",
+            "description": "Target entity UUID"
+          },
+          "relationType": {
+            "type": "string",
+            "description": "Relation type — free-form string (e.g. \"READS\", \"SENT_TO\", \"my custom link\")"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 1
+          }
+        },
+        "required": [
+          "fromType",
+          "fromId",
+          "toType",
+          "toId",
+          "relationType"
+        ]
+      },
+      "EdgeDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fromType": {
+            "type": "string"
+          },
+          "fromId": {
+            "type": "string"
+          },
+          "toType": {
+            "type": "string"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "relationType": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "INFERRED",
+              "SOURCE_DERIVED",
+              "MANUAL"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "fromType",
+          "fromId",
+          "toType",
+          "toId",
+          "relationType",
+          "confidence",
+          "origin"
+        ]
+      },
+      "UpdateEdgeDto": {
+        "type": "object",
+        "properties": {
+          "relationType": {
+            "type": "string",
+            "description": "New relation type label for this edge"
+          }
+        },
+        "required": [
+          "relationType"
         ]
       },
       "StartRunnerDto": {

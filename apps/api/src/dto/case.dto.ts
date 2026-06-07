@@ -17,6 +17,10 @@ export class CreateCaseDto {
   @MaxLength(300)
   title!: string;
 
+  @ApiProperty({ description: 'Initial hypothesis — what do you suspect?' })
+  @IsString()
+  hypothesis!: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -110,14 +114,23 @@ export class QueryCasesDto {
   limit?: number = 50;
 }
 
+/** Add an asset as evidence to a case. EntityType must be "asset". */
 export class AddEvidenceDto {
-  @ApiProperty({ description: 'Entity kind: "asset" | "finding"' })
+  @ApiProperty({ description: 'Entity kind — must be "asset"' })
   @IsString()
   entityType!: string;
 
-  @ApiProperty({ description: 'Asset or finding UUID' })
+  @ApiProperty({ description: 'Asset UUID' })
   @IsString()
   entityId!: string;
+
+  @ApiProperty({
+    description: 'At least one hypothesis UUID this evidence should be linked to. Evidence without a hypothesis is not allowed.',
+    type: [String],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  hypothesisIds!: string[];
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -130,7 +143,23 @@ export class AddEvidenceDto {
   addedBy?: string;
 }
 
-/** A resolved evidence entity (asset or finding) for display. */
+/** Attach a finding (inferred observation) to a piece of evidence in a case. */
+export class AddFindingDto {
+  @ApiProperty({ description: 'CaseEvidence id the finding belongs to' })
+  @IsString()
+  caseEvidenceId!: string;
+
+  @ApiProperty({ description: 'Finding UUID' })
+  @IsString()
+  findingId!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+/** Resolved display info for an evidence asset. */
 export class EvidenceEntityDto {
   @ApiProperty()
   id!: string;
@@ -144,14 +173,35 @@ export class EvidenceEntityDto {
   @ApiPropertyOptional()
   sourceType?: string;
 
+  @ApiPropertyOptional({ description: 'True when the referenced row no longer exists' })
+  missing?: boolean;
+}
+
+/** A resolved finding attached to a piece of case evidence. */
+export class CaseFindingDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  caseEvidenceId!: string;
+
+  @ApiProperty()
+  findingId!: string;
+
+  @ApiProperty({ description: 'Finding type label (e.g. "Contains PII")' })
+  findingLabel!: string;
+
   @ApiPropertyOptional()
   severity?: string;
 
   @ApiPropertyOptional()
   detectorType?: string;
 
-  @ApiPropertyOptional({ description: 'True when the referenced row no longer exists' })
-  missing?: boolean;
+  @ApiPropertyOptional()
+  note?: string | null;
+
+  @ApiProperty()
+  createdAt!: Date;
 }
 
 export class CaseEvidenceDto {
@@ -175,6 +225,9 @@ export class CaseEvidenceDto {
 
   @ApiPropertyOptional({ type: EvidenceEntityDto, nullable: true })
   entity?: EvidenceEntityDto | null;
+
+  @ApiPropertyOptional({ type: [CaseFindingDto] })
+  findings?: CaseFindingDto[];
 }
 
 export class CaseResponseDto {

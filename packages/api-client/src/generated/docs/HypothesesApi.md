@@ -5,10 +5,10 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**hypothesesControllerCreate**](HypothesesApi.md#hypothesescontrollercreate) | **POST** /cases/{caseId}/hypotheses | Create a hypothesis in a case |
-| [**hypothesesControllerLinkEvidence**](HypothesesApi.md#hypothesescontrollerlinkevidence) | **POST** /hypotheses/{id}/evidence | Link case evidence to a hypothesis with a stance |
+| [**hypothesesControllerLinkSupport**](HypothesesApi.md#hypothesescontrollerlinksupport) | **POST** /hypotheses/{id}/support | Link evidence or a finding to a hypothesis with a stance |
 | [**hypothesesControllerList**](HypothesesApi.md#hypothesescontrollerlist) | **GET** /cases/{caseId}/hypotheses | List hypotheses for a case |
 | [**hypothesesControllerRemove**](HypothesesApi.md#hypothesescontrollerremove) | **DELETE** /hypotheses/{id} | Delete a hypothesis |
-| [**hypothesesControllerUnlinkEvidence**](HypothesesApi.md#hypothesescontrollerunlinkevidence) | **DELETE** /hypotheses/{id}/evidence/{linkId} | Unlink evidence from a hypothesis |
+| [**hypothesesControllerUnlinkSupport**](HypothesesApi.md#hypothesescontrollerunlinksupport) | **DELETE** /hypotheses/{id}/support/{linkId} | Remove a support link from a hypothesis |
 | [**hypothesesControllerUpdate**](HypothesesApi.md#hypothesescontrollerupdate) | **PATCH** /hypotheses/{id} | Update a hypothesis |
 
 
@@ -81,11 +81,11 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
-## hypothesesControllerLinkEvidence
+## hypothesesControllerLinkSupport
 
-> HypothesisResponseDto hypothesesControllerLinkEvidence(id, linkEvidenceDto)
+> HypothesisResponseDto hypothesesControllerLinkSupport(id, linkSupportDto)
 
-Link case evidence to a hypothesis with a stance
+Link evidence or a finding to a hypothesis with a stance
 
 ### Example
 
@@ -94,7 +94,7 @@ import {
   Configuration,
   HypothesesApi,
 } from '@workspace/api-client';
-import type { HypothesesControllerLinkEvidenceRequest } from '@workspace/api-client';
+import type { HypothesesControllerLinkSupportRequest } from '@workspace/api-client';
 
 async function example() {
   console.log("🚀 Testing @workspace/api-client SDK...");
@@ -103,12 +103,12 @@ async function example() {
   const body = {
     // string
     id: id_example,
-    // LinkEvidenceDto
-    linkEvidenceDto: ...,
-  } satisfies HypothesesControllerLinkEvidenceRequest;
+    // LinkSupportDto
+    linkSupportDto: ...,
+  } satisfies HypothesesControllerLinkSupportRequest;
 
   try {
-    const data = await api.hypothesesControllerLinkEvidence(body);
+    const data = await api.hypothesesControllerLinkSupport(body);
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -125,7 +125,7 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **id** | `string` |  | [Defaults to `undefined`] |
-| **linkEvidenceDto** | [LinkEvidenceDto](LinkEvidenceDto.md) |  | |
+| **linkSupportDto** | [LinkSupportDto](LinkSupportDto.md) |  | |
 
 ### Return type
 
@@ -279,11 +279,11 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
-## hypothesesControllerUnlinkEvidence
+## hypothesesControllerUnlinkSupport
 
-> HypothesisResponseDto hypothesesControllerUnlinkEvidence(id, linkId)
+> HypothesisResponseDto hypothesesControllerUnlinkSupport(id, linkId)
 
-Unlink evidence from a hypothesis
+Remove a support link from a hypothesis
 
 ### Example
 
@@ -292,7 +292,7 @@ import {
   Configuration,
   HypothesesApi,
 } from '@workspace/api-client';
-import type { HypothesesControllerUnlinkEvidenceRequest } from '@workspace/api-client';
+import type { HypothesesControllerUnlinkSupportRequest } from '@workspace/api-client';
 
 async function example() {
   console.log("🚀 Testing @workspace/api-client SDK...");
@@ -303,10 +303,10 @@ async function example() {
     id: id_example,
     // string
     linkId: linkId_example,
-  } satisfies HypothesesControllerUnlinkEvidenceRequest;
+  } satisfies HypothesesControllerUnlinkSupportRequest;
 
   try {
-    const data = await api.hypothesesControllerUnlinkEvidence(body);
+    const data = await api.hypothesesControllerUnlinkSupport(body);
     console.log(data);
   } catch (error) {
     console.error(error);

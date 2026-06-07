@@ -99,10 +99,7 @@ networkPolicy:
     kubernetes.io/metadata.name: ingress-nginx
 
 # ── Telemetry ─────────────────────────────────────────────────────────────────
-# Telemetry is ON by default and reports to https://otel.classifyre.com.
-# For air-gapped or compliance-sensitive deployments, disable or redirect:
+# Telemetry is OFF by default. Enable it and point at your own OTel Collector:
 # telemetry:
-#   enabled: false
-# — or point at your own OTel Collector:
-# telemetry:
-#   otlpEndpoint: "http://otel-collector.monitoring:4318"
+#   enabled: true
+#   otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318"

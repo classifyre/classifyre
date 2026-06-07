@@ -8,12 +8,13 @@ import { PrismaService } from './prisma.service';
 import {
   CreateHypothesisDto,
   HypothesisResponseDto,
-  LinkEvidenceDto,
+  HypothesisSupportLinkDto,
+  LinkSupportDto,
   UpdateHypothesisDto,
 } from './dto/hypothesis.dto';
 
 type HypothesisRow = Prisma.HypothesisGetPayload<{
-  include: { links: { include: { caseEvidence: true } } };
+  include: { support: true };
 }>;
 
 @Injectable()
@@ -21,7 +22,7 @@ export class HypothesesService {
   constructor(private readonly prisma: PrismaService) {}
 
   private readonly include = {
-    links: { include: { caseEvidence: true } },
+    support: true,
   } satisfies Prisma.HypothesisInclude;
 
   async list(caseId: string): Promise<HypothesisResponseDto[]> {
@@ -33,10 +34,7 @@ export class HypothesesService {
     return this.mapMany(rows);
   }
 
-  async create(
-    caseId: string,
-    dto: CreateHypothesisDto,
-  ): Promise<HypothesisResponseDto> {
+  async create(caseId: string, dto: CreateHypothesisDto): Promise<HypothesisResponseDto> {
     await this.ensureCaseExists(caseId);
     const created = await this.prisma.hypothesis.create({
       data: {
@@ -51,18 +49,11 @@ export class HypothesesService {
     return (await this.mapMany([created]))[0];
   }
 
-  async update(
-    id: string,
-    dto: UpdateHypothesisDto,
-  ): Promise<HypothesisResponseDto> {
+  async update(id: string, dto: UpdateHypothesisDto): Promise<HypothesisResponseDto> {
     await this.ensureExists(id);
     const updated = await this.prisma.hypothesis.update({
       where: { id },
-      data: {
-        statement: dto.statement,
-        status: dto.status,
-        confidence: dto.confidence,
-      },
+      data: { statement: dto.statement, status: dto.status, confidence: dto.confidence },
       include: this.include,
     });
     return (await this.mapMany([updated]))[0];
@@ -73,37 +64,33 @@ export class HypothesesService {
     await this.prisma.hypothesis.delete({ where: { id } });
   }
 
-  async linkEvidence(
-    hypothesisId: string,
-    dto: LinkEvidenceDto,
-  ): Promise<HypothesisResponseDto> {
+  /**
+   * Link evidence or a finding to a hypothesis with a stance.
+   * dto.targetType = "evidence" → targetId is a CaseEvidence.id
+   * dto.targetType = "finding"  → targetId is a CaseFinding.id
+   */
+  async linkSupport(hypothesisId: string, dto: LinkSupportDto): Promise<HypothesisResponseDto> {
     const hypothesis = await this.prisma.hypothesis.findUnique({
       where: { id: hypothesisId },
       select: { caseId: true },
     });
-    if (!hypothesis) {
-      throw new NotFoundException(`Hypothesis ${hypothesisId} not found`);
-    }
-    const evidence = await this.prisma.caseEvidence.findUnique({
-      where: { id: dto.caseEvidenceId },
-      select: { caseId: true },
-    });
-    if (!evidence || evidence.caseId !== hypothesis.caseId) {
-      throw new BadRequestException(
-        'Evidence must belong to the same case as the hypothesis',
-      );
-    }
+    if (!hypothesis) throw new NotFoundException(`Hypothesis ${hypothesisId} not found`);
 
-    await this.prisma.hypothesisEvidence.upsert({
+    // Validate the target exists and belongs to the same case.
+    await this.validateTarget(dto.targetType, dto.targetId, hypothesis.caseId);
+
+    await this.prisma.caseHypothesisSupport.upsert({
       where: {
-        hypothesisId_caseEvidenceId: {
+        hypothesisId_targetType_targetId: {
           hypothesisId,
-          caseEvidenceId: dto.caseEvidenceId,
+          targetType: dto.targetType,
+          targetId: dto.targetId,
         },
       },
       create: {
         hypothesisId,
-        caseEvidenceId: dto.caseEvidenceId,
+        targetType: dto.targetType,
+        targetId: dto.targetId,
         stance: dto.stance ?? EvidenceStance.SUPPORTS,
         weight: dto.weight,
         note: dto.note,
@@ -118,81 +105,118 @@ export class HypothesesService {
     return this.getOne(hypothesisId);
   }
 
-  async unlinkEvidence(
-    hypothesisId: string,
-    linkId: string,
-  ): Promise<HypothesisResponseDto> {
-    const link = await this.prisma.hypothesisEvidence.findUnique({
-      where: { id: linkId },
-    });
+  async unlinkSupport(hypothesisId: string, linkId: string): Promise<HypothesisResponseDto> {
+    const link = await this.prisma.caseHypothesisSupport.findUnique({ where: { id: linkId } });
     if (!link || link.hypothesisId !== hypothesisId) {
-      throw new NotFoundException(`Evidence link ${linkId} not found`);
+      throw new NotFoundException(`Support link ${linkId} not found on hypothesis ${hypothesisId}`);
     }
-    await this.prisma.hypothesisEvidence.delete({ where: { id: linkId } });
+    await this.prisma.caseHypothesisSupport.delete({ where: { id: linkId } });
     return this.getOne(hypothesisId);
   }
 
+  // ─── Private ─────────────────────────────────────────────────────
+
+  private async validateTarget(
+    targetType: 'evidence' | 'finding',
+    targetId: string,
+    caseId: string,
+  ): Promise<void> {
+    if (targetType === 'evidence') {
+      const ev = await this.prisma.caseEvidence.findUnique({
+        where: { id: targetId },
+        select: { caseId: true },
+      });
+      if (!ev || ev.caseId !== caseId) {
+        throw new BadRequestException('Evidence must belong to the same case as the hypothesis');
+      }
+    } else {
+      const cf = await this.prisma.caseFinding.findUnique({
+        where: { id: targetId },
+        select: { caseId: true },
+      });
+      if (!cf || cf.caseId !== caseId) {
+        throw new BadRequestException('Finding must belong to the same case as the hypothesis');
+      }
+    }
+  }
+
   private async getOne(id: string): Promise<HypothesisResponseDto> {
-    const row = await this.prisma.hypothesis.findUnique({
-      where: { id },
-      include: this.include,
-    });
+    const row = await this.prisma.hypothesis.findUnique({ where: { id }, include: this.include });
     if (!row) throw new NotFoundException(`Hypothesis ${id} not found`);
     return (await this.mapMany([row]))[0];
   }
 
   private async ensureExists(id: string): Promise<void> {
-    const found = await this.prisma.hypothesis.findUnique({
-      where: { id },
-      select: { id: true },
-    });
+    const found = await this.prisma.hypothesis.findUnique({ where: { id }, select: { id: true } });
     if (!found) throw new NotFoundException(`Hypothesis ${id} not found`);
   }
 
   private async ensureCaseExists(caseId: string): Promise<void> {
-    const found = await this.prisma.case.findUnique({
-      where: { id: caseId },
-      select: { id: true },
-    });
+    const found = await this.prisma.case.findUnique({ where: { id: caseId }, select: { id: true } });
     if (!found) throw new NotFoundException(`Case with ID ${caseId} not found`);
   }
 
-  private async mapMany(
-    rows: HypothesisRow[],
-  ): Promise<HypothesisResponseDto[]> {
-    // Resolve display labels for all linked evidence in one batch.
-    const evidence = rows.flatMap((r) => r.links.map((l) => l.caseEvidence));
-    const assetIds = evidence.filter((e) => e.entityType === 'asset').map((e) => e.entityId);
-    const findingIds = evidence
-      .filter((e) => e.entityType === 'finding')
-      .map((e) => e.entityId);
+  private async mapMany(rows: HypothesisRow[]): Promise<HypothesisResponseDto[]> {
+    // Collect all target ids split by type for batch resolution.
+    const evidenceIds = rows
+      .flatMap((r) => r.support)
+      .filter((s) => s.targetType === 'evidence')
+      .map((s) => s.targetId);
+    const findingIds = rows
+      .flatMap((r) => r.support)
+      .filter((s) => s.targetType === 'finding')
+      .map((s) => s.targetId);
 
-    const [assets, findings] = await Promise.all([
-      this.prisma.asset.findMany({
-        where: { id: { in: assetIds } },
-        select: { id: true, name: true },
-      }),
-      this.prisma.finding.findMany({
-        where: { id: { in: findingIds } },
-        select: { id: true, findingType: true },
-      }),
+    // For "evidence" links, resolve CaseEvidence → the underlying asset label.
+    const [evidenceRows, caseFindingRows] = await Promise.all([
+      evidenceIds.length > 0
+        ? this.prisma.caseEvidence.findMany({
+            where: { id: { in: evidenceIds } },
+            select: { id: true, entityId: true, entityType: true },
+          })
+        : Promise.resolve([]),
+      findingIds.length > 0
+        ? this.prisma.caseFinding.findMany({
+            where: { id: { in: findingIds } },
+            select: { id: true, finding: { select: { findingType: true } } },
+          })
+        : Promise.resolve([]),
     ]);
-    const assetMap = new Map(assets.map((a) => [a.id, a.name]));
-    const findingMap = new Map(findings.map((f) => [f.id, f.findingType]));
 
-    const labelFor = (entityType: string, entityId: string): string => {
-      if (entityType === 'asset') return assetMap.get(entityId) ?? '(deleted asset)';
-      if (entityType === 'finding') return findingMap.get(entityId) ?? '(deleted finding)';
-      return entityId;
+    // Resolve asset names for evidence links.
+    const assetIds = evidenceRows.map((e) => e.entityId);
+    const assets = assetIds.length > 0
+      ? await this.prisma.asset.findMany({
+          where: { id: { in: assetIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const assetMap = new Map<string, string>(assets.map((a): [string, string] => [a.id, a.name]));
+    const evidenceMap = new Map<string, string>(
+      evidenceRows.map((e): [string, string] => [e.id, assetMap.get(e.entityId) ?? '(deleted asset)']),
+    );
+    const cfMap = new Map<string, string>(
+      caseFindingRows.map((cf): [string, string] => [cf.id, cf.finding.findingType]),
+    );
+
+    const labelFor = (targetType: string, targetId: string): string => {
+      if (targetType === 'evidence') return evidenceMap.get(targetId) ?? '(deleted evidence)';
+      if (targetType === 'finding') return cfMap.get(targetId) ?? '(deleted finding)';
+      return targetId;
     };
 
     return rows.map((r) => {
-      const supportingCount = r.links.filter(
-        (l) => l.stance === EvidenceStance.SUPPORTS,
-      ).length;
-      const contradictingCount = r.links.filter(
-        (l) => l.stance === EvidenceStance.CONTRADICTS,
-      ).length;
+      const supportingCount = r.support.filter((s) => s.stance === EvidenceStance.SUPPORTS).length;
+      const contradictingCount = r.support.filter((s) => s.stance === EvidenceStance.CONTRADICTS).length;
+      const links: HypothesisSupportLinkDto[] = r.support.map((s) => ({
+        id: s.id,
+        targetType: s.targetType,
+        targetId: s.targetId,
+        stance: s.stance,
+        weight: s.weight === null ? null : Number(s.weight),
+        note: s.note,
+        targetLabel: labelFor(s.targetType, s.targetId),
+      }));
       return {
         id: r.id,
         caseId: r.caseId,
@@ -204,17 +228,7 @@ export class HypothesesService {
         contradictingCount,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,
-        links: r.links.map((l) => ({
-          id: l.id,
-          caseEvidenceId: l.caseEvidenceId,
-          stance: l.stance,
-          weight: l.weight === null ? null : Number(l.weight),
-          note: l.note,
-          evidenceLabel: labelFor(
-            l.caseEvidence.entityType,
-            l.caseEvidence.entityId,
-          ),
-        })),
+        links,
       };
     });
   }

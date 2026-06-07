@@ -6,17 +6,57 @@ description: Helm-based deployment patterns, image tags, PostgreSQL modes, and s
 
 import { Callout, Steps, Tabs } from "nextra/components"
 import HelmValuesReference from "../../../src/_generated/helm-values.mdx"
+import { softwareVersion } from "@workspace/ui/lib/software-version"
+import { Sh } from "../../../components/mdx-code"
 
 # Kubernetes Deployment
 
 The official Classifyre Helm chart deploys the API, web UI, database migrations, and CLI scan jobs to any Kubernetes cluster. It is the recommended path for production workloads.
+
+```mermaid
+graph TD
+    Ing["Ingress Controller\n(nginx / traefik)"]
+    Web["Web\n(Service + Deployment)\nNext.js :3100"]
+    API["API\n(Service + Deployment)\nNestJS :8000"]
+    CT["ConfigMap\nCLI Job JSON Template"]
+    PG["PostgreSQL\nExternal / Embedded / CNPG"]
+    S3["S3 Object Storage"]
+    UVCache["PVC: uv-cache\n10 Gi"]
+    CLI["CLI Job\n(ephemeral K8s Job)"]
+    HPA["HPA\napi + web\n2-10 replicas"]
+    Secrets["Secrets\n• Encryption key\n• DB password\n• S3 credentials"]
+
+    Ing -->|"/*"| Web
+    Ing -->|"/api/*  /mcp/*  /socket.io/*"| API
+    Web -->|"API_URL (internal DNS)"| API
+    API --> PG
+    API --> S3
+    API -->|"mounts"| CT
+    API -->|"K8s API → create Job"| CLI
+    CLI -->|"POST findings"| API
+    CLI --> UVCache
+    API --> Secrets
+    Web --> HPA
+    API --> HPA
+
+    style Ing fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+    style Web fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style API fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style CT fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style CLI fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style HPA fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style Secrets fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style PG fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+    style S3 fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+    style UVCache fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+```
 
 **Supports**
 
 - k3s, K3d, kind, EKS, GKE, AKS, and any conformant cluster
 - External PostgreSQL, embedded single-pod PostgreSQL, or [CloudNativePG](https://cloudnative-pg.io/)
 - Horizontal autoscaling (HPA) for API and web deployments
-- OCI Helm registry — no `helm repo add` needed
+- OCI Helm registry, no `helm repo add` needed
 
 ---
 
@@ -31,7 +71,7 @@ The official Classifyre Helm chart deploys the API, web UI, database migrations,
 
 ## Images
 
-Release images are published to Docker Hub, while the Helm chart remains in GHCR.
+Release images and the Helm chart are published to Docker Hub.
 
 | Component | Image |
 |---|---|
@@ -41,23 +81,18 @@ Release images are published to Docker Hub, while the Helm chart remains in GHCR
 
 ### Available tags
 
-Every full release publishes the version tag and `latest`. CI also publishes mutable branch tags and immutable commit tags.
+Every full release publishes the version tag and `latest`. CI also publishes branch-name tags (`main`, `develop`, etc.) for every push.
 
 | Tag | Example | Meaning | Recommended for |
 |---|---|---|---|
-| `{major}.{minor}.{patch}` | `0.1.2` | Exact release | **Production** |
+| `{major}.{minor}.{patch}` | `{softwareVersion}` | Exact release | **Production** |
 | `latest` | - | Latest stable release | Demos / quick evals |
 | `main` | - | Latest commit on `main` | CI / development |
-| `sha-<commit>` | `sha-0123abcd...` | Immutable CI build | Debugging / rollback |
+| `develop` | - | Latest commit on `develop` | CI / staging |
 
 All images are multi-arch: `linux/amd64` + `linux/arm64`.
 
-When you install the chart at a specific version and leave image tags empty, the chart defaults every image to its own `appVersion` automatically — no manual tag management needed.
-
-```bash
-# Pull a specific version
-docker pull classifyre/api:0.1.8
-```
+When you install the chart at a specific version and leave image tags empty, the chart defaults every image to its own `appVersion` automatically, no manual tag management needed.
 
 ---
 
@@ -66,24 +101,22 @@ docker pull classifyre/api:0.1.8
 The chart is published as an OCI artifact:
 
 ```
-oci://ghcr.io/andrebanandre/unstructured/charts/classifyre
+oci://registry-1.docker.io/classifyre/classifyre-core
 ```
 
 Helm 3.8+ supports OCI natively, so there is no `helm repo add` step.
 
-```bash
-# Inspect available versions
-helm show chart oci://ghcr.io/andrebanandre/unstructured/charts/classifyre
+<Sh>{`# Inspect available versions
+helm show chart oci://registry-1.docker.io/classifyre/classifyre-core
 
 # Pull chart locally to inspect values before installing
-helm pull oci://ghcr.io/andrebanandre/unstructured/charts/classifyre --version 0.1.8 --untar
-```
+helm pull oci://registry-1.docker.io/classifyre/classifyre-core --version $version --untar`}</Sh>
 
 ---
 
 ## Quick start
 
-<Tabs items={["k3s / k3d (minimal)", "Production (external DB)", "CloudNativePG"]}>
+<Tabs items={["k3s / k3d (no ingress)", "Production (external DB)", "CloudNativePG"]}>
 <Tabs.Tab>
 
 <Steps>
@@ -94,19 +127,32 @@ helm pull oci://ghcr.io/andrebanandre/unstructured/charts/classifyre --version 0
 kubectl create namespace classifyre
 ```
 
-### Install the chart
+### Create a values file
 
-```bash
-helm install classifyre \
-  oci://ghcr.io/andrebanandre/unstructured/charts/classifyre \
-  --namespace classifyre \
-  --version 0.1.8 \
-  --set postgres.mode=embedded \
-  --set postgres.embedded.password=changeme \
-  --set ingress.host=classifyre.local
+```yaml filename="values-k3s.yaml"
+ingress:
+  enabled: false
+
+frontend:
+  service:
+    type: NodePort
+    nodePort: 30100
+
+postgres:
+  mode: embedded
+  embedded:
+    password: changeme
 ```
 
-Helm uses the chart `appVersion` (`0.1.8`) as the image tag automatically — no extra `--set` needed.
+### Install the chart
+
+<Sh>{`helm install classifyre \\
+  oci://registry-1.docker.io/classifyre/classifyre-core \\
+  --namespace classifyre \\
+  --version $version \\
+  -f values-k3s.yaml`}</Sh>
+
+Helm uses the chart `appVersion` as the image tag automatically, no extra `--set` needed.
 
 ### Verify rollout
 
@@ -117,7 +163,11 @@ kubectl -n classifyre rollout status deployment/classifyre-web
 
 ### Open the UI
 
-Add `classifyre.local` to your `/etc/hosts` pointing at the cluster IP, then open **http://classifyre.local** in your browser.
+Find the node IP and open **http://&lt;node-ip&gt;:30100** in your browser.
+
+```bash
+kubectl get nodes -o wide
+```
 
 </Steps>
 
@@ -164,18 +214,16 @@ postgres:
 
 api:
   maskedConfigEncryption:
-    value: ""          # leave empty — chart auto-generates and persists a key
+    value: ""          # leave empty, chart auto-generates and persists a key
 ```
 
 ### Install
 
-```bash
-helm install classifyre \
-  oci://ghcr.io/andrebanandre/unstructured/charts/classifyre \
-  --namespace classifyre \
-  --version 0.1.8 \
-  -f values-prod.yaml
-```
+<Sh>{`helm install classifyre \\
+  oci://registry-1.docker.io/classifyre/classifyre-core \\
+  --namespace classifyre \\
+  --version $version \\
+  -f values-prod.yaml`}</Sh>
 
 </Steps>
 
@@ -213,13 +261,11 @@ postgres:
 
 ### Install
 
-```bash
-helm install classifyre \
-  oci://ghcr.io/andrebanandre/unstructured/charts/classifyre \
-  --namespace classifyre --create-namespace \
-  --version 0.1.8 \
-  -f values-cnpg.yaml
-```
+<Sh>{`helm install classifyre \\
+  oci://registry-1.docker.io/classifyre/classifyre-core \\
+  --namespace classifyre --create-namespace \\
+  --version $version \\
+  -f values-cnpg.yaml`}</Sh>
 
 CNPG provisions a 3-instance cluster with synchronous replication and automated failover.
 
@@ -234,7 +280,7 @@ CNPG provisions a 3-instance cluster with synchronous replication and automated 
 
 Classifyre encrypts connector credentials (API tokens, passwords) at rest using `CLASSIFYRE_MASKED_CONFIG_KEY`.
 
-**By default** the chart auto-generates a 32-character key on first install and stores it in a Kubernetes Secret. Subsequent `helm upgrade` runs look up the existing secret and reuse the same key — so credentials stay readable across upgrades.
+**By default** the chart auto-generates a 32-character key on first install and stores it in a Kubernetes Secret. Subsequent `helm upgrade` runs look up the existing secret and reuse the same key, so credentials stay readable across upgrades.
 
 <Callout type="warning">
   **Do not delete the secret.** If the secret is deleted, the key is lost and all stored connector credentials become permanently unreadable. You must re-enter them.
@@ -269,18 +315,19 @@ Migrations run automatically as an init container in each API pod on every start
 npx prisma migrate deploy
 ```
 
-This is idempotent — if migrations are already applied, the init container exits immediately and the API starts normally.
+This is idempotent, if migrations are already applied, the init container exits immediately and the API starts normally.
 
 ---
 
 ## Ingress
 
-The chart creates three ingress rules on a single host using the nginx ingress controller:
+The chart creates four ingress rules on a single host using the nginx ingress controller:
 
 | Path | Target |
 |---|---|
 | `/` | Web UI |
 | `/api/*` | REST API |
+| `/mcp` and `/api/mcp` | MCP protocol endpoint |
 | `/socket.io/*` | WebSocket |
 
 The default class is `nginx`. Change it with:
@@ -309,19 +356,17 @@ ingress:
 
 ## Upgrading
 
-```bash
-# Pull the latest chart information
-helm show chart oci://ghcr.io/andrebanandre/unstructured/charts/classifyre --version 0.2.0
+<Sh>{`# Pull the latest chart information
+helm show chart oci://registry-1.docker.io/classifyre/classifyre-core --version $version
 
-# Upgrade in place — migrations run automatically
-helm upgrade classifyre \
-  oci://ghcr.io/andrebanandre/unstructured/charts/classifyre \
-  --namespace classifyre \
-  --version 0.2.0 \
-  -f values-prod.yaml
-```
+# Upgrade in place, migrations run automatically
+helm upgrade classifyre \\
+  oci://registry-1.docker.io/classifyre/classifyre-core \\
+  --namespace classifyre \\
+  --version $version \\
+  -f values-prod.yaml`}</Sh>
 
-The upgrade is rolling — pods are replaced one at a time. The API and web deployments each have a `minAvailable: 1` PodDisruptionBudget so at least one pod stays up during the rollout.
+The upgrade is rolling, pods are replaced one at a time. The API and web deployments each have a `minAvailable: 1` PodDisruptionBudget so at least one pod stays up during the rollout.
 
 ---
 
@@ -336,27 +381,38 @@ api:
     minReplicas: 2
     maxReplicas: 10
     targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 75
+
+frontend:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 75
 ```
 
 CLI scan jobs are ephemeral Kubernetes Jobs — they scale naturally since each scan spawns its own job and the cluster schedules them as capacity allows. Tune their resources with `api.cliJobs.resources`.
+
+Default resource requests for CLI jobs: 500m CPU, 1 Gi memory, 6 Gi ephemeral storage.
 
 ---
 
 ## Storage
 
-The chart provisions three PVCs by default.
+The chart provisions PVCs depending on configuration:
 
-| PVC | Purpose | Default size |
-|---|---|---|
-| `runner-logs` | Scan execution logs (mounted in API pods) | 20 Gi |
-| `uv-cache` | Python package cache shared across CLI jobs | 20 Gi |
+| PVC | Purpose | Default size | Access mode |
+|---|---|---|---|
+| `uv-cache` | Python package cache shared across CLI job pods | 10 Gi | ReadWriteOnce |
+| `postgres` (embedded mode only) | PostgreSQL data directory | 20 Gi | ReadWriteOnce |
 
-Both require `ReadWriteMany` access mode. On clusters without a `ReadWriteMany` storage class (e.g. bare k3s), set a compatible `storageClassName` or point them at an existing NFS/CSI-backed PVC:
+Run logs are persisted to S3-compatible object storage (when configured) or streamed live, there is no filesystem PVC for runner logs.
+
+The `uv-cache` PVC uses `ReadWriteOnce` by default, which works on single-node clusters. On multi-node clusters with concurrent CLI jobs, switch to `ReadWriteMany` (e.g. with an NFS or EFS-backed storage class):
 
 ```yaml
 api:
-  runnerLogs:
-    storageClassName: nfs-client
   cliJobs:
     uvCache:
       storageClassName: nfs-client
@@ -382,6 +438,6 @@ kubectl -n classifyre delete pvc --all
 
 ---
 
-## All values
+## Helm Chart Values
 
 <HelmValuesReference />

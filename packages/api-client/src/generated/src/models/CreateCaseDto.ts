@@ -26,6 +26,12 @@ export interface CreateCaseDto {
      */
     title: string;
     /**
+     * Initial hypothesis — what do you suspect?
+     * @type {string}
+     * @memberof CreateCaseDto
+     */
+    hypothesis: string;
+    /**
      * 
      * @type {string}
      * @memberof CreateCaseDto
@@ -87,6 +93,7 @@ export type CreateCaseDtoSeverityEnum = typeof CreateCaseDtoSeverityEnum[keyof t
  */
 export function instanceOfCreateCaseDto(value: object): value is CreateCaseDto {
     if (!('title' in value) || value['title'] === undefined) return false;
+    if (!('hypothesis' in value) || value['hypothesis'] === undefined) return false;
     return true;
 }
 
@@ -101,6 +108,7 @@ export function CreateCaseDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
     return {
         
         'title': json['title'],
+        'hypothesis': json['hypothesis'],
         'description': json['description'] == null ? undefined : json['description'],
         'status': json['status'] == null ? undefined : json['status'],
         'severity': json['severity'] == null ? undefined : json['severity'],
@@ -121,6 +129,7 @@ export function CreateCaseDtoToJSONTyped(value?: CreateCaseDto | null, ignoreDis
     return {
         
         'title': value['title'],
+        'hypothesis': value['hypothesis'],
         'description': value['description'],
         'status': value['status'],
         'severity': value['severity'],

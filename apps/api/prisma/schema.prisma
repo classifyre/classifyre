@@ -114,6 +114,7 @@ model Finding {
   customDetectorFeedback CustomDetectorFeedback[]
   notifications Notification[]
   extraction CustomDetectorExtraction?
+  caseMentions CaseFinding[]
 
   @@index([assetId])
   @@index([sourceId])
@@ -620,6 +621,7 @@ model SandboxRun {
 enum EdgeOrigin {
   SOURCE_DERIVED
   INFERRED
+  MANUAL
 }
 
 enum CaseStatus {
@@ -679,6 +681,7 @@ model Case {
   updatedAt   DateTime   @updatedAt @map("updated_at")
 
   evidence   CaseEvidence[]
+  findings   CaseFinding[]
   hypotheses Hypothesis[]
   notes      CaseNote[]
 
@@ -688,24 +691,43 @@ model Case {
   @@map("cases")
 }
 
-// An asset/finding attached to a case. Generic (entityType, entityId) so
-// other entity kinds can be attached later without schema changes.
+// An observed asset node attached to a case. entityType is always "asset"
+// (never "finding" — findings are tracked in case_findings).
 model CaseEvidence {
   id         String   @id @default(uuid())
   caseId     String   @map("case_id")
-  entityType String   @map("entity_type")
+  entityType String   @map("entity_type") // always "asset"
   entityId   String   @map("entity_id")
   note       String?  @db.Text
   addedBy    String?  @map("added_by")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  investigation Case                 @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  hypothesisLinks HypothesisEvidence[]
+  investigation Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  findings      CaseFinding[]
 
   @@unique([caseId, entityType, entityId])
   @@index([caseId])
   @@index([entityType, entityId])
   @@map("case_evidence")
+}
+
+// An inferred observation attached to a piece of case evidence (always anchored to evidence).
+model CaseFinding {
+  id             String   @id @default(uuid())
+  caseId         String   @map("case_id")
+  caseEvidenceId String   @map("case_evidence_id")
+  findingId      String   @map("finding_id")
+  note           String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  investigation Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseEvidence  CaseEvidence @relation(fields: [caseEvidenceId], references: [id], onDelete: Cascade)
+  finding       Finding      @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, findingId])
+  @@index([caseId])
+  @@index([caseEvidenceId])
+  @@map("case_findings")
 }
 
 model Hypothesis {
@@ -718,31 +740,32 @@ model Hypothesis {
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
 
-  investigation Case                 @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  links         HypothesisEvidence[]
+  investigation Case                    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  support       CaseHypothesisSupport[]
 
   @@index([caseId])
   @@map("case_hypotheses")
 }
 
-// Links a piece of case evidence to a hypothesis with a stance, realizing
-// "supporting / contradicting evidence" per hypothesis.
-model HypothesisEvidence {
-  id             String         @id @default(uuid())
-  hypothesisId   String         @map("hypothesis_id")
-  caseEvidenceId String         @map("case_evidence_id")
-  stance         EvidenceStance @default(SUPPORTS)
-  weight         Decimal?       @db.Decimal(3, 2)
-  note           String?        @db.Text
-  createdAt      DateTime       @default(now()) @map("created_at")
+// Polymorphic link between a hypothesis and either a piece of case evidence or a case finding.
+// targetType: "evidence" → targetId references case_evidence.id
+// targetType: "finding"  → targetId references case_findings.id
+model CaseHypothesisSupport {
+  id           String         @id @default(uuid())
+  hypothesisId String         @map("hypothesis_id")
+  targetType   String         @map("target_type") // "evidence" | "finding"
+  targetId     String         @map("target_id")
+  stance       EvidenceStance @default(SUPPORTS)
+  weight       Decimal?       @db.Decimal(3, 2)
+  note         String?        @db.Text
+  createdAt    DateTime       @default(now()) @map("created_at")
 
-  hypothesis   Hypothesis   @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
-  caseEvidence CaseEvidence @relation(fields: [caseEvidenceId], references: [id], onDelete: Cascade)
+  hypothesis Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
 
-  @@unique([hypothesisId, caseEvidenceId])
+  @@unique([hypothesisId, targetType, targetId])
   @@index([hypothesisId])
-  @@index([caseEvidenceId])
-  @@map("hypothesis_evidence")
+  @@index([targetType, targetId])
+  @@map("case_hypothesis_support")
 }
 
 model CaseNote {

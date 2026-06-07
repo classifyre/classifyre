@@ -20,6 +20,13 @@ import {
     EvidenceEntityDtoToJSON,
     EvidenceEntityDtoToJSONTyped,
 } from './EvidenceEntityDto';
+import type { CaseFindingDto } from './CaseFindingDto';
+import {
+    CaseFindingDtoFromJSON,
+    CaseFindingDtoFromJSONTyped,
+    CaseFindingDtoToJSON,
+    CaseFindingDtoToJSONTyped,
+} from './CaseFindingDto';
 
 /**
  * 
@@ -69,6 +76,12 @@ export interface CaseEvidenceDto {
      * @memberof CaseEvidenceDto
      */
     entity?: EvidenceEntityDto | null;
+    /**
+     * 
+     * @type {Array<CaseFindingDto>}
+     * @memberof CaseEvidenceDto
+     */
+    findings?: Array<CaseFindingDto>;
 }
 
 /**
@@ -99,6 +112,7 @@ export function CaseEvidenceDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'addedBy': json['addedBy'] == null ? undefined : json['addedBy'],
         'createdAt': (new Date(json['createdAt'])),
         'entity': json['entity'] == null ? undefined : EvidenceEntityDtoFromJSON(json['entity']),
+        'findings': json['findings'] == null ? undefined : ((json['findings'] as Array<any>).map(CaseFindingDtoFromJSON)),
     };
 }
 
@@ -120,6 +134,7 @@ export function CaseEvidenceDtoToJSONTyped(value?: CaseEvidenceDto | null, ignor
         'addedBy': value['addedBy'],
         'createdAt': value['createdAt'].toISOString(),
         'entity': EvidenceEntityDtoToJSON(value['entity']),
+        'findings': value['findings'] == null ? undefined : ((value['findings'] as Array<any>).map(CaseFindingDtoToJSON)),
     };
 }
 

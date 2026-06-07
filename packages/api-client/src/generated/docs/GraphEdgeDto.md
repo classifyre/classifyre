@@ -14,6 +14,7 @@ Name | Type
 `relationType` | string
 `confidence` | number
 `origin` | string
+`crossHypothesis` | boolean
 
 ## Example
 
@@ -30,6 +31,7 @@ const example = {
   "relationType": null,
   "confidence": null,
   "origin": null,
+  "crossHypothesis": null,
 } satisfies GraphEdgeDto
 
 console.log(example)

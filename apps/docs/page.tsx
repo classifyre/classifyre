@@ -56,14 +56,8 @@ export default function DetectorsPage() {
     >
       <div className="space-y-8">
         <header id="detectors-overview" className="scroll-mt-24 space-y-4">
-          <Badge
-            variant="secondary"
-            className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground"
-          >
-            Detectors
-          </Badge>
           <h1 className="font-serif text-4xl font-black uppercase tracking-[0.08em] text-foreground sm:text-5xl">
-            Detector Reference
+            Detectors
           </h1>
           <p className="max-w-3xl text-muted-foreground">
             Every detector page is generated directly from{" "}

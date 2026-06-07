@@ -15,27 +15,144 @@
 
 import * as runtime from '../runtime';
 import type {
+  BulkIngestEdgesDto,
+  BulkIngestEdgesResponseDto,
+  CreateManualEdgeDto,
+  EdgeDetailDto,
   ExpandGraphDto,
   GraphResponseDto,
+  PivotGraphDto,
   RebuildEdgesResponseDto,
+  RelationTypesResponseDto,
+  UpdateEdgeDto,
 } from '../models/index';
 import {
+    BulkIngestEdgesDtoFromJSON,
+    BulkIngestEdgesDtoToJSON,
+    BulkIngestEdgesResponseDtoFromJSON,
+    BulkIngestEdgesResponseDtoToJSON,
+    CreateManualEdgeDtoFromJSON,
+    CreateManualEdgeDtoToJSON,
+    EdgeDetailDtoFromJSON,
+    EdgeDetailDtoToJSON,
     ExpandGraphDtoFromJSON,
     ExpandGraphDtoToJSON,
     GraphResponseDtoFromJSON,
     GraphResponseDtoToJSON,
+    PivotGraphDtoFromJSON,
+    PivotGraphDtoToJSON,
     RebuildEdgesResponseDtoFromJSON,
     RebuildEdgesResponseDtoToJSON,
+    RelationTypesResponseDtoFromJSON,
+    RelationTypesResponseDtoToJSON,
+    UpdateEdgeDtoFromJSON,
+    UpdateEdgeDtoToJSON,
 } from '../models/index';
+
+export interface GraphControllerCreateManualEdgeRequest {
+    createManualEdgeDto: CreateManualEdgeDto;
+}
+
+export interface GraphControllerDeleteEdgeRequest {
+    id: string;
+}
 
 export interface GraphControllerExpandRequest {
     expandGraphDto: ExpandGraphDto;
+}
+
+export interface GraphControllerIngestEdgesRequest {
+    bulkIngestEdgesDto: BulkIngestEdgesDto;
+}
+
+export interface GraphControllerPivotRequest {
+    pivotGraphDto: PivotGraphDto;
+}
+
+export interface GraphControllerUpdateEdgeRequest {
+    id: string;
+    updateEdgeDto: UpdateEdgeDto;
 }
 
 /**
  * 
  */
 export class GraphApi extends runtime.BaseAPI {
+
+    /**
+     * Create a manual edge between two entities (user-defined relation type)
+     */
+    async graphControllerCreateManualEdgeRaw(requestParameters: GraphControllerCreateManualEdgeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<EdgeDetailDto>> {
+        if (requestParameters['createManualEdgeDto'] == null) {
+            throw new runtime.RequiredError(
+                'createManualEdgeDto',
+                'Required parameter "createManualEdgeDto" was null or undefined when calling graphControllerCreateManualEdge().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/graph/edges/manual`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateManualEdgeDtoToJSON(requestParameters['createManualEdgeDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => EdgeDetailDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Create a manual edge between two entities (user-defined relation type)
+     */
+    async graphControllerCreateManualEdge(requestParameters: GraphControllerCreateManualEdgeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<EdgeDetailDto> {
+        const response = await this.graphControllerCreateManualEdgeRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Delete an edge
+     */
+    async graphControllerDeleteEdgeRaw(requestParameters: GraphControllerDeleteEdgeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling graphControllerDeleteEdge().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/graph/edges/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Delete an edge
+     */
+    async graphControllerDeleteEdge(requestParameters: GraphControllerDeleteEdgeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.graphControllerDeleteEdgeRaw(requestParameters, initOverrides);
+    }
 
     /**
      * Expand the graph around a seed entity (recursive traversal)
@@ -77,6 +194,84 @@ export class GraphApi extends runtime.BaseAPI {
     }
 
     /**
+     * Bulk-upsert source-derived edges from a connector. Idempotent.
+     */
+    async graphControllerIngestEdgesRaw(requestParameters: GraphControllerIngestEdgesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkIngestEdgesResponseDto>> {
+        if (requestParameters['bulkIngestEdgesDto'] == null) {
+            throw new runtime.RequiredError(
+                'bulkIngestEdgesDto',
+                'Required parameter "bulkIngestEdgesDto" was null or undefined when calling graphControllerIngestEdges().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/graph/edges`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: BulkIngestEdgesDtoToJSON(requestParameters['bulkIngestEdgesDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => BulkIngestEdgesResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Bulk-upsert source-derived edges from a connector. Idempotent.
+     */
+    async graphControllerIngestEdges(requestParameters: GraphControllerIngestEdgesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkIngestEdgesResponseDto> {
+        const response = await this.graphControllerIngestEdgesRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Named pivot question on a node (e.g. who_touched, upstream_lineage, emails)
+     */
+    async graphControllerPivotRaw(requestParameters: GraphControllerPivotRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GraphResponseDto>> {
+        if (requestParameters['pivotGraphDto'] == null) {
+            throw new runtime.RequiredError(
+                'pivotGraphDto',
+                'Required parameter "pivotGraphDto" was null or undefined when calling graphControllerPivot().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/graph/pivot`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: PivotGraphDtoToJSON(requestParameters['pivotGraphDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GraphResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Named pivot question on a node (e.g. who_touched, upstream_lineage, emails)
+     */
+    async graphControllerPivot(requestParameters: GraphControllerPivotRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GraphResponseDto> {
+        const response = await this.graphControllerPivotRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Rebuild all inferred edges from existing assets and findings
      */
     async graphControllerRebuildEdgesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RebuildEdgesResponseDto>> {
@@ -102,6 +297,82 @@ export class GraphApi extends runtime.BaseAPI {
      */
     async graphControllerRebuildEdges(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RebuildEdgesResponseDto> {
         const response = await this.graphControllerRebuildEdgesRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Get all relation types in use + vocabulary suggestions
+     */
+    async graphControllerRelationTypesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RelationTypesResponseDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/graph/relation-types`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => RelationTypesResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Get all relation types in use + vocabulary suggestions
+     */
+    async graphControllerRelationTypes(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RelationTypesResponseDto> {
+        const response = await this.graphControllerRelationTypesRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Rename an edge relation type
+     */
+    async graphControllerUpdateEdgeRaw(requestParameters: GraphControllerUpdateEdgeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<EdgeDetailDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling graphControllerUpdateEdge().'
+            );
+        }
+
+        if (requestParameters['updateEdgeDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateEdgeDto',
+                'Required parameter "updateEdgeDto" was null or undefined when calling graphControllerUpdateEdge().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/graph/edges/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateEdgeDtoToJSON(requestParameters['updateEdgeDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => EdgeDetailDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Rename an edge relation type
+     */
+    async graphControllerUpdateEdge(requestParameters: GraphControllerUpdateEdgeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<EdgeDetailDto> {
+        const response = await this.graphControllerUpdateEdgeRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

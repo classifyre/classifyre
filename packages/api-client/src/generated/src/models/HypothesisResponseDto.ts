@@ -13,13 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
-import type { HypothesisEvidenceLinkDto } from './HypothesisEvidenceLinkDto';
+import type { HypothesisSupportLinkDto } from './HypothesisSupportLinkDto';
 import {
-    HypothesisEvidenceLinkDtoFromJSON,
-    HypothesisEvidenceLinkDtoFromJSONTyped,
-    HypothesisEvidenceLinkDtoToJSON,
-    HypothesisEvidenceLinkDtoToJSONTyped,
-} from './HypothesisEvidenceLinkDto';
+    HypothesisSupportLinkDtoFromJSON,
+    HypothesisSupportLinkDtoFromJSONTyped,
+    HypothesisSupportLinkDtoToJSON,
+    HypothesisSupportLinkDtoToJSONTyped,
+} from './HypothesisSupportLinkDto';
 
 /**
  * 
@@ -64,13 +64,13 @@ export interface HypothesisResponseDto {
      */
     createdBy?: string;
     /**
-     * Count of linked SUPPORTS evidence
+     * Count of SUPPORTS links
      * @type {number}
      * @memberof HypothesisResponseDto
      */
     supportingCount: number;
     /**
-     * Count of linked CONTRADICTS evidence
+     * Count of CONTRADICTS links
      * @type {number}
      * @memberof HypothesisResponseDto
      */
@@ -89,10 +89,10 @@ export interface HypothesisResponseDto {
     updatedAt: Date;
     /**
      * 
-     * @type {Array<HypothesisEvidenceLinkDto>}
+     * @type {Array<HypothesisSupportLinkDto>}
      * @memberof HypothesisResponseDto
      */
-    links: Array<HypothesisEvidenceLinkDto>;
+    links: Array<HypothesisSupportLinkDto>;
 }
 
 
@@ -144,7 +144,7 @@ export function HypothesisResponseDtoFromJSONTyped(json: any, ignoreDiscriminato
         'contradictingCount': json['contradictingCount'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
-        'links': ((json['links'] as Array<any>).map(HypothesisEvidenceLinkDtoFromJSON)),
+        'links': ((json['links'] as Array<any>).map(HypothesisSupportLinkDtoFromJSON)),
     };
 }
 
@@ -169,7 +169,7 @@ export function HypothesisResponseDtoToJSONTyped(value?: HypothesisResponseDto |
         'contradictingCount': value['contradictingCount'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
-        'links': ((value['links'] as Array<any>).map(HypothesisEvidenceLinkDtoToJSON)),
+        'links': ((value['links'] as Array<any>).map(HypothesisSupportLinkDtoToJSON)),
     };
 }
 

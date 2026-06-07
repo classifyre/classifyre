@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { Button } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
+import { softwareVersion } from "@workspace/ui/lib/software-version";
 
 function extractText(node: React.ReactNode): string {
   if (typeof node === "string" || typeof node === "number") {
@@ -111,6 +112,18 @@ export function MdxInlineCode(props: React.ComponentPropsWithoutRef<"code">) {
       )}
       {...rest}
     />
+  );
+}
+
+export function Sh({ children }: { children: string }) {
+  const content = React.useMemo(
+    () => children.replace(/\$version/g, softwareVersion),
+    [children],
+  );
+  return (
+    <MdxCodeBlock className="language-bash">
+      <code className="language-bash">{content}</code>
+    </MdxCodeBlock>
   );
 }
 

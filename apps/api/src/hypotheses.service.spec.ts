@@ -3,6 +3,18 @@ import { BadRequestException } from '@nestjs/common';
 import { HypothesesService } from './hypotheses.service';
 import { PrismaService } from './prisma.service';
 
+const makeHypRow = (support: object[] = []) => ({
+  id: 'h1',
+  caseId: 'c1',
+  statement: 'Customer PII exported',
+  status: 'PROPOSED',
+  confidence: '0.40',
+  createdBy: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  support,
+});
+
 describe('HypothesesService', () => {
   let service: HypothesesService;
 
@@ -14,8 +26,9 @@ describe('HypothesesService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
-    caseEvidence: { findUnique: jest.fn() },
-    hypothesisEvidence: {
+    caseEvidence: { findUnique: jest.fn(), findMany: jest.fn() },
+    caseFinding: { findUnique: jest.fn(), findMany: jest.fn() },
+    caseHypothesisSupport: {
       upsert: jest.fn(),
       findUnique: jest.fn(),
       delete: jest.fn(),
@@ -35,53 +48,37 @@ describe('HypothesesService', () => {
     service = module.get<HypothesesService>(HypothesesService);
     jest.clearAllMocks();
     mockPrisma.asset.findMany.mockResolvedValue([]);
-    mockPrisma.finding.findMany.mockResolvedValue([]);
+    mockPrisma.caseEvidence.findMany.mockResolvedValue([]);
+    mockPrisma.caseFinding.findMany.mockResolvedValue([]);
   });
 
-  it('computes supporting and contradicting counts from links', async () => {
-    mockPrisma.hypothesis.findUnique.mockResolvedValue({ caseId: 'c1' });
-    mockPrisma.caseEvidence.findUnique.mockResolvedValue({ caseId: 'c1' });
-    mockPrisma.hypothesisEvidence.upsert.mockResolvedValue({});
-    // getOne re-fetch with include
-    mockPrisma.hypothesis.findUnique.mockResolvedValueOnce({ caseId: 'c1' });
-    mockPrisma.hypothesis.findUnique.mockResolvedValueOnce({
-      id: 'h1',
-      caseId: 'c1',
-      statement: 'Customer PII exported',
-      status: 'PROPOSED',
-      confidence: '0.40',
-      createdBy: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      links: [
-        {
-          id: 'l1',
-          caseEvidenceId: 'ev1',
-          stance: 'SUPPORTS',
-          weight: null,
-          note: null,
-          caseEvidence: { entityType: 'asset', entityId: 'a1' },
-        },
-        {
-          id: 'l2',
-          caseEvidenceId: 'ev2',
-          stance: 'CONTRADICTS',
-          weight: null,
-          note: null,
-          caseEvidence: { entityType: 'finding', entityId: 'f1' },
-        },
-      ],
-    });
-    mockPrisma.asset.findMany.mockResolvedValue([{ id: 'a1', name: 'customer.csv' }]);
-    mockPrisma.finding.findMany.mockResolvedValue([{ id: 'f1', findingType: 'ssn' }]);
+  it('computes supporting and contradicting counts from support links', async () => {
+    const evRow = { id: 'ev1', entityId: 'a1', entityType: 'asset' };
+    const cfRow = { id: 'cf1', finding: { findingType: 'Contains PII' } };
 
-    const result = await service.linkEvidence('h1', { caseEvidenceId: 'ev1' });
+    // validateTarget calls
+    mockPrisma.caseEvidence.findUnique.mockResolvedValue({ caseId: 'c1' });
+    mockPrisma.caseHypothesisSupport.upsert.mockResolvedValue({});
+    // hypothesis first findUnique (get caseId)
+    mockPrisma.hypothesis.findUnique.mockResolvedValueOnce({ caseId: 'c1' });
+    // getOne after link
+    mockPrisma.hypothesis.findUnique.mockResolvedValueOnce(
+      makeHypRow([
+        { id: 'l1', targetType: 'evidence', targetId: 'ev1', stance: 'SUPPORTS', weight: null, note: null },
+        { id: 'l2', targetType: 'finding', targetId: 'cf1', stance: 'CONTRADICTS', weight: null, note: null },
+      ]),
+    );
+    mockPrisma.caseEvidence.findMany.mockResolvedValue([evRow]);
+    mockPrisma.caseFinding.findMany.mockResolvedValue([cfRow]);
+    mockPrisma.asset.findMany.mockResolvedValue([{ id: 'a1', name: 'customer.csv' }]);
+
+    const result = await service.linkSupport('h1', { targetType: 'evidence', targetId: 'ev1' });
 
     expect(result.supportingCount).toBe(1);
     expect(result.contradictingCount).toBe(1);
     expect(result.confidence).toBe(0.4);
-    expect(result.links[0].evidenceLabel).toBe('customer.csv');
-    expect(result.links[1].evidenceLabel).toBe('ssn');
+    expect(result.links[0].targetLabel).toBe('customer.csv');
+    expect(result.links[1].targetLabel).toBe('Contains PII');
   });
 
   it('rejects linking evidence from a different case', async () => {
@@ -89,7 +86,16 @@ describe('HypothesesService', () => {
     mockPrisma.caseEvidence.findUnique.mockResolvedValue({ caseId: 'other' });
 
     await expect(
-      service.linkEvidence('h1', { caseEvidenceId: 'ev1' }),
+      service.linkSupport('h1', { targetType: 'evidence', targetId: 'ev1' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects linking a case finding from a different case', async () => {
+    mockPrisma.hypothesis.findUnique.mockResolvedValue({ caseId: 'c1' });
+    mockPrisma.caseFinding.findUnique.mockResolvedValue({ caseId: 'other' });
+
+    await expect(
+      service.linkSupport('h1', { targetType: 'finding', targetId: 'cf1' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

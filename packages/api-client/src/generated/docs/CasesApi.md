@@ -4,13 +4,15 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
-| [**casesControllerAddEvidence**](CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset or finding to the case as evidence |
-| [**casesControllerCreate**](CasesApi.md#casescontrollercreate) | **POST** /cases | Create an investigation case |
-| [**casesControllerFindOne**](CasesApi.md#casescontrollerfindone) | **GET** /cases/{id} | Get a case with hydrated evidence |
+| [**casesControllerAddEvidence**](CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence. Use /evidence/:id/findings for findings. |
+| [**casesControllerAddFinding**](CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of case evidence |
+| [**casesControllerCreate**](CasesApi.md#casescontrollercreate) | **POST** /cases | Create an investigation case with an initial hypothesis |
+| [**casesControllerFindOne**](CasesApi.md#casescontrollerfindone) | **GET** /cases/{id} | Get a case with hydrated evidence (and their findings) |
 | [**casesControllerGraph**](CasesApi.md#casescontrollergraph) | **GET** /cases/{id}/graph | Get the evidence neighbourhood graph for a case |
 | [**casesControllerList**](CasesApi.md#casescontrollerlist) | **GET** /cases | List investigation cases |
 | [**casesControllerRemove**](CasesApi.md#casescontrollerremove) | **DELETE** /cases/{id} | Delete a case |
 | [**casesControllerRemoveEvidence**](CasesApi.md#casescontrollerremoveevidence) | **DELETE** /cases/{id}/evidence/{evidenceId} | Remove evidence from the case |
+| [**casesControllerRemoveFinding**](CasesApi.md#casescontrollerremovefinding) | **DELETE** /cases/{id}/findings/{caseFindingId} | Remove a finding from the case |
 | [**casesControllerUpdate**](CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case |
 
 
@@ -19,7 +21,7 @@ All URIs are relative to *http://localhost*
 
 > CaseEvidenceDto casesControllerAddEvidence(id, addEvidenceDto)
 
-Attach an asset or finding to the case as evidence
+Attach an asset as evidence. Use /evidence/:id/findings for findings.
 
 ### Example
 
@@ -83,11 +85,82 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## casesControllerAddFinding
+
+> CaseFindingDto casesControllerAddFinding(id, evidenceId, addFindingDto)
+
+Attach a finding to a piece of case evidence
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CasesControllerAddFindingRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string
+    evidenceId: evidenceId_example,
+    // AddFindingDto
+    addFindingDto: ...,
+  } satisfies CasesControllerAddFindingRequest;
+
+  try {
+    const data = await api.casesControllerAddFinding(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **evidenceId** | `string` |  | [Defaults to `undefined`] |
+| **addFindingDto** | [AddFindingDto](AddFindingDto.md) |  | |
+
+### Return type
+
+[**CaseFindingDto**](CaseFindingDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## casesControllerCreate
 
 > CaseResponseDto casesControllerCreate(createCaseDto)
 
-Create an investigation case
+Create an investigation case with an initial hypothesis
 
 ### Example
 
@@ -152,7 +225,7 @@ No authorization required
 
 > CaseResponseDto casesControllerFindOne(id)
 
-Get a case with hydrated evidence
+Get a case with hydrated evidence (and their findings)
 
 ### Example
 
@@ -469,6 +542,74 @@ example().catch(console.error);
 |------------- | ------------- | ------------- | -------------|
 | **id** | `string` |  | [Defaults to `undefined`] |
 | **evidenceId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## casesControllerRemoveFinding
+
+> casesControllerRemoveFinding(id, caseFindingId)
+
+Remove a finding from the case
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CasesControllerRemoveFindingRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string
+    caseFindingId: caseFindingId_example,
+  } satisfies CasesControllerRemoveFindingRequest;
+
+  try {
+    const data = await api.casesControllerRemoveFinding(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **caseFindingId** | `string` |  | [Defaults to `undefined`] |
 
 ### Return type
 

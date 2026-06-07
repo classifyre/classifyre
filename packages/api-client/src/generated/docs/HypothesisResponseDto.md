@@ -16,7 +16,7 @@ Name | Type
 `contradictingCount` | number
 `createdAt` | Date
 `updatedAt` | Date
-`links` | [Array&lt;HypothesisEvidenceLinkDto&gt;](HypothesisEvidenceLinkDto.md)
+`links` | [Array&lt;HypothesisSupportLinkDto&gt;](HypothesisSupportLinkDto.md)
 
 ## Example
 

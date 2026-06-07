@@ -34,6 +34,7 @@ export default function InvestigationsPage() {
   const [stats, setStats] = React.useState({ total: 0, open: 0, inProgress: 0 });
   const [createOpen, setCreateOpen] = React.useState(false);
   const [title, setTitle] = React.useState("");
+  const [hypothesis, setHypothesis] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [severity, setSeverity] = React.useState<string>("MEDIUM");
   const [saving, setSaving] = React.useState(false);
@@ -44,33 +45,35 @@ export default function InvestigationsPage() {
       api.cases.casesControllerList({ limit: 1, status: ["OPEN"] }),
       api.cases.casesControllerList({ limit: 1, status: ["IN_PROGRESS"] }),
     ]);
-    setStats({
-      total: all.total,
-      open: open.total,
-      inProgress: inProgress.total,
-    });
+    setStats({ total: all.total, open: open.total, inProgress: inProgress.total });
   }, []);
 
   React.useEffect(() => {
     void loadStats();
   }, [loadStats]);
 
+  const reset = () => {
+    setTitle("");
+    setHypothesis("");
+    setDescription("");
+    setSeverity("MEDIUM");
+  };
+
   const handleCreate = async () => {
-    if (!title.trim()) return;
+    if (!title.trim() || !hypothesis.trim()) return;
     setSaving(true);
     try {
       const created = await api.cases.casesControllerCreate({
         createCaseDto: {
           title: title.trim(),
+          hypothesis: hypothesis.trim(),
           description: description.trim() || undefined,
           severity: severity as never,
         },
       });
       toast.success("Case created");
       setCreateOpen(false);
-      setTitle("");
-      setDescription("");
-      setSeverity("MEDIUM");
+      reset();
       router.push(`/investigations/${created.id}`);
     } catch (err) {
       toast.error("Failed to create case");
@@ -94,8 +97,8 @@ export default function InvestigationsPage() {
             Investigations
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Create cases, collect evidence, explore relationships and test
-            hypotheses.
+            Open a case from a hypothesis, collect evidence, and test competing
+            theories.
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
@@ -119,23 +122,39 @@ export default function InvestigationsPage() {
 
       <CasesTable />
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) reset(); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New investigation case</DialogTitle>
             <DialogDescription>
-              Start a case to gather evidence and reason over relationships.
+              Every case starts with a hypothesis — what do you suspect?
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="case-title">Title</Label>
+              <Label htmlFor="case-hypothesis">
+                Initial hypothesis <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="case-hypothesis"
+                value={hypothesis}
+                onChange={(e) => setHypothesis(e.target.value)}
+                placeholder="e.g. Customer PII was shared externally"
+                autoFocus
+              />
+              <p className="text-muted-foreground text-xs">
+                Frame the core suspicion. Evidence will strengthen or weaken this.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="case-title">
+                Case title <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="case-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Possible external sharing of customer data"
-                autoFocus
               />
             </div>
             <div className="space-y-1.5">
@@ -164,10 +183,13 @@ export default function InvestigationsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+            <Button variant="outline" onClick={() => { setCreateOpen(false); reset(); }}>
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={!title.trim() || saving}>
+            <Button
+              onClick={handleCreate}
+              disabled={!title.trim() || !hypothesis.trim() || saving}
+            >
               Create case
             </Button>
           </DialogFooter>

@@ -67,6 +67,12 @@ export interface GraphEdgeDto {
      * @memberof GraphEdgeDto
      */
     origin: GraphEdgeDtoOriginEnum;
+    /**
+     * True when this edge bridges nodes affiliated with different hypotheses
+     * @type {boolean}
+     * @memberof GraphEdgeDto
+     */
+    crossHypothesis?: boolean;
 }
 
 
@@ -75,7 +81,8 @@ export interface GraphEdgeDto {
  */
 export const GraphEdgeDtoOriginEnum = {
     SourceDerived: 'SOURCE_DERIVED',
-    Inferred: 'INFERRED'
+    Inferred: 'INFERRED',
+    Manual: 'MANUAL'
 } as const;
 export type GraphEdgeDtoOriginEnum = typeof GraphEdgeDtoOriginEnum[keyof typeof GraphEdgeDtoOriginEnum];
 
@@ -113,6 +120,7 @@ export function GraphEdgeDtoFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'relationType': json['relationType'],
         'confidence': json['confidence'],
         'origin': json['origin'],
+        'crossHypothesis': json['crossHypothesis'] == null ? undefined : json['crossHypothesis'],
     };
 }
 
@@ -135,6 +143,7 @@ export function GraphEdgeDtoToJSONTyped(value?: GraphEdgeDto | null, ignoreDiscr
         'relationType': value['relationType'],
         'confidence': value['confidence'],
         'origin': value['origin'],
+        'crossHypothesis': value['crossHypothesis'],
     };
 }
 
