@@ -33,6 +33,30 @@ export { NotificationsApi } from "./generated/src/apis/NotificationsApi";
 export { SandboxApi } from "./generated/src/apis/SandboxApi";
 export { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
 export { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
+export { CasesApi } from "./generated/src/apis/CasesApi";
+export { GraphApi } from "./generated/src/apis/GraphApi";
+export { HypothesesApi } from "./generated/src/apis/HypothesesApi";
+
+// Investigation (cases / graph / hypotheses) model types
+export type {
+  CreateCaseDto,
+  UpdateCaseDto,
+  CaseResponseDto,
+  CaseListResponseDto,
+  CaseEvidenceDto,
+  EvidenceEntityDto,
+  AddEvidenceDto,
+  CreateHypothesisDto,
+  UpdateHypothesisDto,
+  HypothesisResponseDto,
+  HypothesisEvidenceLinkDto,
+  LinkEvidenceDto,
+  ExpandGraphDto,
+  GraphNodeDto,
+  GraphEdgeDto,
+  GraphResponseDto,
+  RebuildEdgesResponseDto,
+} from "./generated/src/models";
 export {
   SandboxControllerListRunsContentTypeEnum,
   SandboxControllerListRunsDetectorTypeEnum,
@@ -748,6 +772,9 @@ import { NotificationsApi } from "./generated/src/apis/NotificationsApi";
 import { SandboxApi } from "./generated/src/apis/SandboxApi";
 import { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
 import { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
+import { CasesApi } from "./generated/src/apis/CasesApi";
+import { GraphApi } from "./generated/src/apis/GraphApi";
+import { HypothesesApi } from "./generated/src/apis/HypothesesApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -802,6 +829,9 @@ class ApiClient {
   public sandbox: SandboxApi;
   public instanceSettings: InstanceSettingsApi;
   public aiProviderConfigs: AIProviderConfigsApi;
+  public cases: CasesApi;
+  public graph: GraphApi;
+  public hypotheses: HypothesesApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -815,6 +845,9 @@ class ApiClient {
     this.sandbox = new SandboxApi(this.config);
     this.instanceSettings = new InstanceSettingsApi(this.config);
     this.aiProviderConfigs = new AIProviderConfigsApi(this.config);
+    this.cases = new CasesApi(this.config);
+    this.graph = new GraphApi(this.config);
+    this.hypotheses = new HypothesesApi(this.config);
   }
 
   async searchAssets(

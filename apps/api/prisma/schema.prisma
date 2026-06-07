@@ -714,3 +714,146 @@ model MetricDashboardPlacement {
   @@index([dashboard])
   @@map("metric_dashboard_placements")
 }
+
+// ─── INVESTIGATIONS (CASES / GRAPH) ──────────────────────────────
+
+enum EdgeOrigin {
+  SOURCE_DERIVED
+  INFERRED
+}
+
+enum CaseStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+  ARCHIVED
+}
+
+enum HypothesisStatus {
+  PROPOSED
+  SUPPORTED
+  REFUTED
+  INCONCLUSIVE
+}
+
+enum EvidenceStance {
+  SUPPORTS
+  CONTRADICTS
+  NEUTRAL
+}
+
+// Generic, directed relationship between any two graph entities.
+// `fromType`/`toType` are entity kinds ("asset" | "finding", room for
+// "concept" later) and the ids reference the corresponding rows. The
+// relation type is a free-form string so the inference engine (and a
+// future ingestion path) can introduce new kinds without a migration.
+model Edge {
+  id           String     @id @default(uuid())
+  fromType     String     @map("from_type")
+  fromId       String     @map("from_id")
+  toType       String     @map("to_type")
+  toId         String     @map("to_id")
+  relationType String     @map("relation_type")
+  confidence   Decimal    @default(1.00) @db.Decimal(3, 2)
+  origin       EdgeOrigin @default(INFERRED)
+  metadata     Json?      @db.JsonB
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@unique([fromType, fromId, toType, toId, relationType])
+  @@index([fromType, fromId])
+  @@index([toType, toId])
+  @@index([relationType])
+  @@map("edges")
+}
+
+model Case {
+  id          String     @id @default(uuid())
+  title       String
+  description String?    @db.Text
+  status      CaseStatus @default(OPEN)
+  severity    Severity   @default(MEDIUM)
+  assignee    String?
+  createdBy   String?    @map("created_by")
+  conclusion  String?    @db.Text
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  evidence   CaseEvidence[]
+  hypotheses Hypothesis[]
+  notes      CaseNote[]
+
+  @@index([status])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("cases")
+}
+
+// An asset/finding attached to a case. Generic (entityType, entityId) so
+// other entity kinds can be attached later without schema changes.
+model CaseEvidence {
+  id         String   @id @default(uuid())
+  caseId     String   @map("case_id")
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  note       String?  @db.Text
+  addedBy    String?  @map("added_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  investigation Case                 @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  hypothesisLinks HypothesisEvidence[]
+
+  @@unique([caseId, entityType, entityId])
+  @@index([caseId])
+  @@index([entityType, entityId])
+  @@map("case_evidence")
+}
+
+model Hypothesis {
+  id         String           @id @default(uuid())
+  caseId     String           @map("case_id")
+  statement  String           @db.Text
+  status     HypothesisStatus @default(PROPOSED)
+  confidence Decimal?         @db.Decimal(3, 2)
+  createdBy  String?          @map("created_by")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  investigation Case                 @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  links         HypothesisEvidence[]
+
+  @@index([caseId])
+  @@map("case_hypotheses")
+}
+
+// Links a piece of case evidence to a hypothesis with a stance, realizing
+// "supporting / contradicting evidence" per hypothesis.
+model HypothesisEvidence {
+  id             String         @id @default(uuid())
+  hypothesisId   String         @map("hypothesis_id")
+  caseEvidenceId String         @map("case_evidence_id")
+  stance         EvidenceStance @default(SUPPORTS)
+  weight         Decimal?       @db.Decimal(3, 2)
+  note           String?        @db.Text
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  hypothesis   Hypothesis   @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  caseEvidence CaseEvidence @relation(fields: [caseEvidenceId], references: [id], onDelete: Cascade)
+
+  @@unique([hypothesisId, caseEvidenceId])
+  @@index([hypothesisId])
+  @@index([caseEvidenceId])
+  @@map("hypothesis_evidence")
+}
+
+model CaseNote {
+  id        String   @id @default(uuid())
+  caseId    String   @map("case_id")
+  body      String   @db.Text
+  author    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  investigation Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("case_notes")
+}

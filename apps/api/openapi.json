@@ -3958,6 +3958,597 @@
         ]
       }
     },
+    "/cases": {
+      "post": {
+        "operationId": "CasesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create an investigation case",
+        "tags": [
+          "cases"
+        ]
+      },
+      "get": {
+        "operationId": "CasesController_list",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "OPEN",
+                  "IN_PROGRESS",
+                  "CLOSED",
+                  "ARCHIVED"
+                ]
+              }
+            }
+          },
+          {
+            "name": "severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "CRITICAL",
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW",
+                  "INFO"
+                ]
+              }
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List investigation cases",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}": {
+      "get": {
+        "operationId": "CasesController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Case not found"
+          }
+        },
+        "summary": "Get a case with hydrated evidence",
+        "tags": [
+          "cases"
+        ]
+      },
+      "patch": {
+        "operationId": "CasesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update a case",
+        "tags": [
+          "cases"
+        ]
+      },
+      "delete": {
+        "operationId": "CasesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/evidence": {
+      "post": {
+        "operationId": "CasesController_addEvidence",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddEvidenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEvidenceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Attach an asset or finding to the case as evidence",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/evidence/{evidenceId}": {
+      "delete": {
+        "operationId": "CasesController_removeEvidence",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "evidenceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Remove evidence from the case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/graph": {
+      "get": {
+        "operationId": "CasesController_graph",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "depth",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get the evidence neighbourhood graph for a case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{caseId}/hypotheses": {
+      "get": {
+        "operationId": "HypothesesController_list",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HypothesisResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List hypotheses for a case",
+        "tags": [
+          "hypotheses"
+        ]
+      },
+      "post": {
+        "operationId": "HypothesesController_create",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHypothesisDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a hypothesis in a case",
+        "tags": [
+          "hypotheses"
+        ]
+      }
+    },
+    "/hypotheses/{id}": {
+      "patch": {
+        "operationId": "HypothesesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateHypothesisDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update a hypothesis",
+        "tags": [
+          "hypotheses"
+        ]
+      },
+      "delete": {
+        "operationId": "HypothesesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a hypothesis",
+        "tags": [
+          "hypotheses"
+        ]
+      }
+    },
+    "/hypotheses/{id}/evidence": {
+      "post": {
+        "operationId": "HypothesesController_linkEvidence",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkEvidenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Link case evidence to a hypothesis with a stance",
+        "tags": [
+          "hypotheses"
+        ]
+      }
+    },
+    "/hypotheses/{id}/evidence/{linkId}": {
+      "delete": {
+        "operationId": "HypothesesController_unlinkEvidence",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "linkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Unlink evidence from a hypothesis",
+        "tags": [
+          "hypotheses"
+        ]
+      }
+    },
+    "/graph/expand": {
+      "post": {
+        "operationId": "GraphController_expand",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpandGraphDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Expand the graph around a seed entity (recursive traversal)",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
+    "/graph/rebuild-edges": {
+      "post": {
+        "operationId": "GraphController_rebuildEdges",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RebuildEdgesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rebuild all inferred edges from existing assets and findings",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
     "/sources/{sourceId}/run": {
       "post": {
         "operationId": "CliRunnerController_startRunner",
@@ -9453,6 +10044,615 @@
           "content",
           "model",
           "provider"
+        ]
+      },
+      "CreateCaseDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "CLOSED",
+              "ARCHIVED"
+            ],
+            "default": "OPEN"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ],
+            "default": "MEDIUM"
+          },
+          "assignee": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "EvidenceEntityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "assetType": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "missing": {
+            "type": "boolean",
+            "description": "True when the referenced row no longer exists"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ]
+      },
+      "CaseEvidenceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "addedBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entity": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceEntityDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "entityType",
+          "entityId",
+          "createdAt"
+        ]
+      },
+      "CaseResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "CLOSED",
+              "ARCHIVED"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ]
+          },
+          "assignee": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "conclusion": {
+            "type": "string"
+          },
+          "evidenceCount": {
+            "type": "number"
+          },
+          "hypothesisCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseEvidenceDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "severity",
+          "evidenceCount",
+          "hypothesisCount",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CaseListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseResponseDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ]
+      },
+      "UpdateCaseDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "CLOSED",
+              "ARCHIVED"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ]
+          },
+          "assignee": {
+            "type": "string"
+          },
+          "conclusion": {
+            "type": "string"
+          }
+        }
+      },
+      "AddEvidenceDto": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "description": "Entity kind: \"asset\" | \"finding\""
+          },
+          "entityId": {
+            "type": "string",
+            "description": "Asset or finding UUID"
+          },
+          "note": {
+            "type": "string"
+          },
+          "addedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "entityType",
+          "entityId"
+        ]
+      },
+      "GraphNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "\"asset\" | \"finding\""
+          },
+          "label": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "number",
+            "description": "Hop distance from the seed/case evidence"
+          },
+          "assetType": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "missing": {
+            "type": "boolean",
+            "description": "True when the underlying row no longer exists"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "label",
+          "depth"
+        ]
+      },
+      "GraphEdgeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fromType": {
+            "type": "string"
+          },
+          "fromId": {
+            "type": "string"
+          },
+          "toType": {
+            "type": "string"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "relationType": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "SOURCE_DERIVED",
+              "INFERRED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "fromType",
+          "fromId",
+          "toType",
+          "toId",
+          "relationType",
+          "confidence",
+          "origin"
+        ]
+      },
+      "GraphResponseDto": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphNodeDto"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphEdgeDto"
+            }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the node cap was hit and the graph is partial"
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "truncated"
+        ]
+      },
+      "HypothesisEvidenceLinkDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseEvidenceId": {
+            "type": "string"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "SUPPORTS",
+              "CONTRADICTS",
+              "NEUTRAL"
+            ]
+          },
+          "weight": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          },
+          "evidenceLabel": {
+            "type": "string",
+            "description": "Display label for the linked evidence entity"
+          }
+        },
+        "required": [
+          "id",
+          "caseEvidenceId",
+          "stance"
+        ]
+      },
+      "HypothesisResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "SUPPORTED",
+              "REFUTED",
+              "INCONCLUSIVE"
+            ]
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "supportingCount": {
+            "type": "number",
+            "description": "Count of linked SUPPORTS evidence"
+          },
+          "contradictingCount": {
+            "type": "number",
+            "description": "Count of linked CONTRADICTS evidence"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HypothesisEvidenceLinkDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "caseId",
+          "statement",
+          "status",
+          "supportingCount",
+          "contradictingCount",
+          "createdAt",
+          "updatedAt",
+          "links"
+        ]
+      },
+      "CreateHypothesisDto": {
+        "type": "object",
+        "properties": {
+          "statement": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "SUPPORTED",
+              "REFUTED",
+              "INCONCLUSIVE"
+            ],
+            "default": "PROPOSED"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "createdBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "statement"
+        ]
+      },
+      "UpdateHypothesisDto": {
+        "type": "object",
+        "properties": {
+          "statement": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "SUPPORTED",
+              "REFUTED",
+              "INCONCLUSIVE"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "nullable": true
+          }
+        }
+      },
+      "LinkEvidenceDto": {
+        "type": "object",
+        "properties": {
+          "caseEvidenceId": {
+            "type": "string",
+            "description": "CaseEvidence id to link to this hypothesis"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "SUPPORTS",
+              "CONTRADICTS",
+              "NEUTRAL"
+            ],
+            "default": "SUPPORTS"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "caseEvidenceId"
+        ]
+      },
+      "ExpandGraphDto": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "description": "Seed entity kind: \"asset\" | \"finding\""
+          },
+          "entityId": {
+            "type": "string",
+            "description": "Seed entity UUID"
+          },
+          "depth": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1,
+            "maximum": 3
+          },
+          "direction": {
+            "type": "string",
+            "default": "both",
+            "enum": [
+              "both",
+              "out",
+              "in"
+            ]
+          },
+          "relationTypes": {
+            "description": "Restrict traversal to these relation types",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "entityType",
+          "entityId"
+        ]
+      },
+      "RebuildEdgesResponseDto": {
+        "type": "object",
+        "properties": {
+          "edgeCount": {
+            "type": "number",
+            "description": "Total edges present after the rebuild"
+          }
+        },
+        "required": [
+          "edgeCount"
         ]
       },
       "StartRunnerDto": {

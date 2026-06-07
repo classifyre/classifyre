@@ -27,6 +27,9 @@ import { McpTokenService } from './mcp-token.service';
 import { McpServerFactoryService } from './mcp-server.factory';
 import { McpToolExecutorService } from './mcp-tool-executor.service';
 import { AssistantService } from './assistant.service';
+import { CasesService } from './cases.service';
+import { HypothesesService } from './hypotheses.service';
+import { GraphService } from './graph.service';
 
 // Import organized controllers
 import {
@@ -46,6 +49,9 @@ import {
   AssistantController,
   CustomDetectorExtractionsController,
   CustomDetectorTestsController,
+  CasesController,
+  HypothesesController,
+  GraphController,
 } from './controllers';
 
 @Module({
@@ -74,6 +80,9 @@ import {
     AiProviderConfigController,
     AiController,
     AssistantController,
+    CasesController,
+    HypothesesController,
+    GraphController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: DemoModeGuard },
@@ -97,6 +106,9 @@ import {
     McpToolExecutorService,
     McpServerFactoryService,
     AssistantService,
+    CasesService,
+    HypothesesService,
+    GraphService,
   ],
 })
 export class AppModule {}
