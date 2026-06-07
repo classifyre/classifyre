@@ -138,14 +138,6 @@ All URIs are relative to *http://localhost*
 *SandboxApi* | [**sandboxControllerGetRunInput**](docs/SandboxApi.md#sandboxcontrollergetruninput) | **GET** /sandbox/runs/{id}/input | Download the staged input file for an in-flight sandbox run
 *SandboxApi* | [**sandboxControllerListRuns**](docs/SandboxApi.md#sandboxcontrollerlistruns) | **GET** /sandbox/runs | List sandbox runs (paginated)
 *SandboxApi* | [**sandboxControllerRerunRun**](docs/SandboxApi.md#sandboxcontrollerrerunrun) | **POST** /sandbox/runs/{id}/rerun | Re-scan a run with different detectors (appends findings)
-*SemanticLayerMetricsApi* | [**metricsControllerCertify**](docs/SemanticLayerMetricsApi.md#metricscontrollercertify) | **POST** /semantic/metrics/{id}/certify | Certify a metric (DRAFT → ACTIVE)
-*SemanticLayerMetricsApi* | [**metricsControllerCreate**](docs/SemanticLayerMetricsApi.md#metricscontrollercreate) | **POST** /semantic/metrics | Create a new metric definition
-*SemanticLayerMetricsApi* | [**metricsControllerDelete**](docs/SemanticLayerMetricsApi.md#metricscontrollerdelete) | **DELETE** /semantic/metrics/{id} | Delete a metric definition
-*SemanticLayerMetricsApi* | [**metricsControllerFindAll**](docs/SemanticLayerMetricsApi.md#metricscontrollerfindall) | **GET** /semantic/metrics | List all metric definitions
-*SemanticLayerMetricsApi* | [**metricsControllerFindById**](docs/SemanticLayerMetricsApi.md#metricscontrollerfindbyid) | **GET** /semantic/metrics/{id} | Get a metric definition by id
-*SemanticLayerMetricsApi* | [**metricsControllerUpdate**](docs/SemanticLayerMetricsApi.md#metricscontrollerupdate) | **PUT** /semantic/metrics/{id} | Update a metric definition
-*SemanticLayerQueryApi* | [**metricQueryControllerQueryMetric**](docs/SemanticLayerQueryApi.md#metricquerycontrollerquerymetric) | **POST** /semantic/query | Evaluate a metric with optional dimensions and filters
-*SemanticLayerQueryApi* | [**metricQueryControllerQueryTimeSeries**](docs/SemanticLayerQueryApi.md#metricquerycontrollerquerytimeseries) | **POST** /semantic/query/timeseries | Evaluate a metric as a time series
 *SourcesApi* | [**searchSourcesControllerSearchSources**](docs/SourcesApi.md#searchsourcescontrollersearchsources) | **POST** /search/sources | Search data sources
 *SourcesApi* | [**sourceAssetsControllerBulkIngest**](docs/SourcesApi.md#sourceassetscontrollerbulkingest) | **POST** /sources/{sourceId}/assets/bulk | Bulk ingest assets
 *SourcesApi* | [**sourceAssetsControllerFinalizeIngest**](docs/SourcesApi.md#sourceassetscontrollerfinalizeingest) | **POST** /sources/{sourceId}/assets/finalize | Finalize ingest run
@@ -189,7 +181,6 @@ All URIs are relative to *http://localhost*
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
 - [CreateMcpTokenDto](docs/CreateMcpTokenDto.md)
-- [CreateMetricDefinitionDto](docs/CreateMetricDefinitionDto.md)
 - [CreateSourceDto](docs/CreateSourceDto.md)
 - [CustomDetectorExampleDto](docs/CustomDetectorExampleDto.md)
 - [CustomDetectorResponseDto](docs/CustomDetectorResponseDto.md)
@@ -231,8 +222,6 @@ All URIs are relative to *http://localhost*
 - [ParseTrainingExamplesResponseDto](docs/ParseTrainingExamplesResponseDto.md)
 - [ParseTrainingExamplesSkippedReasonsDto](docs/ParseTrainingExamplesSkippedReasonsDto.md)
 - [ParsedTrainingExampleDto](docs/ParsedTrainingExampleDto.md)
-- [QueryMetricDto](docs/QueryMetricDto.md)
-- [QueryMetricTimeSeriesDto](docs/QueryMetricTimeSeriesDto.md)
 - [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)
 - [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
 - [RerunSandboxRunDto](docs/RerunSandboxRunDto.md)
@@ -307,7 +296,6 @@ All URIs are relative to *http://localhost*
 - [UpdateFindingDto](docs/UpdateFindingDto.md)
 - [UpdateInstanceSettingsDto](docs/UpdateInstanceSettingsDto.md)
 - [UpdateMcpTokenDto](docs/UpdateMcpTokenDto.md)
-- [UpdateMetricDefinitionDto](docs/UpdateMetricDefinitionDto.md)
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)
 - [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)

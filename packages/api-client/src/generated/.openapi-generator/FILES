@@ -79,7 +79,6 @@ docs/NotificationsControllerMarkAllRead200Response.md
 docs/ParseTrainingExamplesResponseDto.md
 docs/ParseTrainingExamplesSkippedReasonsDto.md
 docs/ParsedTrainingExampleDto.md
-
 docs/RegisterDiscoveredAssetsDto.md
 docs/RegisterDiscoveredAssetsResponseDto.md
 docs/RerunSandboxRunDto.md
@@ -138,7 +137,6 @@ docs/SearchSourcesPageDto.md
 docs/SearchSourcesRequestDto.md
 docs/SearchSourcesResponseDto.md
 docs/SearchSourcesTotalsDto.md
-
 docs/SourceAssetsControllerBulkIngest201Response.md
 docs/SourceInfoDto.md
 docs/SourceResponseDto.md
