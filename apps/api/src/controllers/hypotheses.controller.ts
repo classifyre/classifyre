@@ -14,7 +14,7 @@ import { HypothesesService } from '../hypotheses.service';
 import {
   CreateHypothesisDto,
   HypothesisResponseDto,
-  LinkEvidenceDto,
+  LinkSupportDto,
   UpdateHypothesisDto,
 } from '../dto/hypothesis.dto';
 
@@ -44,10 +44,7 @@ export class HypothesesController {
   @Patch('hypotheses/:id')
   @ApiOperation({ summary: 'Update a hypothesis' })
   @ApiResponse({ status: 200, type: HypothesisResponseDto })
-  async update(
-    @Param('id') id: string,
-    @Body() dto: UpdateHypothesisDto,
-  ): Promise<HypothesisResponseDto> {
+  async update(@Param('id') id: string, @Body() dto: UpdateHypothesisDto): Promise<HypothesisResponseDto> {
     return this.hypothesesService.update(id, dto);
   }
 
@@ -58,23 +55,23 @@ export class HypothesesController {
     await this.hypothesesService.remove(id);
   }
 
-  @Post('hypotheses/:id/evidence')
-  @ApiOperation({ summary: 'Link case evidence to a hypothesis with a stance' })
+  @Post('hypotheses/:id/support')
+  @ApiOperation({ summary: 'Link evidence or a finding to a hypothesis with a stance' })
   @ApiResponse({ status: 200, type: HypothesisResponseDto })
-  async linkEvidence(
+  async linkSupport(
     @Param('id') id: string,
-    @Body() dto: LinkEvidenceDto,
+    @Body() dto: LinkSupportDto,
   ): Promise<HypothesisResponseDto> {
-    return this.hypothesesService.linkEvidence(id, dto);
+    return this.hypothesesService.linkSupport(id, dto);
   }
 
-  @Delete('hypotheses/:id/evidence/:linkId')
-  @ApiOperation({ summary: 'Unlink evidence from a hypothesis' })
+  @Delete('hypotheses/:id/support/:linkId')
+  @ApiOperation({ summary: 'Remove a support link from a hypothesis' })
   @ApiResponse({ status: 200, type: HypothesisResponseDto })
-  async unlinkEvidence(
+  async unlinkSupport(
     @Param('id') id: string,
     @Param('linkId') linkId: string,
   ): Promise<HypothesisResponseDto> {
-    return this.hypothesesService.unlinkEvidence(id, linkId);
+    return this.hypothesesService.unlinkSupport(id, linkId);
   }
 }

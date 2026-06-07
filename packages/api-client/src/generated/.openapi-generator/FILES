@@ -4,6 +4,7 @@ README.md
 docs/AIApi.md
 docs/AIProviderConfigsApi.md
 docs/AddEvidenceDto.md
+docs/AddFindingDto.md
 docs/AiCompleteRequestDto.md
 docs/AiCompleteResponseDto.md
 docs/AiMessageDto.md
@@ -24,9 +25,12 @@ docs/AssistantControllerRespond200Response.md
 docs/AssistantControllerRespondRequest.md
 docs/AssistantControllerRespondRequestMessagesInner.md
 docs/BulkIngestAssetsDto.md
+docs/BulkIngestEdgesDto.md
+docs/BulkIngestEdgesResponseDto.md
 docs/BulkUpdateFindingsDto.md
 docs/BulkUpdateFindingsResponseDto.md
 docs/CaseEvidenceDto.md
+docs/CaseFindingDto.md
 docs/CaseListResponseDto.md
 docs/CaseResponseDto.md
 docs/CasesApi.md
@@ -37,6 +41,7 @@ docs/CreateCustomDetectorDto.md
 docs/CreateExternalRunnerDto.md
 docs/CreateFindingDto.md
 docs/CreateHypothesisDto.md
+docs/CreateManualEdgeDto.md
 docs/CreateMcpTokenDto.md
 docs/CreateSourceDto.md
 docs/CustomDetectorExampleDto.md
@@ -49,6 +54,7 @@ docs/CustomDetectorsApi.md
 docs/DeleteRunnerResponseDto.md
 docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
+docs/EdgeDetailDto.md
 docs/EvidenceEntityDto.md
 docs/ExpandGraphDto.md
 docs/FinalizeIngestRunDto.md
@@ -73,12 +79,13 @@ docs/GraphResponseDto.md
 docs/HealthApi.md
 docs/HealthControllerGetHealth200Response.md
 docs/HypothesesApi.md
-docs/HypothesisEvidenceLinkDto.md
 docs/HypothesisResponseDto.md
+docs/HypothesisSupportLinkDto.md
+docs/IngestEdgeDto.md
 docs/InstanceSettingsApi.md
 docs/InstanceSettingsResponseDto.md
 docs/LatestRunnerSummaryDto.md
-docs/LinkEvidenceDto.md
+docs/LinkSupportDto.md
 docs/ListRunnersResponseDto.md
 docs/LiveQueryResponseDto.md
 docs/LocationDto.md
@@ -96,9 +103,11 @@ docs/NotificationsControllerMarkAllRead200Response.md
 docs/ParseTrainingExamplesResponseDto.md
 docs/ParseTrainingExamplesSkippedReasonsDto.md
 docs/ParsedTrainingExampleDto.md
+docs/PivotGraphDto.md
 docs/RebuildEdgesResponseDto.md
 docs/RegisterDiscoveredAssetsDto.md
 docs/RegisterDiscoveredAssetsResponseDto.md
+docs/RelationTypesResponseDto.md
 docs/RerunSandboxRunDto.md
 docs/RunnerAssetItemDto.md
 docs/RunnerAssetProgressDto.md
@@ -172,6 +181,7 @@ docs/TrainingExamplesStatsDtoByLabelValue.md
 docs/UpdateAiProviderConfigDto.md
 docs/UpdateCaseDto.md
 docs/UpdateCustomDetectorDto.md
+docs/UpdateEdgeDto.md
 docs/UpdateFindingDto.md
 docs/UpdateHypothesisDto.md
 docs/UpdateInstanceSettingsDto.md
@@ -200,6 +210,7 @@ src/apis/SourcesApi.ts
 src/apis/index.ts
 src/index.ts
 src/models/AddEvidenceDto.ts
+src/models/AddFindingDto.ts
 src/models/AiCompleteRequestDto.ts
 src/models/AiCompleteResponseDto.ts
 src/models/AiMessageDto.ts
@@ -218,9 +229,12 @@ src/models/AssistantControllerRespond200Response.ts
 src/models/AssistantControllerRespondRequest.ts
 src/models/AssistantControllerRespondRequestMessagesInner.ts
 src/models/BulkIngestAssetsDto.ts
+src/models/BulkIngestEdgesDto.ts
+src/models/BulkIngestEdgesResponseDto.ts
 src/models/BulkUpdateFindingsDto.ts
 src/models/BulkUpdateFindingsResponseDto.ts
 src/models/CaseEvidenceDto.ts
+src/models/CaseFindingDto.ts
 src/models/CaseListResponseDto.ts
 src/models/CaseResponseDto.ts
 src/models/CliRunnerControllerUpdateRunnerStatusRequest.ts
@@ -230,6 +244,7 @@ src/models/CreateCustomDetectorDto.ts
 src/models/CreateExternalRunnerDto.ts
 src/models/CreateFindingDto.ts
 src/models/CreateHypothesisDto.ts
+src/models/CreateManualEdgeDto.ts
 src/models/CreateMcpTokenDto.ts
 src/models/CreateSourceDto.ts
 src/models/CustomDetectorExampleDto.ts
@@ -239,6 +254,7 @@ src/models/CustomDetectorTrainingRunDto.ts
 src/models/DeleteRunnerResponseDto.ts
 src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
+src/models/EdgeDetailDto.ts
 src/models/EvidenceEntityDto.ts
 src/models/ExpandGraphDto.ts
 src/models/FinalizeIngestRunDto.ts
@@ -259,11 +275,12 @@ src/models/GraphEdgeDto.ts
 src/models/GraphNodeDto.ts
 src/models/GraphResponseDto.ts
 src/models/HealthControllerGetHealth200Response.ts
-src/models/HypothesisEvidenceLinkDto.ts
 src/models/HypothesisResponseDto.ts
+src/models/HypothesisSupportLinkDto.ts
+src/models/IngestEdgeDto.ts
 src/models/InstanceSettingsResponseDto.ts
 src/models/LatestRunnerSummaryDto.ts
-src/models/LinkEvidenceDto.ts
+src/models/LinkSupportDto.ts
 src/models/ListRunnersResponseDto.ts
 src/models/LiveQueryResponseDto.ts
 src/models/LocationDto.ts
@@ -280,9 +297,11 @@ src/models/NotificationsControllerMarkAllRead200Response.ts
 src/models/ParseTrainingExamplesResponseDto.ts
 src/models/ParseTrainingExamplesSkippedReasonsDto.ts
 src/models/ParsedTrainingExampleDto.ts
+src/models/PivotGraphDto.ts
 src/models/RebuildEdgesResponseDto.ts
 src/models/RegisterDiscoveredAssetsDto.ts
 src/models/RegisterDiscoveredAssetsResponseDto.ts
+src/models/RelationTypesResponseDto.ts
 src/models/RerunSandboxRunDto.ts
 src/models/RunnerAssetItemDto.ts
 src/models/RunnerAssetProgressDto.ts
@@ -353,6 +372,7 @@ src/models/TrainingExamplesStatsDtoByLabelValue.ts
 src/models/UpdateAiProviderConfigDto.ts
 src/models/UpdateCaseDto.ts
 src/models/UpdateCustomDetectorDto.ts
+src/models/UpdateEdgeDto.ts
 src/models/UpdateFindingDto.ts
 src/models/UpdateHypothesisDto.ts
 src/models/UpdateInstanceSettingsDto.ts

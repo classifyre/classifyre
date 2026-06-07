@@ -56,7 +56,17 @@ export type {
   GraphEdgeDto,
   GraphResponseDto,
   RebuildEdgesResponseDto,
+  CreateManualEdgeDto,
+  UpdateEdgeDto,
+  EdgeDetailDto,
+  RelationTypesResponseDto,
+  PivotGraphDto,
+  BulkIngestEdgesDto,
+  BulkIngestEdgesResponseDto,
+  AddFindingDto,
+  CaseFindingDto,
 } from "./generated/src/models";
+export { PivotGraphDtoPivotEnum } from "./generated/src/models";
 export {
   SandboxControllerListRunsContentTypeEnum,
   SandboxControllerListRunsDetectorTypeEnum,

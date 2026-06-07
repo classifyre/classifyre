@@ -72,13 +72,15 @@ All URIs are relative to *http://localhost*
 *AssetsApi* | [**sourceAssetsControllerListSourceAssets**](docs/AssetsApi.md#sourceassetscontrollerlistsourceassets) | **GET** /sources/{sourceId}/assets | List assets for a source
 *AssistantApi* | [**assistantControllerParseUpload**](docs/AssistantApi.md#assistantcontrollerparseupload) | **POST** /assistant/parse-upload | Parse assistant chat upload
 *AssistantApi* | [**assistantControllerRespond**](docs/AssistantApi.md#assistantcontrollerrespondoperation) | **POST** /assistant/respond | Respond to a contextual assistant turn
-*CasesApi* | [**casesControllerAddEvidence**](docs/CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset or finding to the case as evidence
-*CasesApi* | [**casesControllerCreate**](docs/CasesApi.md#casescontrollercreate) | **POST** /cases | Create an investigation case
-*CasesApi* | [**casesControllerFindOne**](docs/CasesApi.md#casescontrollerfindone) | **GET** /cases/{id} | Get a case with hydrated evidence
+*CasesApi* | [**casesControllerAddEvidence**](docs/CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence. Use /evidence/:id/findings for findings.
+*CasesApi* | [**casesControllerAddFinding**](docs/CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of case evidence
+*CasesApi* | [**casesControllerCreate**](docs/CasesApi.md#casescontrollercreate) | **POST** /cases | Create an investigation case with an initial hypothesis
+*CasesApi* | [**casesControllerFindOne**](docs/CasesApi.md#casescontrollerfindone) | **GET** /cases/{id} | Get a case with hydrated evidence (and their findings)
 *CasesApi* | [**casesControllerGraph**](docs/CasesApi.md#casescontrollergraph) | **GET** /cases/{id}/graph | Get the evidence neighbourhood graph for a case
 *CasesApi* | [**casesControllerList**](docs/CasesApi.md#casescontrollerlist) | **GET** /cases | List investigation cases
 *CasesApi* | [**casesControllerRemove**](docs/CasesApi.md#casescontrollerremove) | **DELETE** /cases/{id} | Delete a case
 *CasesApi* | [**casesControllerRemoveEvidence**](docs/CasesApi.md#casescontrollerremoveevidence) | **DELETE** /cases/{id}/evidence/{evidenceId} | Remove evidence from the case
+*CasesApi* | [**casesControllerRemoveFinding**](docs/CasesApi.md#casescontrollerremovefinding) | **DELETE** /cases/{id}/findings/{caseFindingId} | Remove a finding from the case
 *CasesApi* | [**casesControllerUpdate**](docs/CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerCoverage**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollercoverage) | **GET** /custom-detectors/{id}/extractions/coverage | 
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerGetByFinding**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollergetbyfinding) | **GET** /findings/{findingId}/extraction | 
@@ -108,15 +110,21 @@ All URIs are relative to *http://localhost*
 *FindingsApi* | [**findingsControllerGetStats**](docs/FindingsApi.md#findingscontrollergetstats) | **GET** /findings/stats | Get finding statistics
 *FindingsApi* | [**findingsControllerListAssetSummaries**](docs/FindingsApi.md#findingscontrollerlistassetsummaries) | **GET** /findings/assets | List asset finding summaries with optional filters
 *FindingsApi* | [**findingsControllerUpdate**](docs/FindingsApi.md#findingscontrollerupdate) | **PATCH** /findings/{id} | Update a finding
+*GraphApi* | [**graphControllerCreateManualEdge**](docs/GraphApi.md#graphcontrollercreatemanualedge) | **POST** /graph/edges/manual | Create a manual edge between two entities (user-defined relation type)
+*GraphApi* | [**graphControllerDeleteEdge**](docs/GraphApi.md#graphcontrollerdeleteedge) | **DELETE** /graph/edges/{id} | Delete an edge
 *GraphApi* | [**graphControllerExpand**](docs/GraphApi.md#graphcontrollerexpand) | **POST** /graph/expand | Expand the graph around a seed entity (recursive traversal)
+*GraphApi* | [**graphControllerIngestEdges**](docs/GraphApi.md#graphcontrolleringestedges) | **POST** /graph/edges | Bulk-upsert source-derived edges from a connector. Idempotent.
+*GraphApi* | [**graphControllerPivot**](docs/GraphApi.md#graphcontrollerpivot) | **POST** /graph/pivot | Named pivot question on a node (e.g. who_touched, upstream_lineage, emails)
 *GraphApi* | [**graphControllerRebuildEdges**](docs/GraphApi.md#graphcontrollerrebuildedges) | **POST** /graph/rebuild-edges | Rebuild all inferred edges from existing assets and findings
+*GraphApi* | [**graphControllerRelationTypes**](docs/GraphApi.md#graphcontrollerrelationtypes) | **GET** /graph/relation-types | Get all relation types in use + vocabulary suggestions
+*GraphApi* | [**graphControllerUpdateEdge**](docs/GraphApi.md#graphcontrollerupdateedge) | **PATCH** /graph/edges/{id} | Rename an edge relation type
 *HealthApi* | [**healthControllerGetHealth**](docs/HealthApi.md#healthcontrollergethealth) | **GET** / | Health check
 *HealthApi* | [**healthControllerPing**](docs/HealthApi.md#healthcontrollerping) | **GET** /ping | Ping endpoint
 *HypothesesApi* | [**hypothesesControllerCreate**](docs/HypothesesApi.md#hypothesescontrollercreate) | **POST** /cases/{caseId}/hypotheses | Create a hypothesis in a case
-*HypothesesApi* | [**hypothesesControllerLinkEvidence**](docs/HypothesesApi.md#hypothesescontrollerlinkevidence) | **POST** /hypotheses/{id}/evidence | Link case evidence to a hypothesis with a stance
+*HypothesesApi* | [**hypothesesControllerLinkSupport**](docs/HypothesesApi.md#hypothesescontrollerlinksupport) | **POST** /hypotheses/{id}/support | Link evidence or a finding to a hypothesis with a stance
 *HypothesesApi* | [**hypothesesControllerList**](docs/HypothesesApi.md#hypothesescontrollerlist) | **GET** /cases/{caseId}/hypotheses | List hypotheses for a case
 *HypothesesApi* | [**hypothesesControllerRemove**](docs/HypothesesApi.md#hypothesescontrollerremove) | **DELETE** /hypotheses/{id} | Delete a hypothesis
-*HypothesesApi* | [**hypothesesControllerUnlinkEvidence**](docs/HypothesesApi.md#hypothesescontrollerunlinkevidence) | **DELETE** /hypotheses/{id}/evidence/{linkId} | Unlink evidence from a hypothesis
+*HypothesesApi* | [**hypothesesControllerUnlinkSupport**](docs/HypothesesApi.md#hypothesescontrollerunlinksupport) | **DELETE** /hypotheses/{id}/support/{linkId} | Remove a support link from a hypothesis
 *HypothesesApi* | [**hypothesesControllerUpdate**](docs/HypothesesApi.md#hypothesescontrollerupdate) | **PATCH** /hypotheses/{id} | Update a hypothesis
 *InstanceSettingsApi* | [**instanceSettingsControllerGetSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollergetsettings) | **GET** /instance-settings | Get instance settings
 *InstanceSettingsApi* | [**instanceSettingsControllerUpdateSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollerupdatesettings) | **PUT** /instance-settings | Update instance settings
@@ -172,6 +180,7 @@ All URIs are relative to *http://localhost*
 ### Models
 
 - [AddEvidenceDto](docs/AddEvidenceDto.md)
+- [AddFindingDto](docs/AddFindingDto.md)
 - [AiCompleteRequestDto](docs/AiCompleteRequestDto.md)
 - [AiCompleteResponseDto](docs/AiCompleteResponseDto.md)
 - [AiMessageDto](docs/AiMessageDto.md)
@@ -190,9 +199,12 @@ All URIs are relative to *http://localhost*
 - [AssistantControllerRespondRequest](docs/AssistantControllerRespondRequest.md)
 - [AssistantControllerRespondRequestMessagesInner](docs/AssistantControllerRespondRequestMessagesInner.md)
 - [BulkIngestAssetsDto](docs/BulkIngestAssetsDto.md)
+- [BulkIngestEdgesDto](docs/BulkIngestEdgesDto.md)
+- [BulkIngestEdgesResponseDto](docs/BulkIngestEdgesResponseDto.md)
 - [BulkUpdateFindingsDto](docs/BulkUpdateFindingsDto.md)
 - [BulkUpdateFindingsResponseDto](docs/BulkUpdateFindingsResponseDto.md)
 - [CaseEvidenceDto](docs/CaseEvidenceDto.md)
+- [CaseFindingDto](docs/CaseFindingDto.md)
 - [CaseListResponseDto](docs/CaseListResponseDto.md)
 - [CaseResponseDto](docs/CaseResponseDto.md)
 - [CliRunnerControllerUpdateRunnerStatusRequest](docs/CliRunnerControllerUpdateRunnerStatusRequest.md)
@@ -202,6 +214,7 @@ All URIs are relative to *http://localhost*
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
 - [CreateHypothesisDto](docs/CreateHypothesisDto.md)
+- [CreateManualEdgeDto](docs/CreateManualEdgeDto.md)
 - [CreateMcpTokenDto](docs/CreateMcpTokenDto.md)
 - [CreateSourceDto](docs/CreateSourceDto.md)
 - [CustomDetectorExampleDto](docs/CustomDetectorExampleDto.md)
@@ -211,6 +224,7 @@ All URIs are relative to *http://localhost*
 - [DeleteRunnerResponseDto](docs/DeleteRunnerResponseDto.md)
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
+- [EdgeDetailDto](docs/EdgeDetailDto.md)
 - [EvidenceEntityDto](docs/EvidenceEntityDto.md)
 - [ExpandGraphDto](docs/ExpandGraphDto.md)
 - [FinalizeIngestRunDto](docs/FinalizeIngestRunDto.md)
@@ -231,11 +245,12 @@ All URIs are relative to *http://localhost*
 - [GraphNodeDto](docs/GraphNodeDto.md)
 - [GraphResponseDto](docs/GraphResponseDto.md)
 - [HealthControllerGetHealth200Response](docs/HealthControllerGetHealth200Response.md)
-- [HypothesisEvidenceLinkDto](docs/HypothesisEvidenceLinkDto.md)
 - [HypothesisResponseDto](docs/HypothesisResponseDto.md)
+- [HypothesisSupportLinkDto](docs/HypothesisSupportLinkDto.md)
+- [IngestEdgeDto](docs/IngestEdgeDto.md)
 - [InstanceSettingsResponseDto](docs/InstanceSettingsResponseDto.md)
 - [LatestRunnerSummaryDto](docs/LatestRunnerSummaryDto.md)
-- [LinkEvidenceDto](docs/LinkEvidenceDto.md)
+- [LinkSupportDto](docs/LinkSupportDto.md)
 - [ListRunnersResponseDto](docs/ListRunnersResponseDto.md)
 - [LiveQueryResponseDto](docs/LiveQueryResponseDto.md)
 - [LocationDto](docs/LocationDto.md)
@@ -252,9 +267,11 @@ All URIs are relative to *http://localhost*
 - [ParseTrainingExamplesResponseDto](docs/ParseTrainingExamplesResponseDto.md)
 - [ParseTrainingExamplesSkippedReasonsDto](docs/ParseTrainingExamplesSkippedReasonsDto.md)
 - [ParsedTrainingExampleDto](docs/ParsedTrainingExampleDto.md)
+- [PivotGraphDto](docs/PivotGraphDto.md)
 - [RebuildEdgesResponseDto](docs/RebuildEdgesResponseDto.md)
 - [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)
 - [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
+- [RelationTypesResponseDto](docs/RelationTypesResponseDto.md)
 - [RerunSandboxRunDto](docs/RerunSandboxRunDto.md)
 - [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
 - [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
@@ -325,6 +342,7 @@ All URIs are relative to *http://localhost*
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
 - [UpdateCaseDto](docs/UpdateCaseDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
+- [UpdateEdgeDto](docs/UpdateEdgeDto.md)
 - [UpdateFindingDto](docs/UpdateFindingDto.md)
 - [UpdateHypothesisDto](docs/UpdateHypothesisDto.md)
 - [UpdateInstanceSettingsDto](docs/UpdateInstanceSettingsDto.md)

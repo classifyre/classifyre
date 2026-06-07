@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Check, Search } from "lucide-react";
+import { Plus, Check, Search, ChevronLeft, Fingerprint, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
   type SearchAssetItemDto,
+  type HypothesisResponseDto,
 } from "@workspace/api-client";
 import {
   Dialog,
@@ -28,6 +29,11 @@ export interface EvidencePickerDialogProps {
   onAdded: () => void;
 }
 
+function abbrev(dt: string | undefined): string {
+  if (!dt) return "";
+  return dt.replace(/^UNSTRUCTURED_API_/, "").replace(/_/g, " ").toLowerCase();
+}
+
 export function EvidencePickerDialog({
   caseId,
   open,
@@ -35,17 +41,42 @@ export function EvidencePickerDialog({
   existingKeys,
   onAdded,
 }: EvidencePickerDialogProps) {
+  const [step, setStep] = React.useState<"hypotheses" | "assets">("hypotheses");
+  const [hypotheses, setHypotheses] = React.useState<HypothesisResponseDto[]>([]);
+  const [selectedHypIds, setSelectedHypIds] = React.useState<Set<string>>(new Set());
   const [search, setSearch] = React.useState("");
   const [results, setResults] = React.useState<SearchAssetItemDto[]>([]);
   const [loading, setLoading] = React.useState(false);
-  const [busyKey, setBusyKey] = React.useState<string | null>(null);
+  // track which asset rows are expanded to show findings
+  const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+  // track in-flight adds: "asset:{id}" or "finding:{assetId}:{findingId}"
+  const [busy, setBusy] = React.useState<Set<string>>(new Set());
+  // track which individual findings have been added this session
+  const [addedFindings, setAddedFindings] = React.useState<Set<string>>(new Set());
+  // track which assets have been added this session
+  const [addedAssets, setAddedAssets] = React.useState<Set<string>>(new Set());
+
+  React.useEffect(() => {
+    if (!open) return;
+    setStep("hypotheses");
+    setSelectedHypIds(new Set());
+    setSearch("");
+    setResults([]);
+    setExpanded(new Set());
+    setBusy(new Set());
+    setAddedFindings(new Set());
+    setAddedAssets(new Set());
+    api.hypotheses.hypothesesControllerList({ caseId })
+      .then(setHypotheses)
+      .catch(() => toast.error("Could not load hypotheses"));
+  }, [open, caseId]);
 
   const runSearch = React.useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.searchAssets({
         assets: { search: search.trim() || undefined },
-        findings: { includeResolved: true },
+        findings: { includeResolved: false },
         page: { skip: 0, limit: 25 },
         options: { excludeFindings: false, includeAssetsWithoutFindings: true },
       });
@@ -58,129 +89,305 @@ export function EvidencePickerDialog({
     }
   }, [search]);
 
-  React.useEffect(() => {
-    if (open) void runSearch();
-  }, [open, runSearch]);
+  const goToAssets = () => {
+    setStep("assets");
+    void runSearch();
+  };
 
-  const add = async (entityType: string, entityId: string) => {
-    const key = `${entityType}:${entityId}`;
-    setBusyKey(key);
+  const toggleHyp = (id: string) => {
+    setSelectedHypIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleExpand = (assetId: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(assetId)) next.delete(assetId);
+      else next.add(assetId);
+      return next;
+    });
+  };
+
+  /** Ensure the asset is added as evidence. Returns the evidence id or null on error. */
+  const ensureAssetEvidence = async (assetId: string): Promise<boolean> => {
+    const alreadyAdded = existingKeys.has(`asset:${assetId}`) || addedAssets.has(assetId);
+    if (alreadyAdded) return true;
     try {
       await api.cases.casesControllerAddEvidence({
         id: caseId,
-        addEvidenceDto: { entityType, entityId },
+        addEvidenceDto: {
+          entityType: "asset",
+          entityId: assetId,
+          hypothesisIds: Array.from(selectedHypIds),
+        },
       });
-      toast.success("Evidence added");
+      setAddedAssets((prev) => new Set([...prev, assetId]));
       onAdded();
+      return true;
     } catch (err) {
       console.error(err);
-      toast.error("Failed to add evidence");
-    } finally {
-      setBusyKey(null);
+      toast.error("Failed to add asset as evidence");
+      return false;
     }
   };
 
-  const renderAddButton = (entityType: string, entityId: string) => {
-    const key = `${entityType}:${entityId}`;
-    const already = existingKeys.has(key);
-    return (
-      <Button
-        size="sm"
-        variant={already ? "ghost" : "outline"}
-        disabled={already || busyKey === key}
-        onClick={() => add(entityType, entityId)}
-      >
-        {already ? (
-          <>
-            <Check className="h-3.5 w-3.5" /> Added
-          </>
-        ) : (
-          <>
-            <Plus className="h-3.5 w-3.5" /> Add
-          </>
-        )}
-      </Button>
-    );
+  /** Add just the asset (no specific findings). */
+  const addAsset = async (assetId: string) => {
+    const key = `asset:${assetId}`;
+    setBusy((prev) => new Set([...prev, key]));
+    try {
+      await ensureAssetEvidence(assetId);
+      toast.success("Asset added as evidence");
+    } finally {
+      setBusy((prev) => { const n = new Set(prev); n.delete(key); return n; });
+    }
   };
+
+  /** Add a specific finding: ensures parent asset evidence exists first, then attaches the finding. */
+  const addFinding = async (assetId: string, findingId: string) => {
+    const key = `finding:${assetId}:${findingId}`;
+    setBusy((prev) => new Set([...prev, key]));
+    try {
+      const ok = await ensureAssetEvidence(assetId);
+      if (!ok) return;
+
+      // Fetch the evidence id for this asset in this case
+      const caseData = await api.cases.casesControllerFindOne({ id: caseId });
+      const evidence = caseData.evidence?.find(
+        (e) => e.entityType === "asset" && e.entityId === assetId,
+      );
+      if (!evidence) {
+        toast.error("Could not find evidence record — try again");
+        return;
+      }
+      await api.cases.casesControllerAddFinding({
+        id: caseId,
+        evidenceId: evidence.id,
+        addFindingDto: { caseEvidenceId: evidence.id, findingId },
+      });
+      setAddedFindings((prev) => new Set([...prev, findingId]));
+      onAdded();
+      toast.success("Finding attached to evidence");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to attach finding");
+    } finally {
+      setBusy((prev) => { const n = new Set(prev); n.delete(key); return n; });
+    }
+  };
+
+  const hypCount = selectedHypIds.size;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Add evidence</DialogTitle>
+          <DialogTitle>
+            {step === "hypotheses" ? "Link to hypothesis" : "Add evidence"}
+          </DialogTitle>
           <DialogDescription>
-            Search ingested assets and findings, then attach them to this case.
+            {step === "hypotheses"
+              ? "Select which hypotheses this evidence will support. Required."
+              : "Add a whole asset or pick individual findings. Asset is added with no findings by default."}
           </DialogDescription>
         </DialogHeader>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void runSearch();
-          }}
-          className="flex gap-2"
-        >
-          <Input
-            placeholder="Search assets by name…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            autoFocus
-          />
-          <Button type="submit" variant="outline" disabled={loading}>
-            <Search className="h-4 w-4" />
-          </Button>
-        </form>
-
-        <ScrollArea className="h-[420px] pr-3">
-          <div className="space-y-3">
-            {results.map((item) => {
-              const a = item.asset;
-              return (
-                <div key={a.id} className="border border-border p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{a.name}</p>
-                      <p className="text-muted-foreground text-xs">
-                        <Badge variant="outline" className="mr-1">
-                          {a.assetType}
-                        </Badge>
-                        {String(a.sourceType)}
-                      </p>
-                    </div>
-                    {renderAddButton("asset", a.id)}
-                  </div>
-                  {item.findings.length > 0 && (
-                    <div className="mt-2 space-y-1 border-t border-border/50 pt-2">
-                      {item.findings.slice(0, 5).map((f) => (
-                        <div
-                          key={f.id}
-                          className="flex items-center justify-between gap-2 text-sm"
-                        >
-                          <span className="flex items-center gap-2">
-                            <SeverityBadge
-                              severity={f.severity.toLowerCase() as never}
-                            >
-                              {f.severity}
-                            </SeverityBadge>
-                            <span className="text-muted-foreground">
-                              {f.findingType}
-                            </span>
-                          </span>
-                          {renderAddButton("finding", f.id)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {!loading && results.length === 0 && (
-              <p className="text-muted-foreground py-8 text-center text-sm">
-                No assets found.
+        {step === "hypotheses" ? (
+          <div className="space-y-4">
+            {hypotheses.length === 0 ? (
+              <p className="text-muted-foreground py-6 text-center text-sm">
+                No hypotheses yet. Create one in the Hypotheses tab first.
               </p>
+            ) : (
+              <div className="space-y-2">
+                {hypotheses.map((h) => {
+                  const selected = selectedHypIds.has(h.id);
+                  return (
+                    <button
+                      key={h.id}
+                      onClick={() => toggleHyp(h.id)}
+                      className={`w-full rounded-md border p-3 text-left transition-colors ${
+                        selected
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-accent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`h-4 w-4 shrink-0 rounded border ${
+                            selected ? "border-primary bg-primary" : "border-muted-foreground"
+                          } flex items-center justify-center`}
+                        >
+                          {selected && <Check className="h-3 w-3 text-primary-foreground" />}
+                        </div>
+                        <span className="font-medium text-sm">{h.statement}</span>
+                      </div>
+                      {h.confidence !== undefined && (
+                        <p className="text-muted-foreground text-xs mt-1 ml-6">
+                          Confidence: {Math.round(h.confidence * 100)}%
+                        </p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             )}
+            <div className="flex justify-end">
+              <Button onClick={goToAssets} disabled={selectedHypIds.size === 0}>
+                Next: Pick assets →
+              </Button>
+            </div>
           </div>
-        </ScrollArea>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-1"
+                onClick={() => setStep("hypotheses")}
+              >
+                <ChevronLeft className="h-4 w-4" /> Back
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Linking to {hypCount} hypothesis{hypCount !== 1 ? "es" : ""}
+              </span>
+            </div>
+
+            <form
+              onSubmit={(e) => { e.preventDefault(); void runSearch(); }}
+              className="flex gap-2"
+            >
+              <Input
+                placeholder="Search assets by name…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+              />
+              <Button type="submit" variant="outline" disabled={loading}>
+                <Search className="h-4 w-4" />
+              </Button>
+            </form>
+
+            <ScrollArea className="h-[400px] pr-3">
+              <div className="space-y-3">
+                {results.map((item) => {
+                  const a = item.asset;
+                  const assetKey = `asset:${a.id}`;
+                  const alreadyAsset = existingKeys.has(assetKey) || addedAssets.has(a.id);
+                  const isExpanded = expanded.has(a.id);
+                  const busyAsset = busy.has(assetKey);
+
+                  return (
+                    <div key={a.id} className="border border-border">
+                      {/* Asset row */}
+                      <div className="flex items-center justify-between gap-2 p-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium text-sm">{a.name}</p>
+                          <p className="text-muted-foreground text-xs">
+                            <Badge variant="outline" className="mr-1 text-[10px]">
+                              {a.assetType}
+                            </Badge>
+                            {String(a.sourceType)}
+                            {item.findings.length > 0 && (
+                              <span className="ml-1">
+                                · {item.findings.length} finding{item.findings.length !== 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {item.findings.length > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => toggleExpand(a.id)}
+                              title={isExpanded ? "Collapse findings" : "Expand findings"}
+                            >
+                              {isExpanded
+                                ? <ChevronDown className="h-4 w-4" />
+                                : <ChevronRight className="h-4 w-4" />}
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant={alreadyAsset ? "ghost" : "outline"}
+                            disabled={alreadyAsset || busyAsset}
+                            onClick={() => addAsset(a.id)}
+                            title="Add asset (no specific findings)"
+                          >
+                            {alreadyAsset
+                              ? <><Check className="h-3.5 w-3.5" /> Added</>
+                              : <><Plus className="h-3.5 w-3.5" /> Add asset</>}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Findings rows */}
+                      {isExpanded && item.findings.length > 0 && (
+                        <div className="border-t border-border/50 bg-muted/30 px-3 pb-2 pt-1 space-y-1">
+                          <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-wide mb-1.5">
+                            Add individual finding
+                          </p>
+                          {item.findings.map((f) => {
+                            const findingKey = `finding:${a.id}:${f.id}`;
+                            const alreadyFinding = addedFindings.has(f.id);
+                            const busyFinding = busy.has(findingKey);
+                            return (
+                              <div
+                                key={f.id}
+                                className="flex items-center justify-between gap-2 py-0.5"
+                              >
+                                <span className="flex min-w-0 items-center gap-1.5 text-sm">
+                                  <Fingerprint className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                                  <SeverityBadge severity={f.severity.toLowerCase() as never}>
+                                    {f.severity}
+                                  </SeverityBadge>
+                                  <span className="font-medium shrink-0">{f.findingType}</span>
+                                  {f.detectorType && (
+                                    <span className="text-muted-foreground text-[10px] shrink-0">
+                                      {abbrev(f.detectorType)}
+                                    </span>
+                                  )}
+                                  {f.matchedContent && (
+                                    <span className="text-muted-foreground truncate text-[11px]">
+                                      {f.matchedContent.slice(0, 40)}
+                                    </span>
+                                  )}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant={alreadyFinding ? "ghost" : "outline"}
+                                  className="h-6 px-2 text-xs shrink-0"
+                                  disabled={alreadyFinding || busyFinding}
+                                  onClick={() => addFinding(a.id, f.id)}
+                                >
+                                  {alreadyFinding
+                                    ? <Check className="h-3 w-3" />
+                                    : <Plus className="h-3 w-3" />}
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {!loading && results.length === 0 && (
+                  <p className="text-muted-foreground py-8 text-center text-sm">
+                    No assets found.
+                  </p>
+                )}
+              </div>
+            </ScrollArea>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

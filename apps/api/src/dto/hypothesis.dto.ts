@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEnum,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -51,10 +52,15 @@ export class UpdateHypothesisDto {
   confidence?: number | null;
 }
 
-export class LinkEvidenceDto {
-  @ApiProperty({ description: 'CaseEvidence id to link to this hypothesis' })
+/** Link a piece of case evidence OR a case finding to a hypothesis with a stance. */
+export class LinkSupportDto {
+  @ApiProperty({ enum: ['evidence', 'finding'], description: 'What is being linked' })
+  @IsIn(['evidence', 'finding'])
+  targetType!: 'evidence' | 'finding';
+
+  @ApiProperty({ description: 'CaseEvidence.id or CaseFinding.id' })
   @IsString()
-  caseEvidenceId!: string;
+  targetId!: string;
 
   @ApiPropertyOptional({ enum: EvidenceStance, default: EvidenceStance.SUPPORTS })
   @IsOptional()
@@ -74,12 +80,15 @@ export class LinkEvidenceDto {
   note?: string;
 }
 
-export class HypothesisEvidenceLinkDto {
+export class HypothesisSupportLinkDto {
   @ApiProperty()
   id!: string;
 
+  @ApiProperty({ enum: ['evidence', 'finding'] })
+  targetType!: string;
+
   @ApiProperty()
-  caseEvidenceId!: string;
+  targetId!: string;
 
   @ApiProperty({ enum: EvidenceStance })
   stance!: EvidenceStance;
@@ -90,8 +99,8 @@ export class HypothesisEvidenceLinkDto {
   @ApiPropertyOptional()
   note?: string | null;
 
-  @ApiPropertyOptional({ description: 'Display label for the linked evidence entity' })
-  evidenceLabel?: string | null;
+  @ApiProperty({ description: 'Display label for the linked target' })
+  targetLabel!: string;
 }
 
 export class HypothesisResponseDto {
@@ -113,10 +122,10 @@ export class HypothesisResponseDto {
   @ApiPropertyOptional()
   createdBy?: string | null;
 
-  @ApiProperty({ description: 'Count of linked SUPPORTS evidence' })
+  @ApiProperty({ description: 'Count of SUPPORTS links' })
   supportingCount!: number;
 
-  @ApiProperty({ description: 'Count of linked CONTRADICTS evidence' })
+  @ApiProperty({ description: 'Count of CONTRADICTS links' })
   contradictingCount!: number;
 
   @ApiProperty()
@@ -125,6 +134,6 @@ export class HypothesisResponseDto {
   @ApiProperty()
   updatedAt!: Date;
 
-  @ApiProperty({ type: [HypothesisEvidenceLinkDto] })
-  links!: HypothesisEvidenceLinkDto[];
+  @ApiProperty({ type: [HypothesisSupportLinkDto] })
+  links!: HypothesisSupportLinkDto[];
 }

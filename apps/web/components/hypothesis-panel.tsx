@@ -16,7 +16,9 @@ import { Slider } from "@workspace/ui/components/slider";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
@@ -28,6 +30,36 @@ const STANCES = ["SUPPORTS", "CONTRADICTS", "NEUTRAL"] as const;
 export interface HypothesisPanelProps {
   caseId: string;
   evidence: CaseEvidenceDto[];
+}
+
+/** Flat list of all linkable targets: evidence rows + their findings. */
+interface LinkTarget {
+  targetType: "evidence" | "finding";
+  targetId: string;
+  label: string;
+  group: string; // display group (evidence label)
+}
+
+function buildLinkTargets(evidence: CaseEvidenceDto[]): LinkTarget[] {
+  const targets: LinkTarget[] = [];
+  for (const e of evidence) {
+    const assetLabel = e.entity?.label ?? e.entityId;
+    targets.push({
+      targetType: "evidence",
+      targetId: e.id,
+      label: assetLabel,
+      group: assetLabel,
+    });
+    for (const f of e.findings ?? []) {
+      targets.push({
+        targetType: "finding",
+        targetId: f.id,
+        label: f.findingLabel,
+        group: assetLabel,
+      });
+    }
+  }
+  return targets;
 }
 
 export function HypothesisPanel({ caseId, evidence }: HypothesisPanelProps) {
@@ -62,14 +94,13 @@ export function HypothesisPanel({ caseId, evidence }: HypothesisPanelProps) {
     }
   };
 
-  const evidenceLabel = (e: CaseEvidenceDto) =>
-    e.entity?.label ?? `${e.entityType}:${e.entityId}`;
+  const linkTargets = buildLinkTargets(evidence);
 
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
         <Input
-          placeholder="State a testable hypothesis, e.g. “Customer PII was exported”"
+          placeholder="Add a competing hypothesis, e.g. Data was accessed by a contractor"
           value={statement}
           onChange={(e) => setStatement(e.target.value)}
           onKeyDown={(e) => {
@@ -92,8 +123,7 @@ export function HypothesisPanel({ caseId, evidence }: HypothesisPanelProps) {
             <HypothesisCard
               key={h.id}
               hypothesis={h}
-              evidence={evidence}
-              evidenceLabel={evidenceLabel}
+              linkTargets={linkTargets}
               onChanged={load}
             />
           ))}
@@ -105,23 +135,25 @@ export function HypothesisPanel({ caseId, evidence }: HypothesisPanelProps) {
 
 function HypothesisCard({
   hypothesis,
-  evidence,
-  evidenceLabel,
+  linkTargets,
   onChanged,
 }: {
   hypothesis: HypothesisResponseDto;
-  evidence: CaseEvidenceDto[];
-  evidenceLabel: (e: CaseEvidenceDto) => string;
+  linkTargets: LinkTarget[];
   onChanged: () => void;
 }) {
   const [confidence, setConfidence] = React.useState(
     hypothesis.confidence != null ? Math.round(hypothesis.confidence * 100) : 0,
   );
-  const [linkEvidenceId, setLinkEvidenceId] = React.useState<string>("");
+  const [linkTargetKey, setLinkTargetKey] = React.useState<string>("");
   const [linkStance, setLinkStance] = React.useState<string>("SUPPORTS");
 
-  const linkedIds = new Set(hypothesis.links.map((l) => l.caseEvidenceId));
-  const available = evidence.filter((e) => !linkedIds.has(e.id));
+  const linkedKeys = new Set(
+    hypothesis.links.map((l) => `${l.targetType}:${l.targetId}`),
+  );
+  const available = linkTargets.filter(
+    (t) => !linkedKeys.has(`${t.targetType}:${t.targetId}`),
+  );
 
   const commitConfidence = async (value: number) => {
     try {
@@ -145,20 +177,23 @@ function HypothesisCard({
   };
 
   const link = async () => {
-    if (!linkEvidenceId) return;
-    await api.hypotheses.hypothesesControllerLinkEvidence({
+    if (!linkTargetKey) return;
+    const [targetType, ...rest] = linkTargetKey.split(":");
+    const targetId = rest.join(":");
+    await api.hypotheses.hypothesesControllerLinkSupport({
       id: hypothesis.id,
-      linkEvidenceDto: {
-        caseEvidenceId: linkEvidenceId,
+      linkSupportDto: {
+        targetType: targetType as "evidence" | "finding",
+        targetId,
         stance: linkStance as never,
       },
     });
-    setLinkEvidenceId("");
+    setLinkTargetKey("");
     onChanged();
   };
 
   const unlink = async (linkId: string) => {
-    await api.hypotheses.hypothesesControllerUnlinkEvidence({
+    await api.hypotheses.hypothesesControllerUnlinkSupport({
       id: hypothesis.id,
       linkId,
     });
@@ -169,6 +204,17 @@ function HypothesisCard({
     await api.hypotheses.hypothesesControllerRemove({ id: hypothesis.id });
     onChanged();
   };
+
+  // Group available targets by evidence asset for the selector.
+  const groups = React.useMemo(() => {
+    const map = new Map<string, LinkTarget[]>();
+    for (const t of available) {
+      const existing = map.get(t.group);
+      if (existing) existing.push(t);
+      else map.set(t.group, [t]);
+    }
+    return map;
+  }, [available]);
 
   return (
     <Card>
@@ -223,6 +269,7 @@ function HypothesisCard({
           />
         </div>
 
+        {/* Linked evidence/findings */}
         <div className="space-y-1.5">
           {hypothesis.links.map((l) => (
             <div
@@ -242,14 +289,17 @@ function HypothesisCard({
                 >
                   {l.stance}
                 </Badge>
-                <span className="truncate">{l.evidenceLabel}</span>
+                <span className="text-muted-foreground text-[10px] font-mono uppercase">
+                  {l.targetType}
+                </span>
+                <span className="truncate">{l.targetLabel}</span>
               </span>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6"
                 onClick={() => unlink(l.id)}
-                aria-label="Unlink evidence"
+                aria-label="Unlink"
               >
                 <X className="h-3.5 w-3.5" />
               </Button>
@@ -257,17 +307,26 @@ function HypothesisCard({
           ))}
         </div>
 
+        {/* Link selector: evidence + findings grouped by asset */}
         {available.length > 0 && (
           <div className="flex items-center gap-2 border-t border-border/50 pt-2">
-            <Select value={linkEvidenceId} onValueChange={setLinkEvidenceId}>
+            <Select value={linkTargetKey} onValueChange={setLinkTargetKey}>
               <SelectTrigger className="h-8 flex-1">
-                <SelectValue placeholder="Link evidence…" />
+                <SelectValue placeholder="Link evidence or finding…" />
               </SelectTrigger>
               <SelectContent>
-                {available.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {evidenceLabel(e)}
-                  </SelectItem>
+                {Array.from(groups.entries()).map(([group, targets]) => (
+                  <SelectGroup key={group}>
+                    <SelectLabel className="text-[10px]">{group}</SelectLabel>
+                    {targets.map((t) => (
+                      <SelectItem key={`${t.targetType}:${t.targetId}`} value={`${t.targetType}:${t.targetId}`}>
+                        <span className="text-muted-foreground mr-1 text-[10px] font-mono uppercase">
+                          {t.targetType === "finding" ? "↳" : ""}
+                        </span>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>
@@ -283,7 +342,7 @@ function HypothesisCard({
                 ))}
               </SelectContent>
             </Select>
-            <Button size="sm" variant="outline" onClick={link} disabled={!linkEvidenceId}>
+            <Button size="sm" variant="outline" onClick={link} disabled={!linkTargetKey}>
               Link
             </Button>
           </div>

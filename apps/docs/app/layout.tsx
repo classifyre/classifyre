@@ -12,7 +12,6 @@ import { Footer, Layout, Navbar } from "nextra-theme-docs";
 
 import { softwareVersionLabel } from "@workspace/ui/lib/software-version";
 import { getAllSourceDocs } from "@workspace/schemas/source-docs";
-import { getAllDetectorDocs } from "@workspace/schemas/detector-docs";
 
 import {
   buildDocsSiteUrl,
@@ -146,63 +145,6 @@ function buildSourcesFolder(
   } as PageMapItem;
 }
 
-function buildDetectorsFolder(
-  baseItem: {
-    name: string;
-    route: string;
-    frontMatter?: unknown;
-    title?: unknown;
-  },
-  nestedChildren: PageMapItem[],
-): PageMapItem {
-  const detectorDocs = getAllDetectorDocs();
-  const generatedDetectorRoutes = new Set(
-    detectorDocs.map((d) => `/detectors/${d.slug}`),
-  );
-
-  const filteredChildren = nestedChildren.filter((child) => {
-    if (!isNamedPageMapItem(child)) return true;
-    if (child.name === "[detectorType]") return false;
-    return !generatedDetectorRoutes.has(child.route);
-  });
-
-  const initialMeta =
-    filteredChildren[0] && isMetaPageMapItem(filteredChildren[0])
-      ? filteredChildren[0].data
-      : {};
-  const childrenWithoutMeta =
-    filteredChildren[0] && isMetaPageMapItem(filteredChildren[0])
-      ? filteredChildren.slice(1)
-      : filteredChildren;
-
-  const mergedMeta: Record<string, unknown> = {
-    ...initialMeta,
-    "[detectorType]": { display: "hidden" },
-  };
-
-  for (const detector of detectorDocs) {
-    mergedMeta[detector.slug] = { title: detector.label };
-  }
-
-  const generatedChildren: PageMapItem[] = detectorDocs.map((detector) => ({
-    name: detector.slug,
-    route: `/detectors/${detector.slug}`,
-    title: detector.label,
-  }));
-
-  return {
-    name: baseItem.name,
-    route: baseItem.route,
-    title: typeof baseItem.title === "string" ? baseItem.title : "Detectors",
-    ...(baseItem.frontMatter ? { frontMatter: baseItem.frontMatter } : {}),
-    children: [
-      { data: mergedMeta },
-      ...childrenWithoutMeta,
-      ...generatedChildren,
-    ],
-  } as PageMapItem;
-}
-
 function withSourceSidebarChildren(pageMap: PageMapItem[]): PageMapItem[] {
   return pageMap.map((item) => {
     if (isFolderPageMapItem(item)) {
@@ -224,39 +166,11 @@ function withSourceSidebarChildren(pageMap: PageMapItem[]): PageMapItem[] {
         );
       }
 
-      if (item.route === "/detectors") {
-        return buildDetectorsFolder(
-          {
-            name: item.name,
-            route: item.route,
-            ...(isNamedPageMapItem(item) && "frontMatter" in item
-              ? { frontMatter: item.frontMatter }
-              : {}),
-            ...(isNamedPageMapItem(item) && "title" in item
-              ? { title: item.title }
-              : {}),
-          },
-          nestedChildren,
-        );
-      }
-
       return { ...item, children: nestedChildren };
     }
 
     if (isNamedPageMapItem(item) && item.route === "/sources") {
       return buildSourcesFolder(
-        {
-          name: item.name,
-          route: item.route,
-          ...("frontMatter" in item ? { frontMatter: item.frontMatter } : {}),
-          ...("title" in item ? { title: item.title } : {}),
-        },
-        [],
-      );
-    }
-
-    if (isNamedPageMapItem(item) && item.route === "/detectors") {
-      return buildDetectorsFolder(
         {
           name: item.name,
           route: item.route,
@@ -350,8 +264,7 @@ const navbar = (
 
 const footer = (
   <Footer className="border-t border-border bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
-    Classifyre Docs. Static export is bundled under{" "}
-    <code>{docsBasePath || "/"}</code> in production.
+    Classifyre Docs
   </Footer>
 );
 

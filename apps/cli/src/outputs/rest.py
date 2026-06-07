@@ -97,6 +97,31 @@ class BulkIngestAssetsRequest(BaseModel):
     skip_findings: bool = Field(False, serialization_alias="skipFindings")
 
 
+class IngestEdge(BaseModel):
+    """A source-derived relationship edge for the investigation graph.
+
+    Identify endpoints by UUID (from_id / to_id) or by asset hash
+    (from_hash / to_hash — the API resolves hashes to UUIDs).
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    from_type: str = Field(serialization_alias="fromType")
+    from_id: str | None = Field(None, serialization_alias="fromId")
+    from_hash: str | None = Field(None, serialization_alias="fromHash")
+    to_type: str = Field(serialization_alias="toType")
+    to_id: str | None = Field(None, serialization_alias="toId")
+    to_hash: str | None = Field(None, serialization_alias="toHash")
+    relation_type: str = Field(serialization_alias="relationType")
+    confidence: float = 1.0
+
+
+class BulkIngestEdgesRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    edges: list[IngestEdge]
+
+
 class FinalizeIngestRunRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -251,6 +276,30 @@ class RestOutputSink:
                 error,
                 update_error,
             )
+
+    async def emit_edges(self, edges: list[IngestEdge]) -> None:
+        """Bulk-upsert source-derived relationship edges to the investigation graph.
+
+        Idempotent — safe to call multiple times with overlapping data.
+        Silently skips if the list is empty.
+        """
+        if not edges:
+            return
+
+        _EDGE_BATCH = 500
+        for i in range(0, len(edges), _EDGE_BATCH):
+            chunk = edges[i : i + _EDGE_BATCH]
+            payload = BulkIngestEdgesRequest(edges=chunk)
+            try:
+                self._request_json(
+                    "POST",
+                    "/graph/edges",
+                    payload.model_dump(mode="json", by_alias=True),
+                )
+                logger.debug("Emitted %d source-derived edges to graph", len(chunk))
+            except Exception as exc:
+                # Edge emission is best-effort: log and continue.
+                logger.warning("Failed to emit edges to graph: %s", exc)
 
     async def register_discovered_assets(self, hashes: list[str]) -> None:
         runner_id = self._require_runner_id()

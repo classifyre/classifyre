@@ -13,6 +13,7 @@ Name | Type
 `addedBy` | string
 `createdAt` | Date
 `entity` | [EvidenceEntityDto](EvidenceEntityDto.md)
+`findings` | [Array&lt;CaseFindingDto&gt;](CaseFindingDto.md)
 
 ## Example
 
@@ -28,6 +29,7 @@ const example = {
   "addedBy": null,
   "createdAt": null,
   "entity": null,
+  "findings": null,
 } satisfies CaseEvidenceDto
 
 console.log(example)

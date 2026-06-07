@@ -74,6 +74,30 @@ export interface GraphNodeDto {
      */
     status?: string;
     /**
+     * For finding nodes: truncated matched text
+     * @type {string}
+     * @memberof GraphNodeDto
+     */
+    matchedContent?: string;
+    /**
+     * For finding nodes: name of the parent asset
+     * @type {string}
+     * @memberof GraphNodeDto
+     */
+    assetName?: string;
+    /**
+     * For finding nodes: parent asset id
+     * @type {string}
+     * @memberof GraphNodeDto
+     */
+    assetId?: string;
+    /**
+     * Hypothesis IDs this node is directly affiliated with (as evidence or case finding)
+     * @type {Array<string>}
+     * @memberof GraphNodeDto
+     */
+    hypothesisIds?: Array<string>;
+    /**
      * True when the underlying row no longer exists
      * @type {boolean}
      * @memberof GraphNodeDto
@@ -111,6 +135,10 @@ export function GraphNodeDtoFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'severity': json['severity'] == null ? undefined : json['severity'],
         'detectorType': json['detectorType'] == null ? undefined : json['detectorType'],
         'status': json['status'] == null ? undefined : json['status'],
+        'matchedContent': json['matchedContent'] == null ? undefined : json['matchedContent'],
+        'assetName': json['assetName'] == null ? undefined : json['assetName'],
+        'assetId': json['assetId'] == null ? undefined : json['assetId'],
+        'hypothesisIds': json['hypothesisIds'] == null ? undefined : json['hypothesisIds'],
         'missing': json['missing'] == null ? undefined : json['missing'],
     };
 }
@@ -135,6 +163,10 @@ export function GraphNodeDtoToJSONTyped(value?: GraphNodeDto | null, ignoreDiscr
         'severity': value['severity'],
         'detectorType': value['detectorType'],
         'status': value['status'],
+        'matchedContent': value['matchedContent'],
+        'assetName': value['assetName'],
+        'assetId': value['assetId'],
+        'hypothesisIds': value['hypothesisIds'],
         'missing': value['missing'],
     };
 }
