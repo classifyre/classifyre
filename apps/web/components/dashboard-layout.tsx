@@ -121,7 +121,6 @@ export function DashboardLayout({
         settings: t("breadcrumb.settings"),
         detectors: t("breadcrumb.detectors"),
         sandbox: t("breadcrumb.sandbox"),
-        semantic: t("breadcrumb.semantic"),
     };
 
     const [resolvedDynamicLabels, setResolvedDynamicLabels] = React.useState<

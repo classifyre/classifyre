@@ -66,9 +66,6 @@ const assistantDecisionJsonSchema = {
             'test_source_connection',
             'create_custom_detector',
             'train_custom_detector',
-            'create_glossary_term',
-            'create_metric_definition',
-            'certify_metric',
           ],
         },
       ],
@@ -334,10 +331,6 @@ export class AssistantService {
       return null;
     }
 
-    if (operation === 'certify_metric' && !context.entityId) {
-      return null;
-    }
-
     return {
       operation,
       title: confirmationTitle(operation),
@@ -587,101 +580,7 @@ export class AssistantService {
           toolCalls,
         });
       }
-      case 'create_glossary_term': {
-        const args = buildCreateGlossaryTermArgs(request.context);
-        const term = ensureRecord(
-          await this.mcpToolExecutor.createGlossaryTerm(args),
-          'create_glossary_term',
-        );
-        toolCalls.push(successToolCall('create_glossary_term', term.id));
-        actions.push({
-          type: 'sync_glossary_term',
-          termId: ensureString(term.id, 'term.id'),
-          values: extractGlossaryTermValues(term),
-        });
-        actions.push({
-          type: 'show_toast',
-          tone: 'success',
-          title: 'Glossary term created',
-          description: ensureString(term.displayName, 'term.displayName'),
-        });
-        const fallbackReply = `Created glossary term "${ensureString(term.displayName, 'term.displayName')}". You can now create metrics scoped to this term or define another term.`;
-        const reply = await this.composePostOperationReply(
-          request,
-          operation,
-          term,
-          fallbackReply,
-        );
 
-        return assistantChatResponseSchema.parse({
-          reply,
-          actions,
-          pendingConfirmation: null,
-          toolCalls,
-        });
-      }
-      case 'create_metric_definition': {
-        const args = buildCreateMetricArgs(request.context);
-        const metric = ensureRecord(
-          await this.mcpToolExecutor.createMetricDefinition(args),
-          'create_metric_definition',
-        );
-        toolCalls.push(successToolCall('create_metric_definition', metric.id));
-        actions.push({
-          type: 'sync_metric',
-          metricId: ensureString(metric.id, 'metric.id'),
-          values: extractMetricValues(metric),
-        });
-        actions.push({
-          type: 'show_toast',
-          tone: 'success',
-          title: 'Metric created',
-          description: ensureString(metric.displayName, 'metric.displayName'),
-        });
-        const fallbackReply = `Created metric "${ensureString(metric.displayName, 'metric.displayName')}". It starts in DRAFT status — you can certify it when ready.`;
-        const reply = await this.composePostOperationReply(
-          request,
-          operation,
-          metric,
-          fallbackReply,
-        );
-
-        return assistantChatResponseSchema.parse({
-          reply,
-          actions,
-          pendingConfirmation: null,
-          toolCalls,
-        });
-      }
-      case 'certify_metric': {
-        const metricSlug = ensureString(
-          request.context.entityId,
-          'context.entityId (metric slug)',
-        );
-        const metric = ensureRecord(
-          await this.mcpToolExecutor.certifyMetric(metricSlug, 'assistant'),
-          'certify_metric',
-        );
-        toolCalls.push(successToolCall('certify_metric', metric.id));
-        actions.push({
-          type: 'sync_metric',
-          metricId: ensureString(metric.id, 'metric.id'),
-          values: extractMetricValues(metric),
-        });
-        actions.push({
-          type: 'show_toast',
-          tone: 'success',
-          title: 'Metric certified',
-          description: `${ensureString(metric.displayName, 'metric.displayName')} is now ACTIVE`,
-        });
-
-        return assistantChatResponseSchema.parse({
-          reply: `Certified metric "${ensureString(metric.displayName, 'metric.displayName')}" — it is now ACTIVE and ready for production use.`,
-          actions,
-          pendingConfirmation: null,
-          toolCalls,
-        });
-      }
       default:
         throw new BadRequestException(
           `Unsupported assistant operation: ${String(operation)}`,
@@ -847,92 +746,6 @@ function buildSystemPrompt(
       ]
     : [];
 
-  const isGlossaryContext = context.key === 'semantic.glossary';
-  const isMetricsContext = context.key === 'semantic.metrics';
-
-  const semanticKnowledge =
-    isGlossaryContext || isMetricsContext
-      ? [
-          '',
-          '## Semantic layer domain knowledge',
-          '',
-          ...(isGlossaryContext
-            ? [
-                '### Glossary Terms',
-                'A glossary term maps a business concept to technical detection filters.',
-                'The user describes what they want to track in plain language, you translate that to a filterMapping.',
-                '',
-                '## EXACT metadata paths for glossary term — use these',
-                '  slug              → string (kebab-case, e.g. "security-threats")',
-                '  displayName       → string (e.g. "Security Threats")',
-                '  description       → string (plain-language description)',
-                '  category          → string (e.g. "Security", "Privacy", "Compliance", "Content", "Operations")',
-                '  filterMapping     → object with optional arrays:',
-                '    filterMapping.detectorTypes   → string[] from: SECRETS, PII, YARA, BROKEN_LINKS, CODE_SECURITY, CUSTOM',
-                '    filterMapping.severities      → string[] from: CRITICAL, HIGH, MEDIUM, LOW, INFO',
-                '    filterMapping.statuses         → string[] from: OPEN, FALSE_POSITIVE, RESOLVED, IGNORED',
-                '    filterMapping.findingTypes     → string[] (free-form finding type strings)',
-                '    filterMapping.customDetectorKeys → string[] (keys of custom detectors)',
-                '  color             → string (hex color, e.g. "#ef4444")',
-                '  icon              → string (Lucide icon name, e.g. "Shield")',
-                '',
-                '## Translating business intent',
-                '  "I want to track exposed secrets and credentials" → detectorTypes: ["SECRETS"]',
-                '  "Show me personal data exposure" → detectorTypes: ["PII", "PHI"]',
-                '  "Show only critical issues" → severities: ["CRITICAL"]',
-                '  "Track unresolved problems" → statuses: ["OPEN"]',
-                '  "Content safety concerns" → detectorTypes: ["CUSTOM"]',
-                '',
-                '## Slug naming — ALWAYS derive from displayName',
-                'Rule: whenever you set displayName, IMMEDIATELY also set slug with a kebab-case version.',
-                '  "Security Threats" → slug = "security-threats"',
-                '  "PII Exposure" → slug = "pii-exposure"',
-              ]
-            : []),
-          ...(isMetricsContext
-            ? [
-                '### Metric Definitions',
-                'A metric defines how to calculate a business number. Choose the right type:',
-                '',
-                'SIMPLE — Single aggregation (COUNT, COUNT_DISTINCT, SUM, AVG, MIN, MAX) over an entity.',
-                '  definition: { aggregation: "COUNT", entity: "finding", filters?: { statuses: ["OPEN"] } }',
-                '  Good for: totals, counts with filters, averages.',
-                '',
-                'RATIO — Divides a numerator by a denominator.',
-                '  definition: { numerator: { aggregation: "COUNT", entity: "finding", filters: {...} }, denominator: { aggregation: "COUNT", entity: "finding" } }',
-                '  Good for: rates (false positive rate, resolution rate).',
-                '',
-                'DERIVED — Arithmetic formula combining other metrics.',
-                '  definition: { formula: "open_findings * 100 / total_findings", inputs: ["open-findings", "total-findings"] }',
-                '',
-                'TREND — Period-over-period comparison.',
-                '  definition: { baseMetricSlug: "total-findings", compareWindow: "7d", currentWindow: "7d" }',
-                '',
-                '## EXACT metadata paths for metric — use these',
-                '  slug              → string (kebab-case)',
-                '  displayName       → string',
-                '  description       → string',
-                '  type              → "SIMPLE" | "RATIO" | "DERIVED" | "TREND"',
-                '  definition        → object (structure depends on type, see above)',
-                '  allowedDimensions → string[] from: severity, detectorType, status, findingType, category',
-                '  glossaryTermSlug  → string (optional, links to a glossary term)',
-                '  format            → "number" | "percentage" | "duration"',
-                '  unit              → string (e.g. "findings", "%", "score")',
-                '  owner             → string (team or person name)',
-                '',
-                '## Translating business intent',
-                '  "How many open issues do we have" → SIMPLE, COUNT, filters: { statuses: ["OPEN"] }',
-                '  "What percentage are false positives" → RATIO, numerator: FALSE_POSITIVE count / denominator: total count',
-                '  "Week over week change in findings" → TREND, baseMetricSlug: "total-findings", windows: "7d"',
-                '  "Average confidence score" → SIMPLE, AVG, field: "confidence"',
-                '',
-                '## Slug naming — ALWAYS derive from displayName',
-                'Rule: whenever you set displayName, IMMEDIATELY also set slug with a kebab-case version.',
-              ]
-            : []),
-        ]
-      : [];
-
   return [
     'You are the Classifyre MCP assistant, embedded in a product UI.',
     'You MUST return a JSON object with exactly three fields: assistantMessage, patches, requestedOperation.',
@@ -964,7 +777,6 @@ function buildSystemPrompt(
     '   - Only propose operations from the supportedOperations list.',
     ...schemaSection,
     ...detectorKnowledge,
-    ...semanticKnowledge,
     '',
     '## Fix validation before proposing an operation',
     '- If "Required fields missing" is non-empty: emit patches that set those exact paths.',
@@ -1150,80 +962,6 @@ function extractDetectorValues(detector: Record<string, unknown>) {
   };
 }
 
-function buildCreateGlossaryTermArgs(context: AssistantPageContext) {
-  const metadata = getAssistantMetadata(context);
-  return {
-    slug: ensureString(metadata.slug, 'metadata.slug'),
-    displayName: ensureString(metadata.displayName, 'metadata.displayName'),
-    description:
-      typeof metadata.description === 'string'
-        ? metadata.description
-        : undefined,
-    category:
-      typeof metadata.category === 'string' ? metadata.category : undefined,
-    filterMapping: ensureRecord(
-      metadata.filterMapping ?? {},
-      'metadata.filterMapping',
-    ),
-    color: typeof metadata.color === 'string' ? metadata.color : undefined,
-    icon: typeof metadata.icon === 'string' ? metadata.icon : undefined,
-  };
-}
-
-function buildCreateMetricArgs(context: AssistantPageContext) {
-  const metadata = getAssistantMetadata(context);
-  return {
-    slug: ensureString(metadata.slug, 'metadata.slug'),
-    displayName: ensureString(metadata.displayName, 'metadata.displayName'),
-    description:
-      typeof metadata.description === 'string'
-        ? metadata.description
-        : undefined,
-    type: ensureString(metadata.type, 'metadata.type') as
-      | 'SIMPLE'
-      | 'RATIO'
-      | 'DERIVED'
-      | 'TREND',
-    definition: ensureRecord(metadata.definition ?? {}, 'metadata.definition'),
-    allowedDimensions: Array.isArray(metadata.allowedDimensions)
-      ? (metadata.allowedDimensions as string[])
-      : undefined,
-    glossaryTermSlug:
-      typeof metadata.glossaryTermSlug === 'string'
-        ? metadata.glossaryTermSlug
-        : undefined,
-    format: typeof metadata.format === 'string' ? metadata.format : undefined,
-    unit: typeof metadata.unit === 'string' ? metadata.unit : undefined,
-    owner: typeof metadata.owner === 'string' ? metadata.owner : undefined,
-  };
-}
-
-function extractGlossaryTermValues(term: Record<string, unknown>) {
-  return {
-    slug: typeof term.slug === 'string' ? term.slug : '',
-    displayName: typeof term.displayName === 'string' ? term.displayName : '',
-    description: typeof term.description === 'string' ? term.description : '',
-    category: typeof term.category === 'string' ? term.category : '',
-    filterMapping: ensureRecord(term.filterMapping ?? {}, 'term.filterMapping'),
-    color: typeof term.color === 'string' ? term.color : undefined,
-    icon: typeof term.icon === 'string' ? term.icon : undefined,
-    isActive: typeof term.isActive === 'boolean' ? term.isActive : true,
-  };
-}
-
-function extractMetricValues(metric: Record<string, unknown>) {
-  return {
-    slug: typeof metric.slug === 'string' ? metric.slug : '',
-    displayName:
-      typeof metric.displayName === 'string' ? metric.displayName : '',
-    description:
-      typeof metric.description === 'string' ? metric.description : '',
-    type: typeof metric.type === 'string' ? metric.type : '',
-    status: typeof metric.status === 'string' ? metric.status : 'DRAFT',
-    definition: ensureRecord(metric.definition ?? {}, 'metric.definition'),
-  };
-}
-
 function ensureRecord(value: unknown, label: string): Record<string, unknown> {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     return value as Record<string, unknown>;
@@ -1256,12 +994,6 @@ function confirmationTitle(operation: AssistantOperation) {
       return 'Create detector via MCP';
     case 'train_custom_detector':
       return 'Train detector via MCP';
-    case 'create_glossary_term':
-      return 'Create glossary term';
-    case 'create_metric_definition':
-      return 'Create metric definition';
-    case 'certify_metric':
-      return 'Certify metric';
     default:
       return String(operation);
   }
@@ -1283,12 +1015,6 @@ function confirmationDetail(
       return `create the detector "${toDisplayString(getAssistantMetadata(context).name) ?? 'Untitled detector'}"`;
     case 'train_custom_detector':
       return `start training for detector ${context.entityId}`;
-    case 'create_glossary_term':
-      return `create the glossary term "${toDisplayString(getAssistantMetadata(context).displayName) ?? 'Untitled term'}"`;
-    case 'create_metric_definition':
-      return `create the metric "${toDisplayString(getAssistantMetadata(context).displayName) ?? 'Untitled metric'}"`;
-    case 'certify_metric':
-      return `certify metric ${context.entityId} for production use`;
   }
 }
 

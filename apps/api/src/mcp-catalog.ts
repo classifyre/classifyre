@@ -100,34 +100,6 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'Browse asset-level finding summaries',
     ],
   },
-  {
-    id: 'semantic_layer',
-    title: 'Semantic Layer',
-    description:
-      'Query governed business metrics, explore the business glossary, and access detection analytics through business-friendly concepts.',
-    toolNames: [
-      'list_glossary_terms',
-      'get_glossary_term',
-      'create_glossary_term',
-      'update_glossary_term',
-      'delete_glossary_term',
-      'list_metrics',
-      'get_metric',
-      'create_metric',
-      'certify_metric',
-      'query_metric',
-      'query_metric_timeseries',
-      'query_dashboard_metrics',
-      'explore_by_glossary_term',
-    ],
-    operations: [
-      'Create, update, and delete business glossary terms',
-      'Create and certify governed metric definitions',
-      'Query governed metrics with dimension breakdowns and filters',
-      'Evaluate dashboard metrics in batch',
-      'Explore detection data through business concepts',
-    ],
-  },
 ];
 
 export const MCP_PROMPTS: McpPromptSummaryDto[] = [
