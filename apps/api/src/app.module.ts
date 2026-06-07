@@ -16,7 +16,6 @@ import { CliRunnerModule } from './cli-runner/cli-runner.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { SandboxModule } from './sandbox/sandbox.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
-import { SemanticLayerModule } from './semantic-layer/semantic-layer.module';
 import { ExportModule } from './export/export.module';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import { InstanceSettingsService } from './instance-settings.service';
@@ -54,7 +53,6 @@ import {
     WebSocketModule,
     SandboxModule,
     SchedulerModule,
-    SemanticLayerModule,
     ExportModule,
   ],
   controllers: [

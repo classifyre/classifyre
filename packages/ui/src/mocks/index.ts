@@ -8,4 +8,4 @@ export * from "./notification-events";
 export * from "./user";
 export * from "./api-keys";
 export * from "./reports";
-export * from "./semantic-layer";
+

@@ -17,10 +17,6 @@ const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/sandbox/new": "sandbox.newScan",
   "/notifications": "notifications.title",
   "/settings": "settings.title",
-  "/semantic": "semantic.title",
-  "/semantic/glossary/new": "semantic.glossary.newTitle",
-  "/semantic/metrics/new": "semantic.metrics.newTitle",
-  "/semantic/explore": "semantic.explore.title",
 };
 
 function getTitleKey(pathname: string): string | null {
@@ -51,12 +47,6 @@ function getTitleKey(pathname: string): string | null {
   }
   if (pathname.startsWith("/detectors/")) {
     return "detectors.detail.title";
-  }
-  if (pathname.startsWith("/semantic/glossary/")) {
-    return "semantic.glossary.detail.title";
-  }
-  if (pathname.startsWith("/semantic/metrics/")) {
-    return "semantic.metrics.detail.title";
   }
 
   return null;
