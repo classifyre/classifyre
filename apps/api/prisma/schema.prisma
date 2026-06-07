@@ -468,6 +468,7 @@ enum AssetType {
   NOTION
   POWERBI
   TABLEAU
+  EMAIL
   CUSTOM
 }
 
@@ -613,107 +614,6 @@ model SandboxRun {
   @@map("sandbox_runs")
 }
 
-// ─── SEMANTIC LAYER ──────────────────────────────────────────────
-
-enum MetricType {
-  SIMPLE
-  RATIO
-  DERIVED
-  TREND
-}
-
-enum MetricStatus {
-  DRAFT
-  ACTIVE
-  DEPRECATED
-}
-
-model GlossaryTerm {
-  id            String   @id @default(uuid())
-  displayName   String   @map("display_name")
-  description   String?  @db.Text
-  category      String?
-
-  // Maps business term to technical detection filters (JSONB)
-  // e.g. { detectorTypes: ["SECRETS","PII"], severities: ["CRITICAL","HIGH"],
-  //        findingTypes: ["aws_key"], customDetectorKeys: ["gdpr-scanner"],
-  //        statuses: ["OPEN"] }
-  filterMapping Json     @map("filter_mapping") @db.JsonB
-
-  color         String?
-  icon          String?
-
-  isActive      Boolean  @default(true) @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  metrics       MetricDefinition[]
-
-  @@index([category])
-  @@index([isActive])
-  @@map("glossary_terms")
-}
-
-model MetricDefinition {
-  id                String       @id @default(uuid())
-  displayName       String       @map("display_name")
-  description       String?      @db.Text
-  type              MetricType
-  status            MetricStatus @default(DRAFT)
-
-  // Metric calculation definition (JSONB)
-  // SIMPLE:  { aggregation: "COUNT", entity: "finding", filters: {...} }
-  // RATIO:   { numerator: {...}, denominator: {...} }
-  // DERIVED: { formula: "a * 100 / b", inputs: ["<metric-id-1>","<metric-id-2>"] }
-  // TREND:   { baseMetricId: "<metric-id>", compareWindow: "7d", currentWindow: "7d" }
-  definition        Json         @db.JsonB
-
-  allowedDimensions String[]     @default([]) @map("allowed_dimensions")
-
-  glossaryTermId    String?      @map("glossary_term_id")
-  glossaryTerm      GlossaryTerm? @relation(fields: [glossaryTermId], references: [id], onDelete: SetNull)
-
-  format            String?
-  unit              String?
-  color             String?
-
-  owner             String?
-  certifiedAt       DateTime?    @map("certified_at")
-  certifiedBy       String?      @map("certified_by")
-
-  isActive          Boolean      @default(true) @map("is_active")
-  createdAt         DateTime     @default(now()) @map("created_at")
-  updatedAt         DateTime     @updatedAt @map("updated_at")
-
-  dashboardPlacements MetricDashboardPlacement[]
-
-  @@index([type])
-  @@index([status])
-  @@index([glossaryTermId])
-  @@index([isActive])
-  @@map("metric_definitions")
-}
-
-model MetricDashboardPlacement {
-  id                  String           @id @default(uuid())
-  metricDefinitionId  String           @map("metric_definition_id")
-  metricDefinition    MetricDefinition @relation(fields: [metricDefinitionId], references: [id], onDelete: Cascade)
-
-  dashboard           String
-  position            Int              @default(0)
-  size                String           @default("md")
-  chartType           String?          @map("chart_type")
-
-  pinnedFilters       Json?            @map("pinned_filters") @db.JsonB
-
-  isVisible           Boolean          @default(true) @map("is_visible")
-  createdAt           DateTime         @default(now()) @map("created_at")
-  updatedAt           DateTime         @updatedAt @map("updated_at")
-
-  @@unique([metricDefinitionId, dashboard])
-  @@index([dashboard])
-  @@map("metric_dashboard_placements")
-}
 
 // ─── INVESTIGATIONS (CASES / GRAPH) ──────────────────────────────
 

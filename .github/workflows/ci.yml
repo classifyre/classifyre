@@ -269,3 +269,14 @@ jobs:
             web-dist=${{ github.workspace }}/web-dist
           cache-from: type=registry,ref=${{ format('{0}/{1}:build-cache', secrets.DOCKER_USERNAME, matrix.repository) }}
           cache-to: type=registry,ref=${{ format('{0}/{1}:build-cache', secrets.DOCKER_USERNAME, matrix.repository) }},mode=max,image-manifest=true
+
+  deploy-develop:
+    name: Deploy → classifyre-develop
+    needs: [docker]
+    if: github.event_name == 'push' && github.ref_name == 'develop'
+    uses: ./.github/workflows/develop.yml
+    with:
+      environment: classifyre-develop
+      image_tag: develop
+      demo_mode: 'true'
+    secrets: inherit

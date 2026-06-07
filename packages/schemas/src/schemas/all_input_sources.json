@@ -65,6 +65,9 @@
     },
     {
       "$ref": "#/definitions/NotionInput"
+    },
+    {
+      "$ref": "#/definitions/EmailInput"
     }
   ],
   "x-asset-metadata": {
@@ -1135,6 +1138,121 @@
             "page_id"
           ]
         }
+      },
+      "EMAIL": {
+        "email": {
+          "properties": {
+            "message_id": {
+              "type": "string",
+              "description": "RFC 5322 Message-ID header (stable dedup key)"
+            },
+            "subject": {
+              "type": "string",
+              "description": "Email subject line"
+            },
+            "from_address": {
+              "type": "string",
+              "description": "Sender email address (From header)"
+            },
+            "to_addresses": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Recipient addresses (To header)"
+            },
+            "cc_addresses": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Carbon-copy addresses (Cc header)"
+            },
+            "date": {
+              "type": "string",
+              "description": "Message date (ISO 8601)"
+            },
+            "folder": {
+              "type": "string",
+              "description": "Mailbox folder the message was fetched from"
+            },
+            "sender_domain": {
+              "type": "string",
+              "description": "Domain parsed from the From address"
+            },
+            "reply_to": {
+              "type": "string",
+              "description": "Reply-To header"
+            },
+            "in_reply_to": {
+              "type": "string",
+              "description": "In-Reply-To header (parent message id)"
+            },
+            "references": {
+              "type": "string",
+              "description": "References header (thread chain)"
+            },
+            "has_html": {
+              "type": "boolean",
+              "description": "Whether the message has an HTML body part"
+            },
+            "attachment_count": {
+              "type": "integer",
+              "description": "Number of attachments on the message"
+            },
+            "spf": {
+              "type": "string",
+              "description": "SPF result parsed from Authentication-Results"
+            },
+            "dkim": {
+              "type": "string",
+              "description": "DKIM result parsed from Authentication-Results"
+            },
+            "dmarc": {
+              "type": "string",
+              "description": "DMARC result parsed from Authentication-Results"
+            }
+          },
+          "required": [
+            "message_id",
+            "subject",
+            "from_address"
+          ]
+        },
+        "attachment": {
+          "use": [
+            "file",
+            "attachment",
+            "image",
+            "document",
+            "spreadsheet",
+            "text",
+            "json"
+          ],
+          "properties": {
+            "parent_email_hash": {
+              "type": "string",
+              "description": "Hash of the parent email asset"
+            },
+            "sha256": {
+              "type": "string",
+              "description": "SHA-256 of the attachment bytes"
+            },
+            "is_inline": {
+              "type": "boolean",
+              "description": "Whether the attachment is inline (e.g. embedded image)"
+            },
+            "content_id": {
+              "type": "string",
+              "description": "Content-ID header for inline parts"
+            }
+          },
+          "required": [
+            "filename",
+            "parent_email_hash",
+            "size_bytes"
+          ]
+        }
       }
     }
   },
@@ -1162,7 +1280,8 @@
         "JIRA",
         "SERVICEDESK",
         "SQLITE",
-        "NOTION"
+        "NOTION",
+        "EMAIL"
       ],
       "description": "Type of the asset or source"
     },
@@ -1414,6 +1533,119 @@
       "properties": {
         "content": {
           "$ref": "#/definitions/WordPressOptionalContent"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EmailRequired": {
+      "title": "EmailRequired",
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "IMAP server host (e.g. imap.gmail.com, outlook.office365.com)"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 993,
+          "description": "IMAP server port (993 for IMAPS)"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "EmailMasked": {
+      "title": "EmailMasked",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Mailbox login (usually the full email address)"
+        },
+        "password": {
+          "type": "string",
+          "description": "Account or app-specific password (use an app password for Gmail/Outlook)"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "EmailOptionalConnection": {
+      "title": "EmailOptionalConnection",
+      "type": "object",
+      "description": "Transport-level connection controls.",
+      "properties": {
+        "use_ssl": {
+          "type": "boolean",
+          "default": true,
+          "description": "Connect over implicit TLS (IMAPS). Disable only for STARTTLS/plain servers."
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30,
+          "description": "Socket timeout for IMAP operations"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EmailOptionalScope": {
+      "title": "EmailOptionalScope",
+      "type": "object",
+      "description": "Which messages and attachments to ingest.",
+      "properties": {
+        "folders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "INBOX"
+          ],
+          "description": "Mailbox folders to scan"
+        },
+        "since_date": {
+          "type": "string",
+          "description": "Only fetch messages on/after this date (ISO 8601 date, e.g. 2026-01-01)"
+        },
+        "before_date": {
+          "type": "string",
+          "description": "Only fetch messages before this date (ISO 8601 date)"
+        },
+        "unseen_only": {
+          "type": "boolean",
+          "default": false,
+          "description": "Only fetch unread (UNSEEN) messages"
+        },
+        "include_attachments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit attachments as separate assets linked to the email"
+        },
+        "max_attachment_size_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Skip downloading attachment bytes above this size (still emits a metadata-only asset). Unset means no limit."
+        }
+      },
+      "additionalProperties": false
+    },
+    "EmailOptional": {
+      "title": "EmailOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/EmailOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/EmailOptionalScope"
         }
       },
       "additionalProperties": false
@@ -3984,6 +4216,50 @@
             },
             "optional": {
               "$ref": "#/definitions/SlackOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "EmailInput": {
+      "title": "EmailInput",
+      "label": "Email",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "EMAIL"
+            },
+            "required": {
+              "$ref": "#/definitions/EmailRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/EmailMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/EmailOptional"
             },
             "detectors": {
               "$ref": "#/definitions/Detectors"
