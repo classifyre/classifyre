@@ -1783,5 +1783,133 @@
         ]
       }
     }
+  ],
+  "EMAIL": [
+    {
+      "name": "Gmail inbox compliance scan",
+      "description": "Scan a Gmail inbox for PII and secrets in messages and attachments using an app password",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "30 7 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "EMAIL",
+        "required": {
+          "host": "imap.gmail.com",
+          "port": 993
+        },
+        "masked": {
+          "username": "you@gmail.com",
+          "password": "your-app-password"
+        },
+        "optional": {
+          "scope": {
+            "folders": [
+              "INBOX"
+            ],
+            "include_attachments": true
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "enable_ocr": true
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Outlook / Microsoft 365 unread audit",
+      "description": "Audit only unread Outlook messages received since a date for sensitive data",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "15 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "EMAIL",
+        "required": {
+          "host": "outlook.office365.com",
+          "port": 993
+        },
+        "masked": {
+          "username": "you@contoso.com",
+          "password": "your-app-password"
+        },
+        "optional": {
+          "scope": {
+            "folders": [
+              "INBOX"
+            ],
+            "unseen_only": true,
+            "since_date": "2026-01-01",
+            "max_attachment_size_bytes": 26214400
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST"
+        }
+      }
+    },
+    {
+      "name": "Corporate IMAP full mailbox scan",
+      "description": "Scan every message across multiple folders on a self-hosted IMAP server",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekly",
+        "cron": "0 2 * * 0",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "EMAIL",
+        "required": {
+          "host": "mail.example.com",
+          "port": 993
+        },
+        "masked": {
+          "username": "scanner@example.com",
+          "password": "service-account-password"
+        },
+        "optional": {
+          "connection": {
+            "use_ssl": true,
+            "timeout_seconds": 60
+          },
+          "scope": {
+            "folders": [
+              "INBOX",
+              "Sent",
+              "Archive"
+            ],
+            "include_attachments": true
+          }
+        },
+        "sampling": {
+          "strategy": "ALL",
+          "enable_ocr": true
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    }
   ]
 }

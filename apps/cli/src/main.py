@@ -197,6 +197,27 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     has_detectors = bool(pipeline.detectors)
 
                     if has_detectors:
+                        # Warm this run's optional dependency groups once, here in
+                        # the parent process, before the worker pool spawns — so the
+                        # pool's worker processes don't each race on their own
+                        # `uv sync` against the shared venv. Best-effort: the
+                        # lock-protected require_module path remains the safety net.
+                        from .utils.dependency_groups import recipe_uv_groups
+                        from .utils.uv_sync import warm_groups
+
+                        warm = recipe_uv_groups(recipe)
+                        if warm:
+                            logger.info(
+                                "Warming optional dependency groups: %s",
+                                ", ".join(sorted(warm)),
+                            )
+                            warm_ok, warm_detail = warm_groups(warm)
+                            if not warm_ok:
+                                logger.warning(
+                                    "Dependency warm-up incomplete (workers will retry): %s",
+                                    warm_detail,
+                                )
+
                         worker_pool = DetectorWorkerPool(max_workers=pool_workers)
                         pipeline = DetectorPipeline.from_recipe(
                             recipe,

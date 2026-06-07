@@ -274,7 +274,10 @@ api:
     pollIntervalMs: 2000
     # -- Working directory inside CLI job container.
     workDir: /app/apps/cli
-    # -- Allow CLI to auto-install optional detector dependencies.
+    # -- Allow CLI to auto-install optional detector dependencies at runtime.
+    # -- The slim cli image installs detector/source groups on demand into a
+    # -- per-pod venv; concurrent/interrupted syncs are made safe by the file
+    # -- lock + cross-process group accumulation + self-heal in uv_sync.py.
     autoInstallOptionalDeps: true
     # -- Number of detector-processed assets to accumulate before pushing findings to the API.
     detectorFlushBatchSize: 5

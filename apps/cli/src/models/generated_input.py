@@ -43,6 +43,7 @@ class AssetType(StrEnum):
     SERVICEDESK = 'SERVICEDESK'
     SQLITE = 'SQLITE'
     NOTION = 'NOTION'
+    EMAIL = 'EMAIL'
 
 
 class SourceCategory(StrEnum):
@@ -236,6 +237,85 @@ class WordPressOptional(BaseModel):
         extra='forbid',
     )
     content: WordPressOptionalContent | None = None
+
+
+class EmailRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    host: str = Field(
+        ..., description='IMAP server host (e.g. imap.gmail.com, outlook.office365.com)'
+    )
+    port: int | None = Field(
+        993, description='IMAP server port (993 for IMAPS)', ge=1, le=65535
+    )
+
+
+class EmailMasked(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    username: str = Field(
+        ..., description='Mailbox login (usually the full email address)'
+    )
+    password: str = Field(
+        ...,
+        description='Account or app-specific password (use an app password for Gmail/Outlook)',
+    )
+
+
+class EmailOptionalConnection(BaseModel):
+    """
+    Transport-level connection controls.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    use_ssl: bool | None = Field(
+        True,
+        description='Connect over implicit TLS (IMAPS). Disable only for STARTTLS/plain servers.',
+    )
+    timeout_seconds: int | None = Field(
+        30, description='Socket timeout for IMAP operations', ge=1
+    )
+
+
+class EmailOptionalScope(BaseModel):
+    """
+    Which messages and attachments to ingest.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    folders: list[str] | None = Field(['INBOX'], description='Mailbox folders to scan')
+    since_date: str | None = Field(
+        None,
+        description='Only fetch messages on/after this date (ISO 8601 date, e.g. 2026-01-01)',
+    )
+    before_date: str | None = Field(
+        None, description='Only fetch messages before this date (ISO 8601 date)'
+    )
+    unseen_only: bool | None = Field(
+        False, description='Only fetch unread (UNSEEN) messages'
+    )
+    include_attachments: bool | None = Field(
+        True, description='Emit attachments as separate assets linked to the email'
+    )
+    max_attachment_size_bytes: int | None = Field(
+        None,
+        description='Skip downloading attachment bytes above this size (still emits a metadata-only asset). Unset means no limit.',
+        ge=0,
+    )
+
+
+class EmailOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: EmailOptionalConnection | None = None
+    scope: EmailOptionalScope | None = None
 
 
 class SlackRequired(BaseModel):
@@ -1872,6 +1952,7 @@ class Type(StrEnum):
     SERVICEDESK = 'SERVICEDESK'
     SQLITE = 'SQLITE'
     NOTION = 'NOTION'
+    EMAIL = 'EMAIL'
 
 
 class SlackInput(CoreInput):
@@ -1881,6 +1962,22 @@ class SlackInput(CoreInput):
         ..., title='SlackMasked'
     )
     optional: SlackOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
+class EmailInput(CoreInput):
+    type: Literal['EMAIL'] = Field('EMAIL', description='Type of the asset or source')
+    required: EmailRequired
+    masked: EmailMasked
+    optional: EmailOptional | None = None
     detectors: list[Detector] | None = Field(
         None, description='Detectors to run on ingested content'
     )
@@ -2331,7 +2428,7 @@ class ConfluenceOptionalConnection(BaseModel):
     )
 
 
-class Type16(StrEnum):
+class Type17(StrEnum):
     """
     Filter spaces by space type
     """
@@ -2368,7 +2465,7 @@ class ConfluenceOptionalScopeSpaces(BaseModel):
     keys: list[str] | None = Field(
         None, description='Filter spaces by keys (up to 250)', max_length=250
     )
-    type: Type16 | None = Field(None, description='Filter spaces by space type')
+    type: Type17 | None = Field(None, description='Filter spaces by space type')
     status: Status | None = Field(None, description='Filter spaces by status')
     labels: list[str] | None = Field(
         None,
@@ -2634,7 +2731,7 @@ class ServiceDeskOptional(BaseModel):
     content: ServiceDeskOptionalContent | None = None
 
 
-class Type17(StrEnum):
+class Type18(StrEnum):
     """
     Type of the asset or source
     """
@@ -2660,6 +2757,7 @@ class Type17(StrEnum):
     SERVICEDESK = 'SERVICEDESK'
     SQLITE = 'SQLITE'
     NOTION = 'NOTION'
+    EMAIL = 'EMAIL'
 
 
 class ConfluenceInput(CoreInput):
@@ -2920,6 +3018,7 @@ class SourceInput(
         | ServiceDeskInput
         | SQLiteInput
         | NotionInput
+        | EmailInput
     ]
 ):
     root: (
@@ -2944,6 +3043,7 @@ class SourceInput(
         | ServiceDeskInput
         | SQLiteInput
         | NotionInput
+        | EmailInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

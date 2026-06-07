@@ -91,7 +91,14 @@ RUN rm -rf apps/web apps/blog apps/docs
 RUN cd apps/api && bun run prisma:generate
 COPY --from=api-source / /repo/apps/api/dist/
 
-# ── cli-builder: install Python dependencies ──────────────────────────────────
+# ── cli-builder: install base Python dependencies (slim) ─────────────────────
+# Ships only base deps (~150-230 MB). Optional detector/source groups install on
+# demand at runtime (CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1), cached via the
+# uv cache. Concurrent/interrupted runtime syncs are made safe by the file lock +
+# cross-process group accumulation + self-heal in src/utils/uv_sync.py, and the
+# parent process warms the run's groups before spawning the detector worker pool.
+# torch is CPU-only on Linux (pyproject [tool.uv.sources]) so runtime torch
+# installs pull ~0.5 GB instead of the ~6 GB NVIDIA CUDA stack.
 FROM python:${PYTHON_VERSION} AS cli-builder
 COPY --from=uv-bin /uv /uvx /usr/local/bin/
 WORKDIR /app
