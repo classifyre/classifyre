@@ -76,15 +76,23 @@ class EmailSource(BaseSource):
         self.password = self.config.masked.password
 
         connection = self.config.optional.connection if self.config.optional else None
-        self.use_ssl = True if connection is None or connection.use_ssl is None else connection.use_ssl
-        self.timeout_seconds = int(connection.timeout_seconds) if connection and connection.timeout_seconds else 30
+        self.use_ssl = (
+            True if connection is None or connection.use_ssl is None else connection.use_ssl
+        )
+        self.timeout_seconds = (
+            int(connection.timeout_seconds) if connection and connection.timeout_seconds else 30
+        )
 
         scope = self.config.optional.scope if self.config.optional else None
         self.folders = list(scope.folders) if scope and scope.folders else ["INBOX"]
         self.since_date = scope.since_date if scope else None
         self.before_date = scope.before_date if scope else None
         self.unseen_only = bool(scope.unseen_only) if scope else False
-        self.include_attachments = True if scope is None or scope.include_attachments is None else scope.include_attachments
+        self.include_attachments = (
+            True
+            if scope is None or scope.include_attachments is None
+            else scope.include_attachments
+        )
         self.max_attachment_size_bytes = scope.max_attachment_size_bytes if scope else None
 
         # Caches populated during extract_raw; served to the detector pipeline.
@@ -208,7 +216,9 @@ class EmailSource(BaseSource):
                     try:
                         assets = self._message_to_assets(msg, folder)
                     except Exception as e:
-                        logger.error("Failed to transform message uid=%s: %s", getattr(msg, "uid", "?"), e)
+                        logger.error(
+                            "Failed to transform message uid=%s: %s", getattr(msg, "uid", "?"), e
+                        )
                         continue
                     for asset in assets:
                         pending.append(asset)
@@ -328,7 +338,9 @@ class EmailSource(BaseSource):
         if att.content_id:
             metadata["content_id"] = att.content_id
 
-        over_limit = self.max_attachment_size_bytes is not None and size > int(self.max_attachment_size_bytes)
+        over_limit = self.max_attachment_size_bytes is not None and size > int(
+            self.max_attachment_size_bytes
+        )
         if payload and not over_limit:
             metadata["sha256"] = hashlib.sha256(payload).hexdigest()
             self._attachment_bytes_by_hash[att_hash] = (payload, mime)

@@ -368,19 +368,14 @@ export type SearchRunnerAssetsResponseDto = {
 export type AssistantContextKey =
   | "source.create"
   | "source.edit"
-  | "detector.create"
-  | "semantic.glossary"
-  | "semantic.metrics";
+  | "detector.create";
 
 export type AssistantOperation =
   | "create_source"
   | "update_source"
   | "test_source_connection"
   | "create_custom_detector"
-  | "train_custom_detector"
-  | "create_glossary_term"
-  | "create_metric_definition"
-  | "certify_metric";
+  | "train_custom_detector";
 
 export type AssistantChatMessage = {
   role: "user" | "assistant";
@@ -440,11 +435,6 @@ export type AssistantUiAction =
   | {
       type: "sync_detector";
       detectorId: string;
-      values: Record<string, unknown>;
-    }
-  | {
-      type: "sync_glossary_term";
-      termId: string;
       values: Record<string, unknown>;
     }
   | {

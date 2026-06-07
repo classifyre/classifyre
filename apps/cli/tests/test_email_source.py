@@ -11,7 +11,9 @@ from src.sources.email.source import EmailSource
 # Fakes for the imap_tools API
 # ---------------------------------------------------------------------------
 class FakeAtt:
-    def __init__(self, filename, payload, content_type, content_id=None, content_disposition="attachment"):
+    def __init__(
+        self, filename, payload, content_type, content_id=None, content_disposition="attachment"
+    ):
         self.filename = filename
         self.payload = payload
         self.content_type = content_type
@@ -22,7 +24,19 @@ class FakeAtt:
 
 
 class FakeMsg:
-    def __init__(self, uid, subject, from_, to=(), cc=(), date=None, text="", html="", headers=None, attachments=None):
+    def __init__(
+        self,
+        uid,
+        subject,
+        from_,
+        to=(),
+        cc=(),
+        date=None,
+        text="",
+        html="",
+        headers=None,
+        attachments=None,
+    ):
         self.uid = uid
         self.subject = subject
         self.from_ = from_
@@ -92,7 +106,13 @@ def _sample_message():
         "in-reply-to": ("<parent@mail.example.com>",),
     }
     attachments = [
-        FakeAtt("photo.png", b"\x89PNG\r\n\x1a\nfakebytes", "image/png", content_id="cid1", content_disposition="inline"),
+        FakeAtt(
+            "photo.png",
+            b"\x89PNG\r\n\x1a\nfakebytes",
+            "image/png",
+            content_id="cid1",
+            content_disposition="inline",
+        ),
         FakeAtt("data.bin", b"rawbinarydata", "application/octet-stream"),
     ]
     return FakeMsg(
