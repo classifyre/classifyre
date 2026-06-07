@@ -1142,6 +1142,7 @@
                   "NOTION",
                   "POWERBI",
                   "TABLEAU",
+                  "EMAIL",
                   "CUSTOM"
                 ]
               }
@@ -1483,6 +1484,7 @@
                   "NOTION",
                   "POWERBI",
                   "TABLEAU",
+                  "EMAIL",
                   "CUSTOM"
                 ]
               }
@@ -1846,6 +1848,7 @@
                   "NOTION",
                   "POWERBI",
                   "TABLEAU",
+                  "EMAIL",
                   "CUSTOM"
                 ]
               }
@@ -5461,7 +5464,7 @@
   },
   "info": {
     "title": "Classifyre API",
-    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.",
+    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, and Email sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.",
     "version": "1.0.0",
     "contact": {
       "name": "Classifyre Team",
@@ -5528,7 +5531,8 @@
               "JIRA",
               "SERVICEDESK",
               "SQLITE",
-              "NOTION"
+              "NOTION",
+              "EMAIL"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -5711,7 +5715,8 @@
               "JIRA",
               "SERVICEDESK",
               "SQLITE",
-              "NOTION"
+              "NOTION",
+              "EMAIL"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -5836,6 +5841,7 @@
                 "NOTION",
                 "POWERBI",
                 "TABLEAU",
+                "EMAIL",
                 "CUSTOM"
               ]
             }
@@ -6142,6 +6148,7 @@
               "NOTION",
               "POWERBI",
               "TABLEAU",
+              "EMAIL",
               "CUSTOM"
             ]
           },
@@ -6277,6 +6284,7 @@
                 "NOTION",
                 "POWERBI",
                 "TABLEAU",
+                "EMAIL",
                 "CUSTOM"
               ]
             }
@@ -7034,6 +7042,7 @@
               "NOTION",
               "POWERBI",
               "TABLEAU",
+              "EMAIL",
               "CUSTOM"
             ]
           }
@@ -9999,6 +10008,7 @@
                 "NOTION",
                 "POWERBI",
                 "TABLEAU",
+                "EMAIL",
                 "CUSTOM"
               ]
             }

@@ -468,6 +468,7 @@ enum AssetType {
   NOTION
   POWERBI
   TABLEAU
+  EMAIL
   CUSTOM
 }
 

@@ -30,6 +30,7 @@ TYPE_TO_DEFINITION = {
     "SERVICEDESK": "ServiceDeskInput",
     "SQLITE": "SQLiteInput",
     "NOTION": "NotionInput",
+    "EMAIL": "EmailInput",
 }
 
 SCHEMAS_DIR = Path(__file__).parent.parent / "src" / "schemas"
