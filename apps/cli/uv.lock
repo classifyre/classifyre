@@ -322,15 +322,15 @@ wheels = [
 
 [[package]]
 name = "beautifulsoup4"
-version = "4.14.3"
+version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "soupsieve" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c3/b0/1c6a16426d389813b48d95e26898aff79abbde42ad353958ad95cc8c9b21/beautifulsoup4-4.14.3.tar.gz", hash = "sha256:6292b1c5186d356bba669ef9f7f051757099565ad9ada5dd630bd9de5fa7fb86", size = 627737, upload-time = "2025-11-30T15:08:26.084Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/65/318323f98dbee45d42dff61d8f047181bc6f2268a9068cfad035a46be5af/beautifulsoup4-4.15.0.tar.gz", hash = "sha256:288e3ca7d54b06f2ac191970bc275c1939cb46d450b255bf6718b04aa37ab4f7", size = 632571, upload-time = "2026-06-07T16:44:20.453Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1a/39/47f9197bdd44df24d67ac8893641e16f386c984a0619ef2ee4c51fbbc019/beautifulsoup4-4.14.3-py3-none-any.whl", hash = "sha256:0918bfe44902e6ad8d57732ba310582e98da931428d231a5ecb9e7c703a735bb", size = 107721, upload-time = "2025-11-30T15:08:24.087Z" },
+    { url = "https://files.pythonhosted.org/packages/88/c6/92fcd42f1ba33e1184263f25bfabf3d27c383410470f169e4b8163bf9c17/beautifulsoup4-4.15.0-py3-none-any.whl", hash = "sha256:d6f88de62e1d4e38ecb1077eb9724cd0eff29d2a08ca16a401e9b9e93f117cf9", size = 109924, upload-time = "2026-06-07T16:44:21.566Z" },
 ]
 
 [[package]]
@@ -1127,7 +1127,7 @@ wheels = [
 
 [[package]]
 name = "datamodel-code-generator"
-version = "0.60.0"
+version = "0.60.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "argcomplete" },
@@ -1139,9 +1139,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/19/4c/ca2e32d92e95528bfd66da10479f5ad08c23716f06e3c3cc8b2dfde28e2a/datamodel_code_generator-0.60.0.tar.gz", hash = "sha256:8bb4abfd4a732dca1ce27d1ba8287cc3f1c5bd609338b17c77fe5f3608b00e08", size = 1138233, upload-time = "2026-06-04T17:19:04.092Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/39/fc/c27ca19607d391b0e15c469748256207dae13ecd0cf2dc61811c523d97eb/datamodel_code_generator-0.60.1.tar.gz", hash = "sha256:320597e2b47b59c2d4d6147f22b9e3bc1a3ac558b38d62388b7ffbe6bd283d83", size = 1139620, upload-time = "2026-06-07T17:38:42.583Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b0/02/2f5cd1f87574be543ddc725e1efb99e69830b3416db80f1a59989e072622/datamodel_code_generator-0.60.0-py3-none-any.whl", hash = "sha256:41aa248aef2cb9de9b97184ee55bb961969c57f1e09d20b0b39258d2cebe723f", size = 336513, upload-time = "2026-06-04T17:19:01.953Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/f7/1debf05421fc6aa28441f47cd9eec40da3145dc9e5dafc9934207b1dc4c1/datamodel_code_generator-0.60.1-py3-none-any.whl", hash = "sha256:2b2477a6182588076aa44ba7e0202a233c983ff7f62e4f02a2869cefedfd300c", size = 336847, upload-time = "2026-06-07T17:38:40.821Z" },
 ]
 
 [[package]]
@@ -1233,14 +1233,14 @@ wheels = [
 
 [[package]]
 name = "docling"
-version = "2.97.0"
+version = "2.98.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "docling-slim", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b5/bf/f79ebaa4f4ff4c88a5e57c3d52975182aef8366e8c4db9f7a2726050ab4c/docling-2.97.0.tar.gz", hash = "sha256:5853ab3f6b2469597a4917a7422f9d1b0e4310687fa318b4eb6f9193eed98857", size = 8744, upload-time = "2026-06-03T13:39:24.927Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/90/7e/66cc9db0c75b963d6382f4b39d284068e011fee7178c9a16fe11c5f5a794/docling-2.98.0.tar.gz", hash = "sha256:528125122c7b28e68bcf74961d98ffa28511bdcd3bc23f7252434960622fbf4b", size = 8755, upload-time = "2026-06-08T05:22:23.85Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/aa/d5/5c37731d89b0e3d430f77f0bb207b621e8e41e80e7ea6c4be2de6cc3cbae/docling-2.97.0-py3-none-any.whl", hash = "sha256:ad038882b6cc0b4bc459ca09b508e9807496b031133dcbcca6f4137799c3e8ca", size = 4783, upload-time = "2026-06-03T13:39:23.614Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/5f/0be059bbb659add745f2e24e61b5779abbd7aad82915e24f50b6a33ce417/docling-2.98.0-py3-none-any.whl", hash = "sha256:8a4783f0bc0d407bcc9d276ec64002ec4f0b7b37c0bbe7dcc4b010407fdffae1", size = 4798, upload-time = "2026-06-08T05:22:22.598Z" },
 ]
 
 [[package]]
@@ -1383,7 +1383,7 @@ wheels = [
 
 [[package]]
 name = "docling-slim"
-version = "2.97.0"
+version = "2.98.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1396,9 +1396,9 @@ dependencies = [
     { name = "requests" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/11/9a/009abfbf90798921c1088bc859b9f8e6c8bc3363aafb4fc006407258679b/docling_slim-2.97.0.tar.gz", hash = "sha256:5e94ed8c91c3ab6d1d3aa607be9d28d52a0dc49b2a9669582fd734c8f91cd540", size = 405556, upload-time = "2026-06-03T13:38:02.694Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/63/fc/8b48e33ef2cab5b3dab9df53385909ee70ccf9e5232c4b4720c0f2035a96/docling_slim-2.98.0.tar.gz", hash = "sha256:7be12e427cf69699435d48a37b5e53315f2609ca48a42e182582262c86ad9f57", size = 408945, upload-time = "2026-06-08T05:20:57.285Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2f/14/b57bc33c4417514659bd79b79c1c519bbe8b9b6ed155280f39fd4ae16283/docling_slim-2.97.0-py3-none-any.whl", hash = "sha256:b666750b3ae41cb01cfdbb5b6d4d2df17c59db7d4a9ea6a8bc53e7c7af0ba049", size = 525749, upload-time = "2026-06-03T13:37:59.987Z" },
+    { url = "https://files.pythonhosted.org/packages/30/7b/1882d691d0503ea33142dd339a1d4fed2a1675081fc1034aec703f61a410/docling_slim-2.98.0-py3-none-any.whl", hash = "sha256:3c4d6632ac314ec817e33703bc32e7bfdfd411ddb0dccc749961915983698421", size = 529258, upload-time = "2026-06-08T05:20:55.471Z" },
 ]
 
 [package.optional-dependencies]
@@ -2312,7 +2312,7 @@ wheels = [
 
 [[package]]
 name = "litellm"
-version = "1.87.1"
+version = "1.88.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2328,9 +2328,9 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5d/e5/d0ac1c8f55e2c8d8799589e831bef0d450e69e02ecb511901ffc8de054d9/litellm-1.87.1.tar.gz", hash = "sha256:70ac9d6b25f56ad30de6ff95d26fac3b3fc697a95da582b6072d25d8dc73d493", size = 15455709, upload-time = "2026-06-04T16:23:23.339Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9b/8c/6cfce5d15554e076b8438a955436e9e6e2a2bd39c76539656c1c3861c369/litellm-1.88.0.tar.gz", hash = "sha256:4ff794493e40bd86c6f13e91dcb3e1aad697403fd46a96902196d93356ba48f4", size = 13886026, upload-time = "2026-06-06T23:25:17.93Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ff/18/8275c95ef09e81ab0c01a162c7b780ce3fbc49066b5d532c6b6ab3dc0118/litellm-1.87.1-py3-none-any.whl", hash = "sha256:dd4e00278cdb846d52e99a09d732575a897273540b54eb044247ecbc0d98f67c", size = 17105482, upload-time = "2026-06-04T16:23:20.769Z" },
+    { url = "https://files.pythonhosted.org/packages/da/71/deb6637475253b83eb4577c058863eec4b4ddaef2d08dcd93981b1aa4209/litellm-1.88.0-py3-none-any.whl", hash = "sha256:abd3037e0bf5703f833f5565c87bdfd93578d3de46cbcb36dfa108c3ef58021c", size = 15276203, upload-time = "2026-06-06T23:25:07.257Z" },
 ]
 
 [[package]]
