@@ -16,6 +16,7 @@ Name | Type
 `contradictingCount` | number
 `createdAt` | Date
 `updatedAt` | Date
+`color` | string
 `links` | [Array&lt;HypothesisSupportLinkDto&gt;](HypothesisSupportLinkDto.md)
 
 ## Example
@@ -35,6 +36,7 @@ const example = {
   "contradictingCount": null,
   "createdAt": null,
   "updatedAt": null,
+  "color": null,
   "links": null,
 } satisfies HypothesisResponseDto
 

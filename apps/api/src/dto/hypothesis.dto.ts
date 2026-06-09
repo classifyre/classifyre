@@ -50,15 +50,20 @@ export class UpdateHypothesisDto {
   @Min(0)
   @Max(1)
   confidence?: number | null;
+
+  @ApiPropertyOptional({ description: 'Hex color string for graph visualization (e.g. "#ef4444")', nullable: true })
+  @IsOptional()
+  @IsString()
+  color?: string | null;
 }
 
-/** Link a piece of case evidence OR a case finding to a hypothesis with a stance. */
+/** Link a piece of question evidence OR a question finding to a hypothesis with a stance. */
 export class LinkSupportDto {
   @ApiProperty({ enum: ['evidence', 'finding'], description: 'What is being linked' })
   @IsIn(['evidence', 'finding'])
   targetType!: 'evidence' | 'finding';
 
-  @ApiProperty({ description: 'CaseEvidence.id or CaseFinding.id' })
+  @ApiProperty({ description: 'QuestionEvidence.id or QuestionFinding.id' })
   @IsString()
   targetId!: string;
 
@@ -133,6 +138,9 @@ export class HypothesisResponseDto {
 
   @ApiProperty()
   updatedAt!: Date;
+
+  @ApiPropertyOptional({ description: 'Custom hex color for graph visualization', nullable: true })
+  color?: string | null;
 
   @ApiProperty({ type: [HypothesisSupportLinkDto] })
   links!: HypothesisSupportLinkDto[];

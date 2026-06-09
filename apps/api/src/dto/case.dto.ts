@@ -9,17 +9,13 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { CaseStatus, Severity } from '@prisma/client';
+import { CaseStatus, InquiryStatus, Severity } from '@prisma/client';
 
 export class CreateCaseDto {
   @ApiProperty()
   @IsString()
   @MaxLength(300)
   title!: string;
-
-  @ApiProperty({ description: 'Initial hypothesis — what do you suspect?' })
-  @IsString()
-  hypothesis!: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -45,6 +41,12 @@ export class CreateCaseDto {
   @IsOptional()
   @IsString()
   createdBy?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Link these questions to the new case (guides)' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  inquiryIds?: string[];
 }
 
 export class UpdateCaseDto {
@@ -124,13 +126,11 @@ export class AddEvidenceDto {
   @IsString()
   entityId!: string;
 
-  @ApiProperty({
-    description: 'At least one hypothesis UUID this evidence should be linked to. Evidence without a hypothesis is not allowed.',
-    type: [String],
-  })
+  @ApiPropertyOptional({ description: 'Hypothesis UUIDs to link this evidence to (optional)', type: [String] })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  hypothesisIds!: string[];
+  hypothesisIds?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -145,10 +145,6 @@ export class AddEvidenceDto {
 
 /** Attach a finding (inferred observation) to a piece of evidence in a case. */
 export class AddFindingDto {
-  @ApiProperty({ description: 'CaseEvidence id the finding belongs to' })
-  @IsString()
-  caseEvidenceId!: string;
-
   @ApiProperty({ description: 'Finding UUID' })
   @IsString()
   findingId!: string;
@@ -159,7 +155,41 @@ export class AddFindingDto {
   note?: string;
 }
 
-/** Resolved display info for an evidence asset. */
+/** Update the analyst note on an evidence row. */
+export class UpdateEvidenceNoteDto {
+  @ApiPropertyOptional({ description: 'Analyst note. Pass null or empty string to clear.' })
+  @IsOptional()
+  @IsString()
+  note?: string | null;
+}
+
+/** Update the analyst note on a case finding row. */
+export class UpdateCaseFindingNoteDto {
+  @ApiPropertyOptional({ description: 'Analyst note. Pass null or empty string to clear.' })
+  @IsOptional()
+  @IsString()
+  note?: string | null;
+}
+
+/** Pull a question's current matches into the case as evidence + findings. */
+export class PullFromInquiryDto {
+  @ApiProperty({ description: 'Question to pull matches from' })
+  @IsString()
+  inquiryId!: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Specific finding IDs (omit = all current matches)' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  findingIds?: string[];
+}
+
+export class PullFromInquiryResponseDto {
+  @ApiProperty({ description: 'Number of findings pulled into the case' })
+  pulled!: number;
+}
+
+/** Resolved display info for an evidence node. */
 export class EvidenceEntityDto {
   @ApiProperty()
   id!: string;
@@ -172,9 +202,6 @@ export class EvidenceEntityDto {
 
   @ApiPropertyOptional()
   sourceType?: string;
-
-  @ApiPropertyOptional({ description: 'True when the referenced row no longer exists' })
-  missing?: boolean;
 }
 
 /** A resolved finding attached to a piece of case evidence. */
@@ -196,6 +223,12 @@ export class CaseFindingDto {
 
   @ApiPropertyOptional()
   detectorType?: string;
+
+  @ApiPropertyOptional({ description: 'Human-readable name for custom detectors (snapshotted at attach time)' })
+  customDetectorName?: string | null;
+
+  @ApiPropertyOptional({ description: 'Matched content snippet snapshotted from the finding at attach time' })
+  matchedContent?: string | null;
 
   @ApiPropertyOptional()
   note?: string | null;
@@ -230,6 +263,21 @@ export class CaseEvidenceDto {
   findings?: CaseFindingDto[];
 }
 
+/** A question linked to a case (guides which findings are relevant). */
+export class CaseLinkedInquiryDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  title!: string;
+
+  @ApiProperty({ enum: InquiryStatus })
+  status!: InquiryStatus;
+
+  @ApiProperty({ description: 'Findings currently matching this question' })
+  matchCount!: number;
+}
+
 export class CaseResponseDto {
   @ApiProperty()
   id!: string;
@@ -262,6 +310,9 @@ export class CaseResponseDto {
   hypothesisCount!: number;
 
   @ApiProperty()
+  inquiryCount!: number;
+
+  @ApiProperty()
   createdAt!: Date;
 
   @ApiProperty()
@@ -269,6 +320,9 @@ export class CaseResponseDto {
 
   @ApiPropertyOptional({ type: [CaseEvidenceDto] })
   evidence?: CaseEvidenceDto[];
+
+  @ApiPropertyOptional({ type: [CaseLinkedInquiryDto] })
+  inquiries?: CaseLinkedInquiryDto[];
 }
 
 export class CaseListResponseDto {

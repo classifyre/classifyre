@@ -21,8 +21,12 @@ import {
   CaseListResponseDto,
   CaseResponseDto,
   CreateCaseDto,
+  PullFromInquiryDto,
+  PullFromInquiryResponseDto,
   QueryCasesDto,
   UpdateCaseDto,
+  UpdateCaseFindingNoteDto,
+  UpdateEvidenceNoteDto,
 } from '../dto/case.dto';
 import { GraphResponseDto } from '../dto/graph.dto';
 
@@ -33,23 +37,22 @@ export class CasesController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create an investigation case with an initial hypothesis' })
+  @ApiOperation({ summary: 'Create a case (optionally linking questions)' })
   @ApiResponse({ status: 201, type: CaseResponseDto })
-  async create(@Body() dto: CreateCaseDto): Promise<CaseResponseDto> {
+  create(@Body() dto: CreateCaseDto): Promise<CaseResponseDto> {
     return this.casesService.create(dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'List investigation cases' })
+  @ApiOperation({ summary: 'List cases' })
   @ApiResponse({ status: 200, type: CaseListResponseDto })
-  async list(@Query() query: QueryCasesDto): Promise<CaseListResponseDto> {
+  list(@Query() query: QueryCasesDto): Promise<CaseListResponseDto> {
     return this.casesService.list(query);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get a case with hydrated evidence (and their findings)' })
+  @ApiOperation({ summary: 'Get a case with evidence, findings and linked questions' })
   @ApiResponse({ status: 200, type: CaseResponseDto })
-  @ApiResponse({ status: 404, description: 'Case not found' })
   async findOne(@Param('id') id: string): Promise<CaseResponseDto> {
     const found = await this.casesService.findOne(id);
     if (!found) throw new NotFoundException(`Case with ID ${id} not found`);
@@ -59,23 +62,34 @@ export class CasesController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a case' })
   @ApiResponse({ status: 200, type: CaseResponseDto })
-  async update(@Param('id') id: string, @Body() dto: UpdateCaseDto): Promise<CaseResponseDto> {
+  update(@Param('id') id: string, @Body() dto: UpdateCaseDto): Promise<CaseResponseDto> {
     return this.casesService.update(id, dto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a case' })
+  @ApiOperation({ summary: 'Delete a case (its questions become standalone)' })
   async remove(@Param('id') id: string): Promise<void> {
     await this.casesService.remove(id);
   }
 
   @Post(':id/evidence')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Attach an asset as evidence. Use /evidence/:id/findings for findings.' })
+  @ApiOperation({ summary: 'Attach an asset as evidence' })
   @ApiResponse({ status: 201, type: CaseEvidenceDto })
-  async addEvidence(@Param('id') id: string, @Body() dto: AddEvidenceDto): Promise<CaseEvidenceDto> {
+  addEvidence(@Param('id') id: string, @Body() dto: AddEvidenceDto): Promise<CaseEvidenceDto> {
     return this.casesService.addEvidence(id, dto);
+  }
+
+  @Patch(':id/evidence/:evidenceId')
+  @ApiOperation({ summary: 'Update the note on an evidence row' })
+  @ApiResponse({ status: 200, type: CaseEvidenceDto })
+  patchEvidenceNote(
+    @Param('id') id: string,
+    @Param('evidenceId') evidenceId: string,
+    @Body() dto: UpdateEvidenceNoteDto,
+  ): Promise<CaseEvidenceDto> {
+    return this.casesService.patchEvidenceNote(id, evidenceId, dto);
   }
 
   @Delete(':id/evidence/:evidenceId')
@@ -87,9 +101,9 @@ export class CasesController {
 
   @Post(':id/evidence/:evidenceId/findings')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Attach a finding to a piece of case evidence' })
+  @ApiOperation({ summary: 'Attach a finding to a piece of evidence' })
   @ApiResponse({ status: 201, type: CaseFindingDto })
-  async addFinding(
+  addFinding(
     @Param('id') id: string,
     @Param('evidenceId') evidenceId: string,
     @Body() dto: AddFindingDto,
@@ -97,21 +111,37 @@ export class CasesController {
     return this.casesService.addFinding(id, evidenceId, dto);
   }
 
+  @Patch(':id/findings/:caseFindingId')
+  @ApiOperation({ summary: 'Update the note on a case finding' })
+  @ApiResponse({ status: 200, type: CaseFindingDto })
+  patchFindingNote(
+    @Param('id') id: string,
+    @Param('caseFindingId') caseFindingId: string,
+    @Body() dto: UpdateCaseFindingNoteDto,
+  ): Promise<CaseFindingDto> {
+    return this.casesService.patchFindingNote(id, caseFindingId, dto);
+  }
+
   @Delete(':id/findings/:caseFindingId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove a finding from the case' })
-  async removeFinding(
-    @Param('id') id: string,
-    @Param('caseFindingId') caseFindingId: string,
-  ): Promise<void> {
+  async removeFinding(@Param('id') id: string, @Param('caseFindingId') caseFindingId: string): Promise<void> {
     await this.casesService.removeFinding(id, caseFindingId);
+  }
+
+  @Post(':id/pull')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Pull a question's matches into the case as evidence" })
+  @ApiResponse({ status: 200, type: PullFromInquiryResponseDto })
+  pull(@Param('id') id: string, @Body() dto: PullFromInquiryDto): Promise<PullFromInquiryResponseDto> {
+    return this.casesService.pullFromInquiry(id, dto);
   }
 
   @Get(':id/graph')
   @ApiOperation({ summary: 'Get the evidence neighbourhood graph for a case' })
   @ApiQuery({ name: 'depth', required: false, type: Number })
   @ApiResponse({ status: 200, type: GraphResponseDto })
-  async graph(@Param('id') id: string, @Query('depth') depth?: string): Promise<GraphResponseDto> {
+  graph(@Param('id') id: string, @Query('depth') depth?: string): Promise<GraphResponseDto> {
     const parsed = depth ? Number.parseInt(depth, 10) : 1;
     return this.casesService.getGraph(id, Number.isNaN(parsed) ? 1 : parsed);
   }

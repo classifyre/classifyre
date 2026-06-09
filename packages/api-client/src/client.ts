@@ -34,23 +34,39 @@ export { SandboxApi } from "./generated/src/apis/SandboxApi";
 export { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
 export { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
 export { CasesApi } from "./generated/src/apis/CasesApi";
+export { InquiriesApi } from "./generated/src/apis/InquiriesApi";
 export { GraphApi } from "./generated/src/apis/GraphApi";
 export { HypothesesApi } from "./generated/src/apis/HypothesesApi";
 
-// Investigation (cases / graph / hypotheses) model types
+// Investigation (cases / inquiries / graph / hypotheses) model types
 export type {
   CreateCaseDto,
   UpdateCaseDto,
   CaseResponseDto,
   CaseListResponseDto,
   CaseEvidenceDto,
+  CaseFindingDto,
+  CaseLinkedInquiryDto,
   EvidenceEntityDto,
   AddEvidenceDto,
+  AddFindingDto,
+  UpdateEvidenceNoteDto,
+  UpdateCaseFindingNoteDto,
+  PullFromInquiryDto,
+  PullFromInquiryResponseDto,
+  CreateInquiryDto,
+  UpdateInquiryDto,
+  InquiryResponseDto,
+  InquiryListResponseDto,
+  InquiryMatchDto,
+  PreviewInquiryDto,
+  PreviewResponseDto,
+  MatchOptionsResponseDto,
   CreateHypothesisDto,
   UpdateHypothesisDto,
   HypothesisResponseDto,
-  HypothesisEvidenceLinkDto,
-  LinkEvidenceDto,
+  HypothesisSupportLinkDto,
+  LinkSupportDto,
   ExpandGraphDto,
   GraphNodeDto,
   GraphEdgeDto,
@@ -63,10 +79,16 @@ export type {
   PivotGraphDto,
   BulkIngestEdgesDto,
   BulkIngestEdgesResponseDto,
-  AddFindingDto,
-  CaseFindingDto,
 } from "./generated/src/models";
 export { PivotGraphDtoPivotEnum } from "./generated/src/models";
+export {
+  CaseResponseDtoStatusEnum,
+  CaseResponseDtoSeverityEnum,
+} from "./generated/src/models";
+export {
+  CasesControllerListStatusEnum,
+  CasesControllerListSeverityEnum,
+} from "./generated/src/apis/CasesApi";
 export {
   SandboxControllerListRunsContentTypeEnum,
   SandboxControllerListRunsDetectorTypeEnum,
@@ -773,6 +795,7 @@ import { SandboxApi } from "./generated/src/apis/SandboxApi";
 import { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
 import { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
 import { CasesApi } from "./generated/src/apis/CasesApi";
+import { InquiriesApi } from "./generated/src/apis/InquiriesApi";
 import { GraphApi } from "./generated/src/apis/GraphApi";
 import { HypothesesApi } from "./generated/src/apis/HypothesesApi";
 
@@ -830,6 +853,7 @@ class ApiClient {
   public instanceSettings: InstanceSettingsApi;
   public aiProviderConfigs: AIProviderConfigsApi;
   public cases: CasesApi;
+  public inquiries: InquiriesApi;
   public graph: GraphApi;
   public hypotheses: HypothesesApi;
 
@@ -846,6 +870,7 @@ class ApiClient {
     this.instanceSettings = new InstanceSettingsApi(this.config);
     this.aiProviderConfigs = new AIProviderConfigsApi(this.config);
     this.cases = new CasesApi(this.config);
+    this.inquiries = new InquiriesApi(this.config);
     this.graph = new GraphApi(this.config);
     this.hypotheses = new HypothesesApi(this.config);
   }

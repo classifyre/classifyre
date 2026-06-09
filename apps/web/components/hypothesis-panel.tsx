@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Plus, X, ThumbsUp, ThumbsDown } from "lucide-react";
+import { HexColorPicker, HexColorInput } from "react-colorful";
 import { toast } from "sonner";
 import {
   api,
@@ -27,6 +28,20 @@ import { EmptyState } from "@workspace/ui/components/empty-state";
 const STATUSES = ["PROPOSED", "SUPPORTED", "REFUTED", "INCONCLUSIVE"] as const;
 const STANCES = ["SUPPORTS", "CONTRADICTS", "NEUTRAL"] as const;
 
+/** Quick-pick swatches shown below the full picker */
+const SWATCHES = [
+  "#e11d48", // rose
+  "#ea580c", // orange
+  "#d97706", // amber
+  "#65a30d", // lime
+  "#059669", // emerald
+  "#0891b2", // cyan
+  "#2563eb", // blue
+  "#7c3aed", // violet
+  "#db2777", // pink
+  "#6b7280", // slate
+] as const;
+
 export interface HypothesisPanelProps {
   caseId: string;
   evidence: CaseEvidenceDto[];
@@ -37,7 +52,7 @@ interface LinkTarget {
   targetType: "evidence" | "finding";
   targetId: string;
   label: string;
-  group: string; // display group (evidence label)
+  group: string;
 }
 
 function buildLinkTargets(evidence: CaseEvidenceDto[]): LinkTarget[] {
@@ -145,8 +160,64 @@ function HypothesisCard({
   const [confidence, setConfidence] = React.useState(
     hypothesis.confidence != null ? Math.round(hypothesis.confidence * 100) : 0,
   );
+  const [currentColor, setCurrentColor] = React.useState<string>(
+    hypothesis.color ?? SWATCHES[0],
+  );
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const pickerRef = React.useRef<HTMLDivElement>(null);
+  const saveTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined);
   const [linkTargetKey, setLinkTargetKey] = React.useState<string>("");
   const [linkStance, setLinkStance] = React.useState<string>("SUPPORTS");
+
+  // If hypothesis.color changes from outside (e.g. another card triggers a reload),
+  // sync local state.
+  React.useEffect(() => {
+    setCurrentColor(hypothesis.color ?? SWATCHES[0]);
+  }, [hypothesis.color]);
+
+  // Close picker on outside click
+  React.useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [pickerOpen]);
+
+  /** Debounced save — fires 400 ms after the last color change. */
+  const saveColor = React.useCallback(
+    (hex: string | null) => {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(async () => {
+        try {
+          await api.hypotheses.hypothesesControllerUpdate({
+            id: hypothesis.id,
+            updateHypothesisDto: { color: hex },
+          });
+          onChanged();
+        } catch (err) {
+          console.error(err);
+          toast.error("Failed to save color");
+        }
+      }, 400);
+    },
+    [hypothesis.id, onChanged],
+  );
+
+  const handleColorChange = (hex: string) => {
+    setCurrentColor(hex);
+    saveColor(hex);
+  };
+
+  const resetColor = () => {
+    const fallback = SWATCHES[0];
+    setCurrentColor(fallback);
+    setPickerOpen(false);
+    saveColor(null); // null → use palette fallback on the page
+  };
 
   const linkedKeys = new Set(
     hypothesis.links.map((l) => `${l.targetType}:${l.targetId}`),
@@ -205,7 +276,6 @@ function HypothesisCard({
     onChanged();
   };
 
-  // Group available targets by evidence asset for the selector.
   const groups = React.useMemo(() => {
     const map = new Map<string, LinkTarget[]>();
     for (const t of available) {
@@ -220,16 +290,73 @@ function HypothesisCard({
     <Card>
       <CardHeader className="flex-row items-start justify-between gap-2 space-y-0 pb-2">
         <p className="font-medium leading-snug">{hypothesis.statement}</p>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 shrink-0"
-          onClick={remove}
-          aria-label="Delete hypothesis"
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Color swatch button + react-colorful popover */}
+          <div className="relative" ref={pickerRef}>
+            <button
+              onClick={() => setPickerOpen((v) => !v)}
+              className="h-5 w-5 rounded-full border border-border shadow-sm transition-transform hover:scale-110"
+              style={{ backgroundColor: currentColor }}
+              title="Set hypothesis color"
+            />
+            {pickerOpen && (
+              <div className="absolute right-0 top-7 z-50 w-48 rounded-md border border-border bg-popover p-3 shadow-lg space-y-2">
+                {/* Full hue/saturation/lightness picker */}
+                <HexColorPicker
+                  color={currentColor}
+                  onChange={handleColorChange}
+                  style={{ width: "100%", height: 120 }}
+                />
+                {/* Hex input */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground text-xs font-mono">#</span>
+                  <HexColorInput
+                    color={currentColor}
+                    onChange={handleColorChange}
+                    prefixed={false}
+                    className="h-6 flex-1 rounded border border-border bg-background px-1.5 font-mono text-xs uppercase focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                {/* Quick-pick swatches */}
+                <div className="flex flex-wrap gap-1">
+                  {SWATCHES.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => handleColorChange(c)}
+                      className="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110"
+                      style={{
+                        backgroundColor: c,
+                        borderColor: currentColor.toLowerCase() === c ? "white" : "transparent",
+                        outline: currentColor.toLowerCase() === c ? `2px solid ${c}` : "none",
+                        outlineOffset: "1px",
+                      }}
+                      title={c}
+                    />
+                  ))}
+                </div>
+                {/* Reset */}
+                <button
+                  className="w-full rounded border border-dashed border-border py-0.5 text-center font-mono text-[10px] text-muted-foreground hover:bg-accent"
+                  onClick={resetColor}
+                >
+                  Reset to auto
+                </button>
+              </div>
+            )}
+          </div>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={remove}
+            aria-label="Delete hypothesis"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
+
       <CardContent className="space-y-4">
         <div className="flex items-center gap-3">
           <Select value={hypothesis.status} onValueChange={updateStatus}>
@@ -319,7 +446,10 @@ function HypothesisCard({
                   <SelectGroup key={group}>
                     <SelectLabel className="text-[10px]">{group}</SelectLabel>
                     {targets.map((t) => (
-                      <SelectItem key={`${t.targetType}:${t.targetId}`} value={`${t.targetType}:${t.targetId}`}>
+                      <SelectItem
+                        key={`${t.targetType}:${t.targetId}`}
+                        value={`${t.targetType}:${t.targetId}`}
+                      >
                         <span className="text-muted-foreground mr-1 text-[10px] font-mono uppercase">
                           {t.targetType === "finding" ? "↳" : ""}
                         </span>

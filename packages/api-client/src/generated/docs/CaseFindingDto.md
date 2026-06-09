@@ -12,6 +12,8 @@ Name | Type
 `findingLabel` | string
 `severity` | string
 `detectorType` | string
+`customDetectorName` | string
+`matchedContent` | string
 `note` | string
 `createdAt` | Date
 
@@ -28,6 +30,8 @@ const example = {
   "findingLabel": null,
   "severity": null,
   "detectorType": null,
+  "customDetectorName": null,
+  "matchedContent": null,
   "note": null,
   "createdAt": null,
 } satisfies CaseFindingDto

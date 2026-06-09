@@ -88,6 +88,12 @@ export interface HypothesisResponseDto {
      */
     updatedAt: Date;
     /**
+     * Custom hex color for graph visualization
+     * @type {string}
+     * @memberof HypothesisResponseDto
+     */
+    color?: string | null;
+    /**
      * 
      * @type {Array<HypothesisSupportLinkDto>}
      * @memberof HypothesisResponseDto
@@ -144,6 +150,7 @@ export function HypothesisResponseDtoFromJSONTyped(json: any, ignoreDiscriminato
         'contradictingCount': json['contradictingCount'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
+        'color': json['color'] == null ? undefined : json['color'],
         'links': ((json['links'] as Array<any>).map(HypothesisSupportLinkDtoFromJSON)),
     };
 }
@@ -169,6 +176,7 @@ export function HypothesisResponseDtoToJSONTyped(value?: HypothesisResponseDto |
         'contradictingCount': value['contradictingCount'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
+        'color': value['color'],
         'links': ((value['links'] as Array<any>).map(HypothesisSupportLinkDtoToJSON)),
     };
 }

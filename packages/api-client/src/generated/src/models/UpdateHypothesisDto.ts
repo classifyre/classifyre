@@ -37,6 +37,12 @@ export interface UpdateHypothesisDto {
      * @memberof UpdateHypothesisDto
      */
     confidence?: number | null;
+    /**
+     * Hex color string for graph visualization (e.g. "#ef4444")
+     * @type {string}
+     * @memberof UpdateHypothesisDto
+     */
+    color?: string | null;
 }
 
 
@@ -72,6 +78,7 @@ export function UpdateHypothesisDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'statement': json['statement'] == null ? undefined : json['statement'],
         'status': json['status'] == null ? undefined : json['status'],
         'confidence': json['confidence'] == null ? undefined : json['confidence'],
+        'color': json['color'] == null ? undefined : json['color'],
     };
 }
 
@@ -89,6 +96,7 @@ export function UpdateHypothesisDtoToJSONTyped(value?: UpdateHypothesisDto | nul
         'statement': value['statement'],
         'status': value['status'],
         'confidence': value['confidence'],
+        'color': value['color'],
     };
 }
 

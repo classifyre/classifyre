@@ -148,6 +148,10 @@ export class FindingsService {
     if (filters?.lastDetectedBefore) {
       where.lastDetectedAt = { lte: filters.lastDetectedBefore };
     }
+    const excludeIds = this.normalizeFilterValues(filters?.excludeIds);
+    if (excludeIds.length) {
+      where.id = { notIn: excludeIds };
+    }
 
     if (!includeResolved && !where.status) {
       where.status = { not: FindingStatus.RESOLVED };

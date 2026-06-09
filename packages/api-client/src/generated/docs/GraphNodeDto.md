@@ -19,6 +19,7 @@ Name | Type
 `assetName` | string
 `assetId` | string
 `hypothesisIds` | Array&lt;string&gt;
+`caseFindingId` | string
 `missing` | boolean
 
 ## Example
@@ -41,6 +42,7 @@ const example = {
   "assetName": null,
   "assetId": null,
   "hypothesisIds": null,
+  "caseFindingId": null,
   "missing": null,
 } satisfies GraphNodeDto
 

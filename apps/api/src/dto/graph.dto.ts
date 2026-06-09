@@ -94,6 +94,9 @@ export class GraphNodeDto {
   })
   hypothesisIds?: string[];
 
+  @ApiPropertyOptional({ description: 'For finding nodes: the CaseFinding record ID (used to unlink)' })
+  caseFindingId?: string;
+
   @ApiPropertyOptional({ description: 'True when the underlying row no longer exists' })
   missing?: boolean;
 }

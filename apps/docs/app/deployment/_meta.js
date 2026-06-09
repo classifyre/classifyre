@@ -1,5 +1,6 @@
 export default {
   index: "Overview",
+  "upgrade-and-versioning": "Upgrade & Versioning",
   docker: "Docker",
   kubernetes: "Kubernetes",
   database: "PostgreSQL Database",

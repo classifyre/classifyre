@@ -1,0 +1,103 @@
+---
+sidebarTitle: AI Providers
+title: AI Providers
+description: Configure LLM providers for the AI assistant and AI-powered custom detectors.
+---
+
+# AI Providers
+
+AI Providers store the API credentials and model configuration used by the
+AI assistant and AI-powered custom detectors. Each provider entry specifies
+a model, an API key, and optional settings depending on the provider type.
+
+---
+
+## Supported providers
+
+| Provider | Default model | Base URL |
+|---|---|---|
+| **OpenAI-Compatible** | `gpt-4o` | Configurable — use for OpenAI, Azure OpenAI, Together AI, OpenRouter, Groq, etc. |
+| **Claude (Anthropic)** | `claude-sonnet-4-5` | Fixed (Anthropic API) |
+| **Gemini (Google)** | `gemini-2.0-flash` | Fixed (Google AI API) |
+
+---
+
+## Configuration fields
+
+| Field | Description |
+|---|---|
+| **Name** | A human-readable label (e.g. "Production Claude", "Dev OpenAI"). Max 120 characters. |
+| **Provider** | One of `OpenAI-Compatible`, `Claude (Anthropic)`, or `Gemini (Google)`. Determines which API endpoint is used. |
+| **Model** | The model identifier (e.g. `gpt-4o`, `claude-sonnet-4-5`, `gemini-2.0-flash`). Max 200 characters. |
+| **API key** | The API key for the provider. Stored encrypted at rest. Only a masked preview is shown after saving (first 4 + last 4 characters). |
+| **Base URL** | Only for **OpenAI-Compatible** providers. The full URL of the API endpoint. Ignored for Claude and Gemini. |
+| **Context size** | Optional. The context window size in tokens (e.g. 200000). |
+| **Vision support** | Optional. Whether the model accepts image and PDF input. |
+
+### Base URL behaviour
+
+- For **OpenAI-Compatible** providers, the base URL is a required configuration
+  field (e.g. `https://api.openai.com/v1` for OpenAI, or a custom endpoint for
+  self-hosted or third-party providers).
+- For **Claude** and **Gemini**, the base URL is fixed to the provider's API
+  and cannot be overridden.
+
+---
+
+## Managing providers
+
+### Create
+
+1. Click **New Provider** on the AI Providers tab.
+2. Enter a name, select the provider type, and fill in the configuration fields.
+3. Optionally click **Test connection** to validate the credentials.
+4. Save — the API key is encrypted before storage.
+
+### Update
+
+Edit any field. To clear the API key, submit an empty value. Changes take
+effect immediately.
+
+### Delete
+
+A provider can be deleted unless it is:
+- Selected as the instance-wide AI assistant model
+- Referenced by one or more custom detectors
+
+In either case, reassign or delete the dependent resources first.
+
+---
+
+## Testing a connection
+
+The **Test connection** button sends a small structured JSON round-trip to
+the provider:
+
+```
+system: "Reply with valid JSON only."
+user:   "Return JSON with fields: status, square of 7, language used."
+```
+
+A successful test returns the provider name and model. A failure shows the
+error message returned by the provider.
+
+The configuration is saved before the test runs, so a passing test confirms
+that the stored credentials are valid.
+
+---
+
+## API keys
+
+- API keys are encrypted at rest using the application's encryption service.
+- Only the first 4 and last 4 characters are ever displayed (e.g. `sk-p...xyz4`).
+- Keys shorter than 8 characters are fully masked.
+- The raw key is never returned by the API after creation.
+
+---
+
+## AI assistant default
+
+One provider is selected as the **default AI assistant model** on the General
+settings tab. This provider is used for all AI assistant interactions across
+the instance. When a new provider is created from the General tab, it is
+automatically set as the default.
