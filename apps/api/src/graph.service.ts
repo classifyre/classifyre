@@ -21,9 +21,35 @@ import {
 const NODE_CAP = 200;
 const MAX_DEPTH = 3;
 
+/** Compose a finding node label from its type and (optionally) a truncated match. */
+function findingLabel(type: string, matched?: string | null): string {
+  if (!matched) return type;
+  const t = matched.length > 35 ? `${matched.slice(0, 35)}…` : matched;
+  return `${type}: ${t}`;
+}
+
 interface SeedNode {
   type: string;
   id: string;
+}
+
+interface CaseFindingSnapshot {
+  id: string;
+  findingId: string;
+  label: string;
+  severity: string | null;
+  detectorType: string | null;
+  matchedContent: string | null;
+}
+
+interface CaseEvidenceWithFindings {
+  id: string;
+  entityType: string;
+  entityId: string;
+  label: string | null;
+  assetType: string | null;
+  sourceType: string | null;
+  findings: CaseFindingSnapshot[];
 }
 
 interface RawEdgeRow {
@@ -353,74 +379,141 @@ export class GraphService {
     );
   }
 
-  /** Build the neighbourhood graph seeded from all evidence of a case. */
+  /**
+   * Build the question graph. The question's own records (question_evidence +
+   * question_findings) are the source of truth: their denormalized snapshots make
+   * every linked node survive deletion of the underlying asset/finding, and let
+   * sandbox evidence — which has no asset/finding rows — appear as first-class
+   * nodes. The live edge neighbourhood of real assets is layered on top for
+   * relationships and unlinked findings.
+   */
   async caseGraph(caseId: string, depth = 1): Promise<GraphResponseDto> {
     const evidence = await this.prisma.caseEvidence.findMany({
       where: { caseId },
-      select: { entityType: true, entityId: true },
+      select: {
+        id: true,
+        entityType: true,
+        entityId: true,
+        label: true,
+        assetType: true,
+        sourceType: true,
+        findings: {
+          select: {
+            id: true,
+            findingId: true,
+            label: true,
+            severity: true,
+            detectorType: true,
+            matchedContent: true,
+          },
+        },
+      },
     });
     if (evidence.length === 0) {
       return { nodes: [], edges: [], truncated: false };
     }
 
-    // Ensure inferred edges exist for the assets involved so the graph is
-    // immediately useful without a global rebuild.
-    const assetIds = new Set<string>();
-    for (const e of evidence) {
-      if (e.entityType === 'asset') assetIds.add(e.entityId);
-    }
-    const findingIds = evidence
-      .filter((e) => e.entityType === 'finding')
-      .map((e) => e.entityId);
-    if (findingIds.length > 0) {
-      const findings = await this.prisma.finding.findMany({
-        where: { id: { in: findingIds } },
-        select: { assetId: true },
-      });
-      findings.forEach((f) => assetIds.add(f.assetId));
-    }
-    for (const assetId of assetIds) {
-      await this.inferEdgesForAsset(assetId);
+    // Refresh inferred edges for real assets so the live neighbourhood is current.
+    const assetEvidence = evidence.filter((e) => e.entityType === 'asset');
+    for (const e of assetEvidence) {
+      await this.inferEdgesForAsset(e.entityId);
     }
 
-    const seeds: SeedNode[] = evidence.map((e) => ({
-      type: e.entityType,
-      id: e.entityId,
-    }));
-    const result = await this.traverse(seeds, Math.min(depth, MAX_DEPTH), 'both');
-    return this.annotateWithHypotheses(caseId, result);
+    // Live neighbourhood of the real assets (relationships + unlinked findings).
+    const base =
+      assetEvidence.length > 0
+        ? await this.traverse(
+            assetEvidence.map((e) => ({ type: 'asset', id: e.entityId })),
+            Math.min(depth, MAX_DEPTH),
+            'both',
+          )
+        : { nodes: [], edges: [], truncated: false };
+
+    return this.mergeCaseGraph(caseId, evidence, base);
   }
 
   /**
-   * Enrich graph nodes with hypothesis affiliation and mark edges that bridge
-   * nodes belonging to different hypothesis sets (cross-lineage).
+   * Overlay the case's denormalized evidence/finding snapshots onto the live
+   * base graph (filling in nodes for deleted assets), then annotate hypothesis
+   * affiliation and mark cross-hypothesis edges.
+   */
+  private async mergeCaseGraph(
+    caseId: string,
+    evidence: CaseEvidenceWithFindings[],
+    base: GraphResponseDto,
+  ): Promise<GraphResponseDto> {
+    const key = (type: string, id: string) => `${type}:${id}`;
+    const nodes = new Map(base.nodes.map((n) => [key(n.type, n.id), n]));
+    const edges = [...base.edges];
+
+    // Evidence nodes — add missing/deleted nodes, refresh labels from snapshots.
+    for (const e of evidence) {
+      const k = key(e.entityType, e.entityId);
+      const existing = nodes.get(k);
+      if (existing && !existing.missing) continue;
+      nodes.set(k, {
+        id: e.entityId,
+        type: e.entityType,
+        depth: 0,
+        label: e.label ?? e.entityId,
+        assetType: e.assetType ?? undefined,
+        sourceType: e.sourceType ?? undefined,
+      });
+    }
+
+    // Linked finding nodes — snapshot labels survive deletion; synthesize the
+    // CONTAINS edge for findings whose asset was deleted (no live edge).
+    for (const e of evidence) {
+      for (const cf of e.findings) {
+        const k = key('finding', cf.findingId);
+        const existing = nodes.get(k);
+        if (!existing || existing.missing) {
+          nodes.set(k, {
+            id: cf.findingId,
+            type: 'finding',
+            depth: 1,
+            label: findingLabel(cf.label, cf.matchedContent),
+            severity: cf.severity ?? undefined,
+            detectorType: cf.detectorType ?? undefined,
+            matchedContent: cf.matchedContent ?? undefined,
+            assetId: e.entityId,
+            assetName: e.label ?? undefined,
+          });
+          edges.push({
+            id: `synthetic:contains:${e.entityId}:${cf.findingId}`,
+            fromType: e.entityType,
+            fromId: e.entityId,
+            toType: 'finding',
+            toId: cf.findingId,
+            relationType: 'CONTAINS',
+            confidence: 1,
+            origin: 'INFERRED',
+          });
+        }
+      }
+    }
+
+    return this.annotateWithHypotheses(evidence, {
+      nodes: [...nodes.values()],
+      edges,
+      truncated: base.truncated,
+    });
+  }
+
+  /**
+   * Enrich graph nodes with hypothesis affiliation (and the QuestionFinding id used
+   * to unlink) and mark edges that bridge nodes belonging to different hypothesis sets.
    */
   private async annotateWithHypotheses(
-    caseId: string,
+    evidence: CaseEvidenceWithFindings[],
     graph: GraphResponseDto,
   ): Promise<GraphResponseDto> {
-    if (graph.nodes.length === 0) return graph;
+    const key = (type: string, id: string) => `${type}:${id}`;
 
-    // Load all evidence for this case including their findings.
-    const evidenceRows = await this.prisma.caseEvidence.findMany({
-      where: { caseId },
-      select: {
-        id: true,
-        entityId: true,
-        entityType: true,
-        findings: { select: { findingId: true } },
-      },
-    });
-
-    const evidenceIds = evidenceRows.map((e) => e.id);
-
-    // Load hypothesis support rows for these evidence records.
-    const supportRows = await this.prisma.caseHypothesisSupport.findMany({
-      where: { targetType: 'evidence', targetId: { in: evidenceIds } },
+    const supportRows = await this.prisma.hypothesisSupport.findMany({
+      where: { targetType: 'evidence', targetId: { in: evidence.map((e) => e.id) } },
       select: { targetId: true, hypothesisId: true },
     });
-
-    // evidenceId → hypothesisId[]
     const evidenceToHyps = new Map<string, string[]>();
     for (const row of supportRows) {
       const arr = evidenceToHyps.get(row.targetId) ?? [];
@@ -428,41 +521,32 @@ export class GraphService {
       evidenceToHyps.set(row.targetId, arr);
     }
 
-    // assetId → hypothesisId[]  (for evidence nodes)
-    const assetToHyps = new Map<string, string[]>();
-    // findingId → hypothesisId[]  (for explicit CaseFinding rows)
-    const findingToHyps = new Map<string, string[]>();
-
-    for (const ev of evidenceRows) {
-      const hyps = evidenceToHyps.get(ev.id) ?? [];
-      if (ev.entityType === 'asset') {
-        assetToHyps.set(ev.entityId, hyps);
-      }
-      for (const cf of ev.findings) {
-        findingToHyps.set(cf.findingId, hyps);
+    // node key → hypothesisId[]  (evidence nodes inherit their support; findings
+    // inherit their parent evidence's support).
+    const nodeToHyps = new Map<string, string[]>();
+    const findingToCaseFindingId = new Map<string, string>();
+    for (const e of evidence) {
+      const hyps = evidenceToHyps.get(e.id) ?? [];
+      nodeToHyps.set(key(e.entityType, e.entityId), hyps);
+      for (const cf of e.findings) {
+        nodeToHyps.set(key('finding', cf.findingId), hyps);
+        findingToCaseFindingId.set(cf.findingId, cf.id);
       }
     }
 
-    // Annotate nodes.
-    const nodeKey = (type: string, id: string) => `${type}:${id}`;
-    const nodeHypMap = new Map<string, string[]>();
-
     const nodes: GraphNodeDto[] = graph.nodes.map((n) => {
-      const hyps =
-        n.type === 'asset'
-          ? (assetToHyps.get(n.id) ?? [])
-          : (findingToHyps.get(n.id) ?? []);
-      nodeHypMap.set(nodeKey(n.type, n.id), hyps);
-      return { ...n, hypothesisIds: hyps };
+      const hypothesisIds = nodeToHyps.get(key(n.type, n.id)) ?? [];
+      const caseFindingId =
+        n.type === 'finding' ? findingToCaseFindingId.get(n.id) : undefined;
+      return { ...n, hypothesisIds, ...(caseFindingId ? { caseFindingId } : {}) };
     });
 
-    // Mark edges that bridge different hypothesis sets.
     const edges: GraphEdgeDto[] = graph.edges.map((e) => {
-      const fromHyps = new Set(nodeHypMap.get(nodeKey(e.fromType, e.fromId)) ?? []);
-      const toHyps = new Set(nodeHypMap.get(nodeKey(e.toType, e.toId)) ?? []);
-      const bothAffiliated = fromHyps.size > 0 && toHyps.size > 0;
-      const noOverlap = bothAffiliated && ![...fromHyps].some((h) => toHyps.has(h));
-      return { ...e, crossHypothesis: noOverlap };
+      const fromHyps = new Set(nodeToHyps.get(key(e.fromType, e.fromId)) ?? []);
+      const toHyps = new Set(nodeToHyps.get(key(e.toType, e.toId)) ?? []);
+      const crossHypothesis =
+        fromHyps.size > 0 && toHyps.size > 0 && ![...fromHyps].some((h) => toHyps.has(h));
+      return { ...e, crossHypothesis };
     });
 
     return { nodes, edges, truncated: graph.truncated };
@@ -611,20 +695,11 @@ export class GraphService {
       const parentAsset = f
         ? (assetMap.get(f.assetId) ?? findingAssetMap.get(f.assetId))
         : undefined;
-      const truncated = f?.matchedContent
-        ? f.matchedContent.length > 35
-          ? `${f.matchedContent.slice(0, 35)}…`
-          : f.matchedContent
-        : null;
       return {
         id: r.node_id,
         type: 'finding',
         depth,
-        label: f
-          ? truncated
-            ? `${f.findingType}: ${truncated}`
-            : f.findingType
-          : '(deleted finding)',
+        label: f ? findingLabel(f.findingType, f.matchedContent) : '(deleted finding)',
         severity: f ? String(f.severity) : undefined,
         detectorType: f ? String(f.detectorType) : undefined,
         status: f ? String(f.status) : undefined,

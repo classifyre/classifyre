@@ -20,6 +20,13 @@ import {
     CaseEvidenceDtoToJSON,
     CaseEvidenceDtoToJSONTyped,
 } from './CaseEvidenceDto';
+import type { CaseLinkedInquiryDto } from './CaseLinkedInquiryDto';
+import {
+    CaseLinkedInquiryDtoFromJSON,
+    CaseLinkedInquiryDtoFromJSONTyped,
+    CaseLinkedInquiryDtoToJSON,
+    CaseLinkedInquiryDtoToJSONTyped,
+} from './CaseLinkedInquiryDto';
 
 /**
  * 
@@ -89,6 +96,12 @@ export interface CaseResponseDto {
     hypothesisCount: number;
     /**
      * 
+     * @type {number}
+     * @memberof CaseResponseDto
+     */
+    inquiryCount: number;
+    /**
+     * 
      * @type {Date}
      * @memberof CaseResponseDto
      */
@@ -105,6 +118,12 @@ export interface CaseResponseDto {
      * @memberof CaseResponseDto
      */
     evidence?: Array<CaseEvidenceDto>;
+    /**
+     * 
+     * @type {Array<CaseLinkedInquiryDto>}
+     * @memberof CaseResponseDto
+     */
+    inquiries?: Array<CaseLinkedInquiryDto>;
 }
 
 
@@ -142,6 +161,7 @@ export function instanceOfCaseResponseDto(value: object): value is CaseResponseD
     if (!('severity' in value) || value['severity'] === undefined) return false;
     if (!('evidenceCount' in value) || value['evidenceCount'] === undefined) return false;
     if (!('hypothesisCount' in value) || value['hypothesisCount'] === undefined) return false;
+    if (!('inquiryCount' in value) || value['inquiryCount'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     return true;
@@ -167,9 +187,11 @@ export function CaseResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'conclusion': json['conclusion'] == null ? undefined : json['conclusion'],
         'evidenceCount': json['evidenceCount'],
         'hypothesisCount': json['hypothesisCount'],
+        'inquiryCount': json['inquiryCount'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
         'evidence': json['evidence'] == null ? undefined : ((json['evidence'] as Array<any>).map(CaseEvidenceDtoFromJSON)),
+        'inquiries': json['inquiries'] == null ? undefined : ((json['inquiries'] as Array<any>).map(CaseLinkedInquiryDtoFromJSON)),
     };
 }
 
@@ -194,9 +216,11 @@ export function CaseResponseDtoToJSONTyped(value?: CaseResponseDto | null, ignor
         'conclusion': value['conclusion'],
         'evidenceCount': value['evidenceCount'],
         'hypothesisCount': value['hypothesisCount'],
+        'inquiryCount': value['inquiryCount'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
         'evidence': value['evidence'] == null ? undefined : ((value['evidence'] as Array<any>).map(CaseEvidenceDtoToJSON)),
+        'inquiries': value['inquiries'] == null ? undefined : ((value['inquiries'] as Array<any>).map(CaseLinkedInquiryDtoToJSON)),
     };
 }
 

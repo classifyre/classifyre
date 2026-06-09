@@ -56,6 +56,18 @@ export interface CaseFindingDto {
      */
     detectorType?: string;
     /**
+     * Human-readable name for custom detectors (snapshotted at attach time)
+     * @type {string}
+     * @memberof CaseFindingDto
+     */
+    customDetectorName?: string;
+    /**
+     * Matched content snippet snapshotted from the finding at attach time
+     * @type {string}
+     * @memberof CaseFindingDto
+     */
+    matchedContent?: string;
+    /**
      * 
      * @type {string}
      * @memberof CaseFindingDto
@@ -97,6 +109,8 @@ export function CaseFindingDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'findingLabel': json['findingLabel'],
         'severity': json['severity'] == null ? undefined : json['severity'],
         'detectorType': json['detectorType'] == null ? undefined : json['detectorType'],
+        'customDetectorName': json['customDetectorName'] == null ? undefined : json['customDetectorName'],
+        'matchedContent': json['matchedContent'] == null ? undefined : json['matchedContent'],
         'note': json['note'] == null ? undefined : json['note'],
         'createdAt': (new Date(json['createdAt'])),
     };
@@ -119,6 +133,8 @@ export function CaseFindingDtoToJSONTyped(value?: CaseFindingDto | null, ignoreD
         'findingLabel': value['findingLabel'],
         'severity': value['severity'],
         'detectorType': value['detectorType'],
+        'customDetectorName': value['customDetectorName'],
+        'matchedContent': value['matchedContent'],
         'note': value['note'],
         'createdAt': value['createdAt'].toISOString(),
     };

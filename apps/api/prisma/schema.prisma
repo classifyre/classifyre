@@ -114,7 +114,6 @@ model Finding {
   customDetectorFeedback CustomDetectorFeedback[]
   notifications Notification[]
   extraction CustomDetectorExtraction?
-  caseMentions CaseFinding[]
 
   @@index([assetId])
   @@index([sourceId])
@@ -668,6 +667,14 @@ model Edge {
   @@map("edges")
 }
 
+enum InquiryStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+// The investigation. A case owns hypotheses and the real, persisted evidence. It
+// may link one or more questions (saved queries) that guide which findings are
+// relevant; evidence is pulled from those queries' matches or added manually.
 model Case {
   id          String     @id @default(uuid())
   title       String
@@ -684,6 +691,7 @@ model Case {
   findings   CaseFinding[]
   hypotheses Hypothesis[]
   notes      CaseNote[]
+  inquiries  Inquiry[]
 
   @@index([status])
   @@index([severity])
@@ -691,13 +699,67 @@ model Case {
   @@map("cases")
 }
 
-// An observed asset node attached to a case. entityType is always "asset"
-// (never "finding" — findings are tracked in case_findings).
+// A saved query / monitor. It does NOT persist evidence — it only defines matchers
+// and tracks which findings currently match (QuestionMatch) so we can surface new
+// matches. A question is standalone (caseId null) or linked to a case to guide it.
+//
+// Matchers: a finding matches iff source matches AND (detector OR customDetector
+// matches) AND type matches, where an empty list for a dimension means "any".
+// findingTypeRegex is evaluated in the app (findingType is dynamic for CUSTOM).
+model Inquiry {
+  id          String         @id @default(uuid())
+  caseId      String?        @map("case_id")
+  title       String
+  description String?        @db.Text
+  status      InquiryStatus @default(ACTIVE)
+  createdBy   String?        @map("created_by")
+
+  matchAllSources    Boolean        @default(false) @map("match_all_sources")
+  sourceIds          String[]       @map("source_ids")
+  detectorTypes      DetectorType[] @map("detector_types")
+  customDetectorKeys String[]       @map("custom_detector_keys")
+  findingTypes       String[]       @map("finding_types")
+  findingTypeRegex   String[]       @map("finding_type_regex")
+  findingValueRegex  String[]       @map("finding_value_regex")
+
+  matchesSeenAt DateTime? @map("matches_seen_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  case    Case?           @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  matches InquiryMatch[]
+
+  @@index([caseId])
+  @@index([status])
+  @@map("inquiries")
+}
+
+// Lightweight tracker: one row per finding currently matching the question. Used to
+// count matches and detect new ones (matchedAt vs Question.matchesSeenAt). Not
+// evidence — finding details are joined live when listing.
+model InquiryMatch {
+  id         String   @id @default(uuid())
+  inquiryId String   @map("inquiry_id")
+  findingId  String   @map("finding_id")
+  matchedAt  DateTime @default(now()) @map("matched_at")
+
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  @@unique([inquiryId, findingId])
+  @@index([inquiryId, matchedAt])
+  @@map("inquiry_matches")
+}
+
+// An observed node attached to a CASE. entityType: "asset" | "sandbox". Display
+// fields are denormalized snapshots so the node survives source-row deletion.
 model CaseEvidence {
   id         String   @id @default(uuid())
   caseId     String   @map("case_id")
-  entityType String   @map("entity_type") // always "asset"
+  entityType String   @map("entity_type")
   entityId   String   @map("entity_id")
+  label      String?
+  assetType  String?  @map("asset_type")
+  sourceType String?  @map("source_type")
   note       String?  @db.Text
   addedBy    String?  @map("added_by")
   createdAt  DateTime @default(now()) @map("created_at")
@@ -711,18 +773,23 @@ model CaseEvidence {
   @@map("case_evidence")
 }
 
-// An inferred observation attached to a piece of case evidence (always anchored to evidence).
+// Inferred observation anchored to case evidence. No FK to findings; findingId is a
+// plain reference. Denormalized snapshots survive deletion of the finding row.
 model CaseFinding {
   id             String   @id @default(uuid())
   caseId         String   @map("case_id")
   caseEvidenceId String   @map("case_evidence_id")
   findingId      String   @map("finding_id")
-  note           String?  @db.Text
+  label          String
+  severity       String?
+  detectorType         String?  @map("detector_type")
+  customDetectorName   String?  @map("custom_detector_name")
+  matchedContent       String?  @map("matched_content") @db.Text
+  note                 String?  @db.Text
   createdAt      DateTime @default(now()) @map("created_at")
 
   investigation Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
   caseEvidence  CaseEvidence @relation(fields: [caseEvidenceId], references: [id], onDelete: Cascade)
-  finding       Finding      @relation(fields: [findingId], references: [id], onDelete: Cascade)
 
   @@unique([caseId, findingId])
   @@index([caseId])
@@ -736,24 +803,24 @@ model Hypothesis {
   statement  String           @db.Text
   status     HypothesisStatus @default(PROPOSED)
   confidence Decimal?         @db.Decimal(3, 2)
+  color      String?          @map("color")
   createdBy  String?          @map("created_by")
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
 
-  investigation Case                    @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  support       CaseHypothesisSupport[]
+  investigation Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  support       HypothesisSupport[]
 
   @@index([caseId])
   @@map("case_hypotheses")
 }
 
-// Polymorphic link between a hypothesis and either a piece of case evidence or a case finding.
-// targetType: "evidence" → targetId references case_evidence.id
-// targetType: "finding"  → targetId references case_findings.id
-model CaseHypothesisSupport {
+// Polymorphic link between a hypothesis and either a piece of case evidence or a
+// case finding.  targetType: "evidence" → case_evidence.id; "finding" → case_findings.id
+model HypothesisSupport {
   id           String         @id @default(uuid())
   hypothesisId String         @map("hypothesis_id")
-  targetType   String         @map("target_type") // "evidence" | "finding"
+  targetType   String         @map("target_type")
   targetId     String         @map("target_id")
   stance       EvidenceStance @default(SUPPORTS)
   weight       Decimal?       @db.Decimal(3, 2)
@@ -765,7 +832,7 @@ model CaseHypothesisSupport {
   @@unique([hypothesisId, targetType, targetId])
   @@index([hypothesisId])
   @@index([targetType, targetId])
-  @@map("case_hypothesis_support")
+  @@map("hypothesis_support")
 }
 
 model CaseNote {

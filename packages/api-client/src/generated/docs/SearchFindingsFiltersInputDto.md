@@ -20,6 +20,7 @@ Name | Type
 `detectionIdentity` | Array&lt;string&gt;
 `firstDetectedAfter` | Date
 `lastDetectedBefore` | Date
+`excludeIds` | Array&lt;string&gt;
 
 ## Example
 
@@ -42,6 +43,7 @@ const example = {
   "detectionIdentity": null,
   "firstDetectedAfter": null,
   "lastDetectedBefore": null,
+  "excludeIds": null,
 } satisfies SearchFindingsFiltersInputDto
 
 console.log(example)

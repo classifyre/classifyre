@@ -1,0 +1,198 @@
+---
+title: Flow
+description: End-to-end lifecycle from source creation to findings — how scanning works behind the scenes.
+---
+
+# Flow
+
+End-to-end lifecycle from source creation to findings.
+Each stage has its own status machine and transitions that are reflected in the UI.
+
+---
+
+## Entity model
+
+The core entities and their relationships:
+
+```mermaid
+graph TD
+    Source["Source<br/>A connection to an external system<br/>(Confluence, Jira, S3, ...)"]
+    Runner["Runner<br/>A single scan execution<br/>(one run = one Runner)"]
+    Asset["Asset<br/>An individual item extracted<br/>from the source (table, file, document)"]
+    RunnerAsset["RunnerAsset<br/>Tracks per-asset progress<br/>within a specific run"]
+    Finding["Finding<br/>A signal produced by a<br/>detector on an asset"]
+
+    Source -- "has many" --> Runner
+    Source -- "has many" --> Asset
+    Runner -- "tracks progress via" --> RunnerAsset
+    RunnerAsset -- "references" --> Asset
+    Asset -- "has many" --> Finding
+```
+
+Each source can have multiple runners (scan runs), each runner tracks its
+progress through runner assets, and every runner asset maps to one asset in
+the database. Findings belong to both an asset and a source.
+
+---
+
+## Source lifecycle
+
+A source starts as a configuration and transitions through run statuses:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> PENDING: Source created
+    PENDING --> RUNNING: Scan triggered
+    RUNNING --> COMPLETED: All assets processed
+    RUNNING --> WARNING: Some assets failed
+    RUNNING --> ERROR: Runner crashed
+    COMPLETED --> [*]
+    WARNING --> [*]
+    ERROR --> [*]
+
+    note right of RUNNING
+        Runner runs locally or
+        on Kubernetes
+    end note
+```
+
+- **PENDING** — source exists but has not been scanned yet, or its last run
+  is finished
+- **RUNNING** — a runner is actively executing for this source. Only one run
+  can be active per source at a time
+- **COMPLETED** — the last run finished with zero asset errors
+- **WARNING** — the last run finished but some assets had processing errors
+- **ERROR** — the last run terminated abnormally
+
+---
+
+## Scan run lifecycle
+
+When a scan is triggered (manually or via schedule), it moves through four
+phases visible in the UI:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Triggered: Scan started
+    Triggered --> Discovering: Exploring source content
+    Discovering --> Scanning: Analysing content
+    Scanning --> Completing: Comparing with previous scan
+    Completing --> [*]
+
+    state Triggered {
+        [*] --> Queued
+        Queued --> Running
+    }
+
+    state Completing {
+        [*] --> Completed: All assets processed
+        Completed --> Warning: Some assets had errors
+        Completed --> Error: Run failed
+        Warning --> [*]
+        Error --> [*]
+    }
+
+    note right of Triggered
+        A run starts as queued
+        and begins when a slot
+        becomes available
+    end note
+```
+
+| Phase | What happens |
+|---|---|
+| **Triggered** | The scan is queued and starts when capacity allows. You'll see this in the Scans page as "pending" or "running". |
+| **Discovering** | The runner lists all content in the source — every page, file, or record. The Scans detail page shows progress: "134 of 500 assets scanned". |
+| **Scanning** | Each asset is processed: content is extracted and detectors (secrets, PII, YARA, etc.) run against it. Findings start appearing in the UI. |
+| **Completing** | The run wraps up. Assets that no longer exist in the source are marked as deleted. Findings that disappeared in this run are automatically resolved. |
+
+At the end, the source shows one of three terminal statuses:
+
+- **Completed** — everything processed successfully
+- **Warning** — finished but some assets had errors (check the run logs)
+- **Error** — the run failed partway through
+
+---
+
+## Asset ingestion and diffing
+
+When the CLI sends a batch of assets, the API diffs them against existing
+records for the same source:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> NEW: Hash not seen before
+    [*] --> UPDATED: Hash exists, checksum differs
+    [*] --> UNCHANGED: Hash + checksum match
+    NEW --> [*]
+    UPDATED --> [*]
+    UNCHANGED --> [*]
+
+    state NEW {
+        [*] --> Finding: DETECTED (OPEN)
+    }
+    state UPDATED {
+        [*] --> Finding: RE_DETECTED
+    }
+    state UNCHANGED {
+        [*] --> Finding: lastDetectedAt bumped
+    }
+```
+
+**During finalization** (full scans only), assets not in the seen set:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> DELETED: Not in seenHashes
+    DELETED --> Finding: Auto-RESOLVED
+    note right of DELETED
+        Only for full scans
+        (sampling strategy = ALL)
+    end note
+```
+
+---
+
+## Finding lifecycle
+
+Findings persist across scans and track their own state machine:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> OPEN: First detection (DETECTED)
+    OPEN --> RESOLVED: Fixed (manual or auto)
+    OPEN --> FALSE_POSITIVE: Reviewed, incorrect
+    OPEN --> IGNORED: Accepted risk
+    RESOLVED --> OPEN: Re-appeared in scan (RE_OPENED)
+
+    note right of OPEN
+        Re-detected in subsequent
+        scans → RE_DETECTED event
+    end note
+```
+
+### History events
+
+Each status change is recorded as a history entry:
+
+| Event | When it fires |
+|---|---|
+| **DETECTED** | First time a finding appears |
+| **RE_DETECTED** | Finding still present in a later scan |
+| **RE_OPENED** | A previously resolved finding reappears |
+| **RESOLVED** | Finding no longer present (auto), or manually marked |
+| **STATUS_CHANGED** | User manually changed the status |
+| **SEVERITY_CHANGED** | User manually changed the severity |
+
+### Auto-resolution
+
+During finalization, findings that were present in a previous run but are
+absent in the current scan are automatically resolved. Manual overrides
+(FALSE_POSITIVE, IGNORED, RESOLVED) are respected and never overwritten.
+
+

@@ -1396,6 +1396,84 @@
       }
     }
   },
+  "cases": {
+    "search": "Ermittlungen suchen…",
+    "noInvestigations": "Keine Ermittlungen gefunden",
+    "noInvestigationsHint": "Filter anpassen, um die Suche zu erweitern.",
+    "loading": "Ermittlungen werden geladen...",
+    "columns": {
+      "title": "Titel",
+      "status": "Status",
+      "severity": "Schweregrad",
+      "inquiries": "Anfragen",
+      "updated": "Aktualisiert"
+    },
+    "statusLabels": {
+      "OPEN": "Offen",
+      "IN_PROGRESS": "In Bearbeitung",
+      "CLOSED": "Geschlossen",
+      "ARCHIVED": "Archiviert"
+    },
+    "severityLabels": {
+      "CRITICAL": "Kritisch",
+      "HIGH": "Hoch",
+      "MEDIUM": "Mittel",
+      "LOW": "Niedrig",
+      "INFO": "Info"
+    },
+    "evidence": {
+      "search": "Beweise suchen…",
+      "noEvidence": "Noch keine Beweise",
+      "noEvidenceHint": "Aus einer verknüpften Frage übernehmen oder Assets manuell hinzufügen.",
+      "addEvidence": "Beweis hinzufügen",
+      "columns": {
+        "entity": "Entität",
+        "type": "Typ",
+        "sourceType": "Quelltyp",
+        "assetType": "Asset-Typ",
+        "findings": "Befunde",
+        "note": "Notiz",
+        "added": "Hinzugefügt",
+        "actions": "Aktionen"
+      },
+      "tooltips": {
+        "entity": "Asset oder Entität, die als Beweis verwendet wird",
+        "type": "Entitätstyp (Asset, Befund, …)",
+        "sourceType": "Quell-Connector-Typ",
+        "assetType": "Asset-Art (Seite, Datei, …)",
+        "findings": "Angehängte Befunde · Chip zeigt verfügbare Anzahl",
+        "note": "Analystennotiz, Stift klicken zum Bearbeiten",
+        "added": "Wann dieser Beweis hinzugefügt wurde",
+        "sortEntity": "Nach Entitätsname sortieren",
+        "sortFindings": "Nach Anzahl der Befunde sortieren",
+        "sortAdded": "Nach Hinzufügedatum sortieren"
+      },
+      "subTable": {
+        "noFindings": "Keine Befunde angehängt",
+        "findingLabel": "Befund",
+        "detectorType": "Detektor",
+        "matchedContent": "Treffer-Inhalt",
+        "severity": "Schweregrad",
+        "note": "Notiz",
+        "added": "Hinzugefügt",
+        "attachedFindings": "Angehängte Befunde",
+        "availableFindings": "Verfügbare Befunde für dieses Asset",
+        "attachSelected": "Ausgewählte anhängen",
+        "tooltips": {
+          "findingLabel": "Erkannter Befundtyp",
+          "detectorType": "Detektortyp, der diesen Befund ausgelöst hat",
+          "matchedContent": "Inhaltsfragment, das diesen Befund ausgelöst hat",
+          "severity": "Risikoniveau dieses Befunds",
+          "note": "Analystennotiz, Stift klicken zum Bearbeiten",
+          "added": "Wann dieser Befund dem Fall hinzugefügt wurde",
+          "sortByFinding": "Nach Befundtyp sortieren",
+          "sortByDetector": "Nach Detektortyp sortieren",
+          "sortBySeverity": "Nach Schweregrad sortieren",
+          "sortByAdded": "Nach Hinzufügedatum sortieren"
+        }
+      }
+    }
+  },
   "forms": {
     "title": "Protokolle",
     "description": "Geparste Runner-Protokolle mit Level-Erkennung",

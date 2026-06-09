@@ -16,9 +16,11 @@ Name | Type
 `conclusion` | string
 `evidenceCount` | number
 `hypothesisCount` | number
+`inquiryCount` | number
 `createdAt` | Date
 `updatedAt` | Date
 `evidence` | [Array&lt;CaseEvidenceDto&gt;](CaseEvidenceDto.md)
+`inquiries` | [Array&lt;CaseLinkedInquiryDto&gt;](CaseLinkedInquiryDto.md)
 
 ## Example
 
@@ -37,9 +39,11 @@ const example = {
   "conclusion": null,
   "evidenceCount": null,
   "hypothesisCount": null,
+  "inquiryCount": null,
   "createdAt": null,
   "updatedAt": null,
   "evidence": null,
+  "inquiries": null,
 } satisfies CaseResponseDto
 
 console.log(example)

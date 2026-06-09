@@ -6,7 +6,6 @@
 
 Name | Type
 ------------ | -------------
-`caseEvidenceId` | string
 `findingId` | string
 `note` | string
 
@@ -17,7 +16,6 @@ import type { AddFindingDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "caseEvidenceId": null,
   "findingId": null,
   "note": null,
 } satisfies AddFindingDto

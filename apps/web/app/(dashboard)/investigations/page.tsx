@@ -2,199 +2,135 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Sparkles, FolderPlus, Check } from "lucide-react";
 import { toast } from "sonner";
-import { api } from "@workspace/api-client";
+import { api, type InquiryResponseDto } from "@workspace/api-client";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
-import { Input } from "@workspace/ui/components/input";
-import { Textarea } from "@workspace/ui/components/textarea";
-import { Label } from "@workspace/ui/components/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@workspace/ui/components/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
+import { Badge } from "@workspace/ui/components/badge";
+import { EmptyState } from "@workspace/ui/components/empty-state";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { CasesTable } from "@/components/cases-table";
-
-const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
 
 export default function InvestigationsPage() {
   const router = useRouter();
-  const [stats, setStats] = React.useState({ total: 0, open: 0, inProgress: 0 });
-  const [createOpen, setCreateOpen] = React.useState(false);
-  const [title, setTitle] = React.useState("");
-  const [hypothesis, setHypothesis] = React.useState("");
-  const [description, setDescription] = React.useState("");
-  const [severity, setSeverity] = React.useState<string>("MEDIUM");
-  const [saving, setSaving] = React.useState(false);
+  const [inquiries, setInquiries] = React.useState<InquiryResponseDto[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [creating, setCreating] = React.useState(false);
 
-  const loadStats = React.useCallback(async () => {
-    const [all, open, inProgress] = await Promise.all([
-      api.cases.casesControllerList({ limit: 1 }),
-      api.cases.casesControllerList({ limit: 1, status: ["OPEN"] }),
-      api.cases.casesControllerList({ limit: 1, status: ["IN_PROGRESS"] }),
-    ]);
-    setStats({ total: all.total, open: open.total, inProgress: inProgress.total });
+  const loadInquiries = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.inquiries.inquiriesControllerList({ limit: 100 });
+      setInquiries(res.items);
+    } finally { setLoading(false); }
   }, []);
 
-  React.useEffect(() => {
-    void loadStats();
-  }, [loadStats]);
+  React.useEffect(() => { void loadInquiries(); }, [loadInquiries]);
 
-  const reset = () => {
-    setTitle("");
-    setHypothesis("");
-    setDescription("");
-    setSeverity("MEDIUM");
-  };
+  const toggle = (id: string) =>
+    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  const handleCreate = async () => {
-    if (!title.trim() || !hypothesis.trim()) return;
-    setSaving(true);
+  const createCaseFromSelected = async () => {
+    if (selected.size === 0) return;
+    setCreating(true);
     try {
+      const first = inquiries.find((q) => selected.has(q.id));
       const created = await api.cases.casesControllerCreate({
         createCaseDto: {
-          title: title.trim(),
-          hypothesis: hypothesis.trim(),
-          description: description.trim() || undefined,
-          severity: severity as never,
+          title: selected.size === 1 && first ? first.title : `Investigation (${selected.size} inquiries)`,
+          inquiryIds: Array.from(selected),
         },
       });
       toast.success("Case created");
-      setCreateOpen(false);
-      reset();
       router.push(`/investigations/${created.id}`);
-    } catch (err) {
-      toast.error("Failed to create case");
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { console.error(err); toast.error("Failed to create case"); }
+    finally { setCreating(false); }
   };
-
-  const panels = [
-    { label: "Total cases", value: stats.total },
-    { label: "Open", value: stats.open },
-    { label: "In progress", value: stats.inProgress },
-  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-black uppercase tracking-[0.04em]">
-            Investigations
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Open a case from a hypothesis, collect evidence, and test competing
-            theories.
+          <h1 className="font-serif text-3xl font-black uppercase tracking-[0.04em]">Investigations</h1>
+          <p className="text-muted-foreground mt-1 text-sm max-w-xl">
+            Inquiries are saved queries that surface relevant findings. Group them into a case to gather
+            evidence and weigh hypotheses.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          New case
+        <Button onClick={() => router.push("/investigations/inquiries/new")}>
+          <Plus className="h-4 w-4" /> New inquiry
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {panels.map((p) => (
-          <Card key={p.label}>
-            <CardContent className="p-4">
-              <p className="font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
-                {p.label}
-              </p>
-              <p className="mt-1 text-3xl font-black tabular-nums">{p.value}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Tabs defaultValue="inquiries">
+        <TabsList>
+          <TabsTrigger value="inquiries">Inquiries</TabsTrigger>
+          <TabsTrigger value="cases">Cases</TabsTrigger>
+        </TabsList>
 
-      <CasesTable />
+        <TabsContent value="inquiries" className="space-y-3">
+          {selected.size > 0 && (
+            <div className="flex items-center justify-between rounded-[4px] border-2 border-border bg-card px-3 py-2 shadow-[3px_3px_0_var(--color-border)]">
+              <span className="text-sm font-medium">{selected.size} selected</span>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>Clear</Button>
+                <Button size="sm" onClick={createCaseFromSelected} disabled={creating}>
+                  <FolderPlus className="h-3.5 w-3.5" /> Create case from selected
+                </Button>
+              </div>
+            </div>
+          )}
 
-      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) reset(); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New investigation case</DialogTitle>
-            <DialogDescription>
-              Every case starts with a hypothesis — what do you suspect?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="case-hypothesis">
-                Initial hypothesis <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="case-hypothesis"
-                value={hypothesis}
-                onChange={(e) => setHypothesis(e.target.value)}
-                placeholder="e.g. Customer PII was shared externally"
-                autoFocus
-              />
-              <p className="text-muted-foreground text-xs">
-                Frame the core suspicion. Evidence will strengthen or weaken this.
-              </p>
+          {!loading && inquiries.length === 0 ? (
+            <EmptyState title="No inquiries yet" description="Create an inquiry to start monitoring findings across your sources." />
+          ) : (
+            <div className="space-y-2">
+              {inquiries.map((q) => {
+                const isSel = selected.has(q.id);
+                return (
+                  <Card key={q.id} className={isSel ? "border-primary" : undefined}>
+                    <CardContent className="flex items-center gap-3 p-3">
+                      <button
+                        onClick={() => toggle(q.id)}
+                        aria-label="Select inquiry"
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${isSel ? "border-primary bg-primary" : "border-muted-foreground/40 hover:border-muted-foreground"}`}
+                      >
+                        {isSel && <Check className="h-3 w-3 text-primary-foreground" />}
+                      </button>
+                      <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => router.push(`/investigations/inquiries/${q.id}`)}>
+                        <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{q.title}</p>
+                          <p className="text-muted-foreground text-xs">
+                            {q.matchAllSources ? "all sources" : `${q.sourceIds.length} source${q.sourceIds.length === 1 ? "" : "s"}`}
+                            {q.caseId ? " · in a case" : ""}
+                          </p>
+                        </div>
+                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {q.newMatchCount > 0 && (
+                          <Badge variant="outline" className="border-[color:var(--color-amber-600,#d97706)]/50 text-[color:var(--color-amber-600,#d97706)]">
+                            {q.newMatchCount} new
+                          </Badge>
+                        )}
+                        <span className="font-mono text-sm tabular-nums">{q.matchCount}</span>
+                        <span className="text-muted-foreground text-[11px]">matches</span>
+                        <Badge variant="outline">{q.status}</Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="case-title">
-                Case title <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="case-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Possible external sharing of customer data"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="case-desc">Description</Label>
-              <Textarea
-                id="case-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What prompted this investigation?"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Severity</Label>
-              <Select value={severity} onValueChange={setSeverity}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SEVERITIES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setCreateOpen(false); reset(); }}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreate}
-              disabled={!title.trim() || !hypothesis.trim() || saving}
-            >
-              Create case
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          )}
+        </TabsContent>
+
+        <TabsContent value="cases">
+          <CasesTable />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

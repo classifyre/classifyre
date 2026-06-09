@@ -48,6 +48,7 @@ class ObjectDetectionRunner(BaseRunner):
             raise MissingDependencyError(
                 "object_detection",
                 ["custom", "detectors"],
+                ["custom", "detectors"],
                 f"ObjectDetectionRunner requires additional dependencies: {exc}",
             ) from exc
 

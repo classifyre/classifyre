@@ -26,7 +26,7 @@ export interface LinkSupportDto {
      */
     targetType: LinkSupportDtoTargetTypeEnum;
     /**
-     * CaseEvidence.id or CaseFinding.id
+     * QuestionEvidence.id or QuestionFinding.id
      * @type {string}
      * @memberof LinkSupportDto
      */

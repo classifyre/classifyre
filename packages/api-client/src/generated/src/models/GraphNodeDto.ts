@@ -98,6 +98,12 @@ export interface GraphNodeDto {
      */
     hypothesisIds?: Array<string>;
     /**
+     * For finding nodes: the CaseFinding record ID (used to unlink)
+     * @type {string}
+     * @memberof GraphNodeDto
+     */
+    caseFindingId?: string;
+    /**
      * True when the underlying row no longer exists
      * @type {boolean}
      * @memberof GraphNodeDto
@@ -139,6 +145,7 @@ export function GraphNodeDtoFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'assetName': json['assetName'] == null ? undefined : json['assetName'],
         'assetId': json['assetId'] == null ? undefined : json['assetId'],
         'hypothesisIds': json['hypothesisIds'] == null ? undefined : json['hypothesisIds'],
+        'caseFindingId': json['caseFindingId'] == null ? undefined : json['caseFindingId'],
         'missing': json['missing'] == null ? undefined : json['missing'],
     };
 }
@@ -167,6 +174,7 @@ export function GraphNodeDtoToJSONTyped(value?: GraphNodeDto | null, ignoreDiscr
         'assetName': value['assetName'],
         'assetId': value['assetId'],
         'hypothesisIds': value['hypothesisIds'],
+        'caseFindingId': value['caseFindingId'],
         'missing': value['missing'],
     };
 }

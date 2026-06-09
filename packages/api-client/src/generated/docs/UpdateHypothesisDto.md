@@ -9,6 +9,7 @@ Name | Type
 `statement` | string
 `status` | string
 `confidence` | number
+`color` | string
 
 ## Example
 
@@ -20,6 +21,7 @@ const example = {
   "statement": null,
   "status": null,
   "confidence": null,
+  "color": null,
 } satisfies UpdateHypothesisDto
 
 console.log(example)

@@ -72,13 +72,16 @@ All URIs are relative to *http://localhost*
 *AssetsApi* | [**sourceAssetsControllerListSourceAssets**](docs/AssetsApi.md#sourceassetscontrollerlistsourceassets) | **GET** /sources/{sourceId}/assets | List assets for a source
 *AssistantApi* | [**assistantControllerParseUpload**](docs/AssistantApi.md#assistantcontrollerparseupload) | **POST** /assistant/parse-upload | Parse assistant chat upload
 *AssistantApi* | [**assistantControllerRespond**](docs/AssistantApi.md#assistantcontrollerrespondoperation) | **POST** /assistant/respond | Respond to a contextual assistant turn
-*CasesApi* | [**casesControllerAddEvidence**](docs/CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence. Use /evidence/:id/findings for findings.
-*CasesApi* | [**casesControllerAddFinding**](docs/CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of case evidence
-*CasesApi* | [**casesControllerCreate**](docs/CasesApi.md#casescontrollercreate) | **POST** /cases | Create an investigation case with an initial hypothesis
-*CasesApi* | [**casesControllerFindOne**](docs/CasesApi.md#casescontrollerfindone) | **GET** /cases/{id} | Get a case with hydrated evidence (and their findings)
+*CasesApi* | [**casesControllerAddEvidence**](docs/CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence
+*CasesApi* | [**casesControllerAddFinding**](docs/CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of evidence
+*CasesApi* | [**casesControllerCreate**](docs/CasesApi.md#casescontrollercreate) | **POST** /cases | Create a case (optionally linking questions)
+*CasesApi* | [**casesControllerFindOne**](docs/CasesApi.md#casescontrollerfindone) | **GET** /cases/{id} | Get a case with evidence, findings and linked questions
 *CasesApi* | [**casesControllerGraph**](docs/CasesApi.md#casescontrollergraph) | **GET** /cases/{id}/graph | Get the evidence neighbourhood graph for a case
-*CasesApi* | [**casesControllerList**](docs/CasesApi.md#casescontrollerlist) | **GET** /cases | List investigation cases
-*CasesApi* | [**casesControllerRemove**](docs/CasesApi.md#casescontrollerremove) | **DELETE** /cases/{id} | Delete a case
+*CasesApi* | [**casesControllerList**](docs/CasesApi.md#casescontrollerlist) | **GET** /cases | List cases
+*CasesApi* | [**casesControllerPatchEvidenceNote**](docs/CasesApi.md#casescontrollerpatchevidencenote) | **PATCH** /cases/{id}/evidence/{evidenceId} | Update the note on an evidence row
+*CasesApi* | [**casesControllerPatchFindingNote**](docs/CasesApi.md#casescontrollerpatchfindingnote) | **PATCH** /cases/{id}/findings/{caseFindingId} | Update the note on a case finding
+*CasesApi* | [**casesControllerPull**](docs/CasesApi.md#casescontrollerpull) | **POST** /cases/{id}/pull | Pull a question\&#39;s matches into the case as evidence
+*CasesApi* | [**casesControllerRemove**](docs/CasesApi.md#casescontrollerremove) | **DELETE** /cases/{id} | Delete a case (its questions become standalone)
 *CasesApi* | [**casesControllerRemoveEvidence**](docs/CasesApi.md#casescontrollerremoveevidence) | **DELETE** /cases/{id}/evidence/{evidenceId} | Remove evidence from the case
 *CasesApi* | [**casesControllerRemoveFinding**](docs/CasesApi.md#casescontrollerremovefinding) | **DELETE** /cases/{id}/findings/{caseFindingId} | Remove a finding from the case
 *CasesApi* | [**casesControllerUpdate**](docs/CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case
@@ -126,6 +129,16 @@ All URIs are relative to *http://localhost*
 *HypothesesApi* | [**hypothesesControllerRemove**](docs/HypothesesApi.md#hypothesescontrollerremove) | **DELETE** /hypotheses/{id} | Delete a hypothesis
 *HypothesesApi* | [**hypothesesControllerUnlinkSupport**](docs/HypothesesApi.md#hypothesescontrollerunlinksupport) | **DELETE** /hypotheses/{id}/support/{linkId} | Remove a support link from a hypothesis
 *HypothesesApi* | [**hypothesesControllerUpdate**](docs/HypothesesApi.md#hypothesescontrollerupdate) | **PATCH** /hypotheses/{id} | Update a hypothesis
+*InquiriesApi* | [**inquiriesControllerCreate**](docs/InquiriesApi.md#inquiriescontrollercreate) | **POST** /inquiries | Create an inquiry (a saved query) and seed its matches
+*InquiriesApi* | [**inquiriesControllerFindOne**](docs/InquiriesApi.md#inquiriescontrollerfindone) | **GET** /inquiries/{id} | Get an inquiry
+*InquiriesApi* | [**inquiriesControllerList**](docs/InquiriesApi.md#inquiriescontrollerlist) | **GET** /inquiries | List inquiries (with match counts)
+*InquiriesApi* | [**inquiriesControllerListMatches**](docs/InquiriesApi.md#inquiriescontrollerlistmatches) | **GET** /inquiries/{id}/matches | List the findings currently matching this inquiry
+*InquiriesApi* | [**inquiriesControllerMarkSeen**](docs/InquiriesApi.md#inquiriescontrollermarkseen) | **POST** /inquiries/{id}/seen | Mark the current matches as seen (clears the \&quot;new\&quot; badge)
+*InquiriesApi* | [**inquiriesControllerMatchOptions**](docs/InquiriesApi.md#inquiriescontrollermatchoptions) | **GET** /inquiries/match-options | Sources, custom detectors and distinct finding types for the matcher form
+*InquiriesApi* | [**inquiriesControllerPreview**](docs/InquiriesApi.md#inquiriescontrollerpreview) | **POST** /inquiries/preview | Preview findings a matcher config currently selects (no save)
+*InquiriesApi* | [**inquiriesControllerRematch**](docs/InquiriesApi.md#inquiriescontrollerrematch) | **POST** /inquiries/{id}/rematch | Recompute matches against all current findings
+*InquiriesApi* | [**inquiriesControllerRemove**](docs/InquiriesApi.md#inquiriescontrollerremove) | **DELETE** /inquiries/{id} | Delete an inquiry
+*InquiriesApi* | [**inquiriesControllerUpdate**](docs/InquiriesApi.md#inquiriescontrollerupdate) | **PATCH** /inquiries/{id} | Update an inquiry (matchers change → matches recomputed)
 *InstanceSettingsApi* | [**instanceSettingsControllerGetSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollergetsettings) | **GET** /instance-settings | Get instance settings
 *InstanceSettingsApi* | [**instanceSettingsControllerUpdateSettings**](docs/InstanceSettingsApi.md#instancesettingscontrollerupdatesettings) | **PUT** /instance-settings | Update instance settings
 *InstanceSettingsApi* | [**mcpSettingsControllerCreateToken**](docs/InstanceSettingsApi.md#mcpsettingscontrollercreatetoken) | **POST** /instance-settings/mcp/tokens | Create MCP access token
@@ -205,6 +218,7 @@ All URIs are relative to *http://localhost*
 - [BulkUpdateFindingsResponseDto](docs/BulkUpdateFindingsResponseDto.md)
 - [CaseEvidenceDto](docs/CaseEvidenceDto.md)
 - [CaseFindingDto](docs/CaseFindingDto.md)
+- [CaseLinkedInquiryDto](docs/CaseLinkedInquiryDto.md)
 - [CaseListResponseDto](docs/CaseListResponseDto.md)
 - [CaseResponseDto](docs/CaseResponseDto.md)
 - [CliRunnerControllerUpdateRunnerStatusRequest](docs/CliRunnerControllerUpdateRunnerStatusRequest.md)
@@ -214,6 +228,7 @@ All URIs are relative to *http://localhost*
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
 - [CreateHypothesisDto](docs/CreateHypothesisDto.md)
+- [CreateInquiryDto](docs/CreateInquiryDto.md)
 - [CreateManualEdgeDto](docs/CreateManualEdgeDto.md)
 - [CreateMcpTokenDto](docs/CreateMcpTokenDto.md)
 - [CreateSourceDto](docs/CreateSourceDto.md)
@@ -248,6 +263,9 @@ All URIs are relative to *http://localhost*
 - [HypothesisResponseDto](docs/HypothesisResponseDto.md)
 - [HypothesisSupportLinkDto](docs/HypothesisSupportLinkDto.md)
 - [IngestEdgeDto](docs/IngestEdgeDto.md)
+- [InquiryListResponseDto](docs/InquiryListResponseDto.md)
+- [InquiryMatchDto](docs/InquiryMatchDto.md)
+- [InquiryResponseDto](docs/InquiryResponseDto.md)
 - [InstanceSettingsResponseDto](docs/InstanceSettingsResponseDto.md)
 - [LatestRunnerSummaryDto](docs/LatestRunnerSummaryDto.md)
 - [LinkSupportDto](docs/LinkSupportDto.md)
@@ -255,6 +273,10 @@ All URIs are relative to *http://localhost*
 - [LiveQueryResponseDto](docs/LiveQueryResponseDto.md)
 - [LocationDto](docs/LocationDto.md)
 - [MarkAllReadDto](docs/MarkAllReadDto.md)
+- [MatchOptionCustomDetectorDto](docs/MatchOptionCustomDetectorDto.md)
+- [MatchOptionFindingTypeDto](docs/MatchOptionFindingTypeDto.md)
+- [MatchOptionSourceDto](docs/MatchOptionSourceDto.md)
+- [MatchOptionsResponseDto](docs/MatchOptionsResponseDto.md)
 - [McpCapabilityGroupDto](docs/McpCapabilityGroupDto.md)
 - [McpOverviewResponseDto](docs/McpOverviewResponseDto.md)
 - [McpPromptSummaryDto](docs/McpPromptSummaryDto.md)
@@ -268,10 +290,15 @@ All URIs are relative to *http://localhost*
 - [ParseTrainingExamplesSkippedReasonsDto](docs/ParseTrainingExamplesSkippedReasonsDto.md)
 - [ParsedTrainingExampleDto](docs/ParsedTrainingExampleDto.md)
 - [PivotGraphDto](docs/PivotGraphDto.md)
+- [PreviewInquiryDto](docs/PreviewInquiryDto.md)
+- [PreviewResponseDto](docs/PreviewResponseDto.md)
+- [PullFromInquiryDto](docs/PullFromInquiryDto.md)
+- [PullFromInquiryResponseDto](docs/PullFromInquiryResponseDto.md)
 - [RebuildEdgesResponseDto](docs/RebuildEdgesResponseDto.md)
 - [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)
 - [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
 - [RelationTypesResponseDto](docs/RelationTypesResponseDto.md)
+- [RematchResponseDto](docs/RematchResponseDto.md)
 - [RerunSandboxRunDto](docs/RerunSandboxRunDto.md)
 - [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
 - [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
@@ -341,10 +368,13 @@ All URIs are relative to *http://localhost*
 - [TrainingExamplesStatsDtoByLabelValue](docs/TrainingExamplesStatsDtoByLabelValue.md)
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
 - [UpdateCaseDto](docs/UpdateCaseDto.md)
+- [UpdateCaseFindingNoteDto](docs/UpdateCaseFindingNoteDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
 - [UpdateEdgeDto](docs/UpdateEdgeDto.md)
+- [UpdateEvidenceNoteDto](docs/UpdateEvidenceNoteDto.md)
 - [UpdateFindingDto](docs/UpdateFindingDto.md)
 - [UpdateHypothesisDto](docs/UpdateHypothesisDto.md)
+- [UpdateInquiryDto](docs/UpdateInquiryDto.md)
 - [UpdateInstanceSettingsDto](docs/UpdateInstanceSettingsDto.md)
 - [UpdateMcpTokenDto](docs/UpdateMcpTokenDto.md)
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)

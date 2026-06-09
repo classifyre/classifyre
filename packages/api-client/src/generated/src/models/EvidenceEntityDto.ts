@@ -43,12 +43,6 @@ export interface EvidenceEntityDto {
      * @memberof EvidenceEntityDto
      */
     sourceType?: string;
-    /**
-     * True when the referenced row no longer exists
-     * @type {boolean}
-     * @memberof EvidenceEntityDto
-     */
-    missing?: boolean;
 }
 
 /**
@@ -74,7 +68,6 @@ export function EvidenceEntityDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'label': json['label'],
         'assetType': json['assetType'] == null ? undefined : json['assetType'],
         'sourceType': json['sourceType'] == null ? undefined : json['sourceType'],
-        'missing': json['missing'] == null ? undefined : json['missing'],
     };
 }
 
@@ -93,7 +86,6 @@ export function EvidenceEntityDtoToJSONTyped(value?: EvidenceEntityDto | null, i
         'label': value['label'],
         'assetType': value['assetType'],
         'sourceType': value['sourceType'],
-        'missing': value['missing'],
     };
 }
 

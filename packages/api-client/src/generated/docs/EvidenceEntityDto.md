@@ -10,7 +10,6 @@ Name | Type
 `label` | string
 `assetType` | string
 `sourceType` | string
-`missing` | boolean
 
 ## Example
 
@@ -23,7 +22,6 @@ const example = {
   "label": null,
   "assetType": null,
   "sourceType": null,
-  "missing": null,
 } satisfies EvidenceEntityDto
 
 console.log(example)

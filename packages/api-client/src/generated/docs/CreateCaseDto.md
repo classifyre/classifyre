@@ -7,12 +7,12 @@
 Name | Type
 ------------ | -------------
 `title` | string
-`hypothesis` | string
 `description` | string
 `status` | string
 `severity` | string
 `assignee` | string
 `createdBy` | string
+`inquiryIds` | Array&lt;string&gt;
 
 ## Example
 
@@ -22,12 +22,12 @@ import type { CreateCaseDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "title": null,
-  "hypothesis": null,
   "description": null,
   "status": null,
   "severity": null,
   "assignee": null,
   "createdBy": null,
+  "inquiryIds": null,
 } satisfies CreateCaseDto
 
 console.log(example)

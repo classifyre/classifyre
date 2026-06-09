@@ -3987,7 +3987,7 @@
             }
           }
         },
-        "summary": "Create an investigation case with an initial hypothesis",
+        "summary": "Create a case (optionally linking questions)",
         "tags": [
           "cases"
         ]
@@ -4069,7 +4069,7 @@
             }
           }
         },
-        "summary": "List investigation cases",
+        "summary": "List cases",
         "tags": [
           "cases"
         ]
@@ -4098,12 +4098,9 @@
                 }
               }
             }
-          },
-          "404": {
-            "description": "Case not found"
           }
         },
-        "summary": "Get a case with hydrated evidence (and their findings)",
+        "summary": "Get a case with evidence, findings and linked questions",
         "tags": [
           "cases"
         ]
@@ -4164,7 +4161,7 @@
             "description": ""
           }
         },
-        "summary": "Delete a case",
+        "summary": "Delete a case (its questions become standalone)",
         "tags": [
           "cases"
         ]
@@ -4205,13 +4202,60 @@
             }
           }
         },
-        "summary": "Attach an asset as evidence. Use /evidence/:id/findings for findings.",
+        "summary": "Attach an asset as evidence",
         "tags": [
           "cases"
         ]
       }
     },
     "/cases/{id}/evidence/{evidenceId}": {
+      "patch": {
+        "operationId": "CasesController_patchEvidenceNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "evidenceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEvidenceNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEvidenceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update the note on an evidence row",
+        "tags": [
+          "cases"
+        ]
+      },
       "delete": {
         "operationId": "CasesController_removeEvidence",
         "parameters": [
@@ -4286,13 +4330,60 @@
             }
           }
         },
-        "summary": "Attach a finding to a piece of case evidence",
+        "summary": "Attach a finding to a piece of evidence",
         "tags": [
           "cases"
         ]
       }
     },
     "/cases/{id}/findings/{caseFindingId}": {
+      "patch": {
+        "operationId": "CasesController_patchFindingNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "caseFindingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCaseFindingNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseFindingDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update the note on a case finding",
+        "tags": [
+          "cases"
+        ]
+      },
       "delete": {
         "operationId": "CasesController_removeFinding",
         "parameters": [
@@ -4319,6 +4410,47 @@
           }
         },
         "summary": "Remove a finding from the case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/pull": {
+      "post": {
+        "operationId": "CasesController_pull",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PullFromInquiryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullFromInquiryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Pull a question's matches into the case as evidence",
         "tags": [
           "cases"
         ]
@@ -4360,6 +4492,356 @@
         "summary": "Get the evidence neighbourhood graph for a case",
         "tags": [
           "cases"
+        ]
+      }
+    },
+    "/inquiries": {
+      "post": {
+        "operationId": "InquiriesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInquiryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InquiryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create an inquiry (a saved query) and seed its matches",
+        "tags": [
+          "inquiries"
+        ]
+      },
+      "get": {
+        "operationId": "InquiriesController_list",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ACTIVE",
+                  "ARCHIVED"
+                ]
+              }
+            }
+          },
+          {
+            "name": "caseId",
+            "required": false,
+            "in": "query",
+            "description": "Filter to a case (or \"none\" for unlinked)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InquiryListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List inquiries (with match counts)",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/inquiries/preview": {
+      "post": {
+        "operationId": "InquiriesController_preview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewInquiryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Preview findings a matcher config currently selects (no save)",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/inquiries/match-options": {
+      "get": {
+        "operationId": "InquiriesController_matchOptions",
+        "parameters": [
+          {
+            "name": "sourceIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchOptionsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sources, custom detectors and distinct finding types for the matcher form",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/inquiries/{id}": {
+      "get": {
+        "operationId": "InquiriesController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InquiryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get an inquiry",
+        "tags": [
+          "inquiries"
+        ]
+      },
+      "patch": {
+        "operationId": "InquiriesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInquiryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InquiryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update an inquiry (matchers change → matches recomputed)",
+        "tags": [
+          "inquiries"
+        ]
+      },
+      "delete": {
+        "operationId": "InquiriesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete an inquiry",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/inquiries/{id}/matches": {
+      "get": {
+        "operationId": "InquiriesController_listMatches",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InquiryMatchDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the findings currently matching this inquiry",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/inquiries/{id}/seen": {
+      "post": {
+        "operationId": "InquiriesController_markSeen",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Mark the current matches as seen (clears the \"new\" badge)",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/inquiries/{id}/rematch": {
+      "post": {
+        "operationId": "InquiriesController_rematch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RematchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Recompute matches against all current findings",
+        "tags": [
+          "inquiries"
         ]
       }
     },
@@ -5780,7 +6262,7 @@
         ]
       },
       "delete": {
-        "description": "Deletes a sandbox run record and its associated S3 file (if no other runs share it). If the run is currently in progress the CLI process is killed first.",
+        "description": "Deletes a sandbox run record and its stored input file. If the run is currently in progress the CLI process is killed first.",
         "operationId": "SandboxController_deleteRun",
         "parameters": [
           {
@@ -7347,6 +7829,13 @@
           "lastDetectedBefore": {
             "format": "date-time",
             "type": "string"
+          },
+          "excludeIds": {
+            "description": "Finding UUIDs to exclude from results (e.g. already-attached findings)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -9911,10 +10400,6 @@
           "title": {
             "type": "string"
           },
-          "hypothesis": {
-            "type": "string",
-            "description": "Initial hypothesis — what do you suspect?"
-          },
           "description": {
             "type": "string"
           },
@@ -9944,11 +10429,17 @@
           },
           "createdBy": {
             "type": "string"
+          },
+          "inquiryIds": {
+            "description": "Link these questions to the new case (guides)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
-          "title",
-          "hypothesis"
+          "title"
         ]
       },
       "EvidenceEntityDto": {
@@ -9965,10 +10456,6 @@
           },
           "sourceType": {
             "type": "string"
-          },
-          "missing": {
-            "type": "boolean",
-            "description": "True when the referenced row no longer exists"
           }
         },
         "required": [
@@ -9997,6 +10484,14 @@
           },
           "detectorType": {
             "type": "string"
+          },
+          "customDetectorName": {
+            "type": "string",
+            "description": "Human-readable name for custom detectors (snapshotted at attach time)"
+          },
+          "matchedContent": {
+            "type": "string",
+            "description": "Matched content snippet snapshotted from the finding at attach time"
           },
           "note": {
             "type": "string"
@@ -10059,6 +10554,34 @@
           "createdAt"
         ]
       },
+      "CaseLinkedInquiryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED"
+            ]
+          },
+          "matchCount": {
+            "type": "number",
+            "description": "Findings currently matching this question"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "matchCount"
+        ]
+      },
       "CaseResponseDto": {
         "type": "object",
         "properties": {
@@ -10105,6 +10628,9 @@
           "hypothesisCount": {
             "type": "number"
           },
+          "inquiryCount": {
+            "type": "number"
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -10118,6 +10644,12 @@
             "items": {
               "$ref": "#/components/schemas/CaseEvidenceDto"
             }
+          },
+          "inquiries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseLinkedInquiryDto"
+            }
           }
         },
         "required": [
@@ -10127,6 +10659,7 @@
           "severity",
           "evidenceCount",
           "hypothesisCount",
+          "inquiryCount",
           "createdAt",
           "updatedAt"
         ]
@@ -10205,7 +10738,7 @@
             "description": "Asset UUID"
           },
           "hypothesisIds": {
-            "description": "At least one hypothesis UUID this evidence should be linked to. Evidence without a hypothesis is not allowed.",
+            "description": "Hypothesis UUIDs to link this evidence to (optional)",
             "type": "array",
             "items": {
               "type": "string"
@@ -10220,17 +10753,21 @@
         },
         "required": [
           "entityType",
-          "entityId",
-          "hypothesisIds"
+          "entityId"
         ]
+      },
+      "UpdateEvidenceNoteDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "Analyst note. Pass null or empty string to clear."
+          }
+        }
       },
       "AddFindingDto": {
         "type": "object",
         "properties": {
-          "caseEvidenceId": {
-            "type": "string",
-            "description": "CaseEvidence id the finding belongs to"
-          },
           "findingId": {
             "type": "string",
             "description": "Finding UUID"
@@ -10240,8 +10777,47 @@
           }
         },
         "required": [
-          "caseEvidenceId",
           "findingId"
+        ]
+      },
+      "UpdateCaseFindingNoteDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "Analyst note. Pass null or empty string to clear."
+          }
+        }
+      },
+      "PullFromInquiryDto": {
+        "type": "object",
+        "properties": {
+          "inquiryId": {
+            "type": "string",
+            "description": "Question to pull matches from"
+          },
+          "findingIds": {
+            "description": "Specific finding IDs (omit = all current matches)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "inquiryId"
+        ]
+      },
+      "PullFromInquiryResponseDto": {
+        "type": "object",
+        "properties": {
+          "pulled": {
+            "type": "number",
+            "description": "Number of findings pulled into the case"
+          }
+        },
+        "required": [
+          "pulled"
         ]
       },
       "GraphNodeDto": {
@@ -10294,6 +10870,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "caseFindingId": {
+            "type": "string",
+            "description": "For finding nodes: the CaseFinding record ID (used to unlink)"
           },
           "missing": {
             "type": "boolean",
@@ -10379,6 +10959,509 @@
           "nodes",
           "edges",
           "truncated"
+        ]
+      },
+      "CreateInquiryDto": {
+        "type": "object",
+        "properties": {
+          "matchAllSources": {
+            "type": "boolean",
+            "description": "Match findings from any source (ignores sourceIds)"
+          },
+          "sourceIds": {
+            "description": "Source IDs to match",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detectorTypes": {
+            "type": "array",
+            "description": "Empty = any detector",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            }
+          },
+          "customDetectorKeys": {
+            "description": "Custom detector keys to match",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypes": {
+            "description": "Exact findingType matches",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypeRegex": {
+            "description": "Regex patterns matched against findingType",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingValueRegex": {
+            "description": "Regex patterns matched against matchedContent (the detected value). Empty = any.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "title": {
+            "type": "string",
+            "description": "The question / monitor name"
+          },
+          "description": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string",
+            "description": "Link to an existing case"
+          },
+          "createdBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "InquiryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED"
+            ]
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "matchAllSources": {
+            "type": "boolean"
+          },
+          "sourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detectorTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            }
+          },
+          "customDetectorKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypeRegex": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingValueRegex": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "matchCount": {
+            "type": "number",
+            "description": "Findings currently matching this query"
+          },
+          "newMatchCount": {
+            "type": "number",
+            "description": "Matches that appeared since you last viewed"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "matchAllSources",
+          "sourceIds",
+          "detectorTypes",
+          "customDetectorKeys",
+          "findingTypes",
+          "findingTypeRegex",
+          "findingValueRegex",
+          "matchCount",
+          "newMatchCount",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PreviewInquiryDto": {
+        "type": "object",
+        "properties": {
+          "matchAllSources": {
+            "type": "boolean",
+            "description": "Match findings from any source (ignores sourceIds)"
+          },
+          "sourceIds": {
+            "description": "Source IDs to match",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detectorTypes": {
+            "type": "array",
+            "description": "Empty = any detector",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            }
+          },
+          "customDetectorKeys": {
+            "description": "Custom detector keys to match",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypes": {
+            "description": "Exact findingType matches",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypeRegex": {
+            "description": "Regex patterns matched against findingType",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingValueRegex": {
+            "description": "Regex patterns matched against matchedContent (the detected value). Empty = any.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "InquiryMatchDto": {
+        "type": "object",
+        "properties": {
+          "findingId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "matchedContent": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "assetName": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string"
+          },
+          "matchedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "isNew": {
+            "type": "boolean",
+            "description": "Appeared since the question was last viewed"
+          }
+        },
+        "required": [
+          "findingId",
+          "label",
+          "assetId",
+          "matchedAt",
+          "isNew"
+        ]
+      },
+      "PreviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Total findings currently matching"
+          },
+          "sample": {
+            "description": "Sample of matches (capped)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InquiryMatchDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "sample"
+        ]
+      },
+      "MatchOptionSourceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type"
+        ]
+      },
+      "MatchOptionCustomDetectorDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ]
+      },
+      "MatchOptionFindingTypeDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "value",
+          "detectorType",
+          "count"
+        ]
+      },
+      "MatchOptionsResponseDto": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatchOptionSourceDto"
+            }
+          },
+          "customDetectors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatchOptionCustomDetectorDto"
+            }
+          },
+          "findingTypes": {
+            "description": "Distinct finding types (optionally scoped to selected sources)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatchOptionFindingTypeDto"
+            }
+          }
+        },
+        "required": [
+          "sources",
+          "customDetectors",
+          "findingTypes"
+        ]
+      },
+      "InquiryListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InquiryResponseDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ]
+      },
+      "UpdateInquiryDto": {
+        "type": "object",
+        "properties": {
+          "matchAllSources": {
+            "type": "boolean",
+            "description": "Match findings from any source (ignores sourceIds)"
+          },
+          "sourceIds": {
+            "description": "Source IDs to match",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detectorTypes": {
+            "type": "array",
+            "description": "Empty = any detector",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            }
+          },
+          "customDetectorKeys": {
+            "description": "Custom detector keys to match",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypes": {
+            "description": "Exact findingType matches",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypeRegex": {
+            "description": "Regex patterns matched against findingType",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingValueRegex": {
+            "description": "Regex patterns matched against matchedContent (the detected value). Empty = any.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED"
+            ]
+          },
+          "caseId": {
+            "type": "string",
+            "description": "Link/unlink a case (null detaches)",
+            "nullable": true
+          }
+        }
+      },
+      "RematchResponseDto": {
+        "type": "object",
+        "properties": {
+          "landed": {
+            "type": "number",
+            "description": "Findings newly recorded as matches"
+          }
+        },
+        "required": [
+          "landed"
         ]
       },
       "HypothesisSupportLinkDto": {
@@ -10467,6 +11550,11 @@
             "format": "date-time",
             "type": "string"
           },
+          "color": {
+            "type": "string",
+            "description": "Custom hex color for graph visualization",
+            "nullable": true
+          },
           "links": {
             "type": "array",
             "items": {
@@ -10535,6 +11623,11 @@
             "minimum": 0,
             "maximum": 1,
             "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "description": "Hex color string for graph visualization (e.g. \"#ef4444\")",
+            "nullable": true
           }
         }
       },
@@ -10551,7 +11644,7 @@
           },
           "targetId": {
             "type": "string",
-            "description": "CaseEvidence.id or CaseFinding.id"
+            "description": "QuestionEvidence.id or QuestionFinding.id"
           },
           "stance": {
             "type": "string",

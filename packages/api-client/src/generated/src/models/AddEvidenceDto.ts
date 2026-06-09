@@ -32,11 +32,11 @@ export interface AddEvidenceDto {
      */
     entityId: string;
     /**
-     * At least one hypothesis UUID this evidence should be linked to. Evidence without a hypothesis is not allowed.
+     * Hypothesis UUIDs to link this evidence to (optional)
      * @type {Array<string>}
      * @memberof AddEvidenceDto
      */
-    hypothesisIds: Array<string>;
+    hypothesisIds?: Array<string>;
     /**
      * 
      * @type {string}
@@ -57,7 +57,6 @@ export interface AddEvidenceDto {
 export function instanceOfAddEvidenceDto(value: object): value is AddEvidenceDto {
     if (!('entityType' in value) || value['entityType'] === undefined) return false;
     if (!('entityId' in value) || value['entityId'] === undefined) return false;
-    if (!('hypothesisIds' in value) || value['hypothesisIds'] === undefined) return false;
     return true;
 }
 
@@ -73,7 +72,7 @@ export function AddEvidenceDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         
         'entityType': json['entityType'],
         'entityId': json['entityId'],
-        'hypothesisIds': json['hypothesisIds'],
+        'hypothesisIds': json['hypothesisIds'] == null ? undefined : json['hypothesisIds'],
         'note': json['note'] == null ? undefined : json['note'],
         'addedBy': json['addedBy'] == null ? undefined : json['addedBy'],
     };

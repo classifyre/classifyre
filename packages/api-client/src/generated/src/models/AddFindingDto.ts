@@ -20,12 +20,6 @@ import { mapValues } from '../runtime';
  */
 export interface AddFindingDto {
     /**
-     * CaseEvidence id the finding belongs to
-     * @type {string}
-     * @memberof AddFindingDto
-     */
-    caseEvidenceId: string;
-    /**
      * Finding UUID
      * @type {string}
      * @memberof AddFindingDto
@@ -43,7 +37,6 @@ export interface AddFindingDto {
  * Check if a given object implements the AddFindingDto interface.
  */
 export function instanceOfAddFindingDto(value: object): value is AddFindingDto {
-    if (!('caseEvidenceId' in value) || value['caseEvidenceId'] === undefined) return false;
     if (!('findingId' in value) || value['findingId'] === undefined) return false;
     return true;
 }
@@ -58,7 +51,6 @@ export function AddFindingDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
     }
     return {
         
-        'caseEvidenceId': json['caseEvidenceId'],
         'findingId': json['findingId'],
         'note': json['note'] == null ? undefined : json['note'],
     };
@@ -75,7 +67,6 @@ export function AddFindingDtoToJSONTyped(value?: AddFindingDto | null, ignoreDis
 
     return {
         
-        'caseEvidenceId': value['caseEvidenceId'],
         'findingId': value['findingId'],
         'note': value['note'],
     };
