@@ -16,6 +16,7 @@ interface FindingRow {
   findingType: string;
   severity: { toString(): string };
   matchedContent: string | null;
+  createdAt?: Date;
   asset?: { name: string; sourceType: { toString(): string } } | null;
 }
 
@@ -33,11 +34,10 @@ const FINDING_SELECT = {
 const PREVIEW_CAP = 50;
 
 /**
- * Background engine: a Question is a saved query. After a source finishes
- * ingesting, the run's findings are matched against every ACTIVE question for that
- * source and the matches are recorded in `question_matches` (a lightweight tracker,
- * NOT evidence). Decoupled from ingestion via a pg-boss queue; idempotent via the
- * unique (questionId, findingId) constraint, so it is safe across multiple pods.
+ * Background engine: an Inquiry is a saved query. After a source finishes
+ * ingesting, the run's new findings are matched against every ACTIVE inquiry for
+ * that source. Counts are stored on the Inquiry row (matchCount + newMatchCount)
+ * instead of persisting individual match rows.
  */
 @Injectable()
 export class InquiryMatchingService implements OnApplicationBootstrap {
@@ -72,40 +72,92 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
     }
   }
 
-  /** Match the run's findings against every ACTIVE question for this source. */
+  /**
+   * After a source run finishes: count new findings from this run that match each
+   * ACTIVE inquiry, increment newMatchCount by that delta, and refresh matchCount
+   * (total OPEN findings across all runs).
+   */
   async processSourceCompletion(sourceId: string, runnerId: string | null): Promise<{ landed: number }> {
     const inquiries = await this.prisma.inquiry.findMany({
       where: { status: 'ACTIVE', OR: [{ matchAllSources: true }, { sourceIds: { has: sourceId } }] },
-      select: this.matcherSelect,
+      select: { ...this.matcherSelect, matchCount: true },
     });
     if (inquiries.length === 0) return { landed: 0 };
 
-    const candidates = (await this.prisma.finding.findMany({
+    // Findings specifically from this run (the "new" ones).
+    const runFindings = (await this.prisma.finding.findMany({
       where: runnerId ? { runnerId, status: 'OPEN' } : { sourceId, status: 'OPEN' },
       select: FINDING_SELECT,
     })) as FindingRow[];
-    if (candidates.length === 0) return { landed: 0 };
 
     let landed = 0;
     for (const q of inquiries) {
       const matcher = new CompiledMatcher(q);
-      const hits = candidates.filter((f) => matcher.matches(f));
-      if (hits.length > 0) landed += await this.recordMatches(q.id, hits.map((f) => f.id));
+
+      // Count hits from this run's findings (the "new" delta).
+      const newHits = runFindings.filter((f) => matcher.matches(f)).length;
+
+      // Recompute total matchCount across all sources/runs.
+      const allMatches = await this.candidateFindings(q, false);
+      const newTotal = allMatches.length;
+
+      if (newHits > 0 || newTotal !== q.matchCount) {
+        await this.prisma.inquiry.update({
+          where: { id: q.id },
+          data: {
+            matchCount: newTotal,
+            ...(newHits > 0 ? { newMatchCount: { increment: newHits } } : {}),
+          },
+        });
+        landed += newHits;
+      }
     }
-    if (landed > 0) this.logger.log(`Recorded ${landed} match(es) for source ${sourceId}`);
+
+    if (landed > 0) this.logger.log(`Recorded ${landed} new match(es) for source ${sourceId}`);
     return { landed };
   }
 
   /**
-   * Re-evaluate ALL current OPEN findings against a single question. Seeds a newly
-   * created question with existing findings and refreshes its match set.
+   * Re-evaluate ALL current OPEN findings against a single inquiry. Seeds a newly
+   * created inquiry with existing findings and refreshes its match set. Resets
+   * newMatchCount to 0 (fresh baseline).
    */
   async rematchInquiry(inquiryId: string): Promise<{ landed: number }> {
     const q = await this.prisma.inquiry.findUnique({ where: { id: inquiryId }, select: this.matcherSelect });
     if (!q) return { landed: 0 };
-    const ids = (await this.candidateFindings(q, false)).map((f) => f.id);
-    const landed = ids.length > 0 ? await this.recordMatches(inquiryId, ids) : 0;
-    return { landed };
+    const matches = await this.candidateFindings(q, false);
+    await this.prisma.inquiry.update({
+      where: { id: inquiryId },
+      data: { matchCount: matches.length, newMatchCount: 0 },
+    });
+    return { landed: matches.length };
+  }
+
+  /** Return live matching findings for an inquiry (used by listMatches endpoint). */
+  async getLiveMatches(inquiryId: string): Promise<InquiryMatchDto[]> {
+    const q = await this.prisma.inquiry.findUnique({ where: { id: inquiryId }, select: this.matcherSelect });
+    if (!q) return [];
+    const rows = await this.candidateFindings(q, true);
+    return rows.map((f) => ({
+      findingId: f.id,
+      label: f.findingType,
+      severity: String(f.severity),
+      detectorType: String(f.detectorType),
+      matchedContent: f.matchedContent ?? undefined,
+      assetId: f.assetId,
+      assetName: f.asset?.name,
+      sourceType: f.asset ? String(f.asset.sourceType) : undefined,
+      matchedAt: f.createdAt ?? new Date(),
+      isNew: false,
+    }));
+  }
+
+  /** Return live matching finding IDs for an inquiry (used by pullFromInquiry). */
+  async getMatchingFindingIds(inquiryId: string): Promise<string[]> {
+    const q = await this.prisma.inquiry.findUnique({ where: { id: inquiryId }, select: this.matcherSelect });
+    if (!q) return [];
+    const rows = await this.candidateFindings(q, false);
+    return rows.map((r) => r.id);
   }
 
   /** Compute (without persisting) the findings a matcher config currently selects. */
@@ -151,7 +203,6 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
       ];
     }
     // Exact-type SQL prefilter: only safe when there are no type-regexes AND no value-regexes.
-    // Once either regex list is non-empty every row must reach app-land for CompiledMatcher.
     if (m.findingTypeRegex.length === 0 && m.findingValueRegex.length === 0 && m.findingTypes.length > 0) {
       where.findingType = { in: m.findingTypes };
     }
@@ -159,19 +210,11 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
     const rows = (await this.prisma.finding.findMany({
       where,
       select: withAsset
-        ? { ...FINDING_SELECT, asset: { select: { name: true, sourceType: true } } }
+        ? { ...FINDING_SELECT, createdAt: true, asset: { select: { name: true, sourceType: true } } }
         : FINDING_SELECT,
     })) as FindingRow[];
 
     const matcher = new CompiledMatcher(m);
     return rows.filter((f) => matcher.matches(f));
-  }
-
-  private async recordMatches(inquiryId: string, findingIds: string[]): Promise<number> {
-    const result = await this.prisma.inquiryMatch.createMany({
-      data: findingIds.map((findingId) => ({ inquiryId, findingId })),
-      skipDuplicates: true,
-    });
-    return result.count;
   }
 }

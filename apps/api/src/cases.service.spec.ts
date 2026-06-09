@@ -3,6 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CasesService } from './cases.service';
 import { PrismaService } from './prisma.service';
 import { GraphService } from './graph.service';
+import { InquiryMatchingService } from './matching/inquiry-matching.service';
 
 describe('CasesService', () => {
   let service: CasesService;
@@ -16,9 +17,9 @@ describe('CasesService', () => {
     hypothesisSupport: { createMany: jest.fn() },
     asset: { findUnique: jest.fn() },
     finding: { findUnique: jest.fn(), findMany: jest.fn() },
-    inquiryMatch: { findMany: jest.fn() },
   };
   const mockGraph = { inferEdgesForAsset: jest.fn(), caseGraph: jest.fn() };
+  const mockMatching = { getMatchingFindingIds: jest.fn() };
 
   const caseRow = (over: Record<string, unknown> = {}) => ({
     id: 'c1',
@@ -41,6 +42,7 @@ describe('CasesService', () => {
         CasesService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: GraphService, useValue: mockGraph },
+        { provide: InquiryMatchingService, useValue: mockMatching },
       ],
     }).compile();
     service = module.get(CasesService);
@@ -81,10 +83,10 @@ describe('CasesService', () => {
     await expect(service.addEvidence('c1', { entityType: 'finding', entityId: 'f1' })).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it("pulls an inquiry's matches into the case as evidence + findings", async () => {
+  it("pulls an inquiry's live matches into the case as evidence + findings", async () => {
     mockPrisma.case.findUnique.mockResolvedValue({ id: 'c1' });
     mockPrisma.inquiry.findUnique.mockResolvedValue({ id: 'q1' });
-    mockPrisma.inquiryMatch.findMany.mockResolvedValue([{ findingId: 'f1' }, { findingId: 'f2' }]);
+    mockMatching.getMatchingFindingIds.mockResolvedValue(['f1', 'f2']);
     mockPrisma.finding.findMany.mockResolvedValue([
       { id: 'f1', assetId: 'a1', findingType: 'ssn', severity: 'HIGH', detectorType: 'PII', matchedContent: 'x', asset: { name: 'a.csv', assetType: 'file', sourceType: 'S3_COMPATIBLE_STORAGE' } },
       { id: 'f2', assetId: 'a1', findingType: 'email', severity: 'LOW', detectorType: 'PII', matchedContent: 'y', asset: { name: 'a.csv', assetType: 'file', sourceType: 'S3_COMPATIBLE_STORAGE' } },

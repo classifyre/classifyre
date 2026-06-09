@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  ArrowLeft, Fingerprint, RefreshCw, FolderPlus, Trash2, Archive, Sparkles, Link2,
+  ArrowLeft, Fingerprint, RefreshCw, FolderPlus, Trash2, Archive, Sparkles, Link2, Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -139,6 +139,11 @@ export default function InquiryDetailPage() {
             <span className="text-muted-foreground tabular-nums text-sm">{inquiry.matchCount}</span>
           </div>
           <div className="flex items-center gap-2">
+            {inquiry.status !== "ARCHIVED" && (
+              <Button variant="outline" size="sm" onClick={() => router.push(`/investigations/inquiries/${inquiryId}/edit`)}>
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={rescan} disabled={busy}><RefreshCw className="h-3.5 w-3.5" /> Re-scan</Button>
             {inquiry.status !== "ARCHIVED" && <Button variant="outline" size="sm" onClick={archive}><Archive className="h-3.5 w-3.5" /> Archive</Button>}
             <Button variant="ghost" size="sm" className="text-destructive" onClick={remove}><Trash2 className="h-3.5 w-3.5" /> Delete</Button>

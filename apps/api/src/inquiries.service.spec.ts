@@ -8,7 +8,7 @@ describe('InquiriesService', () => {
   let service: InquiriesService;
 
   const mockPrisma = {
-    question: {
+    inquiry: {
       create: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
@@ -16,11 +16,12 @@ describe('InquiriesService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
-    inquiryMatch: { findMany: jest.fn(), deleteMany: jest.fn() },
     case: { findUnique: jest.fn() },
-    $queryRaw: jest.fn(),
+    source: { findMany: jest.fn() },
+    customDetector: { findMany: jest.fn() },
+    finding: { groupBy: jest.fn() },
   };
-  const mockMatching = { rematchQuestion: jest.fn(), preview: jest.fn() };
+  const mockMatching = { rematchInquiry: jest.fn(), getLiveMatches: jest.fn(), preview: jest.fn() };
 
   const row = (over: Record<string, unknown> = {}) => ({
     id: 'q1',
@@ -36,9 +37,11 @@ describe('InquiriesService', () => {
     findingTypes: ['ssn'],
     findingTypeRegex: [],
     findingValueRegex: [],
+    matchCount: 3,
+    newMatchCount: 0,
+    matchesSeenAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    _count: { matches: 3 },
     ...over,
   });
 
@@ -52,45 +55,41 @@ describe('InquiriesService', () => {
     }).compile();
     service = module.get(InquiriesService);
     jest.clearAllMocks();
-    mockPrisma.$queryRaw.mockResolvedValue([]);
   });
 
   it('creates a query and seeds its matches', async () => {
-    mockPrisma.question.create.mockResolvedValue(row());
-    mockPrisma.question.findUnique.mockResolvedValue(row());
-    mockMatching.rematchQuestion.mockResolvedValue({ landed: 3 });
+    mockPrisma.inquiry.create.mockResolvedValue(row());
+    mockPrisma.inquiry.findUnique.mockResolvedValue(row());
+    mockMatching.rematchInquiry.mockResolvedValue({ landed: 3 });
 
     const result = await service.create({ title: 'Exfil monitor', matchAllSources: true, findingTypes: ['ssn'] });
 
-    expect(mockMatching.rematchQuestion).toHaveBeenCalledWith('q1');
+    expect(mockMatching.rematchInquiry).toHaveBeenCalledWith('q1');
     expect(result.matchCount).toBe(3);
   });
 
   it('rejects an invalid regex matcher', async () => {
     await expect(service.create({ title: 'q', findingTypeRegex: ['('] })).rejects.toBeInstanceOf(BadRequestException);
-    expect(mockPrisma.question.create).not.toHaveBeenCalled();
+    expect(mockPrisma.inquiry.create).not.toHaveBeenCalled();
   });
 
   it('recomputes matches from scratch when matchers change on update', async () => {
-    mockPrisma.question.findUnique.mockResolvedValue(row());
-    mockPrisma.question.update.mockResolvedValue(row());
-    mockPrisma.inquiryMatch.deleteMany.mockResolvedValue({ count: 3 });
-    mockMatching.rematchQuestion.mockResolvedValue({ landed: 2 });
+    mockPrisma.inquiry.findUnique.mockResolvedValue(row());
+    mockPrisma.inquiry.update.mockResolvedValue(row());
+    mockMatching.rematchInquiry.mockResolvedValue({ landed: 2 });
 
     await service.update('q1', { findingTypes: ['email'] });
 
-    expect(mockPrisma.inquiryMatch.deleteMany).toHaveBeenCalledWith({ where: { inquiryId: 'q1' } });
-    expect(mockMatching.rematchQuestion).toHaveBeenCalledWith('q1');
+    expect(mockMatching.rematchInquiry).toHaveBeenCalledWith('q1');
   });
 
   it('does NOT recompute when only metadata changes', async () => {
-    mockPrisma.question.findUnique.mockResolvedValue(row());
-    mockPrisma.question.update.mockResolvedValue(row());
+    mockPrisma.inquiry.findUnique.mockResolvedValue(row());
+    mockPrisma.inquiry.update.mockResolvedValue(row());
 
     await service.update('q1', { title: 'Renamed' });
 
-    expect(mockPrisma.inquiryMatch.deleteMany).not.toHaveBeenCalled();
-    expect(mockMatching.rematchQuestion).not.toHaveBeenCalled();
+    expect(mockMatching.rematchInquiry).not.toHaveBeenCalled();
   });
 
   it('delegates preview to the matching engine with defaulted matchers', async () => {
@@ -102,12 +101,11 @@ describe('InquiriesService', () => {
     );
   });
 
-  it('computes newMatchCount from the seen-watermark query', async () => {
-    mockPrisma.question.findUnique.mockResolvedValue(row({ _count: { matches: 3 } }));
-    mockPrisma.$queryRaw.mockResolvedValue([{ question_id: 'q1', cnt: 2n }]);
+  it('reads matchCount and newMatchCount directly from the inquiry row', async () => {
+    mockPrisma.inquiry.findUnique.mockResolvedValue(row({ matchCount: 7, newMatchCount: 2 }));
 
     const result = await service.findOne('q1');
-    expect(result?.matchCount).toBe(3);
+    expect(result?.matchCount).toBe(7);
     expect(result?.newMatchCount).toBe(2);
   });
 });
