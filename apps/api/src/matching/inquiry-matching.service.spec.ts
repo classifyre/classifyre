@@ -7,13 +7,12 @@ describe('InquiryMatchingService', () => {
   let service: InquiryMatchingService;
 
   const mockPrisma = {
-    question: { findMany: jest.fn(), findUnique: jest.fn() },
+    inquiry: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     finding: { findMany: jest.fn() },
-    inquiryMatch: { createMany: jest.fn() },
   };
   const mockPgBoss = {};
 
-  const question = (over: Record<string, unknown> = {}) => ({
+  const inquiry = (over: Record<string, unknown> = {}) => ({
     id: 'q1',
     matchAllSources: false,
     sourceIds: ['s1'],
@@ -22,6 +21,7 @@ describe('InquiryMatchingService', () => {
     findingTypes: [],
     findingTypeRegex: [],
     findingValueRegex: [],
+    matchCount: 0,
     ...over,
   });
 
@@ -35,35 +35,56 @@ describe('InquiryMatchingService', () => {
     }).compile();
     service = module.get(InquiryMatchingService);
     jest.clearAllMocks();
-    mockPrisma.inquiryMatch.createMany.mockResolvedValue({ count: 0 });
+    mockPrisma.inquiry.update.mockResolvedValue({});
   });
 
-  it('does nothing when no active question matches the source', async () => {
-    mockPrisma.question.findMany.mockResolvedValue([]);
+  it('does nothing when no active inquiry matches the source', async () => {
+    mockPrisma.inquiry.findMany.mockResolvedValue([]);
     const result = await service.processSourceCompletion('s1', 'run-1');
     expect(result.landed).toBe(0);
     expect(mockPrisma.finding.findMany).not.toHaveBeenCalled();
   });
 
-  it('records matches for the run findings (no evidence created)', async () => {
-    mockPrisma.question.findMany.mockResolvedValue([question({ findingTypes: ['email'] })]);
-    mockPrisma.finding.findMany.mockResolvedValue([
-      { id: 'f1', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'email', severity: 'HIGH', matchedContent: 'a@b.com' },
-      { id: 'f2', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'ssn', severity: 'HIGH', matchedContent: '...' },
-    ]);
-    mockPrisma.inquiryMatch.createMany.mockResolvedValue({ count: 1 });
+  it('increments newMatchCount by hits from the run and refreshes matchCount', async () => {
+    mockPrisma.inquiry.findMany.mockResolvedValue([inquiry({ findingTypes: ['email'] })]);
+    // First call: run's new findings. Second call: all OPEN findings for matchCount recompute.
+    mockPrisma.finding.findMany
+      .mockResolvedValueOnce([
+        { id: 'f1', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'email', severity: 'HIGH', matchedContent: 'a@b.com' },
+        { id: 'f2', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'ssn', severity: 'HIGH', matchedContent: '...' },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'f1', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'email', severity: 'HIGH', matchedContent: 'a@b.com' },
+      ]);
 
     const result = await service.processSourceCompletion('s1', 'run-1');
 
     expect(result.landed).toBe(1);
-    expect(mockPrisma.finding.findMany.mock.calls[0][0]).toMatchObject({ where: { runnerId: 'run-1', status: 'OPEN' } });
-    const data = mockPrisma.inquiryMatch.createMany.mock.calls[0][0].data;
-    expect(data).toEqual([{ inquiryId: 'q1', findingId: 'f1' }]);
+    expect(mockPrisma.inquiry.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'q1' },
+        data: expect.objectContaining({ matchCount: 1, newMatchCount: { increment: 1 } }),
+      }),
+    );
+  });
+
+  it('resets newMatchCount to 0 on rematch', async () => {
+    mockPrisma.inquiry.findUnique.mockResolvedValue(inquiry());
+    mockPrisma.finding.findMany.mockResolvedValue([
+      { id: 'f1', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'email', severity: 'HIGH', matchedContent: 'x' },
+    ]);
+
+    await service.rematchInquiry('q1');
+
+    expect(mockPrisma.inquiry.update).toHaveBeenCalledWith({
+      where: { id: 'q1' },
+      data: { matchCount: 1, newMatchCount: 0 },
+    });
   });
 
   it('preview returns total + a capped sample without persisting', async () => {
     mockPrisma.finding.findMany.mockResolvedValue([
-      { id: 'f1', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'ssn', severity: 'HIGH', matchedContent: 'x', asset: { name: 'a.csv', sourceType: 'S3_COMPATIBLE_STORAGE' } },
+      { id: 'f1', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'ssn', severity: 'HIGH', matchedContent: 'x', createdAt: new Date(), asset: { name: 'a.csv', sourceType: 'S3_COMPATIBLE_STORAGE' } },
     ]);
     const result = await service.preview({
       matchAllSources: true,
@@ -72,10 +93,10 @@ describe('InquiryMatchingService', () => {
       customDetectorKeys: [],
       findingTypes: ['ssn'],
       findingTypeRegex: [],
-    findingValueRegex: [],
+      findingValueRegex: [],
     });
     expect(result.total).toBe(1);
     expect(result.sample[0]).toMatchObject({ findingId: 'f1', label: 'ssn', assetName: 'a.csv' });
-    expect(mockPrisma.inquiryMatch.createMany).not.toHaveBeenCalled();
+    expect(mockPrisma.inquiry.update).not.toHaveBeenCalled();
   });
 });

@@ -722,32 +722,17 @@ model Inquiry {
   findingTypeRegex   String[]       @map("finding_type_regex")
   findingValueRegex  String[]       @map("finding_value_regex")
 
+  matchCount    Int       @default(0) @map("match_count")
+  newMatchCount Int       @default(0) @map("new_match_count")
   matchesSeenAt DateTime? @map("matches_seen_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  case    Case?           @relation(fields: [caseId], references: [id], onDelete: SetNull)
-  matches InquiryMatch[]
+  case Case? @relation(fields: [caseId], references: [id], onDelete: SetNull)
 
   @@index([caseId])
   @@index([status])
   @@map("inquiries")
-}
-
-// Lightweight tracker: one row per finding currently matching the question. Used to
-// count matches and detect new ones (matchedAt vs Question.matchesSeenAt). Not
-// evidence — finding details are joined live when listing.
-model InquiryMatch {
-  id         String   @id @default(uuid())
-  inquiryId String   @map("inquiry_id")
-  findingId  String   @map("finding_id")
-  matchedAt  DateTime @default(now()) @map("matched_at")
-
-  inquiry Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
-
-  @@unique([inquiryId, findingId])
-  @@index([inquiryId, matchedAt])
-  @@map("inquiry_matches")
 }
 
 // An observed node attached to a CASE. entityType: "asset" | "sandbox". Display

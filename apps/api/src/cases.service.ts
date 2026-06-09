@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { GraphService } from './graph.service';
+import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import {
   AddEvidenceDto,
   AddFindingDto,
@@ -35,6 +36,7 @@ export class CasesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly graph: GraphService,
+    private readonly matching: InquiryMatchingService,
   ) {}
 
   async create(dto: CreateCaseDto): Promise<CaseResponseDto> {
@@ -89,10 +91,7 @@ export class CasesService {
       include: {
         ...countSelect,
         evidence: { orderBy: { createdAt: 'asc' }, include: { findings: true } },
-        inquiries: {
-          orderBy: { createdAt: 'asc' },
-          include: { _count: { select: { matches: true } } },
-        },
+        inquiries: { orderBy: { createdAt: 'asc' } },
       },
     });
     if (!row) return null;
@@ -101,7 +100,7 @@ export class CasesService {
       id: q.id,
       title: q.title,
       status: q.status,
-      matchCount: q._count.matches,
+      matchCount: q.matchCount,
     }));
     return { ...this.mapCase(row), evidence, inquiries };
   }
@@ -249,9 +248,7 @@ export class CasesService {
 
     let findingIds = dto.findingIds;
     if (!findingIds || findingIds.length === 0) {
-      findingIds = (
-        await this.prisma.inquiryMatch.findMany({ where: { inquiryId: dto.inquiryId }, select: { findingId: true } })
-      ).map((m) => m.findingId);
+      findingIds = await this.matching.getMatchingFindingIds(dto.inquiryId);
     }
     if (findingIds.length === 0) return { pulled: 0 };
 
