@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import {
+  Eye,
+  EyeOff,
   GitBranch,
   Lightbulb,
   Maximize2,
@@ -9,6 +11,7 @@ import {
   Plus,
   RotateCcw,
   Route,
+  Search,
   X,
 } from "lucide-react";
 import type { GraphMode, PathResult } from "./graph-types";
@@ -79,6 +82,10 @@ export interface GraphToolbarProps {
   onNewHypothesis: () => void;
   onZoomToFit: () => void;
   onReload: () => void;
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  findingsVisible: boolean;
+  onToggleFindings: () => void;
 }
 
 export function GraphToolbar({
@@ -92,6 +99,10 @@ export function GraphToolbar({
   onNewHypothesis,
   onZoomToFit,
   onReload,
+  searchQuery,
+  onSearchChange,
+  findingsVisible,
+  onToggleFindings,
 }: GraphToolbarProps) {
   return (
     <div className="flex flex-wrap items-center gap-2 border-b-2 border-border bg-card px-3 py-2">
@@ -136,6 +147,37 @@ export function GraphToolbar({
         icon={<Lightbulb className="h-3 w-3" />}
         label="Hypothesis"
         title="Create a new hypothesis"
+      />
+
+      <div className="h-5 w-0.5 bg-border" />
+
+      {/* Full-text highlight search */}
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="search graph…"
+          className="h-[26px] w-[180px] border-2 border-border bg-card pr-6 font-mono text-[11px] outline-none placeholder:text-muted-foreground focus:border-foreground"
+          style={{ paddingLeft: 24 }}
+        />
+        {searchQuery && (
+          <button
+            onClick={() => onSearchChange("")}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+
+      <ModeButton
+        active={findingsVisible}
+        onClick={onToggleFindings}
+        icon={findingsVisible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+        label="Findings"
+        title={findingsVisible ? "Collapse all findings into their assets" : "Show findings as separate nodes"}
       />
 
       {/* Mode hint / path chip */}

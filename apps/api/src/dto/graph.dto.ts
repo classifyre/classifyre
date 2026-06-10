@@ -76,13 +76,22 @@ export class GraphNodeDto {
   @ApiPropertyOptional()
   detectorType?: string;
 
+  @ApiPropertyOptional({
+    description: 'For CUSTOM findings: the custom detector display name',
+  })
+  customDetectorName?: string;
+
   @ApiPropertyOptional()
   status?: string;
 
-  @ApiPropertyOptional({ description: 'For finding nodes: truncated matched text' })
+  @ApiPropertyOptional({
+    description: 'For finding nodes: truncated matched text',
+  })
   matchedContent?: string;
 
-  @ApiPropertyOptional({ description: 'For finding nodes: name of the parent asset' })
+  @ApiPropertyOptional({
+    description: 'For finding nodes: name of the parent asset',
+  })
   assetName?: string;
 
   @ApiPropertyOptional({ description: 'For finding nodes: parent asset id' })
@@ -90,14 +99,20 @@ export class GraphNodeDto {
 
   @ApiPropertyOptional({
     type: [String],
-    description: 'Hypothesis IDs this node is directly affiliated with (as evidence or case finding)',
+    description:
+      'Hypothesis IDs this node is directly affiliated with (as evidence or case finding)',
   })
   hypothesisIds?: string[];
 
-  @ApiPropertyOptional({ description: 'For finding nodes: the CaseFinding record ID (used to unlink)' })
+  @ApiPropertyOptional({
+    description:
+      'For finding nodes: the CaseFinding record ID (used to unlink)',
+  })
   caseFindingId?: string;
 
-  @ApiPropertyOptional({ description: 'True when the underlying row no longer exists' })
+  @ApiPropertyOptional({
+    description: 'True when the underlying row no longer exists',
+  })
   missing?: boolean;
 }
 
@@ -127,7 +142,8 @@ export class GraphEdgeDto {
   origin!: EdgeOrigin;
 
   @ApiPropertyOptional({
-    description: 'True when this edge bridges nodes affiliated with different hypotheses',
+    description:
+      'True when this edge bridges nodes affiliated with different hypotheses',
   })
   crossHypothesis?: boolean;
 }
@@ -139,7 +155,9 @@ export class GraphResponseDto {
   @ApiProperty({ type: [GraphEdgeDto] })
   edges!: GraphEdgeDto[];
 
-  @ApiProperty({ description: 'True when the node cap was hit and the graph is partial' })
+  @ApiProperty({
+    description: 'True when the node cap was hit and the graph is partial',
+  })
   truncated!: boolean;
 }
 
@@ -160,12 +178,17 @@ export class IngestEdgeDto {
   @IsString()
   fromType!: string;
 
-  @ApiPropertyOptional({ description: 'Source entity UUID (use fromId OR fromHash)' })
+  @ApiPropertyOptional({
+    description: 'Source entity UUID (use fromId OR fromHash)',
+  })
   @IsOptional()
   @IsString()
   fromId?: string;
 
-  @ApiPropertyOptional({ description: 'Source asset hash (alternative to fromId — API resolves to UUID)' })
+  @ApiPropertyOptional({
+    description:
+      'Source asset hash (alternative to fromId — API resolves to UUID)',
+  })
   @IsOptional()
   @IsString()
   fromHash?: string;
@@ -174,18 +197,24 @@ export class IngestEdgeDto {
   @IsString()
   toType!: string;
 
-  @ApiPropertyOptional({ description: 'Target entity UUID (use toId OR toHash)' })
+  @ApiPropertyOptional({
+    description: 'Target entity UUID (use toId OR toHash)',
+  })
   @IsOptional()
   @IsString()
   toId?: string;
 
-  @ApiPropertyOptional({ description: 'Target asset hash (alternative to toId — API resolves to UUID)' })
+  @ApiPropertyOptional({
+    description:
+      'Target asset hash (alternative to toId — API resolves to UUID)',
+  })
   @IsOptional()
   @IsString()
   toHash?: string;
 
   @ApiProperty({
-    description: 'Relation type: OWNS | ACCESSED | READS | WRITES | GENERATED_FROM | EXPORTED_TO | ATTACHED_TO | SENT_TO | EXECUTED | MENTIONS | CONTAINS | REFERENCES',
+    description:
+      'Relation type: OWNS | ACCESSED | READS | WRITES | GENERATED_FROM | EXPORTED_TO | ATTACHED_TO | SENT_TO | EXECUTED | MENTIONS | CONTAINS | REFERENCES',
   })
   @IsString()
   relationType!: string;
@@ -229,7 +258,8 @@ export class CreateManualEdgeDto {
   toId!: string;
 
   @ApiProperty({
-    description: 'Relation type — free-form string (e.g. "READS", "SENT_TO", "my custom link")',
+    description:
+      'Relation type — free-form string (e.g. "READS", "SENT_TO", "my custom link")',
   })
   @IsString()
   relationType!: string;
@@ -275,10 +305,16 @@ export class EdgeDetailDto {
 }
 
 export class RelationTypesResponseDto {
-  @ApiProperty({ type: [String], description: 'All relation types in use, sorted by frequency' })
+  @ApiProperty({
+    type: [String],
+    description: 'All relation types in use, sorted by frequency',
+  })
   inUse!: string[];
 
-  @ApiProperty({ type: [String], description: 'Vocabulary suggestions (built-in + inUse)' })
+  @ApiProperty({
+    type: [String],
+    description: 'Vocabulary suggestions (built-in + inUse)',
+  })
   suggestions!: string[];
 }
 

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import {
@@ -39,6 +43,7 @@ interface CaseFindingSnapshot {
   label: string;
   severity: string | null;
   detectorType: string | null;
+  customDetectorName: string | null;
   matchedContent: string | null;
 }
 
@@ -142,7 +147,14 @@ export class GraphService {
         out.push(entry);
       } else if (entry && typeof entry === 'object') {
         const obj = entry as Record<string, unknown>;
-        for (const key of ['id', 'assetId', 'url', 'href', 'target', 'externalUrl']) {
+        for (const key of [
+          'id',
+          'assetId',
+          'url',
+          'href',
+          'target',
+          'externalUrl',
+        ]) {
           const val = obj[key];
           if (typeof val === 'string' && val.length > 0) out.push(val);
         }
@@ -159,9 +171,7 @@ export class GraphService {
       .filter((a) => a.targets.length > 0);
     if (perAsset.length === 0) return;
 
-    const allTargets = Array.from(
-      new Set(perAsset.flatMap((a) => a.targets)),
-    );
+    const allTargets = Array.from(new Set(perAsset.flatMap((a) => a.targets)));
     const matches = await this.prisma.asset.findMany({
       where: {
         OR: [{ id: { in: allTargets } }, { externalUrl: { in: allTargets } }],
@@ -203,9 +213,13 @@ export class GraphService {
    * Hash references are resolved to UUIDs before insertion; unresolvable hashes are skipped.
    * Idempotent via the unique constraint on edges.
    */
-  async upsertEdges(dto: BulkIngestEdgesDto): Promise<BulkIngestEdgesResponseDto> {
+  async upsertEdges(
+    dto: BulkIngestEdgesDto,
+  ): Promise<BulkIngestEdgesResponseDto> {
     // Collect all hashes that need UUID resolution.
-    const fromHashes = dto.edges.filter((e) => e.fromHash).map((e) => e.fromHash!);
+    const fromHashes = dto.edges
+      .filter((e) => e.fromHash)
+      .map((e) => e.fromHash!);
     const toHashes = dto.edges.filter((e) => e.toHash).map((e) => e.toHash!);
     const allHashes = Array.from(new Set([...fromHashes, ...toHashes]));
 
@@ -222,7 +236,8 @@ export class GraphService {
 
     const rows: Prisma.EdgeCreateManyInput[] = [];
     for (const e of dto.edges) {
-      const fromId = e.fromId ?? (e.fromHash ? hashToId.get(e.fromHash) : undefined);
+      const fromId =
+        e.fromId ?? (e.fromHash ? hashToId.get(e.fromHash) : undefined);
       const toId = e.toId ?? (e.toHash ? hashToId.get(e.toHash) : undefined);
       if (!fromId || !toId) continue; // skip unresolvable
 
@@ -238,7 +253,10 @@ export class GraphService {
     }
 
     if (rows.length === 0) return { upserted: 0 };
-    const result = await this.prisma.edge.createMany({ data: rows, skipDuplicates: true });
+    const result = await this.prisma.edge.createMany({
+      data: rows,
+      skipDuplicates: true,
+    });
     return { upserted: result.count };
   }
 
@@ -253,15 +271,37 @@ export class GraphService {
     switch (dto.pivot) {
       case 'who_touched':
         // Incoming ACCESSED / READS / EXECUTED / WRITES edges
-        return this.traverse([seed], depth, 'in', ['ACCESSED', 'READS', 'EXECUTED', 'WRITES']);
+        return this.traverse([seed], depth, 'in', [
+          'ACCESSED',
+          'READS',
+          'EXECUTED',
+          'WRITES',
+        ]);
       case 'upstream_lineage':
-        return this.traverse([seed], depth, 'in', ['GENERATED_FROM', 'READS', 'OWNS']);
+        return this.traverse([seed], depth, 'in', [
+          'GENERATED_FROM',
+          'READS',
+          'OWNS',
+        ]);
       case 'downstream_lineage':
-        return this.traverse([seed], depth, 'out', ['GENERATED_FROM', 'EXPORTED_TO', 'WRITES']);
+        return this.traverse([seed], depth, 'out', [
+          'GENERATED_FROM',
+          'EXPORTED_TO',
+          'WRITES',
+        ]);
       case 'access':
-        return this.traverse([seed], depth, 'both', ['OWNS', 'ACCESSED', 'READS', 'WRITES']);
+        return this.traverse([seed], depth, 'both', [
+          'OWNS',
+          'ACCESSED',
+          'READS',
+          'WRITES',
+        ]);
       case 'emails':
-        return this.traverse([seed], depth, 'both', ['ATTACHED_TO', 'SENT_TO', 'MENTIONS']);
+        return this.traverse([seed], depth, 'both', [
+          'ATTACHED_TO',
+          'SENT_TO',
+          'MENTIONS',
+        ]);
       case 'similar_findings':
         return this.traverse([seed], depth, 'both', ['CONTAINS']);
       default:
@@ -272,12 +312,24 @@ export class GraphService {
   // ─── Phase 2: Manual edges ───────────────────────────────────────
 
   private static readonly BUILTIN_RELATION_TYPES = [
-    'CONTAINS', 'REFERENCES', 'OWNS', 'ACCESSED', 'READS', 'WRITES',
-    'GENERATED_FROM', 'EXPORTED_TO', 'ATTACHED_TO', 'SENT_TO', 'EXECUTED', 'MENTIONS',
+    'CONTAINS',
+    'REFERENCES',
+    'OWNS',
+    'ACCESSED',
+    'READS',
+    'WRITES',
+    'GENERATED_FROM',
+    'EXPORTED_TO',
+    'ATTACHED_TO',
+    'SENT_TO',
+    'EXECUTED',
+    'MENTIONS',
   ];
 
   async getRelationTypes(): Promise<RelationTypesResponseDto> {
-    const rows = await this.prisma.$queryRaw<{ relation_type: string; cnt: bigint }[]>`
+    const rows = await this.prisma.$queryRaw<
+      { relation_type: string; cnt: bigint }[]
+    >`
       SELECT relation_type, COUNT(*) AS cnt
       FROM edges
       GROUP BY relation_type
@@ -292,9 +344,11 @@ export class GraphService {
       ...GraphService.BUILTIN_RELATION_TYPES.filter((t) => !inUseSet.has(t)),
     ].filter((v, i, arr) => arr.indexOf(v) === i);
     // also include any custom types not in builtin list
-    inUse.filter((t) => !builtinSet.has(t)).forEach((t) => {
-      if (!suggestions.includes(t)) suggestions.push(t);
-    });
+    inUse
+      .filter((t) => !builtinSet.has(t))
+      .forEach((t) => {
+        if (!suggestions.includes(t)) suggestions.push(t);
+      });
     return { inUse, suggestions };
   }
 
@@ -312,7 +366,7 @@ export class GraphService {
                 confidence::float AS confidence, origin::text AS origin
     `;
     if (rows.length === 0) throw new Error('Edge insert returned no row');
-    return this.rawRowToDetail(rows[0]!);
+    return this.rawRowToDetail(rows[0]);
   }
 
   async updateEdge(id: string, dto: UpdateEdgeDto): Promise<EdgeDetailDto> {
@@ -321,7 +375,7 @@ export class GraphService {
     if (existing.origin === 'INFERRED') {
       throw new BadRequestException(
         'Inferred edges are re-created automatically and cannot be renamed. ' +
-        'Create a manual edge with the desired label instead.',
+          'Create a manual edge with the desired label instead.',
       );
     }
     // Delete+insert atomically because relationType is part of the unique key.
@@ -339,7 +393,7 @@ export class GraphService {
                 confidence::float AS confidence, origin::text AS origin
     `;
     if (rows.length === 0) throw new Error('Edge rename returned no row');
-    return this.rawRowToDetail(rows[0]!);
+    return this.rawRowToDetail(rows[0]);
   }
 
   async deleteEdge(id: string): Promise<void> {
@@ -348,7 +402,7 @@ export class GraphService {
     if (existing.origin === 'INFERRED') {
       throw new BadRequestException(
         'Inferred edges are re-created automatically and cannot be deleted. ' +
-        'You can rename or delete manual edges only.',
+          'You can rename or delete manual edges only.',
       );
     }
     await this.prisma.edge.delete({ where: { id } });
@@ -404,6 +458,7 @@ export class GraphService {
             label: true,
             severity: true,
             detectorType: true,
+            customDetectorName: true,
             matchedContent: true,
           },
         },
@@ -475,6 +530,7 @@ export class GraphService {
             label: findingLabel(cf.label, cf.matchedContent),
             severity: cf.severity ?? undefined,
             detectorType: cf.detectorType ?? undefined,
+            customDetectorName: cf.customDetectorName ?? undefined,
             matchedContent: cf.matchedContent ?? undefined,
             assetId: e.entityId,
             assetName: e.label ?? undefined,
@@ -510,26 +566,49 @@ export class GraphService {
   ): Promise<GraphResponseDto> {
     const key = (type: string, id: string) => `${type}:${id}`;
 
+    const caseFindingIds = evidence.flatMap((e) =>
+      e.findings.map((cf) => cf.id),
+    );
     const supportRows = await this.prisma.caseThreadSupport.findMany({
-      where: { targetType: 'evidence', targetId: { in: evidence.map((e) => e.id) } },
-      select: { targetId: true, threadId: true },
+      where: {
+        thread: { kind: 'HYPOTHESIS' },
+        OR: [
+          {
+            targetType: 'evidence',
+            targetId: { in: evidence.map((e) => e.id) },
+          },
+          ...(caseFindingIds.length > 0
+            ? [{ targetType: 'finding', targetId: { in: caseFindingIds } }]
+            : []),
+        ],
+      },
+      select: { targetId: true, targetType: true, threadId: true },
     });
     const evidenceToThreads = new Map<string, string[]>();
+    const caseFindingToThreads = new Map<string, string[]>();
     for (const row of supportRows) {
-      const arr = evidenceToThreads.get(row.targetId) ?? [];
+      const map =
+        row.targetType === 'evidence'
+          ? evidenceToThreads
+          : caseFindingToThreads;
+      const arr = map.get(row.targetId) ?? [];
       arr.push(row.threadId);
-      evidenceToThreads.set(row.targetId, arr);
+      map.set(row.targetId, arr);
     }
 
-    // node key → threadId[]  (evidence nodes inherit their support; findings
-    // inherit their parent evidence's support).
+    // node key → threadId[]. Evidence nodes carry their own support; findings
+    // combine their parent evidence's support (inherited) with links that
+    // target the CaseFinding record directly.
     const nodeToThreads = new Map<string, string[]>();
     const findingToCaseFindingId = new Map<string, string>();
     for (const e of evidence) {
       const threads = evidenceToThreads.get(e.id) ?? [];
       nodeToThreads.set(key(e.entityType, e.entityId), threads);
       for (const cf of e.findings) {
-        nodeToThreads.set(key('finding', cf.findingId), threads);
+        const own = caseFindingToThreads.get(cf.id) ?? [];
+        nodeToThreads.set(key('finding', cf.findingId), [
+          ...new Set([...threads, ...own]),
+        ]);
         findingToCaseFindingId.set(cf.findingId, cf.id);
       }
     }
@@ -538,14 +617,22 @@ export class GraphService {
       const hypothesisIds = nodeToThreads.get(key(n.type, n.id)) ?? [];
       const caseFindingId =
         n.type === 'finding' ? findingToCaseFindingId.get(n.id) : undefined;
-      return { ...n, hypothesisIds, ...(caseFindingId ? { caseFindingId } : {}) };
+      return {
+        ...n,
+        hypothesisIds,
+        ...(caseFindingId ? { caseFindingId } : {}),
+      };
     });
 
     const edges: GraphEdgeDto[] = graph.edges.map((e) => {
-      const fromThreads = new Set(nodeToThreads.get(key(e.fromType, e.fromId)) ?? []);
+      const fromThreads = new Set(
+        nodeToThreads.get(key(e.fromType, e.fromId)) ?? [],
+      );
       const toThreads = new Set(nodeToThreads.get(key(e.toType, e.toId)) ?? []);
       const crossHypothesis =
-        fromThreads.size > 0 && toThreads.size > 0 && ![...fromThreads].some((h) => toThreads.has(h));
+        fromThreads.size > 0 &&
+        toThreads.size > 0 &&
+        ![...fromThreads].some((h) => toThreads.has(h));
       return { ...e, crossHypothesis };
     });
 
@@ -632,7 +719,9 @@ export class GraphService {
   }
 
   private async hydrateNodes(rows: TraversalRow[]): Promise<GraphNodeDto[]> {
-    const assetIds = rows.filter((r) => r.node_type === 'asset').map((r) => r.node_id);
+    const assetIds = rows
+      .filter((r) => r.node_type === 'asset')
+      .map((r) => r.node_id);
     const findingIds = rows
       .filter((r) => r.node_type === 'finding')
       .map((r) => r.node_id);
@@ -656,6 +745,7 @@ export class GraphService {
           matchedContent: true,
           severity: true,
           detectorType: true,
+          customDetectorName: true,
           status: true,
           assetId: true,
         },
@@ -666,12 +756,13 @@ export class GraphService {
     const findingAssetIds = findings
       .map((f) => f.assetId)
       .filter((id) => !assetIds.includes(id));
-    const findingAssets = findingAssetIds.length > 0
-      ? await this.prisma.asset.findMany({
-          where: { id: { in: findingAssetIds } },
-          select: { id: true, name: true },
-        })
-      : [];
+    const findingAssets =
+      findingAssetIds.length > 0
+        ? await this.prisma.asset.findMany({
+            where: { id: { in: findingAssetIds } },
+            select: { id: true, name: true },
+          })
+        : [];
     const findingAssetMap = new Map(findingAssets.map((a) => [a.id, a]));
     const assetMap = new Map(assets.map((a) => [a.id, a]));
     const findingMap = new Map(findings.map((f) => [f.id, f]));
@@ -699,9 +790,12 @@ export class GraphService {
         id: r.node_id,
         type: 'finding',
         depth,
-        label: f ? findingLabel(f.findingType, f.matchedContent) : '(deleted finding)',
+        label: f
+          ? findingLabel(f.findingType, f.matchedContent)
+          : '(deleted finding)',
         severity: f ? String(f.severity) : undefined,
         detectorType: f ? String(f.detectorType) : undefined,
+        customDetectorName: f?.customDetectorName ?? undefined,
         status: f ? String(f.status) : undefined,
         matchedContent: f?.matchedContent ?? undefined,
         assetId: f?.assetId ?? undefined,

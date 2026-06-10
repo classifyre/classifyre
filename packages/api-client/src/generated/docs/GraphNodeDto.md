@@ -14,6 +14,7 @@ Name | Type
 `sourceType` | string
 `severity` | string
 `detectorType` | string
+`customDetectorName` | string
 `status` | string
 `matchedContent` | string
 `assetName` | string
@@ -37,6 +38,7 @@ const example = {
   "sourceType": null,
   "severity": null,
   "detectorType": null,
+  "customDetectorName": null,
   "status": null,
   "matchedContent": null,
   "assetName": null,

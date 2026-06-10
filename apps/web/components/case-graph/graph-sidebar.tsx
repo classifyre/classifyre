@@ -3,6 +3,14 @@
 import * as React from "react";
 import type { ThreadResponseDto } from "@workspace/api-client";
 import { Plus } from "lucide-react";
+import {
+  MultiSelect,
+  MultiSelectContent,
+  MultiSelectGroup,
+  MultiSelectItem,
+  MultiSelectTrigger,
+  MultiSelectValue,
+} from "@workspace/ui/components/multi-select";
 import { ACCENT, CROSS_HYP_COLOR, MANUAL_EDGE_COLOR } from "./graph-types";
 
 export function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -93,6 +101,93 @@ export function HypothesisLegend({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+export interface HighlightOption {
+  value: string;
+  label: string;
+  count: number;
+}
+
+export interface HighlightFiltersProps {
+  sourceOptions: HighlightOption[];
+  detectorOptions: HighlightOption[];
+  sourceFilter: string[];
+  detectorFilter: string[];
+  onSourceChange: (values: string[]) => void;
+  onDetectorChange: (values: string[]) => void;
+}
+
+/**
+ * Gray-out highlighting by source type / finding category. Matching nodes stay
+ * at full color, everything else dims — nothing is removed from the graph.
+ */
+export function HighlightFilters({
+  sourceOptions,
+  detectorOptions,
+  sourceFilter,
+  detectorFilter,
+  onSourceChange,
+  onDetectorChange,
+}: HighlightFiltersProps) {
+  const active = sourceFilter.length > 0 || detectorFilter.length > 0;
+  if (sourceOptions.length === 0 && detectorOptions.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <SectionTitle>Highlight</SectionTitle>
+        {active && (
+          <button
+            onClick={() => {
+              onSourceChange([]);
+              onDetectorChange([]);
+            }}
+            className="font-mono text-[10px] uppercase text-muted-foreground underline"
+          >
+            clear
+          </button>
+        )}
+      </div>
+      {sourceOptions.length > 0 && (
+        <MultiSelect values={sourceFilter} onValuesChange={onSourceChange}>
+          <MultiSelectTrigger className="h-8 w-full border-2 border-border rounded-[2px] text-xs">
+            <MultiSelectValue placeholder="Sources…" overflowBehavior="cutoff" />
+          </MultiSelectTrigger>
+          <MultiSelectContent
+            search={{ placeholder: "Search sources…", emptyMessage: "No sources" }}
+          >
+            <MultiSelectGroup>
+              {sourceOptions.map((o) => (
+                <MultiSelectItem key={o.value} value={o.value}>
+                  <span className="font-mono text-xs uppercase">{o.label}</span>
+                  <span className="ml-1.5 text-xs text-muted-foreground">({o.count})</span>
+                </MultiSelectItem>
+              ))}
+            </MultiSelectGroup>
+          </MultiSelectContent>
+        </MultiSelect>
+      )}
+      {detectorOptions.length > 0 && (
+        <MultiSelect values={detectorFilter} onValuesChange={onDetectorChange}>
+          <MultiSelectTrigger className="h-8 w-full border-2 border-border rounded-[2px] text-xs">
+            <MultiSelectValue placeholder="Finding categories…" overflowBehavior="cutoff" />
+          </MultiSelectTrigger>
+          <MultiSelectContent
+            search={{ placeholder: "Search categories…", emptyMessage: "No categories" }}
+          >
+            <MultiSelectGroup>
+              {detectorOptions.map((o) => (
+                <MultiSelectItem key={o.value} value={o.value}>
+                  <span className="text-xs">{o.label}</span>
+                  <span className="ml-1.5 text-xs text-muted-foreground">({o.count})</span>
+                </MultiSelectItem>
+              ))}
+            </MultiSelectGroup>
+          </MultiSelectContent>
+        </MultiSelect>
+      )}
     </div>
   );
 }

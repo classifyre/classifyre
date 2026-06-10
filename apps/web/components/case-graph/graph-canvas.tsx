@@ -28,6 +28,8 @@ export interface GraphCanvasProps {
   hypothesisColors: Record<string, string>;
   /** asset entity id → count of findings not yet attached as evidence */
   attachableCounts: Map<string, number>;
+  /** asset entity id → count of attached findings hidden by collapse */
+  collapsedCounts: Map<string, number>;
   selection: GraphSelection;
   mode: GraphMode;
   /** Node keys rendered at full opacity; null = nothing is dimmed. */
@@ -39,6 +41,7 @@ export interface GraphCanvasProps {
   onEdgeContextMenu: (edge: GraphEdgeDto, clientX: number, clientY: number) => void;
   onBackgroundClick: () => void;
   onAttachBadgeClick: (node: GraphNodeDto) => void;
+  onToggleCollapse: (node: GraphNodeDto) => void;
 }
 
 export function GraphCanvas({
@@ -49,6 +52,7 @@ export function GraphCanvas({
   evidenceKeys,
   hypothesisColors,
   attachableCounts,
+  collapsedCounts,
   selection,
   mode,
   activeNodeKeys,
@@ -59,6 +63,7 @@ export function GraphCanvas({
   onEdgeContextMenu,
   onBackgroundClick,
   onAttachBadgeClick,
+  onToggleCollapse,
 }: GraphCanvasProps) {
   const { simNodes, version, dragStart, dragMove, dragEnd, isPinned } = layout;
   const { svgRef, gRef, screenToWorld, beginPan } = panZoom;
@@ -124,11 +129,12 @@ export function GraphCanvas({
   );
 
   const isNodeDimmed = (key: string) => activeNodeKeys !== null && !activeNodeKeys.has(key);
+  // Edges stay readable while highlighting: dim only when BOTH ends are dimmed.
   const isEdgeDimmed = (e: GraphEdgeDto) => {
     if (path) return !path.edgeIds.has(e.id);
     if (activeNodeKeys === null) return false;
     return (
-      !activeNodeKeys.has(nodeKey(e.fromType, e.fromId)) ||
+      !activeNodeKeys.has(nodeKey(e.fromType, e.fromId)) &&
       !activeNodeKeys.has(nodeKey(e.toType, e.toId))
     );
   };
@@ -210,9 +216,11 @@ export function GraphCanvas({
                 isConnectSource={connectSourceKey === key}
                 hypColors={hypColors}
                 attachableCount={n.type === "asset" ? (attachableCounts.get(n.id) ?? 0) : 0}
+                collapsedCount={n.type === "asset" ? (collapsedCounts.get(n.id) ?? 0) : 0}
                 onPointerDown={handleNodePointerDown}
                 onContextMenu={(node, ev) => onNodeContextMenu(node, ev.clientX, ev.clientY)}
                 onAttachBadgeClick={onAttachBadgeClick}
+                onToggleCollapse={onToggleCollapse}
               />
             );
           })}
