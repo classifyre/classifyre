@@ -14,6 +14,7 @@ import {
   type GraphEdgeDto,
   type GraphNodeDto,
   type HypothesisResponseDto,
+  type ThreadResponseDto,
 } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
@@ -28,6 +29,8 @@ import { EmptyState } from "@workspace/ui/components/empty-state";
 import { EvidencePickerDialog } from "@/components/evidence-picker-dialog";
 import { EvidenceTable } from "@/components/evidence-table";
 import { HypothesisPanel } from "@/components/hypothesis-panel";
+import { CaseThreadPanel } from "@/components/case-thread-panel";
+import { CaseTimeline } from "@/components/case-timeline";
 import { ManualEdgeDialog } from "@/components/manual-edge-dialog";
 import { RenameEdgeDialog } from "@/components/rename-edge-dialog";
 
@@ -37,20 +40,20 @@ const STATUSES = ["OPEN", "IN_PROGRESS", "CLOSED", "ARCHIVED"] as const;
 const nodeKey = (type: string, id: string) => `${type}:${id}`;
 const HYP_PALETTE = ["#ef4444", "#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#ec4899", "#06b6d4", "#84cc16"];
 
-/** Pick hypotheses when adding a graph node as evidence. */
+/** Pick threads when adding a graph node as evidence. */
 function AddEvidenceHypDialog({
   open, onOpenChange, node, caseId, onAdded,
 }: {
   open: boolean; onOpenChange: (v: boolean) => void; node: GraphNodeDto | null; caseId: string; onAdded: () => void;
 }) {
-  const [hypotheses, setHypotheses] = React.useState<HypothesisResponseDto[]>([]);
+  const [threadList, setThreadList] = React.useState<ThreadResponseDto[]>([]);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
     setSelected(new Set());
-    api.hypotheses.hypothesesControllerList({ caseId }).then(setHypotheses).catch(() => {});
+    api.threads.threadsControllerList({ caseId }).then(setThreadList).catch(() => {});
   }, [open, caseId]);
 
   const toggle = (id: string) =>
@@ -77,22 +80,22 @@ function AddEvidenceHypDialog({
         <DialogHeader><DialogTitle>Add evidence</DialogTitle></DialogHeader>
         <div className="space-y-3 py-2">
           <p className="text-sm text-muted-foreground">
-            Adding <span className="font-medium">{node?.label}</span> as evidence. Optionally link hypotheses.
+            Adding <span className="font-medium">{node?.label}</span> as evidence. Optionally link to threads.
           </p>
-          {hypotheses.length === 0 ? (
-            <p className="text-muted-foreground text-sm py-2 text-center">No hypotheses yet — add the evidence and link later.</p>
+          {threadList.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-2 text-center">No threads yet — add the evidence and link later.</p>
           ) : (
             <div className="space-y-2">
-              {hypotheses.map((h) => {
-                const sel = selected.has(h.id);
+              {threadList.map((t) => {
+                const sel = selected.has(t.id);
                 return (
-                  <button key={h.id} onClick={() => toggle(h.id)}
+                  <button key={t.id} onClick={() => toggle(t.id)}
                     className={`w-full rounded border p-2.5 text-left text-sm transition-colors ${sel ? "border-primary bg-primary/5" : "border-border hover:bg-accent"}`}>
                     <span className="flex items-center gap-2">
                       <span className={`h-3.5 w-3.5 shrink-0 rounded border flex items-center justify-center ${sel ? "border-primary bg-primary" : "border-muted-foreground"}`}>
                         {sel && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
                       </span>
-                      {h.statement}
+                      {t.title}
                     </span>
                   </button>
                 );
@@ -116,6 +119,7 @@ export default function CaseWorkspacePage() {
 
   const [caseData, setCaseData] = React.useState<CaseResponseDto | null>(null);
   const [hypotheses, setHypotheses] = React.useState<HypothesisResponseDto[]>([]);
+  const [threads, setThreads] = React.useState<ThreadResponseDto[]>([]);
   const [pickerOpen, setPickerOpen] = React.useState(false);
 
   const [nodes, setNodes] = React.useState<GraphNodeDto[]>([]);
@@ -155,9 +159,13 @@ export default function CaseWorkspacePage() {
     setHypotheses(await api.hypotheses.hypothesesControllerList({ caseId }));
   }, [caseId]);
 
+  const loadThreads = React.useCallback(async () => {
+    setThreads(await api.threads.threadsControllerList({ caseId }));
+  }, [caseId]);
+
   React.useEffect(() => {
-    void loadCase(); void loadGraph(); void loadHypotheses();
-  }, [loadCase, loadGraph, loadHypotheses]);
+    void loadCase(); void loadGraph(); void loadHypotheses(); void loadThreads();
+  }, [loadCase, loadGraph, loadHypotheses, loadThreads]);
 
   const reloadAll = () => { void loadCase(); void loadGraph(); };
 
@@ -175,9 +183,12 @@ export default function CaseWorkspacePage() {
 
   const hypothesisColors = React.useMemo(() => {
     const map: Record<string, string> = {};
-    hypotheses.forEach((h, i) => { map[h.id] = h.color ?? HYP_PALETTE[i % HYP_PALETTE.length] ?? "#888888"; });
+    // Use threads (which have the same UUIDs as old hypotheses after migration)
+    threads.forEach((t, i) => { map[t.id] = t.color ?? HYP_PALETTE[i % HYP_PALETTE.length] ?? "#888888"; });
+    // Fallback: also include old hypothesis data in case threads haven't loaded yet
+    hypotheses.forEach((h, i) => { if (!map[h.id]) map[h.id] = h.color ?? HYP_PALETTE[i % HYP_PALETTE.length] ?? "#888888"; });
     return map;
-  }, [hypotheses]);
+  }, [threads, hypotheses]);
 
   const allEdgeTypes = React.useMemo(() => Array.from(new Set(edges.map((e) => e.relationType))).sort(), [edges]);
   const visibleEdges = React.useMemo(
@@ -295,17 +306,25 @@ export default function CaseWorkspacePage() {
         {caseData.description && <p className="text-muted-foreground mt-1 max-w-3xl text-sm">{caseData.description}</p>}
       </div>
 
-      <Tabs defaultValue="hypotheses">
+      <Tabs defaultValue="timeline">
         <TabsList>
-          <TabsTrigger value="hypotheses">Hypotheses ({caseData.hypothesisCount})</TabsTrigger>
+          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="threads">Threads ({threads.length})</TabsTrigger>
           <TabsTrigger value="evidence">Evidence ({caseData.evidenceCount})</TabsTrigger>
           <TabsTrigger value="inquiries">Inquiries ({caseData.inquiryCount})</TabsTrigger>
           <TabsTrigger value="graph">Graph</TabsTrigger>
           <TabsTrigger value="conclusion">Conclusion</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="hypotheses">
-          <HypothesisPanel caseId={caseId} evidence={caseData.evidence ?? []} />
+        <TabsContent value="timeline" className="space-y-4">
+          <p className="text-muted-foreground text-xs max-w-md">
+            Unified activity log for this case — all evidence, findings, and thread changes in chronological order.
+          </p>
+          <CaseTimeline caseId={caseId} />
+        </TabsContent>
+
+        <TabsContent value="threads">
+          <CaseThreadPanel caseId={caseId} evidence={caseData.evidence ?? []} />
         </TabsContent>
 
         <TabsContent value="evidence" className="space-y-4">

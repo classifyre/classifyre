@@ -637,6 +637,41 @@ enum HypothesisStatus {
   INCONCLUSIVE
 }
 
+enum CaseThreadKind {
+  HYPOTHESIS
+  DISCUSSION
+}
+
+enum CaseThreadEntryType {
+  NOTE
+  STATEMENT
+  STATUS_CHANGE
+  CONFIDENCE_CHANGE
+}
+
+enum CaseActivityType {
+  CASE_CREATED
+  CASE_UPDATED
+  CONCLUSION_UPDATED
+  INQUIRY_LINKED
+  INQUIRY_UNLINKED
+  INQUIRY_PULLED
+  EVIDENCE_ADDED
+  EVIDENCE_REMOVED
+  EVIDENCE_NOTE_UPDATED
+  FINDING_ADDED
+  FINDING_REMOVED
+  FINDING_NOTE_UPDATED
+  THREAD_CREATED
+  THREAD_ENTRY_ADDED
+  THREAD_STATEMENT_UPDATED
+  THREAD_STATUS_CHANGED
+  THREAD_CONFIDENCE_CHANGED
+  SUPPORT_LINKED
+  SUPPORT_UNLINKED
+  SUPPORT_UPDATED
+}
+
 enum EvidenceStance {
   SUPPORTS
   CONTRADICTS
@@ -692,6 +727,8 @@ model Case {
   hypotheses Hypothesis[]
   notes      CaseNote[]
   inquiries  Inquiry[]
+  threads    CaseThread[]
+  activities CaseActivity[]
 
   @@index([status])
   @@index([severity])
@@ -831,4 +868,80 @@ model CaseNote {
 
   @@index([caseId])
   @@map("case_notes")
+}
+
+// Thread container: hypothesis thread (replaces Hypothesis) or custom discussion thread.
+model CaseThread {
+  id         String          @id @default(uuid())
+  caseId     String          @map("case_id")
+  kind       CaseThreadKind  @default(HYPOTHESIS)
+  title      String
+  // Hypothesis-only denormalized current state (for graph/quick queries)
+  status     HypothesisStatus? @default(PROPOSED)
+  confidence Decimal?         @db.Decimal(3, 2)
+  color      String?
+  createdBy  String?          @map("created_by")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  investigation Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  entries       CaseThreadEntry[]
+  support       CaseThreadSupport[]
+
+  @@index([caseId])
+  @@index([caseId, kind])
+  @@map("case_threads")
+}
+
+// Append-only evolution log for a thread (notes, statement revisions, status changes).
+model CaseThreadEntry {
+  id        String              @id @default(uuid())
+  threadId  String              @map("thread_id")
+  entryType CaseThreadEntryType @default(NOTE) @map("entry_type")
+  body      String?             @db.Text
+  metadata  Json?               @db.JsonB
+  author    String?
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  thread  CaseThread          @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  support CaseThreadSupport[]
+
+  @@index([threadId, createdAt])
+  @@map("case_thread_entries")
+}
+
+// Polymorphic link between a thread (and optionally an entry) and evidence/finding.
+model CaseThreadSupport {
+  id         String         @id @default(uuid())
+  threadId   String         @map("thread_id")
+  entryId    String?        @map("entry_id")
+  targetType String         @map("target_type")
+  targetId   String         @map("target_id")
+  stance     EvidenceStance @default(SUPPORTS)
+  weight     Decimal?       @db.Decimal(3, 2)
+  note       String?        @db.Text
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  thread CaseThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  entry  CaseThreadEntry? @relation(fields: [entryId], references: [id], onDelete: SetNull)
+
+  @@unique([threadId, targetType, targetId])
+  @@index([threadId])
+  @@index([targetType, targetId])
+  @@map("case_thread_support")
+}
+
+// Append-only case event log — the unified timeline.
+model CaseActivity {
+  id           String          @id @default(uuid())
+  caseId       String          @map("case_id")
+  activityType CaseActivityType @map("activity_type")
+  actor        String?
+  payload      Json?           @db.JsonB
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  investigation Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt(sort: Desc)])
+  @@map("case_activities")
 }

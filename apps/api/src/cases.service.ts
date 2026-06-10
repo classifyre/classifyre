@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { CaseActivityType, Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { GraphService } from './graph.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
+import { CaseActivityService } from './case-activity.service';
 import {
   AddEvidenceDto,
   AddFindingDto,
@@ -37,6 +38,7 @@ export class CasesService {
     private readonly prisma: PrismaService,
     private readonly graph: GraphService,
     private readonly matching: InquiryMatchingService,
+    private readonly activity: CaseActivityService,
   ) {}
 
   async create(dto: CreateCaseDto): Promise<CaseResponseDto> {
@@ -51,6 +53,7 @@ export class CasesService {
       },
       include: countSelect,
     });
+    await this.activity.record(created.id, CaseActivityType.CASE_CREATED, { title: dto.title }, dto.createdBy);
     if (dto.inquiryIds && dto.inquiryIds.length > 0) {
       await this.prisma.inquiry.updateMany({
         where: { id: { in: dto.inquiryIds } },
@@ -119,6 +122,8 @@ export class CasesService {
       },
       include: countSelect,
     });
+    const actType = dto.conclusion !== undefined ? CaseActivityType.CONCLUSION_UPDATED : CaseActivityType.CASE_UPDATED;
+    await this.activity.record(id, actType, { title: dto.title, status: dto.status, severity: dto.severity });
     return this.mapCase(updated);
   }
 
@@ -154,6 +159,11 @@ export class CasesService {
     });
     if (hypothesisIds.length > 0) await this.linkSupport(hypothesisIds, 'evidence', evidence.id);
     await this.graph.inferEdgesForAsset(dto.entityId);
+    await this.activity.record(caseId, CaseActivityType.EVIDENCE_ADDED, {
+      evidenceId: evidence.id,
+      entityId: dto.entityId,
+      label: snapshot.label,
+    }, dto.addedBy);
 
     const updated = await this.prisma.caseEvidence.findUniqueOrThrow({ where: { id: evidence.id }, include: { findings: true } });
     return this.hydrateEvidence([updated as EvidenceRow])[0]!;
@@ -196,6 +206,11 @@ export class CasesService {
       update: { note: dto.note ?? undefined },
     });
     await this.graph.inferEdgesForAsset(finding.assetId);
+    await this.activity.record(caseId, CaseActivityType.FINDING_ADDED, {
+      caseFindingId: cf.id,
+      findingId: dto.findingId,
+      label: finding.findingType,
+    });
     return this.mapCaseFinding(cf);
   }
 
@@ -205,6 +220,7 @@ export class CasesService {
       throw new NotFoundException(`Finding ${caseFindingId} not found in case ${caseId}`);
     }
     await this.prisma.caseFinding.delete({ where: { id: caseFindingId } });
+    await this.activity.record(caseId, CaseActivityType.FINDING_REMOVED, { caseFindingId, findingId: cf.findingId, label: cf.label });
   }
 
   async patchEvidenceNote(caseId: string, evidenceId: string, dto: UpdateEvidenceNoteDto): Promise<CaseEvidenceDto> {
@@ -217,6 +233,7 @@ export class CasesService {
       data: { note: dto.note ?? null },
       include: { findings: true },
     });
+    await this.activity.record(caseId, CaseActivityType.EVIDENCE_NOTE_UPDATED, { evidenceId });
     return this.hydrateEvidence([updated as EvidenceRow])[0]!;
   }
 
@@ -229,6 +246,7 @@ export class CasesService {
       where: { id: caseFindingId },
       data: { note: dto.note ?? null },
     });
+    await this.activity.record(caseId, CaseActivityType.FINDING_NOTE_UPDATED, { caseFindingId });
     return this.mapCaseFinding(updated);
   }
 
@@ -238,6 +256,7 @@ export class CasesService {
       throw new NotFoundException(`Evidence ${evidenceId} not found in case ${caseId}`);
     }
     await this.prisma.caseEvidence.delete({ where: { id: evidenceId } });
+    await this.activity.record(caseId, CaseActivityType.EVIDENCE_REMOVED, { evidenceId, entityId: evidence.entityId, label: evidence.label });
   }
 
   /** Pull a linked question's current matches into the case as evidence + findings. */
@@ -288,6 +307,10 @@ export class CasesService {
       skipDuplicates: true,
     });
     for (const assetId of evidenceByAsset.keys()) await this.graph.inferEdgesForAsset(assetId);
+    await this.activity.record(caseId, CaseActivityType.INQUIRY_PULLED, {
+      inquiryId: dto.inquiryId,
+      pulled: created.count,
+    });
     return { pulled: created.count };
   }
 

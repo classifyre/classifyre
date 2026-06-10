@@ -29,7 +29,8 @@ import { McpToolExecutorService } from './mcp-tool-executor.service';
 import { AssistantService } from './assistant.service';
 import { CasesService } from './cases.service';
 import { InquiriesService } from './inquiries.service';
-import { HypothesesService } from './hypotheses.service';
+import { CaseThreadsService } from './case-threads.service';
+import { CaseActivityService } from './case-activity.service';
 import { GraphService } from './graph.service';
 
 // Import organized controllers
@@ -52,7 +53,9 @@ import {
   CustomDetectorTestsController,
   CasesController,
   InquiriesController,
-  HypothesesController,
+  CaseThreadsController,
+  CaseTimelineController,
+  HypothesisAliasController,
   GraphController,
 } from './controllers';
 
@@ -84,7 +87,9 @@ import {
     AssistantController,
     CasesController,
     InquiriesController,
-    HypothesesController,
+    CaseTimelineController,
+    CaseThreadsController,
+    HypothesisAliasController,
     GraphController,
   ],
   providers: [
@@ -109,9 +114,10 @@ import {
     McpToolExecutorService,
     McpServerFactoryService,
     AssistantService,
+    CaseActivityService,
     CasesService,
     InquiriesService,
-    HypothesesService,
+    CaseThreadsService,
     GraphService,
   ],
 })

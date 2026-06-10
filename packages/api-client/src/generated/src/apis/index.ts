@@ -18,3 +18,4 @@ export { NotificationsApi } from './NotificationsApi';
 export { RunnersApi } from './RunnersApi';
 export { SandboxApi } from './SandboxApi';
 export { SourcesApi } from './SourcesApi';
+export { ThreadsApi } from './ThreadsApi';
