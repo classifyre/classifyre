@@ -5,10 +5,12 @@ import type { GraphEdgeDto, GraphNodeDto, ThreadResponseDto } from "@workspace/a
 import { LinkThreadSupportDtoStanceEnum } from "@workspace/api-client";
 import {
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   ExternalLink,
   GitBranch,
   Lightbulb,
-  Maximize2,
+  Network,
   Paperclip,
   Pin,
   Route,
@@ -33,6 +35,10 @@ export interface GraphContextMenuProps {
   isEvidence: (node: GraphNodeDto) => boolean;
   isPinned: (node: GraphNodeDto) => boolean;
   attachableCount: (node: GraphNodeDto) => number;
+  /** Attached findings on this asset (collapsible). 0 = no toggle shown. */
+  attachedCount: (node: GraphNodeDto) => number;
+  isAssetExpanded: (node: GraphNodeDto) => boolean;
+  onToggleCollapse: (node: GraphNodeDto) => void;
   hypotheses: ThreadResponseDto[];
   hypothesisColors: Record<string, string>;
   onAddEvidence: (node: GraphNodeDto) => void;
@@ -48,6 +54,7 @@ export interface GraphContextMenuProps {
   onAttachFindingsDialog: (node: GraphNodeDto) => void;
   onReleasePin: (node: GraphNodeDto) => void;
   onOpenAsset: (node: GraphNodeDto) => void;
+  onOpenFinding: (node: GraphNodeDto) => void;
   // edge context
   onRenameEdge: (edge: GraphEdgeDto) => void;
   onDeleteEdge: (edge: GraphEdgeDto) => void;
@@ -231,8 +238,24 @@ export function GraphContextMenu(props: GraphContextMenuProps) {
       <MenuItem icon={<Route className="h-3.5 w-3.5" />} onClick={close(() => props.onPathFrom(node))}>
         Find path from here
       </MenuItem>
-      <MenuItem icon={<Maximize2 className="h-3.5 w-3.5" />} onClick={close(() => props.onExpand(node))}>
-        Expand neighbors
+      {node.type === "asset" && props.attachedCount(node) > 0 && (
+        <MenuItem
+          icon={
+            props.isAssetExpanded(node) ? (
+              <ChevronsDownUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronsUpDown className="h-3.5 w-3.5" />
+            )
+          }
+          onClick={close(() => props.onToggleCollapse(node))}
+        >
+          {props.isAssetExpanded(node)
+            ? `Collapse ${props.attachedCount(node)} finding${props.attachedCount(node) === 1 ? "" : "s"} into asset`
+            : `Expand ${props.attachedCount(node)} finding${props.attachedCount(node) === 1 ? "" : "s"}`}
+        </MenuItem>
+      )}
+      <MenuItem icon={<Network className="h-3.5 w-3.5" />} onClick={close(() => props.onExpand(node))}>
+        Load related entities
       </MenuItem>
       {node.type === "asset" && attachable > 0 && (
         <MenuItem icon={<Paperclip className="h-3.5 w-3.5" />} onClick={close(() => props.onAttachFindingsDialog(node))}>
@@ -246,7 +269,12 @@ export function GraphContextMenu(props: GraphContextMenuProps) {
       )}
       {node.type === "asset" && (
         <MenuItem icon={<ExternalLink className="h-3.5 w-3.5" />} onClick={close(() => props.onOpenAsset(node))}>
-          Open asset
+          Open asset ↗
+        </MenuItem>
+      )}
+      {isFinding && (
+        <MenuItem icon={<ExternalLink className="h-3.5 w-3.5" />} onClick={close(() => props.onOpenFinding(node))}>
+          Open finding ↗
         </MenuItem>
       )}
     </div>

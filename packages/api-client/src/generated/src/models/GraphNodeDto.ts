@@ -68,6 +68,12 @@ export interface GraphNodeDto {
      */
     detectorType?: string;
     /**
+     * For CUSTOM findings: the custom detector display name
+     * @type {string}
+     * @memberof GraphNodeDto
+     */
+    customDetectorName?: string;
+    /**
      * 
      * @type {string}
      * @memberof GraphNodeDto
@@ -140,6 +146,7 @@ export function GraphNodeDtoFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'sourceType': json['sourceType'] == null ? undefined : json['sourceType'],
         'severity': json['severity'] == null ? undefined : json['severity'],
         'detectorType': json['detectorType'] == null ? undefined : json['detectorType'],
+        'customDetectorName': json['customDetectorName'] == null ? undefined : json['customDetectorName'],
         'status': json['status'] == null ? undefined : json['status'],
         'matchedContent': json['matchedContent'] == null ? undefined : json['matchedContent'],
         'assetName': json['assetName'] == null ? undefined : json['assetName'],
@@ -169,6 +176,7 @@ export function GraphNodeDtoToJSONTyped(value?: GraphNodeDto | null, ignoreDiscr
         'sourceType': value['sourceType'],
         'severity': value['severity'],
         'detectorType': value['detectorType'],
+        'customDetectorName': value['customDetectorName'],
         'status': value['status'],
         'matchedContent': value['matchedContent'],
         'assetName': value['assetName'],

@@ -11441,6 +11441,10 @@
           "detectorType": {
             "type": "string"
           },
+          "customDetectorName": {
+            "type": "string",
+            "description": "For CUSTOM findings: the custom detector display name"
+          },
           "status": {
             "type": "string"
           },

@@ -39,13 +39,45 @@ export interface PathResult {
   edgeIds: Set<string>;
 }
 
-export const SEVERITY_COLORS: Record<string, string> = {
-  CRITICAL: "#b91c1c",
-  HIGH: "#c2410c",
-  MEDIUM: "#a16207",
-  LOW: "#1d4ed8",
-  INFO: "#78716c",
-};
+import { FINDING_SEVERITY_COLOR_BY_ENUM } from "@workspace/ui/lib/finding-severity";
+
+/** Severity → fill color, shared with the findings table badges. */
+export const SEVERITY_COLORS: Record<string, string> = { ...FINDING_SEVERITY_COLOR_BY_ENUM };
+
+/** Black or white text for legibility on a given hex fill. */
+export function contrastText(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return "#ffffff";
+  const v = parseInt(m[1]!, 16);
+  const r = (v >> 16) & 255;
+  const g = (v >> 8) & 255;
+  const b = v & 255;
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminance > 150 ? "#0a0a0a" : "#ffffff";
+}
+
+/**
+ * Compact category code shown inside finding circles: short names stay full
+ * ("PII"), multi-word names become initials ("SENTIMENT_ANALYZER" → "SA"),
+ * long single words are clipped ("SECRETS" → "SEC"). CUSTOM detectors use
+ * their display name.
+ */
+export function findingCategoryCode(node: GraphNodeDto): string {
+  const custom = node.customDetectorName?.trim();
+  const name =
+    node.detectorType?.toUpperCase() === "CUSTOM" && custom ? custom : (node.detectorType ?? "");
+  const words = name.split(/[\s_-]+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) {
+    const w = words[0]!;
+    return (w.length <= 4 ? w : w.slice(0, 3)).toUpperCase();
+  }
+  return words
+    .map((w) => w[0]!)
+    .join("")
+    .slice(0, 3)
+    .toUpperCase();
+}
 
 export const MANUAL_EDGE_COLOR = "#d97706";
 export const CROSS_HYP_COLOR = "#a855f7";

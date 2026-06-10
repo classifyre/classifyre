@@ -5,10 +5,12 @@ import type { GraphNodeDto, ThreadResponseDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { SeverityBadge } from "@workspace/ui/components/severity-badge";
 import {
+  ChevronsDownUp,
+  ChevronsUpDown,
   ExternalLink,
   GitBranch,
   Lightbulb,
-  Maximize2,
+  Network,
   Paperclip,
   Pin,
   Trash2,
@@ -20,6 +22,9 @@ export interface NodeDetailPanelProps {
   isEvidence: boolean;
   isPinned: boolean;
   attachableCount: number;
+  /** Attached findings on this asset (collapsible). */
+  attachedCount: number;
+  isExpandedAsset: boolean;
   hypotheses: ThreadResponseDto[];
   hypothesisColors: Record<string, string>;
   expanding: boolean;
@@ -30,9 +35,11 @@ export interface NodeDetailPanelProps {
   onLinkHypothesis: () => void;
   onConnectFrom: () => void;
   onExpand: () => void;
+  onToggleCollapse: () => void;
   onAttachFindingsDialog: () => void;
   onReleasePin: () => void;
   onOpenAsset: () => void;
+  onOpenFinding: () => void;
 }
 
 export function NodeDetailPanel({
@@ -40,6 +47,8 @@ export function NodeDetailPanel({
   isEvidence,
   isPinned,
   attachableCount,
+  attachedCount,
+  isExpandedAsset,
   hypotheses,
   hypothesisColors,
   expanding,
@@ -50,9 +59,11 @@ export function NodeDetailPanel({
   onLinkHypothesis,
   onConnectFrom,
   onExpand,
+  onToggleCollapse,
   onAttachFindingsDialog,
   onReleasePin,
   onOpenAsset,
+  onOpenFinding,
 }: NodeDetailPanelProps) {
   const isFinding = node.type === "finding";
   const memberships = (node.hypothesisIds ?? [])
@@ -150,8 +161,20 @@ export function NodeDetailPanel({
           <Button size="sm" variant="outline" onClick={onConnectFrom}>
             <GitBranch className="h-3.5 w-3.5" /> Connect from here
           </Button>
+          {node.type === "asset" && attachedCount > 0 && (
+            <Button size="sm" variant="outline" onClick={onToggleCollapse}>
+              {isExpandedAsset ? (
+                <ChevronsDownUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronsUpDown className="h-3.5 w-3.5" />
+              )}
+              {isExpandedAsset
+                ? `Collapse ${attachedCount} finding${attachedCount === 1 ? "" : "s"}`
+                : `Expand ${attachedCount} finding${attachedCount === 1 ? "" : "s"}`}
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={onExpand} disabled={expanding}>
-            <Maximize2 className="h-3.5 w-3.5" /> {expanding ? "Expanding…" : "Expand neighbors"}
+            <Network className="h-3.5 w-3.5" /> {expanding ? "Loading…" : "Load related entities"}
           </Button>
           {node.type === "asset" && attachableCount > 0 && (
             <Button size="sm" variant="outline" onClick={onAttachFindingsDialog}>
@@ -161,7 +184,12 @@ export function NodeDetailPanel({
           )}
           {node.type === "asset" && (
             <Button size="sm" variant="outline" onClick={onOpenAsset}>
-              <ExternalLink className="h-3.5 w-3.5" /> Open asset
+              <ExternalLink className="h-3.5 w-3.5" /> Open asset ↗
+            </Button>
+          )}
+          {isFinding && (
+            <Button size="sm" variant="outline" onClick={onOpenFinding}>
+              <ExternalLink className="h-3.5 w-3.5" /> Open finding ↗
             </Button>
           )}
           {isPinned && (

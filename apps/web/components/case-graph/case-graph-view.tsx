@@ -30,7 +30,9 @@ import { GraphContextMenu, type ContextMenuState } from "./graph-context-menu";
 import {
   EdgeTypeFilters,
   GraphLegendAndStats,
+  HighlightFilters,
   HypothesisLegend,
+  type HighlightOption,
 } from "./graph-sidebar";
 import { NodeDetailPanel } from "./node-detail-panel";
 import { EdgeDetailPanel } from "./edge-detail-panel";
@@ -105,9 +107,54 @@ export function CaseGraphView({
     return m;
   }, [attachableByAsset]);
 
+  const nodeIndex = React.useMemo(() => {
+    const m = new Map<string, GraphNodeDto>();
+    nodes.forEach((n) => m.set(keyOf(n), n));
+    return m;
+  }, [nodes]);
+
+  /** Attached findings per asset — these are the collapsible ones. */
+  const attachedByAsset = React.useMemo(() => {
+    const m = new Map<string, number>();
+    nodes.forEach((n) => {
+      if (n.type === "finding" && n.caseFindingId && n.assetId) {
+        m.set(n.assetId, (m.get(n.assetId) ?? 0) + 1);
+      }
+    });
+    return m;
+  }, [nodes]);
+
+  // ── Findings collapse/expand (per asset, with a global default) ───────────
+
+  const [findingsVisibleDefault, setFindingsVisibleDefault] = React.useState(true);
+  const [expandOverrides, setExpandOverrides] = React.useState<Map<string, boolean>>(new Map());
+
+  const isAssetExpanded = React.useCallback(
+    (assetId: string) => expandOverrides.get(assetId) ?? findingsVisibleDefault,
+    [expandOverrides, findingsVisibleDefault],
+  );
+  const toggleAssetExpanded = React.useCallback(
+    (assetId: string) =>
+      setExpandOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(assetId, !(prev.get(assetId) ?? findingsVisibleDefault));
+        return next;
+      }),
+    [findingsVisibleDefault],
+  );
+  const toggleFindingsDefault = React.useCallback(() => {
+    setFindingsVisibleDefault((v) => !v);
+    setExpandOverrides(new Map());
+  }, []);
+
   const visibleNodes = React.useMemo(
-    () => nodes.filter((n) => n.type !== "finding" || Boolean(n.caseFindingId)),
-    [nodes],
+    () =>
+      nodes.filter((n) => {
+        if (n.type !== "finding") return true;
+        if (!n.caseFindingId) return false; // unattached → badge + dialog only
+        return n.assetId ? isAssetExpanded(n.assetId) : true;
+      }),
+    [nodes, isAssetExpanded],
   );
 
   const visibleKeys = React.useMemo(
@@ -115,11 +162,14 @@ export function CaseGraphView({
     [visibleNodes],
   );
 
-  const nodeIndex = React.useMemo(() => {
-    const m = new Map<string, GraphNodeDto>();
-    nodes.forEach((n) => m.set(keyOf(n), n));
+  /** Attached findings hidden because their asset is collapsed. */
+  const collapsedCounts = React.useMemo(() => {
+    const m = new Map<string, number>();
+    attachedByAsset.forEach((count, assetId) => {
+      if (!isAssetExpanded(assetId)) m.set(assetId, count);
+    });
     return m;
-  }, [nodes]);
+  }, [attachedByAsset, isAssetExpanded]);
 
   const [activeEdgeTypes, setActiveEdgeTypes] = React.useState<Set<string>>(new Set());
 
@@ -131,17 +181,42 @@ export function CaseGraphView({
       .sort((a, b) => a.type.localeCompare(b.type));
   }, [edges]);
 
-  const visibleEdges = React.useMemo(
-    () =>
-      edges.filter((e) => {
-        if (activeEdgeTypes.size > 0 && !activeEdgeTypes.has(e.relationType)) return false;
-        return (
-          visibleKeys.has(nodeKey(e.fromType, e.fromId)) &&
-          visibleKeys.has(nodeKey(e.toType, e.toId))
-        );
-      }),
-    [edges, activeEdgeTypes, visibleKeys],
-  );
+  /**
+   * Edges adjusted for visibility: an edge endpoint at a hidden finding
+   * (collapsed asset or unattached) is re-routed to its parent asset so the
+   * relationship stays observable; duplicates produced by the re-routing are
+   * collapsed into one line. Self-loops (asset → its own finding) disappear.
+   */
+  const visibleEdges = React.useMemo(() => {
+    const remap = (type: string, id: string): { type: string; id: string } | null => {
+      const k = nodeKey(type, id);
+      if (visibleKeys.has(k)) return { type, id };
+      if (type !== "finding") return null;
+      const assetId = nodeIndex.get(k)?.assetId;
+      if (assetId && visibleKeys.has(nodeKey("asset", assetId))) return { type: "asset", id: assetId };
+      return null;
+    };
+    const seen = new Set<string>();
+    const out: GraphEdgeDto[] = [];
+    for (const e of edges) {
+      if (activeEdgeTypes.size > 0 && !activeEdgeTypes.has(e.relationType)) continue;
+      const from = remap(e.fromType, e.fromId);
+      const to = remap(e.toType, e.toId);
+      if (!from || !to) continue;
+      if (from.type === to.type && from.id === to.id) continue;
+      const remapped =
+        from.id !== e.fromId || to.id !== e.toId || from.type !== e.fromType || to.type !== e.toType;
+      if (remapped) {
+        const dedupe = `${from.type}:${from.id}|${to.type}:${to.id}|${e.relationType}|${e.origin}`;
+        if (seen.has(dedupe)) continue;
+        seen.add(dedupe);
+        out.push({ ...e, fromType: from.type, fromId: from.id, toType: to.type, toId: to.id });
+      } else {
+        out.push(e);
+      }
+    }
+    return out;
+  }, [edges, activeEdgeTypes, visibleKeys, nodeIndex]);
 
   const hypMemberCounts = React.useMemo(() => {
     const m = new Map<string, number>();
@@ -195,6 +270,9 @@ export function CaseGraphView({
   const [selection, setSelection] = React.useState<GraphSelection>(null);
   const [path, setPath] = React.useState<PathResult | null>(null);
   const [hypothesisFocus, setHypothesisFocus] = React.useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [sourceFilter, setSourceFilter] = React.useState<string[]>([]);
+  const [detectorFilter, setDetectorFilter] = React.useState<string[]>([]);
   const [contextMenu, setContextMenu] = React.useState<ContextMenuState | null>(null);
   const [expandingKey, setExpandingKey] = React.useState<string | null>(null);
 
@@ -229,14 +307,126 @@ export function CaseGraphView({
   const selectedEdge =
     selection?.type === "edge" ? (edges.find((e) => e.id === selection.id) ?? null) : null;
 
+  // ── Highlighting (dim non-matches; never remove) ──────────────────────────
+
+  /** Stable filter value for a finding's category (custom detectors by name). */
+  const detectorValueOf = React.useCallback((n: GraphNodeDto): string | null => {
+    if (n.type !== "finding") return null;
+    const custom = n.customDetectorName?.trim();
+    if (n.detectorType?.toUpperCase() === "CUSTOM" && custom) return `custom:${custom}`;
+    return n.detectorType ?? null;
+  }, []);
+
+  const sourceOfNode = React.useCallback(
+    (n: GraphNodeDto): string | undefined =>
+      n.sourceType ??
+      (n.assetId ? nodeIndex.get(nodeKey("asset", n.assetId))?.sourceType : undefined),
+    [nodeIndex],
+  );
+
+  const sourceOptions = React.useMemo<HighlightOption[]>(() => {
+    const counts = new Map<string, number>();
+    nodes.forEach((n) => {
+      if (n.type === "finding") return;
+      const src = n.sourceType;
+      if (src) counts.set(src, (counts.get(src) ?? 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([value, count]) => ({ value, label: value, count }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [nodes]);
+
+  const detectorOptions = React.useMemo<HighlightOption[]>(() => {
+    const counts = new Map<string, { label: string; count: number }>();
+    nodes.forEach((n) => {
+      if (n.type !== "finding" || !n.caseFindingId) return;
+      const value = detectorValueOf(n);
+      if (!value) return;
+      const label = value.startsWith("custom:")
+        ? value.slice(7)
+        : value
+            .toLowerCase()
+            .split("_")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+      const prev = counts.get(value);
+      counts.set(value, { label, count: (prev?.count ?? 0) + 1 });
+    });
+    return Array.from(counts.entries())
+      .map(([value, { label, count }]) => ({ value, label, count }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [nodes, detectorValueOf]);
+
   const activeNodeKeys = React.useMemo(() => {
-    if (!hypothesisFocus) return null;
+    const query = searchQuery.trim().toLowerCase();
+    if (!hypothesisFocus && !query && sourceFilter.length === 0 && detectorFilter.length === 0) {
+      return null;
+    }
+    const sourceSet = new Set(sourceFilter);
+    const detectorSet = new Set(detectorFilter);
+
+    // An asset matches a category filter when any of its attached findings do —
+    // even while collapsed.
+    const assetMatchesDetector = new Set<string>();
+    if (detectorSet.size > 0) {
+      nodes.forEach((n) => {
+        if (n.type !== "finding" || !n.assetId) return;
+        const v = detectorValueOf(n);
+        if (v && detectorSet.has(v)) assetMatchesDetector.add(n.assetId);
+      });
+    }
+
+    const matches = (n: GraphNodeDto): boolean => {
+      if (hypothesisFocus && !(n.hypothesisIds ?? []).includes(hypothesisFocus)) return false;
+      if (sourceSet.size > 0) {
+        const src = sourceOfNode(n);
+        if (!src || !sourceSet.has(src)) return false;
+      }
+      if (detectorSet.size > 0) {
+        if (n.type === "finding") {
+          const v = detectorValueOf(n);
+          if (!v || !detectorSet.has(v)) return false;
+        } else if (!assetMatchesDetector.has(n.id)) {
+          return false;
+        }
+      }
+      if (query) {
+        const hay = [
+          n.label,
+          n.type,
+          n.severity,
+          n.detectorType,
+          n.customDetectorName,
+          n.sourceType,
+          n.assetType,
+          n.assetName,
+          n.matchedContent,
+          n.status,
+          n.id,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(query)) return false;
+      }
+      return true;
+    };
+
     const s = new Set<string>();
     visibleNodes.forEach((n) => {
-      if ((n.hypothesisIds ?? []).includes(hypothesisFocus)) s.add(keyOf(n));
+      if (matches(n)) s.add(keyOf(n));
     });
     return s;
-  }, [hypothesisFocus, visibleNodes]);
+  }, [
+    hypothesisFocus,
+    searchQuery,
+    sourceFilter,
+    detectorFilter,
+    visibleNodes,
+    nodes,
+    detectorValueOf,
+    sourceOfNode,
+  ]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -488,6 +678,10 @@ export function CaseGraphView({
         onNewHypothesis={() => setNewHypNode({ open: true, node: null })}
         onZoomToFit={zoomToFit}
         onReload={onReload}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        findingsVisible={findingsVisibleDefault}
+        onToggleFindings={toggleFindingsDefault}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -500,6 +694,7 @@ export function CaseGraphView({
             evidenceKeys={evidenceKeys}
             hypothesisColors={hypothesisColors}
             attachableCounts={attachableCounts}
+            collapsedCounts={collapsedCounts}
             selection={selection}
             mode={mode}
             activeNodeKeys={activeNodeKeys}
@@ -517,6 +712,7 @@ export function CaseGraphView({
             }
             onBackgroundClick={handleBackgroundClick}
             onAttachBadgeClick={(node) => setAttachAsset(node)}
+            onToggleCollapse={(node) => toggleAssetExpanded(node.id)}
           />
         </div>
 
@@ -527,6 +723,10 @@ export function CaseGraphView({
               isEvidence={evidenceKeys.has(keyOf(selectedNode))}
               isPinned={layout.isPinned(keyOf(selectedNode))}
               attachableCount={attachableCountFor(selectedNode)}
+              attachedCount={
+                selectedNode.type === "asset" ? (attachedByAsset.get(selectedNode.id) ?? 0) : 0
+              }
+              isExpandedAsset={selectedNode.type === "asset" && isAssetExpanded(selectedNode.id)}
               hypotheses={hypotheses}
               hypothesisColors={hypothesisColors}
               expanding={expandingKey === keyOf(selectedNode)}
@@ -537,9 +737,11 @@ export function CaseGraphView({
               onLinkHypothesis={() => setLinkHypNode(selectedNode)}
               onConnectFrom={() => setMode({ kind: "connect", sourceKey: keyOf(selectedNode) })}
               onExpand={() => void expandNode(selectedNode)}
+              onToggleCollapse={() => toggleAssetExpanded(selectedNode.id)}
               onAttachFindingsDialog={() => setAttachAsset(selectedNode)}
               onReleasePin={() => layout.releasePin(keyOf(selectedNode))}
-              onOpenAsset={() => router.push(`/assets/${selectedNode.id}`)}
+              onOpenAsset={() => window.open(`/assets/${selectedNode.id}`, "_blank")}
+              onOpenFinding={() => window.open(`/findings/${selectedNode.id}`, "_blank")}
             />
           ) : selectedEdge ? (
             <EdgeDetailPanel
@@ -561,6 +763,14 @@ export function CaseGraphView({
                   setHypothesisFocus((prev) => (prev === id ? null : id))
                 }
                 onNewHypothesis={() => setNewHypNode({ open: true, node: null })}
+              />
+              <HighlightFilters
+                sourceOptions={sourceOptions}
+                detectorOptions={detectorOptions}
+                sourceFilter={sourceFilter}
+                detectorFilter={detectorFilter}
+                onSourceChange={setSourceFilter}
+                onDetectorChange={setDetectorFilter}
               />
               <EdgeTypeFilters
                 edgeTypes={edgeTypes}
@@ -589,6 +799,9 @@ export function CaseGraphView({
           isEvidence={(n) => evidenceKeys.has(keyOf(n))}
           isPinned={(n) => layout.isPinned(keyOf(n))}
           attachableCount={attachableCountFor}
+          attachedCount={(n) => (n.type === "asset" ? (attachedByAsset.get(n.id) ?? 0) : 0)}
+          isAssetExpanded={(n) => isAssetExpanded(n.id)}
+          onToggleCollapse={(n) => toggleAssetExpanded(n.id)}
           hypotheses={hypotheses}
           hypothesisColors={hypothesisColors}
           onAddEvidence={(n) => void addEvidence(n)}
@@ -605,7 +818,8 @@ export function CaseGraphView({
           onExpand={(n) => void expandNode(n)}
           onAttachFindingsDialog={(n) => setAttachAsset(n)}
           onReleasePin={(n) => layout.releasePin(keyOf(n))}
-          onOpenAsset={(n) => router.push(`/assets/${n.id}`)}
+          onOpenAsset={(n) => window.open(`/assets/${n.id}`, "_blank")}
+          onOpenFinding={(n) => window.open(`/findings/${n.id}`, "_blank")}
           onRenameEdge={(e) => setRenameEdge(e)}
           onDeleteEdge={(e) => setEdgeToDelete(e)}
         />

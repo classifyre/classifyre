@@ -369,7 +369,13 @@ function CaseWorkspaceInner() {
   const mergeExpansion = React.useCallback((newNodes: GraphNodeDto[], newEdges: GraphEdgeDto[]) => {
     setNodes((prev) => {
       const m = new Map(prev.map((n) => [nodeKey(n.type, n.id), n]));
-      newNodes.forEach((n) => m.set(nodeKey(n.type, n.id), n));
+      // Only add unseen nodes: the expand endpoint is not case-aware, so its
+      // copies lack caseFindingId/hypothesisIds — overwriting existing nodes
+      // would make attached findings vanish from the graph.
+      newNodes.forEach((n) => {
+        const k = nodeKey(n.type, n.id);
+        if (!m.has(k)) m.set(k, n);
+      });
       return Array.from(m.values());
     });
     setEdges((prev) => {

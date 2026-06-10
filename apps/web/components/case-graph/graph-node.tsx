@@ -2,10 +2,14 @@
 
 import * as React from "react";
 import type { GraphNodeDto } from "@workspace/api-client";
+import { FlaskConical } from "lucide-react";
+import { getAssetKindIcon } from "@/lib/asset-kind";
 import {
   ACCENT,
   CROSS_HYP_COLOR,
   SEVERITY_COLORS,
+  contrastText,
+  findingCategoryCode,
   nodeRadius,
 } from "./graph-types";
 
@@ -13,13 +17,6 @@ const LABEL_MAX = 26;
 
 function truncate(s: string, max = LABEL_MAX) {
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
-}
-
-/** Compact source/asset code shown inside asset squares, e.g. "JIRA", "S3". */
-function assetCode(node: GraphNodeDto): string {
-  const src = node.sourceType ?? node.assetType ?? node.type;
-  const clean = src.replace(/[^a-zA-Z0-9]/g, "");
-  return (clean.length <= 4 ? clean : clean.slice(0, 3)).toUpperCase() || "?";
 }
 
 export interface GraphNodeProps {
@@ -34,9 +31,12 @@ export interface GraphNodeProps {
   hypColors: string[];
   /** Findings on this asset that are not yet case evidence. */
   attachableCount: number;
+  /** Attached findings currently hidden because the asset is collapsed. */
+  collapsedCount: number;
   onPointerDown: (node: GraphNodeDto, e: React.PointerEvent) => void;
   onContextMenu: (node: GraphNodeDto, e: React.MouseEvent) => void;
   onAttachBadgeClick: (node: GraphNodeDto) => void;
+  onToggleCollapse: (node: GraphNodeDto) => void;
 }
 
 export const GraphNode = React.memo(function GraphNode({
@@ -50,55 +50,25 @@ export const GraphNode = React.memo(function GraphNode({
   isConnectSource,
   hypColors,
   attachableCount,
+  collapsedCount,
   onPointerDown,
   onContextMenu,
   onAttachBadgeClick,
+  onToggleCollapse,
 }: GraphNodeProps) {
   const r = nodeRadius(node);
   const isFinding = node.type === "finding";
   const severityColor = node.severity
-    ? (SEVERITY_COLORS[node.severity.toUpperCase()] ?? SEVERITY_COLORS.INFO)
-    : SEVERITY_COLORS.INFO;
-  const crossHyp = (node.hypothesisIds?.length ?? 0) > 1;
+    ? (SEVERITY_COLORS[node.severity.toUpperCase()] ?? SEVERITY_COLORS.INFO!)
+    : SEVERITY_COLORS.INFO!;
 
-  let shape: React.ReactNode;
-  if (isFinding) {
-    shape = (
-      <circle r={r} fill={severityColor} stroke="var(--foreground)" strokeWidth={2} />
-    );
-  } else if (node.type === "sandbox") {
-    shape = (
-      <rect
-        x={-r}
-        y={-r}
-        width={r * 2}
-        height={r * 2}
-        rx={2}
-        transform="rotate(45)"
-        fill="var(--card)"
-        stroke="var(--foreground)"
-        strokeWidth={2}
-      />
-    );
-  } else {
-    shape = (
-      <rect
-        x={-r}
-        y={-r}
-        width={r * 2}
-        height={r * 2}
-        rx={3}
-        fill="var(--card)"
-        stroke="var(--foreground)"
-        strokeWidth={2}
-      />
-    );
-  }
-
+  const crossHyp = hypColors.length > 1;
   const ringR = r + 5;
   const dots = hypColors.slice(0, 6);
   const dotSpacing = 11;
   const dotsStartX = -((dots.length - 1) * dotSpacing) / 2;
+
+  const AssetIcon = node.type === "sandbox" ? FlaskConical : getAssetKindIcon(node.assetType);
 
   return (
     <g
@@ -136,34 +106,35 @@ export const GraphNode = React.memo(function GraphNode({
         />
       )}
 
-      {shape}
-
-      {/* Asset/sandbox source code glyph */}
-      {!isFinding && (
-        <text
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={9}
-          fontWeight={700}
-          fill="var(--foreground)"
-          style={{ fontFamily: "var(--font-mono)", pointerEvents: "none", userSelect: "none" }}
-        >
-          {assetCode(node)}
-        </text>
-      )}
-
-      {/* Severity initial inside findings */}
-      {isFinding && node.severity && (
-        <text
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={9}
-          fontWeight={700}
-          fill="#ffffff"
-          style={{ fontFamily: "var(--font-mono)", pointerEvents: "none", userSelect: "none" }}
-        >
-          {node.severity[0]?.toUpperCase()}
-        </text>
+      {/* Shape + hit area */}
+      {isFinding ? (
+        <>
+          <circle r={r} fill={severityColor} stroke="var(--foreground)" strokeWidth={2} />
+          <text
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={8.5}
+            fontWeight={700}
+            fill={contrastText(severityColor)}
+            style={{ fontFamily: "var(--font-mono)", pointerEvents: "none", userSelect: "none" }}
+          >
+            {findingCategoryCode(node)}
+          </text>
+        </>
+      ) : (
+        <>
+          {/* invisible hit circle — the icon itself is mostly strokes */}
+          <circle r={r + 3} fill="var(--background)" fillOpacity={0.01} />
+          <AssetIcon
+            x={-r + 3}
+            y={-r + 3}
+            width={(r - 3) * 2}
+            height={(r - 3) * 2}
+            strokeWidth={1.75}
+            color="var(--foreground)"
+            style={{ pointerEvents: "none" }}
+          />
+        </>
       )}
 
       {/* Hypothesis membership dots */}
@@ -184,7 +155,7 @@ export const GraphNode = React.memo(function GraphNode({
         <circle cx={r - 2} cy={r - 2} r={3.5} fill="var(--foreground)" stroke="var(--background)" strokeWidth={1.5} />
       )}
 
-      {/* Attachable findings badge */}
+      {/* Attachable (unattached) findings badge — acid green */}
       {attachableCount > 0 && (
         <g
           transform={`translate(${r + 4},${-r - 4})`}
@@ -206,6 +177,41 @@ export const GraphNode = React.memo(function GraphNode({
             style={{ fontFamily: "var(--font-mono)", userSelect: "none" }}
           >
             +{attachableCount}
+          </text>
+        </g>
+      )}
+
+      {/* Collapsed attached findings chip — click to expand */}
+      {collapsedCount > 0 && (
+        <g
+          transform={`translate(${r + 4},${r + 4})`}
+          style={{ cursor: "pointer" }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCollapse(node);
+          }}
+        >
+          <rect
+            x={0}
+            y={-9}
+            width={collapsedCount > 9 ? 34 : 28}
+            height={18}
+            fill="var(--card)"
+            stroke="var(--foreground)"
+            strokeWidth={1.5}
+            rx={2}
+          />
+          <text
+            x={collapsedCount > 9 ? 17 : 14}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={9.5}
+            fontWeight={700}
+            fill="var(--foreground)"
+            style={{ fontFamily: "var(--font-mono)", userSelect: "none" }}
+          >
+            ▸{collapsedCount}
           </text>
         </g>
       )}
