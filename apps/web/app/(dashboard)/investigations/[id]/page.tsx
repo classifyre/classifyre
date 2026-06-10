@@ -2,18 +2,33 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft, Plus, X, Maximize2,
-  Save, Link2, Check, HelpCircle, DownloadCloud,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  DownloadCloud,
+  Lightbulb,
+  Link2,
+  Loader2,
+  MessageSquare,
+  Paperclip,
+  Pencil,
+  RotateCcw,
+  Save,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
+  ThreadResponseDtoKindEnum,
+  type CaseActivityDto,
   type CaseResponseDto,
   type GraphEdgeDto,
   type GraphNodeDto,
-  type HypothesisResponseDto,
+  type InquiryResponseDto,
+  type CaseLinkedInquiryDto,
   type ThreadResponseDto,
 } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
@@ -21,218 +36,311 @@ import { Badge } from "@workspace/ui/components/badge";
 import { SeverityBadge } from "@workspace/ui/components/severity-badge";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Textarea } from "@workspace/ui/components/textarea";
-import { Label } from "@workspace/ui/components/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@workspace/ui/components/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@workspace/ui/components/alert-dialog";
 import { EmptyState } from "@workspace/ui/components/empty-state";
-import { EvidencePickerDialog } from "@/components/evidence-picker-dialog";
+import { CaseStatusBadge } from "@/components/case-status-badge";
 import { EvidenceTable } from "@/components/evidence-table";
-import { HypothesisPanel } from "@/components/hypothesis-panel";
-import { CaseThreadPanel } from "@/components/case-thread-panel";
+import { CaseThreads } from "@/components/case-threads";
 import { CaseTimeline } from "@/components/case-timeline";
-import { ManualEdgeDialog } from "@/components/manual-edge-dialog";
-import { RenameEdgeDialog } from "@/components/rename-edge-dialog";
 
-const CaseGraph = dynamic(() => import("@/components/case-graph").then((m) => m.CaseGraph), { ssr: false });
+const CaseGraphView = dynamic(
+  () => import("@/components/case-graph/case-graph-view").then((m) => m.CaseGraphView),
+  { ssr: false },
+);
+
+const TABS = ["overview", "evidence", "threads", "timeline", "graph"] as const;
+type TabValue = (typeof TABS)[number];
 
 const STATUSES = ["OPEN", "IN_PROGRESS", "CLOSED", "ARCHIVED"] as const;
 const nodeKey = (type: string, id: string) => `${type}:${id}`;
-const HYP_PALETTE = ["#ef4444", "#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#ec4899", "#06b6d4", "#84cc16"];
+const HYP_PALETTE = [
+  "#ef4444", "#3b82f6", "#22c55e", "#f59e0b",
+  "#a855f7", "#ec4899", "#06b6d4", "#84cc16",
+];
 
-/** Pick threads when adding a graph node as evidence. */
-function AddEvidenceHypDialog({
-  open, onOpenChange, node, caseId, onAdded,
+function StatCard({
+  label,
+  value,
+  hint,
+  icon,
+  onClick,
 }: {
-  open: boolean; onOpenChange: (v: boolean) => void; node: GraphNodeDto | null; caseId: string; onAdded: () => void;
+  label: string;
+  value: React.ReactNode;
+  hint?: string;
+  icon: React.ReactNode;
+  onClick?: () => void;
 }) {
-  const [threadList, setThreadList] = React.useState<ThreadResponseDto[]>([]);
-  const [selected, setSelected] = React.useState<Set<string>>(new Set());
-  const [loading, setLoading] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!open) return;
-    setSelected(new Set());
-    api.threads.threadsControllerList({ caseId }).then(setThreadList).catch(() => {});
-  }, [open, caseId]);
-
-  const toggle = (id: string) =>
-    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-
-  const submit = async () => {
-    if (!node) return;
-    setLoading(true);
-    try {
-      await api.cases.casesControllerAddEvidence({
-        id: caseId,
-        addEvidenceDto: { entityType: node.type, entityId: node.id, hypothesisIds: Array.from(selected) },
-      });
-      toast.success("Added to evidence");
-      onAdded();
-      onOpenChange(false);
-    } catch (err) { console.error(err); toast.error("Failed to add evidence"); }
-    finally { setLoading(false); }
-  };
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Add evidence</DialogTitle></DialogHeader>
-        <div className="space-y-3 py-2">
-          <p className="text-sm text-muted-foreground">
-            Adding <span className="font-medium">{node?.label}</span> as evidence. Optionally link to threads.
-          </p>
-          {threadList.length === 0 ? (
-            <p className="text-muted-foreground text-sm py-2 text-center">No threads yet — add the evidence and link later.</p>
-          ) : (
-            <div className="space-y-2">
-              {threadList.map((t) => {
-                const sel = selected.has(t.id);
-                return (
-                  <button key={t.id} onClick={() => toggle(t.id)}
-                    className={`w-full rounded border p-2.5 text-left text-sm transition-colors ${sel ? "border-primary bg-primary/5" : "border-border hover:bg-accent"}`}>
-                    <span className="flex items-center gap-2">
-                      <span className={`h-3.5 w-3.5 shrink-0 rounded border flex items-center justify-center ${sel ? "border-primary bg-primary" : "border-muted-foreground"}`}>
-                        {sel && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-                      </span>
-                      {t.title}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={loading}>Add evidence</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <button
+      onClick={onClick}
+      disabled={!onClick}
+      className="rounded-[4px] border-2 border-border bg-card p-4 text-left shadow-[0_1px_3px_rgba(28,25,23,0.04)] transition-colors enabled:hover:border-foreground/30"
+    >
+      <div className="text-muted-foreground flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em]">
+        {icon}
+        {label}
+      </div>
+      <p className="mt-1.5 font-serif text-2xl font-black tabular-nums">{value}</p>
+      {hint && <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>}
+    </button>
   );
 }
 
 export default function CaseWorkspacePage() {
+  return (
+    <React.Suspense>
+      <CaseWorkspaceInner />
+    </React.Suspense>
+  );
+}
+
+function CaseWorkspaceInner() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const caseId = params.id as string;
 
+  const urlTab = searchParams.get("tab");
+  const [tab, setTab] = React.useState<TabValue>(
+    TABS.includes(urlTab as TabValue) ? (urlTab as TabValue) : "overview",
+  );
+  const changeTab = (value: string) => {
+    const next = value as TabValue;
+    setTab(next);
+    const sp = new URLSearchParams(searchParams.toString());
+    if (next === "overview") sp.delete("tab");
+    else sp.set("tab", next);
+    router.replace(`/investigations/${caseId}${sp.size > 0 ? `?${sp}` : ""}`, { scroll: false });
+  };
+
   const [caseData, setCaseData] = React.useState<CaseResponseDto | null>(null);
-  const [hypotheses, setHypotheses] = React.useState<HypothesisResponseDto[]>([]);
   const [threads, setThreads] = React.useState<ThreadResponseDto[]>([]);
-  const [pickerOpen, setPickerOpen] = React.useState(false);
-
-  const [nodes, setNodes] = React.useState<GraphNodeDto[]>([]);
-  const [edges, setEdges] = React.useState<GraphEdgeDto[]>([]);
-  const [selectedNode, setSelectedNode] = React.useState<GraphNodeDto | null>(null);
-  const [graphLoading, setGraphLoading] = React.useState(false);
-  const [activeEdgeTypes, setActiveEdgeTypes] = React.useState<Set<string>>(new Set());
-
-  const [addEvidenceDialogOpen, setAddEvidenceDialogOpen] = React.useState(false);
-  const [addEvidenceNode, setAddEvidenceNode] = React.useState<GraphNodeDto | null>(null);
-  const [edgeDialogOpen, setEdgeDialogOpen] = React.useState(false);
-  const [edgeFromNode, setEdgeFromNode] = React.useState<GraphNodeDto | null>(null);
-  const [renameEdgeOpen, setRenameEdgeOpen] = React.useState(false);
-  const [edgeToRename, setEdgeToRename] = React.useState<GraphEdgeDto | null>(null);
+  const [allInquiries, setAllInquiries] = React.useState<InquiryResponseDto[]>([]);
+  const [inquiryToLink, setInquiryToLink] = React.useState("");
+  const [linkingInquiry, setLinkingInquiry] = React.useState(false);
+  const [recentActivity, setRecentActivity] = React.useState<CaseActivityDto[]>([]);
 
   const [conclusion, setConclusion] = React.useState("");
-  const [status, setStatus] = React.useState<string>("OPEN");
-  const [saving, setSaving] = React.useState(false);
+  const [savingConclusion, setSavingConclusion] = React.useState(false);
+  const [closing, setClosing] = React.useState(false);
   const [pulling, setPulling] = React.useState<string | null>(null);
+
+  // ── Graph state (rendered by CaseGraphView) ───────────────────────────────
+  const [nodes, setNodes] = React.useState<GraphNodeDto[]>([]);
+  const [edges, setEdges] = React.useState<GraphEdgeDto[]>([]);
+  const [graphLoading, setGraphLoading] = React.useState(false);
+
+  // ── Loaders ────────────────────────────────────────────────────────────────
 
   const loadCase = React.useCallback(async () => {
     const data = await api.cases.casesControllerFindOne({ id: caseId });
     setCaseData(data);
-    setConclusion(data.conclusion ?? "");
-    setStatus(data.status);
+    setConclusion((prev) => (prev ? prev : (data.conclusion ?? "")));
+  }, [caseId]);
+
+  // All inquiries, for the "link another inquiry" picker.
+  React.useEffect(() => {
+    api.inquiries
+      .inquiriesControllerList({ limit: 200 })
+      .then((res) => setAllInquiries(res.items))
+      .catch(() => setAllInquiries([]));
+  }, []);
+
+  const loadThreads = React.useCallback(async () => {
+    setThreads(await api.threads.caseThreadsControllerList({ caseId }));
+  }, [caseId]);
+
+  const loadRecentActivity = React.useCallback(async () => {
+    try {
+      const res = await api.cases.caseTimelineControllerGetTimeline({ caseId, limit: "6" });
+      setRecentActivity(res.items);
+    } catch {
+      setRecentActivity([]);
+    }
   }, [caseId]);
 
   const loadGraph = React.useCallback(async () => {
     setGraphLoading(true);
     try {
       const g = await api.cases.casesControllerGraph({ id: caseId, depth: 1 });
-      setNodes(g.nodes); setEdges(g.edges); setActiveEdgeTypes(new Set());
-    } finally { setGraphLoading(false); }
-  }, [caseId]);
-
-  const loadHypotheses = React.useCallback(async () => {
-    setHypotheses(await api.hypotheses.hypothesesControllerList({ caseId }));
-  }, [caseId]);
-
-  const loadThreads = React.useCallback(async () => {
-    setThreads(await api.threads.threadsControllerList({ caseId }));
+      setNodes(g.nodes);
+      setEdges(g.edges);
+    } finally {
+      setGraphLoading(false);
+    }
   }, [caseId]);
 
   React.useEffect(() => {
-    void loadCase(); void loadGraph(); void loadHypotheses(); void loadThreads();
-  }, [loadCase, loadGraph, loadHypotheses, loadThreads]);
+    void loadCase();
+    void loadThreads();
+    void loadRecentActivity();
+    void loadGraph();
+  }, [loadCase, loadThreads, loadRecentActivity, loadGraph]);
 
-  const reloadAll = () => { void loadCase(); void loadGraph(); };
+  const reloadAll = React.useCallback(() => {
+    void loadCase();
+    void loadThreads();
+    void loadGraph();
+    void loadRecentActivity();
+  }, [loadCase, loadThreads, loadGraph, loadRecentActivity]);
 
-  const evidenceKeys = React.useMemo(() => {
-    const s = new Set<string>();
-    caseData?.evidence?.forEach((e) => s.add(nodeKey(e.entityType, e.entityId)));
-    return s;
-  }, [caseData]);
+  // ── Derived ────────────────────────────────────────────────────────────────
 
-  const evidenceMap = React.useMemo(() => {
-    const m = new Map<string, string>();
-    caseData?.evidence?.forEach((e) => m.set(nodeKey(e.entityType, e.entityId), e.id));
-    return m;
-  }, [caseData]);
+  const evidence = React.useMemo(() => caseData?.evidence ?? [], [caseData]);
+  const findingCount = evidence.reduce((sum, e) => sum + (e.findings?.length ?? 0), 0);
+
+  const hypothesisThreads = threads.filter(
+    (t) => t.kind === ThreadResponseDtoKindEnum.Hypothesis,
+  );
+  const verdictSummary = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const t of hypothesisThreads) {
+      const s = t.status ?? "PROPOSED";
+      counts[s] = (counts[s] ?? 0) + 1;
+    }
+    return Object.entries(counts)
+      .map(([s, n]) => `${n} ${s.toLowerCase()}`)
+      .join(" · ");
+  }, [hypothesisThreads]);
+
+  const isClosed = caseData?.status === "CLOSED" || caseData?.status === "ARCHIVED";
 
   const hypothesisColors = React.useMemo(() => {
     const map: Record<string, string> = {};
-    // Use threads (which have the same UUIDs as old hypotheses after migration)
-    threads.forEach((t, i) => { map[t.id] = t.color ?? HYP_PALETTE[i % HYP_PALETTE.length] ?? "#888888"; });
-    // Fallback: also include old hypothesis data in case threads haven't loaded yet
-    hypotheses.forEach((h, i) => { if (!map[h.id]) map[h.id] = h.color ?? HYP_PALETTE[i % HYP_PALETTE.length] ?? "#888888"; });
+    threads.forEach((t, i) => {
+      map[t.id] = t.color ?? HYP_PALETTE[i % HYP_PALETTE.length] ?? "#888888";
+    });
     return map;
-  }, [threads, hypotheses]);
+  }, [threads]);
 
-  const allEdgeTypes = React.useMemo(() => Array.from(new Set(edges.map((e) => e.relationType))).sort(), [edges]);
-  const visibleEdges = React.useMemo(
-    () => (activeEdgeTypes.size === 0 ? edges : edges.filter((e) => activeEdgeTypes.has(e.relationType))),
-    [edges, activeEdgeTypes],
-  );
-  const toggleEdgeType = (type: string) =>
-    setActiveEdgeTypes((prev) => { const n = new Set(prev); n.has(type) ? n.delete(type) : n.add(type); return n; });
+  // ── Actions ────────────────────────────────────────────────────────────────
 
-  const mergeGraph = React.useCallback((newNodes: GraphNodeDto[], newEdges: GraphEdgeDto[]) => {
-    setNodes((prev) => { const m = new Map(prev.map((n) => [nodeKey(n.type, n.id), n])); newNodes.forEach((n) => m.set(nodeKey(n.type, n.id), n)); return Array.from(m.values()); });
-    setEdges((prev) => { const m = new Map(prev.map((e) => [e.id, e])); newEdges.forEach((e) => m.set(e.id, e)); return Array.from(m.values()); });
-  }, []);
-
-  const expandNode = async (node: GraphNodeDto) => {
+  const changeStatus = async (status: string) => {
     try {
-      const g = await api.graph.graphControllerExpand({ expandGraphDto: { entityType: node.type, entityId: node.id, depth: 1, direction: "both" } });
-      mergeGraph(g.nodes, g.edges);
-      toast.success(`Expanded — ${g.nodes.length} nodes`);
-    } catch (err) { console.error(err); toast.error("Failed to expand"); }
+      await api.cases.casesControllerUpdate({
+        id: caseId,
+        updateCaseDto: { status: status as never },
+      });
+      toast.success(`Status set to ${status.replace("_", " ").toLowerCase()}`);
+      reloadAll();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to change status");
+    }
+  };
+
+  const saveConclusion = async () => {
+    setSavingConclusion(true);
+    try {
+      await api.cases.casesControllerUpdate({ id: caseId, updateCaseDto: { conclusion } });
+      toast.success("Conclusion saved");
+      reloadAll();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save conclusion");
+    } finally {
+      setSavingConclusion(false);
+    }
+  };
+
+  const closeCase = async () => {
+    setClosing(true);
+    try {
+      const res = await api.cases.casesControllerClose({
+        id: caseId,
+        closeCaseDto: { conclusion: conclusion.trim() },
+      });
+      toast.success(
+        res.archivedInquiries > 0
+          ? `Case closed — ${res.archivedInquiries} inquir${res.archivedInquiries === 1 ? "y" : "ies"} archived`
+          : "Case closed",
+      );
+      setCaseData(res._case);
+      reloadAll();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to close case");
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  const reopen = async () => changeStatus("IN_PROGRESS");
+
+  const linkInquiry = async () => {
+    if (!inquiryToLink) return;
+    setLinkingInquiry(true);
+    try {
+      await api.cases.casesControllerLinkInquiries({
+        id: caseId,
+        linkInquiriesDto: { inquiryIds: [inquiryToLink] },
+      });
+      toast.success("Inquiry linked");
+      setInquiryToLink("");
+      reloadAll();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to link inquiry");
+    } finally {
+      setLinkingInquiry(false);
+    }
+  };
+
+  const unlinkInquiry = async (inquiryId: string) => {
+    try {
+      await api.cases.casesControllerUnlinkInquiry({ id: caseId, inquiryId });
+      toast.success("Inquiry unlinked");
+      reloadAll();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to unlink inquiry");
+    }
+  };
+
+  const pullInquiry = async (inquiryId: string) => {
+    setPulling(inquiryId);
+    try {
+      const res = await api.cases.casesControllerPull({
+        id: caseId,
+        pullFromInquiryDto: { inquiryId },
+      });
+      toast.success(`Pulled ${res.pulled} finding${res.pulled === 1 ? "" : "s"} into evidence`);
+      reloadAll();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to pull matches");
+    } finally {
+      setPulling(null);
+    }
   };
 
   const removeEvidence = async (evidenceId: string) => {
     await api.cases.casesControllerRemoveEvidence({ id: caseId, evidenceId });
-    await loadCase();
+    reloadAll();
   };
   const removeFinding = async (caseFindingId: string) => {
     await api.cases.casesControllerRemoveFinding({ id: caseId, caseFindingId });
-    await loadCase();
+    reloadAll();
   };
-  const addFinding = async (evidenceId: string, findingId: string) => {
-    try {
-      await api.cases.casesControllerAddFinding({
-        id: caseId,
-        evidenceId,
-        addFindingDto: { findingId },
-      });
-    } catch (err) {
-      console.error("Failed to add finding:", err);
-      toast.error("Failed to add finding");
-      throw err; // propagate so handleAttachFindings can track failures
-    }
-  };
-
   const updateEvidenceNote = async (evidenceId: string, note: string) => {
     try {
       await api.cases.casesControllerPatchEvidenceNote({
@@ -241,11 +349,10 @@ export default function CaseWorkspacePage() {
         updateEvidenceNoteDto: { note: note || undefined },
       });
     } catch (err) {
-      console.error("Failed to save evidence note:", err);
+      console.error(err);
       toast.error("Failed to save note");
     }
   };
-
   const updateFindingNote = async (caseFindingId: string, note: string) => {
     try {
       await api.cases.casesControllerPatchFindingNote({
@@ -254,221 +361,459 @@ export default function CaseWorkspacePage() {
         updateCaseFindingNoteDto: { note: note || undefined },
       });
     } catch (err) {
-      console.error("Failed to save finding note:", err);
+      console.error(err);
       toast.error("Failed to save note");
     }
   };
-  const deleteEdge = async (edge: GraphEdgeDto) => {
-    try {
-      await api.graph.graphControllerDeleteEdge({ id: edge.id });
-      setEdges((prev) => prev.filter((e) => e.id !== edge.id));
-      toast.success("Edge deleted");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(msg.includes("Inferred") ? "Inferred edges cannot be deleted." : "Failed to delete edge");
-    }
-  };
-  const pullInquiry = async (inquiryId: string) => {
-    setPulling(inquiryId);
-    try {
-      const res = await api.cases.casesControllerPull({ id: caseId, pullFromInquiryDto: { inquiryId } });
-      toast.success(`Pulled ${res.pulled} finding${res.pulled === 1 ? "" : "s"} into evidence`);
-      reloadAll();
-    } catch (err) { console.error(err); toast.error("Failed to pull matches"); }
-    finally { setPulling(null); }
-  };
 
-  const save = async () => {
-    setSaving(true);
-    try {
-      await api.cases.casesControllerUpdate({ id: caseId, updateCaseDto: { conclusion, status: status as never } });
-      toast.success("Case updated");
-      await loadCase();
-    } catch (err) { console.error(err); toast.error("Failed to save"); }
-    finally { setSaving(false); }
-  };
+  const mergeExpansion = React.useCallback((newNodes: GraphNodeDto[], newEdges: GraphEdgeDto[]) => {
+    setNodes((prev) => {
+      const m = new Map(prev.map((n) => [nodeKey(n.type, n.id), n]));
+      newNodes.forEach((n) => m.set(nodeKey(n.type, n.id), n));
+      return Array.from(m.values());
+    });
+    setEdges((prev) => {
+      const m = new Map(prev.map((e) => [e.id, e]));
+      newEdges.forEach((e) => m.set(e.id, e));
+      return Array.from(m.values());
+    });
+  }, []);
 
-  if (!caseData) return <div className="text-muted-foreground py-12 text-center text-sm">Loading case…</div>;
+  // ── Render ────────────────────────────────────────────────────────────────
 
-  const inquiries = caseData.inquiries ?? [];
+  if (!caseData) {
+    return (
+      <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading case…
+      </div>
+    );
+  }
+
+  const linkedInquiries: CaseLinkedInquiryDto[] = caseData.inquiries ?? [];
+  const newMatchTotal = linkedInquiries.reduce((sum, q) => sum + q.newMatchCount, 0);
+  const linkedIds = new Set(linkedInquiries.map((q) => q.id));
+  const linkableInquiries = allInquiries.filter(
+    (q) => !linkedIds.has(q.id) && q.status !== "ARCHIVED",
+  );
 
   return (
     <div className="space-y-6">
+      {/* ── Header ── */}
       <div>
-        <Button variant="ghost" size="sm" className="mb-2 -ml-2" onClick={() => router.push("/investigations")}>
-          <ArrowLeft className="h-4 w-4" /> Investigations
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2 mb-2"
+          onClick={() => router.push("/investigations")}
+        >
+          <ArrowLeft className="h-4 w-4" /> Cases
         </Button>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-serif text-2xl font-black uppercase tracking-[0.03em]">{caseData.title}</h1>
-          <Badge variant="outline">{caseData.status.replace("_", " ")}</Badge>
-          <SeverityBadge severity={caseData.severity.toLowerCase() as never}>{caseData.severity}</SeverityBadge>
+          <h1 className="font-serif text-2xl font-black uppercase tracking-[0.03em]">
+            {caseData.title}
+          </h1>
+          <CaseStatusBadge status={caseData.status} />
+          <SeverityBadge severity={caseData.severity.toLowerCase() as never}>
+            {caseData.severity}
+          </SeverityBadge>
+          {caseData.assignee && (
+            <Badge variant="outline" className="text-xs">
+              {caseData.assignee}
+            </Badge>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            {!isClosed && (
+              <Select value={caseData.status} onValueChange={changeStatus}>
+                <SelectTrigger className="h-8 w-40 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUSES.filter((s) => s !== "CLOSED").map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s.replace("_", " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {isClosed && (
+              <Button variant="outline" size="sm" onClick={reopen}>
+                <RotateCcw className="h-3.5 w-3.5" /> Reopen
+              </Button>
+            )}
+          </div>
         </div>
-        {caseData.description && <p className="text-muted-foreground mt-1 max-w-3xl text-sm">{caseData.description}</p>}
+        {caseData.description && (
+          <p className="text-muted-foreground mt-1 max-w-3xl text-sm">{caseData.description}</p>
+        )}
       </div>
 
-      <Tabs defaultValue="timeline">
+      <Tabs value={tab} onValueChange={changeTab}>
         <TabsList>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="evidence">Evidence ({evidence.length})</TabsTrigger>
           <TabsTrigger value="threads">Threads ({threads.length})</TabsTrigger>
-          <TabsTrigger value="evidence">Evidence ({caseData.evidenceCount})</TabsTrigger>
-          <TabsTrigger value="inquiries">Inquiries ({caseData.inquiryCount})</TabsTrigger>
+          <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="graph">Graph</TabsTrigger>
-          <TabsTrigger value="conclusion">Conclusion</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="timeline" className="space-y-4">
-          <p className="text-muted-foreground text-xs max-w-md">
-            Unified activity log for this case — all evidence, findings, and thread changes in chronological order.
-          </p>
-          <CaseTimeline caseId={caseId} />
+        {/* ════ Overview ════ */}
+        <TabsContent value="overview" className="space-y-6">
+          {/* New matches alert */}
+          {newMatchTotal > 0 && !isClosed && (
+            <Card className="border-[color:var(--color-amber-600,#d97706)]/50">
+              <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+                <p className="text-sm">
+                  <Sparkles className="mr-1.5 inline h-4 w-4 text-[color:var(--color-amber-600,#d97706)]" />
+                  {newMatchTotal} new match{newMatchTotal === 1 ? "" : "es"} appeared in the
+                  linked inquir{linkedInquiries.length === 1 ? "y" : "ies"} since last review.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const target =
+                      linkedInquiries.find((q) => q.newMatchCount > 0) ?? linkedInquiries[0];
+                    router.push(`/investigations/inquiries/${target?.id}?caseId=${caseId}`);
+                  }}
+                >
+                  Review matches <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Stats */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <StatCard
+              label="Evidence"
+              value={evidence.length}
+              hint={`${findingCount} finding${findingCount === 1 ? "" : "s"} attached`}
+              icon={<Paperclip className="h-3 w-3" />}
+              onClick={() => changeTab("evidence")}
+            />
+            <StatCard
+              label="Hypotheses"
+              value={hypothesisThreads.length}
+              hint={verdictSummary || "none yet"}
+              icon={<Lightbulb className="h-3 w-3" />}
+              onClick={() => changeTab("threads")}
+            />
+            <StatCard
+              label="Discussions"
+              value={threads.length - hypothesisThreads.length}
+              hint="open threads"
+              icon={<MessageSquare className="h-3 w-3" />}
+              onClick={() => changeTab("threads")}
+            />
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+            {/* ── Conclusion / close flow ── */}
+            <div className="space-y-3">
+              <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
+                Conclusion
+              </p>
+              {isClosed ? (
+                <Card>
+                  <CardContent className="space-y-2 p-4">
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400">
+                      <CheckCircle2 className="h-4 w-4" /> Case closed
+                    </p>
+                    <p className="whitespace-pre-wrap text-sm">
+                      {caseData.conclusion || "No conclusion recorded."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <Textarea
+                    value={conclusion}
+                    onChange={(e) => setConclusion(e.target.value)}
+                    placeholder="Summarize what the evidence shows, which hypothesis it supports, and how strongly. Closing the case archives its inquiry."
+                    rows={6}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={saveConclusion}
+                      disabled={savingConclusion}
+                    >
+                      <Save className="h-3.5 w-3.5" /> Save draft
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" disabled={closing || conclusion.trim().length === 0}>
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Close case
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Close this case?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            The conclusion is recorded, the case is marked closed and{" "}
+                            {linkedInquiries.length > 0
+                              ? "its linked inquiry is archived (it stops surfacing new matches)."
+                              : "no inquiries are affected."}{" "}
+                            You can reopen later.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={closeCase}>Close case</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                    {conclusion.trim().length === 0 && (
+                      <span className="text-muted-foreground text-xs">
+                        a conclusion is required to close
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* ── Linked inquiry + recent activity ── */}
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
+                  Driving inquiries ({linkedInquiries.length})
+                </p>
+                {linkedInquiries.length === 0 && (
+                  <Card>
+                    <CardContent className="text-muted-foreground p-3 text-xs">
+                      No inquiry linked — evidence is added manually. Link one below to pull
+                      its matches as evidence.
+                    </CardContent>
+                  </Card>
+                )}
+                {linkedInquiries.map((q) => (
+                  <Card key={q.id}>
+                    <CardContent className="space-y-2 p-3">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 shrink-0 text-[color:var(--color-amber-600,#d97706)]" />
+                        <button
+                          className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline"
+                          onClick={() =>
+                            router.push(`/investigations/inquiries/${q.id}?caseId=${caseId}`)
+                          }
+                        >
+                          {q.title}
+                        </button>
+                        {q.status === "ARCHIVED" && (
+                          <Badge variant="outline" className="text-[10px] uppercase">
+                            archived
+                          </Badge>
+                        )}
+                        {q.status !== "ARCHIVED" && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6"
+                            aria-label="Edit inquiry query"
+                            onClick={() =>
+                              router.push(`/investigations/inquiries/${q.id}/edit`)
+                            }
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        )}
+                        {!isClosed && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 text-muted-foreground"
+                                aria-label="Unlink inquiry"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Unlink “{q.title}”?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  The inquiry and the evidence already pulled from it are
+                                  kept — only the link to this case is removed.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => unlinkInquiry(q.id)}>
+                                  Unlink
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        {q.matchCount} current match{q.matchCount === 1 ? "" : "es"}
+                        {q.newMatchCount > 0 ? (
+                          <span className="text-[color:var(--color-amber-600,#d97706)]">
+                            {" "}· {q.newMatchCount} new
+                          </span>
+                        ) : (
+                          ""
+                        )}
+                      </p>
+                      {!isClosed && q.matchCount > 0 && (
+                        <div className="flex gap-1.5">
+                          <Button
+                            size="sm"
+                            className="flex-1"
+                            onClick={() =>
+                              router.push(`/investigations/inquiries/${q.id}?caseId=${caseId}`)
+                            }
+                          >
+                            Select matches to pull <ArrowRight className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={pulling === q.id}
+                            onClick={() => pullInquiry(q.id)}
+                            title="Pull all current matches"
+                          >
+                            {pulling === q.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <DownloadCloud className="h-3.5 w-3.5" />
+                            )}
+                            All
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+                {!isClosed && linkableInquiries.length > 0 && (
+                  <div className="flex gap-1.5">
+                    <Select value={inquiryToLink} onValueChange={setInquiryToLink}>
+                      <SelectTrigger className="h-8 flex-1 text-xs">
+                        <SelectValue placeholder="Link another inquiry…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {linkableInquiries.map((q) => (
+                          <SelectItem key={q.id} value={q.id}>
+                            {q.title}{" "}
+                            <span className="text-muted-foreground">({q.matchCount})</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={linkInquiry}
+                      disabled={!inquiryToLink || linkingInquiry}
+                    >
+                      {linkingInquiry ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Link2 className="h-3.5 w-3.5" />
+                      )}
+                      Link
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
+                    Recent activity
+                  </p>
+                  <button
+                    className="text-muted-foreground text-xs underline"
+                    onClick={() => changeTab("timeline")}
+                  >
+                    Full timeline
+                  </button>
+                </div>
+                {recentActivity.length === 0 ? (
+                  <p className="text-muted-foreground text-xs">No activity yet.</p>
+                ) : (
+                  <div className="divide-y divide-border rounded-[4px] border-2 border-border bg-card">
+                    {recentActivity.map((a) => (
+                      <div key={a.id} className="flex items-baseline justify-between gap-2 px-3 py-2">
+                        <span className="min-w-0 flex-1 truncate text-xs">
+                          {a.activityType.toLowerCase().replace(/_/g, " ")}
+                        </span>
+                        <span className="text-muted-foreground shrink-0 text-[10px]">
+                          {new Date(a.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </TabsContent>
 
-        <TabsContent value="threads">
-          <CaseThreadPanel caseId={caseId} evidence={caseData.evidence ?? []} />
-        </TabsContent>
-
+        {/* ════ Evidence ════ */}
         <TabsContent value="evidence" className="space-y-4">
-          <p className="text-muted-foreground text-xs max-w-md">
-            The real, persisted evidence for this case. Pull from an inquiry (Inquiries tab) or add manually.
+          <p className="text-muted-foreground max-w-2xl text-xs">
+            The persisted record of this case — snapshots survive even if the source data
+            changes. Pull from the driving inquiry on the Overview tab, or attach findings
+            directly.
           </p>
           <EvidenceTable
-            evidence={caseData.evidence ?? []}
+            evidence={evidence}
             onRemoveEvidence={removeEvidence}
             onRemoveFinding={removeFinding}
-            onAddEvidence={() => setPickerOpen(true)}
-            onAddFinding={addFinding}
+            onAddEvidence={() => router.push(`/investigations/${caseId}/evidence/add`)}
+            onAddFindings={(assetId) =>
+              router.push(`/investigations/${caseId}/evidence/add?assetId=${assetId}`)
+            }
             onNoteChange={updateEvidenceNote}
             onFindingNoteChange={updateFindingNote}
-            onRefresh={() => void loadCase()}
           />
         </TabsContent>
 
-        <TabsContent value="inquiries" className="space-y-4">
-          <p className="text-muted-foreground text-xs max-w-lg">
-            Linked inquiries guide this case. Pull their current matches in as evidence — the case keeps its own copy even if the query later changes.
-          </p>
-          {inquiries.length > 0 ? (
-            <div className="space-y-2">
-              {inquiries.map((q) => (
-                <Card key={q.id}>
-                  <CardContent className="flex items-center justify-between gap-3 p-3">
-                    <button className="flex min-w-0 items-center gap-2 text-left" onClick={() => router.push(`/investigations/inquiries/${q.id}`)}>
-                      <HelpCircle className="text-muted-foreground h-4 w-4 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{q.title}</p>
-                        <p className="text-muted-foreground text-xs">{q.matchCount} match{q.matchCount === 1 ? "" : "es"} · {q.status}</p>
-                      </div>
-                    </button>
-                    <Button size="sm" variant="outline" disabled={pulling === q.id || q.matchCount === 0} onClick={() => pullInquiry(q.id)}>
-                      <DownloadCloud className="h-3.5 w-3.5" /> Pull {q.matchCount > 0 ? `(${q.matchCount})` : ""}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <EmptyState title="No linked inquiries" description="Link inquiries to this case from the Inquiries list." />
-          )}
+        {/* ════ Threads ════ */}
+        <TabsContent value="threads">
+          <CaseThreads caseId={caseId} evidence={evidence} />
         </TabsContent>
 
-        <TabsContent value="graph" className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-muted-foreground text-sm">{graphLoading ? "Building graph…" : `${nodes.length} nodes · ${edges.length} relationships`}</p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => { setEdgeFromNode(selectedNode); setEdgeDialogOpen(true); }} disabled={!selectedNode}>
-                <Link2 className="h-3.5 w-3.5" /> Add edge
-              </Button>
-              <Button variant="outline" size="sm" onClick={loadGraph}>Reset</Button>
-            </div>
-          </div>
-          {allEdgeTypes.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-muted-foreground font-mono text-[10px] uppercase tracking-wide mr-1">Show edges:</span>
-              {allEdgeTypes.map((type) => {
-                const active = activeEdgeTypes.size === 0 || activeEdgeTypes.has(type);
-                const count = edges.filter((e) => e.relationType === type).length;
-                return (
-                  <button key={type} onClick={() => toggleEdgeType(type)}
-                    className={`rounded border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide transition-colors ${active ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}>
-                    {type} <span className="opacity-60">({count})</span>
-                  </button>
-                );
-              })}
-              {activeEdgeTypes.size > 0 && <button onClick={() => setActiveEdgeTypes(new Set())} className="text-muted-foreground text-[10px] underline">clear</button>}
-            </div>
-          )}
-          <div className="grid gap-3 lg:grid-cols-[1fr_240px]">
-            <div className="h-[560px] border border-border bg-card">
-              {nodes.length > 0 ? (
-                <CaseGraph
-                  caseId={caseId}
-                  nodes={nodes}
-                  edges={visibleEdges}
-                  hypotheses={hypotheses}
-                  hypothesisColors={hypothesisColors}
-                  evidenceKeys={evidenceKeys}
-                  evidenceMap={evidenceMap}
-                  selectedKey={selectedNode ? nodeKey(selectedNode.type, selectedNode.id) : null}
-                  onSelectNode={setSelectedNode}
-                  onAddEdgeFrom={(node) => { setEdgeFromNode(node); setEdgeDialogOpen(true); }}
-                  onRenameEdge={(edge) => { setEdgeToRename(edge); setRenameEdgeOpen(true); }}
-                  onDeleteEdge={deleteEdge}
-                  onGraphChanged={reloadAll}
+        {/* ════ Timeline ════ */}
+        <TabsContent value="timeline">
+          <CaseTimeline caseId={caseId} />
+        </TabsContent>
+
+        {/* ════ Graph ════ */}
+        <TabsContent value="graph">
+          <div className="h-[calc(100vh-220px)] min-h-[560px]">
+            {graphLoading && nodes.length === 0 ? (
+              <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" /> Building graph…
+              </div>
+            ) : nodes.length > 0 ? (
+              <CaseGraphView
+                caseId={caseId}
+                nodes={nodes}
+                edges={edges}
+                hypotheses={hypothesisThreads}
+                hypothesisColors={hypothesisColors}
+                evidence={evidence}
+                onReload={reloadAll}
+                onMergeExpansion={mergeExpansion}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center border-2 border-border bg-card">
+                <EmptyState
+                  title="Empty graph"
+                  description="Add evidence to seed the relationship graph."
                 />
-              ) : (
-                <div className="flex h-full items-center justify-center">
-                  <EmptyState title="Empty graph" description="Add evidence to seed the relationship graph." />
-                </div>
-              )}
-            </div>
-            <div className="space-y-3">
-              {selectedNode ? (
-                <Card>
-                  <CardContent className="space-y-3 p-3">
-                    <div>
-                      <p className="text-muted-foreground text-[11px] font-mono uppercase">{selectedNode.type}</p>
-                      <p className="break-words font-medium">{selectedNode.label}</p>
-                    </div>
-                    {selectedNode.severity && <SeverityBadge severity={selectedNode.severity.toLowerCase() as never}>{selectedNode.severity}</SeverityBadge>}
-                    <div className="flex flex-col gap-2">
-                      <Button size="sm" variant="outline" onClick={() => expandNode(selectedNode)}><Maximize2 className="h-3.5 w-3.5" /> Expand</Button>
-                      {selectedNode.type === "asset" && !evidenceKeys.has(nodeKey(selectedNode.type, selectedNode.id)) && (
-                        <Button size="sm" onClick={() => { setAddEvidenceNode(selectedNode); setAddEvidenceDialogOpen(true); }}><Plus className="h-3.5 w-3.5" /> Add as evidence</Button>
-                      )}
-                      <Button size="sm" variant="outline" onClick={() => { setEdgeFromNode(selectedNode); setEdgeDialogOpen(true); }}><Link2 className="h-3.5 w-3.5" /> Add manual edge</Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card><CardContent className="text-muted-foreground p-3 text-sm">Click a node to select it. Green ring = already evidence.</CardContent></Card>
-              )}
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="conclusion" className="space-y-4">
-          <div className="max-w-3xl space-y-4">
-            <div className="space-y-1.5">
-              <Label>Case status</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
-                <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s.replace("_", " ")}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="conclusion">Conclusion</Label>
-              <Textarea id="conclusion" value={conclusion} onChange={(e) => setConclusion(e.target.value)}
-                placeholder="Summarize which hypothesis the evidence supports, and how strongly." rows={8} />
-            </div>
-            <Button onClick={save} disabled={saving}><Save className="h-4 w-4" /> Save</Button>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
-
-      <EvidencePickerDialog caseId={caseId} open={pickerOpen} onOpenChange={setPickerOpen} existingKeys={evidenceKeys} onAdded={reloadAll} />
-      <AddEvidenceHypDialog open={addEvidenceDialogOpen} onOpenChange={setAddEvidenceDialogOpen} node={addEvidenceNode} caseId={caseId} onAdded={reloadAll} />
-      <ManualEdgeDialog open={edgeDialogOpen} onOpenChange={setEdgeDialogOpen} fromNode={edgeFromNode} nodes={nodes} onCreated={() => void loadGraph()} />
-      <RenameEdgeDialog open={renameEdgeOpen} onOpenChange={setRenameEdgeOpen} edge={edgeToRename} onRenamed={() => void loadGraph()} />
     </div>
   );
 }

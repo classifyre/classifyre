@@ -38,11 +38,17 @@ export interface CaseLinkedInquiryDto {
      */
     status: CaseLinkedInquiryDtoStatusEnum;
     /**
-     * Findings currently matching this question
+     * Findings currently matching this inquiry
      * @type {number}
      * @memberof CaseLinkedInquiryDto
      */
     matchCount: number;
+    /**
+     * Matches that appeared since the inquiry was last viewed
+     * @type {number}
+     * @memberof CaseLinkedInquiryDto
+     */
+    newMatchCount: number;
 }
 
 
@@ -64,6 +70,7 @@ export function instanceOfCaseLinkedInquiryDto(value: object): value is CaseLink
     if (!('title' in value) || value['title'] === undefined) return false;
     if (!('status' in value) || value['status'] === undefined) return false;
     if (!('matchCount' in value) || value['matchCount'] === undefined) return false;
+    if (!('newMatchCount' in value) || value['newMatchCount'] === undefined) return false;
     return true;
 }
 
@@ -81,6 +88,7 @@ export function CaseLinkedInquiryDtoFromJSONTyped(json: any, ignoreDiscriminator
         'title': json['title'],
         'status': json['status'],
         'matchCount': json['matchCount'],
+        'newMatchCount': json['newMatchCount'],
     };
 }
 
@@ -99,6 +107,7 @@ export function CaseLinkedInquiryDtoToJSONTyped(value?: CaseLinkedInquiryDto | n
         'title': value['title'],
         'status': value['status'],
         'matchCount': value['matchCount'],
+        'newMatchCount': value['newMatchCount'],
     };
 }
 

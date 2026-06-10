@@ -10,6 +10,7 @@ Name | Type
 `title` | string
 `status` | string
 `matchCount` | number
+`newMatchCount` | number
 
 ## Example
 
@@ -22,6 +23,7 @@ const example = {
   "title": null,
   "status": null,
   "matchCount": null,
+  "newMatchCount": null,
 } satisfies CaseLinkedInquiryDto
 
 console.log(example)

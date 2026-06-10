@@ -102,6 +102,8 @@ export {
   CreateThreadDtoKindEnum,
   ThreadEntryDtoEntryTypeEnum,
   AddThreadEntryDtoEntryTypeEnum,
+  LinkThreadSupportDtoTargetTypeEnum,
+  LinkThreadSupportDtoStanceEnum,
 } from "./generated/src/models";
 export {
   CasesControllerListStatusEnum,

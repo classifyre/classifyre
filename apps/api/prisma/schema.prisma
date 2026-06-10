@@ -722,13 +722,13 @@ model Case {
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
 
-  evidence   CaseEvidence[]
-  findings   CaseFinding[]
-  hypotheses Hypothesis[]
-  notes      CaseNote[]
-  inquiries  Inquiry[]
-  threads    CaseThread[]
-  activities CaseActivity[]
+  evidence     CaseEvidence[]
+  findings     CaseFinding[]
+  hypotheses   Hypothesis[]
+  notes        CaseNote[]
+  inquiryLinks CaseInquiry[]
+  threads      CaseThread[]
+  activities   CaseActivity[]
 
   @@index([status])
   @@index([severity])
@@ -738,14 +738,13 @@ model Case {
 
 // A saved query / monitor. It does NOT persist evidence — it only defines matchers
 // and tracks which findings currently match (QuestionMatch) so we can surface new
-// matches. A question is standalone (caseId null) or linked to a case to guide it.
+// matches. An inquiry is standalone or linked to any number of cases (CaseInquiry).
 //
 // Matchers: a finding matches iff source matches AND (detector OR customDetector
 // matches) AND type matches, where an empty list for a dimension means "any".
 // findingTypeRegex is evaluated in the app (findingType is dynamic for CUSTOM).
 model Inquiry {
   id          String         @id @default(uuid())
-  caseId      String?        @map("case_id")
   title       String
   description String?        @db.Text
   status      InquiryStatus @default(ACTIVE)
@@ -765,11 +764,26 @@ model Inquiry {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  case Case? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  caseLinks CaseInquiry[]
 
-  @@index([caseId])
   @@index([status])
   @@map("inquiries")
+}
+
+// Many-to-many link: an inquiry can guide several cases and a case can be
+// driven by several inquiries. Deleting either side removes only the link.
+model CaseInquiry {
+  id        String   @id @default(uuid())
+  caseId    String   @map("case_id")
+  inquiryId String   @map("inquiry_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  case    Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, inquiryId])
+  @@index([inquiryId])
+  @@map("case_inquiries")
 }
 
 // An observed node attached to a CASE. entityType: "asset" | "sandbox". Display

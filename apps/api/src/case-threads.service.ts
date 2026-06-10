@@ -174,10 +174,10 @@ export class CaseThreadsService {
   }
 
   async linkSupport(threadId: string, dto: LinkThreadSupportDto): Promise<ThreadResponseDto> {
-    const thread = await this.prisma.caseThread.findUnique({ where: { id: threadId }, select: { caseId: true } });
+    const thread = await this.prisma.caseThread.findUnique({ where: { id: threadId }, select: { caseId: true, title: true } });
     if (!thread) throw new NotFoundException(`Thread ${threadId} not found`);
 
-    await this.validateTarget(dto.targetType, dto.targetId, thread.caseId);
+    const targetLabel = await this.validateTarget(dto.targetType, dto.targetId, thread.caseId);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.caseThreadSupport.upsert({
@@ -188,7 +188,14 @@ export class CaseThreadsService {
       await this.activity.record(
         thread.caseId,
         CaseActivityType.SUPPORT_LINKED,
-        { threadId, targetType: dto.targetType, targetId: dto.targetId, stance: dto.stance },
+        {
+          threadId,
+          threadTitle: thread.title,
+          targetType: dto.targetType,
+          targetId: dto.targetId,
+          targetLabel,
+          stance: dto.stance ?? EvidenceStance.SUPPORTS,
+        },
         undefined,
         tx,
       );
@@ -198,16 +205,26 @@ export class CaseThreadsService {
   }
 
   async unlinkSupport(threadId: string, linkId: string): Promise<ThreadResponseDto> {
-    const link = await this.prisma.caseThreadSupport.findUnique({ where: { id: linkId }, select: { threadId: true } });
+    const link = await this.prisma.caseThreadSupport.findUnique({
+      where: { id: linkId },
+      select: { threadId: true, targetType: true, targetId: true },
+    });
     if (!link || link.threadId !== threadId) {
       throw new NotFoundException(`Support link ${linkId} not found on thread ${threadId}`);
     }
-    const thread = await this.prisma.caseThread.findUnique({ where: { id: threadId }, select: { caseId: true } });
+    const thread = await this.prisma.caseThread.findUnique({ where: { id: threadId }, select: { caseId: true, title: true } });
+    const targetLabel = await this.lookupTargetLabel(link.targetType, link.targetId);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.caseThreadSupport.delete({ where: { id: linkId } });
       if (thread) {
-        await this.activity.record(thread.caseId, CaseActivityType.SUPPORT_UNLINKED, { threadId, linkId }, undefined, tx);
+        await this.activity.record(
+          thread.caseId,
+          CaseActivityType.SUPPORT_UNLINKED,
+          { threadId, threadTitle: thread.title, linkId, targetType: link.targetType, targetLabel },
+          undefined,
+          tx,
+        );
       }
     });
 
@@ -227,14 +244,26 @@ export class CaseThreadsService {
     if (!found) throw new NotFoundException(`Case with ID ${caseId} not found`);
   }
 
-  private async validateTarget(targetType: 'evidence' | 'finding', targetId: string, caseId: string): Promise<void> {
+  /** Validates the target belongs to the case and returns its display label. */
+  private async validateTarget(targetType: 'evidence' | 'finding', targetId: string, caseId: string): Promise<string> {
     if (targetType === 'evidence') {
-      const ev = await this.prisma.caseEvidence.findUnique({ where: { id: targetId }, select: { caseId: true } });
+      const ev = await this.prisma.caseEvidence.findUnique({ where: { id: targetId }, select: { caseId: true, label: true, entityId: true } });
       if (!ev || ev.caseId !== caseId) throw new BadRequestException('Evidence must belong to the same case as the thread');
-    } else {
-      const cf = await this.prisma.caseFinding.findUnique({ where: { id: targetId }, select: { caseId: true } });
-      if (!cf || cf.caseId !== caseId) throw new BadRequestException('Finding must belong to the same case as the thread');
+      return ev.label ?? ev.entityId;
     }
+    const cf = await this.prisma.caseFinding.findUnique({ where: { id: targetId }, select: { caseId: true, label: true } });
+    if (!cf || cf.caseId !== caseId) throw new BadRequestException('Finding must belong to the same case as the thread');
+    return cf.label;
+  }
+
+  /** Best-effort display label for a support target (used when unlinking). */
+  private async lookupTargetLabel(targetType: string, targetId: string): Promise<string | null> {
+    if (targetType === 'evidence') {
+      const ev = await this.prisma.caseEvidence.findUnique({ where: { id: targetId }, select: { label: true, entityId: true } });
+      return ev ? (ev.label ?? ev.entityId) : null;
+    }
+    const cf = await this.prisma.caseFinding.findUnique({ where: { id: targetId }, select: { label: true } });
+    return cf?.label ?? null;
   }
 
   private async mapMany(rows: ThreadRow[]): Promise<ThreadResponseDto[]> {

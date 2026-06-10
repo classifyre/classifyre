@@ -17,12 +17,18 @@ import * as runtime from '../runtime';
 import type {
   AddEvidenceDto,
   AddFindingDto,
+  AttachFindingsDto,
+  AttachFindingsResponseDto,
   CaseEvidenceDto,
   CaseFindingDto,
   CaseListResponseDto,
   CaseResponseDto,
+  CaseTimelineResponseDto,
+  CloseCaseDto,
+  CloseCaseResponseDto,
   CreateCaseDto,
   GraphResponseDto,
+  LinkInquiriesDto,
   PullFromInquiryDto,
   PullFromInquiryResponseDto,
   UpdateCaseDto,
@@ -34,6 +40,10 @@ import {
     AddEvidenceDtoToJSON,
     AddFindingDtoFromJSON,
     AddFindingDtoToJSON,
+    AttachFindingsDtoFromJSON,
+    AttachFindingsDtoToJSON,
+    AttachFindingsResponseDtoFromJSON,
+    AttachFindingsResponseDtoToJSON,
     CaseEvidenceDtoFromJSON,
     CaseEvidenceDtoToJSON,
     CaseFindingDtoFromJSON,
@@ -42,10 +52,18 @@ import {
     CaseListResponseDtoToJSON,
     CaseResponseDtoFromJSON,
     CaseResponseDtoToJSON,
+    CaseTimelineResponseDtoFromJSON,
+    CaseTimelineResponseDtoToJSON,
+    CloseCaseDtoFromJSON,
+    CloseCaseDtoToJSON,
+    CloseCaseResponseDtoFromJSON,
+    CloseCaseResponseDtoToJSON,
     CreateCaseDtoFromJSON,
     CreateCaseDtoToJSON,
     GraphResponseDtoFromJSON,
     GraphResponseDtoToJSON,
+    LinkInquiriesDtoFromJSON,
+    LinkInquiriesDtoToJSON,
     PullFromInquiryDtoFromJSON,
     PullFromInquiryDtoToJSON,
     PullFromInquiryResponseDtoFromJSON,
@@ -58,6 +76,12 @@ import {
     UpdateEvidenceNoteDtoToJSON,
 } from '../models/index';
 
+export interface CaseTimelineControllerGetTimelineRequest {
+    caseId: string;
+    cursor?: string;
+    limit?: string;
+}
+
 export interface CasesControllerAddEvidenceRequest {
     id: string;
     addEvidenceDto: AddEvidenceDto;
@@ -67,6 +91,16 @@ export interface CasesControllerAddFindingRequest {
     id: string;
     evidenceId: string;
     addFindingDto: AddFindingDto;
+}
+
+export interface CasesControllerAttachFindingsRequest {
+    id: string;
+    attachFindingsDto: AttachFindingsDto;
+}
+
+export interface CasesControllerCloseRequest {
+    id: string;
+    closeCaseDto: CloseCaseDto;
 }
 
 export interface CasesControllerCreateRequest {
@@ -80,6 +114,11 @@ export interface CasesControllerFindOneRequest {
 export interface CasesControllerGraphRequest {
     id: string;
     depth?: number;
+}
+
+export interface CasesControllerLinkInquiriesRequest {
+    id: string;
+    linkInquiriesDto: LinkInquiriesDto;
 }
 
 export interface CasesControllerListRequest {
@@ -121,6 +160,11 @@ export interface CasesControllerRemoveFindingRequest {
     caseFindingId: string;
 }
 
+export interface CasesControllerUnlinkInquiryRequest {
+    id: string;
+    inquiryId: string;
+}
+
 export interface CasesControllerUpdateRequest {
     id: string;
     updateCaseDto: UpdateCaseDto;
@@ -130,6 +174,51 @@ export interface CasesControllerUpdateRequest {
  * 
  */
 export class CasesApi extends runtime.BaseAPI {
+
+    /**
+     * Paginated unified case activity feed (newest first)
+     */
+    async caseTimelineControllerGetTimelineRaw(requestParameters: CaseTimelineControllerGetTimelineRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseTimelineResponseDto>> {
+        if (requestParameters['caseId'] == null) {
+            throw new runtime.RequiredError(
+                'caseId',
+                'Required parameter "caseId" was null or undefined when calling caseTimelineControllerGetTimeline().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['cursor'] != null) {
+            queryParameters['cursor'] = requestParameters['cursor'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/cases/{caseId}/timeline`;
+        urlPath = urlPath.replace(`{${"caseId"}}`, encodeURIComponent(String(requestParameters['caseId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseTimelineResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Paginated unified case activity feed (newest first)
+     */
+    async caseTimelineControllerGetTimeline(requestParameters: CaseTimelineControllerGetTimelineRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseTimelineResponseDto> {
+        const response = await this.caseTimelineControllerGetTimelineRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Attach an asset as evidence
@@ -230,6 +319,100 @@ export class CasesApi extends runtime.BaseAPI {
      */
     async casesControllerAddFinding(requestParameters: CasesControllerAddFindingRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseFindingDto> {
         const response = await this.casesControllerAddFindingRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Batch-attach findings (asset evidence rows are created as needed)
+     */
+    async casesControllerAttachFindingsRaw(requestParameters: CasesControllerAttachFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AttachFindingsResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling casesControllerAttachFindings().'
+            );
+        }
+
+        if (requestParameters['attachFindingsDto'] == null) {
+            throw new runtime.RequiredError(
+                'attachFindingsDto',
+                'Required parameter "attachFindingsDto" was null or undefined when calling casesControllerAttachFindings().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/findings`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AttachFindingsDtoToJSON(requestParameters['attachFindingsDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AttachFindingsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Batch-attach findings (asset evidence rows are created as needed)
+     */
+    async casesControllerAttachFindings(requestParameters: CasesControllerAttachFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AttachFindingsResponseDto> {
+        const response = await this.casesControllerAttachFindingsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Close a case with a conclusion (archives linked inquiries)
+     */
+    async casesControllerCloseRaw(requestParameters: CasesControllerCloseRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CloseCaseResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling casesControllerClose().'
+            );
+        }
+
+        if (requestParameters['closeCaseDto'] == null) {
+            throw new runtime.RequiredError(
+                'closeCaseDto',
+                'Required parameter "closeCaseDto" was null or undefined when calling casesControllerClose().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/close`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CloseCaseDtoToJSON(requestParameters['closeCaseDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CloseCaseResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Close a case with a conclusion (archives linked inquiries)
+     */
+    async casesControllerClose(requestParameters: CasesControllerCloseRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CloseCaseResponseDto> {
+        const response = await this.casesControllerCloseRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -347,6 +530,53 @@ export class CasesApi extends runtime.BaseAPI {
      */
     async casesControllerGraph(requestParameters: CasesControllerGraphRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GraphResponseDto> {
         const response = await this.casesControllerGraphRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Link inquiries to a case (already-linked ones are ignored)
+     */
+    async casesControllerLinkInquiriesRaw(requestParameters: CasesControllerLinkInquiriesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling casesControllerLinkInquiries().'
+            );
+        }
+
+        if (requestParameters['linkInquiriesDto'] == null) {
+            throw new runtime.RequiredError(
+                'linkInquiriesDto',
+                'Required parameter "linkInquiriesDto" was null or undefined when calling casesControllerLinkInquiries().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{id}/inquiries`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: LinkInquiriesDtoToJSON(requestParameters['linkInquiriesDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Link inquiries to a case (already-linked ones are ignored)
+     */
+    async casesControllerLinkInquiries(requestParameters: CasesControllerLinkInquiriesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseResponseDto> {
+        const response = await this.casesControllerLinkInquiriesRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -678,6 +908,51 @@ export class CasesApi extends runtime.BaseAPI {
      */
     async casesControllerRemoveFinding(requestParameters: CasesControllerRemoveFindingRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.casesControllerRemoveFindingRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Unlink an inquiry from a case (the inquiry is untouched)
+     */
+    async casesControllerUnlinkInquiryRaw(requestParameters: CasesControllerUnlinkInquiryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling casesControllerUnlinkInquiry().'
+            );
+        }
+
+        if (requestParameters['inquiryId'] == null) {
+            throw new runtime.RequiredError(
+                'inquiryId',
+                'Required parameter "inquiryId" was null or undefined when calling casesControllerUnlinkInquiry().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/cases/{id}/inquiries/{inquiryId}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+        urlPath = urlPath.replace(`{${"inquiryId"}}`, encodeURIComponent(String(requestParameters['inquiryId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Unlink an inquiry from a case (the inquiry is untouched)
+     */
+    async casesControllerUnlinkInquiry(requestParameters: CasesControllerUnlinkInquiryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseResponseDto> {
+        const response = await this.casesControllerUnlinkInquiryRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

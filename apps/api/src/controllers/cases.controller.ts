@@ -16,11 +16,16 @@ import { CasesService } from '../cases.service';
 import {
   AddEvidenceDto,
   AddFindingDto,
+  AttachFindingsDto,
+  AttachFindingsResponseDto,
   CaseEvidenceDto,
   CaseFindingDto,
   CaseListResponseDto,
   CaseResponseDto,
+  CloseCaseDto,
+  CloseCaseResponseDto,
   CreateCaseDto,
+  LinkInquiriesDto,
   PullFromInquiryDto,
   PullFromInquiryResponseDto,
   QueryCasesDto,
@@ -111,6 +116,17 @@ export class CasesController {
     return this.casesService.addFinding(id, evidenceId, dto);
   }
 
+  @Post(':id/findings')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Batch-attach findings (asset evidence rows are created as needed)' })
+  @ApiResponse({ status: 200, type: AttachFindingsResponseDto })
+  attachFindings(
+    @Param('id') id: string,
+    @Body() dto: AttachFindingsDto,
+  ): Promise<AttachFindingsResponseDto> {
+    return this.casesService.attachFindings(id, dto);
+  }
+
   @Patch(':id/findings/:caseFindingId')
   @ApiOperation({ summary: 'Update the note on a case finding' })
   @ApiResponse({ status: 200, type: CaseFindingDto })
@@ -127,6 +143,33 @@ export class CasesController {
   @ApiOperation({ summary: 'Remove a finding from the case' })
   async removeFinding(@Param('id') id: string, @Param('caseFindingId') caseFindingId: string): Promise<void> {
     await this.casesService.removeFinding(id, caseFindingId);
+  }
+
+  @Post(':id/inquiries')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Link inquiries to a case (already-linked ones are ignored)' })
+  @ApiResponse({ status: 200, type: CaseResponseDto })
+  linkInquiries(@Param('id') id: string, @Body() dto: LinkInquiriesDto): Promise<CaseResponseDto> {
+    return this.casesService.linkInquiries(id, dto);
+  }
+
+  @Delete(':id/inquiries/:inquiryId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Unlink an inquiry from a case (the inquiry is untouched)' })
+  @ApiResponse({ status: 200, type: CaseResponseDto })
+  unlinkInquiry(
+    @Param('id') id: string,
+    @Param('inquiryId') inquiryId: string,
+  ): Promise<CaseResponseDto> {
+    return this.casesService.unlinkInquiry(id, inquiryId);
+  }
+
+  @Post(':id/close')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Close a case with a conclusion (archives linked inquiries)' })
+  @ApiResponse({ status: 200, type: CloseCaseResponseDto })
+  close(@Param('id') id: string, @Body() dto: CloseCaseDto): Promise<CloseCaseResponseDto> {
+    return this.casesService.close(id, dto);
   }
 
   @Post(':id/pull')

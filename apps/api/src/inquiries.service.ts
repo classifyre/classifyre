@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DetectorType, Inquiry, Prisma } from '@prisma/client';
+import { DetectorType, Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { InquiryMatchers } from './matching/inquiry-matcher';
@@ -52,15 +52,20 @@ export class InquiriesService {
     private readonly matching: InquiryMatchingService,
   ) {}
 
+  private readonly caseInclude = {
+    caseLinks: {
+      include: { case: { select: { id: true, title: true, status: true } } },
+      orderBy: { createdAt: 'asc' as const },
+    },
+  } satisfies Prisma.InquiryInclude;
+
   async create(dto: CreateInquiryDto): Promise<InquiryResponseDto> {
     assertValidRegexAll(dto);
-    if (dto.caseId) await this.ensureCaseExists(dto.caseId);
 
     const created = await this.prisma.inquiry.create({
       data: {
         title: dto.title,
         description: dto.description,
-        caseId: dto.caseId,
         createdBy: dto.createdBy,
         ...this.matcherData(dto),
       },
@@ -77,8 +82,8 @@ export class InquiriesService {
     const where: Prisma.InquiryWhereInput = {};
     const statusFilter = this.toArray(query.status);
     if (statusFilter.length > 0) where.status = { in: statusFilter };
-    if (query.caseId === 'none') where.caseId = null;
-    else if (query.caseId) where.caseId = query.caseId;
+    if (query.caseId === 'none') where.caseLinks = { none: {} };
+    else if (query.caseId) where.caseLinks = { some: { caseId: query.caseId } };
     if (query.search && query.search.trim().length > 0) {
       const term = query.search.trim();
       where.OR = [
@@ -88,14 +93,14 @@ export class InquiriesService {
     }
 
     const [rows, total] = await Promise.all([
-      this.prisma.inquiry.findMany({ where, orderBy: { updatedAt: 'desc' }, skip, take: limit }),
+      this.prisma.inquiry.findMany({ where, include: this.caseInclude, orderBy: { updatedAt: 'desc' }, skip, take: limit }),
       this.prisma.inquiry.count({ where }),
     ]);
     return { items: rows.map((r) => this.mapInquiry(r)), total, skip, limit };
   }
 
   async findOne(id: string): Promise<InquiryResponseDto | null> {
-    const row = await this.prisma.inquiry.findUnique({ where: { id } });
+    const row = await this.prisma.inquiry.findUnique({ where: { id }, include: this.caseInclude });
     if (!row) return null;
     return this.mapInquiry(row);
   }
@@ -103,7 +108,6 @@ export class InquiriesService {
   async update(id: string, dto: UpdateInquiryDto): Promise<InquiryResponseDto> {
     await this.ensureExists(id);
     assertValidRegexAll(dto);
-    if (dto.caseId) await this.ensureCaseExists(dto.caseId);
 
     await this.prisma.inquiry.update({
       where: { id },
@@ -111,7 +115,6 @@ export class InquiriesService {
         title: dto.title,
         description: dto.description,
         status: dto.status,
-        caseId: dto.caseId === undefined ? undefined : dto.caseId,
         ...this.matcherData(dto),
       },
     });
@@ -189,11 +192,6 @@ export class InquiriesService {
     if (!found) throw new NotFoundException(`Inquiry ${id} not found`);
   }
 
-  private async ensureCaseExists(id: string): Promise<void> {
-    const found = await this.prisma.case.findUnique({ where: { id }, select: { id: true } });
-    if (!found) throw new NotFoundException(`Case ${id} not found`);
-  }
-
   private async findOneOrThrow(id: string): Promise<InquiryResponseDto> {
     const q = await this.findOne(id);
     if (!q) throw new NotFoundException(`Inquiry ${id} not found`);
@@ -232,10 +230,18 @@ export class InquiriesService {
     };
   }
 
-  private mapInquiry(row: Inquiry): InquiryResponseDto {
+  private mapInquiry(
+    row: Prisma.InquiryGetPayload<{
+      include: { caseLinks: { include: { case: { select: { id: true; title: true; status: true } } } } };
+    }>,
+  ): InquiryResponseDto {
     return {
       id: row.id,
-      caseId: row.caseId,
+      cases: row.caseLinks.map((l) => ({
+        id: l.case.id,
+        title: l.case.title,
+        status: String(l.case.status),
+      })),
       title: row.title,
       description: row.description,
       status: row.status,

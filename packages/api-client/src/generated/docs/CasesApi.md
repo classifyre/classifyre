@@ -4,11 +4,15 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**caseTimelineControllerGetTimeline**](CasesApi.md#casetimelinecontrollergettimeline) | **GET** /cases/{caseId}/timeline | Paginated unified case activity feed (newest first) |
 | [**casesControllerAddEvidence**](CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence |
 | [**casesControllerAddFinding**](CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of evidence |
+| [**casesControllerAttachFindings**](CasesApi.md#casescontrollerattachfindings) | **POST** /cases/{id}/findings | Batch-attach findings (asset evidence rows are created as needed) |
+| [**casesControllerClose**](CasesApi.md#casescontrollerclose) | **POST** /cases/{id}/close | Close a case with a conclusion (archives linked inquiries) |
 | [**casesControllerCreate**](CasesApi.md#casescontrollercreate) | **POST** /cases | Create a case (optionally linking questions) |
 | [**casesControllerFindOne**](CasesApi.md#casescontrollerfindone) | **GET** /cases/{id} | Get a case with evidence, findings and linked questions |
 | [**casesControllerGraph**](CasesApi.md#casescontrollergraph) | **GET** /cases/{id}/graph | Get the evidence neighbourhood graph for a case |
+| [**casesControllerLinkInquiries**](CasesApi.md#casescontrollerlinkinquiries) | **POST** /cases/{id}/inquiries | Link inquiries to a case (already-linked ones are ignored) |
 | [**casesControllerList**](CasesApi.md#casescontrollerlist) | **GET** /cases | List cases |
 | [**casesControllerPatchEvidenceNote**](CasesApi.md#casescontrollerpatchevidencenote) | **PATCH** /cases/{id}/evidence/{evidenceId} | Update the note on an evidence row |
 | [**casesControllerPatchFindingNote**](CasesApi.md#casescontrollerpatchfindingnote) | **PATCH** /cases/{id}/findings/{caseFindingId} | Update the note on a case finding |
@@ -16,8 +20,80 @@ All URIs are relative to *http://localhost*
 | [**casesControllerRemove**](CasesApi.md#casescontrollerremove) | **DELETE** /cases/{id} | Delete a case (its questions become standalone) |
 | [**casesControllerRemoveEvidence**](CasesApi.md#casescontrollerremoveevidence) | **DELETE** /cases/{id}/evidence/{evidenceId} | Remove evidence from the case |
 | [**casesControllerRemoveFinding**](CasesApi.md#casescontrollerremovefinding) | **DELETE** /cases/{id}/findings/{caseFindingId} | Remove a finding from the case |
+| [**casesControllerUnlinkInquiry**](CasesApi.md#casescontrollerunlinkinquiry) | **DELETE** /cases/{id}/inquiries/{inquiryId} | Unlink an inquiry from a case (the inquiry is untouched) |
 | [**casesControllerUpdate**](CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case |
 
+
+
+## caseTimelineControllerGetTimeline
+
+> CaseTimelineResponseDto caseTimelineControllerGetTimeline(caseId, cursor, limit)
+
+Paginated unified case activity feed (newest first)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseTimelineControllerGetTimelineRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    caseId: caseId_example,
+    // string (optional)
+    cursor: cursor_example,
+    // string (optional)
+    limit: limit_example,
+  } satisfies CaseTimelineControllerGetTimelineRequest;
+
+  try {
+    const data = await api.caseTimelineControllerGetTimeline(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **caseId** | `string` |  | [Defaults to `undefined`] |
+| **cursor** | `string` |  | [Optional] [Defaults to `undefined`] |
+| **limit** | `string` |  | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**CaseTimelineResponseDto**](CaseTimelineResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## casesControllerAddEvidence
@@ -155,6 +231,142 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## casesControllerAttachFindings
+
+> AttachFindingsResponseDto casesControllerAttachFindings(id, attachFindingsDto)
+
+Batch-attach findings (asset evidence rows are created as needed)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CasesControllerAttachFindingsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // AttachFindingsDto
+    attachFindingsDto: ...,
+  } satisfies CasesControllerAttachFindingsRequest;
+
+  try {
+    const data = await api.casesControllerAttachFindings(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **attachFindingsDto** | [AttachFindingsDto](AttachFindingsDto.md) |  | |
+
+### Return type
+
+[**AttachFindingsResponseDto**](AttachFindingsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## casesControllerClose
+
+> CloseCaseResponseDto casesControllerClose(id, closeCaseDto)
+
+Close a case with a conclusion (archives linked inquiries)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CasesControllerCloseRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // CloseCaseDto
+    closeCaseDto: ...,
+  } satisfies CasesControllerCloseRequest;
+
+  try {
+    const data = await api.casesControllerClose(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **closeCaseDto** | [CloseCaseDto](CloseCaseDto.md) |  | |
+
+### Return type
+
+[**CloseCaseResponseDto**](CloseCaseResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -346,6 +558,74 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## casesControllerLinkInquiries
+
+> CaseResponseDto casesControllerLinkInquiries(id, linkInquiriesDto)
+
+Link inquiries to a case (already-linked ones are ignored)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CasesControllerLinkInquiriesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // LinkInquiriesDto
+    linkInquiriesDto: ...,
+  } satisfies CasesControllerLinkInquiriesRequest;
+
+  try {
+    const data = await api.casesControllerLinkInquiries(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **linkInquiriesDto** | [LinkInquiriesDto](LinkInquiriesDto.md) |  | |
+
+### Return type
+
+[**CaseResponseDto**](CaseResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
 - **Accept**: `application/json`
 
 
@@ -841,6 +1121,74 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## casesControllerUnlinkInquiry
+
+> CaseResponseDto casesControllerUnlinkInquiry(id, inquiryId)
+
+Unlink an inquiry from a case (the inquiry is untouched)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CasesControllerUnlinkInquiryRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // string
+    inquiryId: inquiryId_example,
+  } satisfies CasesControllerUnlinkInquiryRequest;
+
+  try {
+    const data = await api.casesControllerUnlinkInquiry(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **inquiryId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**CaseResponseDto**](CaseResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

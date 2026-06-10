@@ -72,11 +72,15 @@ All URIs are relative to *http://localhost*
 *AssetsApi* | [**sourceAssetsControllerListSourceAssets**](docs/AssetsApi.md#sourceassetscontrollerlistsourceassets) | **GET** /sources/{sourceId}/assets | List assets for a source
 *AssistantApi* | [**assistantControllerParseUpload**](docs/AssistantApi.md#assistantcontrollerparseupload) | **POST** /assistant/parse-upload | Parse assistant chat upload
 *AssistantApi* | [**assistantControllerRespond**](docs/AssistantApi.md#assistantcontrollerrespondoperation) | **POST** /assistant/respond | Respond to a contextual assistant turn
+*CasesApi* | [**caseTimelineControllerGetTimeline**](docs/CasesApi.md#casetimelinecontrollergettimeline) | **GET** /cases/{caseId}/timeline | Paginated unified case activity feed (newest first)
 *CasesApi* | [**casesControllerAddEvidence**](docs/CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence
 *CasesApi* | [**casesControllerAddFinding**](docs/CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of evidence
+*CasesApi* | [**casesControllerAttachFindings**](docs/CasesApi.md#casescontrollerattachfindings) | **POST** /cases/{id}/findings | Batch-attach findings (asset evidence rows are created as needed)
+*CasesApi* | [**casesControllerClose**](docs/CasesApi.md#casescontrollerclose) | **POST** /cases/{id}/close | Close a case with a conclusion (archives linked inquiries)
 *CasesApi* | [**casesControllerCreate**](docs/CasesApi.md#casescontrollercreate) | **POST** /cases | Create a case (optionally linking questions)
 *CasesApi* | [**casesControllerFindOne**](docs/CasesApi.md#casescontrollerfindone) | **GET** /cases/{id} | Get a case with evidence, findings and linked questions
 *CasesApi* | [**casesControllerGraph**](docs/CasesApi.md#casescontrollergraph) | **GET** /cases/{id}/graph | Get the evidence neighbourhood graph for a case
+*CasesApi* | [**casesControllerLinkInquiries**](docs/CasesApi.md#casescontrollerlinkinquiries) | **POST** /cases/{id}/inquiries | Link inquiries to a case (already-linked ones are ignored)
 *CasesApi* | [**casesControllerList**](docs/CasesApi.md#casescontrollerlist) | **GET** /cases | List cases
 *CasesApi* | [**casesControllerPatchEvidenceNote**](docs/CasesApi.md#casescontrollerpatchevidencenote) | **PATCH** /cases/{id}/evidence/{evidenceId} | Update the note on an evidence row
 *CasesApi* | [**casesControllerPatchFindingNote**](docs/CasesApi.md#casescontrollerpatchfindingnote) | **PATCH** /cases/{id}/findings/{caseFindingId} | Update the note on a case finding
@@ -84,6 +88,7 @@ All URIs are relative to *http://localhost*
 *CasesApi* | [**casesControllerRemove**](docs/CasesApi.md#casescontrollerremove) | **DELETE** /cases/{id} | Delete a case (its questions become standalone)
 *CasesApi* | [**casesControllerRemoveEvidence**](docs/CasesApi.md#casescontrollerremoveevidence) | **DELETE** /cases/{id}/evidence/{evidenceId} | Remove evidence from the case
 *CasesApi* | [**casesControllerRemoveFinding**](docs/CasesApi.md#casescontrollerremovefinding) | **DELETE** /cases/{id}/findings/{caseFindingId} | Remove a finding from the case
+*CasesApi* | [**casesControllerUnlinkInquiry**](docs/CasesApi.md#casescontrollerunlinkinquiry) | **DELETE** /cases/{id}/inquiries/{inquiryId} | Unlink an inquiry from a case (the inquiry is untouched)
 *CasesApi* | [**casesControllerUpdate**](docs/CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerCoverage**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollercoverage) | **GET** /custom-detectors/{id}/extractions/coverage | 
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerGetByFinding**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollergetbyfinding) | **GET** /findings/{findingId}/extraction | 
@@ -123,12 +128,12 @@ All URIs are relative to *http://localhost*
 *GraphApi* | [**graphControllerUpdateEdge**](docs/GraphApi.md#graphcontrollerupdateedge) | **PATCH** /graph/edges/{id} | Rename an edge relation type
 *HealthApi* | [**healthControllerGetHealth**](docs/HealthApi.md#healthcontrollergethealth) | **GET** / | Health check
 *HealthApi* | [**healthControllerPing**](docs/HealthApi.md#healthcontrollerping) | **GET** /ping | Ping endpoint
-*HypothesesApi* | [**hypothesesControllerCreate**](docs/HypothesesApi.md#hypothesescontrollercreate) | **POST** /cases/{caseId}/hypotheses | Create a hypothesis in a case
-*HypothesesApi* | [**hypothesesControllerLinkSupport**](docs/HypothesesApi.md#hypothesescontrollerlinksupport) | **POST** /hypotheses/{id}/support | Link evidence or a finding to a hypothesis with a stance
-*HypothesesApi* | [**hypothesesControllerList**](docs/HypothesesApi.md#hypothesescontrollerlist) | **GET** /cases/{caseId}/hypotheses | List hypotheses for a case
-*HypothesesApi* | [**hypothesesControllerRemove**](docs/HypothesesApi.md#hypothesescontrollerremove) | **DELETE** /hypotheses/{id} | Delete a hypothesis
-*HypothesesApi* | [**hypothesesControllerUnlinkSupport**](docs/HypothesesApi.md#hypothesescontrollerunlinksupport) | **DELETE** /hypotheses/{id}/support/{linkId} | Remove a support link from a hypothesis
-*HypothesesApi* | [**hypothesesControllerUpdate**](docs/HypothesesApi.md#hypothesescontrollerupdate) | **PATCH** /hypotheses/{id} | Update a hypothesis
+*HypothesesApi* | [**hypothesisAliasControllerCreate**](docs/HypothesesApi.md#hypothesisaliascontrollercreate) | **POST** /cases/{caseId}/hypotheses | [Deprecated] Create hypothesis — use POST /cases/:caseId/threads
+*HypothesesApi* | [**hypothesisAliasControllerLinkSupport**](docs/HypothesesApi.md#hypothesisaliascontrollerlinksupport) | **POST** /hypotheses/{id}/support | [Deprecated] Link support — use POST /threads/:id/support
+*HypothesesApi* | [**hypothesisAliasControllerList**](docs/HypothesesApi.md#hypothesisaliascontrollerlist) | **GET** /cases/{caseId}/hypotheses | [Deprecated] List hypotheses — use GET /cases/:caseId/threads?kind&#x3D;HYPOTHESIS
+*HypothesesApi* | [**hypothesisAliasControllerRemove**](docs/HypothesesApi.md#hypothesisaliascontrollerremove) | **DELETE** /hypotheses/{id} | [Deprecated] Delete hypothesis — use DELETE /threads/:id
+*HypothesesApi* | [**hypothesisAliasControllerUnlinkSupport**](docs/HypothesesApi.md#hypothesisaliascontrollerunlinksupport) | **DELETE** /hypotheses/{id}/support/{linkId} | [Deprecated] Unlink support — use DELETE /threads/:id/support/:linkId
+*HypothesesApi* | [**hypothesisAliasControllerUpdate**](docs/HypothesesApi.md#hypothesisaliascontrollerupdate) | **PATCH** /hypotheses/{id} | [Deprecated] Update hypothesis — use PATCH /threads/:id
 *InquiriesApi* | [**inquiriesControllerCreate**](docs/InquiriesApi.md#inquiriescontrollercreate) | **POST** /inquiries | Create an inquiry (a saved query) and seed its matches
 *InquiriesApi* | [**inquiriesControllerFindOne**](docs/InquiriesApi.md#inquiriescontrollerfindone) | **GET** /inquiries/{id} | Get an inquiry
 *InquiriesApi* | [**inquiriesControllerList**](docs/InquiriesApi.md#inquiriescontrollerlist) | **GET** /inquiries | List inquiries (with match counts)
@@ -188,12 +193,21 @@ All URIs are relative to *http://localhost*
 *SourcesApi* | [**sourcesControllerTestConnection**](docs/SourcesApi.md#sourcescontrollertestconnection) | **POST** /sources/{id}/test | Test source connection
 *SourcesApi* | [**sourcesControllerUpdateSource**](docs/SourcesApi.md#sourcescontrollerupdatesource) | **PUT** /sources/{id} | Update a data source
 *SourcesApi* | [**sourcesControllerUpdateStatus**](docs/SourcesApi.md#sourcescontrollerupdatestatusoperation) | **PATCH** /sources/{id}/status | Update runner status
+*ThreadsApi* | [**caseThreadsControllerAddEntry**](docs/ThreadsApi.md#casethreadscontrolleraddentry) | **POST** /threads/{id}/entries | Add a note, statement revision, or status entry to a thread
+*ThreadsApi* | [**caseThreadsControllerCreate**](docs/ThreadsApi.md#casethreadscontrollercreate) | **POST** /cases/{caseId}/threads | Create a thread (hypothesis or discussion)
+*ThreadsApi* | [**caseThreadsControllerGetEntries**](docs/ThreadsApi.md#casethreadscontrollergetentries) | **GET** /threads/{id}/entries | Paginated thread entry history
+*ThreadsApi* | [**caseThreadsControllerLinkSupport**](docs/ThreadsApi.md#casethreadscontrollerlinksupport) | **POST** /threads/{id}/support | Link evidence or finding to a thread
+*ThreadsApi* | [**caseThreadsControllerList**](docs/ThreadsApi.md#casethreadscontrollerlist) | **GET** /cases/{caseId}/threads | List threads (hypothesis + discussion) for a case
+*ThreadsApi* | [**caseThreadsControllerRemove**](docs/ThreadsApi.md#casethreadscontrollerremove) | **DELETE** /threads/{id} | Delete a thread
+*ThreadsApi* | [**caseThreadsControllerUnlinkSupport**](docs/ThreadsApi.md#casethreadscontrollerunlinksupport) | **DELETE** /threads/{id}/support/{linkId} | Unlink evidence or finding from a thread
+*ThreadsApi* | [**caseThreadsControllerUpdate**](docs/ThreadsApi.md#casethreadscontrollerupdate) | **PATCH** /threads/{id} | Update thread title / status / confidence / color
 
 
 ### Models
 
 - [AddEvidenceDto](docs/AddEvidenceDto.md)
 - [AddFindingDto](docs/AddFindingDto.md)
+- [AddThreadEntryDto](docs/AddThreadEntryDto.md)
 - [AiCompleteRequestDto](docs/AiCompleteRequestDto.md)
 - [AiCompleteResponseDto](docs/AiCompleteResponseDto.md)
 - [AiMessageDto](docs/AiMessageDto.md)
@@ -211,17 +225,23 @@ All URIs are relative to *http://localhost*
 - [AssistantControllerRespond200Response](docs/AssistantControllerRespond200Response.md)
 - [AssistantControllerRespondRequest](docs/AssistantControllerRespondRequest.md)
 - [AssistantControllerRespondRequestMessagesInner](docs/AssistantControllerRespondRequestMessagesInner.md)
+- [AttachFindingsDto](docs/AttachFindingsDto.md)
+- [AttachFindingsResponseDto](docs/AttachFindingsResponseDto.md)
 - [BulkIngestAssetsDto](docs/BulkIngestAssetsDto.md)
 - [BulkIngestEdgesDto](docs/BulkIngestEdgesDto.md)
 - [BulkIngestEdgesResponseDto](docs/BulkIngestEdgesResponseDto.md)
 - [BulkUpdateFindingsDto](docs/BulkUpdateFindingsDto.md)
 - [BulkUpdateFindingsResponseDto](docs/BulkUpdateFindingsResponseDto.md)
+- [CaseActivityDto](docs/CaseActivityDto.md)
 - [CaseEvidenceDto](docs/CaseEvidenceDto.md)
 - [CaseFindingDto](docs/CaseFindingDto.md)
 - [CaseLinkedInquiryDto](docs/CaseLinkedInquiryDto.md)
 - [CaseListResponseDto](docs/CaseListResponseDto.md)
 - [CaseResponseDto](docs/CaseResponseDto.md)
+- [CaseTimelineResponseDto](docs/CaseTimelineResponseDto.md)
 - [CliRunnerControllerUpdateRunnerStatusRequest](docs/CliRunnerControllerUpdateRunnerStatusRequest.md)
+- [CloseCaseDto](docs/CloseCaseDto.md)
+- [CloseCaseResponseDto](docs/CloseCaseResponseDto.md)
 - [CreateAiProviderConfigDto](docs/CreateAiProviderConfigDto.md)
 - [CreateCaseDto](docs/CreateCaseDto.md)
 - [CreateCustomDetectorDto](docs/CreateCustomDetectorDto.md)
@@ -232,6 +252,7 @@ All URIs are relative to *http://localhost*
 - [CreateManualEdgeDto](docs/CreateManualEdgeDto.md)
 - [CreateMcpTokenDto](docs/CreateMcpTokenDto.md)
 - [CreateSourceDto](docs/CreateSourceDto.md)
+- [CreateThreadDto](docs/CreateThreadDto.md)
 - [CustomDetectorExampleDto](docs/CustomDetectorExampleDto.md)
 - [CustomDetectorResponseDto](docs/CustomDetectorResponseDto.md)
 - [CustomDetectorResponseDtoSourcesUsingInner](docs/CustomDetectorResponseDtoSourcesUsingInner.md)
@@ -263,12 +284,15 @@ All URIs are relative to *http://localhost*
 - [HypothesisResponseDto](docs/HypothesisResponseDto.md)
 - [HypothesisSupportLinkDto](docs/HypothesisSupportLinkDto.md)
 - [IngestEdgeDto](docs/IngestEdgeDto.md)
+- [InquiryLinkedCaseDto](docs/InquiryLinkedCaseDto.md)
 - [InquiryListResponseDto](docs/InquiryListResponseDto.md)
 - [InquiryMatchDto](docs/InquiryMatchDto.md)
 - [InquiryResponseDto](docs/InquiryResponseDto.md)
 - [InstanceSettingsResponseDto](docs/InstanceSettingsResponseDto.md)
 - [LatestRunnerSummaryDto](docs/LatestRunnerSummaryDto.md)
+- [LinkInquiriesDto](docs/LinkInquiriesDto.md)
 - [LinkSupportDto](docs/LinkSupportDto.md)
+- [LinkThreadSupportDto](docs/LinkThreadSupportDto.md)
 - [ListRunnersResponseDto](docs/ListRunnersResponseDto.md)
 - [LiveQueryResponseDto](docs/LiveQueryResponseDto.md)
 - [LocationDto](docs/LocationDto.md)
@@ -361,6 +385,10 @@ All URIs are relative to *http://localhost*
 - [StartRunnerDto](docs/StartRunnerDto.md)
 - [StopRunnerResponseDto](docs/StopRunnerResponseDto.md)
 - [TestConnectionResponseDto](docs/TestConnectionResponseDto.md)
+- [ThreadEntriesResponseDto](docs/ThreadEntriesResponseDto.md)
+- [ThreadEntryDto](docs/ThreadEntryDto.md)
+- [ThreadResponseDto](docs/ThreadResponseDto.md)
+- [ThreadSupportLinkDto](docs/ThreadSupportLinkDto.md)
 - [TrainCustomDetectorDto](docs/TrainCustomDetectorDto.md)
 - [TrainingExampleDto](docs/TrainingExampleDto.md)
 - [TrainingExampleItemDto](docs/TrainingExampleItemDto.md)
@@ -380,6 +408,7 @@ All URIs are relative to *http://localhost*
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)
 - [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)
+- [UpdateThreadDto](docs/UpdateThreadDto.md)
 
 ### Authorization
 

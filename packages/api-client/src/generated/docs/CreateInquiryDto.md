@@ -15,7 +15,6 @@ Name | Type
 `findingValueRegex` | Array&lt;string&gt;
 `title` | string
 `description` | string
-`caseId` | string
 `createdBy` | string
 
 ## Example
@@ -34,7 +33,6 @@ const example = {
   "findingValueRegex": null,
   "title": null,
   "description": null,
-  "caseId": null,
   "createdBy": null,
 } satisfies CreateInquiryDto
 

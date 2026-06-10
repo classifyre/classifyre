@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { InquiryLinkedCaseDto } from './InquiryLinkedCaseDto';
+import {
+    InquiryLinkedCaseDtoFromJSON,
+    InquiryLinkedCaseDtoFromJSONTyped,
+    InquiryLinkedCaseDtoToJSON,
+    InquiryLinkedCaseDtoToJSONTyped,
+} from './InquiryLinkedCaseDto';
+
 /**
  * 
  * @export
@@ -26,11 +34,11 @@ export interface InquiryResponseDto {
      */
     id: string;
     /**
-     * 
-     * @type {string}
+     * Cases this inquiry drives
+     * @type {Array<InquiryLinkedCaseDto>}
      * @memberof InquiryResponseDto
      */
-    caseId?: string | null;
+    cases: Array<InquiryLinkedCaseDto>;
     /**
      * 
      * @type {string}
@@ -152,6 +160,7 @@ export type InquiryResponseDtoDetectorTypesEnum = typeof InquiryResponseDtoDetec
  */
 export function instanceOfInquiryResponseDto(value: object): value is InquiryResponseDto {
     if (!('id' in value) || value['id'] === undefined) return false;
+    if (!('cases' in value) || value['cases'] === undefined) return false;
     if (!('title' in value) || value['title'] === undefined) return false;
     if (!('status' in value) || value['status'] === undefined) return false;
     if (!('matchAllSources' in value) || value['matchAllSources'] === undefined) return false;
@@ -179,7 +188,7 @@ export function InquiryResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: 
     return {
         
         'id': json['id'],
-        'caseId': json['caseId'] == null ? undefined : json['caseId'],
+        'cases': ((json['cases'] as Array<any>).map(InquiryLinkedCaseDtoFromJSON)),
         'title': json['title'],
         'description': json['description'] == null ? undefined : json['description'],
         'status': json['status'],
@@ -210,7 +219,7 @@ export function InquiryResponseDtoToJSONTyped(value?: InquiryResponseDto | null,
     return {
         
         'id': value['id'],
-        'caseId': value['caseId'],
+        'cases': ((value['cases'] as Array<any>).map(InquiryLinkedCaseDtoToJSON)),
         'title': value['title'],
         'description': value['description'],
         'status': value['status'],

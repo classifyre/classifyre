@@ -2,151 +2,412 @@
 
 import * as React from "react";
 import {
-  Activity, FileText, Search, Link2, Trash2, Download,
-  Pencil, MessageSquare, GitCommit, ChevronDown,
+  Activity,
+  ChevronDown,
+  Download,
+  FileText,
+  Fingerprint,
+  FolderOpen,
+  GitCommit,
+  Link2,
+  Loader2,
+  MessageSquare,
+  Pencil,
+  Search,
+  Trash2,
 } from "lucide-react";
 import { api, type CaseActivityDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
-import { Badge } from "@workspace/ui/components/badge";
 
-const TYPE_META: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
-  CASE_CREATED: { icon: <Activity className="h-3.5 w-3.5" />, label: "Case created", color: "text-green-600 dark:text-green-400" },
-  CASE_UPDATED: { icon: <Pencil className="h-3.5 w-3.5" />, label: "Case updated", color: "text-muted-foreground" },
-  CONCLUSION_UPDATED: { icon: <FileText className="h-3.5 w-3.5" />, label: "Conclusion updated", color: "text-amber-600 dark:text-amber-400" },
-  INQUIRY_LINKED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Inquiry linked", color: "text-blue-600 dark:text-blue-400" },
-  INQUIRY_UNLINKED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Inquiry unlinked", color: "text-muted-foreground" },
-  INQUIRY_PULLED: { icon: <Download className="h-3.5 w-3.5" />, label: "Pulled from inquiry", color: "text-blue-600 dark:text-blue-400" },
-  EVIDENCE_ADDED: { icon: <Search className="h-3.5 w-3.5" />, label: "Evidence added", color: "text-green-600 dark:text-green-400" },
-  EVIDENCE_REMOVED: { icon: <Trash2 className="h-3.5 w-3.5" />, label: "Evidence removed", color: "text-red-600 dark:text-red-400" },
-  EVIDENCE_NOTE_UPDATED: { icon: <Pencil className="h-3.5 w-3.5" />, label: "Evidence note updated", color: "text-muted-foreground" },
-  FINDING_ADDED: { icon: <Search className="h-3.5 w-3.5" />, label: "Finding added", color: "text-green-600 dark:text-green-400" },
-  FINDING_REMOVED: { icon: <Trash2 className="h-3.5 w-3.5" />, label: "Finding removed", color: "text-red-600 dark:text-red-400" },
-  FINDING_NOTE_UPDATED: { icon: <Pencil className="h-3.5 w-3.5" />, label: "Finding note updated", color: "text-muted-foreground" },
-  THREAD_CREATED: { icon: <GitCommit className="h-3.5 w-3.5" />, label: "Thread created", color: "text-violet-600 dark:text-violet-400" },
-  THREAD_ENTRY_ADDED: { icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Note added", color: "text-muted-foreground" },
-  THREAD_STATEMENT_UPDATED: { icon: <GitCommit className="h-3.5 w-3.5" />, label: "Statement revised", color: "text-violet-600 dark:text-violet-400" },
-  THREAD_STATUS_CHANGED: { icon: <GitCommit className="h-3.5 w-3.5" />, label: "Status changed", color: "text-amber-600 dark:text-amber-400" },
-  THREAD_CONFIDENCE_CHANGED: { icon: <GitCommit className="h-3.5 w-3.5" />, label: "Confidence updated", color: "text-amber-600 dark:text-amber-400" },
-  SUPPORT_LINKED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Evidence linked to thread", color: "text-blue-600 dark:text-blue-400" },
-  SUPPORT_UNLINKED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Evidence unlinked", color: "text-muted-foreground" },
-  SUPPORT_UPDATED: { icon: <Pencil className="h-3.5 w-3.5" />, label: "Support updated", color: "text-muted-foreground" },
+// ─── Event metadata ───────────────────────────────────────────────────────────
+
+type EventGroup = "case" | "inquiry" | "evidence" | "thread";
+
+const TYPE_META: Record<
+  string,
+  { icon: React.ReactNode; label: string; color: string; group: EventGroup }
+> = {
+  CASE_CREATED: { icon: <FolderOpen className="h-3.5 w-3.5" />, label: "Case opened", color: "text-green-600 dark:text-green-400", group: "case" },
+  CASE_UPDATED: { icon: <Pencil className="h-3.5 w-3.5" />, label: "Case updated", color: "text-muted-foreground", group: "case" },
+  CONCLUSION_UPDATED: { icon: <FileText className="h-3.5 w-3.5" />, label: "Conclusion updated", color: "text-amber-600 dark:text-amber-400", group: "case" },
+  INQUIRY_LINKED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Inquiry linked", color: "text-blue-600 dark:text-blue-400", group: "inquiry" },
+  INQUIRY_UNLINKED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Inquiry unlinked", color: "text-muted-foreground", group: "inquiry" },
+  INQUIRY_PULLED: { icon: <Download className="h-3.5 w-3.5" />, label: "Evidence pulled from inquiry", color: "text-blue-600 dark:text-blue-400", group: "inquiry" },
+  EVIDENCE_ADDED: { icon: <Search className="h-3.5 w-3.5" />, label: "Evidence added", color: "text-green-600 dark:text-green-400", group: "evidence" },
+  EVIDENCE_REMOVED: { icon: <Trash2 className="h-3.5 w-3.5" />, label: "Evidence removed", color: "text-red-600 dark:text-red-400", group: "evidence" },
+  EVIDENCE_NOTE_UPDATED: { icon: <Pencil className="h-3.5 w-3.5" />, label: "Evidence note updated", color: "text-muted-foreground", group: "evidence" },
+  FINDING_ADDED: { icon: <Fingerprint className="h-3.5 w-3.5" />, label: "Finding attached", color: "text-green-600 dark:text-green-400", group: "evidence" },
+  FINDING_REMOVED: { icon: <Trash2 className="h-3.5 w-3.5" />, label: "Finding removed", color: "text-red-600 dark:text-red-400", group: "evidence" },
+  FINDING_NOTE_UPDATED: { icon: <Pencil className="h-3.5 w-3.5" />, label: "Finding note updated", color: "text-muted-foreground", group: "evidence" },
+  THREAD_CREATED: { icon: <GitCommit className="h-3.5 w-3.5" />, label: "Thread started", color: "text-violet-600 dark:text-violet-400", group: "thread" },
+  THREAD_ENTRY_ADDED: { icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Note added", color: "text-violet-600 dark:text-violet-400", group: "thread" },
+  THREAD_STATEMENT_UPDATED: { icon: <GitCommit className="h-3.5 w-3.5" />, label: "Statement revised", color: "text-violet-600 dark:text-violet-400", group: "thread" },
+  THREAD_STATUS_CHANGED: { icon: <GitCommit className="h-3.5 w-3.5" />, label: "Hypothesis status changed", color: "text-amber-600 dark:text-amber-400", group: "thread" },
+  THREAD_CONFIDENCE_CHANGED: { icon: <GitCommit className="h-3.5 w-3.5" />, label: "Confidence updated", color: "text-amber-600 dark:text-amber-400", group: "thread" },
+  SUPPORT_LINKED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Evidence linked to thread", color: "text-blue-600 dark:text-blue-400", group: "thread" },
+  SUPPORT_UNLINKED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Evidence unlinked from thread", color: "text-muted-foreground", group: "thread" },
+  SUPPORT_UPDATED: { icon: <Pencil className="h-3.5 w-3.5" />, label: "Support updated", color: "text-muted-foreground", group: "thread" },
 };
 
-function relativeTime(date: Date): string {
-  const diff = Date.now() - date.getTime();
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
-  return date.toLocaleDateString();
+const GROUP_FILTERS: Array<{ key: "ALL" | EventGroup; label: string }> = [
+  { key: "ALL", label: "All" },
+  { key: "case", label: "Case" },
+  { key: "inquiry", label: "Inquiries" },
+  { key: "evidence", label: "Evidence" },
+  { key: "thread", label: "Threads" },
+];
+
+function str(v: unknown): string | null {
+  return typeof v === "string" && v.length > 0 ? v : null;
 }
 
-function ActivityCard({ item }: { item: CaseActivityDto }) {
-  const meta = TYPE_META[item.activityType] ?? {
-    icon: <Activity className="h-3.5 w-3.5" />,
-    label: item.activityType.toLowerCase().replace(/_/g, " "),
-    color: "text-muted-foreground",
-  };
-  const p = item.payload as Record<string, unknown>;
+function strList(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
 
-  const detail = (() => {
-    if (item.activityType === "INQUIRY_PULLED") return `${p.pulled ?? 0} finding${p.pulled === 1 ? "" : "s"} pulled`;
-    if (item.activityType === "THREAD_CREATED") return p.threadTitle ? String(p.threadTitle) : null;
-    if (item.activityType === "THREAD_STATEMENT_UPDATED" && p.body) return String(p.body).slice(0, 80);
-    if (item.activityType === "THREAD_STATUS_CHANGED") return `${p.previousStatus} → ${p.status}`;
-    if (item.activityType === "THREAD_CONFIDENCE_CHANGED") return `confidence → ${Math.round(Number(p.confidence ?? 0) * 100)}%`;
-    if (item.activityType === "EVIDENCE_ADDED" && p.label) return String(p.label);
-    if (item.activityType === "FINDING_ADDED" && p.label) return String(p.label);
-    return null;
-  })();
+/** Subject of the event — the entity it happened to, shown emphasized. */
+function eventSubject(item: CaseActivityDto): string | null {
+  const p = (item.payload ?? {}) as Record<string, unknown>;
+  switch (item.activityType) {
+    case "INQUIRY_LINKED":
+    case "INQUIRY_UNLINKED":
+    case "INQUIRY_PULLED":
+      return str(p.inquiryTitle);
+    case "THREAD_CREATED":
+    case "THREAD_ENTRY_ADDED":
+    case "THREAD_STATEMENT_UPDATED":
+    case "THREAD_STATUS_CHANGED":
+    case "THREAD_CONFIDENCE_CHANGED":
+    case "SUPPORT_LINKED":
+    case "SUPPORT_UNLINKED":
+    case "SUPPORT_UPDATED":
+      return str(p.threadTitle);
+    case "EVIDENCE_ADDED":
+    case "EVIDENCE_REMOVED":
+    case "EVIDENCE_NOTE_UPDATED":
+    case "FINDING_ADDED":
+    case "FINDING_REMOVED":
+    case "FINDING_NOTE_UPDATED":
+      return str(p.label);
+    case "CASE_CREATED":
+      return str(p.title);
+    default:
+      return null;
+  }
+}
 
+/** Rich detail block under the event title. Old events may lack the newer payload fields. */
+function EventDetail({ item }: { item: CaseActivityDto }) {
+  const p = (item.payload ?? {}) as Record<string, unknown>;
+  const lines: React.ReactNode[] = [];
+
+  switch (item.activityType) {
+    case "INQUIRY_PULLED": {
+      lines.push(
+        <span key="count">
+          {Number(p.pulled ?? 0)} finding{Number(p.pulled ?? 0) === 1 ? "" : "s"} copied into the case
+        </span>,
+      );
+      break;
+    }
+    case "THREAD_ENTRY_ADDED":
+    case "THREAD_STATEMENT_UPDATED": {
+      const body = str(p.body);
+      if (body) {
+        lines.push(
+          <span key="body" className="block whitespace-pre-wrap">
+            “{body.slice(0, 200)}{body.length > 200 ? "…" : ""}”
+          </span>,
+        );
+      }
+      break;
+    }
+    case "THREAD_STATUS_CHANGED":
+      lines.push(
+        <span key="status">
+          {String(p.previousStatus ?? "?")} → <span className="font-medium text-foreground">{String(p.status ?? "?")}</span>
+        </span>,
+      );
+      break;
+    case "THREAD_CONFIDENCE_CHANGED":
+      lines.push(<span key="conf">confidence → {Math.round(Number(p.confidence ?? 0) * 100)}%</span>,);
+      break;
+    case "SUPPORT_LINKED":
+    case "SUPPORT_UNLINKED": {
+      const target = str(p.targetLabel);
+      if (target) {
+        lines.push(
+          <span key="target">
+            <span className="font-medium text-foreground">{target}</span>
+            {str(p.stance) ? ` · ${String(p.stance).toLowerCase()}` : ""}
+          </span>,
+        );
+      }
+      break;
+    }
+    case "EVIDENCE_NOTE_UPDATED":
+    case "FINDING_NOTE_UPDATED": {
+      const note = str(p.note);
+      lines.push(
+        note ? (
+          <span key="note" className="block whitespace-pre-wrap">
+            “{note}”
+          </span>
+        ) : (
+          <span key="note" className="italic">note cleared</span>
+        ),
+      );
+      break;
+    }
+    case "CONCLUSION_UPDATED":
+      if (p.closed) {
+        const archived = Number(p.archivedInquiries ?? 0);
+        lines.push(
+          <span key="closed">
+            Case closed with a conclusion
+            {archived > 0 ? ` · ${archived} inquir${archived === 1 ? "y" : "ies"} archived` : ""}
+          </span>,
+        );
+      }
+      break;
+    case "CASE_UPDATED":
+      if (str(p.status)) lines.push(<span key="status">status → {String(p.status)}</span>);
+      break;
+    default:
+      break;
+  }
+
+  // Finding/asset chips for batch events (pull + batch attach).
+  const findingLabels = strList(p.findingLabels);
+  const assetLabels = strList(p.assetLabels);
+  const chips = [...new Set([...findingLabels, ...assetLabels])];
+
+  if (lines.length === 0 && chips.length === 0) return null;
   return (
-    <div className="flex items-start gap-3 py-2.5">
-      <div className={`mt-0.5 shrink-0 ${meta.color}`}>{meta.icon}</div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{meta.label}</p>
-        {detail && <p className="text-muted-foreground mt-0.5 truncate text-xs">{detail}</p>}
-      </div>
-      <div className="shrink-0 text-right">
-        {item.actor && <p className="text-muted-foreground text-xs">{item.actor}</p>}
-        <p className="text-muted-foreground text-[11px]">{relativeTime(new Date(item.createdAt))}</p>
-      </div>
+    <div className="text-muted-foreground mt-0.5 space-y-1 text-xs">
+      {lines}
+      {chips.length > 0 && (
+        <span className="flex flex-wrap gap-1">
+          {chips.slice(0, 8).map((label) => (
+            <span key={label} className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px]">
+              {label}
+            </span>
+          ))}
+          {Number(p.pulled ?? p.count ?? 0) > 8 && (
+            <span className="px-1 text-[10px]">+{Number(p.pulled ?? p.count) - 8} more</span>
+          )}
+        </span>
+      )}
     </div>
   );
 }
 
-type FilterKind = "ALL" | "SYSTEM" | "THREADS";
+// ─── Date helpers ─────────────────────────────────────────────────────────────
 
-const FILTER_TYPES: Record<FilterKind, string[] | null> = {
-  ALL: null,
-  SYSTEM: ["CASE_CREATED", "CASE_UPDATED", "CONCLUSION_UPDATED", "INQUIRY_LINKED", "INQUIRY_UNLINKED", "INQUIRY_PULLED", "EVIDENCE_ADDED", "EVIDENCE_REMOVED", "EVIDENCE_NOTE_UPDATED", "FINDING_ADDED", "FINDING_REMOVED", "FINDING_NOTE_UPDATED"],
-  THREADS: ["THREAD_CREATED", "THREAD_ENTRY_ADDED", "THREAD_STATEMENT_UPDATED", "THREAD_STATUS_CHANGED", "THREAD_CONFIDENCE_CHANGED", "SUPPORT_LINKED", "SUPPORT_UNLINKED", "SUPPORT_UPDATED"],
-};
+function dayKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function dayLabel(key: string): string {
+  const today = dayKey(new Date());
+  const yesterday = dayKey(new Date(Date.now() - 86_400_000));
+  if (key === today) return "Today";
+  if (key === yesterday) return "Yesterday";
+  return new Date(`${key}T00:00:00`).toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function timeLabel(date: Date): string {
+  return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function CaseTimeline({ caseId }: { caseId: string }) {
   const [items, setItems] = React.useState<CaseActivityDto[]>([]);
   const [cursor, setCursor] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(false);
-  const [filter, setFilter] = React.useState<FilterKind>("ALL");
+  const [loading, setLoading] = React.useState(true);
+  const [filter, setFilter] = React.useState<"ALL" | EventGroup>("ALL");
 
-  const load = React.useCallback(async (append = false) => {
-    setLoading(true);
-    try {
-      const res = await api.threads.threadsControllerTimeline({
-        caseId,
-        cursor: append && cursor ? cursor : undefined,
-        limit: 50,
-      });
-      setItems((prev) => append ? [...prev, ...res.items] : res.items);
-      setCursor(res.nextCursor);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+  const load = React.useCallback(
+    async (append = false, fromCursor?: string) => {
+      setLoading(true);
+      try {
+        const res = await api.cases.caseTimelineControllerGetTimeline({
+          caseId,
+          cursor: append ? fromCursor : undefined,
+          limit: "100",
+        });
+        setItems((prev) => (append ? [...prev, ...res.items] : res.items));
+        setCursor(res.nextCursor ?? null);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [caseId],
+  );
+
+  React.useEffect(() => {
+    void load();
+  }, [load]);
+
+  const visible = React.useMemo(
+    () =>
+      filter === "ALL"
+        ? items
+        : items.filter((i) => (TYPE_META[i.activityType]?.group ?? "case") === filter),
+    [items, filter],
+  );
+
+  // Group by day, newest day first (API returns newest first).
+  const days = React.useMemo(() => {
+    const map = new Map<string, CaseActivityDto[]>();
+    for (const item of visible) {
+      const key = dayKey(new Date(item.createdAt));
+      const list = map.get(key);
+      if (list) list.push(item);
+      else map.set(key, [item]);
     }
-  }, [caseId, cursor]);
+    return Array.from(map.entries());
+  }, [visible]);
 
-  React.useEffect(() => { void load(); }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const jumpTo = (key: string) => {
+    document
+      .getElementById(`timeline-day-${key}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
-  const visible = React.useMemo(() => {
-    const allowed = FILTER_TYPES[filter];
-    if (!allowed) return items;
-    return items.filter((i) => allowed.includes(i.activityType));
-  }, [items, filter]);
+  if (loading && items.length === 0) {
+    return (
+      <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading timeline…
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 flex-wrap">
-        {(["ALL", "SYSTEM", "THREADS"] as FilterKind[]).map((k) => (
+    <div className="grid gap-6 lg:grid-cols-[1fr_200px]">
+      <div className="min-w-0 space-y-4">
+        {/* ── Filters ── */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {GROUP_FILTERS.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={`rounded-[4px] border-2 px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-wide transition-colors ${
+                filter === key
+                  ? "border-accent bg-accent/10 text-accent"
+                  : "border-border text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
           <button
-            key={k}
-            onClick={() => setFilter(k)}
-            className={`rounded border px-2.5 py-0.5 text-xs font-medium transition-colors ${filter === k ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-accent"}`}
+            onClick={() => void load()}
+            className="text-muted-foreground ml-auto text-xs underline"
           >
-            {k === "ALL" ? "All" : k === "SYSTEM" ? "Case events" : "Threads"}
+            Refresh
           </button>
-        ))}
-        <button onClick={() => load()} className="ml-auto text-muted-foreground text-xs underline">Refresh</button>
+        </div>
+
+        {days.length === 0 ? (
+          <p className="text-muted-foreground py-8 text-center text-sm">
+            No activity {filter === "ALL" ? "yet" : "in this category"}.
+          </p>
+        ) : (
+          days.map(([key, dayItems]) => (
+            <section key={key} id={`timeline-day-${key}`} className="scroll-mt-20">
+              <div className="sticky top-0 z-10 -mx-1 bg-background/95 px-1 py-1.5 backdrop-blur">
+                <h3 className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-foreground">
+                  {dayLabel(key)}
+                  <span className="text-muted-foreground ml-2 font-normal">
+                    {dayItems.length} event{dayItems.length === 1 ? "" : "s"}
+                  </span>
+                </h3>
+              </div>
+              <ol className="ml-2 border-l-2 border-border">
+                {dayItems.map((item) => {
+                  const meta = TYPE_META[item.activityType] ?? {
+                    icon: <Activity className="h-3.5 w-3.5" />,
+                    label: item.activityType.toLowerCase().replace(/_/g, " "),
+                    color: "text-muted-foreground",
+                    group: "case" as const,
+                  };
+                  const subject = eventSubject(item);
+                  return (
+                    <li key={item.id} id={`timeline-event-${item.id}`} className="relative pl-6 py-2">
+                      <span
+                        className={`absolute -left-[9px] top-2.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-border bg-card ${meta.color}`}
+                      >
+                        <span className="scale-[0.65]">{meta.icon}</span>
+                      </span>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="min-w-0 text-sm">
+                          <span className="font-medium">{meta.label}</span>
+                          {subject && (
+                            <>
+                              <span className="text-muted-foreground"> — </span>
+                              <span className="font-medium text-foreground">{subject}</span>
+                            </>
+                          )}
+                        </p>
+                        <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
+                          {timeLabel(new Date(item.createdAt))}
+                        </span>
+                      </div>
+                      <EventDetail item={item} />
+                      {item.actor && (
+                        <p className="text-muted-foreground/70 mt-0.5 text-[11px]">by {item.actor}</p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          ))
+        )}
+
+        {cursor && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void load(true, cursor)}
+            disabled={loading}
+            className="w-full"
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            Load older events
+          </Button>
+        )}
       </div>
 
-      {visible.length === 0 && !loading ? (
-        <p className="text-muted-foreground py-8 text-center text-sm">No activity yet.</p>
-      ) : (
-        <div className="divide-y divide-border">
-          {visible.map((item) => (
-            <ActivityCard key={item.id} item={item} />
-          ))}
-        </div>
-      )}
-
-      {cursor && (
-        <Button variant="outline" size="sm" onClick={() => load(true)} disabled={loading} className="w-full">
-          <ChevronDown className="h-3.5 w-3.5" /> Load more
-        </Button>
+      {/* ── Jump navigation ── */}
+      {days.length > 1 && (
+        <nav className="sticky top-4 hidden self-start lg:block">
+          <p className="text-muted-foreground mb-2 font-mono text-[10px] uppercase tracking-[0.14em]">
+            Jump to
+          </p>
+          <ul className="space-y-1 border-l-2 border-border">
+            {days.map(([key, dayItems]) => (
+              <li key={key}>
+                <button
+                  onClick={() => jumpTo(key)}
+                  className="text-muted-foreground hover:text-foreground block w-full truncate px-3 py-0.5 text-left text-xs transition-colors"
+                >
+                  {dayLabel(key)}
+                  <span className="text-muted-foreground/60 ml-1">({dayItems.length})</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
       )}
     </div>
   );

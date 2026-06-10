@@ -23,12 +23,6 @@ import { FINDING_SEVERITY_COLOR_BY_ENUM } from "@workspace/ui/lib/finding-severi
 import {
   Badge,
   Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   EmptyState,
   Input,
   Pagination,
@@ -56,7 +50,6 @@ import {
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
-import { FindingsTable, type FindingSelection } from "./findings-table";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -138,100 +131,6 @@ function SortableHead({
         <TooltipContent>{tooltip}</TooltipContent>
       </Tooltip>
     </TableHead>
-  );
-}
-
-// ─── Add findings dialog ──────────────────────────────────────────────────────
-
-function AddFindingsDialog({
-  open,
-  onOpenChange,
-  assetId,
-  evidenceId,
-  attachedFindingIds,
-  onAttach,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  assetId: string;
-  evidenceId: string;
-  /** Finding UUIDs (FindingResponseDto.id) already on this evidence row. */
-  attachedFindingIds: string[];
-  onAttach: (evidenceId: string, findingIds: string[]) => Promise<void>;
-}) {
-  const [selection, setSelection] = useState<FindingSelection | null>(null);
-  const [attaching, setAttaching] = useState(false);
-
-  useEffect(() => {
-    if (open) setSelection(null);
-  }, [open]);
-
-  const selCount =
-    selection?.type === "ids"
-      ? selection.findings.length
-      : (selection?.total ?? 0);
-
-  const handleAttach = async () => {
-    if (!selection || selection.type !== "ids" || selection.findings.length === 0)
-      return;
-    setAttaching(true);
-    try {
-      await onAttach(evidenceId, selection.findings.map((f) => f.id));
-      onOpenChange(false);
-    } finally {
-      setAttaching(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[88vh] w-[92vw] max-w-[92vw] flex-col gap-0 p-0">
-        <DialogHeader className="border-b px-6 py-4">
-          <DialogTitle className="font-serif text-base font-black uppercase tracking-[0.04em]">
-            Add findings to evidence
-          </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
-            Select findings from this asset. Already-attached findings are
-            hidden from the list.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
-          {open && (
-            <FindingsTable
-              key={`${assetId}:${evidenceId}`}
-              lockedFilters={{
-                assetId: [assetId],
-                ...(attachedFindingIds.length > 0
-                  ? { excludeIds: attachedFindingIds }
-                  : {}),
-              }}
-              onSelectionChange={setSelection}
-              disableUrlSync
-            />
-          )}
-        </div>
-
-        <DialogFooter className="border-t px-6 py-3">
-          <Button
-            variant="outline"
-            className="rounded-[4px]"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={() => void handleAttach()}
-            disabled={attaching || selCount === 0}
-            className="rounded-[4px] bg-accent font-mono text-xs font-bold uppercase tracking-[0.08em] text-accent-foreground hover:bg-accent/90"
-          >
-            {selCount > 0
-              ? `Attach ${selCount} finding${selCount === 1 ? "" : "s"}`
-              : "Attach selected"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -543,10 +442,11 @@ type EvidenceTableProps = {
   onAddEvidence: () => void;
   onNoteChange?: (evidenceId: string, note: string) => Promise<void>;
   onFindingNoteChange?: (caseFindingId: string, note: string) => Promise<void>;
-  /** Per-finding API call — no case reload. Use onRefresh for that. */
-  onAddFinding?: (evidenceId: string, findingId: string) => Promise<void>;
-  /** Called once after a batch of findings are attached. */
-  onRefresh?: () => void;
+  /**
+   * Invoked when the analyst wants to attach more findings to an asset's
+   * evidence row — the case page navigates to the dedicated add-evidence page.
+   */
+  onAddFindings?: (assetId: string) => void;
 };
 
 export function EvidenceTable({
@@ -556,8 +456,7 @@ export function EvidenceTable({
   onAddEvidence,
   onNoteChange,
   onFindingNoteChange,
-  onAddFinding,
-  onRefresh,
+  onAddFindings,
 }: EvidenceTableProps) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -586,20 +485,12 @@ export function EvidenceTable({
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  // ── Dialog ───────────────────────────────────────────────────────────────
-
-  const [findingsDialogFor, setFindingsDialogFor] = useState<{
-    evidenceId: string;
-    assetId: string;
-    attachedFindingIds: string[];
-  } | null>(null);
-
   // ── Available-count fetch ────────────────────────────────────────────────
 
   const [availableCounts, setAvailableCounts] = useState<Map<string, number | null>>(new Map());
 
   useEffect(() => {
-    if (!onAddFinding) return;
+    if (!onAddFindings) return;
     const assetRows = evidence.filter((e) => e.entityType.toLowerCase() === "asset");
     if (assetRows.length === 0) return;
 
@@ -629,7 +520,7 @@ export function EvidenceTable({
     return () => {
       active = false;
     };
-  }, [evidence, onAddFinding]);
+  }, [evidence, onAddFindings]);
 
   // ── Note overrides ───────────────────────────────────────────────────────
 
@@ -653,17 +544,6 @@ export function EvidenceTable({
       void onFindingNoteChange?.(caseFindingId, value);
     },
     [onFindingNoteChange],
-  );
-
-  // ── Attach findings ──────────────────────────────────────────────────────
-
-  const handleAttachFindings = useCallback(
-    async (evidenceId: string, findingIds: string[]) => {
-      if (!onAddFinding) return;
-      await Promise.allSettled(findingIds.map((id) => onAddFinding(evidenceId, id)));
-      onRefresh?.();
-    },
-    [onAddFinding, onRefresh],
   );
 
   // ── Filtered / sorted / paged data ──────────────────────────────────────
@@ -837,7 +717,7 @@ export function EvidenceTable({
                   const availableCount = availableCounts.get(e.id) ?? null;
                   const showAddBtn =
                     isAsset &&
-                    onAddFinding !== undefined &&
+                    onAddFindings !== undefined &&
                     availableCount !== null &&
                     availableCount > 0;
 
@@ -936,13 +816,7 @@ export function EvidenceTable({
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <button
-                                    onClick={() =>
-                                      setFindingsDialogFor({
-                                        evidenceId: e.id,
-                                        assetId: e.entityId,
-                                        attachedFindingIds: findings.map((f) => f.findingId),
-                                      })
-                                    }
+                                    onClick={() => onAddFindings?.(e.entityId)}
                                     className="inline-flex items-center gap-0.5 rounded-[3px] border border-dashed border-accent/40 px-1.5 py-0.5 font-mono text-[10px] text-accent transition-colors hover:border-accent hover:bg-accent/5"
                                   >
                                     <Plus className="h-2.5 w-2.5" />
@@ -1018,13 +892,7 @@ export function EvidenceTable({
                                     size="sm"
                                     variant="outline"
                                     className="h-7 gap-1.5 rounded-[4px] border-dashed border-accent/40 font-mono text-[11px] text-accent hover:border-accent hover:bg-accent/5"
-                                    onClick={() =>
-                                      setFindingsDialogFor({
-                                        evidenceId: e.id,
-                                        assetId: e.entityId,
-                                        attachedFindingIds: findings.map((f) => f.findingId),
-                                      })
-                                    }
+                                    onClick={() => onAddFindings?.(e.entityId)}
                                   >
                                     <Plus className="h-3 w-3" />
                                     {t("cases.evidence.subTable.availableFindings")} ({availableCount})
@@ -1128,19 +996,6 @@ export function EvidenceTable({
         )}
       </div>
 
-      {/* ── Add findings dialog ── */}
-      {findingsDialogFor && (
-        <AddFindingsDialog
-          open={findingsDialogFor !== null}
-          onOpenChange={(v) => {
-            if (!v) setFindingsDialogFor(null);
-          }}
-          assetId={findingsDialogFor.assetId}
-          evidenceId={findingsDialogFor.evidenceId}
-          attachedFindingIds={findingsDialogFor.attachedFindingIds}
-          onAttach={handleAttachFindings}
-        />
-      )}
     </div>
   );
 }

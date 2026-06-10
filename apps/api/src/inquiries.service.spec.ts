@@ -25,7 +25,7 @@ describe('InquiriesService', () => {
 
   const row = (over: Record<string, unknown> = {}) => ({
     id: 'q1',
-    caseId: null,
+    caseLinks: [],
     title: 'Exfil monitor',
     description: null,
     status: 'ACTIVE',
