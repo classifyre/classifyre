@@ -501,8 +501,8 @@ export class GraphService {
   }
 
   /**
-   * Enrich graph nodes with hypothesis affiliation (and the QuestionFinding id used
-   * to unlink) and mark edges that bridge nodes belonging to different hypothesis sets.
+   * Enrich graph nodes with thread affiliation (hypothesisIds field — same UUIDs as
+   * old hypothesis rows, preserved by migration) and mark cross-thread edges.
    */
   private async annotateWithHypotheses(
     evidence: CaseEvidenceWithFindings[],
@@ -510,42 +510,42 @@ export class GraphService {
   ): Promise<GraphResponseDto> {
     const key = (type: string, id: string) => `${type}:${id}`;
 
-    const supportRows = await this.prisma.hypothesisSupport.findMany({
+    const supportRows = await this.prisma.caseThreadSupport.findMany({
       where: { targetType: 'evidence', targetId: { in: evidence.map((e) => e.id) } },
-      select: { targetId: true, hypothesisId: true },
+      select: { targetId: true, threadId: true },
     });
-    const evidenceToHyps = new Map<string, string[]>();
+    const evidenceToThreads = new Map<string, string[]>();
     for (const row of supportRows) {
-      const arr = evidenceToHyps.get(row.targetId) ?? [];
-      arr.push(row.hypothesisId);
-      evidenceToHyps.set(row.targetId, arr);
+      const arr = evidenceToThreads.get(row.targetId) ?? [];
+      arr.push(row.threadId);
+      evidenceToThreads.set(row.targetId, arr);
     }
 
-    // node key → hypothesisId[]  (evidence nodes inherit their support; findings
+    // node key → threadId[]  (evidence nodes inherit their support; findings
     // inherit their parent evidence's support).
-    const nodeToHyps = new Map<string, string[]>();
+    const nodeToThreads = new Map<string, string[]>();
     const findingToCaseFindingId = new Map<string, string>();
     for (const e of evidence) {
-      const hyps = evidenceToHyps.get(e.id) ?? [];
-      nodeToHyps.set(key(e.entityType, e.entityId), hyps);
+      const threads = evidenceToThreads.get(e.id) ?? [];
+      nodeToThreads.set(key(e.entityType, e.entityId), threads);
       for (const cf of e.findings) {
-        nodeToHyps.set(key('finding', cf.findingId), hyps);
+        nodeToThreads.set(key('finding', cf.findingId), threads);
         findingToCaseFindingId.set(cf.findingId, cf.id);
       }
     }
 
     const nodes: GraphNodeDto[] = graph.nodes.map((n) => {
-      const hypothesisIds = nodeToHyps.get(key(n.type, n.id)) ?? [];
+      const hypothesisIds = nodeToThreads.get(key(n.type, n.id)) ?? [];
       const caseFindingId =
         n.type === 'finding' ? findingToCaseFindingId.get(n.id) : undefined;
       return { ...n, hypothesisIds, ...(caseFindingId ? { caseFindingId } : {}) };
     });
 
     const edges: GraphEdgeDto[] = graph.edges.map((e) => {
-      const fromHyps = new Set(nodeToHyps.get(key(e.fromType, e.fromId)) ?? []);
-      const toHyps = new Set(nodeToHyps.get(key(e.toType, e.toId)) ?? []);
+      const fromThreads = new Set(nodeToThreads.get(key(e.fromType, e.fromId)) ?? []);
+      const toThreads = new Set(nodeToThreads.get(key(e.toType, e.toId)) ?? []);
       const crossHypothesis =
-        fromHyps.size > 0 && toHyps.size > 0 && ![...fromHyps].some((h) => toHyps.has(h));
+        fromThreads.size > 0 && toThreads.size > 0 && ![...fromThreads].some((h) => toThreads.has(h));
       return { ...e, crossHypothesis };
     });
 

@@ -37,6 +37,7 @@ export { CasesApi } from "./generated/src/apis/CasesApi";
 export { InquiriesApi } from "./generated/src/apis/InquiriesApi";
 export { GraphApi } from "./generated/src/apis/GraphApi";
 export { HypothesesApi } from "./generated/src/apis/HypothesesApi";
+export { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 
 // Investigation (cases / inquiries / graph / hypotheses) model types
 export type {
@@ -67,6 +68,16 @@ export type {
   HypothesisResponseDto,
   HypothesisSupportLinkDto,
   LinkSupportDto,
+  CreateThreadDto,
+  UpdateThreadDto,
+  ThreadResponseDto,
+  ThreadEntryDto,
+  ThreadSupportLinkDto,
+  ThreadEntriesResponseDto,
+  AddThreadEntryDto,
+  LinkThreadSupportDto,
+  CaseActivityDto,
+  CaseTimelineResponseDto,
   ExpandGraphDto,
   GraphNodeDto,
   GraphEdgeDto,
@@ -84,6 +95,13 @@ export { PivotGraphDtoPivotEnum } from "./generated/src/models";
 export {
   CaseResponseDtoStatusEnum,
   CaseResponseDtoSeverityEnum,
+} from "./generated/src/models";
+export {
+  ThreadResponseDtoKindEnum,
+  ThreadResponseDtoStatusEnum,
+  CreateThreadDtoKindEnum,
+  ThreadEntryDtoEntryTypeEnum,
+  AddThreadEntryDtoEntryTypeEnum,
 } from "./generated/src/models";
 export {
   CasesControllerListStatusEnum,
@@ -798,6 +816,7 @@ import { CasesApi } from "./generated/src/apis/CasesApi";
 import { InquiriesApi } from "./generated/src/apis/InquiriesApi";
 import { GraphApi } from "./generated/src/apis/GraphApi";
 import { HypothesesApi } from "./generated/src/apis/HypothesesApi";
+import { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -856,6 +875,7 @@ class ApiClient {
   public inquiries: InquiriesApi;
   public graph: GraphApi;
   public hypotheses: HypothesesApi;
+  public threads: ThreadsApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -873,6 +893,7 @@ class ApiClient {
     this.inquiries = new InquiriesApi(this.config);
     this.graph = new GraphApi(this.config);
     this.hypotheses = new HypothesesApi(this.config);
+    this.threads = new ThreadsApi(this.config);
   }
 
   async searchAssets(
