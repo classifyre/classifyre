@@ -79,12 +79,6 @@ export interface UpdateInquiryDto {
      * @memberof UpdateInquiryDto
      */
     status?: UpdateInquiryDtoStatusEnum;
-    /**
-     * Link/unlink a case (null detaches)
-     * @type {string}
-     * @memberof UpdateInquiryDto
-     */
-    caseId?: string | null;
 }
 
 
@@ -138,7 +132,6 @@ export function UpdateInquiryDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'title': json['title'] == null ? undefined : json['title'],
         'description': json['description'] == null ? undefined : json['description'],
         'status': json['status'] == null ? undefined : json['status'],
-        'caseId': json['caseId'] == null ? undefined : json['caseId'],
     };
 }
 
@@ -163,7 +156,6 @@ export function UpdateInquiryDtoToJSONTyped(value?: UpdateInquiryDto | null, ign
         'title': value['title'],
         'description': value['description'],
         'status': value['status'],
-        'caseId': value['caseId'],
     };
 }
 

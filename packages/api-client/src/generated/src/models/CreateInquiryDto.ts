@@ -74,12 +74,6 @@ export interface CreateInquiryDto {
      */
     description?: string;
     /**
-     * Link to an existing case
-     * @type {string}
-     * @memberof CreateInquiryDto
-     */
-    caseId?: string;
-    /**
      * 
      * @type {string}
      * @memberof CreateInquiryDto
@@ -129,7 +123,6 @@ export function CreateInquiryDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'findingValueRegex': json['findingValueRegex'] == null ? undefined : json['findingValueRegex'],
         'title': json['title'],
         'description': json['description'] == null ? undefined : json['description'],
-        'caseId': json['caseId'] == null ? undefined : json['caseId'],
         'createdBy': json['createdBy'] == null ? undefined : json['createdBy'],
     };
 }
@@ -154,7 +147,6 @@ export function CreateInquiryDtoToJSONTyped(value?: CreateInquiryDto | null, ign
         'findingValueRegex': value['findingValueRegex'],
         'title': value['title'],
         'description': value['description'],
-        'caseId': value['caseId'],
         'createdBy': value['createdBy'],
     };
 }

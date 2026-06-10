@@ -25,6 +25,8 @@ interface ManualEdgeDialogProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   fromNode: GraphNodeDto | null;
+  /** When set (connect mode), the target select is prefilled with this node. */
+  toNode?: GraphNodeDto | null;
   nodes: GraphNodeDto[];
   onCreated: () => void;
 }
@@ -33,6 +35,7 @@ export function ManualEdgeDialog({
   open,
   onOpenChange,
   fromNode,
+  toNode,
   nodes,
   onCreated,
 }: ManualEdgeDialogProps) {
@@ -49,10 +52,10 @@ export function ManualEdgeDialog({
     api.graph.graphControllerRelationTypes()
       .then((r: RelationTypesResponseDto) => setSuggestions(r.suggestions))
       .catch(() => {});
-    setToNodeId("");
+    setToNodeId(toNode ? `${toNode.type}:${toNode.id}` : "");
     setRelationType("");
     setCustomType("");
-  }, [open]);
+  }, [open, toNode]);
 
   const effectiveType = relationType === CUSTOM_SENTINEL ? customType.trim() : relationType;
 

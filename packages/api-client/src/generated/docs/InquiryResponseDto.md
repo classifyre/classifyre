@@ -7,7 +7,7 @@
 Name | Type
 ------------ | -------------
 `id` | string
-`caseId` | string
+`cases` | [Array&lt;InquiryLinkedCaseDto&gt;](InquiryLinkedCaseDto.md)
 `title` | string
 `description` | string
 `status` | string
@@ -32,7 +32,7 @@ import type { InquiryResponseDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "id": null,
-  "caseId": null,
+  "cases": null,
   "title": null,
   "description": null,
   "status": null,

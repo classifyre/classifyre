@@ -1,134 +1,207 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import { Plus, Sparkles, FolderPlus, Check } from "lucide-react";
-import { toast } from "sonner";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, Sparkles, FolderPlus, FolderOpen, Pencil, Loader2 } from "lucide-react";
 import { api, type InquiryResponseDto } from "@workspace/api-client";
-import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { CasesTable } from "@/components/cases-table";
 
-export default function InvestigationsPage() {
+function inquiryScope(q: InquiryResponseDto): string {
+  const sources = q.matchAllSources
+    ? "all sources"
+    : `${q.sourceIds.length} source${q.sourceIds.length === 1 ? "" : "s"}`;
+  const matcherCount =
+    q.detectorTypes.length +
+    q.customDetectorKeys.length +
+    q.findingTypes.length +
+    q.findingTypeRegex.length;
+  return matcherCount === 0
+    ? `${sources} · any finding`
+    : `${sources} · ${matcherCount} matcher${matcherCount === 1 ? "" : "s"}`;
+}
+
+function InquiryRow({ inquiry }: { inquiry: InquiryResponseDto }) {
   const router = useRouter();
+  const archived = inquiry.status === "ARCHIVED";
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-[4px] border-2 border-border bg-card px-4 py-3 shadow-[0_1px_3px_rgba(28,25,23,0.04)] transition-colors hover:border-foreground/30 ${archived ? "opacity-60" : ""}`}
+    >
+      <Sparkles className="h-4 w-4 shrink-0 text-[color:var(--color-amber-600,#d97706)]" />
+      <button
+        className="min-w-0 flex-1 text-left"
+        onClick={() => router.push(`/investigations/inquiries/${inquiry.id}`)}
+      >
+        <p className="truncate font-medium">{inquiry.title}</p>
+        <p className="text-muted-foreground text-xs">{inquiryScope(inquiry)}</p>
+      </button>
+
+      <div className="flex shrink-0 items-center gap-3">
+        <div className="text-right">
+          <p className="font-mono text-sm tabular-nums">{inquiry.matchCount}</p>
+          <p className="text-muted-foreground text-[10px] uppercase tracking-wide">matches</p>
+        </div>
+        {inquiry.newMatchCount > 0 && (
+          <Badge
+            variant="outline"
+            className="border-[color:var(--color-amber-600,#d97706)]/50 text-[color:var(--color-amber-600,#d97706)]"
+          >
+            {inquiry.newMatchCount} new
+          </Badge>
+        )}
+        {archived && (
+          <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+            archived
+          </Badge>
+        )}
+        {inquiry.cases.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              router.push(
+                inquiry.cases.length === 1
+                  ? `/investigations/${inquiry.cases[0]!.id}`
+                  : `/investigations/inquiries/${inquiry.id}`,
+              )
+            }
+          >
+            <FolderOpen className="h-3.5 w-3.5" />
+            {inquiry.cases.length === 1 ? "Case" : `${inquiry.cases.length} cases`}
+          </Button>
+        )}
+        {!archived && (
+          <Button
+            size="sm"
+            variant={inquiry.cases.length === 0 ? "default" : "ghost"}
+            onClick={() => router.push(`/investigations/cases/new?inquiryId=${inquiry.id}`)}
+          >
+            <FolderPlus className="h-3.5 w-3.5" /> Open case
+          </Button>
+        )}
+        {!archived && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            aria-label="Edit inquiry"
+            onClick={() => router.push(`/investigations/inquiries/${inquiry.id}/edit`)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function InvestigationsPage() {
+  return (
+    <React.Suspense>
+      <InvestigationsPageInner />
+    </React.Suspense>
+  );
+}
+
+function InvestigationsPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [inquiries, setInquiries] = React.useState<InquiryResponseDto[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [selected, setSelected] = React.useState<Set<string>>(new Set());
-  const [creating, setCreating] = React.useState(false);
 
   const loadInquiries = React.useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.inquiries.inquiriesControllerList({ limit: 100 });
+      const res = await api.inquiries.inquiriesControllerList({ limit: 200 });
       setInquiries(res.items);
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  React.useEffect(() => { void loadInquiries(); }, [loadInquiries]);
+  React.useEffect(() => {
+    void loadInquiries();
+  }, [loadInquiries]);
 
-  const toggle = (id: string) =>
-    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-
-  const createCaseFromSelected = async () => {
-    if (selected.size === 0) return;
-    setCreating(true);
-    try {
-      const first = inquiries.find((q) => selected.has(q.id));
-      const created = await api.cases.casesControllerCreate({
-        createCaseDto: {
-          title: selected.size === 1 && first ? first.title : `Investigation (${selected.size} inquiries)`,
-          inquiryIds: Array.from(selected),
-        },
-      });
-      toast.success("Case created");
-      router.push(`/investigations/${created.id}`);
-    } catch (err) { console.error(err); toast.error("Failed to create case"); }
-    finally { setCreating(false); }
-  };
+  const active = inquiries.filter((q) => q.status !== "ARCHIVED");
+  const archived = inquiries.filter((q) => q.status === "ARCHIVED");
+  const defaultTab = searchParams.get("tab") === "inquiries" ? "inquiries" : "cases";
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-serif text-3xl font-black uppercase tracking-[0.04em]">Investigations</h1>
-          <p className="text-muted-foreground mt-1 text-sm max-w-xl">
-            Inquiries are saved queries that surface relevant findings. Group them into a case to gather
-            evidence and weigh hypotheses.
+          <h1 className="font-serif text-3xl font-black uppercase tracking-[0.04em]">
+            Investigations
+          </h1>
+          <p className="text-muted-foreground mt-1 max-w-xl text-sm">
+            Start with an inquiry — a saved question over your findings. When the matches
+            warrant a deeper look, open a case to collect evidence, weigh hypotheses, and
+            reach a conclusion.
           </p>
         </div>
-        <Button onClick={() => router.push("/investigations/inquiries/new")}>
-          <Plus className="h-4 w-4" /> New inquiry
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => router.push("/investigations/inquiries/new")}
+          >
+            <Sparkles className="h-4 w-4" /> New inquiry
+          </Button>
+          <Button onClick={() => router.push("/investigations/cases/new")}>
+            <Plus className="h-4 w-4" /> New case
+          </Button>
+        </div>
       </div>
 
-      <Tabs defaultValue="inquiries">
+      <Tabs defaultValue={defaultTab}>
         <TabsList>
-          <TabsTrigger value="inquiries">Inquiries</TabsTrigger>
           <TabsTrigger value="cases">Cases</TabsTrigger>
+          <TabsTrigger value="inquiries">
+            Inquiries
+            {active.some((q) => q.newMatchCount > 0) && (
+              <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[color:var(--color-amber-600,#d97706)]" />
+            )}
+          </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="inquiries" className="space-y-3">
-          {selected.size > 0 && (
-            <div className="flex items-center justify-between rounded-[4px] border-2 border-border bg-card px-3 py-2 shadow-[3px_3px_0_var(--color-border)]">
-              <span className="text-sm font-medium">{selected.size} selected</span>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>Clear</Button>
-                <Button size="sm" onClick={createCaseFromSelected} disabled={creating}>
-                  <FolderPlus className="h-3.5 w-3.5" /> Create case from selected
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {!loading && inquiries.length === 0 ? (
-            <EmptyState title="No inquiries yet" description="Create an inquiry to start monitoring findings across your sources." />
-          ) : (
-            <div className="space-y-2">
-              {inquiries.map((q) => {
-                const isSel = selected.has(q.id);
-                return (
-                  <Card key={q.id} className={isSel ? "border-primary" : undefined}>
-                    <CardContent className="flex items-center gap-3 p-3">
-                      <button
-                        onClick={() => toggle(q.id)}
-                        aria-label="Select inquiry"
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${isSel ? "border-primary bg-primary" : "border-muted-foreground/40 hover:border-muted-foreground"}`}
-                      >
-                        {isSel && <Check className="h-3 w-3 text-primary-foreground" />}
-                      </button>
-                      <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" onClick={() => router.push(`/investigations/inquiries/${q.id}`)}>
-                        <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <div className="min-w-0">
-                          <p className="truncate font-medium">{q.title}</p>
-                          <p className="text-muted-foreground text-xs">
-                            {q.matchAllSources ? "all sources" : `${q.sourceIds.length} source${q.sourceIds.length === 1 ? "" : "s"}`}
-                            {q.caseId ? " · in a case" : ""}
-                          </p>
-                        </div>
-                      </button>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {q.newMatchCount > 0 && (
-                          <Badge variant="outline" className="border-[color:var(--color-amber-600,#d97706)]/50 text-[color:var(--color-amber-600,#d97706)]">
-                            {q.newMatchCount} new
-                          </Badge>
-                        )}
-                        <span className="font-mono text-sm tabular-nums">{q.matchCount}</span>
-                        <span className="text-muted-foreground text-[11px]">matches</span>
-                        <Badge variant="outline">{q.status}</Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
 
         <TabsContent value="cases">
           <CasesTable />
+        </TabsContent>
+
+        <TabsContent value="inquiries" className="space-y-5">
+          {loading ? (
+            <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading inquiries…
+            </div>
+          ) : inquiries.length === 0 ? (
+            <EmptyState
+              icon={Sparkles}
+              title="No inquiries yet"
+              description="Create an inquiry to start monitoring findings across your sources."
+            />
+          ) : (
+            <>
+              <div className="space-y-2">
+                {active.map((q) => (
+                  <InquiryRow key={q.id} inquiry={q} />
+                ))}
+              </div>
+              {archived.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
+                    Archived ({archived.length})
+                  </p>
+                  {archived.map((q) => (
+                    <InquiryRow key={q.id} inquiry={q} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </div>

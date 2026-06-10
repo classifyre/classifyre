@@ -4,20 +4,20 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
-| [**hypothesesControllerCreate**](HypothesesApi.md#hypothesescontrollercreate) | **POST** /cases/{caseId}/hypotheses | Create a hypothesis in a case |
-| [**hypothesesControllerLinkSupport**](HypothesesApi.md#hypothesescontrollerlinksupport) | **POST** /hypotheses/{id}/support | Link evidence or a finding to a hypothesis with a stance |
-| [**hypothesesControllerList**](HypothesesApi.md#hypothesescontrollerlist) | **GET** /cases/{caseId}/hypotheses | List hypotheses for a case |
-| [**hypothesesControllerRemove**](HypothesesApi.md#hypothesescontrollerremove) | **DELETE** /hypotheses/{id} | Delete a hypothesis |
-| [**hypothesesControllerUnlinkSupport**](HypothesesApi.md#hypothesescontrollerunlinksupport) | **DELETE** /hypotheses/{id}/support/{linkId} | Remove a support link from a hypothesis |
-| [**hypothesesControllerUpdate**](HypothesesApi.md#hypothesescontrollerupdate) | **PATCH** /hypotheses/{id} | Update a hypothesis |
+| [**hypothesisAliasControllerCreate**](HypothesesApi.md#hypothesisaliascontrollercreate) | **POST** /cases/{caseId}/hypotheses | [Deprecated] Create hypothesis — use POST /cases/:caseId/threads |
+| [**hypothesisAliasControllerLinkSupport**](HypothesesApi.md#hypothesisaliascontrollerlinksupport) | **POST** /hypotheses/{id}/support | [Deprecated] Link support — use POST /threads/:id/support |
+| [**hypothesisAliasControllerList**](HypothesesApi.md#hypothesisaliascontrollerlist) | **GET** /cases/{caseId}/hypotheses | [Deprecated] List hypotheses — use GET /cases/:caseId/threads?kind&#x3D;HYPOTHESIS |
+| [**hypothesisAliasControllerRemove**](HypothesesApi.md#hypothesisaliascontrollerremove) | **DELETE** /hypotheses/{id} | [Deprecated] Delete hypothesis — use DELETE /threads/:id |
+| [**hypothesisAliasControllerUnlinkSupport**](HypothesesApi.md#hypothesisaliascontrollerunlinksupport) | **DELETE** /hypotheses/{id}/support/{linkId} | [Deprecated] Unlink support — use DELETE /threads/:id/support/:linkId |
+| [**hypothesisAliasControllerUpdate**](HypothesesApi.md#hypothesisaliascontrollerupdate) | **PATCH** /hypotheses/{id} | [Deprecated] Update hypothesis — use PATCH /threads/:id |
 
 
 
-## hypothesesControllerCreate
+## hypothesisAliasControllerCreate
 
-> HypothesisResponseDto hypothesesControllerCreate(caseId, createHypothesisDto)
+> HypothesisResponseDto hypothesisAliasControllerCreate(caseId, createHypothesisDto)
 
-Create a hypothesis in a case
+[Deprecated] Create hypothesis — use POST /cases/:caseId/threads
 
 ### Example
 
@@ -26,7 +26,7 @@ import {
   Configuration,
   HypothesesApi,
 } from '@workspace/api-client';
-import type { HypothesesControllerCreateRequest } from '@workspace/api-client';
+import type { HypothesisAliasControllerCreateRequest } from '@workspace/api-client';
 
 async function example() {
   console.log("🚀 Testing @workspace/api-client SDK...");
@@ -37,10 +37,10 @@ async function example() {
     caseId: caseId_example,
     // CreateHypothesisDto
     createHypothesisDto: ...,
-  } satisfies HypothesesControllerCreateRequest;
+  } satisfies HypothesisAliasControllerCreateRequest;
 
   try {
-    const data = await api.hypothesesControllerCreate(body);
+    const data = await api.hypothesisAliasControllerCreate(body);
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -81,11 +81,11 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
-## hypothesesControllerLinkSupport
+## hypothesisAliasControllerLinkSupport
 
-> HypothesisResponseDto hypothesesControllerLinkSupport(id, linkSupportDto)
+> HypothesisResponseDto hypothesisAliasControllerLinkSupport(id, linkSupportDto)
 
-Link evidence or a finding to a hypothesis with a stance
+[Deprecated] Link support — use POST /threads/:id/support
 
 ### Example
 
@@ -94,7 +94,7 @@ import {
   Configuration,
   HypothesesApi,
 } from '@workspace/api-client';
-import type { HypothesesControllerLinkSupportRequest } from '@workspace/api-client';
+import type { HypothesisAliasControllerLinkSupportRequest } from '@workspace/api-client';
 
 async function example() {
   console.log("🚀 Testing @workspace/api-client SDK...");
@@ -105,10 +105,10 @@ async function example() {
     id: id_example,
     // LinkSupportDto
     linkSupportDto: ...,
-  } satisfies HypothesesControllerLinkSupportRequest;
+  } satisfies HypothesisAliasControllerLinkSupportRequest;
 
   try {
-    const data = await api.hypothesesControllerLinkSupport(body);
+    const data = await api.hypothesisAliasControllerLinkSupport(body);
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -149,11 +149,11 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
-## hypothesesControllerList
+## hypothesisAliasControllerList
 
-> Array&lt;HypothesisResponseDto&gt; hypothesesControllerList(caseId)
+> Array&lt;HypothesisResponseDto&gt; hypothesisAliasControllerList(caseId)
 
-List hypotheses for a case
+[Deprecated] List hypotheses — use GET /cases/:caseId/threads?kind&#x3D;HYPOTHESIS
 
 ### Example
 
@@ -162,7 +162,7 @@ import {
   Configuration,
   HypothesesApi,
 } from '@workspace/api-client';
-import type { HypothesesControllerListRequest } from '@workspace/api-client';
+import type { HypothesisAliasControllerListRequest } from '@workspace/api-client';
 
 async function example() {
   console.log("🚀 Testing @workspace/api-client SDK...");
@@ -171,10 +171,10 @@ async function example() {
   const body = {
     // string
     caseId: caseId_example,
-  } satisfies HypothesesControllerListRequest;
+  } satisfies HypothesisAliasControllerListRequest;
 
   try {
-    const data = await api.hypothesesControllerList(body);
+    const data = await api.hypothesisAliasControllerList(body);
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -214,11 +214,11 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
-## hypothesesControllerRemove
+## hypothesisAliasControllerRemove
 
-> hypothesesControllerRemove(id)
+> hypothesisAliasControllerRemove(id)
 
-Delete a hypothesis
+[Deprecated] Delete hypothesis — use DELETE /threads/:id
 
 ### Example
 
@@ -227,7 +227,7 @@ import {
   Configuration,
   HypothesesApi,
 } from '@workspace/api-client';
-import type { HypothesesControllerRemoveRequest } from '@workspace/api-client';
+import type { HypothesisAliasControllerRemoveRequest } from '@workspace/api-client';
 
 async function example() {
   console.log("🚀 Testing @workspace/api-client SDK...");
@@ -236,10 +236,10 @@ async function example() {
   const body = {
     // string
     id: id_example,
-  } satisfies HypothesesControllerRemoveRequest;
+  } satisfies HypothesisAliasControllerRemoveRequest;
 
   try {
-    const data = await api.hypothesesControllerRemove(body);
+    const data = await api.hypothesisAliasControllerRemove(body);
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -279,11 +279,11 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
-## hypothesesControllerUnlinkSupport
+## hypothesisAliasControllerUnlinkSupport
 
-> HypothesisResponseDto hypothesesControllerUnlinkSupport(id, linkId)
+> HypothesisResponseDto hypothesisAliasControllerUnlinkSupport(id, linkId)
 
-Remove a support link from a hypothesis
+[Deprecated] Unlink support — use DELETE /threads/:id/support/:linkId
 
 ### Example
 
@@ -292,7 +292,7 @@ import {
   Configuration,
   HypothesesApi,
 } from '@workspace/api-client';
-import type { HypothesesControllerUnlinkSupportRequest } from '@workspace/api-client';
+import type { HypothesisAliasControllerUnlinkSupportRequest } from '@workspace/api-client';
 
 async function example() {
   console.log("🚀 Testing @workspace/api-client SDK...");
@@ -303,10 +303,10 @@ async function example() {
     id: id_example,
     // string
     linkId: linkId_example,
-  } satisfies HypothesesControllerUnlinkSupportRequest;
+  } satisfies HypothesisAliasControllerUnlinkSupportRequest;
 
   try {
-    const data = await api.hypothesesControllerUnlinkSupport(body);
+    const data = await api.hypothesisAliasControllerUnlinkSupport(body);
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -347,11 +347,11 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
-## hypothesesControllerUpdate
+## hypothesisAliasControllerUpdate
 
-> HypothesisResponseDto hypothesesControllerUpdate(id, updateHypothesisDto)
+> HypothesisResponseDto hypothesisAliasControllerUpdate(id, updateHypothesisDto)
 
-Update a hypothesis
+[Deprecated] Update hypothesis — use PATCH /threads/:id
 
 ### Example
 
@@ -360,7 +360,7 @@ import {
   Configuration,
   HypothesesApi,
 } from '@workspace/api-client';
-import type { HypothesesControllerUpdateRequest } from '@workspace/api-client';
+import type { HypothesisAliasControllerUpdateRequest } from '@workspace/api-client';
 
 async function example() {
   console.log("🚀 Testing @workspace/api-client SDK...");
@@ -371,10 +371,10 @@ async function example() {
     id: id_example,
     // UpdateHypothesisDto
     updateHypothesisDto: ...,
-  } satisfies HypothesesControllerUpdateRequest;
+  } satisfies HypothesisAliasControllerUpdateRequest;
 
   try {
-    const data = await api.hypothesesControllerUpdate(body);
+    const data = await api.hypothesisAliasControllerUpdate(body);
     console.log(data);
   } catch (error) {
     console.error(error);

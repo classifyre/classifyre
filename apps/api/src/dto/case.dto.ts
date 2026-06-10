@@ -143,6 +143,24 @@ export class AddEvidenceDto {
   addedBy?: string;
 }
 
+/** Batch-attach findings to a case. Asset evidence rows are created as needed. */
+export class AttachFindingsDto {
+  @ApiProperty({ type: [String], description: 'Finding UUIDs to attach as case evidence' })
+  @IsArray()
+  @IsString({ each: true })
+  findingIds!: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  addedBy?: string;
+}
+
+export class AttachFindingsResponseDto {
+  @ApiProperty({ description: 'Findings newly attached to the case' })
+  attached!: number;
+}
+
 /** Attach a finding (inferred observation) to a piece of evidence in a case. */
 export class AddFindingDto {
   @ApiProperty({ description: 'Finding UUID' })
@@ -263,7 +281,7 @@ export class CaseEvidenceDto {
   findings?: CaseFindingDto[];
 }
 
-/** A question linked to a case (guides which findings are relevant). */
+/** An inquiry linked to a case (guides which findings are relevant). */
 export class CaseLinkedInquiryDto {
   @ApiProperty()
   id!: string;
@@ -274,8 +292,19 @@ export class CaseLinkedInquiryDto {
   @ApiProperty({ enum: InquiryStatus })
   status!: InquiryStatus;
 
-  @ApiProperty({ description: 'Findings currently matching this question' })
+  @ApiProperty({ description: 'Findings currently matching this inquiry' })
   matchCount!: number;
+
+  @ApiProperty({ description: 'Matches that appeared since the inquiry was last viewed' })
+  newMatchCount!: number;
+}
+
+/** Link inquiries to an existing case. */
+export class LinkInquiriesDto {
+  @ApiProperty({ type: [String], description: 'Inquiry UUIDs to link' })
+  @IsArray()
+  @IsString({ each: true })
+  inquiryIds!: string[];
 }
 
 export class CaseResponseDto {
@@ -323,6 +352,26 @@ export class CaseResponseDto {
 
   @ApiPropertyOptional({ type: [CaseLinkedInquiryDto] })
   inquiries?: CaseLinkedInquiryDto[];
+}
+
+/** Close a case with a conclusion. Linked inquiries are archived. */
+export class CloseCaseDto {
+  @ApiProperty({ description: 'Final conclusion — required to close the case' })
+  @IsString()
+  conclusion!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  closedBy?: string;
+}
+
+export class CloseCaseResponseDto {
+  @ApiProperty({ type: CaseResponseDto })
+  case!: CaseResponseDto;
+
+  @ApiProperty({ description: 'Linked inquiries archived by closing this case' })
+  archivedInquiries!: number;
 }
 
 export class CaseListResponseDto {

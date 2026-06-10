@@ -4336,6 +4336,47 @@
         ]
       }
     },
+    "/cases/{id}/findings": {
+      "post": {
+        "operationId": "CasesController_attachFindings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachFindingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachFindingsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Batch-attach findings (asset evidence rows are created as needed)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
     "/cases/{id}/findings/{caseFindingId}": {
       "patch": {
         "operationId": "CasesController_patchFindingNote",
@@ -4410,6 +4451,127 @@
           }
         },
         "summary": "Remove a finding from the case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/inquiries": {
+      "post": {
+        "operationId": "CasesController_linkInquiries",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkInquiriesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Link inquiries to a case (already-linked ones are ignored)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/inquiries/{inquiryId}": {
+      "delete": {
+        "operationId": "CasesController_unlinkInquiry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inquiryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Unlink an inquiry from a case (the inquiry is untouched)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/close": {
+      "post": {
+        "operationId": "CasesController_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseCaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseCaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Close a case with a conclusion (archives linked inquiries)",
         "tags": [
           "cases"
         ]
@@ -4556,7 +4718,7 @@
             "name": "caseId",
             "required": false,
             "in": "query",
-            "description": "Filter to a case (or \"none\" for unlinked)",
+            "description": "Filter to inquiries linked to a case (or \"none\" for unlinked)",
             "schema": {
               "type": "string"
             }
@@ -4845,9 +5007,358 @@
         ]
       }
     },
+    "/cases/{caseId}/timeline": {
+      "get": {
+        "operationId": "CaseTimelineController_getTimeline",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseTimelineResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Paginated unified case activity feed (newest first)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{caseId}/threads": {
+      "get": {
+        "operationId": "CaseThreadsController_list",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ThreadResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List threads (hypothesis + discussion) for a case",
+        "tags": [
+          "threads"
+        ]
+      },
+      "post": {
+        "operationId": "CaseThreadsController_create",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateThreadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a thread (hypothesis or discussion)",
+        "tags": [
+          "threads"
+        ]
+      }
+    },
+    "/threads/{id}": {
+      "patch": {
+        "operationId": "CaseThreadsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateThreadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update thread title / status / confidence / color",
+        "tags": [
+          "threads"
+        ]
+      },
+      "delete": {
+        "operationId": "CaseThreadsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a thread",
+        "tags": [
+          "threads"
+        ]
+      }
+    },
+    "/threads/{id}/entries": {
+      "post": {
+        "operationId": "CaseThreadsController_addEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddThreadEntryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add a note, statement revision, or status entry to a thread",
+        "tags": [
+          "threads"
+        ]
+      },
+      "get": {
+        "operationId": "CaseThreadsController_getEntries",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadEntriesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Paginated thread entry history",
+        "tags": [
+          "threads"
+        ]
+      }
+    },
+    "/threads/{id}/support": {
+      "post": {
+        "operationId": "CaseThreadsController_linkSupport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkThreadSupportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Link evidence or finding to a thread",
+        "tags": [
+          "threads"
+        ]
+      }
+    },
+    "/threads/{id}/support/{linkId}": {
+      "delete": {
+        "operationId": "CaseThreadsController_unlinkSupport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "linkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Unlink evidence or finding from a thread",
+        "tags": [
+          "threads"
+        ]
+      }
+    },
     "/cases/{caseId}/hypotheses": {
       "get": {
-        "operationId": "HypothesesController_list",
+        "operationId": "HypothesisAliasController_list",
         "parameters": [
           {
             "name": "caseId",
@@ -4873,13 +5384,13 @@
             }
           }
         },
-        "summary": "List hypotheses for a case",
+        "summary": "[Deprecated] List hypotheses — use GET /cases/:caseId/threads?kind=HYPOTHESIS",
         "tags": [
           "hypotheses"
         ]
       },
       "post": {
-        "operationId": "HypothesesController_create",
+        "operationId": "HypothesisAliasController_create",
         "parameters": [
           {
             "name": "caseId",
@@ -4912,7 +5423,7 @@
             }
           }
         },
-        "summary": "Create a hypothesis in a case",
+        "summary": "[Deprecated] Create hypothesis — use POST /cases/:caseId/threads",
         "tags": [
           "hypotheses"
         ]
@@ -4920,7 +5431,7 @@
     },
     "/hypotheses/{id}": {
       "patch": {
-        "operationId": "HypothesesController_update",
+        "operationId": "HypothesisAliasController_update",
         "parameters": [
           {
             "name": "id",
@@ -4953,13 +5464,13 @@
             }
           }
         },
-        "summary": "Update a hypothesis",
+        "summary": "[Deprecated] Update hypothesis — use PATCH /threads/:id",
         "tags": [
           "hypotheses"
         ]
       },
       "delete": {
-        "operationId": "HypothesesController_remove",
+        "operationId": "HypothesisAliasController_remove",
         "parameters": [
           {
             "name": "id",
@@ -4975,7 +5486,7 @@
             "description": ""
           }
         },
-        "summary": "Delete a hypothesis",
+        "summary": "[Deprecated] Delete hypothesis — use DELETE /threads/:id",
         "tags": [
           "hypotheses"
         ]
@@ -4983,7 +5494,7 @@
     },
     "/hypotheses/{id}/support": {
       "post": {
-        "operationId": "HypothesesController_linkSupport",
+        "operationId": "HypothesisAliasController_linkSupport",
         "parameters": [
           {
             "name": "id",
@@ -5016,7 +5527,7 @@
             }
           }
         },
-        "summary": "Link evidence or a finding to a hypothesis with a stance",
+        "summary": "[Deprecated] Link support — use POST /threads/:id/support",
         "tags": [
           "hypotheses"
         ]
@@ -5024,7 +5535,7 @@
     },
     "/hypotheses/{id}/support/{linkId}": {
       "delete": {
-        "operationId": "HypothesesController_unlinkSupport",
+        "operationId": "HypothesisAliasController_unlinkSupport",
         "parameters": [
           {
             "name": "id",
@@ -5055,7 +5566,7 @@
             }
           }
         },
-        "summary": "Remove a support link from a hypothesis",
+        "summary": "[Deprecated] Unlink support — use DELETE /threads/:id/support/:linkId",
         "tags": [
           "hypotheses"
         ]
@@ -10572,14 +11083,19 @@
           },
           "matchCount": {
             "type": "number",
-            "description": "Findings currently matching this question"
+            "description": "Findings currently matching this inquiry"
+          },
+          "newMatchCount": {
+            "type": "number",
+            "description": "Matches that appeared since the inquiry was last viewed"
           }
         },
         "required": [
           "id",
           "title",
           "status",
-          "matchCount"
+          "matchCount",
+          "newMatchCount"
         ]
       },
       "CaseResponseDto": {
@@ -10780,6 +11296,36 @@
           "findingId"
         ]
       },
+      "AttachFindingsDto": {
+        "type": "object",
+        "properties": {
+          "findingIds": {
+            "description": "Finding UUIDs to attach as case evidence",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "addedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "findingIds"
+        ]
+      },
+      "AttachFindingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "attached": {
+            "type": "number",
+            "description": "Findings newly attached to the case"
+          }
+        },
+        "required": [
+          "attached"
+        ]
+      },
       "UpdateCaseFindingNoteDto": {
         "type": "object",
         "properties": {
@@ -10788,6 +11334,52 @@
             "description": "Analyst note. Pass null or empty string to clear."
           }
         }
+      },
+      "LinkInquiriesDto": {
+        "type": "object",
+        "properties": {
+          "inquiryIds": {
+            "description": "Inquiry UUIDs to link",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "inquiryIds"
+        ]
+      },
+      "CloseCaseDto": {
+        "type": "object",
+        "properties": {
+          "conclusion": {
+            "type": "string",
+            "description": "Final conclusion — required to close the case"
+          },
+          "closedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "conclusion"
+        ]
+      },
+      "CloseCaseResponseDto": {
+        "type": "object",
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/CaseResponseDto"
+          },
+          "archivedInquiries": {
+            "type": "number",
+            "description": "Linked inquiries archived by closing this case"
+          }
+        },
+        "required": [
+          "case",
+          "archivedInquiries"
+        ]
       },
       "PullFromInquiryDto": {
         "type": "object",
@@ -11025,10 +11617,6 @@
           "description": {
             "type": "string"
           },
-          "caseId": {
-            "type": "string",
-            "description": "Link to an existing case"
-          },
           "createdBy": {
             "type": "string"
           }
@@ -11037,15 +11625,37 @@
           "title"
         ]
       },
+      "InquiryLinkedCaseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status"
+        ]
+      },
       "InquiryResponseDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
           },
-          "caseId": {
-            "type": "string",
-            "nullable": true
+          "cases": {
+            "description": "Cases this inquiry drives",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InquiryLinkedCaseDto"
+            }
           },
           "title": {
             "type": "string"
@@ -11129,6 +11739,7 @@
         },
         "required": [
           "id",
+          "cases",
           "title",
           "status",
           "matchAllSources",
@@ -11444,11 +12055,6 @@
               "ACTIVE",
               "ARCHIVED"
             ]
-          },
-          "caseId": {
-            "type": "string",
-            "description": "Link/unlink a case (null detaches)",
-            "nullable": true
           }
         }
       },
@@ -11462,6 +12068,395 @@
         },
         "required": [
           "landed"
+        ]
+      },
+      "CaseActivityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string"
+          },
+          "activityType": {
+            "type": "string",
+            "enum": [
+              "CASE_CREATED",
+              "CASE_UPDATED",
+              "CONCLUSION_UPDATED",
+              "INQUIRY_LINKED",
+              "INQUIRY_UNLINKED",
+              "INQUIRY_PULLED",
+              "EVIDENCE_ADDED",
+              "EVIDENCE_REMOVED",
+              "EVIDENCE_NOTE_UPDATED",
+              "FINDING_ADDED",
+              "FINDING_REMOVED",
+              "FINDING_NOTE_UPDATED",
+              "THREAD_CREATED",
+              "THREAD_ENTRY_ADDED",
+              "THREAD_STATEMENT_UPDATED",
+              "THREAD_STATUS_CHANGED",
+              "THREAD_CONFIDENCE_CHANGED",
+              "SUPPORT_LINKED",
+              "SUPPORT_UNLINKED",
+              "SUPPORT_UPDATED"
+            ]
+          },
+          "actor": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "caseId",
+          "activityType",
+          "payload",
+          "createdAt"
+        ]
+      },
+      "CaseTimelineResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseActivityDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "ThreadSupportLinkDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "evidence",
+              "finding"
+            ]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "SUPPORTS",
+              "CONTRADICTS",
+              "NEUTRAL"
+            ]
+          },
+          "weight": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          },
+          "targetLabel": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "stance",
+          "targetLabel",
+          "createdAt"
+        ]
+      },
+      "ThreadEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "entryType": {
+            "type": "string",
+            "enum": [
+              "NOTE",
+              "STATEMENT",
+              "STATUS_CHANGE",
+              "CONFIDENCE_CHANGE"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "author": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "threadId",
+          "entryType",
+          "createdAt"
+        ]
+      },
+      "ThreadResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "HYPOTHESIS",
+              "DISCUSSION"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "SUPPORTED",
+              "REFUTED",
+              "INCONCLUSIVE"
+            ],
+            "nullable": true
+          },
+          "confidence": {
+            "type": "number",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "supportingCount": {
+            "type": "number",
+            "description": "Count of SUPPORTS links"
+          },
+          "contradictingCount": {
+            "type": "number",
+            "description": "Count of CONTRADICTS links"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThreadSupportLinkDto"
+            }
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThreadEntryDto"
+            }
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "caseId",
+          "kind",
+          "title",
+          "supportingCount",
+          "contradictingCount",
+          "links",
+          "entries",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateThreadDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "HYPOTHESIS",
+              "DISCUSSION"
+            ],
+            "default": "HYPOTHESIS"
+          },
+          "title": {
+            "type": "string",
+            "description": "Short display title (hypothesis name or discussion topic)"
+          },
+          "statement": {
+            "type": "string",
+            "description": "Initial statement body (hypothesis threads)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "SUPPORTED",
+              "REFUTED",
+              "INCONCLUSIVE"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "createdBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title"
+        ]
+      },
+      "UpdateThreadDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "SUPPORTED",
+              "REFUTED",
+              "INCONCLUSIVE"
+            ],
+            "nullable": true
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "actor": {
+            "type": "string"
+          }
+        }
+      },
+      "AddThreadEntryDto": {
+        "type": "object",
+        "properties": {
+          "entryType": {
+            "type": "string",
+            "enum": [
+              "NOTE",
+              "STATEMENT",
+              "STATUS_CHANGE",
+              "CONFIDENCE_CHANGE"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "entryType"
+        ]
+      },
+      "ThreadEntriesResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThreadEntryDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "LinkThreadSupportDto": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "evidence",
+              "finding"
+            ]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "SUPPORTS",
+              "CONTRADICTS",
+              "NEUTRAL"
+            ]
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetType",
+          "targetId"
         ]
       },
       "HypothesisSupportLinkDto": {

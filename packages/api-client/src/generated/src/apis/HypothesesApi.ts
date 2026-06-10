@@ -31,30 +31,30 @@ import {
     UpdateHypothesisDtoToJSON,
 } from '../models/index';
 
-export interface HypothesesControllerCreateRequest {
+export interface HypothesisAliasControllerCreateRequest {
     caseId: string;
     createHypothesisDto: CreateHypothesisDto;
 }
 
-export interface HypothesesControllerLinkSupportRequest {
+export interface HypothesisAliasControllerLinkSupportRequest {
     id: string;
     linkSupportDto: LinkSupportDto;
 }
 
-export interface HypothesesControllerListRequest {
+export interface HypothesisAliasControllerListRequest {
     caseId: string;
 }
 
-export interface HypothesesControllerRemoveRequest {
+export interface HypothesisAliasControllerRemoveRequest {
     id: string;
 }
 
-export interface HypothesesControllerUnlinkSupportRequest {
+export interface HypothesisAliasControllerUnlinkSupportRequest {
     id: string;
     linkId: string;
 }
 
-export interface HypothesesControllerUpdateRequest {
+export interface HypothesisAliasControllerUpdateRequest {
     id: string;
     updateHypothesisDto: UpdateHypothesisDto;
 }
@@ -65,20 +65,20 @@ export interface HypothesesControllerUpdateRequest {
 export class HypothesesApi extends runtime.BaseAPI {
 
     /**
-     * Create a hypothesis in a case
+     * [Deprecated] Create hypothesis — use POST /cases/:caseId/threads
      */
-    async hypothesesControllerCreateRaw(requestParameters: HypothesesControllerCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HypothesisResponseDto>> {
+    async hypothesisAliasControllerCreateRaw(requestParameters: HypothesisAliasControllerCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HypothesisResponseDto>> {
         if (requestParameters['caseId'] == null) {
             throw new runtime.RequiredError(
                 'caseId',
-                'Required parameter "caseId" was null or undefined when calling hypothesesControllerCreate().'
+                'Required parameter "caseId" was null or undefined when calling hypothesisAliasControllerCreate().'
             );
         }
 
         if (requestParameters['createHypothesisDto'] == null) {
             throw new runtime.RequiredError(
                 'createHypothesisDto',
-                'Required parameter "createHypothesisDto" was null or undefined when calling hypothesesControllerCreate().'
+                'Required parameter "createHypothesisDto" was null or undefined when calling hypothesisAliasControllerCreate().'
             );
         }
 
@@ -104,28 +104,28 @@ export class HypothesesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Create a hypothesis in a case
+     * [Deprecated] Create hypothesis — use POST /cases/:caseId/threads
      */
-    async hypothesesControllerCreate(requestParameters: HypothesesControllerCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HypothesisResponseDto> {
-        const response = await this.hypothesesControllerCreateRaw(requestParameters, initOverrides);
+    async hypothesisAliasControllerCreate(requestParameters: HypothesisAliasControllerCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HypothesisResponseDto> {
+        const response = await this.hypothesisAliasControllerCreateRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
-     * Link evidence or a finding to a hypothesis with a stance
+     * [Deprecated] Link support — use POST /threads/:id/support
      */
-    async hypothesesControllerLinkSupportRaw(requestParameters: HypothesesControllerLinkSupportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HypothesisResponseDto>> {
+    async hypothesisAliasControllerLinkSupportRaw(requestParameters: HypothesisAliasControllerLinkSupportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HypothesisResponseDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
-                'Required parameter "id" was null or undefined when calling hypothesesControllerLinkSupport().'
+                'Required parameter "id" was null or undefined when calling hypothesisAliasControllerLinkSupport().'
             );
         }
 
         if (requestParameters['linkSupportDto'] == null) {
             throw new runtime.RequiredError(
                 'linkSupportDto',
-                'Required parameter "linkSupportDto" was null or undefined when calling hypothesesControllerLinkSupport().'
+                'Required parameter "linkSupportDto" was null or undefined when calling hypothesisAliasControllerLinkSupport().'
             );
         }
 
@@ -151,21 +151,21 @@ export class HypothesesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Link evidence or a finding to a hypothesis with a stance
+     * [Deprecated] Link support — use POST /threads/:id/support
      */
-    async hypothesesControllerLinkSupport(requestParameters: HypothesesControllerLinkSupportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HypothesisResponseDto> {
-        const response = await this.hypothesesControllerLinkSupportRaw(requestParameters, initOverrides);
+    async hypothesisAliasControllerLinkSupport(requestParameters: HypothesisAliasControllerLinkSupportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HypothesisResponseDto> {
+        const response = await this.hypothesisAliasControllerLinkSupportRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
-     * List hypotheses for a case
+     * [Deprecated] List hypotheses — use GET /cases/:caseId/threads?kind=HYPOTHESIS
      */
-    async hypothesesControllerListRaw(requestParameters: HypothesesControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<HypothesisResponseDto>>> {
+    async hypothesisAliasControllerListRaw(requestParameters: HypothesisAliasControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<HypothesisResponseDto>>> {
         if (requestParameters['caseId'] == null) {
             throw new runtime.RequiredError(
                 'caseId',
-                'Required parameter "caseId" was null or undefined when calling hypothesesControllerList().'
+                'Required parameter "caseId" was null or undefined when calling hypothesisAliasControllerList().'
             );
         }
 
@@ -188,21 +188,21 @@ export class HypothesesApi extends runtime.BaseAPI {
     }
 
     /**
-     * List hypotheses for a case
+     * [Deprecated] List hypotheses — use GET /cases/:caseId/threads?kind=HYPOTHESIS
      */
-    async hypothesesControllerList(requestParameters: HypothesesControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<HypothesisResponseDto>> {
-        const response = await this.hypothesesControllerListRaw(requestParameters, initOverrides);
+    async hypothesisAliasControllerList(requestParameters: HypothesisAliasControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<HypothesisResponseDto>> {
+        const response = await this.hypothesisAliasControllerListRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
-     * Delete a hypothesis
+     * [Deprecated] Delete hypothesis — use DELETE /threads/:id
      */
-    async hypothesesControllerRemoveRaw(requestParameters: HypothesesControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async hypothesisAliasControllerRemoveRaw(requestParameters: HypothesisAliasControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
-                'Required parameter "id" was null or undefined when calling hypothesesControllerRemove().'
+                'Required parameter "id" was null or undefined when calling hypothesisAliasControllerRemove().'
             );
         }
 
@@ -225,27 +225,27 @@ export class HypothesesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Delete a hypothesis
+     * [Deprecated] Delete hypothesis — use DELETE /threads/:id
      */
-    async hypothesesControllerRemove(requestParameters: HypothesesControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.hypothesesControllerRemoveRaw(requestParameters, initOverrides);
+    async hypothesisAliasControllerRemove(requestParameters: HypothesisAliasControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.hypothesisAliasControllerRemoveRaw(requestParameters, initOverrides);
     }
 
     /**
-     * Remove a support link from a hypothesis
+     * [Deprecated] Unlink support — use DELETE /threads/:id/support/:linkId
      */
-    async hypothesesControllerUnlinkSupportRaw(requestParameters: HypothesesControllerUnlinkSupportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HypothesisResponseDto>> {
+    async hypothesisAliasControllerUnlinkSupportRaw(requestParameters: HypothesisAliasControllerUnlinkSupportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HypothesisResponseDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
-                'Required parameter "id" was null or undefined when calling hypothesesControllerUnlinkSupport().'
+                'Required parameter "id" was null or undefined when calling hypothesisAliasControllerUnlinkSupport().'
             );
         }
 
         if (requestParameters['linkId'] == null) {
             throw new runtime.RequiredError(
                 'linkId',
-                'Required parameter "linkId" was null or undefined when calling hypothesesControllerUnlinkSupport().'
+                'Required parameter "linkId" was null or undefined when calling hypothesisAliasControllerUnlinkSupport().'
             );
         }
 
@@ -269,28 +269,28 @@ export class HypothesesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Remove a support link from a hypothesis
+     * [Deprecated] Unlink support — use DELETE /threads/:id/support/:linkId
      */
-    async hypothesesControllerUnlinkSupport(requestParameters: HypothesesControllerUnlinkSupportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HypothesisResponseDto> {
-        const response = await this.hypothesesControllerUnlinkSupportRaw(requestParameters, initOverrides);
+    async hypothesisAliasControllerUnlinkSupport(requestParameters: HypothesisAliasControllerUnlinkSupportRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HypothesisResponseDto> {
+        const response = await this.hypothesisAliasControllerUnlinkSupportRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
-     * Update a hypothesis
+     * [Deprecated] Update hypothesis — use PATCH /threads/:id
      */
-    async hypothesesControllerUpdateRaw(requestParameters: HypothesesControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HypothesisResponseDto>> {
+    async hypothesisAliasControllerUpdateRaw(requestParameters: HypothesisAliasControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HypothesisResponseDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
-                'Required parameter "id" was null or undefined when calling hypothesesControllerUpdate().'
+                'Required parameter "id" was null or undefined when calling hypothesisAliasControllerUpdate().'
             );
         }
 
         if (requestParameters['updateHypothesisDto'] == null) {
             throw new runtime.RequiredError(
                 'updateHypothesisDto',
-                'Required parameter "updateHypothesisDto" was null or undefined when calling hypothesesControllerUpdate().'
+                'Required parameter "updateHypothesisDto" was null or undefined when calling hypothesisAliasControllerUpdate().'
             );
         }
 
@@ -316,10 +316,10 @@ export class HypothesesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Update a hypothesis
+     * [Deprecated] Update hypothesis — use PATCH /threads/:id
      */
-    async hypothesesControllerUpdate(requestParameters: HypothesesControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HypothesisResponseDto> {
-        const response = await this.hypothesesControllerUpdateRaw(requestParameters, initOverrides);
+    async hypothesisAliasControllerUpdate(requestParameters: HypothesisAliasControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HypothesisResponseDto> {
+        const response = await this.hypothesisAliasControllerUpdateRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

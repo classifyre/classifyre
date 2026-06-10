@@ -171,7 +171,7 @@ async function example() {
     search: search_example,
     // Array<'ACTIVE' | 'ARCHIVED'> (optional)
     status: ...,
-    // string | Filter to a case (or \"none\" for unlinked) (optional)
+    // string | Filter to inquiries linked to a case (or \"none\" for unlinked) (optional)
     caseId: caseId_example,
     // number (optional)
     skip: 8.14,
@@ -198,7 +198,7 @@ example().catch(console.error);
 |------------- | ------------- | ------------- | -------------|
 | **search** | `string` |  | [Optional] [Defaults to `undefined`] |
 | **status** | `ACTIVE`, `ARCHIVED` |  | [Optional] [Enum: ACTIVE, ARCHIVED] |
-| **caseId** | `string` | Filter to a case (or \&quot;none\&quot; for unlinked) | [Optional] [Defaults to `undefined`] |
+| **caseId** | `string` | Filter to inquiries linked to a case (or \&quot;none\&quot; for unlinked) | [Optional] [Defaults to `undefined`] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **limit** | `number` |  | [Optional] [Defaults to `50`] |
 

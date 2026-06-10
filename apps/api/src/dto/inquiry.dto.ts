@@ -67,11 +67,6 @@ export class CreateInquiryDto extends InquiryMatchersDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ description: 'Link to an existing case' })
-  @IsOptional()
-  @IsString()
-  caseId?: string;
-
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -95,10 +90,6 @@ export class UpdateInquiryDto extends InquiryMatchersDto {
   @IsEnum(InquiryStatus)
   status?: InquiryStatus;
 
-  @ApiPropertyOptional({ description: 'Link/unlink a case (null detaches)', nullable: true })
-  @IsOptional()
-  @IsString()
-  caseId?: string | null;
 }
 
 export class QueryInquiriesDto {
@@ -114,7 +105,7 @@ export class QueryInquiriesDto {
   @IsEnum(InquiryStatus, { each: true })
   status?: InquiryStatus[];
 
-  @ApiPropertyOptional({ description: 'Filter to a case (or "none" for unlinked)' })
+  @ApiPropertyOptional({ description: 'Filter to inquiries linked to a case (or "none" for unlinked)' })
   @IsOptional()
   @IsString()
   caseId?: string;
@@ -134,12 +125,24 @@ export class QueryInquiriesDto {
   limit?: number = 50;
 }
 
+/** A case an inquiry is linked to. */
+export class InquiryLinkedCaseDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  title!: string;
+
+  @ApiProperty()
+  status!: string;
+}
+
 export class InquiryResponseDto {
   @ApiProperty()
   id!: string;
 
-  @ApiPropertyOptional({ nullable: true })
-  caseId?: string | null;
+  @ApiProperty({ type: () => [InquiryLinkedCaseDto], description: 'Cases this inquiry drives' })
+  cases!: InquiryLinkedCaseDto[];
 
   @ApiProperty()
   title!: string;
