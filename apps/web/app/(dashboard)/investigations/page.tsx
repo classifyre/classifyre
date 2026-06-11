@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Sparkles, FolderPlus, FolderOpen, Pencil, Loader2 } from "lucide-react";
+import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
 import { api, type InquiryResponseDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
@@ -36,7 +37,10 @@ function InquiryRow({ inquiry }: { inquiry: InquiryResponseDto }) {
         className="min-w-0 flex-1 text-left"
         onClick={() => router.push(`/investigations/inquiries/${inquiry.id}`)}
       >
-        <p className="truncate font-medium">{inquiry.title}</p>
+        <p className="flex items-center gap-2 truncate font-medium">
+          <span className="truncate">{inquiry.title}</span>
+          {isAiActor(inquiry.createdBy) && <AiActorBadge />}
+        </p>
         <p className="text-muted-foreground text-xs">{inquiryScope(inquiry)}</p>
       </button>
 

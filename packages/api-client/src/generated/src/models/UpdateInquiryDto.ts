@@ -79,6 +79,12 @@ export interface UpdateInquiryDto {
      * @memberof UpdateInquiryDto
      */
     status?: UpdateInquiryDtoStatusEnum;
+    /**
+     * AI autopilot mode for this inquiry. INHERIT follows the instance setting; OBSERVE_ONLY blocks autopilot mutations.
+     * @type {string}
+     * @memberof UpdateInquiryDto
+     */
+    aiMode?: UpdateInquiryDtoAiModeEnum;
 }
 
 
@@ -103,6 +109,16 @@ export const UpdateInquiryDtoStatusEnum = {
     Archived: 'ARCHIVED'
 } as const;
 export type UpdateInquiryDtoStatusEnum = typeof UpdateInquiryDtoStatusEnum[keyof typeof UpdateInquiryDtoStatusEnum];
+
+/**
+ * @export
+ */
+export const UpdateInquiryDtoAiModeEnum = {
+    Inherit: 'INHERIT',
+    Managed: 'MANAGED',
+    ObserveOnly: 'OBSERVE_ONLY'
+} as const;
+export type UpdateInquiryDtoAiModeEnum = typeof UpdateInquiryDtoAiModeEnum[keyof typeof UpdateInquiryDtoAiModeEnum];
 
 
 /**
@@ -132,6 +148,7 @@ export function UpdateInquiryDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'title': json['title'] == null ? undefined : json['title'],
         'description': json['description'] == null ? undefined : json['description'],
         'status': json['status'] == null ? undefined : json['status'],
+        'aiMode': json['aiMode'] == null ? undefined : json['aiMode'],
     };
 }
 
@@ -156,6 +173,7 @@ export function UpdateInquiryDtoToJSONTyped(value?: UpdateInquiryDto | null, ign
         'title': value['title'],
         'description': value['description'],
         'status': value['status'],
+        'aiMode': value['aiMode'],
     };
 }
 

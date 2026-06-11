@@ -62,6 +62,36 @@ export interface InstanceSettingsResponseDto {
      */
     aiProviderConfigId: string | null;
     /**
+     * When true, the autopilot inquiry agent manages inquiries automatically after scans.
+     * @type {boolean}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autopilotInquiryEnabled: boolean;
+    /**
+     * Operator guidance for the inquiry agent: what is desired / worth investigating.
+     * @type {string}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autopilotInquiryDesired: string | null;
+    /**
+     * Operator guidance for the inquiry agent: what is searchable in this instance.
+     * @type {string}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autopilotInquirySearchable: string | null;
+    /**
+     * When true, the autopilot case agent manages investigation cases automatically after scans.
+     * @type {boolean}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autopilotCaseEnabled: boolean;
+    /**
+     * Operator guidance for the case agent.
+     * @type {string}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autopilotCaseGuidance: string | null;
+    /**
      * Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.
      * @type {boolean}
      * @memberof InstanceSettingsResponseDto
@@ -114,6 +144,11 @@ export function instanceOfInstanceSettingsResponseDto(value: object): value is I
     if (!('timezone' in value) || value['timezone'] === undefined) return false;
     if (!('timeFormat' in value) || value['timeFormat'] === undefined) return false;
     if (!('aiProviderConfigId' in value) || value['aiProviderConfigId'] === undefined) return false;
+    if (!('autopilotInquiryEnabled' in value) || value['autopilotInquiryEnabled'] === undefined) return false;
+    if (!('autopilotInquiryDesired' in value) || value['autopilotInquiryDesired'] === undefined) return false;
+    if (!('autopilotInquirySearchable' in value) || value['autopilotInquirySearchable'] === undefined) return false;
+    if (!('autopilotCaseEnabled' in value) || value['autopilotCaseEnabled'] === undefined) return false;
+    if (!('autopilotCaseGuidance' in value) || value['autopilotCaseGuidance'] === undefined) return false;
     if (!('demoMode' in value) || value['demoMode'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
@@ -137,6 +172,11 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'timezone': json['timezone'],
         'timeFormat': json['timeFormat'],
         'aiProviderConfigId': json['aiProviderConfigId'],
+        'autopilotInquiryEnabled': json['autopilotInquiryEnabled'],
+        'autopilotInquiryDesired': json['autopilotInquiryDesired'],
+        'autopilotInquirySearchable': json['autopilotInquirySearchable'],
+        'autopilotCaseEnabled': json['autopilotCaseEnabled'],
+        'autopilotCaseGuidance': json['autopilotCaseGuidance'],
         'demoMode': json['demoMode'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
@@ -161,6 +201,11 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
         'timezone': value['timezone'],
         'timeFormat': value['timeFormat'],
         'aiProviderConfigId': value['aiProviderConfigId'],
+        'autopilotInquiryEnabled': value['autopilotInquiryEnabled'],
+        'autopilotInquiryDesired': value['autopilotInquiryDesired'],
+        'autopilotInquirySearchable': value['autopilotInquirySearchable'],
+        'autopilotCaseEnabled': value['autopilotCaseEnabled'],
+        'autopilotCaseGuidance': value['autopilotCaseGuidance'],
         'demoMode': value['demoMode'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),

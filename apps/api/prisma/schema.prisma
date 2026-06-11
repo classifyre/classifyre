@@ -387,6 +387,15 @@ model InstanceSettings {
   timezone   String           @default("AUTOMATIC")
   timeFormat InstanceTimeFormat @default(AUTOMATIC) @map("time_format")
   aiProviderConfigId String?  @map("ai_provider_config_id")
+
+  // Investigation autopilot — instance-wide defaults. Per-entity aiMode on
+  // Inquiry/Case overrides these when not INHERIT.
+  autopilotInquiryEnabled    Boolean @default(false) @map("autopilot_inquiry_enabled")
+  autopilotInquiryDesired    String? @db.Text @map("autopilot_inquiry_desired")
+  autopilotInquirySearchable String? @db.Text @map("autopilot_inquiry_searchable")
+  autopilotCaseEnabled       Boolean @default(false) @map("autopilot_case_enabled")
+  autopilotCaseGuidance      String? @db.Text @map("autopilot_case_guidance")
+
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
 
@@ -718,6 +727,7 @@ model Case {
   severity    Severity   @default(MEDIUM)
   assignee    String?
   createdBy   String?    @map("created_by")
+  aiMode      AiManagementMode @default(INHERIT) @map("ai_mode")
   conclusion  String?    @db.Text
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
@@ -749,6 +759,7 @@ model Inquiry {
   description String?        @db.Text
   status      InquiryStatus @default(ACTIVE)
   createdBy   String?        @map("created_by")
+  aiMode      AiManagementMode @default(INHERIT) @map("ai_mode")
 
   matchAllSources    Boolean        @default(false) @map("match_all_sources")
   sourceIds          String[]       @map("source_ids")
@@ -958,4 +969,129 @@ model CaseActivity {
 
   @@index([caseId, createdAt(sort: Desc)])
   @@map("case_activities")
+}
+
+// ── Investigation autopilot ──────────────────────────────────────────────────
+// Autonomous background agents that manage inquiries and cases after scans.
+// Every cycle is an AgentRun; every (non-)action is an AgentDecision with a
+// mandatory rationale; learned domain knowledge lives in AgentMemory.
+
+// Per-entity override of the instance-wide autopilot flags. OBSERVE_ONLY means
+// the agent may read the entity but never mutate it.
+enum AiManagementMode {
+  INHERIT
+  MANAGED
+  OBSERVE_ONLY
+}
+
+enum AgentKind {
+  INQUIRY
+  CASE
+}
+
+enum AgentRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum AgentDecisionAction {
+  CREATE_INQUIRY
+  UPDATE_INQUIRY
+  ENRICH_INQUIRY_MATCHERS
+  SIGNAL_CASE_READY
+  CREATE_CASE
+  UPDATE_CASE
+  ADD_HYPOTHESIS
+  UPDATE_HYPOTHESIS
+  ADD_EVIDENCE
+  ATTACH_FINDINGS
+  ADD_NOTE
+  ADD_THREAD_ENTRY
+  CREATE_EDGE
+  CHANGE_STATUS
+  LINK_INQUIRY
+  NO_ACTION
+}
+
+enum AgentDecisionOutcome {
+  APPLIED
+  SKIPPED_OBSERVE_ONLY
+  FAILED
+}
+
+enum AgentMemoryKind {
+  GLOSSARY
+  DECISION_PRECEDENT
+  TOPIC_INQUIRY_MAP
+}
+
+// One autonomous agent cycle (triggered by a scan completion). currentStep +
+// stepState make the pipeline resumable across pg-boss redeliveries without
+// repeating LLM calls whose validated output is already stored.
+model AgentRun {
+  id          String         @id @default(uuid())
+  agentKind   AgentKind      @map("agent_kind")
+  status      AgentRunStatus @default(PENDING)
+  sourceId    String?        @map("source_id")
+  runnerId    String?        @map("runner_id")
+  trigger     String         @default("scan_completed")
+  currentStep String?        @map("current_step")
+  stepState   Json?          @db.JsonB @map("step_state")
+  attempts    Int            @default(0)
+  error       String?        @db.Text
+  summary     String?        @db.Text
+  startedAt   DateTime?      @map("started_at")
+  finishedAt  DateTime?      @map("finished_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  decisions AgentDecision[]
+
+  @@index([agentKind, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("agent_runs")
+}
+
+// A single agent decision — including the decision to do nothing. Rationale is
+// always required; payload holds the exact mutation input for auditability.
+model AgentDecision {
+  id         String               @id @default(uuid())
+  runId      String               @map("run_id")
+  action     AgentDecisionAction
+  outcome    AgentDecisionOutcome @default(APPLIED)
+  entityType String?              @map("entity_type")
+  entityId   String?              @map("entity_id")
+  rationale  String               @db.Text
+  payload    Json?                @db.JsonB
+  createdAt  DateTime             @default(now()) @map("created_at")
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([entityType, entityId])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("agent_decisions")
+}
+
+// Long-lived agent knowledge: domain glossary, generalized decision precedents
+// and topic→inquiry mappings. Recalled via pg_trgm similarity on key/content
+// (raw SQL indexes in the migration). weight is a reinforcement counter.
+model AgentMemory {
+  id        String          @id @default(uuid())
+  kind      AgentMemoryKind
+  key       String
+  content   String          @db.Text
+  tags      String[]        @default([])
+  refType   String?         @map("ref_type")
+  refId     String?         @map("ref_id")
+  weight    Int             @default(1)
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  @@unique([kind, key])
+  @@index([kind])
+  @@index([tags], type: Gin)
+  @@map("agent_memories")
 }

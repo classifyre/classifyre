@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CaseActivityType, Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { GraphService } from './graph.service';
@@ -28,9 +32,15 @@ import {
 import { GraphResponseDto } from './dto/graph.dto';
 
 type CaseRow = Prisma.CaseGetPayload<{
-  include: { _count: { select: { evidence: true; hypotheses: true; inquiryLinks: true } } };
+  include: {
+    _count: {
+      select: { evidence: true; hypotheses: true; inquiryLinks: true };
+    };
+  };
 }>;
-type EvidenceRow = Prisma.CaseEvidenceGetPayload<{ include: { findings: true } }>;
+type EvidenceRow = Prisma.CaseEvidenceGetPayload<{
+  include: { findings: true };
+}>;
 
 const countSelect = {
   _count: { select: { evidence: true, hypotheses: true, inquiryLinks: true } },
@@ -69,10 +79,18 @@ export class CasesService {
       },
       include: countSelect,
     });
-    await this.activity.record(created.id, CaseActivityType.CASE_CREATED, { title: dto.title }, dto.createdBy);
+    await this.activity.record(
+      created.id,
+      CaseActivityType.CASE_CREATED,
+      { title: dto.title },
+      dto.createdBy,
+    );
     if (inquiryIds.length > 0) {
       await this.prisma.caseInquiry.createMany({
-        data: inquiryIds.map((inquiryId) => ({ caseId: created.id, inquiryId })),
+        data: inquiryIds.map((inquiryId) => ({
+          caseId: created.id,
+          inquiryId,
+        })),
         skipDuplicates: true,
       });
       for (const q of inquiries) {
@@ -89,7 +107,11 @@ export class CasesService {
   }
 
   /** Link additional inquiries to a case. Already-linked ones are ignored. */
-  async linkInquiries(caseId: string, dto: LinkInquiriesDto): Promise<CaseResponseDto> {
+  async linkInquiries(
+    caseId: string,
+    dto: LinkInquiriesDto,
+    actor?: string,
+  ): Promise<CaseResponseDto> {
     await this.ensureExists(caseId);
     const inquiryIds = [...new Set(dto.inquiryIds ?? [])];
     if (inquiryIds.length === 0) return (await this.findOne(caseId))!;
@@ -111,22 +133,30 @@ export class CasesService {
     });
     for (const q of inquiries) {
       if (existingIds.has(q.id)) continue;
-      await this.activity.record(caseId, CaseActivityType.INQUIRY_LINKED, {
-        inquiryId: q.id,
-        inquiryTitle: q.title,
-      });
+      await this.activity.record(
+        caseId,
+        CaseActivityType.INQUIRY_LINKED,
+        { inquiryId: q.id, inquiryTitle: q.title },
+        actor,
+      );
     }
     return (await this.findOne(caseId))!;
   }
 
   /** Unlink an inquiry from a case. The inquiry itself is untouched. */
-  async unlinkInquiry(caseId: string, inquiryId: string): Promise<CaseResponseDto> {
+  async unlinkInquiry(
+    caseId: string,
+    inquiryId: string,
+  ): Promise<CaseResponseDto> {
     await this.ensureExists(caseId);
     const link = await this.prisma.caseInquiry.findUnique({
       where: { caseId_inquiryId: { caseId, inquiryId } },
       include: { inquiry: { select: { title: true } } },
     });
-    if (!link) throw new NotFoundException(`Inquiry ${inquiryId} is not linked to case ${caseId}`);
+    if (!link)
+      throw new NotFoundException(
+        `Inquiry ${inquiryId} is not linked to case ${caseId}`,
+      );
     await this.prisma.caseInquiry.delete({ where: { id: link.id } });
     await this.activity.record(caseId, CaseActivityType.INQUIRY_UNLINKED, {
       inquiryId,
@@ -140,7 +170,9 @@ export class CasesService {
     await this.ensureExists(id);
     const conclusion = (dto.conclusion ?? '').trim();
     if (conclusion.length === 0) {
-      throw new BadRequestException('A conclusion is required to close a case.');
+      throw new BadRequestException(
+        'A conclusion is required to close a case.',
+      );
     }
     await this.prisma.case.update({
       where: { id },
@@ -157,7 +189,10 @@ export class CasesService {
     const archivable = linked
       .filter((q) =>
         q.caseLinks.every(
-          (l) => l.case.id === id || l.case.status === 'CLOSED' || l.case.status === 'ARCHIVED',
+          (l) =>
+            l.case.id === id ||
+            l.case.status === 'CLOSED' ||
+            l.case.status === 'ARCHIVED',
         ),
       )
       .map((q) => q.id);
@@ -174,7 +209,10 @@ export class CasesService {
       { closed: true, archivedInquiries: archived.count },
       dto.closedBy,
     );
-    return { case: (await this.findOne(id))!, archivedInquiries: archived.count };
+    return {
+      case: (await this.findOne(id))!,
+      archivedInquiries: archived.count,
+    };
   }
 
   async list(query: QueryCasesDto): Promise<CaseListResponseDto> {
@@ -195,7 +233,13 @@ export class CasesService {
     }
 
     const [rows, total] = await Promise.all([
-      this.prisma.case.findMany({ where, include: countSelect, orderBy: { updatedAt: 'desc' }, skip, take: limit }),
+      this.prisma.case.findMany({
+        where,
+        include: countSelect,
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
       this.prisma.case.count({ where }),
     ]);
     return { items: rows.map((r) => this.mapCase(r)), total, skip, limit };
@@ -206,12 +250,18 @@ export class CasesService {
       where: { id },
       include: {
         ...countSelect,
-        evidence: { orderBy: { createdAt: 'asc' }, include: { findings: true } },
-        inquiryLinks: { orderBy: { createdAt: 'asc' }, include: { inquiry: true } },
+        evidence: {
+          orderBy: { createdAt: 'asc' },
+          include: { findings: true },
+        },
+        inquiryLinks: {
+          orderBy: { createdAt: 'asc' },
+          include: { inquiry: true },
+        },
       },
     });
     if (!row) return null;
-    const evidence = this.hydrateEvidence(row.evidence as EvidenceRow[]);
+    const evidence = this.hydrateEvidence(row.evidence);
     const inquiries: CaseLinkedInquiryDto[] = row.inquiryLinks.map((l) => ({
       id: l.inquiry.id,
       title: l.inquiry.title,
@@ -222,7 +272,11 @@ export class CasesService {
     return { ...this.mapCase(row), evidence, inquiries };
   }
 
-  async update(id: string, dto: UpdateCaseDto): Promise<CaseResponseDto> {
+  async update(
+    id: string,
+    dto: UpdateCaseDto,
+    actor?: string,
+  ): Promise<CaseResponseDto> {
     await this.ensureExists(id);
     const updated = await this.prisma.case.update({
       where: { id },
@@ -233,11 +287,20 @@ export class CasesService {
         severity: dto.severity,
         assignee: dto.assignee,
         conclusion: dto.conclusion,
+        aiMode: dto.aiMode,
       },
       include: countSelect,
     });
-    const actType = dto.conclusion !== undefined ? CaseActivityType.CONCLUSION_UPDATED : CaseActivityType.CASE_UPDATED;
-    await this.activity.record(id, actType, { title: dto.title, status: dto.status, severity: dto.severity });
+    const actType =
+      dto.conclusion !== undefined
+        ? CaseActivityType.CONCLUSION_UPDATED
+        : CaseActivityType.CASE_UPDATED;
+    await this.activity.record(
+      id,
+      actType,
+      { title: dto.title, status: dto.status, severity: dto.severity },
+      actor,
+    );
     return this.mapCase(updated);
   }
 
@@ -246,7 +309,10 @@ export class CasesService {
     await this.prisma.case.delete({ where: { id } });
   }
 
-  async addEvidence(caseId: string, dto: AddEvidenceDto): Promise<CaseEvidenceDto> {
+  async addEvidence(
+    caseId: string,
+    dto: AddEvidenceDto,
+  ): Promise<CaseEvidenceDto> {
     await this.ensureExists(caseId);
     if (dto.entityType !== 'asset') {
       throw new BadRequestException(
@@ -254,7 +320,8 @@ export class CasesService {
       );
     }
     const hypothesisIds = dto.hypothesisIds ?? [];
-    if (hypothesisIds.length > 0) await this.assertHypothesesInCase(caseId, hypothesisIds);
+    if (hypothesisIds.length > 0)
+      await this.assertHypothesesInCase(caseId, hypothesisIds);
 
     const asset = await this.prisma.asset.findUnique({
       where: { id: dto.entityId },
@@ -266,28 +333,58 @@ export class CasesService {
       sourceType: asset ? String(asset.sourceType) : null,
     };
     const evidence = await this.prisma.caseEvidence.upsert({
-      where: { caseId_entityType_entityId: { caseId, entityType: 'asset', entityId: dto.entityId } },
-      create: { caseId, entityType: 'asset', entityId: dto.entityId, note: dto.note, addedBy: dto.addedBy, ...snapshot },
+      where: {
+        caseId_entityType_entityId: {
+          caseId,
+          entityType: 'asset',
+          entityId: dto.entityId,
+        },
+      },
+      create: {
+        caseId,
+        entityType: 'asset',
+        entityId: dto.entityId,
+        note: dto.note,
+        addedBy: dto.addedBy,
+        ...snapshot,
+      },
       update: { note: dto.note ?? undefined, ...snapshot },
       include: { findings: true },
     });
-    if (hypothesisIds.length > 0) await this.linkSupport(hypothesisIds, 'evidence', evidence.id);
+    if (hypothesisIds.length > 0)
+      await this.linkSupport(hypothesisIds, 'evidence', evidence.id);
     await this.graph.inferEdgesForAsset(dto.entityId);
-    await this.activity.record(caseId, CaseActivityType.EVIDENCE_ADDED, {
-      evidenceId: evidence.id,
-      entityId: dto.entityId,
-      label: snapshot.label,
-    }, dto.addedBy);
+    await this.activity.record(
+      caseId,
+      CaseActivityType.EVIDENCE_ADDED,
+      {
+        evidenceId: evidence.id,
+        entityId: dto.entityId,
+        label: snapshot.label,
+      },
+      dto.addedBy,
+    );
 
-    const updated = await this.prisma.caseEvidence.findUniqueOrThrow({ where: { id: evidence.id }, include: { findings: true } });
-    return this.hydrateEvidence([updated as EvidenceRow])[0]!;
+    const updated = await this.prisma.caseEvidence.findUniqueOrThrow({
+      where: { id: evidence.id },
+      include: { findings: true },
+    });
+    return this.hydrateEvidence([updated])[0];
   }
 
-  async addFinding(caseId: string, evidenceId: string, dto: AddFindingDto): Promise<CaseFindingDto> {
+  async addFinding(
+    caseId: string,
+    evidenceId: string,
+    dto: AddFindingDto,
+  ): Promise<CaseFindingDto> {
     await this.ensureExists(caseId);
-    const evidence = await this.prisma.caseEvidence.findUnique({ where: { id: evidenceId } });
+    const evidence = await this.prisma.caseEvidence.findUnique({
+      where: { id: evidenceId },
+    });
     if (!evidence || evidence.caseId !== caseId) {
-      throw new NotFoundException(`Evidence ${evidenceId} not found in case ${caseId}`);
+      throw new NotFoundException(
+        `Evidence ${evidenceId} not found in case ${caseId}`,
+      );
     }
     const finding = await this.prisma.finding.findUnique({
       where: { id: dto.findingId },
@@ -301,9 +398,14 @@ export class CasesService {
         asset: { select: { name: true, assetType: true, sourceType: true } },
       },
     });
-    if (!finding) throw new NotFoundException(`Finding ${dto.findingId} not found`);
+    if (!finding)
+      throw new NotFoundException(`Finding ${dto.findingId} not found`);
 
-    const assetEv = await this.ensureAssetEvidence(caseId, finding.assetId, finding.asset);
+    const assetEv = await this.ensureAssetEvidence(
+      caseId,
+      finding.assetId,
+      finding.asset,
+    );
     const cf = await this.prisma.caseFinding.upsert({
       where: { caseId_findingId: { caseId, findingId: dto.findingId } },
       create: {
@@ -329,7 +431,10 @@ export class CasesService {
   }
 
   /** Batch-attach findings; asset evidence rows are created automatically. */
-  async attachFindings(caseId: string, dto: AttachFindingsDto): Promise<AttachFindingsResponseDto> {
+  async attachFindings(
+    caseId: string,
+    dto: AttachFindingsDto,
+  ): Promise<AttachFindingsResponseDto> {
     await this.ensureExists(caseId);
     const findingIds = [...new Set(dto.findingIds ?? [])];
     if (findingIds.length === 0) return { attached: 0 };
@@ -352,7 +457,10 @@ export class CasesService {
     const evidenceByAsset = new Map<string, string>();
     for (const f of findings) {
       if (!evidenceByAsset.has(f.assetId)) {
-        evidenceByAsset.set(f.assetId, await this.ensureAssetEvidence(caseId, f.assetId, f.asset));
+        evidenceByAsset.set(
+          f.assetId,
+          await this.ensureAssetEvidence(caseId, f.assetId, f.asset),
+        );
       }
     }
     const created = await this.prisma.caseFinding.createMany({
@@ -368,7 +476,8 @@ export class CasesService {
       })),
       skipDuplicates: true,
     });
-    for (const assetId of evidenceByAsset.keys()) await this.graph.inferEdgesForAsset(assetId);
+    for (const assetId of evidenceByAsset.keys())
+      await this.graph.inferEdgesForAsset(assetId);
     await this.activity.record(
       caseId,
       CaseActivityType.FINDING_ADDED,
@@ -376,7 +485,9 @@ export class CasesService {
         count: created.count,
         label: `${created.count} finding${created.count === 1 ? '' : 's'} attached`,
         findingLabels: findings.slice(0, 10).map((f) => f.findingType),
-        assetLabels: [...new Set(findings.map((f) => f.asset?.name).filter(Boolean))].slice(0, 10),
+        assetLabels: [
+          ...new Set(findings.map((f) => f.asset?.name).filter(Boolean)),
+        ].slice(0, 10),
       },
       dto.addedBy,
     );
@@ -384,18 +495,34 @@ export class CasesService {
   }
 
   async removeFinding(caseId: string, caseFindingId: string): Promise<void> {
-    const cf = await this.prisma.caseFinding.findUnique({ where: { id: caseFindingId } });
+    const cf = await this.prisma.caseFinding.findUnique({
+      where: { id: caseFindingId },
+    });
     if (!cf || cf.caseId !== caseId) {
-      throw new NotFoundException(`Finding ${caseFindingId} not found in case ${caseId}`);
+      throw new NotFoundException(
+        `Finding ${caseFindingId} not found in case ${caseId}`,
+      );
     }
     await this.prisma.caseFinding.delete({ where: { id: caseFindingId } });
-    await this.activity.record(caseId, CaseActivityType.FINDING_REMOVED, { caseFindingId, findingId: cf.findingId, label: cf.label });
+    await this.activity.record(caseId, CaseActivityType.FINDING_REMOVED, {
+      caseFindingId,
+      findingId: cf.findingId,
+      label: cf.label,
+    });
   }
 
-  async patchEvidenceNote(caseId: string, evidenceId: string, dto: UpdateEvidenceNoteDto): Promise<CaseEvidenceDto> {
-    const evidence = await this.prisma.caseEvidence.findUnique({ where: { id: evidenceId } });
+  async patchEvidenceNote(
+    caseId: string,
+    evidenceId: string,
+    dto: UpdateEvidenceNoteDto,
+  ): Promise<CaseEvidenceDto> {
+    const evidence = await this.prisma.caseEvidence.findUnique({
+      where: { id: evidenceId },
+    });
     if (!evidence || evidence.caseId !== caseId) {
-      throw new NotFoundException(`Evidence ${evidenceId} not found in case ${caseId}`);
+      throw new NotFoundException(
+        `Evidence ${evidenceId} not found in case ${caseId}`,
+      );
     }
     const updated = await this.prisma.caseEvidence.update({
       where: { id: evidenceId },
@@ -407,13 +534,21 @@ export class CasesService {
       label: updated.label ?? updated.entityId,
       note: (dto.note ?? '').slice(0, 300) || null,
     });
-    return this.hydrateEvidence([updated as EvidenceRow])[0]!;
+    return this.hydrateEvidence([updated])[0];
   }
 
-  async patchFindingNote(caseId: string, caseFindingId: string, dto: UpdateCaseFindingNoteDto): Promise<CaseFindingDto> {
-    const cf = await this.prisma.caseFinding.findUnique({ where: { id: caseFindingId } });
+  async patchFindingNote(
+    caseId: string,
+    caseFindingId: string,
+    dto: UpdateCaseFindingNoteDto,
+  ): Promise<CaseFindingDto> {
+    const cf = await this.prisma.caseFinding.findUnique({
+      where: { id: caseFindingId },
+    });
     if (!cf || cf.caseId !== caseId) {
-      throw new NotFoundException(`Finding ${caseFindingId} not found in case ${caseId}`);
+      throw new NotFoundException(
+        `Finding ${caseFindingId} not found in case ${caseId}`,
+      );
     }
     const updated = await this.prisma.caseFinding.update({
       where: { id: caseFindingId },
@@ -428,22 +563,34 @@ export class CasesService {
   }
 
   async removeEvidence(caseId: string, evidenceId: string): Promise<void> {
-    const evidence = await this.prisma.caseEvidence.findUnique({ where: { id: evidenceId } });
+    const evidence = await this.prisma.caseEvidence.findUnique({
+      where: { id: evidenceId },
+    });
     if (!evidence || evidence.caseId !== caseId) {
-      throw new NotFoundException(`Evidence ${evidenceId} not found in case ${caseId}`);
+      throw new NotFoundException(
+        `Evidence ${evidenceId} not found in case ${caseId}`,
+      );
     }
     await this.prisma.caseEvidence.delete({ where: { id: evidenceId } });
-    await this.activity.record(caseId, CaseActivityType.EVIDENCE_REMOVED, { evidenceId, entityId: evidence.entityId, label: evidence.label });
+    await this.activity.record(caseId, CaseActivityType.EVIDENCE_REMOVED, {
+      evidenceId,
+      entityId: evidence.entityId,
+      label: evidence.label,
+    });
   }
 
   /** Pull a linked question's current matches into the case as evidence + findings. */
-  async pullFromInquiry(caseId: string, dto: PullFromInquiryDto): Promise<PullFromInquiryResponseDto> {
+  async pullFromInquiry(
+    caseId: string,
+    dto: PullFromInquiryDto,
+  ): Promise<PullFromInquiryResponseDto> {
     await this.ensureExists(caseId);
     const inquiry = await this.prisma.inquiry.findUnique({
       where: { id: dto.inquiryId },
       select: { id: true, title: true },
     });
-    if (!inquiry) throw new NotFoundException(`Inquiry ${dto.inquiryId} not found`);
+    if (!inquiry)
+      throw new NotFoundException(`Inquiry ${dto.inquiryId} not found`);
 
     let findingIds = dto.findingIds;
     if (!findingIds || findingIds.length === 0) {
@@ -470,7 +617,10 @@ export class CasesService {
     const evidenceByAsset = new Map<string, string>();
     for (const f of findings) {
       if (!evidenceByAsset.has(f.assetId)) {
-        evidenceByAsset.set(f.assetId, await this.ensureAssetEvidence(caseId, f.assetId, f.asset));
+        evidenceByAsset.set(
+          f.assetId,
+          await this.ensureAssetEvidence(caseId, f.assetId, f.asset),
+        );
       }
     }
     const created = await this.prisma.caseFinding.createMany({
@@ -486,13 +636,16 @@ export class CasesService {
       })),
       skipDuplicates: true,
     });
-    for (const assetId of evidenceByAsset.keys()) await this.graph.inferEdgesForAsset(assetId);
+    for (const assetId of evidenceByAsset.keys())
+      await this.graph.inferEdgesForAsset(assetId);
     await this.activity.record(caseId, CaseActivityType.INQUIRY_PULLED, {
       inquiryId: dto.inquiryId,
       inquiryTitle: inquiry.title,
       pulled: created.count,
       findingLabels: findings.slice(0, 10).map((f) => f.findingType),
-      assetLabels: [...new Set(findings.map((f) => f.asset?.name).filter(Boolean))].slice(0, 10),
+      assetLabels: [
+        ...new Set(findings.map((f) => f.asset?.name).filter(Boolean)),
+      ].slice(0, 10),
     });
     return { pulled: created.count };
   }
@@ -511,20 +664,40 @@ export class CasesService {
   }
 
   private async ensureExists(id: string): Promise<void> {
-    const found = await this.prisma.case.findUnique({ where: { id }, select: { id: true } });
+    const found = await this.prisma.case.findUnique({
+      where: { id },
+      select: { id: true },
+    });
     if (!found) throw new NotFoundException(`Case with ID ${id} not found`);
   }
 
-  private async assertHypothesesInCase(caseId: string, hypothesisIds: string[]): Promise<void> {
-    const found = await this.prisma.hypothesis.findMany({ where: { id: { in: hypothesisIds }, caseId }, select: { id: true } });
+  private async assertHypothesesInCase(
+    caseId: string,
+    hypothesisIds: string[],
+  ): Promise<void> {
+    const found = await this.prisma.hypothesis.findMany({
+      where: { id: { in: hypothesisIds }, caseId },
+      select: { id: true },
+    });
     if (found.length !== hypothesisIds.length) {
-      throw new BadRequestException('One or more hypothesisIds do not belong to this case.');
+      throw new BadRequestException(
+        'One or more hypothesisIds do not belong to this case.',
+      );
     }
   }
 
-  private async linkSupport(hypothesisIds: string[], targetType: 'evidence' | 'finding', targetId: string): Promise<void> {
+  private async linkSupport(
+    hypothesisIds: string[],
+    targetType: 'evidence' | 'finding',
+    targetId: string,
+  ): Promise<void> {
     await this.prisma.hypothesisSupport.createMany({
-      data: hypothesisIds.map((hypothesisId) => ({ hypothesisId, targetType, targetId, stance: 'NEUTRAL' as const })),
+      data: hypothesisIds.map((hypothesisId) => ({
+        hypothesisId,
+        targetType,
+        targetId,
+        stance: 'NEUTRAL' as const,
+      })),
       skipDuplicates: true,
     });
   }
@@ -533,10 +706,20 @@ export class CasesService {
   private async ensureAssetEvidence(
     caseId: string,
     assetId: string,
-    asset: { name: string; assetType: string; sourceType: { toString(): string } } | null,
+    asset: {
+      name: string;
+      assetType: string;
+      sourceType: { toString(): string };
+    } | null,
   ): Promise<string> {
     const ev = await this.prisma.caseEvidence.upsert({
-      where: { caseId_entityType_entityId: { caseId, entityType: 'asset', entityId: assetId } },
+      where: {
+        caseId_entityType_entityId: {
+          caseId,
+          entityType: 'asset',
+          entityId: assetId,
+        },
+      },
       create: {
         caseId,
         entityType: 'asset',
@@ -558,6 +741,7 @@ export class CasesService {
       description: row.description,
       status: row.status,
       severity: row.severity,
+      aiMode: row.aiMode,
       assignee: row.assignee,
       createdBy: row.createdBy,
       conclusion: row.conclusion,

@@ -62,6 +62,12 @@ export interface InquiryResponseDto {
      * @type {string}
      * @memberof InquiryResponseDto
      */
+    aiMode: InquiryResponseDtoAiModeEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof InquiryResponseDto
+     */
     createdBy?: string;
     /**
      * 
@@ -144,6 +150,16 @@ export type InquiryResponseDtoStatusEnum = typeof InquiryResponseDtoStatusEnum[k
 /**
  * @export
  */
+export const InquiryResponseDtoAiModeEnum = {
+    Inherit: 'INHERIT',
+    Managed: 'MANAGED',
+    ObserveOnly: 'OBSERVE_ONLY'
+} as const;
+export type InquiryResponseDtoAiModeEnum = typeof InquiryResponseDtoAiModeEnum[keyof typeof InquiryResponseDtoAiModeEnum];
+
+/**
+ * @export
+ */
 export const InquiryResponseDtoDetectorTypesEnum = {
     Secrets: 'SECRETS',
     Pii: 'PII',
@@ -163,6 +179,7 @@ export function instanceOfInquiryResponseDto(value: object): value is InquiryRes
     if (!('cases' in value) || value['cases'] === undefined) return false;
     if (!('title' in value) || value['title'] === undefined) return false;
     if (!('status' in value) || value['status'] === undefined) return false;
+    if (!('aiMode' in value) || value['aiMode'] === undefined) return false;
     if (!('matchAllSources' in value) || value['matchAllSources'] === undefined) return false;
     if (!('sourceIds' in value) || value['sourceIds'] === undefined) return false;
     if (!('detectorTypes' in value) || value['detectorTypes'] === undefined) return false;
@@ -192,6 +209,7 @@ export function InquiryResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'title': json['title'],
         'description': json['description'] == null ? undefined : json['description'],
         'status': json['status'],
+        'aiMode': json['aiMode'],
         'createdBy': json['createdBy'] == null ? undefined : json['createdBy'],
         'matchAllSources': json['matchAllSources'],
         'sourceIds': json['sourceIds'],
@@ -223,6 +241,7 @@ export function InquiryResponseDtoToJSONTyped(value?: InquiryResponseDto | null,
         'title': value['title'],
         'description': value['description'],
         'status': value['status'],
+        'aiMode': value['aiMode'],
         'createdBy': value['createdBy'],
         'matchAllSources': value['matchAllSources'],
         'sourceIds': value['sourceIds'],

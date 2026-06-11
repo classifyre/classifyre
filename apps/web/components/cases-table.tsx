@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import { Filter, Loader2, Search } from "lucide-react";
+import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
 import {
   api,
   CasesControllerListStatusEnum,
@@ -332,7 +333,12 @@ export function CasesTable() {
                       className="cursor-pointer hover:bg-muted/40"
                       onClick={() => router.push(`/investigations/${c.id}`)}
                     >
-                      <TableCell className="font-medium">{c.title}</TableCell>
+                      <TableCell className="font-medium">
+                        <span className="inline-flex items-center gap-2">
+                          {c.title}
+                          {isAiActor(c.createdBy) && <AiActorBadge />}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <CaseStatusBadge status={c.status} />
                       </TableCell>

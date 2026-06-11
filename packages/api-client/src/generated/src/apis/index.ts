@@ -4,6 +4,7 @@ export { AIApi } from './AIApi';
 export { AIProviderConfigsApi } from './AIProviderConfigsApi';
 export { AssetsApi } from './AssetsApi';
 export { AssistantApi } from './AssistantApi';
+export { AutopilotApi } from './AutopilotApi';
 export { CasesApi } from './CasesApi';
 export { CustomDetectorExtractionsApi } from './CustomDetectorExtractionsApi';
 export { CustomDetectorTestsApi } from './CustomDetectorTestsApi';

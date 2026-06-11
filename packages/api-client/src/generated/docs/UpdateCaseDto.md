@@ -12,6 +12,7 @@ Name | Type
 `severity` | string
 `assignee` | string
 `conclusion` | string
+`aiMode` | string
 
 ## Example
 
@@ -26,6 +27,7 @@ const example = {
   "severity": null,
   "assignee": null,
   "conclusion": null,
+  "aiMode": null,
 } satisfies UpdateCaseDto
 
 console.log(example)

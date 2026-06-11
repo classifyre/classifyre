@@ -57,6 +57,40 @@ export class InstanceSettingsResponseDto {
 
   @ApiProperty({
     description:
+      'When true, the autopilot inquiry agent manages inquiries automatically after scans.',
+    example: false,
+  })
+  autopilotInquiryEnabled: boolean;
+
+  @ApiProperty({
+    description:
+      'Operator guidance for the inquiry agent: what is desired / worth investigating.',
+    nullable: true,
+  })
+  autopilotInquiryDesired: string | null;
+
+  @ApiProperty({
+    description:
+      'Operator guidance for the inquiry agent: what is searchable in this instance.',
+    nullable: true,
+  })
+  autopilotInquirySearchable: string | null;
+
+  @ApiProperty({
+    description:
+      'When true, the autopilot case agent manages investigation cases automatically after scans.',
+    example: false,
+  })
+  autopilotCaseEnabled: boolean;
+
+  @ApiProperty({
+    description: 'Operator guidance for the case agent.',
+    nullable: true,
+  })
+  autopilotCaseGuidance: string | null;
+
+  @ApiProperty({
+    description:
       'Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.',
     example: false,
   })

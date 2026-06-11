@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { api, type CaseActivityDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
+import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
 
 // ─── Event metadata ───────────────────────────────────────────────────────────
 
@@ -363,9 +364,14 @@ export function CaseTimeline({ caseId }: { caseId: string }) {
                         </span>
                       </div>
                       <EventDetail item={item} />
-                      {item.actor && (
-                        <p className="text-muted-foreground/70 mt-0.5 text-[11px]">by {item.actor}</p>
-                      )}
+                      {item.actor &&
+                        (isAiActor(item.actor) ? (
+                          <p className="text-muted-foreground/70 mt-0.5 text-[11px]">
+                            by <AiActorBadge className="align-middle" />
+                          </p>
+                        ) : (
+                          <p className="text-muted-foreground/70 mt-0.5 text-[11px]">by {item.actor}</p>
+                        ))}
                     </li>
                   );
                 })}

@@ -16,6 +16,7 @@ Name | Type
 `title` | string
 `description` | string
 `status` | string
+`aiMode` | string
 
 ## Example
 
@@ -34,6 +35,7 @@ const example = {
   "title": null,
   "description": null,
   "status": null,
+  "aiMode": null,
 } satisfies UpdateInquiryDto
 
 console.log(example)
