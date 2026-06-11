@@ -9,7 +9,12 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { CaseStatus, InquiryStatus, Severity } from '@prisma/client';
+import {
+  AiManagementMode,
+  CaseStatus,
+  InquiryStatus,
+  Severity,
+} from '@prisma/client';
 
 export class CreateCaseDto {
   @ApiProperty()
@@ -42,7 +47,10 @@ export class CreateCaseDto {
   @IsString()
   createdBy?: string;
 
-  @ApiPropertyOptional({ type: [String], description: 'Link these questions to the new case (guides)' })
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Link these questions to the new case (guides)',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -80,6 +88,15 @@ export class UpdateCaseDto {
   @IsOptional()
   @IsString()
   conclusion?: string;
+
+  @ApiPropertyOptional({
+    enum: AiManagementMode,
+    description:
+      'AI autopilot mode for this case. INHERIT follows the instance setting; OBSERVE_ONLY blocks autopilot mutations.',
+  })
+  @IsOptional()
+  @IsEnum(AiManagementMode)
+  aiMode?: AiManagementMode;
 }
 
 export class QueryCasesDto {
@@ -126,7 +143,10 @@ export class AddEvidenceDto {
   @IsString()
   entityId!: string;
 
-  @ApiPropertyOptional({ description: 'Hypothesis UUIDs to link this evidence to (optional)', type: [String] })
+  @ApiPropertyOptional({
+    description: 'Hypothesis UUIDs to link this evidence to (optional)',
+    type: [String],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -145,7 +165,10 @@ export class AddEvidenceDto {
 
 /** Batch-attach findings to a case. Asset evidence rows are created as needed. */
 export class AttachFindingsDto {
-  @ApiProperty({ type: [String], description: 'Finding UUIDs to attach as case evidence' })
+  @ApiProperty({
+    type: [String],
+    description: 'Finding UUIDs to attach as case evidence',
+  })
   @IsArray()
   @IsString({ each: true })
   findingIds!: string[];
@@ -175,7 +198,9 @@ export class AddFindingDto {
 
 /** Update the analyst note on an evidence row. */
 export class UpdateEvidenceNoteDto {
-  @ApiPropertyOptional({ description: 'Analyst note. Pass null or empty string to clear.' })
+  @ApiPropertyOptional({
+    description: 'Analyst note. Pass null or empty string to clear.',
+  })
   @IsOptional()
   @IsString()
   note?: string | null;
@@ -183,7 +208,9 @@ export class UpdateEvidenceNoteDto {
 
 /** Update the analyst note on a case finding row. */
 export class UpdateCaseFindingNoteDto {
-  @ApiPropertyOptional({ description: 'Analyst note. Pass null or empty string to clear.' })
+  @ApiPropertyOptional({
+    description: 'Analyst note. Pass null or empty string to clear.',
+  })
   @IsOptional()
   @IsString()
   note?: string | null;
@@ -195,7 +222,10 @@ export class PullFromInquiryDto {
   @IsString()
   inquiryId!: string;
 
-  @ApiPropertyOptional({ type: [String], description: 'Specific finding IDs (omit = all current matches)' })
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Specific finding IDs (omit = all current matches)',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -242,10 +272,16 @@ export class CaseFindingDto {
   @ApiPropertyOptional()
   detectorType?: string;
 
-  @ApiPropertyOptional({ description: 'Human-readable name for custom detectors (snapshotted at attach time)' })
+  @ApiPropertyOptional({
+    description:
+      'Human-readable name for custom detectors (snapshotted at attach time)',
+  })
   customDetectorName?: string | null;
 
-  @ApiPropertyOptional({ description: 'Matched content snippet snapshotted from the finding at attach time' })
+  @ApiPropertyOptional({
+    description:
+      'Matched content snippet snapshotted from the finding at attach time',
+  })
   matchedContent?: string | null;
 
   @ApiPropertyOptional()
@@ -295,7 +331,9 @@ export class CaseLinkedInquiryDto {
   @ApiProperty({ description: 'Findings currently matching this inquiry' })
   matchCount!: number;
 
-  @ApiProperty({ description: 'Matches that appeared since the inquiry was last viewed' })
+  @ApiProperty({
+    description: 'Matches that appeared since the inquiry was last viewed',
+  })
   newMatchCount!: number;
 }
 
@@ -322,6 +360,9 @@ export class CaseResponseDto {
 
   @ApiProperty({ enum: Severity })
   severity!: Severity;
+
+  @ApiProperty({ enum: AiManagementMode })
+  aiMode!: AiManagementMode;
 
   @ApiPropertyOptional()
   assignee?: string | null;
@@ -370,7 +411,9 @@ export class CloseCaseResponseDto {
   @ApiProperty({ type: CaseResponseDto })
   case!: CaseResponseDto;
 
-  @ApiProperty({ description: 'Linked inquiries archived by closing this case' })
+  @ApiProperty({
+    description: 'Linked inquiries archived by closing this case',
+  })
   archivedInquiries!: number;
 }
 

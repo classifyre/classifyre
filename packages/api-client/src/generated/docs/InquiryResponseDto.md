@@ -11,6 +11,7 @@ Name | Type
 `title` | string
 `description` | string
 `status` | string
+`aiMode` | string
 `createdBy` | string
 `matchAllSources` | boolean
 `sourceIds` | Array&lt;string&gt;
@@ -36,6 +37,7 @@ const example = {
   "title": null,
   "description": null,
   "status": null,
+  "aiMode": null,
   "createdBy": null,
   "matchAllSources": null,
   "sourceIds": null,

@@ -19,6 +19,8 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
+import { AiModeSelect, type AiMode } from "@/components/ai-mode-select";
 import { toast } from "sonner";
 import {
   api,
@@ -234,6 +236,20 @@ function CaseWorkspaceInner() {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
+  const setAiMode = async (mode: AiMode) => {
+    try {
+      await api.cases.casesControllerUpdate({
+        id: caseId,
+        updateCaseDto: { aiMode: mode as never },
+      });
+      toast.success("AI mode updated");
+      reloadAll();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to change AI mode");
+    }
+  };
+
   const changeStatus = async (status: string) => {
     try {
       await api.cases.casesControllerUpdate({
@@ -422,12 +438,17 @@ function CaseWorkspaceInner() {
           <SeverityBadge severity={caseData.severity.toLowerCase() as never}>
             {caseData.severity}
           </SeverityBadge>
+          {isAiActor(caseData.createdBy) && <AiActorBadge />}
           {caseData.assignee && (
             <Badge variant="outline" className="text-xs">
               {caseData.assignee}
             </Badge>
           )}
           <div className="ml-auto flex items-center gap-2">
+            <AiModeSelect
+              value={(caseData.aiMode ?? "INHERIT") as AiMode}
+              onChange={(mode) => void setAiMode(mode)}
+            />
             {!isClosed && (
               <Select value={caseData.status} onValueChange={changeStatus}>
                 <SelectTrigger className="h-8 w-40 text-xs">

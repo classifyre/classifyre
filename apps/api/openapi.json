@@ -6894,6 +6894,105 @@
           "Sandbox"
         ]
       }
+    },
+    "/autopilot/runs": {
+      "get": {
+        "operationId": "AutopilotController_listRuns",
+        "parameters": [
+          {
+            "name": "agentKind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INQUIRY",
+                "CASE"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "RUNNING",
+                "COMPLETED",
+                "FAILED",
+                "SKIPPED"
+              ]
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List autopilot agent runs (newest first)",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/runs/{id}": {
+      "get": {
+        "operationId": "AutopilotController_getRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get one autopilot run with all decisions and rationales",
+        "tags": [
+          "autopilot"
+        ]
+      }
     }
   },
   "info": {
@@ -10323,6 +10422,31 @@
             "description": "Id of the AI provider credential used as the instance-wide default. Null when unset.",
             "nullable": true
           },
+          "autopilotInquiryEnabled": {
+            "type": "boolean",
+            "description": "When true, the autopilot inquiry agent manages inquiries automatically after scans.",
+            "example": false
+          },
+          "autopilotInquiryDesired": {
+            "type": "string",
+            "description": "Operator guidance for the inquiry agent: what is desired / worth investigating.",
+            "nullable": true
+          },
+          "autopilotInquirySearchable": {
+            "type": "string",
+            "description": "Operator guidance for the inquiry agent: what is searchable in this instance.",
+            "nullable": true
+          },
+          "autopilotCaseEnabled": {
+            "type": "boolean",
+            "description": "When true, the autopilot case agent manages investigation cases automatically after scans.",
+            "example": false
+          },
+          "autopilotCaseGuidance": {
+            "type": "string",
+            "description": "Operator guidance for the case agent.",
+            "nullable": true
+          },
           "demoMode": {
             "type": "boolean",
             "description": "Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.",
@@ -10345,6 +10469,11 @@
           "timezone",
           "timeFormat",
           "aiProviderConfigId",
+          "autopilotInquiryEnabled",
+          "autopilotInquiryDesired",
+          "autopilotInquirySearchable",
+          "autopilotCaseEnabled",
+          "autopilotCaseGuidance",
           "demoMode",
           "createdAt",
           "updatedAt"
@@ -10389,6 +10518,31 @@
           "aiProviderConfigId": {
             "type": "string",
             "description": "Id of the AI provider credential to use as the instance-wide default. Pass null or an empty string to clear the selection.",
+            "nullable": true
+          },
+          "autopilotInquiryEnabled": {
+            "type": "boolean",
+            "description": "When true, the autopilot inquiry agent manages inquiries automatically after scans.",
+            "example": false
+          },
+          "autopilotInquiryDesired": {
+            "type": "string",
+            "description": "Operator guidance for the inquiry agent: what is desired / worth investigating.",
+            "nullable": true
+          },
+          "autopilotInquirySearchable": {
+            "type": "string",
+            "description": "Operator guidance for the inquiry agent: what is searchable in this instance.",
+            "nullable": true
+          },
+          "autopilotCaseEnabled": {
+            "type": "boolean",
+            "description": "When true, the autopilot case agent manages investigation cases automatically after scans.",
+            "example": false
+          },
+          "autopilotCaseGuidance": {
+            "type": "string",
+            "description": "Operator guidance for the case agent.",
             "nullable": true
           }
         }
@@ -11129,6 +11283,14 @@
               "INFO"
             ]
           },
+          "aiMode": {
+            "type": "string",
+            "enum": [
+              "INHERIT",
+              "MANAGED",
+              "OBSERVE_ONLY"
+            ]
+          },
           "assignee": {
             "type": "string"
           },
@@ -11173,6 +11335,7 @@
           "title",
           "status",
           "severity",
+          "aiMode",
           "evidenceCount",
           "hypothesisCount",
           "inquiryCount",
@@ -11239,6 +11402,15 @@
           },
           "conclusion": {
             "type": "string"
+          },
+          "aiMode": {
+            "type": "string",
+            "enum": [
+              "INHERIT",
+              "MANAGED",
+              "OBSERVE_ONLY"
+            ],
+            "description": "AI autopilot mode for this case. INHERIT follows the instance setting; OBSERVE_ONLY blocks autopilot mutations."
           }
         }
       },
@@ -11674,6 +11846,14 @@
               "ARCHIVED"
             ]
           },
+          "aiMode": {
+            "type": "string",
+            "enum": [
+              "INHERIT",
+              "MANAGED",
+              "OBSERVE_ONLY"
+            ]
+          },
           "createdBy": {
             "type": "string"
           },
@@ -11746,6 +11926,7 @@
           "cases",
           "title",
           "status",
+          "aiMode",
           "matchAllSources",
           "sourceIds",
           "detectorTypes",
@@ -12059,6 +12240,15 @@
               "ACTIVE",
               "ARCHIVED"
             ]
+          },
+          "aiMode": {
+            "type": "string",
+            "enum": [
+              "INHERIT",
+              "MANAGED",
+              "OBSERVE_ONLY"
+            ],
+            "description": "AI autopilot mode for this inquiry. INHERIT follows the instance setting; OBSERVE_ONLY blocks autopilot mutations."
           }
         }
       },
@@ -14159,6 +14349,251 @@
         },
         "required": [
           "detectors"
+        ]
+      },
+      "AgentRunDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "agentKind": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "SKIPPED"
+            ]
+          },
+          "sourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "runnerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "decisionCount": {
+            "type": "number"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "agentKind",
+          "status",
+          "trigger",
+          "attempts",
+          "decisionCount",
+          "createdAt"
+        ]
+      },
+      "AgentRunListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRunDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ]
+      },
+      "AgentDecisionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "CREATE_INQUIRY",
+              "UPDATE_INQUIRY",
+              "ENRICH_INQUIRY_MATCHERS",
+              "SIGNAL_CASE_READY",
+              "CREATE_CASE",
+              "UPDATE_CASE",
+              "ADD_HYPOTHESIS",
+              "UPDATE_HYPOTHESIS",
+              "ADD_EVIDENCE",
+              "ATTACH_FINDINGS",
+              "ADD_NOTE",
+              "ADD_THREAD_ENTRY",
+              "CREATE_EDGE",
+              "CHANGE_STATUS",
+              "LINK_INQUIRY",
+              "NO_ACTION"
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "SKIPPED_OBSERVE_ONLY",
+              "FAILED"
+            ]
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true,
+            "description": "\"inquiry\" | \"case\""
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why the agent made (or skipped) this change"
+          },
+          "payload": {
+            "type": "object",
+            "description": "Exact mutation input / rejection detail",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "outcome",
+          "rationale",
+          "createdAt"
+        ]
+      },
+      "AgentRunDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "agentKind": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "SKIPPED"
+            ]
+          },
+          "sourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "runnerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "decisionCount": {
+            "type": "number"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentDecisionDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "agentKind",
+          "status",
+          "trigger",
+          "attempts",
+          "decisionCount",
+          "createdAt",
+          "decisions"
         ]
       }
     }

@@ -55,6 +55,12 @@ export interface UpdateCaseDto {
      * @memberof UpdateCaseDto
      */
     conclusion?: string;
+    /**
+     * AI autopilot mode for this case. INHERIT follows the instance setting; OBSERVE_ONLY blocks autopilot mutations.
+     * @type {string}
+     * @memberof UpdateCaseDto
+     */
+    aiMode?: UpdateCaseDtoAiModeEnum;
 }
 
 
@@ -81,6 +87,16 @@ export const UpdateCaseDtoSeverityEnum = {
 } as const;
 export type UpdateCaseDtoSeverityEnum = typeof UpdateCaseDtoSeverityEnum[keyof typeof UpdateCaseDtoSeverityEnum];
 
+/**
+ * @export
+ */
+export const UpdateCaseDtoAiModeEnum = {
+    Inherit: 'INHERIT',
+    Managed: 'MANAGED',
+    ObserveOnly: 'OBSERVE_ONLY'
+} as const;
+export type UpdateCaseDtoAiModeEnum = typeof UpdateCaseDtoAiModeEnum[keyof typeof UpdateCaseDtoAiModeEnum];
+
 
 /**
  * Check if a given object implements the UpdateCaseDto interface.
@@ -105,6 +121,7 @@ export function UpdateCaseDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         'severity': json['severity'] == null ? undefined : json['severity'],
         'assignee': json['assignee'] == null ? undefined : json['assignee'],
         'conclusion': json['conclusion'] == null ? undefined : json['conclusion'],
+        'aiMode': json['aiMode'] == null ? undefined : json['aiMode'],
     };
 }
 
@@ -125,6 +142,7 @@ export function UpdateCaseDtoToJSONTyped(value?: UpdateCaseDto | null, ignoreDis
         'severity': value['severity'],
         'assignee': value['assignee'],
         'conclusion': value['conclusion'],
+        'aiMode': value['aiMode'],
     };
 }
 

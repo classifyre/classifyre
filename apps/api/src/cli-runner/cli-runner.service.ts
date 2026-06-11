@@ -14,6 +14,10 @@ import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { INQUIRY_MATCH_QUEUE } from '../matching/matching.constants';
 import {
+  AUTOPILOT_QUEUE,
+  AUTOPILOT_START_AFTER_SECONDS,
+} from '../autopilot/autopilot.constants';
+import {
   AssetType,
   Prisma,
   RunnerExecutionMode,
@@ -95,11 +99,31 @@ export class CliRunnerService implements OnApplicationBootstrap {
    * ingestion: we only drop a pg-boss message (singletonKey dedupes rapid
    * completions). Never let a matching failure break run completion.
    */
-  private async enqueueQuestionMatching(sourceId: string, runnerId: string): Promise<void> {
+  private async enqueueQuestionMatching(
+    sourceId: string,
+    runnerId: string,
+  ): Promise<void> {
     if (!this.pgBossService) return;
     try {
       const boss = await this.pgBossService.getBossAsync();
-      await boss.send(INQUIRY_MATCH_QUEUE, { sourceId, runnerId }, { singletonKey: sourceId });
+      await boss.send(
+        INQUIRY_MATCH_QUEUE,
+        { sourceId, runnerId },
+        { singletonKey: sourceId },
+      );
+      // Autopilot cycle for the same scan — deliberately delayed so inquiry
+      // matching lands first; singletonKey debounces rapid rescans.
+      await boss.send(
+        AUTOPILOT_QUEUE,
+        { sourceId, runnerId },
+        {
+          singletonKey: `autopilot:${sourceId}`,
+          startAfter: AUTOPILOT_START_AFTER_SECONDS,
+          retryLimit: 2,
+          retryDelay: 120,
+          retryBackoff: true,
+        },
+      );
     } catch (error) {
       this.logger.warn(
         `Failed to enqueue question matching for source ${sourceId}: ${error instanceof Error ? error.message : String(error)}`,

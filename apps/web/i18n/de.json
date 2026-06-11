@@ -154,6 +154,32 @@
       "disabledHint": "Aktivieren Sie den Assistenten, um ein Modell zu wählen.",
       "usingNone": "Kein Modell ausgewählt",
       "loading": "Assistenteneinstellungen werden geladen…"
+    },
+    "autopilot": {
+      "subtitle": "Ermittlungs-Autopilot",
+      "title": "Autopilot",
+      "description": "Autonome KI-Agenten, die nach jedem Scan Anfragen und Ermittlungsfälle verwalten. Alle Aktionen werden der KI zugeordnet und vollständig protokolliert.",
+      "inquiryEnable": "Automatische Anfragenverwaltung",
+      "inquiryEnableDesc": "Nach jedem Scan prüft die KI neue Funde, erstellt oder erweitert Anfragen, vermeidet Duplikate und signalisiert, wenn ein Fall angebracht ist.",
+      "inquiryDesired": "Was gewünscht ist",
+      "inquiryDesiredPlaceholder": "Beschreiben Sie, worauf sich die KI konzentrieren soll, z. B. geleakte Zugangsdaten in Kundenbereichen, PII in öffentlichen Dokumenten…",
+      "inquirySearchable": "Was durchsuchbar ist",
+      "inquirySearchablePlaceholder": "Beschreiben Sie, welche Daten vorhanden und relevant sind, z. B. Confluence-Bereiche mit API-Doku, Jira-Projekte mit Support-Tickets…",
+      "caseEnable": "Vollständige Fallverwaltung",
+      "caseEnableDesc": "Die KI erstellt und entwickelt Ermittlungsfälle aus Anfragen: Hypothesen, Beweise, Funde, Notizen, Kanten und Statusänderungen.",
+      "caseGuidance": "Fall-Leitlinien",
+      "caseGuidancePlaceholder": "Zusätzliche Anweisungen für die Fallverwaltung, z. B. Schweregrad-Konventionen, wann ein Fall geschlossen wird, Namensregeln…",
+      "enabledToast": "Autopilot-Einstellung gespeichert",
+      "guidanceSaved": "Leitlinien gespeichert",
+      "requiresAi": "Aktivieren Sie den KI-Assistenten und wählen Sie einen Anbieter, um den Autopiloten zu nutzen.",
+      "aiMode": "KI-Autopilot",
+      "aiModeInherit": "Erben",
+      "aiModeManaged": "Verwaltet",
+      "aiModeObserveOnly": "Nur beobachten",
+      "aiModeDesc": "„Erben“ folgt der Instanz-Einstellung. „Nur beobachten“ erlaubt der KI zu lesen, aber nie zu ändern.",
+      "aiBadge": "KI",
+      "aiBadgeTooltip": "Vom Ermittlungs-Autopilot ausgeführt",
+      "saveGuidance": "Leitlinien speichern"
     }
   },
   "sources": {
@@ -1475,37 +1501,6 @@
     }
   },
   "forms": {
-    "title": "Protokolle",
-    "description": "Geparste Runner-Protokolle mit Level-Erkennung",
-    "search": "Nachricht suchen",
-    "allLevels": "Alle Level",
-    "searchLevels": "Level suchen…",
-    "noLevelsFound": "Keine Level gefunden",
-    "newestFirst": "Neueste zuerst",
-    "oldestFirst": "Älteste zuerst",
-    "noLogs": "Keine Protokolle verfügbar",
-    "noLogsHint": "Keine Protokolleinträge entsprechen Ihrer Suche.",
-    "autoRefresh": "Automatische Aktualisierung",
-    "wrapLines": "Zeilenumbruch",
-    "refresh": "Aktualisieren",
-    "downloadVisible": "Sichtbare herunterladen",
-    "downloadAll": "Alle herunterladen",
-    "loadMore": "Mehr laden",
-    "jumpToLatest": "Zum Neuesten springen",
-    "showing": "{{filtered}} / {{total}} geladen angezeigt",
-    "autoRefreshEnabled": "Automatische Aktualisierung aktiviert (alle 2 Sek.)",
-    "autoRefreshPaused": "Automatische Aktualisierung pausiert",
-    "runnerCompleted": "Runner abgeschlossen",
-    "copyRow": "Zeile kopieren",
-    "copied": "Kopiert",
-    "downloaded": "Sichtbare Protokolle heruntergeladen",
-    "downloadedCount": "{{count}} Protokolleinträge heruntergeladen",
-    "copiedRows": "{{count}} Protokollzeilen kopiert",
-    "noLogsDownload": "Keine Protokolle zum Herunterladen verfügbar",
-    "noRowsToCopy": "Mindestens eine Zeile zum Kopieren auswählen",
-    "loadedEntries": "geladen"
-  },
-  "forms": {
     "sourceName": "Quellenname",
     "sourceNameDesc": "Dieser Quelle einen eindeutigen, aussagekräftigen Namen geben.",
     "requiredFields": "Pflichtfelder",
@@ -1537,7 +1532,7 @@
     "template": "Vorlage",
     "noTemplatesAvailable": "Für diese Quelle sind noch keine Vorlagen verfügbar."
   },
-"mcp": {
+  "mcp": {
     "enable": "MCP aktivieren",
     "cursorWorkspace": "Cursor lokaler Arbeitsbereich",
     "tokenCreated": "MCP-Token erstellt. Kopieren Sie ihn jetzt, da er nicht erneut angezeigt wird.",
@@ -1619,7 +1614,7 @@
       "weekly": "Sonntagabend"
     }
   },
-"aiProvider": {
+  "aiProvider": {
     "saved": "KI-Anbietereinstellungen gespeichert",
     "title": "KI-Anbieter",
     "configuration": "KI-Anbieterkonfiguration",
@@ -1772,4 +1767,3 @@
     "sandbox": "Sandbox"
   }
 }
-

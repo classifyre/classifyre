@@ -38,6 +38,7 @@ export { InquiriesApi } from "./generated/src/apis/InquiriesApi";
 export { GraphApi } from "./generated/src/apis/GraphApi";
 export { HypothesesApi } from "./generated/src/apis/HypothesesApi";
 export { ThreadsApi } from "./generated/src/apis/ThreadsApi";
+export { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 
 // Investigation (cases / inquiries / graph / hypotheses) model types
 export type {
@@ -819,6 +820,7 @@ import { InquiriesApi } from "./generated/src/apis/InquiriesApi";
 import { GraphApi } from "./generated/src/apis/GraphApi";
 import { HypothesesApi } from "./generated/src/apis/HypothesesApi";
 import { ThreadsApi } from "./generated/src/apis/ThreadsApi";
+import { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -878,6 +880,7 @@ class ApiClient {
   public graph: GraphApi;
   public hypotheses: HypothesesApi;
   public threads: ThreadsApi;
+  public autopilot: AutopilotApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -896,6 +899,7 @@ class ApiClient {
     this.graph = new GraphApi(this.config);
     this.hypotheses = new HypothesesApi(this.config);
     this.threads = new ThreadsApi(this.config);
+    this.autopilot = new AutopilotApi(this.config);
   }
 
   async searchAssets(

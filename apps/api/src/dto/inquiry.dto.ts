@@ -10,11 +10,13 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { DetectorType, InquiryStatus } from '@prisma/client';
+import { DetectorType, InquiryStatus, AiManagementMode } from '@prisma/client';
 
 /** Matcher fields shared by create/update/preview — what findings a query selects. */
 export class InquiryMatchersDto {
-  @ApiPropertyOptional({ description: 'Match findings from any source (ignores sourceIds)' })
+  @ApiPropertyOptional({
+    description: 'Match findings from any source (ignores sourceIds)',
+  })
   @IsOptional()
   @IsBoolean()
   matchAllSources?: boolean;
@@ -25,31 +27,48 @@ export class InquiryMatchersDto {
   @IsString({ each: true })
   sourceIds?: string[];
 
-  @ApiPropertyOptional({ enum: DetectorType, isArray: true, description: 'Empty = any detector' })
+  @ApiPropertyOptional({
+    enum: DetectorType,
+    isArray: true,
+    description: 'Empty = any detector',
+  })
   @IsOptional()
   @IsArray()
   @IsEnum(DetectorType, { each: true })
   detectorTypes?: DetectorType[];
 
-  @ApiPropertyOptional({ type: [String], description: 'Custom detector keys to match' })
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Custom detector keys to match',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   customDetectorKeys?: string[];
 
-  @ApiPropertyOptional({ type: [String], description: 'Exact findingType matches' })
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Exact findingType matches',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   findingTypes?: string[];
 
-  @ApiPropertyOptional({ type: [String], description: 'Regex patterns matched against findingType' })
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Regex patterns matched against findingType',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   findingTypeRegex?: string[];
 
-  @ApiPropertyOptional({ type: [String], description: 'Regex patterns matched against matchedContent (the detected value). Empty = any.' })
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Regex patterns matched against matchedContent (the detected value). Empty = any.',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -90,6 +109,14 @@ export class UpdateInquiryDto extends InquiryMatchersDto {
   @IsEnum(InquiryStatus)
   status?: InquiryStatus;
 
+  @ApiPropertyOptional({
+    enum: AiManagementMode,
+    description:
+      'AI autopilot mode for this inquiry. INHERIT follows the instance setting; OBSERVE_ONLY blocks autopilot mutations.',
+  })
+  @IsOptional()
+  @IsEnum(AiManagementMode)
+  aiMode?: AiManagementMode;
 }
 
 export class QueryInquiriesDto {
@@ -105,7 +132,10 @@ export class QueryInquiriesDto {
   @IsEnum(InquiryStatus, { each: true })
   status?: InquiryStatus[];
 
-  @ApiPropertyOptional({ description: 'Filter to inquiries linked to a case (or "none" for unlinked)' })
+  @ApiPropertyOptional({
+    description:
+      'Filter to inquiries linked to a case (or "none" for unlinked)',
+  })
   @IsOptional()
   @IsString()
   caseId?: string;
@@ -141,7 +171,10 @@ export class InquiryResponseDto {
   @ApiProperty()
   id!: string;
 
-  @ApiProperty({ type: () => [InquiryLinkedCaseDto], description: 'Cases this inquiry drives' })
+  @ApiProperty({
+    type: () => [InquiryLinkedCaseDto],
+    description: 'Cases this inquiry drives',
+  })
   cases!: InquiryLinkedCaseDto[];
 
   @ApiProperty()
@@ -152,6 +185,9 @@ export class InquiryResponseDto {
 
   @ApiProperty({ enum: InquiryStatus })
   status!: InquiryStatus;
+
+  @ApiProperty({ enum: AiManagementMode })
+  aiMode!: AiManagementMode;
 
   @ApiPropertyOptional()
   createdBy?: string | null;
@@ -244,7 +280,10 @@ export class PreviewResponseDto {
   @ApiProperty({ description: 'Total findings currently matching' })
   total!: number;
 
-  @ApiProperty({ type: [InquiryMatchDto], description: 'Sample of matches (capped)' })
+  @ApiProperty({
+    type: [InquiryMatchDto],
+    description: 'Sample of matches (capped)',
+  })
   sample!: InquiryMatchDto[];
 }
 
@@ -273,6 +312,10 @@ export class MatchOptionsResponseDto {
   @ApiProperty({ type: [MatchOptionCustomDetectorDto] })
   customDetectors!: MatchOptionCustomDetectorDto[];
 
-  @ApiProperty({ type: [MatchOptionFindingTypeDto], description: 'Distinct finding types (optionally scoped to selected sources)' })
+  @ApiProperty({
+    type: [MatchOptionFindingTypeDto],
+    description:
+      'Distinct finding types (optionally scoped to selected sources)',
+  })
   findingTypes!: MatchOptionFindingTypeDto[];
 }

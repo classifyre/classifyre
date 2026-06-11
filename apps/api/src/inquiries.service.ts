@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DetectorType, Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
@@ -31,7 +35,10 @@ function touchesMatchers(dto: InquiryMatchersDto): boolean {
 
 function assertValidRegex(patterns: string[] | undefined): void {
   for (const p of patterns ?? []) {
-    if (p.length > 500) throw new BadRequestException(`Regex pattern too long: ${p.slice(0, 30)}…`);
+    if (p.length > 500)
+      throw new BadRequestException(
+        `Regex pattern too long: ${p.slice(0, 30)}…`,
+      );
     try {
       new RegExp(p);
     } catch {
@@ -93,14 +100,23 @@ export class InquiriesService {
     }
 
     const [rows, total] = await Promise.all([
-      this.prisma.inquiry.findMany({ where, include: this.caseInclude, orderBy: { updatedAt: 'desc' }, skip, take: limit }),
+      this.prisma.inquiry.findMany({
+        where,
+        include: this.caseInclude,
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
       this.prisma.inquiry.count({ where }),
     ]);
     return { items: rows.map((r) => this.mapInquiry(r)), total, skip, limit };
   }
 
   async findOne(id: string): Promise<InquiryResponseDto | null> {
-    const row = await this.prisma.inquiry.findUnique({ where: { id }, include: this.caseInclude });
+    const row = await this.prisma.inquiry.findUnique({
+      where: { id },
+      include: this.caseInclude,
+    });
     if (!row) return null;
     return this.mapInquiry(row);
   }
@@ -115,6 +131,7 @@ export class InquiriesService {
         title: dto.title,
         description: dto.description,
         status: dto.status,
+        aiMode: dto.aiMode,
         ...this.matcherData(dto),
       },
     });
@@ -140,7 +157,10 @@ export class InquiriesService {
   /** Mark the current matches as seen (clears the "new" badge). */
   async markSeen(id: string): Promise<void> {
     await this.ensureExists(id);
-    await this.prisma.inquiry.update({ where: { id }, data: { newMatchCount: 0, matchesSeenAt: new Date() } });
+    await this.prisma.inquiry.update({
+      where: { id },
+      data: { newMatchCount: 0, matchesSeenAt: new Date() },
+    });
   }
 
   /** Recompute matches for a query (e.g. on demand). */
@@ -157,23 +177,42 @@ export class InquiriesService {
 
   /** Filter options for the create form: sources, custom detectors, distinct finding types. */
   async matchOptions(sourceIds?: string[]): Promise<MatchOptionsResponseDto> {
-    const scopedSources = sourceIds && sourceIds.length > 0 ? sourceIds : undefined;
+    const scopedSources =
+      sourceIds && sourceIds.length > 0 ? sourceIds : undefined;
     const [sources, customDetectors, typeRows] = await Promise.all([
-      this.prisma.source.findMany({ select: { id: true, name: true, type: true }, orderBy: { name: 'asc' } }),
-      this.prisma.customDetector.findMany({ where: { isActive: true }, select: { key: true, name: true }, orderBy: { name: 'asc' } }),
+      this.prisma.source.findMany({
+        select: { id: true, name: true, type: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.customDetector.findMany({
+        where: { isActive: true },
+        select: { key: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
       this.prisma.finding.groupBy({
         by: ['findingType', 'detectorType'],
-        where: { status: 'OPEN', ...(scopedSources ? { sourceId: { in: scopedSources } } : {}) },
+        where: {
+          status: 'OPEN',
+          ...(scopedSources ? { sourceId: { in: scopedSources } } : {}),
+        },
         _count: { _all: true },
       }),
     ]);
 
     const findingTypes = typeRows
-      .map((r) => ({ value: r.findingType, detectorType: String(r.detectorType), count: r._count._all }))
+      .map((r) => ({
+        value: r.findingType,
+        detectorType: String(r.detectorType),
+        count: r._count._all,
+      }))
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 
     return {
-      sources: sources.map((s) => ({ id: s.id, name: s.name, type: String(s.type) })),
+      sources: sources.map((s) => ({
+        id: s.id,
+        name: s.name,
+        type: String(s.type),
+      })),
       customDetectors,
       findingTypes,
     };
@@ -188,7 +227,10 @@ export class InquiriesService {
   }
 
   private async ensureExists(id: string): Promise<void> {
-    const found = await this.prisma.inquiry.findUnique({ where: { id }, select: { id: true } });
+    const found = await this.prisma.inquiry.findUnique({
+      where: { id },
+      select: { id: true },
+    });
     if (!found) throw new NotFoundException(`Inquiry ${id} not found`);
   }
 
@@ -232,7 +274,13 @@ export class InquiriesService {
 
   private mapInquiry(
     row: Prisma.InquiryGetPayload<{
-      include: { caseLinks: { include: { case: { select: { id: true; title: true; status: true } } } } };
+      include: {
+        caseLinks: {
+          include: {
+            case: { select: { id: true; title: true; status: true } };
+          };
+        };
+      };
     }>,
   ): InquiryResponseDto {
     return {
@@ -245,6 +293,7 @@ export class InquiriesService {
       title: row.title,
       description: row.description,
       status: row.status,
+      aiMode: row.aiMode,
       createdBy: row.createdBy,
       matchAllSources: row.matchAllSources,
       sourceIds: row.sourceIds,

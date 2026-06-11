@@ -69,6 +69,12 @@ export interface CaseResponseDto {
      * @type {string}
      * @memberof CaseResponseDto
      */
+    aiMode: CaseResponseDtoAiModeEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof CaseResponseDto
+     */
     assignee?: string;
     /**
      * 
@@ -150,6 +156,16 @@ export const CaseResponseDtoSeverityEnum = {
 } as const;
 export type CaseResponseDtoSeverityEnum = typeof CaseResponseDtoSeverityEnum[keyof typeof CaseResponseDtoSeverityEnum];
 
+/**
+ * @export
+ */
+export const CaseResponseDtoAiModeEnum = {
+    Inherit: 'INHERIT',
+    Managed: 'MANAGED',
+    ObserveOnly: 'OBSERVE_ONLY'
+} as const;
+export type CaseResponseDtoAiModeEnum = typeof CaseResponseDtoAiModeEnum[keyof typeof CaseResponseDtoAiModeEnum];
+
 
 /**
  * Check if a given object implements the CaseResponseDto interface.
@@ -159,6 +175,7 @@ export function instanceOfCaseResponseDto(value: object): value is CaseResponseD
     if (!('title' in value) || value['title'] === undefined) return false;
     if (!('status' in value) || value['status'] === undefined) return false;
     if (!('severity' in value) || value['severity'] === undefined) return false;
+    if (!('aiMode' in value) || value['aiMode'] === undefined) return false;
     if (!('evidenceCount' in value) || value['evidenceCount'] === undefined) return false;
     if (!('hypothesisCount' in value) || value['hypothesisCount'] === undefined) return false;
     if (!('inquiryCount' in value) || value['inquiryCount'] === undefined) return false;
@@ -182,6 +199,7 @@ export function CaseResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'description': json['description'] == null ? undefined : json['description'],
         'status': json['status'],
         'severity': json['severity'],
+        'aiMode': json['aiMode'],
         'assignee': json['assignee'] == null ? undefined : json['assignee'],
         'createdBy': json['createdBy'] == null ? undefined : json['createdBy'],
         'conclusion': json['conclusion'] == null ? undefined : json['conclusion'],
@@ -211,6 +229,7 @@ export function CaseResponseDtoToJSONTyped(value?: CaseResponseDto | null, ignor
         'description': value['description'],
         'status': value['status'],
         'severity': value['severity'],
+        'aiMode': value['aiMode'],
         'assignee': value['assignee'],
         'createdBy': value['createdBy'],
         'conclusion': value['conclusion'],

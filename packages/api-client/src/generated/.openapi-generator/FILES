@@ -6,6 +6,10 @@ docs/AIProviderConfigsApi.md
 docs/AddEvidenceDto.md
 docs/AddFindingDto.md
 docs/AddThreadEntryDto.md
+docs/AgentDecisionDto.md
+docs/AgentRunDetailDto.md
+docs/AgentRunDto.md
+docs/AgentRunListResponseDto.md
 docs/AiCompleteRequestDto.md
 docs/AiCompleteResponseDto.md
 docs/AiMessageDto.md
@@ -27,6 +31,7 @@ docs/AssistantControllerRespondRequest.md
 docs/AssistantControllerRespondRequestMessagesInner.md
 docs/AttachFindingsDto.md
 docs/AttachFindingsResponseDto.md
+docs/AutopilotApi.md
 docs/BulkIngestAssetsDto.md
 docs/BulkIngestEdgesDto.md
 docs/BulkIngestEdgesResponseDto.md
@@ -229,6 +234,7 @@ src/apis/AIApi.ts
 src/apis/AIProviderConfigsApi.ts
 src/apis/AssetsApi.ts
 src/apis/AssistantApi.ts
+src/apis/AutopilotApi.ts
 src/apis/CasesApi.ts
 src/apis/CustomDetectorExtractionsApi.ts
 src/apis/CustomDetectorTestsApi.ts
@@ -249,6 +255,10 @@ src/index.ts
 src/models/AddEvidenceDto.ts
 src/models/AddFindingDto.ts
 src/models/AddThreadEntryDto.ts
+src/models/AgentDecisionDto.ts
+src/models/AgentRunDetailDto.ts
+src/models/AgentRunDto.ts
+src/models/AgentRunListResponseDto.ts
 src/models/AiCompleteRequestDto.ts
 src/models/AiCompleteResponseDto.ts
 src/models/AiMessageDto.ts

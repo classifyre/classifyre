@@ -23,6 +23,11 @@ export class InstanceSettingsService {
       timezone: settings.timezone,
       timeFormat: settings.timeFormat,
       aiProviderConfigId: settings.aiProviderConfigId,
+      autopilotInquiryEnabled: settings.autopilotInquiryEnabled,
+      autopilotInquiryDesired: settings.autopilotInquiryDesired,
+      autopilotInquirySearchable: settings.autopilotInquirySearchable,
+      autopilotCaseEnabled: settings.autopilotCaseEnabled,
+      autopilotCaseGuidance: settings.autopilotCaseGuidance,
       demoMode: this.demoMode.isDemoMode,
       createdAt: settings.createdAt,
       updatedAt: settings.updatedAt,
@@ -99,6 +104,31 @@ export class InstanceSettingsService {
       ...(updateDto.timeFormat !== undefined
         ? { timeFormat: updateDto.timeFormat }
         : {}),
+      ...(updateDto.autopilotInquiryEnabled !== undefined
+        ? { autopilotInquiryEnabled: updateDto.autopilotInquiryEnabled }
+        : {}),
+      ...(updateDto.autopilotInquiryDesired !== undefined
+        ? {
+            autopilotInquiryDesired: emptyToNull(
+              updateDto.autopilotInquiryDesired,
+            ),
+          }
+        : {}),
+      ...(updateDto.autopilotInquirySearchable !== undefined
+        ? {
+            autopilotInquirySearchable: emptyToNull(
+              updateDto.autopilotInquirySearchable,
+            ),
+          }
+        : {}),
+      ...(updateDto.autopilotCaseEnabled !== undefined
+        ? { autopilotCaseEnabled: updateDto.autopilotCaseEnabled }
+        : {}),
+      ...(updateDto.autopilotCaseGuidance !== undefined
+        ? {
+            autopilotCaseGuidance: emptyToNull(updateDto.autopilotCaseGuidance),
+          }
+        : {}),
       ...(aiProviderConfigUpdate ?? {}),
     };
 
@@ -109,4 +139,9 @@ export class InstanceSettingsService {
 
     return this.toResponse(settings);
   }
+}
+
+function emptyToNull(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }

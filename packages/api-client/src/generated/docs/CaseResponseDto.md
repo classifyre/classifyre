@@ -11,6 +11,7 @@ Name | Type
 `description` | string
 `status` | string
 `severity` | string
+`aiMode` | string
 `assignee` | string
 `createdBy` | string
 `conclusion` | string
@@ -34,6 +35,7 @@ const example = {
   "description": null,
   "status": null,
   "severity": null,
+  "aiMode": null,
   "assignee": null,
   "createdBy": null,
   "conclusion": null,

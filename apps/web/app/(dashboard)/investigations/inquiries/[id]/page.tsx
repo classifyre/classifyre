@@ -14,6 +14,8 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
+import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
+import { AiModeSelect, type AiMode } from "@/components/ai-mode-select";
 import { toast } from "sonner";
 import {
   api,
@@ -157,6 +159,15 @@ function InquiryDetailInner() {
     }
   };
 
+  const setAiMode = async (mode: AiMode) => {
+    await api.inquiries.inquiriesControllerUpdate({
+      id: inquiryId,
+      updateInquiryDto: { aiMode: mode as never },
+    });
+    toast.success("AI mode updated");
+    await load();
+  };
+
   const archive = async () => {
     await api.inquiries.inquiriesControllerUpdate({
       id: inquiryId,
@@ -208,12 +219,17 @@ function InquiryDetailInner() {
           <h1 className="font-serif text-2xl font-black uppercase tracking-[0.03em]">
             {inquiry.title}
           </h1>
+          {isAiActor(inquiry.createdBy) && <AiActorBadge />}
           {isArchived && (
             <Badge variant="outline" className="uppercase tracking-wide">
               archived
             </Badge>
           )}
           <div className="ml-auto flex items-center gap-2">
+            <AiModeSelect
+              value={(inquiry.aiMode ?? "INHERIT") as AiMode}
+              onChange={(mode) => void setAiMode(mode)}
+            />
             {!isArchived && (
               <Button
                 variant="outline"
