@@ -7,6 +7,7 @@ import {
 import { AiClientService } from '../ai';
 import { PrismaService } from '../prisma.service';
 import { AgentAuditService } from './audit/agent-audit.service';
+import { AgentLoggerService } from './audit/agent-logger.service';
 import { AgentMemoryService } from './memory/agent-memory.service';
 import { AgentSearchService } from './search/agent-search.service';
 import {
@@ -63,6 +64,7 @@ export class CaseAgentService {
     private readonly memory: AgentMemoryService,
     private readonly applier: DecisionApplierService,
     private readonly audit: AgentAuditService,
+    private readonly log: AgentLoggerService,
   ) {}
 
   async execute(ctx: AgentContext): Promise<ApplySummary> {
@@ -76,6 +78,7 @@ export class CaseAgentService {
         { name: 'persist-memory', execute: (c) => this.persistMemory(c) },
       ],
       this.audit,
+      this.log,
     );
     return stepOutput<ApplySummary>(ctx, 'apply');
   }
@@ -90,7 +93,12 @@ export class CaseAgentService {
     const candidates: CandidateInquiry[] = [];
     for (const q of inquiries) {
       const caseReadySignal = caseReadyIds.has(q.id);
-      if (q.newMatchCount === 0 && !caseReadySignal) continue;
+      // Scan cycles react to the delta; manual cycles review every inquiry
+      // that currently matches anything.
+      const eligible = ctx.manual
+        ? q.matchCount > 0 || caseReadySignal
+        : q.newMatchCount > 0 || caseReadySignal;
+      if (!eligible) continue;
       if (candidates.length >= MAX_CASE_CLUSTERS_PER_CYCLE) break;
       candidates.push({
         ...q,
@@ -98,6 +106,10 @@ export class CaseAgentService {
         sampleMatches: await this.search.sampleInquiryMatches(q.id),
       });
     }
+    await this.log.business(
+      ctx.run.id,
+      `Reviewing ${candidates.length} candidate inquir${candidates.length === 1 ? 'y' : 'ies'} against ${openCases.length} open case(s).`,
+    );
     return { candidates, openCases };
   }
 
@@ -106,8 +118,7 @@ export class CaseAgentService {
     const inquiryRun = await this.prisma.agentRun.findFirst({
       where: {
         agentKind: AgentKind.INQUIRY,
-        sourceId: ctx.sourceId,
-        runnerId: ctx.runnerId,
+        cycleKey: ctx.run.cycleKey,
       },
       orderBy: { createdAt: 'desc' },
       select: { id: true },
@@ -152,6 +163,10 @@ export class CaseAgentService {
     const memories = stepOutput<RecalledMemory[]>(ctx, 'recall-memory');
 
     if (candidates.length === 0) {
+      await this.log.business(
+        ctx.run.id,
+        'No candidate inquiries — skipping the model call.',
+      );
       return {
         decisions: [
           {
@@ -163,24 +178,46 @@ export class CaseAgentService {
       };
     }
 
-    const { content } = await this.ai.completeJson<CaseDecisionOutput>(
-      [
-        {
-          role: 'system',
-          content: buildCaseSystemPrompt(ctx.settings.autopilotCaseGuidance),
-        },
-        {
-          role: 'user',
-          content: buildCaseUserPrompt({
-            sourceName: ctx.sourceName,
-            candidateInquiries: candidates,
-            openCases,
-            memories,
-          }),
-        },
-      ],
-      caseDecisionSchema,
-      { temperature: 0.2 },
+    const systemPrompt = buildCaseSystemPrompt(
+      ctx.settings.autopilotCaseGuidance,
+    );
+    const userPrompt = buildCaseUserPrompt({
+      sourceName: ctx.sourceName,
+      manual: ctx.manual,
+      instruction: ctx.instruction,
+      candidateInquiries: candidates,
+      openCases,
+      memories,
+    });
+    await this.log.technical(
+      ctx.run.id,
+      'Requesting case decisions from the model.',
+      {
+        systemPromptChars: systemPrompt.length,
+        userPromptChars: userPrompt.length,
+        memoriesRecalled: memories.length,
+      },
+    );
+
+    const { content, model, raw } =
+      await this.ai.completeJson<CaseDecisionOutput>(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        caseDecisionSchema,
+        { temperature: 0.2 },
+      );
+    await this.log.technical(
+      ctx.run.id,
+      `Model ${model} returned a valid decision payload.`,
+      {
+        raw,
+      },
+    );
+    await this.log.business(
+      ctx.run.id,
+      `Model proposed ${content.decisions.length} case decision(s): ${content.decisions.map((d) => d.action).join(', ')}.`,
     );
     this.logger.log(
       `Run ${ctx.run.id}: model returned ${content.decisions.length} case decision(s)`,
@@ -199,6 +236,12 @@ export class CaseAgentService {
   private async persistMemory(ctx: AgentContext): Promise<{ written: number }> {
     const output = stepOutput<CaseDecisionOutput>(ctx, 'decide');
     const written = await this.memory.writeMany(output.memoryWrites);
+    if (written > 0) {
+      await this.log.business(
+        ctx.run.id,
+        `Learned ${written} memory entr${written === 1 ? 'y' : 'ies'} for future cycles.`,
+      );
+    }
     return { written };
   }
 }

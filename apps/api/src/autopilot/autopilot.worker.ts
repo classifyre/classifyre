@@ -6,6 +6,7 @@ import { PgBossService } from '../scheduler/pg-boss.service';
 import { AiSchemaError } from '../ai';
 import { INQUIRY_MATCH_QUEUE } from '../matching/matching.constants';
 import { AgentAuditService } from './audit/agent-audit.service';
+import { AgentLoggerService } from './audit/agent-logger.service';
 import { AgentSearchService } from './search/agent-search.service';
 import { InquiryAgentService } from './inquiry-agent.service';
 import { CaseAgentService } from './case-agent.service';
@@ -18,10 +19,24 @@ import type { AgentContext, AutopilotJob } from './autopilot.types';
 
 const INSTANCE_SETTINGS_ID = 1;
 
+interface CycleInput {
+  sourceId: string | null;
+  runnerId: string | null;
+  cycleKey: string;
+  trigger: string;
+  manual: boolean;
+  instruction: string | null;
+}
+
 /**
- * Consumes AUTOPILOT_QUEUE jobs (enqueued with a debounce delay when a source
- * run finishes) and orchestrates one autopilot cycle: inquiry agent first,
- * then case agent. Each agent gets its own resumable AgentRun.
+ * Consumes AUTOPILOT_QUEUE jobs and orchestrates one autopilot cycle:
+ * inquiry agent first, then case agent — each with its own resumable
+ * AgentRun, full BUSINESS/TECHNICAL logging and decision audit.
+ *
+ * Two job shapes:
+ *  - scan_completed (enqueued by cli-runner with a debounce delay)
+ *  - manual "steer" runs (POST /autopilot/trigger): reviews ALL existing
+ *    open data with an operator instruction, both agents treated as enabled.
  */
 @Injectable()
 export class AutopilotWorker implements OnApplicationBootstrap {
@@ -31,6 +46,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
     private readonly prisma: PrismaService,
     private readonly pgBoss: PgBossService,
     private readonly audit: AgentAuditService,
+    private readonly log: AgentLoggerService,
     private readonly search: AgentSearchService,
     private readonly inquiryAgent: InquiryAgentService,
     private readonly caseAgent: CaseAgentService,
@@ -52,76 +68,94 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         typeof data?.sourceId === 'string' ? data.sourceId : null;
       const runnerId =
         typeof data?.runnerId === 'string' ? data.runnerId : null;
-      if (!sourceId) continue;
-      await this.runCycle(sourceId, runnerId);
+      const manual = data?.manual === true;
+      if (!sourceId && !manual) continue;
+      await this.runCycle({
+        sourceId,
+        runnerId,
+        manual,
+        instruction:
+          typeof data?.instruction === 'string' && data.instruction.trim()
+            ? data.instruction.trim()
+            : null,
+        cycleKey:
+          typeof data?.cycleKey === 'string' && data.cycleKey
+            ? data.cycleKey
+            : `scan:${sourceId}:${runnerId ?? 'none'}`,
+        trigger: manual ? 'manual' : 'scan_completed',
+      });
     }
   }
 
-  async runCycle(sourceId: string, runnerId: string | null): Promise<void> {
+  async runCycle(cycle: CycleInput): Promise<void> {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: INSTANCE_SETTINGS_ID },
     });
-    // Master switches: when autopilot is fully off this is not worth an audit row.
+    if (!settings?.aiEnabled) {
+      this.logger.debug('AI disabled — skipping autopilot cycle');
+      return;
+    }
+    // Scan cycles respect the instance flags as master switches. Manual runs
+    // are explicit operator intent and always execute (per-entity
+    // OBSERVE_ONLY is still enforced by the decision applier).
     if (
-      !settings?.aiEnabled ||
-      (!settings.autopilotInquiryEnabled && !settings.autopilotCaseEnabled)
+      !cycle.manual &&
+      !settings.autopilotInquiryEnabled &&
+      !settings.autopilotCaseEnabled
     ) {
       this.logger.debug(
-        `Autopilot disabled — skipping cycle for source ${sourceId}`,
+        `Autopilot disabled — skipping cycle for source ${cycle.sourceId}`,
       );
       return;
     }
 
-    // Deterministic ordering: if inquiry matching for this scan is still queued,
-    // push the cycle back instead of racing it.
-    if (await this.inquiryMatchingPending()) {
+    // Deterministic ordering for scan cycles: if inquiry matching is still
+    // queued, push the cycle back instead of racing it.
+    if (!cycle.manual && (await this.inquiryMatchingPending())) {
       this.logger.log(
-        `Inquiry matching still pending — re-queueing autopilot cycle for source ${sourceId}`,
+        `Inquiry matching still pending — re-queueing autopilot cycle for source ${cycle.sourceId}`,
       );
       const boss = await this.pgBoss.getBossAsync();
       await boss.send(
         AUTOPILOT_QUEUE,
-        { sourceId, runnerId: runnerId ?? undefined },
+        {
+          sourceId: cycle.sourceId ?? undefined,
+          runnerId: cycle.runnerId ?? undefined,
+          cycleKey: cycle.cycleKey,
+        },
         {
           startAfter: AUTOPILOT_RETRY_AFTER_SECONDS,
-          singletonKey: `autopilot:${sourceId}`,
+          singletonKey: `autopilot:${cycle.sourceId}`,
         },
       );
       return;
     }
 
-    const sourceName = await this.search.sourceName(sourceId);
+    const sourceName = cycle.sourceId
+      ? await this.search.sourceName(cycle.sourceId)
+      : 'all sources';
 
-    if (settings.autopilotInquiryEnabled) {
-      await this.runAgent(
-        AgentKind.INQUIRY,
-        settings,
-        sourceId,
-        sourceName,
-        runnerId,
-      );
+    const inquiryEnabled = cycle.manual || settings.autopilotInquiryEnabled;
+    const caseEnabled = cycle.manual || settings.autopilotCaseEnabled;
+
+    if (inquiryEnabled) {
+      await this.runAgent(AgentKind.INQUIRY, settings, cycle, sourceName);
     } else {
       await this.audit.recordSkippedRun(
         AgentKind.INQUIRY,
-        sourceId,
-        runnerId,
+        cycle.sourceId ?? 'all',
+        cycle.runnerId,
         'Inquiry autopilot disabled in settings; observing only.',
       );
     }
 
-    if (settings.autopilotCaseEnabled) {
-      await this.runAgent(
-        AgentKind.CASE,
-        settings,
-        sourceId,
-        sourceName,
-        runnerId,
-      );
+    if (caseEnabled) {
+      await this.runAgent(AgentKind.CASE, settings, cycle, sourceName);
     } else {
       await this.audit.recordSkippedRun(
         AgentKind.CASE,
-        sourceId,
-        runnerId,
+        cycle.sourceId ?? 'all',
+        cycle.runnerId,
         'Case autopilot disabled in settings; observing only.',
       );
     }
@@ -130,19 +164,44 @@ export class AutopilotWorker implements OnApplicationBootstrap {
   private async runAgent(
     agentKind: AgentKind,
     settings: InstanceSettings,
-    sourceId: string,
+    cycle: CycleInput,
     sourceName: string,
-    runnerId: string | null,
   ): Promise<void> {
-    const run = await this.audit.openRun(agentKind, sourceId, runnerId);
+    const run = await this.audit.openRun(agentKind, {
+      sourceId: cycle.sourceId,
+      runnerId: cycle.runnerId,
+      cycleKey: cycle.cycleKey,
+      trigger: cycle.trigger,
+      instruction: cycle.instruction,
+    });
     if (run.status !== AgentRunStatus.RUNNING) return;
+
+    await this.log.business(
+      run.id,
+      cycle.manual
+        ? `Manual ${agentKind.toLowerCase()} review started for ${sourceName}${cycle.instruction ? ' with operator instruction.' : '.'}`
+        : `${agentKind === AgentKind.INQUIRY ? 'Inquiry' : 'Case'} cycle started after a scan of ${sourceName}.`,
+      cycle.instruction ? { instruction: cycle.instruction } : undefined,
+    );
+
+    // Manual runs override the instance flags (explicit operator intent);
+    // the applier still enforces per-entity OBSERVE_ONLY.
+    const effectiveSettings: InstanceSettings = cycle.manual
+      ? {
+          ...settings,
+          autopilotInquiryEnabled: true,
+          autopilotCaseEnabled: true,
+        }
+      : settings;
 
     const ctx: AgentContext = {
       run,
-      settings,
-      sourceId,
+      settings: effectiveSettings,
+      sourceId: cycle.sourceId,
       sourceName,
-      runnerId,
+      runnerId: cycle.runnerId,
+      manual: cycle.manual,
+      instruction: cycle.instruction,
       state: {},
     };
     const agent =
@@ -151,14 +210,31 @@ export class AutopilotWorker implements OnApplicationBootstrap {
     try {
       const summary = await agent.execute(ctx);
       await this.audit.complete(run.id, formatSummary(summary));
+      await this.log.business(
+        run.id,
+        `Cycle finished: ${formatSummary(summary)}`,
+      );
       this.logger.log(
         `${agentKind} agent run ${run.id} completed: ${formatSummary(summary)}`,
       );
     } catch (error) {
       if (error instanceof AiSchemaError) {
         // The model could not produce valid output even after completeJson's
-        // correction retries — document it and stop; a retry with identical
-        // context is unlikely to do better.
+        // correction retries — store every raw response so the operator can
+        // inspect exactly what came back, then stop (a retry with identical
+        // context is unlikely to do better).
+        await this.log.error(
+          run.id,
+          'TECHNICAL',
+          'Model failed to produce schema-valid output.',
+          {
+            attempts: error.attempts.map((a, i) => ({
+              attempt: i + 1,
+              error: a.error,
+              raw: a.raw,
+            })),
+          },
+        );
         await this.audit.recordDecision(run.id, {
           action: 'NO_ACTION',
           outcome: 'FAILED',
@@ -173,6 +249,14 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       }
       // Provider/transient errors: mark failed and rethrow so pg-boss retries;
       // the run resumes from its last completed step.
+      await this.log.error(
+        run.id,
+        'TECHNICAL',
+        'Cycle failed with a provider/transient error.',
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
       await this.audit.fail(run.id, error);
       this.logger.error(
         `${agentKind} agent run ${run.id} failed: ${error instanceof Error ? error.message : String(error)}`,

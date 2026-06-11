@@ -1,0 +1,384 @@
+"use client";
+
+import * as React from "react";
+import { BookOpenText, Brain, Loader2, Map, Pencil, Plus, Scale, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { api, type AgentMemoryDto } from "@workspace/api-client";
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  EmptyState,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
+} from "@workspace/ui/components";
+import { cn } from "@workspace/ui/lib/utils";
+
+type Kind = "GLOSSARY" | "DECISION_PRECEDENT" | "TOPIC_INQUIRY_MAP";
+const KINDS: Array<{ value: Kind | "ALL"; label: string; icon: React.ReactNode }> = [
+  { value: "ALL", label: "All", icon: <Brain className="h-3 w-3" /> },
+  { value: "GLOSSARY", label: "Glossary", icon: <BookOpenText className="h-3 w-3" /> },
+  { value: "DECISION_PRECEDENT", label: "Precedents", icon: <Scale className="h-3 w-3" /> },
+  { value: "TOPIC_INQUIRY_MAP", label: "Topic map", icon: <Map className="h-3 w-3" /> },
+];
+
+const KIND_LABEL: Record<string, string> = {
+  GLOSSARY: "glossary",
+  DECISION_PRECEDENT: "precedent",
+  TOPIC_INQUIRY_MAP: "topic map",
+};
+
+/**
+ * The agent's long-term memory as an editable card catalog. The operator can
+ * correct wrong lessons, boost important ones (weight) or plant new knowledge
+ * to steer future cycles.
+ */
+export function AutopilotMemory() {
+  const [items, setItems] = React.useState<AgentMemoryDto[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [loading, setLoading] = React.useState(true);
+  const [kind, setKind] = React.useState<Kind | "ALL">("ALL");
+  const [search, setSearch] = React.useState("");
+  const [editing, setEditing] = React.useState<AgentMemoryDto | null>(null);
+  const [adding, setAdding] = React.useState(false);
+
+  const load = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.autopilot.autopilotControllerListMemory({
+        kind: kind === "ALL" ? undefined : kind,
+        search: search.trim() || undefined,
+        limit: 100,
+      });
+      setItems(res.items);
+      setTotal(res.total);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load memory");
+    } finally {
+      setLoading(false);
+    }
+  }, [kind, search]);
+
+  React.useEffect(() => {
+    const t = setTimeout(() => void load(), search ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [load, search]);
+
+  const remove = async (m: AgentMemoryDto) => {
+    try {
+      await api.autopilot.autopilotControllerDeleteMemory({ id: m.id });
+      toast.success("Memory forgotten");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete memory");
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex rounded-[4px] border-2 border-border p-0.5">
+          {KINDS.map((k) => (
+            <button
+              key={k.value}
+              onClick={() => setKind(k.value)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-[2px] px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors",
+                kind === k.value
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {k.icon}
+              {k.label}
+            </button>
+          ))}
+        </div>
+        <div className="relative ml-auto w-56">
+          <Search className="text-muted-foreground absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search memory…"
+            className="h-8 rounded-[4px] border-2 border-border pl-8 text-sm"
+          />
+        </div>
+        <Button size="sm" onClick={() => setAdding(true)}>
+          <Plus className="h-3.5 w-3.5" /> Teach
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading memory…
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={Brain}
+          title="Nothing learned yet"
+          description="The agent writes glossary entries, decision precedents and topic mappings as it works — or teach it something now."
+        />
+      ) : (
+        <>
+          <p className="font-mono text-[11px] text-muted-foreground">
+            {total} entr{total === 1 ? "y" : "ies"}
+          </p>
+          <div className="grid gap-2.5 md:grid-cols-2">
+            {items.map((m) => (
+              <div
+                key={m.id}
+                className="group rounded-[4px] border-2 border-border bg-card px-3.5 py-3 shadow-[0_1px_3px_rgba(28,25,23,0.04)]"
+              >
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className="border-[#d97706]/40 px-1.5 text-[9px] uppercase tracking-wider text-[#d97706]"
+                  >
+                    {KIND_LABEL[m.kind] ?? m.kind}
+                  </Badge>
+                  <span className="truncate font-mono text-xs">{m.key}</span>
+                  <span
+                    className="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground"
+                    title="Reinforcement weight — how often this lesson was confirmed"
+                  >
+                    ×{m.weight}
+                  </span>
+                </div>
+                <p className="mt-1.5 line-clamp-3 text-sm text-muted-foreground">{m.content}</p>
+                <div className="mt-2 flex items-center gap-1.5">
+                  {m.tags.slice(0, 4).map((t) => (
+                    <span key={t} className="rounded bg-muted/60 px-1.5 py-px font-mono text-[9px]">
+                      {t}
+                    </span>
+                  ))}
+                  <span className="ml-auto flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => setEditing(m)}
+                      title="Edit"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                      onClick={() => void remove(m)}
+                      title="Forget"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <MemoryEditDialog memory={editing} onClose={() => setEditing(null)} onSaved={load} />
+      <MemoryAddDialog open={adding} onClose={() => setAdding(false)} onSaved={load} />
+    </div>
+  );
+}
+
+function MemoryEditDialog({
+  memory,
+  onClose,
+  onSaved,
+}: {
+  memory: AgentMemoryDto | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [content, setContent] = React.useState("");
+  const [tags, setTags] = React.useState("");
+  const [weight, setWeight] = React.useState(1);
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (memory) {
+      setContent(memory.content);
+      setTags(memory.tags.join(", "));
+      setWeight(memory.weight);
+    }
+  }, [memory]);
+
+  const save = async () => {
+    if (!memory) return;
+    try {
+      setSaving(true);
+      await api.autopilot.autopilotControllerUpdateMemory({
+        id: memory.id,
+        updateAgentMemoryDto: {
+          content: content.trim(),
+          tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+          weight,
+        },
+      });
+      toast.success("Memory updated");
+      onClose();
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update memory");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!memory} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="rounded-[6px] border-2 border-border sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-mono text-sm">{memory?.key}</DialogTitle>
+          <DialogDescription>
+            Correct what the agent learned — it will use this in every future cycle.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={4}
+            maxLength={2000}
+            className="rounded-[4px] border-2 border-border text-sm"
+          />
+          <div className="grid grid-cols-[1fr_90px] gap-2">
+            <div className="space-y-1">
+              <Label className="text-[10px] font-mono uppercase tracking-wider">Tags</Label>
+              <Input
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder="comma, separated"
+                className="h-8 rounded-[4px] border-2 border-border text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-mono uppercase tracking-wider">Weight</Label>
+              <Input
+                type="number"
+                min={0}
+                value={weight}
+                onChange={(e) => setWeight(Math.max(0, Number(e.target.value) || 0))}
+                className="h-8 rounded-[4px] border-2 border-border text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={() => void save()} disabled={saving || !content.trim()}>
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Save
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MemoryAddDialog({
+  open,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [kind, setKind] = React.useState<Kind>("GLOSSARY");
+  const [key, setKey] = React.useState("");
+  const [content, setContent] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+
+  const save = async () => {
+    try {
+      setSaving(true);
+      await api.autopilot.autopilotControllerCreateMemory({
+        createAgentMemoryDto: { kind, key: key.trim(), content: content.trim() },
+      });
+      toast.success("The agent will remember that");
+      setKey("");
+      setContent("");
+      onClose();
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add memory");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="rounded-[6px] border-2 border-border sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Teach the autopilot</DialogTitle>
+          <DialogDescription>
+            Plant domain knowledge, a decision rule, or a topic→inquiry mapping the
+            agent should respect from now on.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-[150px_1fr] gap-2">
+            <div className="space-y-1">
+              <Label className="text-[10px] font-mono uppercase tracking-wider">Kind</Label>
+              <Select value={kind} onValueChange={(v) => setKind(v as Kind)}>
+                <SelectTrigger className="h-8 rounded-[4px] border-2 border-border text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GLOSSARY">Glossary</SelectItem>
+                  <SelectItem value="DECISION_PRECEDENT">Precedent</SelectItem>
+                  <SelectItem value="TOPIC_INQUIRY_MAP">Topic map</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-mono uppercase tracking-wider">Key</Label>
+              <Input
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder="e.g. customer-pii"
+                maxLength={200}
+                className="h-8 rounded-[4px] border-2 border-border text-sm"
+              />
+            </div>
+          </div>
+          <Textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={4}
+            maxLength={2000}
+            placeholder="e.g. Findings in the “Customers” Confluence space are customer-facing — treat any PII there as HIGH severity and case-worthy."
+            className="rounded-[4px] border-2 border-border text-sm"
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={() => void save()} disabled={saving || !key.trim() || !content.trim()}>
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Remember
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

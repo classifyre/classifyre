@@ -28,14 +28,19 @@ export class AgentSearchService {
     private readonly matching: InquiryMatchingService,
   ) {}
 
-  /** New OPEN findings of a run (fallback: the source), grouped and sampled. */
+  /**
+   * OPEN findings grouped and sampled. Scope narrows with what is given:
+   * runner (scan delta) → source → the whole instance (manual full reviews).
+   */
   async summarizeNewFindings(
-    sourceId: string,
+    sourceId: string | null,
     runnerId: string | null,
   ): Promise<FindingGroupSummary[]> {
     const where: Prisma.FindingWhereInput = runnerId
       ? { runnerId, status: 'OPEN' }
-      : { sourceId, status: 'OPEN' };
+      : sourceId
+        ? { sourceId, status: 'OPEN' }
+        : { status: 'OPEN' };
 
     const rows = await this.prisma.finding.findMany({
       where,

@@ -7,6 +7,10 @@ docs/AddEvidenceDto.md
 docs/AddFindingDto.md
 docs/AddThreadEntryDto.md
 docs/AgentDecisionDto.md
+docs/AgentLogDto.md
+docs/AgentLogListResponseDto.md
+docs/AgentMemoryDto.md
+docs/AgentMemoryListResponseDto.md
 docs/AgentRunDetailDto.md
 docs/AgentRunDto.md
 docs/AgentRunListResponseDto.md
@@ -48,6 +52,7 @@ docs/CasesApi.md
 docs/CliRunnerControllerUpdateRunnerStatusRequest.md
 docs/CloseCaseDto.md
 docs/CloseCaseResponseDto.md
+docs/CreateAgentMemoryDto.md
 docs/CreateAiProviderConfigDto.md
 docs/CreateCaseDto.md
 docs/CreateCustomDetectorDto.md
@@ -214,6 +219,9 @@ docs/TrainingExampleDto.md
 docs/TrainingExampleItemDto.md
 docs/TrainingExamplesStatsDto.md
 docs/TrainingExamplesStatsDtoByLabelValue.md
+docs/TriggerAutopilotDto.md
+docs/TriggerAutopilotResponseDto.md
+docs/UpdateAgentMemoryDto.md
 docs/UpdateAiProviderConfigDto.md
 docs/UpdateCaseDto.md
 docs/UpdateCaseFindingNoteDto.md
@@ -256,6 +264,10 @@ src/models/AddEvidenceDto.ts
 src/models/AddFindingDto.ts
 src/models/AddThreadEntryDto.ts
 src/models/AgentDecisionDto.ts
+src/models/AgentLogDto.ts
+src/models/AgentLogListResponseDto.ts
+src/models/AgentMemoryDto.ts
+src/models/AgentMemoryListResponseDto.ts
 src/models/AgentRunDetailDto.ts
 src/models/AgentRunDto.ts
 src/models/AgentRunListResponseDto.ts
@@ -293,6 +305,7 @@ src/models/CaseTimelineResponseDto.ts
 src/models/CliRunnerControllerUpdateRunnerStatusRequest.ts
 src/models/CloseCaseDto.ts
 src/models/CloseCaseResponseDto.ts
+src/models/CreateAgentMemoryDto.ts
 src/models/CreateAiProviderConfigDto.ts
 src/models/CreateCaseDto.ts
 src/models/CreateCustomDetectorDto.ts
@@ -445,6 +458,9 @@ src/models/TrainingExampleDto.ts
 src/models/TrainingExampleItemDto.ts
 src/models/TrainingExamplesStatsDto.ts
 src/models/TrainingExamplesStatsDtoByLabelValue.ts
+src/models/TriggerAutopilotDto.ts
+src/models/TriggerAutopilotResponseDto.ts
+src/models/UpdateAgentMemoryDto.ts
 src/models/UpdateAiProviderConfigDto.ts
 src/models/UpdateCaseDto.ts
 src/models/UpdateCaseFindingNoteDto.ts

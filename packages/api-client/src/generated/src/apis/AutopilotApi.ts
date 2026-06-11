@@ -15,18 +15,59 @@
 
 import * as runtime from '../runtime';
 import type {
+  AgentLogListResponseDto,
+  AgentMemoryDto,
+  AgentMemoryListResponseDto,
   AgentRunDetailDto,
   AgentRunListResponseDto,
+  CreateAgentMemoryDto,
+  TriggerAutopilotDto,
+  TriggerAutopilotResponseDto,
+  UpdateAgentMemoryDto,
 } from '../models/index';
 import {
+    AgentLogListResponseDtoFromJSON,
+    AgentLogListResponseDtoToJSON,
+    AgentMemoryDtoFromJSON,
+    AgentMemoryDtoToJSON,
+    AgentMemoryListResponseDtoFromJSON,
+    AgentMemoryListResponseDtoToJSON,
     AgentRunDetailDtoFromJSON,
     AgentRunDetailDtoToJSON,
     AgentRunListResponseDtoFromJSON,
     AgentRunListResponseDtoToJSON,
+    CreateAgentMemoryDtoFromJSON,
+    CreateAgentMemoryDtoToJSON,
+    TriggerAutopilotDtoFromJSON,
+    TriggerAutopilotDtoToJSON,
+    TriggerAutopilotResponseDtoFromJSON,
+    TriggerAutopilotResponseDtoToJSON,
+    UpdateAgentMemoryDtoFromJSON,
+    UpdateAgentMemoryDtoToJSON,
 } from '../models/index';
+
+export interface AutopilotControllerCreateMemoryRequest {
+    createAgentMemoryDto: CreateAgentMemoryDto;
+}
+
+export interface AutopilotControllerDeleteMemoryRequest {
+    id: string;
+}
 
 export interface AutopilotControllerGetRunRequest {
     id: string;
+}
+
+export interface AutopilotControllerListLogsRequest {
+    id: string;
+    channel?: AutopilotControllerListLogsChannelEnum;
+}
+
+export interface AutopilotControllerListMemoryRequest {
+    kind?: AutopilotControllerListMemoryKindEnum;
+    search?: string;
+    skip?: number;
+    limit?: number;
 }
 
 export interface AutopilotControllerListRunsRequest {
@@ -36,10 +77,94 @@ export interface AutopilotControllerListRunsRequest {
     limit?: number;
 }
 
+export interface AutopilotControllerTriggerRequest {
+    triggerAutopilotDto: TriggerAutopilotDto;
+}
+
+export interface AutopilotControllerUpdateMemoryRequest {
+    id: string;
+    updateAgentMemoryDto: UpdateAgentMemoryDto;
+}
+
 /**
  * 
  */
 export class AutopilotApi extends runtime.BaseAPI {
+
+    /**
+     * Add (or overwrite) a memory entry to steer the agent
+     */
+    async autopilotControllerCreateMemoryRaw(requestParameters: AutopilotControllerCreateMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentMemoryDto>> {
+        if (requestParameters['createAgentMemoryDto'] == null) {
+            throw new runtime.RequiredError(
+                'createAgentMemoryDto',
+                'Required parameter "createAgentMemoryDto" was null or undefined when calling autopilotControllerCreateMemory().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/memory`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateAgentMemoryDtoToJSON(requestParameters['createAgentMemoryDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AgentMemoryDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Add (or overwrite) a memory entry to steer the agent
+     */
+    async autopilotControllerCreateMemory(requestParameters: AutopilotControllerCreateMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentMemoryDto> {
+        const response = await this.autopilotControllerCreateMemoryRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Delete a memory entry the agent learned
+     */
+    async autopilotControllerDeleteMemoryRaw(requestParameters: AutopilotControllerDeleteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling autopilotControllerDeleteMemory().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/memory/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Delete a memory entry the agent learned
+     */
+    async autopilotControllerDeleteMemory(requestParameters: AutopilotControllerDeleteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.autopilotControllerDeleteMemoryRaw(requestParameters, initOverrides);
+    }
 
     /**
      * Get one autopilot run with all decisions and rationales
@@ -75,6 +200,92 @@ export class AutopilotApi extends runtime.BaseAPI {
      */
     async autopilotControllerGetRun(requestParameters: AutopilotControllerGetRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentRunDetailDto> {
         const response = await this.autopilotControllerGetRunRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output)
+     */
+    async autopilotControllerListLogsRaw(requestParameters: AutopilotControllerListLogsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentLogListResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling autopilotControllerListLogs().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['channel'] != null) {
+            queryParameters['channel'] = requestParameters['channel'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/runs/{id}/logs`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AgentLogListResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output)
+     */
+    async autopilotControllerListLogs(requestParameters: AutopilotControllerListLogsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentLogListResponseDto> {
+        const response = await this.autopilotControllerListLogsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * List the agent memory (glossary, precedents, topic map)
+     */
+    async autopilotControllerListMemoryRaw(requestParameters: AutopilotControllerListMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentMemoryListResponseDto>> {
+        const queryParameters: any = {};
+
+        if (requestParameters['kind'] != null) {
+            queryParameters['kind'] = requestParameters['kind'];
+        }
+
+        if (requestParameters['search'] != null) {
+            queryParameters['search'] = requestParameters['search'];
+        }
+
+        if (requestParameters['skip'] != null) {
+            queryParameters['skip'] = requestParameters['skip'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/memory`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AgentMemoryListResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * List the agent memory (glossary, precedents, topic map)
+     */
+    async autopilotControllerListMemory(requestParameters: AutopilotControllerListMemoryRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentMemoryListResponseDto> {
+        const response = await this.autopilotControllerListMemoryRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -123,8 +334,111 @@ export class AutopilotApi extends runtime.BaseAPI {
         return await response.value();
     }
 
+    /**
+     * Manually trigger an autopilot cycle over existing data, with an optional steering instruction
+     */
+    async autopilotControllerTriggerRaw(requestParameters: AutopilotControllerTriggerRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TriggerAutopilotResponseDto>> {
+        if (requestParameters['triggerAutopilotDto'] == null) {
+            throw new runtime.RequiredError(
+                'triggerAutopilotDto',
+                'Required parameter "triggerAutopilotDto" was null or undefined when calling autopilotControllerTrigger().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/trigger`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: TriggerAutopilotDtoToJSON(requestParameters['triggerAutopilotDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TriggerAutopilotResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Manually trigger an autopilot cycle over existing data, with an optional steering instruction
+     */
+    async autopilotControllerTrigger(requestParameters: AutopilotControllerTriggerRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TriggerAutopilotResponseDto> {
+        const response = await this.autopilotControllerTriggerRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Edit a memory entry (content, tags, weight)
+     */
+    async autopilotControllerUpdateMemoryRaw(requestParameters: AutopilotControllerUpdateMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentMemoryDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling autopilotControllerUpdateMemory().'
+            );
+        }
+
+        if (requestParameters['updateAgentMemoryDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateAgentMemoryDto',
+                'Required parameter "updateAgentMemoryDto" was null or undefined when calling autopilotControllerUpdateMemory().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/memory/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateAgentMemoryDtoToJSON(requestParameters['updateAgentMemoryDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AgentMemoryDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Edit a memory entry (content, tags, weight)
+     */
+    async autopilotControllerUpdateMemory(requestParameters: AutopilotControllerUpdateMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentMemoryDto> {
+        const response = await this.autopilotControllerUpdateMemoryRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
 }
 
+/**
+ * @export
+ */
+export const AutopilotControllerListLogsChannelEnum = {
+    Technical: 'TECHNICAL',
+    Business: 'BUSINESS'
+} as const;
+export type AutopilotControllerListLogsChannelEnum = typeof AutopilotControllerListLogsChannelEnum[keyof typeof AutopilotControllerListLogsChannelEnum];
+/**
+ * @export
+ */
+export const AutopilotControllerListMemoryKindEnum = {
+    Glossary: 'GLOSSARY',
+    DecisionPrecedent: 'DECISION_PRECEDENT',
+    TopicInquiryMap: 'TOPIC_INQUIRY_MAP'
+} as const;
+export type AutopilotControllerListMemoryKindEnum = typeof AutopilotControllerListMemoryKindEnum[keyof typeof AutopilotControllerListMemoryKindEnum];
 /**
  * @export
  */

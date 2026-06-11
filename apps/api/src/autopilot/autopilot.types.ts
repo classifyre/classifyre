@@ -7,8 +7,15 @@ import type {
 
 /** Payload of an AUTOPILOT_QUEUE job. */
 export interface AutopilotJob {
-  sourceId: string;
+  /** Absent for manual all-sources runs. */
+  sourceId?: string;
   runnerId?: string;
+  /** Manually triggered cycle ("steer" run): scans existing data, not a scan delta. */
+  manual?: boolean;
+  /** Operator instruction embedded into the agent prompts (manual runs). */
+  instruction?: string;
+  /** Stable cycle identity for resuming the right run on redelivery. */
+  cycleKey?: string;
 }
 
 /** Aggregated view of one group of new findings (token-bounded). */
@@ -66,9 +73,13 @@ export interface RecalledMemory {
 export interface AgentContext {
   run: AgentRun;
   settings: InstanceSettings;
-  sourceId: string;
+  sourceId: string | null;
   sourceName: string;
   runnerId: string | null;
+  /** Manual "steer" run: review ALL existing open data, not just the scan delta. */
+  manual: boolean;
+  /** Operator instruction for this cycle (manual runs only). */
+  instruction: string | null;
   /** Validated output of each completed step, keyed by step name. */
   state: Record<string, unknown>;
 }

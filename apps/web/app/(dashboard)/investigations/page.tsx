@@ -10,6 +10,7 @@ import { Badge } from "@workspace/ui/components/badge";
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { CasesTable } from "@/components/cases-table";
+import { AutopilotPanel } from "@/components/autopilot/autopilot-panel";
 
 function inquiryScope(q: InquiryResponseDto): string {
   const sources = q.matchAllSources
@@ -133,7 +134,9 @@ function InvestigationsPageInner() {
 
   const active = inquiries.filter((q) => q.status !== "ARCHIVED");
   const archived = inquiries.filter((q) => q.status === "ARCHIVED");
-  const defaultTab = searchParams.get("tab") === "inquiries" ? "inquiries" : "cases";
+  const tabParam = searchParams.get("tab");
+  const defaultTab =
+    tabParam === "inquiries" || tabParam === "autopilot" ? tabParam : "cases";
 
   return (
     <div className="space-y-6">
@@ -170,6 +173,7 @@ function InvestigationsPageInner() {
               <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[color:var(--color-amber-600,#d97706)]" />
             )}
           </TabsTrigger>
+          <TabsTrigger value="autopilot">Autopilot</TabsTrigger>
         </TabsList>
 
         <TabsContent value="cases">
@@ -206,6 +210,10 @@ function InvestigationsPageInner() {
               )}
             </>
           )}
+        </TabsContent>
+
+        <TabsContent value="autopilot">
+          <AutopilotPanel />
         </TabsContent>
       </Tabs>
     </div>

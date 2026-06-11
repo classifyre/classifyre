@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AiProviderConfigService } from '../ai-provider-config.service';
+import type { AiSchemaAttempt } from './errors';
 import {
   AiAuthError,
   AiConfigError,
@@ -75,6 +76,7 @@ export class AiClientService {
 
     let currentMessages = baseMessages;
     let lastError: unknown;
+    const failedAttempts: AiSchemaAttempt[] = [];
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       let raw = '';
@@ -88,6 +90,7 @@ export class AiClientService {
           content: parsed,
           model: config.model,
           provider: config.provider,
+          raw,
         };
       } catch (err) {
         // Never retry provider-level errors — surface immediately so callers
@@ -102,6 +105,10 @@ export class AiClientService {
         }
 
         lastError = err;
+        failedAttempts.push({
+          raw,
+          error: err instanceof Error ? err.message : String(err),
+        });
 
         if (attempt < maxRetries) {
           // Extend the conversation with the bad output + correction request
@@ -113,6 +120,7 @@ export class AiClientService {
     throw new AiSchemaError(
       `Failed to produce valid JSON after ${maxRetries + 1} attempt(s).`,
       lastError,
+      failedAttempts,
     );
   }
 

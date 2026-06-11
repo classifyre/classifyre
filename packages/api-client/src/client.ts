@@ -39,6 +39,20 @@ export { GraphApi } from "./generated/src/apis/GraphApi";
 export { HypothesesApi } from "./generated/src/apis/HypothesesApi";
 export { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 export { AutopilotApi } from "./generated/src/apis/AutopilotApi";
+export type {
+  AgentRunDto,
+  AgentRunDetailDto,
+  AgentRunListResponseDto,
+  AgentDecisionDto,
+  AgentLogDto,
+  AgentLogListResponseDto,
+  AgentMemoryDto,
+  AgentMemoryListResponseDto,
+  CreateAgentMemoryDto,
+  UpdateAgentMemoryDto,
+  TriggerAutopilotDto,
+  TriggerAutopilotResponseDto,
+} from "./generated/src/models";
 
 // Investigation (cases / inquiries / graph / hypotheses) model types
 export type {

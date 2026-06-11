@@ -115,7 +115,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       // matching lands first; singletonKey debounces rapid rescans.
       await boss.send(
         AUTOPILOT_QUEUE,
-        { sourceId, runnerId },
+        { sourceId, runnerId, cycleKey: `scan:${sourceId}:${runnerId}` },
         {
           singletonKey: `autopilot:${sourceId}`,
           startAfter: AUTOPILOT_START_AFTER_SECONDS,

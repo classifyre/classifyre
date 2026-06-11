@@ -12,6 +12,7 @@ import { GraphService } from '../graph.service';
 import { AgentMemoryService } from './memory/agent-memory.service';
 import { AgentSearchService } from './search/agent-search.service';
 import { AgentAuditService } from './audit/agent-audit.service';
+import { AgentLoggerService } from './audit/agent-logger.service';
 import { DecisionApplierService } from './decision-applier.service';
 import { InquiryAgentService } from './inquiry-agent.service';
 import { CaseAgentService } from './case-agent.service';
@@ -41,6 +42,7 @@ import { AutopilotController } from './autopilot.controller';
     AgentMemoryService,
     AgentSearchService,
     AgentAuditService,
+    AgentLoggerService,
     DecisionApplierService,
     InquiryAgentService,
     CaseAgentService,

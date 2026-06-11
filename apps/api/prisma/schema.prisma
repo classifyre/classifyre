@@ -1038,6 +1038,11 @@ model AgentRun {
   sourceId    String?        @map("source_id")
   runnerId    String?        @map("runner_id")
   trigger     String         @default("scan_completed")
+  // Operator instruction for manually triggered cycles ("steer" runs).
+  instruction String?        @db.Text
+  // Stable identity of the cycle that produced this run — used to resume the
+  // right run on pg-boss redelivery (scan: source:runner, manual: uuid).
+  cycleKey    String?        @map("cycle_key")
   currentStep String?        @map("current_step")
   stepState   Json?          @db.JsonB @map("step_state")
   attempts    Int            @default(0)
@@ -1048,10 +1053,45 @@ model AgentRun {
   createdAt   DateTime       @default(now()) @map("created_at")
 
   decisions AgentDecision[]
+  logs      AgentLog[]
 
   @@index([agentKind, createdAt(sort: Desc)])
   @@index([status])
+  @@index([cycleKey])
   @@map("agent_runs")
+}
+
+enum AgentLogChannel {
+  // Internal mechanics: step transitions, prompts/raw model output, retries.
+  TECHNICAL
+  // Human-readable narrative of what the agent observed and did.
+  BUSINESS
+}
+
+enum AgentLogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+// Append-only execution log of a run. BUSINESS entries tell the analyst the
+// story; TECHNICAL entries carry raw model I/O and step mechanics (including
+// the raw responses behind schema failures).
+model AgentLog {
+  id        String          @id @default(uuid())
+  runId     String          @map("run_id")
+  channel   AgentLogChannel
+  level     AgentLogLevel   @default(INFO)
+  message   String          @db.Text
+  payload   Json?           @db.JsonB
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, createdAt])
+  @@index([runId, channel])
+  @@map("agent_logs")
 }
 
 // A single agent decision — including the decision to do nothing. Rationale is

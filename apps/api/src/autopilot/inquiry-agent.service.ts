@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AgentKind, AgentMemoryKind } from '@prisma/client';
 import { AiClientService } from '../ai';
 import { AgentAuditService } from './audit/agent-audit.service';
+import { AgentLoggerService } from './audit/agent-logger.service';
 import { AgentMemoryService } from './memory/agent-memory.service';
 import { AgentSearchService } from './search/agent-search.service';
 import {
@@ -41,6 +42,7 @@ export class InquiryAgentService {
     private readonly memory: AgentMemoryService,
     private readonly applier: DecisionApplierService,
     private readonly audit: AgentAuditService,
+    private readonly log: AgentLoggerService,
   ) {}
 
   async execute(ctx: AgentContext): Promise<ApplySummary> {
@@ -54,15 +56,24 @@ export class InquiryAgentService {
         { name: 'persist-memory', execute: (c) => this.persistMemory(c) },
       ],
       this.audit,
+      this.log,
     );
     return stepOutput<ApplySummary>(ctx, 'apply');
   }
 
   private async gatherContext(ctx: AgentContext): Promise<GatheredContext> {
+    // Manual "steer" cycles review all open findings in scope, not the delta.
     const [findingGroups, inquiries] = await Promise.all([
-      this.search.summarizeNewFindings(ctx.sourceId, ctx.runnerId),
+      this.search.summarizeNewFindings(
+        ctx.sourceId,
+        ctx.manual ? null : ctx.runnerId,
+      ),
       this.search.listActiveInquiries(),
     ]);
+    await this.log.business(
+      ctx.run.id,
+      `Observed ${findingGroups.reduce((n, g) => n + g.count, 0)} open finding(s) in ${findingGroups.length} group(s) across ${ctx.sourceName}; ${inquiries.length} active inquiries to compare against.`,
+    );
     return { findingGroups, inquiries };
   }
 
@@ -98,6 +109,10 @@ export class InquiryAgentService {
 
     // Cheap path: no new findings → documented no-op without an LLM call.
     if (findingGroups.length === 0) {
+      await this.log.business(
+        ctx.run.id,
+        'No open findings in scope — skipping the model call.',
+      );
       return {
         decisions: [
           {
@@ -109,28 +124,48 @@ export class InquiryAgentService {
       };
     }
 
-    const { content } = await this.ai.completeJson<InquiryDecisionOutput>(
-      [
-        {
-          role: 'system',
-          content: buildInquirySystemPrompt({
-            desired: ctx.settings.autopilotInquiryDesired,
-            searchable: ctx.settings.autopilotInquirySearchable,
-          }),
-        },
-        {
-          role: 'user',
-          content: buildInquiryUserPrompt({
-            sourceName: ctx.sourceName,
-            sourceId: ctx.sourceId,
-            findingGroups,
-            inquiries,
-            memories,
-          }),
-        },
-      ],
-      inquiryDecisionSchema,
-      { temperature: 0.2 },
+    const systemPrompt = buildInquirySystemPrompt({
+      desired: ctx.settings.autopilotInquiryDesired,
+      searchable: ctx.settings.autopilotInquirySearchable,
+    });
+    const userPrompt = buildInquiryUserPrompt({
+      sourceName: ctx.sourceName,
+      sourceId: ctx.sourceId,
+      manual: ctx.manual,
+      instruction: ctx.instruction,
+      findingGroups,
+      inquiries,
+      memories,
+    });
+    await this.log.technical(
+      ctx.run.id,
+      'Requesting inquiry decisions from the model.',
+      {
+        systemPromptChars: systemPrompt.length,
+        userPromptChars: userPrompt.length,
+        memoriesRecalled: memories.length,
+      },
+    );
+
+    const { content, model, raw } =
+      await this.ai.completeJson<InquiryDecisionOutput>(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        inquiryDecisionSchema,
+        { temperature: 0.2 },
+      );
+    await this.log.technical(
+      ctx.run.id,
+      `Model ${model} returned a valid decision payload.`,
+      {
+        raw,
+      },
+    );
+    await this.log.business(
+      ctx.run.id,
+      `Model proposed ${content.decisions.length} inquiry decision(s): ${content.decisions.map((d) => d.action).join(', ')}.`,
     );
     this.logger.log(
       `Run ${ctx.run.id}: model returned ${content.decisions.length} inquiry decision(s)`,
@@ -158,6 +193,12 @@ export class InquiryAgentService {
         inquiry.title,
       );
       written++;
+    }
+    if (written > 0) {
+      await this.log.business(
+        ctx.run.id,
+        `Learned ${written} memory entr${written === 1 ? 'y' : 'ies'} for future cycles.`,
+      );
     }
     return { written };
   }

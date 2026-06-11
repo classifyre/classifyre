@@ -6895,6 +6895,38 @@
         ]
       }
     },
+    "/autopilot/trigger": {
+      "post": {
+        "operationId": "AutopilotController_trigger",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriggerAutopilotDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerAutopilotResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Manually trigger an autopilot cycle over existing data, with an optional steering instruction",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
     "/autopilot/runs": {
       "get": {
         "operationId": "AutopilotController_listRuns",
@@ -6989,6 +7021,206 @@
           }
         },
         "summary": "Get one autopilot run with all decisions and rationales",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/runs/{id}/logs": {
+      "get": {
+        "operationId": "AutopilotController_listLogs",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "description": "BUSINESS = analyst narrative, TECHNICAL = mechanics/raw model I/O",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TECHNICAL",
+                "BUSINESS"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentLogListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output)",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/memory": {
+      "get": {
+        "operationId": "AutopilotController_listMemory",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "GLOSSARY",
+                "DECISION_PRECEDENT",
+                "TOPIC_INQUIRY_MAP"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Substring search over key and content",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentMemoryListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the agent memory (glossary, precedents, topic map)",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "post": {
+        "operationId": "AutopilotController_createMemory",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentMemoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentMemoryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add (or overwrite) a memory entry to steer the agent",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/memory/{id}": {
+      "patch": {
+        "operationId": "AutopilotController_updateMemory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentMemoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentMemoryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Edit a memory entry (content, tags, weight)",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "delete": {
+        "operationId": "AutopilotController_deleteMemory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a memory entry the agent learned",
         "tags": [
           "autopilot"
         ]
@@ -14351,6 +14583,35 @@
           "detectors"
         ]
       },
+      "TriggerAutopilotDto": {
+        "type": "object",
+        "properties": {
+          "instruction": {
+            "type": "string",
+            "description": "What the agents should pay attention to in this cycle (highest-priority prompt section)."
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "Limit the review to one source. Omit to review all sources."
+          }
+        }
+      },
+      "TriggerAutopilotResponseDto": {
+        "type": "object",
+        "properties": {
+          "cycleKey": {
+            "type": "string",
+            "description": "Cycle identity — runs will carry this cycleKey"
+          },
+          "enqueued": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cycleKey",
+          "enqueued"
+        ]
+      },
       "AgentRunDto": {
         "type": "object",
         "properties": {
@@ -14383,7 +14644,13 @@
             "nullable": true
           },
           "trigger": {
-            "type": "string"
+            "type": "string",
+            "description": "\"scan_completed\" or \"manual\""
+          },
+          "instruction": {
+            "type": "string",
+            "description": "Operator instruction for manual cycles",
+            "nullable": true
           },
           "attempts": {
             "type": "number"
@@ -14548,7 +14815,13 @@
             "nullable": true
           },
           "trigger": {
-            "type": "string"
+            "type": "string",
+            "description": "\"scan_completed\" or \"manual\""
+          },
+          "instruction": {
+            "type": "string",
+            "description": "Operator instruction for manual cycles",
+            "nullable": true
           },
           "attempts": {
             "type": "number"
@@ -14595,6 +14868,196 @@
           "createdAt",
           "decisions"
         ]
+      },
+      "AgentLogDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "TECHNICAL",
+              "BUSINESS"
+            ]
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "DEBUG",
+              "INFO",
+              "WARN",
+              "ERROR"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "description": "Structured detail — raw model output, prompt sizes, errors",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "level",
+          "message",
+          "createdAt"
+        ]
+      },
+      "AgentLogListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentLogDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "AgentMemoryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "GLOSSARY",
+              "DECISION_PRECEDENT",
+              "TOPIC_INQUIRY_MAP"
+            ]
+          },
+          "key": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "refType": {
+            "type": "string",
+            "nullable": true
+          },
+          "refId": {
+            "type": "string",
+            "nullable": true
+          },
+          "weight": {
+            "type": "number",
+            "description": "Reinforcement counter — higher = recalled first"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "key",
+          "content",
+          "tags",
+          "weight",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AgentMemoryListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentMemoryDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ]
+      },
+      "CreateAgentMemoryDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "GLOSSARY",
+              "DECISION_PRECEDENT",
+              "TOPIC_INQUIRY_MAP"
+            ]
+          },
+          "key": {
+            "type": "string",
+            "description": "Normalized lookup key (topic slug, term)"
+          },
+          "content": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "content"
+        ]
+      },
+      "UpdateAgentMemoryDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "weight": {
+            "type": "number",
+            "description": "Set the reinforcement weight directly"
+          }
+        }
       }
     }
   }

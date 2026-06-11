@@ -21,6 +21,8 @@ import {
   type SearchAssetsChartsResponseDto,
 } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
+import { Bot } from "lucide-react";
+import { RunAutopilotDialog } from "@/components/autopilot/run-autopilot-dialog";
 import {
   Card,
   CardContent,
@@ -105,6 +107,7 @@ export default function SourceViewPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isStartingScan, setIsStartingScan] = useState(false);
+  const [autopilotOpen, setAutopilotOpen] = useState(false);
 
   // Findings tab bulk update
   const [findingsSelection, setFindingsSelection] = useState<FindingSelection | null>(null);
@@ -419,6 +422,15 @@ export default function SourceViewPage() {
             </Button>
             <DeleteSourceAction sourceId={sourceId} />
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAutopilotOpen(true)}
+              title="Have the AI autopilot review this source's findings with your instruction"
+            >
+              <Bot className="h-4 w-4 text-[#d97706]" />
+              AI autopilot
+            </Button>
+            <Button
               size="sm"
               onClick={handleStartScan}
               disabled={isStartingScan || isRunning}
@@ -436,6 +448,13 @@ export default function SourceViewPage() {
           )}
         </div>
       </div>
+
+      <RunAutopilotDialog
+        open={autopilotOpen}
+        onOpenChange={setAutopilotOpen}
+        defaultSourceId={sourceId}
+        onTriggered={() => router.push("/investigations?tab=autopilot")}
+      />
 
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">
