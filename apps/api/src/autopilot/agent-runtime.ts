@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { AgentAuditService } from './audit/agent-audit.service';
+import type { AgentLoggerService } from './audit/agent-logger.service';
 import type { AgentContext, AgentStep } from './autopilot.types';
 
 const logger = new Logger('AgentRuntime');
@@ -15,6 +16,7 @@ export async function runPipeline(
   ctx: AgentContext,
   steps: AgentStep[],
   audit: AgentAuditService,
+  log?: AgentLoggerService,
 ): Promise<void> {
   // Seed state from a previous attempt of this run, if any.
   const persisted = (ctx.run.stepState ?? {}) as Record<string, unknown>;
@@ -25,12 +27,31 @@ export async function runPipeline(
       logger.debug(
         `Run ${ctx.run.id}: step ${step.name} already done, skipping`,
       );
+      await log?.technical(
+        ctx.run.id,
+        `Step "${step.name}" already completed in a previous attempt — reusing stored output.`,
+      );
       continue;
     }
     logger.log(`Run ${ctx.run.id}: executing step ${step.name}`);
-    const output = await step.execute(ctx);
-    ctx.state[step.name] = output ?? null;
-    await audit.saveStep(ctx.run.id, step.name, ctx.state);
+    const startedAt = Date.now();
+    try {
+      const output = await step.execute(ctx);
+      ctx.state[step.name] = output ?? null;
+      await audit.saveStep(ctx.run.id, step.name, ctx.state);
+      await log?.technical(
+        ctx.run.id,
+        `Step "${step.name}" completed in ${Date.now() - startedAt}ms.`,
+      );
+    } catch (error) {
+      await log?.technical(
+        ctx.run.id,
+        `Step "${step.name}" failed after ${Date.now() - startedAt}ms: ${error instanceof Error ? error.message : String(error)}`,
+        undefined,
+        'ERROR',
+      );
+      throw error;
+    }
   }
 }
 

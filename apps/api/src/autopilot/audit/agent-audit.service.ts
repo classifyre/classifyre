@@ -8,6 +8,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
+import { AgentLoggerService } from './agent-logger.service';
 import { AUTOPILOT_MAX_ATTEMPTS } from '../autopilot.constants';
 
 export interface RecordDecisionInput {
@@ -28,22 +29,31 @@ export interface RecordDecisionInput {
  */
 @Injectable()
 export class AgentAuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly log: AgentLoggerService,
+  ) {}
 
   /**
-   * Find a resumable run for this trigger (RUNNING/FAILED with attempts left —
-   * e.g. after a crash or provider failure) or create a fresh one.
+   * Find a resumable run for this cycle (RUNNING/FAILED with attempts left —
+   * e.g. after a crash or provider failure) or create a fresh one. The cycle
+   * is identified by cycleKey so distinct manual triggers never resume each
+   * other's runs.
    */
   async openRun(
     agentKind: AgentKind,
-    sourceId: string,
-    runnerId: string | null,
+    cycle: {
+      sourceId: string | null;
+      runnerId: string | null;
+      cycleKey: string;
+      trigger: string;
+      instruction?: string | null;
+    },
   ): Promise<AgentRun> {
     const existing = await this.prisma.agentRun.findFirst({
       where: {
         agentKind,
-        sourceId,
-        runnerId,
+        cycleKey: cycle.cycleKey,
         status: {
           in: [
             AgentRunStatus.PENDING,
@@ -69,8 +79,11 @@ export class AgentAuditService {
     return this.prisma.agentRun.create({
       data: {
         agentKind,
-        sourceId,
-        runnerId,
+        sourceId: cycle.sourceId,
+        runnerId: cycle.runnerId,
+        cycleKey: cycle.cycleKey,
+        trigger: cycle.trigger,
+        instruction: cycle.instruction ?? null,
         status: AgentRunStatus.RUNNING,
         attempts: 1,
         startedAt: new Date(),
@@ -167,6 +180,16 @@ export class AgentAuditService {
         },
       },
     });
+    // Mirror every decision into the business log so the narrative is complete.
+    const target = input.entityType
+      ? ` on ${input.entityType}${input.entityId ? ` ${input.entityId}` : ''}`
+      : '';
+    await this.log.business(
+      runId,
+      `[${input.outcome}] ${input.action}${target} — ${input.rationale}`,
+      input.payload,
+      input.outcome === 'FAILED' ? 'WARN' : 'INFO',
+    );
     return true;
   }
 

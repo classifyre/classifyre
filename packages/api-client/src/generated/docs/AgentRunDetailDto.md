@@ -12,6 +12,7 @@ Name | Type
 `sourceId` | string
 `runnerId` | string
 `trigger` | string
+`instruction` | string
 `attempts` | number
 `error` | string
 `summary` | string
@@ -34,6 +35,7 @@ const example = {
   "sourceId": null,
   "runnerId": null,
   "trigger": null,
+  "instruction": null,
   "attempts": null,
   "error": null,
   "summary": null,

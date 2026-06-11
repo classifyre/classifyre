@@ -46,22 +46,30 @@ Rules:
 
 export function buildInquiryUserPrompt(input: {
   sourceName: string;
-  sourceId: string;
+  sourceId: string | null;
+  manual: boolean;
+  instruction: string | null;
   findingGroups: FindingGroupSummary[];
   inquiries: InquirySummary[];
   memories: RecalledMemory[];
 }): string {
   return [
-    `## Scan that just finished`,
-    `Source: ${input.sourceName} (id: ${input.sourceId})`,
-    `## New findings from this scan (grouped; ${input.findingGroups.length} group(s))`,
+    input.manual
+      ? `## Manual review requested by the operator\nScope: ${input.sourceName}. Review ALL existing open findings below — this is not a scan delta.`
+      : `## Scan that just finished\nSource: ${input.sourceName}${input.sourceId ? ` (id: ${input.sourceId})` : ''}`,
+    input.instruction
+      ? `## Operator instruction for THIS cycle (highest priority — follow it)\n${input.instruction}`
+      : '',
+    `## ${input.manual ? 'Open findings in scope' : 'New findings from this scan'} (grouped; ${input.findingGroups.length} group(s))`,
     json(input.findingGroups.map(compactGroup)),
     `## Existing ACTIVE inquiries (${input.inquiries.length})`,
     json(input.inquiries.map(compactInquiry)),
     `## Your memories (glossary, precedents, topic→inquiry map)`,
     json(input.memories),
     `Respond with the decision JSON.`,
-  ].join('\n\n');
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 export function buildCaseSystemPrompt(guidance: string | null): string {
@@ -85,6 +93,8 @@ Rules:
 
 export function buildCaseUserPrompt(input: {
   sourceName: string;
+  manual: boolean;
+  instruction: string | null;
   candidateInquiries: Array<
     InquirySummary & {
       caseReadySignal: boolean;
@@ -101,9 +111,13 @@ export function buildCaseUserPrompt(input: {
   memories: RecalledMemory[];
 }): string {
   return [
-    `## Scan that just finished`,
-    `Source: ${input.sourceName}`,
-    `## Candidate inquiries (new matches and/or flagged case-ready)`,
+    input.manual
+      ? `## Manual review requested by the operator\nScope: ${input.sourceName}. Candidate inquiries include ALL with current matches — this is not a scan delta.`
+      : `## Scan that just finished\nSource: ${input.sourceName}`,
+    input.instruction
+      ? `## Operator instruction for THIS cycle (highest priority — follow it)\n${input.instruction}`
+      : '',
+    `## Candidate inquiries (matches and/or flagged case-ready)`,
     json(
       input.candidateInquiries.map((q) => ({
         ...compactInquiry(q),
@@ -116,7 +130,9 @@ export function buildCaseUserPrompt(input: {
     `## Your memories`,
     json(input.memories),
     `Respond with the decision JSON.`,
-  ].join('\n\n');
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 function compactGroup(g: FindingGroupSummary): Record<string, unknown> {

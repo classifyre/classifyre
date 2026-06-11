@@ -72,8 +72,14 @@ All URIs are relative to *http://localhost*
 *AssetsApi* | [**sourceAssetsControllerListSourceAssets**](docs/AssetsApi.md#sourceassetscontrollerlistsourceassets) | **GET** /sources/{sourceId}/assets | List assets for a source
 *AssistantApi* | [**assistantControllerParseUpload**](docs/AssistantApi.md#assistantcontrollerparseupload) | **POST** /assistant/parse-upload | Parse assistant chat upload
 *AssistantApi* | [**assistantControllerRespond**](docs/AssistantApi.md#assistantcontrollerrespondoperation) | **POST** /assistant/respond | Respond to a contextual assistant turn
+*AutopilotApi* | [**autopilotControllerCreateMemory**](docs/AutopilotApi.md#autopilotcontrollercreatememory) | **POST** /autopilot/memory | Add (or overwrite) a memory entry to steer the agent
+*AutopilotApi* | [**autopilotControllerDeleteMemory**](docs/AutopilotApi.md#autopilotcontrollerdeletememory) | **DELETE** /autopilot/memory/{id} | Delete a memory entry the agent learned
 *AutopilotApi* | [**autopilotControllerGetRun**](docs/AutopilotApi.md#autopilotcontrollergetrun) | **GET** /autopilot/runs/{id} | Get one autopilot run with all decisions and rationales
+*AutopilotApi* | [**autopilotControllerListLogs**](docs/AutopilotApi.md#autopilotcontrollerlistlogs) | **GET** /autopilot/runs/{id}/logs | Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output)
+*AutopilotApi* | [**autopilotControllerListMemory**](docs/AutopilotApi.md#autopilotcontrollerlistmemory) | **GET** /autopilot/memory | List the agent memory (glossary, precedents, topic map)
 *AutopilotApi* | [**autopilotControllerListRuns**](docs/AutopilotApi.md#autopilotcontrollerlistruns) | **GET** /autopilot/runs | List autopilot agent runs (newest first)
+*AutopilotApi* | [**autopilotControllerTrigger**](docs/AutopilotApi.md#autopilotcontrollertrigger) | **POST** /autopilot/trigger | Manually trigger an autopilot cycle over existing data, with an optional steering instruction
+*AutopilotApi* | [**autopilotControllerUpdateMemory**](docs/AutopilotApi.md#autopilotcontrollerupdatememory) | **PATCH** /autopilot/memory/{id} | Edit a memory entry (content, tags, weight)
 *CasesApi* | [**caseTimelineControllerGetTimeline**](docs/CasesApi.md#casetimelinecontrollergettimeline) | **GET** /cases/{caseId}/timeline | Paginated unified case activity feed (newest first)
 *CasesApi* | [**casesControllerAddEvidence**](docs/CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence
 *CasesApi* | [**casesControllerAddFinding**](docs/CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of evidence
@@ -211,6 +217,10 @@ All URIs are relative to *http://localhost*
 - [AddFindingDto](docs/AddFindingDto.md)
 - [AddThreadEntryDto](docs/AddThreadEntryDto.md)
 - [AgentDecisionDto](docs/AgentDecisionDto.md)
+- [AgentLogDto](docs/AgentLogDto.md)
+- [AgentLogListResponseDto](docs/AgentLogListResponseDto.md)
+- [AgentMemoryDto](docs/AgentMemoryDto.md)
+- [AgentMemoryListResponseDto](docs/AgentMemoryListResponseDto.md)
 - [AgentRunDetailDto](docs/AgentRunDetailDto.md)
 - [AgentRunDto](docs/AgentRunDto.md)
 - [AgentRunListResponseDto](docs/AgentRunListResponseDto.md)
@@ -248,6 +258,7 @@ All URIs are relative to *http://localhost*
 - [CliRunnerControllerUpdateRunnerStatusRequest](docs/CliRunnerControllerUpdateRunnerStatusRequest.md)
 - [CloseCaseDto](docs/CloseCaseDto.md)
 - [CloseCaseResponseDto](docs/CloseCaseResponseDto.md)
+- [CreateAgentMemoryDto](docs/CreateAgentMemoryDto.md)
 - [CreateAiProviderConfigDto](docs/CreateAiProviderConfigDto.md)
 - [CreateCaseDto](docs/CreateCaseDto.md)
 - [CreateCustomDetectorDto](docs/CreateCustomDetectorDto.md)
@@ -400,6 +411,9 @@ All URIs are relative to *http://localhost*
 - [TrainingExampleItemDto](docs/TrainingExampleItemDto.md)
 - [TrainingExamplesStatsDto](docs/TrainingExamplesStatsDto.md)
 - [TrainingExamplesStatsDtoByLabelValue](docs/TrainingExamplesStatsDtoByLabelValue.md)
+- [TriggerAutopilotDto](docs/TriggerAutopilotDto.md)
+- [TriggerAutopilotResponseDto](docs/TriggerAutopilotResponseDto.md)
+- [UpdateAgentMemoryDto](docs/UpdateAgentMemoryDto.md)
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
 - [UpdateCaseDto](docs/UpdateCaseDto.md)
 - [UpdateCaseFindingNoteDto](docs/UpdateCaseFindingNoteDto.md)

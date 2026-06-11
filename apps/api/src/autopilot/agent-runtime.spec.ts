@@ -14,6 +14,8 @@ function makeCtx(
     sourceId: 's1',
     sourceName: 'Source',
     runnerId: 'r1',
+    manual: false,
+    instruction: null,
     state: {},
   };
 }
