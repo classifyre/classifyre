@@ -141,6 +141,17 @@ export class SearchFindingsFiltersInputDto {
   @Type(() => Date)
   @IsDate()
   lastDetectedBefore?: Date;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Finding UUIDs to exclude from results (e.g. already-attached findings)',
+  })
+  @IsOptional()
+  @Transform(({ value }) => normalizeToStringArray(value))
+  @IsArray()
+  @ArrayMaxSize(1000)
+  @IsString({ each: true })
+  excludeIds?: string[];
 }
 
 export class SearchFindingsPageDto {

@@ -102,6 +102,8 @@ class EmailSource(BaseSource):
         self._email_locator_by_hash: dict[str, tuple[str, str]] = {}
         self._hash_by_url: dict[str, str] = {}
         self._attachment_name_by_hash = {}
+        # Phase 1: tracks (email_hash → [attachment_hash, ...]) for relationship emission.
+        self._email_attachment_links: dict[str, list[str]] = {}
 
         self._mailbox: Any = None
 
@@ -303,6 +305,9 @@ class EmailSource(BaseSource):
             runner_id=self.runner_id,
             **self.metadata_fields("email", metadata),
         )
+        # Track for Phase 1 relationship emission.
+        if attachment_hashes:
+            self._email_attachment_links[email_hash] = attachment_hashes
         return [email_asset, *attachment_assets]
 
     def _attachment_to_asset(
@@ -515,6 +520,24 @@ class EmailSource(BaseSource):
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
+    async def collect_relationships(self) -> list[Any]:
+        """Emit ATTACHED_TO edges: email → attachment for each extracted message."""
+        from ...outputs.rest import IngestEdge
+
+        edges: list[IngestEdge] = []
+        for email_hash, attachment_hashes in self._email_attachment_links.items():
+            for att_hash in attachment_hashes:
+                edges.append(
+                    IngestEdge(
+                        from_type="asset",
+                        from_hash=email_hash,
+                        to_type="asset",
+                        to_hash=att_hash,
+                        relation_type="ATTACHED_TO",
+                    )
+                )
+        return edges
+
     def abort(self) -> None:
         logger.info("Aborting email extraction...")
         super().abort()

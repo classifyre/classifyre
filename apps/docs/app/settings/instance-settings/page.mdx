@@ -1,0 +1,69 @@
+---
+sidebarTitle: Instance Settings
+title: Instance Settings
+description: Language, timezone, and time format configuration — auto-detection and fixed overrides.
+---
+
+# Instance Settings
+
+Locale settings control how the UI displays dates, times, and language
+content. Each setting supports automatic detection from the user's browser
+or a fixed instance-wide default.
+
+---
+
+## Language
+
+Controls the UI language for all users of this instance.
+
+| Value | Behaviour |
+|---|---|
+| `Automatic` | Detected from the user's browser preferences. Currently supports English and German. Any unrecognised browser language defaults to English. |
+| `English` | Forces English regardless of browser preference. |
+| `German` | Forces German regardless of browser preference. |
+
+### Per-user override
+
+A user can override the instance language for their session without affecting
+other users. The UI header includes a language switcher with the same three
+options. The session override takes precedence over the instance default and
+persists for one year.
+
+Resolution order:
+
+```
+User override → Instance default → Browser preference → English
+```
+
+---
+
+## Timezone
+
+Controls how dates and times are displayed. The instance default can be a
+specific timezone or `Automatic` for browser-based detection.
+
+| Value | Behaviour |
+|---|---|
+| `Automatic` | Detected from the user's browser. Falls back to UTC. |
+| IANA timezone | Fixed timezone applied to all date/time displays. |
+
+Common timezones available in the selector:
+
+`UTC`, `Europe/London`, `Europe/Vienna`, `Europe/Berlin`, `Europe/Kyiv`,
+`America/New_York`, `America/Chicago`, `America/Denver`,
+`America/Los_Angeles`, `Asia/Dubai`, `Asia/Singapore`, `Asia/Tokyo`,
+`Australia/Sydney`
+
+Each timezone is shown with its current UTC offset (e.g. `Europe/Berlin (UTC+02:00)`).
+
+---
+
+## Time format
+
+Controls whether times are displayed in 12-hour or 24-hour format.
+
+| Value | Behaviour | Example |
+|---|---|---|
+| `Automatic` | Detected from the user's browser preferences. Typically 12-hour for US browsers, 24-hour for most others. | depends on browser |
+| `12-hour` | Fixed 12-hour display. | `08:45 PM` |
+| `24-hour` | Fixed 24-hour display. | `20:45` |

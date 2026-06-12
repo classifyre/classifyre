@@ -1,0 +1,168 @@
+---
+sidebarTitle: Upgrade & Versioning
+title: Upgrade & Versioning
+description: Version consistency, upgrade paths, and migration behaviour.
+---
+
+# Upgrade & Versioning
+
+---
+
+## Versioning
+
+Every artifact in a Classifyre release shares the **same version number**.
+
+All components — including the API, web frontend, CLI, Docker images
+(all-in-one and individual), and the Helm chart — are versioned together
+as a single unit. A release ships with a consistent set of images, charts,
+and packages, each carrying the same semver tag.
+
+This means individual components may carry a version number even when
+nothing changed in that specific package from the previous release. The
+consistency guarantees **integrity**: you can be confident that the API
+image tag `0.4.15` pairs correctly with the web image `0.4.15` and the
+Helm chart `0.4.15`.
+
+Version numbers follow semantic versioning (`major.minor.patch`), with
+pre-release versions carrying a `-SNAPSHOT` suffix (e.g. `0.4.15-SNAPSHOT`).
+
+---
+
+## Upgrade paths
+
+Upgrades are **forward-only** across the version range.
+
+You can upgrade from any current version to any higher version — including
+skipping intermediate releases. For example, upgrading directly from
+`1.0.0` to `1.5.0` is supported. On startup, the system automatically
+applies any pending database migrations in the correct order, regardless
+of how many versions you skip.
+
+**Downgrades are not supported.** There is no guarantee that a downgrade
+will work correctly. Running an older version against a database that has
+been migrated to a newer schema version may cause data loss or service
+failure.
+
+---
+
+## How upgrades work
+
+When the API starts (whether as a Helm pod, a standalone container, or
+part of the all-in-one image), it automatically checks for and applies
+any pending database migrations before accepting traffic.
+
+### Kubernetes (Helm)
+
+The API deployment includes an **init container** that runs database migrations before the main API container starts. The init
+container:
+
+1. Constructs the database connection string from environment variables
+2. Applies any pending schema migrations
+3. Exits — allowing the API container to start only after the database
+   is up to date
+
+### All-in-one Docker
+
+The all-in-one image uses s6-overlay to manage service startup order:
+PostgreSQL starts first, the API starts second (running migrations during
+its startup sequence), the web frontend starts third, and Caddy starts
+last. The API waits up to 90 seconds for PostgreSQL to be ready, creates
+the database if missing, runs any pending migrations, then starts serving.
+
+
+---
+
+## Upgrade procedure (Helm)
+
+1. Download the new chart package from the release:
+
+   ```bash
+   helm pull classifyre/classifyre-core --version <new-version> --untar
+   ```
+
+   Or, if using the chart from the repository, check out the release tag:
+
+   ```bash
+   git checkout tags/v<new-version>
+   ```
+
+2. Run `helm upgrade` pointing to the new chart:
+
+   ```bash
+   helm upgrade --install classifyre ./classifyre-core \
+     -n classifyre
+   ```
+
+   The chart carries the new version and defaults all image tags to its
+   `appVersion` — no explicit `--set` overrides needed. Use
+   `--set api.image.tag=...` only when pinning immutable tags that differ
+   from the chart version.
+
+4. Watch the rollout until new pods are ready:
+
+   ```bash
+   kubectl -n classifyre get pods -w
+   ```
+
+5. Verify the deployment:
+
+   ```bash
+   curl https://<your-host>/api/ping
+   ```
+
+6. Run a sandbox scan and a real ingestion run to confirm everything works.
+
+### What is preserved across upgrades
+
+- **Encryption keys** — the `CLASSIFYRE_MASKED_CONFIG_KEY` secret is
+  preserved using Helm's `lookup` function. Rotating it is an operational
+  migration, not a side effect of upgrading.
+- **Persistent volume claims** — PVC storage sizes are retained even if
+  the values file changes.
+- **Instance ID** — the telemetry instance identifier is preserved via
+  `helm.sh/resource-policy: keep`.
+
+### Post-upgrade verification
+
+| Check | Command |
+|---|---|
+| Release status | `helm status classifyre -n classifyre` |
+| Pod status | `kubectl -n classifyre get pods` |
+| API health | `curl https://<your-host>/api/ping` |
+| Functionality | Start a sandbox run and a source scan |
+
+---
+
+## Upgrade procedure (All-in-one Docker)
+
+1. Pull the new all-in-one image:
+
+   ```bash
+   docker pull classifyre/classifyre:<new-version>
+   ```
+
+2. Stop the running container and restart with the new image tag. **Always use a
+   volume mount for PostgreSQL data** — without it, all data is lost when the
+   container is replaced.
+
+   ```bash
+   docker run -d \
+     -p 8000:8000 \
+     -p 443:443 \
+     -v classifyre-data:/var/lib/postgresql/data \
+     classifyre/classifyre:<new-version>
+   ```
+
+   On startup, migrations run automatically before the web UI becomes available.
+
+---
+
+## Important considerations
+
+- **Database migrations are applied on every pod start.** This is safe
+  because Prisma migrations are idempotent — they only apply migrations
+  that have not been run yet. No migration is ever applied twice.
+- **Image tags must resolve.** If you upgrade the Helm chart to a version
+  that references an image tag that does not exist in the registry, pods
+  will fail to pull.
+- **Always test upgrades in a non-production environment first.**

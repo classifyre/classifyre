@@ -63,4 +63,51 @@ export class UpdateInstanceSettingsDto {
   @IsString()
   @MaxLength(64)
   aiProviderConfigId?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'When true, the autopilot inquiry agent manages inquiries automatically after scans.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  autopilotInquiryEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Operator guidance for the inquiry agent: what is desired / worth investigating.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  autopilotInquiryDesired?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Operator guidance for the inquiry agent: what is searchable in this instance.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  autopilotInquirySearchable?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'When true, the autopilot case agent manages investigation cases automatically after scans.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  autopilotCaseEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Operator guidance for the case agent.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  autopilotCaseGuidance?: string | null;
 }

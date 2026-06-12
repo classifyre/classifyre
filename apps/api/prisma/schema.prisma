@@ -387,6 +387,15 @@ model InstanceSettings {
   timezone   String           @default("AUTOMATIC")
   timeFormat InstanceTimeFormat @default(AUTOMATIC) @map("time_format")
   aiProviderConfigId String?  @map("ai_provider_config_id")
+
+  // Investigation autopilot — instance-wide defaults. Per-entity aiMode on
+  // Inquiry/Case overrides these when not INHERIT.
+  autopilotInquiryEnabled    Boolean @default(false) @map("autopilot_inquiry_enabled")
+  autopilotInquiryDesired    String? @db.Text @map("autopilot_inquiry_desired")
+  autopilotInquirySearchable String? @db.Text @map("autopilot_inquiry_searchable")
+  autopilotCaseEnabled       Boolean @default(false) @map("autopilot_case_enabled")
+  autopilotCaseGuidance      String? @db.Text @map("autopilot_case_guidance")
+
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
 
@@ -615,3 +624,514 @@ model SandboxRun {
 }
 
 
+// ─── INVESTIGATIONS (CASES / GRAPH) ──────────────────────────────
+
+enum EdgeOrigin {
+  SOURCE_DERIVED
+  INFERRED
+  MANUAL
+}
+
+enum CaseStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+  ARCHIVED
+}
+
+enum HypothesisStatus {
+  PROPOSED
+  SUPPORTED
+  REFUTED
+  INCONCLUSIVE
+}
+
+enum CaseThreadKind {
+  HYPOTHESIS
+  DISCUSSION
+}
+
+enum CaseThreadEntryType {
+  NOTE
+  STATEMENT
+  STATUS_CHANGE
+  CONFIDENCE_CHANGE
+}
+
+enum CaseActivityType {
+  CASE_CREATED
+  CASE_UPDATED
+  CONCLUSION_UPDATED
+  INQUIRY_LINKED
+  INQUIRY_UNLINKED
+  INQUIRY_PULLED
+  EVIDENCE_ADDED
+  EVIDENCE_REMOVED
+  EVIDENCE_NOTE_UPDATED
+  FINDING_ADDED
+  FINDING_REMOVED
+  FINDING_NOTE_UPDATED
+  THREAD_CREATED
+  THREAD_ENTRY_ADDED
+  THREAD_STATEMENT_UPDATED
+  THREAD_STATUS_CHANGED
+  THREAD_CONFIDENCE_CHANGED
+  SUPPORT_LINKED
+  SUPPORT_UNLINKED
+  SUPPORT_UPDATED
+}
+
+enum EvidenceStance {
+  SUPPORTS
+  CONTRADICTS
+  NEUTRAL
+}
+
+// Generic, directed relationship between any two graph entities.
+// `fromType`/`toType` are entity kinds ("asset" | "finding", room for
+// "concept" later) and the ids reference the corresponding rows. The
+// relation type is a free-form string so the inference engine (and a
+// future ingestion path) can introduce new kinds without a migration.
+model Edge {
+  id           String     @id @default(uuid())
+  fromType     String     @map("from_type")
+  fromId       String     @map("from_id")
+  toType       String     @map("to_type")
+  toId         String     @map("to_id")
+  relationType String     @map("relation_type")
+  confidence   Decimal    @default(1.00) @db.Decimal(3, 2)
+  origin       EdgeOrigin @default(INFERRED)
+  metadata     Json?      @db.JsonB
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@unique([fromType, fromId, toType, toId, relationType])
+  @@index([fromType, fromId])
+  @@index([toType, toId])
+  @@index([relationType])
+  @@map("edges")
+}
+
+enum InquiryStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+// The investigation. A case owns hypotheses and the real, persisted evidence. It
+// may link one or more questions (saved queries) that guide which findings are
+// relevant; evidence is pulled from those queries' matches or added manually.
+model Case {
+  id          String     @id @default(uuid())
+  title       String
+  description String?    @db.Text
+  status      CaseStatus @default(OPEN)
+  severity    Severity   @default(MEDIUM)
+  assignee    String?
+  createdBy   String?    @map("created_by")
+  aiMode      AiManagementMode @default(INHERIT) @map("ai_mode")
+  conclusion  String?    @db.Text
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  evidence     CaseEvidence[]
+  findings     CaseFinding[]
+  hypotheses   Hypothesis[]
+  notes        CaseNote[]
+  inquiryLinks CaseInquiry[]
+  threads      CaseThread[]
+  activities   CaseActivity[]
+
+  @@index([status])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("cases")
+}
+
+// A saved query / monitor. It does NOT persist evidence — it only defines matchers
+// and tracks which findings currently match (QuestionMatch) so we can surface new
+// matches. An inquiry is standalone or linked to any number of cases (CaseInquiry).
+//
+// Matchers: a finding matches iff source matches AND (detector OR customDetector
+// matches) AND type matches, where an empty list for a dimension means "any".
+// findingTypeRegex is evaluated in the app (findingType is dynamic for CUSTOM).
+model Inquiry {
+  id          String         @id @default(uuid())
+  title       String
+  description String?        @db.Text
+  status      InquiryStatus @default(ACTIVE)
+  createdBy   String?        @map("created_by")
+  aiMode      AiManagementMode @default(INHERIT) @map("ai_mode")
+
+  matchAllSources    Boolean        @default(false) @map("match_all_sources")
+  sourceIds          String[]       @map("source_ids")
+  detectorTypes      DetectorType[] @map("detector_types")
+  customDetectorKeys String[]       @map("custom_detector_keys")
+  findingTypes       String[]       @map("finding_types")
+  findingTypeRegex   String[]       @map("finding_type_regex")
+  findingValueRegex  String[]       @map("finding_value_regex")
+
+  matchCount    Int       @default(0) @map("match_count")
+  newMatchCount Int       @default(0) @map("new_match_count")
+  matchesSeenAt DateTime? @map("matches_seen_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  caseLinks CaseInquiry[]
+
+  @@index([status])
+  @@map("inquiries")
+}
+
+// Many-to-many link: an inquiry can guide several cases and a case can be
+// driven by several inquiries. Deleting either side removes only the link.
+model CaseInquiry {
+  id        String   @id @default(uuid())
+  caseId    String   @map("case_id")
+  inquiryId String   @map("inquiry_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  case    Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, inquiryId])
+  @@index([inquiryId])
+  @@map("case_inquiries")
+}
+
+// An observed node attached to a CASE. entityType: "asset" | "sandbox". Display
+// fields are denormalized snapshots so the node survives source-row deletion.
+model CaseEvidence {
+  id         String   @id @default(uuid())
+  caseId     String   @map("case_id")
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  label      String?
+  assetType  String?  @map("asset_type")
+  sourceType String?  @map("source_type")
+  note       String?  @db.Text
+  addedBy    String?  @map("added_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  investigation Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  findings      CaseFinding[]
+
+  @@unique([caseId, entityType, entityId])
+  @@index([caseId])
+  @@index([entityType, entityId])
+  @@map("case_evidence")
+}
+
+// Inferred observation anchored to case evidence. No FK to findings; findingId is a
+// plain reference. Denormalized snapshots survive deletion of the finding row.
+model CaseFinding {
+  id             String   @id @default(uuid())
+  caseId         String   @map("case_id")
+  caseEvidenceId String   @map("case_evidence_id")
+  findingId      String   @map("finding_id")
+  label          String
+  severity       String?
+  detectorType         String?  @map("detector_type")
+  customDetectorName   String?  @map("custom_detector_name")
+  matchedContent       String?  @map("matched_content") @db.Text
+  note                 String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  investigation Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseEvidence  CaseEvidence @relation(fields: [caseEvidenceId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, findingId])
+  @@index([caseId])
+  @@index([caseEvidenceId])
+  @@map("case_findings")
+}
+
+model Hypothesis {
+  id         String           @id @default(uuid())
+  caseId     String           @map("case_id")
+  statement  String           @db.Text
+  status     HypothesisStatus @default(PROPOSED)
+  confidence Decimal?         @db.Decimal(3, 2)
+  color      String?          @map("color")
+  createdBy  String?          @map("created_by")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  investigation Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  support       HypothesisSupport[]
+
+  @@index([caseId])
+  @@map("case_hypotheses")
+}
+
+// Polymorphic link between a hypothesis and either a piece of case evidence or a
+// case finding.  targetType: "evidence" → case_evidence.id; "finding" → case_findings.id
+model HypothesisSupport {
+  id           String         @id @default(uuid())
+  hypothesisId String         @map("hypothesis_id")
+  targetType   String         @map("target_type")
+  targetId     String         @map("target_id")
+  stance       EvidenceStance @default(SUPPORTS)
+  weight       Decimal?       @db.Decimal(3, 2)
+  note         String?        @db.Text
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  hypothesis Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+
+  @@unique([hypothesisId, targetType, targetId])
+  @@index([hypothesisId])
+  @@index([targetType, targetId])
+  @@map("hypothesis_support")
+}
+
+model CaseNote {
+  id        String   @id @default(uuid())
+  caseId    String   @map("case_id")
+  body      String   @db.Text
+  author    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  investigation Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("case_notes")
+}
+
+// Thread container: hypothesis thread (replaces Hypothesis) or custom discussion thread.
+model CaseThread {
+  id         String          @id @default(uuid())
+  caseId     String          @map("case_id")
+  kind       CaseThreadKind  @default(HYPOTHESIS)
+  title      String
+  // Hypothesis-only denormalized current state (for graph/quick queries)
+  status     HypothesisStatus? @default(PROPOSED)
+  confidence Decimal?         @db.Decimal(3, 2)
+  color      String?
+  createdBy  String?          @map("created_by")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  investigation Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  entries       CaseThreadEntry[]
+  support       CaseThreadSupport[]
+
+  @@index([caseId])
+  @@index([caseId, kind])
+  @@map("case_threads")
+}
+
+// Append-only evolution log for a thread (notes, statement revisions, status changes).
+model CaseThreadEntry {
+  id        String              @id @default(uuid())
+  threadId  String              @map("thread_id")
+  entryType CaseThreadEntryType @default(NOTE) @map("entry_type")
+  body      String?             @db.Text
+  metadata  Json?               @db.JsonB
+  author    String?
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  thread  CaseThread          @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  support CaseThreadSupport[]
+
+  @@index([threadId, createdAt])
+  @@map("case_thread_entries")
+}
+
+// Polymorphic link between a thread (and optionally an entry) and evidence/finding.
+model CaseThreadSupport {
+  id         String         @id @default(uuid())
+  threadId   String         @map("thread_id")
+  entryId    String?        @map("entry_id")
+  targetType String         @map("target_type")
+  targetId   String         @map("target_id")
+  stance     EvidenceStance @default(SUPPORTS)
+  weight     Decimal?       @db.Decimal(3, 2)
+  note       String?        @db.Text
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  thread CaseThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  entry  CaseThreadEntry? @relation(fields: [entryId], references: [id], onDelete: SetNull)
+
+  @@unique([threadId, targetType, targetId])
+  @@index([threadId])
+  @@index([targetType, targetId])
+  @@map("case_thread_support")
+}
+
+// Append-only case event log — the unified timeline.
+model CaseActivity {
+  id           String          @id @default(uuid())
+  caseId       String          @map("case_id")
+  activityType CaseActivityType @map("activity_type")
+  actor        String?
+  payload      Json?           @db.JsonB
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  investigation Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt(sort: Desc)])
+  @@map("case_activities")
+}
+
+// ── Investigation autopilot ──────────────────────────────────────────────────
+// Autonomous background agents that manage inquiries and cases after scans.
+// Every cycle is an AgentRun; every (non-)action is an AgentDecision with a
+// mandatory rationale; learned domain knowledge lives in AgentMemory.
+
+// Per-entity override of the instance-wide autopilot flags. OBSERVE_ONLY means
+// the agent may read the entity but never mutate it.
+enum AiManagementMode {
+  INHERIT
+  MANAGED
+  OBSERVE_ONLY
+}
+
+enum AgentKind {
+  INQUIRY
+  CASE
+}
+
+enum AgentRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum AgentDecisionAction {
+  CREATE_INQUIRY
+  UPDATE_INQUIRY
+  ENRICH_INQUIRY_MATCHERS
+  SIGNAL_CASE_READY
+  CREATE_CASE
+  UPDATE_CASE
+  ADD_HYPOTHESIS
+  UPDATE_HYPOTHESIS
+  ADD_EVIDENCE
+  ATTACH_FINDINGS
+  ADD_NOTE
+  ADD_THREAD_ENTRY
+  CREATE_EDGE
+  CHANGE_STATUS
+  LINK_INQUIRY
+  NO_ACTION
+}
+
+enum AgentDecisionOutcome {
+  APPLIED
+  SKIPPED_OBSERVE_ONLY
+  FAILED
+}
+
+enum AgentMemoryKind {
+  GLOSSARY
+  DECISION_PRECEDENT
+  TOPIC_INQUIRY_MAP
+}
+
+// One autonomous agent cycle (triggered by a scan completion). currentStep +
+// stepState make the pipeline resumable across pg-boss redeliveries without
+// repeating LLM calls whose validated output is already stored.
+model AgentRun {
+  id          String         @id @default(uuid())
+  agentKind   AgentKind      @map("agent_kind")
+  status      AgentRunStatus @default(PENDING)
+  sourceId    String?        @map("source_id")
+  runnerId    String?        @map("runner_id")
+  trigger     String         @default("scan_completed")
+  // Operator instruction for manually triggered cycles ("steer" runs).
+  instruction String?        @db.Text
+  // Stable identity of the cycle that produced this run — used to resume the
+  // right run on pg-boss redelivery (scan: source:runner, manual: uuid).
+  cycleKey    String?        @map("cycle_key")
+  currentStep String?        @map("current_step")
+  stepState   Json?          @db.JsonB @map("step_state")
+  attempts    Int            @default(0)
+  error       String?        @db.Text
+  summary     String?        @db.Text
+  startedAt   DateTime?      @map("started_at")
+  finishedAt  DateTime?      @map("finished_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  decisions AgentDecision[]
+  logs      AgentLog[]
+
+  @@index([agentKind, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([cycleKey])
+  @@map("agent_runs")
+}
+
+enum AgentLogChannel {
+  // Internal mechanics: step transitions, prompts/raw model output, retries.
+  TECHNICAL
+  // Human-readable narrative of what the agent observed and did.
+  BUSINESS
+}
+
+enum AgentLogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+// Append-only execution log of a run. BUSINESS entries tell the analyst the
+// story; TECHNICAL entries carry raw model I/O and step mechanics (including
+// the raw responses behind schema failures).
+model AgentLog {
+  id        String          @id @default(uuid())
+  runId     String          @map("run_id")
+  channel   AgentLogChannel
+  level     AgentLogLevel   @default(INFO)
+  message   String          @db.Text
+  payload   Json?           @db.JsonB
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, createdAt])
+  @@index([runId, channel])
+  @@map("agent_logs")
+}
+
+// A single agent decision — including the decision to do nothing. Rationale is
+// always required; payload holds the exact mutation input for auditability.
+model AgentDecision {
+  id         String               @id @default(uuid())
+  runId      String               @map("run_id")
+  action     AgentDecisionAction
+  outcome    AgentDecisionOutcome @default(APPLIED)
+  entityType String?              @map("entity_type")
+  entityId   String?              @map("entity_id")
+  rationale  String               @db.Text
+  payload    Json?                @db.JsonB
+  createdAt  DateTime             @default(now()) @map("created_at")
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([entityType, entityId])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("agent_decisions")
+}
+
+// Long-lived agent knowledge: domain glossary, generalized decision precedents
+// and topic→inquiry mappings. Recalled via pg_trgm similarity on key/content
+// (raw SQL indexes in the migration). weight is a reinforcement counter.
+model AgentMemory {
+  id        String          @id @default(uuid())
+  kind      AgentMemoryKind
+  key       String
+  content   String          @db.Text
+  tags      String[]        @default([])
+  refType   String?         @map("ref_type")
+  refId     String?         @map("ref_id")
+  weight    Int             @default(1)
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  @@unique([kind, key])
+  @@index([kind])
+  @@index([tags], type: Gin)
+  @@map("agent_memories")
+}

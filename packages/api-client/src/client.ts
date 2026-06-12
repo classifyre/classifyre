@@ -33,6 +33,102 @@ export { NotificationsApi } from "./generated/src/apis/NotificationsApi";
 export { SandboxApi } from "./generated/src/apis/SandboxApi";
 export { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
 export { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
+export { CasesApi } from "./generated/src/apis/CasesApi";
+export { InquiriesApi } from "./generated/src/apis/InquiriesApi";
+export { GraphApi } from "./generated/src/apis/GraphApi";
+export { HypothesesApi } from "./generated/src/apis/HypothesesApi";
+export { ThreadsApi } from "./generated/src/apis/ThreadsApi";
+export { AutopilotApi } from "./generated/src/apis/AutopilotApi";
+export type {
+  AgentRunDto,
+  AgentRunDetailDto,
+  AgentRunListResponseDto,
+  AgentDecisionDto,
+  AgentLogDto,
+  AgentLogListResponseDto,
+  AgentMemoryDto,
+  AgentMemoryListResponseDto,
+  CreateAgentMemoryDto,
+  UpdateAgentMemoryDto,
+  TriggerAutopilotDto,
+  TriggerAutopilotResponseDto,
+} from "./generated/src/models";
+
+// Investigation (cases / inquiries / graph / hypotheses) model types
+export type {
+  CreateCaseDto,
+  UpdateCaseDto,
+  CaseResponseDto,
+  CaseListResponseDto,
+  CaseEvidenceDto,
+  CaseFindingDto,
+  CaseLinkedInquiryDto,
+  EvidenceEntityDto,
+  AddEvidenceDto,
+  AddFindingDto,
+  UpdateEvidenceNoteDto,
+  UpdateCaseFindingNoteDto,
+  PullFromInquiryDto,
+  PullFromInquiryResponseDto,
+  CreateInquiryDto,
+  UpdateInquiryDto,
+  InquiryResponseDto,
+  InquiryListResponseDto,
+  InquiryMatchDto,
+  InquiryMatchListResponseDto,
+  PreviewInquiryDto,
+  PreviewResponseDto,
+  MatchOptionsResponseDto,
+  CreateHypothesisDto,
+  UpdateHypothesisDto,
+  HypothesisResponseDto,
+  HypothesisSupportLinkDto,
+  LinkSupportDto,
+  CreateThreadDto,
+  UpdateThreadDto,
+  ThreadResponseDto,
+  ThreadEntryDto,
+  ThreadSupportLinkDto,
+  ThreadEntriesResponseDto,
+  AddThreadEntryDto,
+  LinkThreadSupportDto,
+  CaseActivityDto,
+  CaseTimelineResponseDto,
+  ExpandGraphDto,
+  GraphNodeDto,
+  GraphEdgeDto,
+  GraphResponseDto,
+  RebuildEdgesResponseDto,
+  CreateManualEdgeDto,
+  UpdateEdgeDto,
+  EdgeDetailDto,
+  RelationTypesResponseDto,
+  PivotGraphDto,
+  BulkIngestEdgesDto,
+  BulkIngestEdgesResponseDto,
+} from "./generated/src/models";
+export { PivotGraphDtoPivotEnum } from "./generated/src/models";
+export {
+  CaseResponseDtoStatusEnum,
+  CaseResponseDtoSeverityEnum,
+} from "./generated/src/models";
+export {
+  ThreadResponseDtoKindEnum,
+  ThreadResponseDtoStatusEnum,
+  CreateThreadDtoKindEnum,
+  ThreadEntryDtoEntryTypeEnum,
+  AddThreadEntryDtoEntryTypeEnum,
+  LinkThreadSupportDtoTargetTypeEnum,
+  LinkThreadSupportDtoStanceEnum,
+} from "./generated/src/models";
+export {
+  CasesControllerListStatusEnum,
+  CasesControllerListSeverityEnum,
+} from "./generated/src/apis/CasesApi";
+export {
+  InquiriesControllerListStatusEnum,
+  InquiriesControllerListMatchesSeverityEnum,
+} from "./generated/src/apis/InquiriesApi";
 export {
   SandboxControllerListRunsContentTypeEnum,
   SandboxControllerListRunsDetectorTypeEnum,
@@ -738,6 +834,12 @@ import { NotificationsApi } from "./generated/src/apis/NotificationsApi";
 import { SandboxApi } from "./generated/src/apis/SandboxApi";
 import { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
 import { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
+import { CasesApi } from "./generated/src/apis/CasesApi";
+import { InquiriesApi } from "./generated/src/apis/InquiriesApi";
+import { GraphApi } from "./generated/src/apis/GraphApi";
+import { HypothesesApi } from "./generated/src/apis/HypothesesApi";
+import { ThreadsApi } from "./generated/src/apis/ThreadsApi";
+import { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -792,6 +894,12 @@ class ApiClient {
   public sandbox: SandboxApi;
   public instanceSettings: InstanceSettingsApi;
   public aiProviderConfigs: AIProviderConfigsApi;
+  public cases: CasesApi;
+  public inquiries: InquiriesApi;
+  public graph: GraphApi;
+  public hypotheses: HypothesesApi;
+  public threads: ThreadsApi;
+  public autopilot: AutopilotApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -805,6 +913,12 @@ class ApiClient {
     this.sandbox = new SandboxApi(this.config);
     this.instanceSettings = new InstanceSettingsApi(this.config);
     this.aiProviderConfigs = new AIProviderConfigsApi(this.config);
+    this.cases = new CasesApi(this.config);
+    this.inquiries = new InquiriesApi(this.config);
+    this.graph = new GraphApi(this.config);
+    this.hypotheses = new HypothesesApi(this.config);
+    this.threads = new ThreadsApi(this.config);
+    this.autopilot = new AutopilotApi(this.config);
   }
 
   async searchAssets(
