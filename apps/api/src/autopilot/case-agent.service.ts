@@ -16,6 +16,13 @@ import {
 } from './decision-applier.service';
 import { runPipeline, stepOutput } from './agent-runtime';
 import { caseDecisionSchema } from './schemas/case-decision.schema';
+import { repairCaseOutput } from './schemas/repair';
+import {
+  chunkByBudget,
+  mergeDecisionOutputs,
+  promptCharBudget,
+  runChunked,
+} from './context-budget';
 import { buildCaseSystemPrompt, buildCaseUserPrompt } from './prompts';
 import {
   MAX_CASE_CLUSTERS_PER_CYCLE,
@@ -44,6 +51,12 @@ type CandidateInquiry = InquirySummary & {
 interface GatheredCaseContext {
   candidates: CandidateInquiry[];
   openCases: CaseSummary[];
+  closedCases: Array<{
+    id: string;
+    title: string;
+    status: string;
+    conclusion: string | null;
+  }>;
 }
 
 /**
@@ -84,11 +97,13 @@ export class CaseAgentService {
   }
 
   private async gatherContext(ctx: AgentContext): Promise<GatheredCaseContext> {
-    const [inquiries, openCases, caseReadyIds] = await Promise.all([
-      this.search.listActiveInquiries(),
-      this.search.listOpenCases(),
-      this.caseReadySignals(ctx),
-    ]);
+    const [inquiries, openCases, closedCases, caseReadyIds] =
+      await Promise.all([
+        this.search.listActiveInquiries(),
+        this.search.listOpenCases(),
+        this.search.listRecentlyClosedCases(),
+        this.caseReadySignals(ctx),
+      ]);
 
     const candidates: CandidateInquiry[] = [];
     for (const q of inquiries) {
@@ -110,7 +125,7 @@ export class CaseAgentService {
       ctx.run.id,
       `Reviewing ${candidates.length} candidate inquir${candidates.length === 1 ? 'y' : 'ies'} against ${openCases.length} open case(s).`,
     );
-    return { candidates, openCases };
+    return { candidates, openCases, closedCases };
   }
 
   /** SIGNAL_CASE_READY decisions recorded by this cycle's inquiry run. */
@@ -156,10 +171,8 @@ export class CaseAgentService {
   }
 
   private async decide(ctx: AgentContext): Promise<CaseDecisionOutput> {
-    const { candidates, openCases } = stepOutput<GatheredCaseContext>(
-      ctx,
-      'gather-context',
-    );
+    const { candidates, openCases, closedCases } =
+      stepOutput<GatheredCaseContext>(ctx, 'gather-context');
     const memories = stepOutput<RecalledMemory[]>(ctx, 'recall-memory');
 
     if (candidates.length === 0) {
@@ -181,40 +194,67 @@ export class CaseAgentService {
     const systemPrompt = buildCaseSystemPrompt(
       ctx.settings.autopilotCaseGuidance,
     );
-    const userPrompt = buildCaseUserPrompt({
-      sourceName: ctx.sourceName,
-      manual: ctx.manual,
-      instruction: ctx.instruction,
-      candidateInquiries: candidates,
-      openCases,
-      memories,
-    });
-    await this.log.technical(
-      ctx.run.id,
-      'Requesting case decisions from the model.',
-      {
-        systemPrompt,
-        userPrompt,
-        memoriesRecalled: memories.length,
-      },
-    );
+    const buildPrompt = (
+      chunk: CandidateInquiry[],
+      part?: { index: number; total: number },
+    ) =>
+      buildCaseUserPrompt({
+        sourceName: ctx.sourceName,
+        manual: ctx.manual,
+        instruction: ctx.instruction,
+        candidateInquiries: chunk,
+        openCases,
+        closedCases,
+        memories,
+        part,
+      });
 
-    const { content, model, raw } =
-      await this.ai.completeJson<CaseDecisionOutput>(
-        [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        caseDecisionSchema,
-        { temperature: 0.2 },
-      );
-    await this.log.technical(
-      ctx.run.id,
-      `Model ${model} returned a valid decision payload.`,
-      {
-        raw,
-      },
+    // Token budget: split candidate inquiries into context-window-sized
+    // chunks instead of truncating.
+    const budget = promptCharBudget(await this.ai.getContextSize());
+    const fixedChars = systemPrompt.length + buildPrompt([]).length;
+    const chunks = chunkByBudget(
+      candidates,
+      fixedChars,
+      budget,
+      (c) => JSON.stringify(c).length + 40,
     );
+    if (chunks.length > 1) {
+      await this.log.technical(
+        ctx.run.id,
+        `Context exceeds the model window — assessing the ${candidates.length} candidate inquir${candidates.length === 1 ? 'y' : 'ies'} in ${chunks.length} part(s).`,
+        { budgetChars: budget, fixedChars },
+      );
+    }
+
+    const outputs = await runChunked(chunks, async (chunk, index, total) => {
+      const userPrompt = buildPrompt(
+        chunk,
+        total > 1 ? { index, total } : undefined,
+      );
+      await this.log.technical(
+        ctx.run.id,
+        `Requesting case decisions from the model${total > 1 ? ` (part ${index}/${total})` : ''}.`,
+        { systemPrompt, userPrompt, memoriesRecalled: memories.length },
+      );
+      const { content, model, raw } =
+        await this.ai.completeJson<CaseDecisionOutput>(
+          [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          caseDecisionSchema,
+          { temperature: 0.2, repair: repairCaseOutput },
+        );
+      await this.log.technical(
+        ctx.run.id,
+        `Model ${model} returned a valid decision payload${total > 1 ? ` (part ${index}/${total})` : ''}.`,
+        { raw },
+      );
+      return content;
+    });
+
+    const content = mergeDecisionOutputs(outputs) as CaseDecisionOutput;
     await this.log.business(
       ctx.run.id,
       `Model proposed ${content.decisions.length} case decision(s): ${content.decisions.map((d) => d.action).join(', ')}.`,

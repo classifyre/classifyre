@@ -11,6 +11,13 @@ import {
 } from './decision-applier.service';
 import { runPipeline, stepOutput } from './agent-runtime';
 import { inquiryDecisionSchema } from './schemas/inquiry-decision.schema';
+import { repairInquiryOutput } from './schemas/repair';
+import {
+  chunkByBudget,
+  mergeDecisionOutputs,
+  promptCharBudget,
+  runChunked,
+} from './context-budget';
 import { buildInquirySystemPrompt, buildInquiryUserPrompt } from './prompts';
 import { MAX_GLOSSARY_ENTRIES } from './autopilot.constants';
 import type {
@@ -24,6 +31,11 @@ import type {
 interface GatheredContext {
   findingGroups: FindingGroupSummary[];
   inquiries: InquirySummary[];
+  archivedInquiries: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+  }>;
 }
 
 /**
@@ -63,18 +75,19 @@ export class InquiryAgentService {
 
   private async gatherContext(ctx: AgentContext): Promise<GatheredContext> {
     // Manual "steer" cycles review all open findings in scope, not the delta.
-    const [findingGroups, inquiries] = await Promise.all([
+    const [findingGroups, inquiries, archivedInquiries] = await Promise.all([
       this.search.summarizeNewFindings(
         ctx.sourceId,
         ctx.manual ? null : ctx.runnerId,
       ),
       this.search.listActiveInquiries(),
+      this.search.listRecentlyArchivedInquiries(),
     ]);
     await this.log.business(
       ctx.run.id,
       `Observed ${findingGroups.reduce((n, g) => n + g.count, 0)} open finding(s) in ${findingGroups.length} group(s) across ${ctx.sourceName}; ${inquiries.length} active inquiries to compare against.`,
     );
-    return { findingGroups, inquiries };
+    return { findingGroups, inquiries, archivedInquiries };
   }
 
   private async recallMemory(ctx: AgentContext): Promise<RecalledMemory[]> {
@@ -101,10 +114,8 @@ export class InquiryAgentService {
   }
 
   private async decide(ctx: AgentContext): Promise<InquiryDecisionOutput> {
-    const { findingGroups, inquiries } = stepOutput<GatheredContext>(
-      ctx,
-      'gather-context',
-    );
+    const { findingGroups, inquiries, archivedInquiries } =
+      stepOutput<GatheredContext>(ctx, 'gather-context');
     const memories = stepOutput<RecalledMemory[]>(ctx, 'recall-memory');
 
     // Cheap path: no new findings → documented no-op without an LLM call.
@@ -128,41 +139,68 @@ export class InquiryAgentService {
       desired: ctx.settings.autopilotInquiryDesired,
       searchable: ctx.settings.autopilotInquirySearchable,
     });
-    const userPrompt = buildInquiryUserPrompt({
-      sourceName: ctx.sourceName,
-      sourceId: ctx.sourceId,
-      manual: ctx.manual,
-      instruction: ctx.instruction,
-      findingGroups,
-      inquiries,
-      memories,
-    });
-    await this.log.technical(
-      ctx.run.id,
-      'Requesting inquiry decisions from the model.',
-      {
-        systemPrompt,
-        userPrompt,
-        memoriesRecalled: memories.length,
-      },
-    );
+    const buildPrompt = (
+      groups: FindingGroupSummary[],
+      part?: { index: number; total: number },
+    ) =>
+      buildInquiryUserPrompt({
+        sourceName: ctx.sourceName,
+        sourceId: ctx.sourceId,
+        manual: ctx.manual,
+        instruction: ctx.instruction,
+        findingGroups: groups,
+        inquiries,
+        archivedInquiries,
+        memories,
+        part,
+      });
 
-    const { content, model, raw } =
-      await this.ai.completeJson<InquiryDecisionOutput>(
-        [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        inquiryDecisionSchema,
-        { temperature: 0.2 },
-      );
-    await this.log.technical(
-      ctx.run.id,
-      `Model ${model} returned a valid decision payload.`,
-      {
-        raw,
-      },
+    // Token budget: never truncate — split finding groups into chunks the
+    // provider's context window can hold and assess each chunk.
+    const budget = promptCharBudget(await this.ai.getContextSize());
+    const fixedChars = systemPrompt.length + buildPrompt([]).length;
+    const chunks = chunkByBudget(
+      findingGroups,
+      fixedChars,
+      budget,
+      (g) => JSON.stringify(g).length + 40,
     );
+    if (chunks.length > 1) {
+      await this.log.technical(
+        ctx.run.id,
+        `Context exceeds the model window — assessing the ${findingGroups.length} finding group(s) in ${chunks.length} part(s).`,
+        { budgetChars: budget, fixedChars },
+      );
+    }
+
+    const outputs = await runChunked(chunks, async (chunk, index, total) => {
+      const userPrompt = buildPrompt(
+        chunk,
+        total > 1 ? { index, total } : undefined,
+      );
+      await this.log.technical(
+        ctx.run.id,
+        `Requesting inquiry decisions from the model${total > 1 ? ` (part ${index}/${total})` : ''}.`,
+        { systemPrompt, userPrompt, memoriesRecalled: memories.length },
+      );
+      const { content, model, raw } =
+        await this.ai.completeJson<InquiryDecisionOutput>(
+          [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          inquiryDecisionSchema,
+          { temperature: 0.2, repair: repairInquiryOutput },
+        );
+      await this.log.technical(
+        ctx.run.id,
+        `Model ${model} returned a valid decision payload${total > 1 ? ` (part ${index}/${total})` : ''}.`,
+        { raw },
+      );
+      return content;
+    });
+
+    const content = mergeDecisionOutputs(outputs) as InquiryDecisionOutput;
     await this.log.business(
       ctx.run.id,
       `Model proposed ${content.decisions.length} inquiry decision(s): ${content.decisions.map((d) => d.action).join(', ')}.`,

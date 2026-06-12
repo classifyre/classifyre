@@ -121,13 +121,15 @@ describe('AiClientService', () => {
       expect(mockProviderComplete).toHaveBeenCalledTimes(1);
     });
 
-    it('surfaces AiRateLimitError without retrying', async () => {
+    it('surfaces AiRateLimitError without retrying when backoff is disabled', async () => {
       mockProviderComplete.mockRejectedValueOnce(
         new AiRateLimitError('rate limited'),
       );
 
       await expect(
-        service.completeText([{ role: 'user', content: 'hi' }]),
+        service.completeText([{ role: 'user', content: 'hi' }], {
+          rateLimitRetries: 0,
+        }),
       ).rejects.toBeInstanceOf(AiRateLimitError);
       expect(mockProviderComplete).toHaveBeenCalledTimes(1);
     });

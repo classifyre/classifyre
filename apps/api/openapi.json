@@ -6978,6 +6978,28 @@
         ]
       }
     },
+    "/autopilot/dream": {
+      "post": {
+        "operationId": "AutopilotController_triggerDream",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerAutopilotResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Trigger a dream cycle now (memory consolidation — dedupe, prune noise, distill notes)",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
     "/autopilot/runs": {
       "get": {
         "operationId": "AutopilotController_listRuns",
@@ -6990,7 +7012,8 @@
               "type": "string",
               "enum": [
                 "INQUIRY",
-                "CASE"
+                "CASE",
+                "DREAM"
               ]
             }
           },
@@ -7005,7 +7028,8 @@
                 "RUNNING",
                 "COMPLETED",
                 "FAILED",
-                "SKIPPED"
+                "SKIPPED",
+                "CANCELLED"
               ]
             }
           },
@@ -7072,6 +7096,68 @@
           }
         },
         "summary": "Get one autopilot run with all decisions and rationales",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/runs/{id}/cancel": {
+      "post": {
+        "operationId": "AutopilotController_cancelRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stop a pending/running agent run (it aborts before its next step)",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/runs/{id}/rerun": {
+      "post": {
+        "operationId": "AutopilotController_rerunRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerAutopilotResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Re-execute one specific agent run from scratch under its original cycle identity",
         "tags": [
           "autopilot"
         ]
@@ -14705,7 +14791,8 @@
             "type": "string",
             "enum": [
               "INQUIRY",
-              "CASE"
+              "CASE",
+              "DREAM"
             ]
           },
           "status": {
@@ -14715,7 +14802,8 @@
               "RUNNING",
               "COMPLETED",
               "FAILED",
-              "SKIPPED"
+              "SKIPPED",
+              "CANCELLED"
             ]
           },
           "sourceId": {
@@ -14824,6 +14912,7 @@
               "CREATE_EDGE",
               "CHANGE_STATUS",
               "LINK_INQUIRY",
+              "CONSOLIDATE_MEMORY",
               "NO_ACTION"
             ]
           },
@@ -14876,7 +14965,8 @@
             "type": "string",
             "enum": [
               "INQUIRY",
-              "CASE"
+              "CASE",
+              "DREAM"
             ]
           },
           "status": {
@@ -14886,7 +14976,8 @@
               "RUNNING",
               "COMPLETED",
               "FAILED",
-              "SKIPPED"
+              "SKIPPED",
+              "CANCELLED"
             ]
           },
           "sourceId": {

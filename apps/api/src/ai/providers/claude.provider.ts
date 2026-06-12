@@ -27,7 +27,7 @@ export class ClaudeProvider implements IAiProvider {
     config: AiProviderRuntimeConfig,
     options: AiCompletionOptions,
   ): Promise<string> {
-    const client = new Anthropic({ apiKey: config.apiKey });
+    const client = new Anthropic({ apiKey: config.apiKey, timeout: 30 * 60 * 1000 });
 
     const systemParts = messages.filter((m) => m.role === 'system');
     const system = systemParts.map((m) => m.content).join('\n\n') || undefined;

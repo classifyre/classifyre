@@ -120,6 +120,45 @@ export class AgentSearchService {
     }));
   }
 
+  /**
+   * Recently archived inquiries — intentionally closed topics the agent must
+   * not blindly recreate.
+   */
+  async listRecentlyArchivedInquiries(): Promise<
+    Array<{ id: string; title: string; description: string | null; archivedAt: Date }>
+  > {
+    const rows = await this.prisma.inquiry.findMany({
+      where: { status: 'ARCHIVED' },
+      select: { id: true, title: true, description: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 15,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      archivedAt: r.updatedAt,
+    }));
+  }
+
+  /** Recently closed/archived cases with their conclusions — solved topics. */
+  async listRecentlyClosedCases(): Promise<
+    Array<{ id: string; title: string; status: string; conclusion: string | null }>
+  > {
+    const rows = await this.prisma.case.findMany({
+      where: { status: { in: ['CLOSED', 'ARCHIVED'] } },
+      select: { id: true, title: true, status: true, conclusion: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      status: String(r.status),
+      conclusion: r.conclusion,
+    }));
+  }
+
   /** Open/in-progress cases (capped) as compact summaries. */
   async listOpenCases(): Promise<CaseSummary[]> {
     const rows = await this.prisma.case.findMany({

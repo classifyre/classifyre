@@ -5,6 +5,7 @@ import { PrismaService } from './prisma.service';
 import { GraphService } from './graph.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { CaseActivityService } from './case-activity.service';
+import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 
 describe('CasesService', () => {
   let service: CasesService;
@@ -23,6 +24,7 @@ describe('CasesService', () => {
   const mockGraph = { inferEdgesForAsset: jest.fn(), caseGraph: jest.fn() };
   const mockMatching = { getMatchingFindingIds: jest.fn() };
   const mockActivity = { record: jest.fn() };
+  const mockAgentMemory = { recordEntityDeletion: jest.fn() };
 
   const caseRow = (over: Record<string, unknown> = {}) => ({
     id: 'c1',
@@ -47,6 +49,7 @@ describe('CasesService', () => {
         { provide: GraphService, useValue: mockGraph },
         { provide: InquiryMatchingService, useValue: mockMatching },
         { provide: CaseActivityService, useValue: mockActivity },
+        { provide: AgentMemoryService, useValue: mockAgentMemory },
       ],
     }).compile();
     service = module.get(CasesService);

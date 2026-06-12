@@ -122,6 +122,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
           retryLimit: 2,
           retryDelay: 120,
           retryBackoff: true,
+          // Cycles may legitimately take a long time (slow providers, 429
+          // backoff) — don't let pg-boss expire and redeliver mid-run.
+          expireInSeconds: 3 * 3600,
         },
       );
     } catch (error) {

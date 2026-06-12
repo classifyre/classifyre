@@ -4,9 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { Prisma } from '@prisma/client';
+import { AgentKind, AgentRunStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
+import { AgentAuditService } from './audit/agent-audit.service';
 import { AUTOPILOT_QUEUE } from './autopilot.constants';
 import {
   AgentDecisionDto,
@@ -36,6 +37,7 @@ export class AutopilotService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pgBoss: PgBossService,
+    private readonly audit: AgentAuditService,
   ) {}
 
   // ── Manual trigger ──────────────────────────────────────────────────────────
@@ -79,9 +81,100 @@ export class AutopilotService {
       },
       // Spaced retries so provider rate limits (429) get room to clear;
       // resumed deliveries skip already-completed steps via stepState.
-      { retryLimit: 2, retryDelay: 90, retryBackoff: true },
+      { retryLimit: 2, retryDelay: 90, retryBackoff: true, expireInSeconds: 3 * 3600 },
     );
     return { cycleKey, enqueued: true };
+  }
+
+  /**
+   * Enqueue a dream (memory consolidation) cycle right now, outside the
+   * every-other-day schedule.
+   */
+  async triggerDream(): Promise<TriggerAutopilotResponseDto> {
+    const settings = await this.prisma.instanceSettings.findUnique({
+      where: { id: 1 },
+      select: { aiEnabled: true, aiProviderConfigId: true },
+    });
+    if (!settings?.aiEnabled || !settings.aiProviderConfigId) {
+      throw new BadRequestException(
+        'Enable AI and select a default provider in Settings before triggering a dream cycle.',
+      );
+    }
+    const cycleKey = `dream:manual:${randomUUID()}`;
+    const boss = await this.pgBoss.getBossAsync();
+    await boss.send(
+      AUTOPILOT_QUEUE,
+      { dream: true, manual: true, cycleKey },
+      { retryLimit: 2, retryDelay: 90, retryBackoff: true, expireInSeconds: 3 * 3600 },
+    );
+    return { cycleKey, enqueued: true };
+  }
+
+  // ── Run control (stop / rerun) ──────────────────────────────────────────────
+
+  /**
+   * Stop a pending/running agent run. The pipeline aborts before its next
+   * step (an in-flight model call is never interrupted mid-request).
+   */
+  async cancelRun(id: string): Promise<AgentRunDto> {
+    const run = await this.prisma.agentRun.findUnique({ where: { id } });
+    if (!run) throw new NotFoundException(`Agent run ${id} not found`);
+    const cancelled = await this.audit.cancel(id);
+    if (!cancelled) {
+      throw new BadRequestException(
+        `Run ${id} is ${run.status} — only PENDING, RUNNING or FAILED runs can be cancelled.`,
+      );
+    }
+    return this.getRun(id);
+  }
+
+  /**
+   * Re-execute one specific agent run: the run is reset to PENDING with a
+   * clean slate (fresh context, no reused step output) and re-enqueued so
+   * ONLY its agent executes again under the original cycle identity.
+   */
+  async rerunRun(id: string): Promise<TriggerAutopilotResponseDto> {
+    const run = await this.prisma.agentRun.findUnique({ where: { id } });
+    if (!run) throw new NotFoundException(`Agent run ${id} not found`);
+    if (run.status === AgentRunStatus.RUNNING) {
+      throw new BadRequestException(
+        `Run ${id} is still RUNNING — cancel it first or wait for it to finish.`,
+      );
+    }
+    if (!run.cycleKey) {
+      throw new BadRequestException(
+        `Run ${id} has no cycle identity and cannot be rerun.`,
+      );
+    }
+
+    await this.prisma.agentRun.update({
+      where: { id },
+      data: {
+        status: AgentRunStatus.PENDING,
+        attempts: 0,
+        error: null,
+        summary: null,
+        currentStep: null,
+        stepState: Prisma.DbNull,
+        finishedAt: null,
+      },
+    });
+
+    const boss = await this.pgBoss.getBossAsync();
+    await boss.send(
+      AUTOPILOT_QUEUE,
+      {
+        cycleKey: run.cycleKey,
+        agentKind: run.agentKind,
+        dream: run.agentKind === AgentKind.DREAM || undefined,
+        manual: run.trigger === 'manual' || undefined,
+        instruction: run.instruction ?? undefined,
+        sourceId: run.sourceId ?? undefined,
+        runnerId: run.runnerId ?? undefined,
+      },
+      { retryLimit: 2, retryDelay: 90, retryBackoff: true, expireInSeconds: 3 * 3600 },
+    );
+    return { cycleKey: run.cycleKey, enqueued: true };
   }
 
   // ── Logs ────────────────────────────────────────────────────────────────────

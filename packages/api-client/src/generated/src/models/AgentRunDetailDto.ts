@@ -125,7 +125,8 @@ export interface AgentRunDetailDto {
  */
 export const AgentRunDetailDtoAgentKindEnum = {
     Inquiry: 'INQUIRY',
-    Case: 'CASE'
+    Case: 'CASE',
+    Dream: 'DREAM'
 } as const;
 export type AgentRunDetailDtoAgentKindEnum = typeof AgentRunDetailDtoAgentKindEnum[keyof typeof AgentRunDetailDtoAgentKindEnum];
 
@@ -137,7 +138,8 @@ export const AgentRunDetailDtoStatusEnum = {
     Running: 'RUNNING',
     Completed: 'COMPLETED',
     Failed: 'FAILED',
-    Skipped: 'SKIPPED'
+    Skipped: 'SKIPPED',
+    Cancelled: 'CANCELLED'
 } as const;
 export type AgentRunDetailDtoStatusEnum = typeof AgentRunDetailDtoStatusEnum[keyof typeof AgentRunDetailDtoStatusEnum];
 
