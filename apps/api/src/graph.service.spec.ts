@@ -12,7 +12,7 @@ describe('GraphService', () => {
     finding: { findMany: jest.fn() },
     edge: { createMany: jest.fn(), count: jest.fn() },
     caseEvidence: { findMany: jest.fn() },
-    hypothesisSupport: { findMany: jest.fn() },
+    caseThreadSupport: { findMany: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -175,7 +175,7 @@ describe('GraphService', () => {
           ],
         },
       ]);
-      mockPrisma.hypothesisSupport.findMany.mockResolvedValue([]);
+      mockPrisma.caseThreadSupport.findMany.mockResolvedValue([]);
 
       const result = await service.caseGraph('case-1', 1);
 
@@ -215,7 +215,7 @@ describe('GraphService', () => {
         .mockResolvedValueOnce([]);
       mockPrisma.asset.findMany.mockResolvedValue([]);
       mockPrisma.finding.findMany.mockResolvedValue([]);
-      mockPrisma.hypothesisSupport.findMany.mockResolvedValue([]);
+      mockPrisma.caseThreadSupport.findMany.mockResolvedValue([]);
 
       const result = await service.caseGraph('case-1', 1);
 
