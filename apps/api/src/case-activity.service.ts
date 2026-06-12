@@ -4,7 +4,7 @@ import { CaseActivityType, Prisma, PrismaClient } from '@prisma/client';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type JsonInput = any;
 import { PrismaService } from './prisma.service';
-import { CaseActivityDto, CaseTimelineResponseDto } from './dto/case-activity.dto';
+import { CaseTimelineResponseDto } from './dto/case-activity.dto';
 
 type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
 
