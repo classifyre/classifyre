@@ -138,22 +138,6 @@ All URIs are relative to *http://localhost*
 *SandboxApi* | [**sandboxControllerGetRunInput**](docs/SandboxApi.md#sandboxcontrollergetruninput) | **GET** /sandbox/runs/{id}/input | Download the staged input file for an in-flight sandbox run
 *SandboxApi* | [**sandboxControllerListRuns**](docs/SandboxApi.md#sandboxcontrollerlistruns) | **GET** /sandbox/runs | List sandbox runs (paginated)
 *SandboxApi* | [**sandboxControllerRerunRun**](docs/SandboxApi.md#sandboxcontrollerrerunrun) | **POST** /sandbox/runs/{id}/rerun | Re-scan a run with different detectors (appends findings)
-*SemanticLayerGlossaryApi* | [**glossaryControllerCreate**](docs/SemanticLayerGlossaryApi.md#glossarycontrollercreate) | **POST** /semantic/glossary | Create a new glossary term
-*SemanticLayerGlossaryApi* | [**glossaryControllerDelete**](docs/SemanticLayerGlossaryApi.md#glossarycontrollerdelete) | **DELETE** /semantic/glossary/{id} | Delete a glossary term
-*SemanticLayerGlossaryApi* | [**glossaryControllerFindAll**](docs/SemanticLayerGlossaryApi.md#glossarycontrollerfindall) | **GET** /semantic/glossary | List all glossary terms
-*SemanticLayerGlossaryApi* | [**glossaryControllerFindById**](docs/SemanticLayerGlossaryApi.md#glossarycontrollerfindbyid) | **GET** /semantic/glossary/{id} | Get a glossary term by id
-*SemanticLayerGlossaryApi* | [**glossaryControllerPreview**](docs/SemanticLayerGlossaryApi.md#glossarycontrollerpreview) | **POST** /semantic/glossary/{id}/preview | Preview the number of findings matching this glossary term
-*SemanticLayerGlossaryApi* | [**glossaryControllerUpdate**](docs/SemanticLayerGlossaryApi.md#glossarycontrollerupdate) | **PUT** /semantic/glossary/{id} | Update a glossary term
-*SemanticLayerMetricsApi* | [**metricsControllerCertify**](docs/SemanticLayerMetricsApi.md#metricscontrollercertify) | **POST** /semantic/metrics/{id}/certify | Certify a metric (DRAFT → ACTIVE)
-*SemanticLayerMetricsApi* | [**metricsControllerCreate**](docs/SemanticLayerMetricsApi.md#metricscontrollercreate) | **POST** /semantic/metrics | Create a new metric definition
-*SemanticLayerMetricsApi* | [**metricsControllerDelete**](docs/SemanticLayerMetricsApi.md#metricscontrollerdelete) | **DELETE** /semantic/metrics/{id} | Delete a metric definition
-*SemanticLayerMetricsApi* | [**metricsControllerFindAll**](docs/SemanticLayerMetricsApi.md#metricscontrollerfindall) | **GET** /semantic/metrics | List all metric definitions
-*SemanticLayerMetricsApi* | [**metricsControllerFindById**](docs/SemanticLayerMetricsApi.md#metricscontrollerfindbyid) | **GET** /semantic/metrics/{id} | Get a metric definition by id
-*SemanticLayerMetricsApi* | [**metricsControllerUpdate**](docs/SemanticLayerMetricsApi.md#metricscontrollerupdate) | **PUT** /semantic/metrics/{id} | Update a metric definition
-*SemanticLayerQueryApi* | [**metricQueryControllerExplore**](docs/SemanticLayerQueryApi.md#metricquerycontrollerexplore) | **POST** /semantic/query/explore | Explore detection data through a glossary term with metric breakdown
-*SemanticLayerQueryApi* | [**metricQueryControllerQueryDashboard**](docs/SemanticLayerQueryApi.md#metricquerycontrollerquerydashboard) | **POST** /semantic/query/dashboard | Batch-evaluate all metrics placed on a dashboard
-*SemanticLayerQueryApi* | [**metricQueryControllerQueryMetric**](docs/SemanticLayerQueryApi.md#metricquerycontrollerquerymetric) | **POST** /semantic/query | Evaluate a metric with optional dimensions and filters
-*SemanticLayerQueryApi* | [**metricQueryControllerQueryTimeSeries**](docs/SemanticLayerQueryApi.md#metricquerycontrollerquerytimeseries) | **POST** /semantic/query/timeseries | Evaluate a metric as a time series
 *SourcesApi* | [**searchSourcesControllerSearchSources**](docs/SourcesApi.md#searchsourcescontrollersearchsources) | **POST** /search/sources | Search data sources
 *SourcesApi* | [**sourceAssetsControllerBulkIngest**](docs/SourcesApi.md#sourceassetscontrollerbulkingest) | **POST** /sources/{sourceId}/assets/bulk | Bulk ingest assets
 *SourcesApi* | [**sourceAssetsControllerFinalizeIngest**](docs/SourcesApi.md#sourceassetscontrollerfinalizeingest) | **POST** /sources/{sourceId}/assets/finalize | Finalize ingest run
@@ -196,9 +180,7 @@ All URIs are relative to *http://localhost*
 - [CreateCustomDetectorDto](docs/CreateCustomDetectorDto.md)
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
-- [CreateGlossaryTermDto](docs/CreateGlossaryTermDto.md)
 - [CreateMcpTokenDto](docs/CreateMcpTokenDto.md)
-- [CreateMetricDefinitionDto](docs/CreateMetricDefinitionDto.md)
 - [CreateSourceDto](docs/CreateSourceDto.md)
 - [CustomDetectorExampleDto](docs/CustomDetectorExampleDto.md)
 - [CustomDetectorResponseDto](docs/CustomDetectorResponseDto.md)
@@ -221,7 +203,6 @@ All URIs are relative to *http://localhost*
 - [FindingsDiscoveryStatusBreakdownDto](docs/FindingsDiscoveryStatusBreakdownDto.md)
 - [FindingsDiscoveryTopAssetDto](docs/FindingsDiscoveryTopAssetDto.md)
 - [FindingsDiscoveryTotalsDto](docs/FindingsDiscoveryTotalsDto.md)
-- [GlossaryFilterMappingDto](docs/GlossaryFilterMappingDto.md)
 - [HealthControllerGetHealth200Response](docs/HealthControllerGetHealth200Response.md)
 - [InstanceSettingsResponseDto](docs/InstanceSettingsResponseDto.md)
 - [LatestRunnerSummaryDto](docs/LatestRunnerSummaryDto.md)
@@ -241,9 +222,6 @@ All URIs are relative to *http://localhost*
 - [ParseTrainingExamplesResponseDto](docs/ParseTrainingExamplesResponseDto.md)
 - [ParseTrainingExamplesSkippedReasonsDto](docs/ParseTrainingExamplesSkippedReasonsDto.md)
 - [ParsedTrainingExampleDto](docs/ParsedTrainingExampleDto.md)
-- [QueryDashboardMetricsDto](docs/QueryDashboardMetricsDto.md)
-- [QueryMetricDto](docs/QueryMetricDto.md)
-- [QueryMetricTimeSeriesDto](docs/QueryMetricTimeSeriesDto.md)
 - [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)
 - [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
 - [RerunSandboxRunDto](docs/RerunSandboxRunDto.md)
@@ -316,10 +294,8 @@ All URIs are relative to *http://localhost*
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
 - [UpdateFindingDto](docs/UpdateFindingDto.md)
-- [UpdateGlossaryTermDto](docs/UpdateGlossaryTermDto.md)
 - [UpdateInstanceSettingsDto](docs/UpdateInstanceSettingsDto.md)
 - [UpdateMcpTokenDto](docs/UpdateMcpTokenDto.md)
-- [UpdateMetricDefinitionDto](docs/UpdateMetricDefinitionDto.md)
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)
 - [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)

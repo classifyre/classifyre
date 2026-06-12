@@ -9,8 +9,6 @@ import { CliRunnerService } from './cli-runner/cli-runner.service';
 import { CustomDetectorsService } from './custom-detectors.service';
 import { CustomDetectorTestsService } from './custom-detector-tests.service';
 import { SchedulerService } from './scheduler/scheduler.service';
-import { GlossaryService } from './semantic-layer/glossary.service';
-import { MetricsService } from './semantic-layer/metrics.service';
 import { SourceService } from './source.service';
 import { ValidationService } from './validation.service';
 
@@ -57,8 +55,6 @@ export class McpToolExecutorService {
     private readonly customDetectorTests: CustomDetectorTestsService,
     private readonly cliRunnerService: CliRunnerService,
     private readonly schedulerService: SchedulerService,
-    private readonly glossaryService: GlossaryService,
-    private readonly metricsService: MetricsService,
     private readonly demoMode: DemoModeService,
   ) {}
 
@@ -169,99 +165,6 @@ export class McpToolExecutorService {
       args.detectorId,
       (args.triggeredBy as any) || 'ASSISTANT',
     );
-  }
-
-  async createGlossaryTerm(args: {
-    displayName: string;
-    description?: string;
-    category?: string;
-    filterMapping: Record<string, unknown>;
-    color?: string;
-    icon?: string;
-  }) {
-    this.assertNotDemoMode();
-    return this.glossaryService.create({
-      displayName: args.displayName,
-      description: args.description,
-      category: args.category,
-      filterMapping: args.filterMapping,
-      color: args.color,
-      icon: args.icon,
-    });
-  }
-
-  async createMetricDefinition(args: {
-    displayName: string;
-    description?: string;
-    type: 'SIMPLE' | 'RATIO' | 'DERIVED' | 'TREND';
-    definition: Record<string, any>;
-    allowedDimensions?: string[];
-    glossaryTermId?: string;
-    format?: string;
-    unit?: string;
-    owner?: string;
-  }) {
-    this.assertNotDemoMode();
-    return this.metricsService.create({
-      displayName: args.displayName,
-      description: args.description,
-      type: args.type,
-      definition: args.definition,
-      allowedDimensions: args.allowedDimensions,
-      glossaryTermId: args.glossaryTermId,
-      format: args.format,
-      unit: args.unit,
-      owner: args.owner,
-    });
-  }
-
-  async certifyMetric(id: string, certifiedBy: string) {
-    this.assertNotDemoMode();
-    return this.metricsService.certify(id, certifiedBy);
-  }
-
-  async updateGlossaryTerm(
-    id: string,
-    args: {
-      displayName?: string;
-      description?: string;
-      category?: string;
-      filterMapping?: Record<string, unknown>;
-      color?: string;
-      icon?: string;
-      isActive?: boolean;
-    },
-  ) {
-    this.assertNotDemoMode();
-    return this.glossaryService.update(id, args);
-  }
-
-  async deleteGlossaryTerm(id: string) {
-    this.assertNotDemoMode();
-    return this.glossaryService.delete(id);
-  }
-
-  async updateMetricDefinition(
-    id: string,
-    args: {
-      displayName?: string;
-      description?: string;
-      definition?: Record<string, any>;
-      allowedDimensions?: string[];
-      glossaryTermId?: string;
-      format?: string;
-      unit?: string;
-      owner?: string;
-      isActive?: boolean;
-    },
-  ) {
-    this.assertNotDemoMode();
-    return this.metricsService.update(id, args);
-  }
-
-  async deleteMetricDefinition(id: string) {
-    this.assertNotDemoMode();
-    return this.metricsService.delete(id);
   }
 
   private async prepareSourceConfig(

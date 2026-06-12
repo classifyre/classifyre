@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@workspace/ui/components/button";
+import { AppIcon } from "@/components/app-icon";
 import { useTranslation } from "@/hooks/use-translation";
 
 export function ThemeToggle() {
@@ -36,7 +36,7 @@ export function ThemeToggle() {
         disabled
         className="relative rounded-[4px] border-2 border-transparent hover:border-border"
       >
-        <Sun className="h-5 w-5" />
+        <AppIcon name="light-mode" size={20} />
         <span className="sr-only">{t("common.toggleTheme")}</span>
       </Button>
     );
@@ -52,7 +52,7 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       className="relative rounded-[4px] border-2 border-transparent hover:border-border"
     >
-      {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+      {isDark ? <AppIcon name="light-mode" size={20} /> : <AppIcon name="dark-mode" size={20} />}
       <span className="sr-only">Toggle theme</span>
     </Button>
   );

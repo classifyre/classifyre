@@ -28,6 +28,7 @@ import {
   Cloud,
   Database,
   Folder,
+  Mail,
   Monitor,
   Settings,
 } from "lucide-react";
@@ -122,6 +123,7 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.Servicedesk]: null,
   [CreateSourceDtoTypeEnum.Sqlite]: null,
   [CreateSourceDtoTypeEnum.Notion]: siNotion,
+  [CreateSourceDtoTypeEnum.Email]: null,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -162,6 +164,7 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Servicedesk]: Monitor,
   [CreateSourceDtoTypeEnum.Sqlite]: FALLBACK_SOURCE_ICON,
   [CreateSourceDtoTypeEnum.Notion]: createSimpleIconComponent(siNotion),
+  [CreateSourceDtoTypeEnum.Email]: Mail,
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =
