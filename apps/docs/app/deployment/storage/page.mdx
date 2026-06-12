@@ -1,0 +1,116 @@
+---
+title: S3-Compatible Object Storage
+sidebarTitle: Object Storage (S3)
+description: Configuring external S3-compatible object storage for Classifyre runner logs and sandbox files.
+---
+
+import { Callout, Steps } from "nextra/components"
+
+# S3-Compatible Object Storage
+
+Classifyre uses **S3-compatible object storage** to persist long-term runner execution logs and document inputs uploaded via the developer sandbox.
+
+Object storage is **optional** and is always **external** to the core Classifyre application. You can use AWS S3, MinIO, Garage, Backblaze B2, Google Cloud Storage, or any other S3-compliant API provider.
+
+---
+
+## Behavior when Object Storage is Disabled
+
+By default, object storage is disabled (`objectStorage.enabled: false`).
+
+- **Live Streaming Logs:** Scan runner execution logs will still stream live to the Web UI using WebSockets.
+- **No Persistence:** Once the scan job pod finishes and is deleted, the execution logs are lost. You will not be able to view logs for historical runs.
+- **In-App Warning:** Users will see a warning banner in the Classifyre web interface indicating that historical logs are not being persisted.
+- **Sandbox Limits:** Local sandbox file uploads for zero-shot testing require object storage to persist.
+
+---
+
+## Configuration Settings
+
+To enable object storage, configure the `objectStorage.*` values in your Helm values file:
+
+```yaml
+objectStorage:
+  # -- Set to true to enable S3-compatible object storage
+  enabled: true
+  
+  # -- S3 bucket used for runner logs
+  bucket: "classifyre-logs"
+  
+  # -- S3 bucket used for sandbox uploaded files
+  sandboxBucket: "classifyre-sandbox"
+  
+  # -- S3 object key prefix for runner logs
+  logPrefix: "runner-logs/"
+  
+  # -- AWS region (required for AWS S3, ignored by most self-hosted providers)
+  region: "us-east-1"
+  
+  # -- S3 endpoint URL. Leave empty for AWS S3. Required for all other providers.
+  endpoint: ""
+  
+  # -- Force path-style S3 URLs (required for MinIO, Garage, Backblaze B2)
+  forcePathStyle: false
+```
+
+---
+
+## Provider Configuration Examples
+
+<Steps>
+
+### Amazon AWS S3
+For official AWS S3, leave the `endpoint` blank. The SDK will automatically resolve standard region endpoints.
+
+```yaml
+objectStorage:
+  enabled: true
+  bucket: "my-aws-logs-bucket"
+  sandboxBucket: "my-aws-sandbox-bucket"
+  region: "us-west-2"
+  endpoint: ""
+  forcePathStyle: false
+```
+
+### MinIO / Garage / Self-Hosted S3
+For self-hosted options, you must supply the internal or external endpoint and set `forcePathStyle` to `true`.
+
+```yaml
+objectStorage:
+  enabled: true
+  bucket: "classifyre-logs"
+  sandboxBucket: "classifyre-sandbox"
+  endpoint: "http://minio.storage.svc.cluster.local:9000"
+  forcePathStyle: true
+```
+
+### Backblaze B2
+Specify the Backblaze S3 API endpoint matching your bucket region and enable path-style URLs.
+
+```yaml
+objectStorage:
+  enabled: true
+  bucket: "my-b2-logs"
+  sandboxBucket: "my-b2-sandbox"
+  endpoint: "https://s3.us-west-004.backblazeb2.com"
+  forcePathStyle: true
+```
+
+</Steps>
+
+---
+
+## Credentials Configuration
+
+For production, we recommend credentials be loaded from a pre-created Kubernetes Secret.
+
+```yaml
+objectStorage:
+  existingSecret: "classifyre-s3-credentials"
+  existingSecretAccessKeyIdKey: "access-key-id"
+  existingSecretSecretAccessKeyKey: "secret-access-key"
+```
+
+The referenced secret must exist in the namespace and contain the keys:
+- `access-key-id`: The S3 access key ID.
+- `secret-access-key`: The S3 secret access key.

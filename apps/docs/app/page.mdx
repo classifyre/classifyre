@@ -1,102 +1,99 @@
 ---
 title: Classifyre Docs
-description: Core documentation for setup, bundling, and SEO strategy.
+description: Core documentation for setup, architecture, and deployment options.
 ---
 
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Separator } from "@workspace/ui/components"
+import { Separator } from "@workspace/ui/components"
 
 # Classifyre Docs
 
-<Badge variant="secondary">Static Export · Nextra Docs Theme</Badge>
+Classifyre turns messy, distributed source data into governed signals. Connect the systems you already run, detect what matters, classify content and findings, and label data for security, privacy, moderation, and operational workflows.
 
-This docs app is statically exported and bundled into the existing `@classifyre/web`
-image under `/docs` with no extra deployment.
+
+##  Classifyre Component Architecture
+
+The diagram below highlights the separation between the **Core Classifyre Stack** (colored in green) and the **External Infrastructure** (colored in gray):
+
+```mermaid
+graph TD
+    %% Core Classifyre Stack Components (Vibrant Indigo)
+    Web["Web UI"]
+    API["API and Orchestrator"]
+    CLI["CLI Runner"]
+
+    %% External Infrastructure (Slate Gray)
+    DB["Database (PostgreSQL)"]
+    S3["Object Storage (S3)"]
+    Sources["External Sources"]
+
+    %% Interactions
+    Web --> API
+    API -- "Reads / writes state" --> DB
+    API -- "Spawns scan job" --> CLI
+    CLI -- "Pulls data" --> Sources
+    CLI -- "Streams findings" --> API
+    API -- "Logs and Artifacts" --> S3
+
+    %% Styling for visual differentiation
+    style Web fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style API fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style CLI fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+
+    style DB fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+    style S3 fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+    style Sources fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+```
+
+---
+
+
+Classifyre is designed as a distributed, decoupled platform. The system is split between the **Core Classifyre Stack** and **External Infrastructure** components:
+
+### Core Classifyre Stack
+
+These primary services form the core of the Classifyre application:
+
+#### 1. Web UI (Frontend)
+- **Role:** The user-facing frontend.
+- **Responsibilities:**
+  - Configuring and managing data sources.
+  - Enabling, disabling, and adjusting settings for detectors and classifiers.
+  - Inspecting scan runs, execution logs, and classified findings.
+  - Triggering scans manually or defining automated schedules.
+
+#### 2. API and Orchestrator
+- **Role:** The control plane and orchestrator.
+- **Responsibilities:**
+  - Exposing REST APIs and WebSocket endpoints to power the Web UI.
+  - Coordinating runner lifecycles, states, and jobs.
+  - Spawning CLI execution runs (locally or as Kubernetes Jobs).
+  - Receiving batched findings from active CLI scanners via REST endpoints.
+  - Fetching run artifacts and logs from storage.
+
+#### 3. CLI Runner
+- **Role:** The ephemeral execution worker where the extraction and detection takes place.
+- **Responsibilities:**
+  - Ingesting documents from target external sources.
+  - Executing extractors to parse text and structural metadata.
+  - Running detectors (secrets, PII, custom LLM models) against parsed text.
+  - Streaming NDJSON envelope findings back to the API in batches.
+
+### External Infrastructure
+
+Classifyre relies on standard external components for data persistence, storage, and ingestion. Users can configure and bring their own instances of these components:
+
+- **[PostgreSQL Database](/deployment/database/):** Stores all system metadata, configurations, schedules, logs, and findings. Classifyre supports **embedded** database pods for quick evaluations or **external** database instances (such as AWS RDS, GCP Cloud SQL, or CloudNativePG clusters) for production.
+- **[S3 Object Storage](/deployment/storage/):** An **external** and **optional** component used to persist long-term runner execution logs and developer sandbox uploads. If disabled, logs are streamed live but not saved.
+- **[External Data Sources](/sources/):** The target systems containing unstructured documents (e.g., AWS S3, Confluence, Slack, Google Drive) that Classifyre scans using its extractors and detectors to identify security and compliance findings.
+
+---
+
 
 <Separator className="my-8" />
 
-<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-  <Card className="panel-card">
-    <CardHeader>
-      <CardTitle>Get Started</CardTitle>
-      <CardDescription>Install and run docs locally with Nextra.</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <Button asChild variant="secondary" className="w-full">
-        <a href="get-started/">Open page</a>
-      </Button>
-    </CardContent>
-  </Card>
+## Explore the Documentation
 
-  <Card className="panel-card">
-    <CardHeader>
-      <CardTitle>Docker Bundle</CardTitle>
-      <CardDescription>How docs land in the existing web bundle.</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <Button asChild variant="secondary" className="w-full">
-        <a href="docker-bundle/">Open page</a>
-      </Button>
-    </CardContent>
-  </Card>
-
-  <Card className="panel-card">
-    <CardHeader>
-      <CardTitle>SEO & Sitemap</CardTitle>
-      <CardDescription>Robots, sitemap, and structured metadata shape.</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <Button asChild variant="secondary" className="w-full">
-        <a href="seo-sitemap/">Open page</a>
-      </Button>
-    </CardContent>
-  </Card>
-
-  <Card className="panel-card">
-    <CardHeader>
-      <CardTitle>Kubernetes Deployment</CardTitle>
-      <CardDescription>Helm-based install patterns, images, secrets, and production modes.</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <Button asChild variant="secondary" className="w-full">
-        <a href="deployment/kubernetes/">Open page</a>
-      </Button>
-    </CardContent>
-  </Card>
-
-  <Card className="panel-card">
-    <CardHeader>
-      <CardTitle>Chart Publishing</CardTitle>
-      <CardDescription>Release workflow, chart-only publishing, and version/tag conventions.</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <Button asChild variant="secondary" className="w-full">
-        <a href="deployment/publishing/">Open page</a>
-      </Button>
-    </CardContent>
-  </Card>
-
-  <Card className="panel-card">
-    <CardHeader>
-      <CardTitle>Sources Reference</CardTitle>
-      <CardDescription>Auto-generated source schema table, JSON, and examples.</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <Button asChild variant="secondary" className="w-full">
-        <a href="sources/">Open page</a>
-      </Button>
-    </CardContent>
-  </Card>
-
-  <Card className="panel-card">
-    <CardHeader>
-      <CardTitle>MCP Server</CardTitle>
-      <CardDescription>Bearer token auth, client setup, and capability map.</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <Button asChild variant="secondary" className="w-full">
-        <a href="mcp-server/">Open page</a>
-      </Button>
-    </CardContent>
-  </Card>
-
-</div>
+- **[Deployments](/deployment/):** Detailed installation and setup instructions using Docker All-in-One and Kubernetes Helm charts.
+- **[Sources Reference](/sources/):** Connection parameters, schemas, and examples for all supported integrations.
+- **[Detectors Reference](/detectors/):** Available detection engines (PII, secrets, regex, and ML models) to classify content.
+- **[MCP Server](/settings/mcp-server/):** Model Context Protocol integration configurations and capabilities.

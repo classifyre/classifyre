@@ -62,6 +62,10 @@ postgres:
       accessModes:
         - ReadWriteOnce
 
+telemetry:
+  enabled: true
+  otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318"
+
 objectStorage:
   enabled: true
   bucket: classifyredemologs

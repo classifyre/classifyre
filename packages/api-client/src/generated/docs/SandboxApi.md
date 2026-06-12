@@ -158,7 +158,7 @@ No authorization required
 
 Delete a sandbox run
 
-Deletes a sandbox run record and its associated S3 file (if no other runs share it). If the run is currently in progress the CLI process is killed first.
+Deletes a sandbox run record and its stored input file. If the run is currently in progress the CLI process is killed first.
 
 ### Example
 

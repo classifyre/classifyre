@@ -55,6 +55,36 @@ export interface UpdateInstanceSettingsDto {
      * @memberof UpdateInstanceSettingsDto
      */
     aiProviderConfigId?: string | null;
+    /**
+     * When true, the autopilot inquiry agent manages inquiries automatically after scans.
+     * @type {boolean}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    autopilotInquiryEnabled?: boolean;
+    /**
+     * Operator guidance for the inquiry agent: what is desired / worth investigating.
+     * @type {string}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    autopilotInquiryDesired?: string | null;
+    /**
+     * Operator guidance for the inquiry agent: what is searchable in this instance.
+     * @type {string}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    autopilotInquirySearchable?: string | null;
+    /**
+     * When true, the autopilot case agent manages investigation cases automatically after scans.
+     * @type {boolean}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    autopilotCaseEnabled?: boolean;
+    /**
+     * Operator guidance for the case agent.
+     * @type {string}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    autopilotCaseGuidance?: string | null;
 }
 
 
@@ -102,6 +132,11 @@ export function UpdateInstanceSettingsDtoFromJSONTyped(json: any, ignoreDiscrimi
         'timezone': json['timezone'] == null ? undefined : json['timezone'],
         'timeFormat': json['timeFormat'] == null ? undefined : json['timeFormat'],
         'aiProviderConfigId': json['aiProviderConfigId'] == null ? undefined : json['aiProviderConfigId'],
+        'autopilotInquiryEnabled': json['autopilotInquiryEnabled'] == null ? undefined : json['autopilotInquiryEnabled'],
+        'autopilotInquiryDesired': json['autopilotInquiryDesired'] == null ? undefined : json['autopilotInquiryDesired'],
+        'autopilotInquirySearchable': json['autopilotInquirySearchable'] == null ? undefined : json['autopilotInquirySearchable'],
+        'autopilotCaseEnabled': json['autopilotCaseEnabled'] == null ? undefined : json['autopilotCaseEnabled'],
+        'autopilotCaseGuidance': json['autopilotCaseGuidance'] == null ? undefined : json['autopilotCaseGuidance'],
     };
 }
 
@@ -122,6 +157,11 @@ export function UpdateInstanceSettingsDtoToJSONTyped(value?: UpdateInstanceSetti
         'timezone': value['timezone'],
         'timeFormat': value['timeFormat'],
         'aiProviderConfigId': value['aiProviderConfigId'],
+        'autopilotInquiryEnabled': value['autopilotInquiryEnabled'],
+        'autopilotInquiryDesired': value['autopilotInquiryDesired'],
+        'autopilotInquirySearchable': value['autopilotInquirySearchable'],
+        'autopilotCaseEnabled': value['autopilotCaseEnabled'],
+        'autopilotCaseGuidance': value['autopilotCaseGuidance'],
     };
 }
 

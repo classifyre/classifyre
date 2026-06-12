@@ -111,8 +111,8 @@ const navbar = (
                 <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-serif font-bold">Classifyre</span>
                     <span className="truncate font-mono text-[10px] text-muted-foreground">
-            Detection Platform
-          </span>
+            Investigation Platform
+</span>
                 </div>
             </div>
         }

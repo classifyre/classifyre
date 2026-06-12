@@ -1,0 +1,101 @@
+---
+title: Detectors
+description: How detectors scan content, produce findings, and track issues across ingestion runs.
+---
+
+# Detectors
+
+Detectors are the scanning engines that analyse content extracted from your
+sources. Each detector targets a specific class of signal — hardcoded
+credentials, personally identifiable information, malware signatures, broken
+links, insecure code patterns, or custom rules you define.
+
+---
+
+## Source → Asset → Finding model
+
+Every scan follows a three-level hierarchy:
+
+1. **Source** — a connection to an external system (Confluence, Jira, S3 bucket,
+   SharePoint, Google Drive, etc.)
+2. **Asset** — an individual item extracted from the source: a page, a document,
+   a file, a database row. Each asset has a content type (URL, TEXT, TABLE,
+   IMAGE, VIDEO, AUDIO, BINARY, or OTHER).
+3. **Finding** — a single signal produced by a detector on a specific asset.
+   One asset can produce zero, one, or many findings.
+
+A source is ingested to produce a set of assets. Each asset is scanned by every
+detector that applies to its content type. The result is a flat list of findings
+grouped by asset.
+
+---
+
+## Severity
+
+Every finding is assigned a severity level that indicates its importance:
+
+| Severity | Meaning |
+|---|---|
+| **CRITICAL** | Immediate risk — exposed credentials, active malware, or similar. |
+| **HIGH** | Significant risk that should be addressed soon. |
+| **MEDIUM** | Moderate risk or policy deviation. |
+| **LOW** | Minor issue or informational observation. |
+| **INFO** | No direct risk but worth documenting. |
+
+Severity is set by the detector based on the matched content. You can filter
+and sort findings by severity to focus on the most important items first.
+
+---
+
+## Finding status
+
+Each finding has a lifecycle that you control:
+
+| Status | Meaning |
+|---|---|
+| **OPEN** | Newly detected and not yet reviewed. |
+| **FALSE_POSITIVE** | Marked as an incorrect detection after review. |
+| **RESOLVED** | The underlying issue has been fixed. |
+| **IGNORED** | Acknowledged but accepted as a risk. |
+
+Findings start as **OPEN** when first detected. Across subsequent scans, the
+system preserves each finding and tracks its changes:
+
+- **DETECTED** — first appearance
+- **RE_DETECTED** — still present in a later scan
+- **RESOLVED** — no longer present after a scan
+- **RE_OPENED** — returned in a scan after being resolved
+- **STATUS_CHANGED** / **SEVERITY_CHANGED** — manual updates
+
+This history means a finding is never duplicated across scans. Instead, its
+status and history are updated, giving you a complete audit trail.
+
+---
+
+## Confidence
+
+Each finding includes a confidence score from 0 to 1, indicating how certain
+the detector is about the match. A score of 1.0 means the detector is fully
+confident; lower scores suggest the signal may need manual verification.
+
+---
+
+## Pre-built and Custom detectors
+
+Classifyre ships with **six pre-built detectors** for common signal types:
+
+- **Secrets Detector** — hardcoded credentials, API keys, tokens
+- **PII Detector** — personally identifiable information
+- **YARA Detector** — malware patterns and threat indicators
+- **Broken Links Detector** — unreachable or empty URLs
+- **Code Security Detector** — insecure code patterns (Python)
+- **Custom Detector** — user-defined pipelines (regex, LLM, ML models, image
+  analysis)
+
+The **Custom Detector** is a generic framework that supports seven detection
+engines: GLiNER2, Regex, AI Detector (LLM), Text Classification, Image
+Classification, Feature Extraction, and Object Detection.
+
+See [Pre-built Detectors](/detectors/pre-built) for full descriptions and
+configuration guides, or [Custom Detectors](/detectors/custom-detectors) to
+build your own detection pipelines.

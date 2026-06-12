@@ -5,6 +5,7 @@ description: Run the entire Classifyre stack in a single Docker container for lo
 ---
 
 import { Callout, Steps } from "nextra/components"
+import { Sh } from "../../../components/mdx-code"
 
 # Docker
 
@@ -23,24 +24,54 @@ The Classifyre all-in-one Docker image bundles everything into a single containe
 
 ---
 
-## The image
+## Quick start
 
-```
-classifyre/all-in-one
-```
 
-Available for `linux/amd64` and `linux/arm64`. Tags follow the same scheme as the Kubernetes images — pin to a release version for reproducible demos.
+<Steps>
 
-```bash
-docker pull classifyre/all-in-one:latest
+### Pull the image
 
-# Pin to a specific release (recommended)
-docker pull classifyre/all-in-one:0.1.8
-```
+<Sh>{`docker pull classifyre/all-in-one:$version`}</Sh>
+
+The image is available for `linux/amd64` and `linux/arm64`. Pin to a release version for reproducible demos.
+
+### Run without persistence
+
+<Sh>{`docker run --rm \\
+  -p 3000:3000 \\
+  classifyre/all-in-one:$version`}</Sh>
+
+Open **http://localhost:3000** in your browser.
+
+The API health endpoint is at **http://localhost:3000/api/ping**.
+
+<Callout type="info">
+  Without a volume, everything — sources, findings, settings, and credentials — is lost when the container stops.
+</Callout>
+
+### Add a data volume
+
+<Sh>{`docker run --rm \\
+  -p 3000:3000 \\
+  -v classifyre-data:/var/lib/postgresql/data \\
+  classifyre/all-in-one:$version`}</Sh>
+
+With the volume mounted, the database and all application state survive container restarts and image upgrades.
+
+</Steps>
+
+---
+
+
+
+
 
 ---
 
 ## What runs inside
+
+
+
 
 All services start automatically via [s6-overlay](https://github.com/just-containers/s6-overlay), a lightweight process supervisor that manages boot order and handles graceful shutdown.
 
@@ -61,53 +92,31 @@ Prisma migrations run automatically every time the container starts. You never n
 
 ---
 
-## Quick start
-
-<Steps>
-
-### Run without persistence
-
-```bash
-docker run --rm \
-  -p 3000:3000 \
-  classifyre/all-in-one:latest
-```
-
-Open **http://localhost:3000** in your browser.
-
-The API health endpoint is at **http://localhost:3000/api/ping**.
-
-<Callout type="info">
-  Without a volume, everything — sources, findings, settings, and credentials — is lost when the container stops.
-</Callout>
-
-### Add a data volume
-
-```bash
-docker run --rm \
-  -p 3000:3000 \
-  -v classifyre-data:/data \
-  classifyre/all-in-one:latest
-```
-
-With `-v classifyre-data:/data` the database and all application state survive container restarts and image upgrades.
-
-</Steps>
-
----
-
 ## Volumes
 
-The container writes everything to `/data`. This single mount point covers the entire application state.
+The container persists PostgreSQL data at `/var/lib/postgresql/data`, declared as a Docker volume. All logs go to stdout/stderr and are managed by s6-overlay — use `docker logs` to access them.
 
 ```
-/data
-├── postgres/        PostgreSQL data directory (all your sources, findings, detectors, jobs)
-└── logs/
-    ├── api.log
-    ├── postgres.log
-    └── caddy.log
+Docker volume /var/lib/postgresql/data
+├── PG_VERSION
+├── .classifyre_masked_config_key    (encryption key, auto-generated)
+└── base/  global/  pg_wal/  ...     (PostgreSQL data files)
 ```
+
+To persist data across restarts, mount a named volume at `/var/lib/postgresql/data`:
+
+<Sh>{`docker run --rm \\
+  -p 3000:3000 \\
+  -v classifyre-data:/var/lib/postgresql/data \\
+  classifyre/all-in-one:$version`}</Sh>
+
+The container also uses `/cache/uv` as a package cache for on-demand Python dependency installs. It is declared as a separate volume.
+
+<Sh>{`docker run --rm \\
+  -p 3000:3000 \\
+  -v classifyre-data:/var/lib/postgresql/data \\
+  -v classifyre-uv-cache:/cache/uv \\
+  classifyre/all-in-one:$version`}</Sh>
 
 ### What you lose without a volume
 
@@ -115,7 +124,7 @@ The container writes everything to `/data`. This single mount point covers the e
 |---|---|
 | PostgreSQL database | All sources, findings, custom detectors, and job history gone |
 | Encryption key | Stored connector credentials become permanently unreadable |
-| Logs | No audit trail between sessions |
+| uv package cache | Dependencies re-downloaded on next Python install |
 
 ### Why the encryption key matters
 
@@ -123,44 +132,25 @@ Classifyre encrypts connector credentials (API tokens, passwords) at rest using 
 
 **Always mount a volume for any session where you configure real connectors.**
 
----
 
-## Docker Compose
+## Storage
 
-For demos that survive machine reboots, Docker Compose is simpler than bare `docker run` flags.
-
-```yaml filename="docker-compose.yml"
-services:
-  classifyre:
-    image: classifyre/all-in-one:latest
-    ports:
-      - "3000:3000"
-    volumes:
-      - classifyre-data:/data
-    environment:
-      LOG_LEVEL: info
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-
-volumes:
-  classifyre-data:
-```
+The all-in-one Docker image has no embedded object storage. To enable S3 persistence, pass the relevant environment variables at runtime:
 
 ```bash
-# Start in the background
-docker compose up -d
-
-# Follow logs
-docker compose logs -f
-
-# Stop (volume is preserved)
-docker compose down
+docker run \
+  -e S3_ENDPOINT=https://s3.us-east-1.amazonaws.com \
+  -e S3_BUCKET=my-classifyre-logs \
+  -e S3_SANDBOX_BUCKET=my-classifyre-sandbox \
+  -e S3_REGION=us-east-1 \
+  -e S3_FORCE_PATH_STYLE=false \
+  -e S3_ACCESS_KEY_ID=AKIA... \
+  -e S3_SECRET_ACCESS_KEY=... \
+  classifyre/all-in-one:latest
 ```
+
+When these variables are not set, the image runs without object storage and logs stream in-memory only.
+
 
 ---
 
@@ -170,15 +160,17 @@ docker compose down
 |---|---|---|
 | `CLASSIFYRE_MASKED_CONFIG_KEY` | auto-generated | 32-character key for encrypting connector credentials. Set explicitly if you need the same key across sessions without a persistent volume. |
 | `LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warn`, `error`. |
-| `NODE_ENV` | `production` | Runtime environment. |
+| `MAX_CONCURRENT_RUNNERS` | `1` | Max simultaneous CLI scan jobs running inside the container. |
+| `POSTGRES_PASSWORD` | _(empty)_ | Password for the `postgres` user (auth is trust-based by default). |
+| `POSTGRES_DB` | `classifyre` | Name of the default database created on first start. |
+| `TEMP_DIR` | `/tmp` | Temporary directory for scan artifacts. |
+| `CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS` | `1` | Auto-installs optional detector dependencies (e.g. OCR, ML models) via `uv` at runtime. Set to `0` to disable. |
 
-```bash
-docker run \
-  -p 3000:3000 \
-  -v classifyre-data:/data \
-  -e LOG_LEVEL=debug \
-  classifyre/all-in-one:latest
-```
+<Sh>{`docker run \\
+  -p 3000:3000 \\
+  -v classifyre-data:/var/lib/postgresql/data \\
+  -e LOG_LEVEL=debug \\
+  classifyre/all-in-one:$version`}</Sh>
 
 ---
 
@@ -198,12 +190,10 @@ Playwright (browser-based crawling) is bundled in the image. Connectors that use
 
 Pull the new image, stop the existing container, start again pointing at the same volume. Migrations run automatically.
 
-```bash
-docker pull classifyre/all-in-one:latest
+<Sh>{`docker pull classifyre/all-in-one:$version
 
 docker compose down
-docker compose up -d
-```
+docker compose up -d`}</Sh>
 
 The data volume is untouched by image upgrades.
 
@@ -215,22 +205,30 @@ Even for demos, you may want to preserve a working state.
 
 **Backup:**
 
+For a consistent backup, use `pg_dump` against the running container:
+
+```bash
+docker exec <container-id> pg_dump -h 127.0.0.1 -U postgres classifyre > classifyre-$(date +%Y%m%d).sql
+```
+
+To back up the full data directory (container must be stopped):
+
 ```bash
 docker run --rm \
-  -v classifyre-data:/data \
+  -v classifyre-data:/var/lib/postgresql/data \
   -v "$(pwd)/backups:/backup" \
   alpine \
-  tar czf /backup/classifyre-$(date +%Y%m%d).tar.gz -C /data .
+  tar czf /backup/classifyre-$(date +%Y%m%d).tar.gz -C /var/lib/postgresql/data .
 ```
 
 **Restore:**
 
 ```bash
 docker run --rm \
-  -v classifyre-data:/data \
+  -v classifyre-data:/var/lib/postgresql/data \
   -v "$(pwd)/backups:/backup" \
   alpine \
-  tar xzf /backup/classifyre-20240101.tar.gz -C /data
+  tar xzf /backup/classifyre-20240101.tar.gz -C /var/lib/postgresql/data
 ```
 
 ---
@@ -248,11 +246,11 @@ Common causes: port 3000 already in use (`lsof -i :3000`), insufficient disk spa
 **Web UI loads but API returns errors**
 
 ```bash
-# Tail the API log
-docker exec <container-id> tail -f /data/logs/api.log
-
 # Check s6 service status
 docker exec <container-id> s6-rc -a list
+
+# Tail the API log (via Docker, s6 captures stdout)
+docker logs <container-id>
 ```
 
 **Verify health**
@@ -263,6 +261,31 @@ curl -i http://localhost:3000/api/ping
 ```
 
 ---
+
+## Architecture reference
+
+```mermaid
+graph TD
+    Browser["Browser"]
+    Caddy["Caddy\n:3000"]
+    Web["Next.js Web\n:3100"]
+    API["NestJS API\n:8000"]
+    PG["PostgreSQL 18\n:5432"]
+    Volume["Data Volume"]
+
+    Browser -->|"localhost:3000"| Caddy
+    Caddy -->|"/api/*  /mcp/*  /socket.io*"| API
+    Caddy -->|"/* (fallback)"| Web
+    API --> PG
+    PG --> Volume
+
+    style Caddy fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style Web fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style API fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style PG fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style Browser fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+    style Volume fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+```
 
 ## Moving to production
 

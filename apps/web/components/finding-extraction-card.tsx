@@ -64,7 +64,7 @@ export function FindingExtractionCard({ findingId }: Props) {
   if (extraction === undefined) return null;
   if (extraction === null) return null;
 
-  const entries = Object.entries(extraction.extractedData).filter(
+  const entries = Object.entries(extraction.extractedData ?? {}).filter(
     ([, v]) => v !== null && v !== undefined && v !== "",
   );
 

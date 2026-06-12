@@ -3961,6 +3961,1903 @@
         ]
       }
     },
+    "/cases": {
+      "post": {
+        "operationId": "CasesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a case (optionally linking questions)",
+        "tags": [
+          "cases"
+        ]
+      },
+      "get": {
+        "operationId": "CasesController_list",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "OPEN",
+                  "IN_PROGRESS",
+                  "CLOSED",
+                  "ARCHIVED"
+                ]
+              }
+            }
+          },
+          {
+            "name": "severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "CRITICAL",
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW",
+                  "INFO"
+                ]
+              }
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List cases",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}": {
+      "get": {
+        "operationId": "CasesController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get a case with evidence, findings and linked questions",
+        "tags": [
+          "cases"
+        ]
+      },
+      "patch": {
+        "operationId": "CasesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update a case",
+        "tags": [
+          "cases"
+        ]
+      },
+      "delete": {
+        "operationId": "CasesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a case (its questions become standalone)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/evidence": {
+      "post": {
+        "operationId": "CasesController_addEvidence",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddEvidenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEvidenceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Attach an asset as evidence",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/evidence/{evidenceId}": {
+      "patch": {
+        "operationId": "CasesController_patchEvidenceNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "evidenceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEvidenceNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEvidenceDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update the note on an evidence row",
+        "tags": [
+          "cases"
+        ]
+      },
+      "delete": {
+        "operationId": "CasesController_removeEvidence",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "evidenceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Remove evidence from the case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/evidence/{evidenceId}/findings": {
+      "post": {
+        "operationId": "CasesController_addFinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "evidenceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddFindingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseFindingDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Attach a finding to a piece of evidence",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/findings": {
+      "post": {
+        "operationId": "CasesController_attachFindings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachFindingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachFindingsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Batch-attach findings (asset evidence rows are created as needed)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/findings/{caseFindingId}": {
+      "patch": {
+        "operationId": "CasesController_patchFindingNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "caseFindingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCaseFindingNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseFindingDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update the note on a case finding",
+        "tags": [
+          "cases"
+        ]
+      },
+      "delete": {
+        "operationId": "CasesController_removeFinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "caseFindingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Remove a finding from the case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/inquiries": {
+      "post": {
+        "operationId": "CasesController_linkInquiries",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkInquiriesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Link inquiries to a case (already-linked ones are ignored)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/inquiries/{inquiryId}": {
+      "delete": {
+        "operationId": "CasesController_unlinkInquiry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inquiryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Unlink an inquiry from a case (the inquiry is untouched)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/close": {
+      "post": {
+        "operationId": "CasesController_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseCaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseCaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Close a case with a conclusion (archives linked inquiries)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/pull": {
+      "post": {
+        "operationId": "CasesController_pull",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PullFromInquiryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullFromInquiryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Pull a question's matches into the case as evidence",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{id}/graph": {
+      "get": {
+        "operationId": "CasesController_graph",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "depth",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get the evidence neighbourhood graph for a case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/inquiries": {
+      "post": {
+        "operationId": "InquiriesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInquiryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InquiryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create an inquiry (a saved query) and seed its matches",
+        "tags": [
+          "inquiries"
+        ]
+      },
+      "get": {
+        "operationId": "InquiriesController_list",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ACTIVE",
+                  "ARCHIVED"
+                ]
+              }
+            }
+          },
+          {
+            "name": "caseId",
+            "required": false,
+            "in": "query",
+            "description": "Filter to inquiries linked to a case (or \"none\" for unlinked)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InquiryListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List inquiries (with match counts)",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/inquiries/preview": {
+      "post": {
+        "operationId": "InquiriesController_preview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewInquiryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Preview findings a matcher config currently selects (no save)",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/inquiries/match-options": {
+      "get": {
+        "operationId": "InquiriesController_matchOptions",
+        "parameters": [
+          {
+            "name": "sourceIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchOptionsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sources, custom detectors and distinct finding types for the matcher form",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/inquiries/{id}": {
+      "get": {
+        "operationId": "InquiriesController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InquiryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get an inquiry",
+        "tags": [
+          "inquiries"
+        ]
+      },
+      "patch": {
+        "operationId": "InquiriesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInquiryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InquiryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update an inquiry (matchers change → matches recomputed)",
+        "tags": [
+          "inquiries"
+        ]
+      },
+      "delete": {
+        "operationId": "InquiriesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete an inquiry",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/inquiries/{id}/matches": {
+      "get": {
+        "operationId": "InquiriesController_listMatches",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Substring match on finding type, asset name or matched content",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "CRITICAL",
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW",
+                  "INFO"
+                ]
+              }
+            }
+          },
+          {
+            "name": "onlyNew",
+            "required": false,
+            "in": "query",
+            "description": "Only matches that appeared since last seen",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InquiryMatchListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the findings currently matching this inquiry (paginated)",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/inquiries/{id}/seen": {
+      "post": {
+        "operationId": "InquiriesController_markSeen",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Mark the current matches as seen (clears the \"new\" badge)",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/inquiries/{id}/rematch": {
+      "post": {
+        "operationId": "InquiriesController_rematch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RematchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Recompute matches against all current findings",
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/cases/{caseId}/timeline": {
+      "get": {
+        "operationId": "CaseTimelineController_getTimeline",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseTimelineResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Paginated unified case activity feed (newest first)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{caseId}/threads": {
+      "get": {
+        "operationId": "CaseThreadsController_list",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ThreadResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List threads (hypothesis + discussion) for a case",
+        "tags": [
+          "threads"
+        ]
+      },
+      "post": {
+        "operationId": "CaseThreadsController_create",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateThreadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a thread (hypothesis or discussion)",
+        "tags": [
+          "threads"
+        ]
+      }
+    },
+    "/threads/{id}": {
+      "patch": {
+        "operationId": "CaseThreadsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateThreadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update thread title / status / confidence / color",
+        "tags": [
+          "threads"
+        ]
+      },
+      "delete": {
+        "operationId": "CaseThreadsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a thread",
+        "tags": [
+          "threads"
+        ]
+      }
+    },
+    "/threads/{id}/entries": {
+      "post": {
+        "operationId": "CaseThreadsController_addEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddThreadEntryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add a note, statement revision, or status entry to a thread",
+        "tags": [
+          "threads"
+        ]
+      },
+      "get": {
+        "operationId": "CaseThreadsController_getEntries",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadEntriesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Paginated thread entry history",
+        "tags": [
+          "threads"
+        ]
+      }
+    },
+    "/threads/{id}/support": {
+      "post": {
+        "operationId": "CaseThreadsController_linkSupport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkThreadSupportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Link evidence or finding to a thread",
+        "tags": [
+          "threads"
+        ]
+      }
+    },
+    "/threads/{id}/support/{linkId}": {
+      "delete": {
+        "operationId": "CaseThreadsController_unlinkSupport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "linkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Unlink evidence or finding from a thread",
+        "tags": [
+          "threads"
+        ]
+      }
+    },
+    "/cases/{caseId}/hypotheses": {
+      "get": {
+        "operationId": "HypothesisAliasController_list",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HypothesisResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "[Deprecated] List hypotheses — use GET /cases/:caseId/threads?kind=HYPOTHESIS",
+        "tags": [
+          "hypotheses"
+        ]
+      },
+      "post": {
+        "operationId": "HypothesisAliasController_create",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHypothesisDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "[Deprecated] Create hypothesis — use POST /cases/:caseId/threads",
+        "tags": [
+          "hypotheses"
+        ]
+      }
+    },
+    "/hypotheses/{id}": {
+      "patch": {
+        "operationId": "HypothesisAliasController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateHypothesisDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "[Deprecated] Update hypothesis — use PATCH /threads/:id",
+        "tags": [
+          "hypotheses"
+        ]
+      },
+      "delete": {
+        "operationId": "HypothesisAliasController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "[Deprecated] Delete hypothesis — use DELETE /threads/:id",
+        "tags": [
+          "hypotheses"
+        ]
+      }
+    },
+    "/hypotheses/{id}/support": {
+      "post": {
+        "operationId": "HypothesisAliasController_linkSupport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkSupportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "[Deprecated] Link support — use POST /threads/:id/support",
+        "tags": [
+          "hypotheses"
+        ]
+      }
+    },
+    "/hypotheses/{id}/support/{linkId}": {
+      "delete": {
+        "operationId": "HypothesisAliasController_unlinkSupport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "linkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "[Deprecated] Unlink support — use DELETE /threads/:id/support/:linkId",
+        "tags": [
+          "hypotheses"
+        ]
+      }
+    },
+    "/graph/expand": {
+      "post": {
+        "operationId": "GraphController_expand",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpandGraphDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Expand the graph around a seed entity (recursive traversal)",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
+    "/graph/pivot": {
+      "post": {
+        "operationId": "GraphController_pivot",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PivotGraphDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Named pivot question on a node (e.g. who_touched, upstream_lineage, emails)",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
+    "/graph/edges": {
+      "post": {
+        "operationId": "GraphController_ingestEdges",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkIngestEdgesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkIngestEdgesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Bulk-upsert source-derived edges from a connector. Idempotent.",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
+    "/graph/rebuild-edges": {
+      "post": {
+        "operationId": "GraphController_rebuildEdges",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RebuildEdgesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rebuild all inferred edges from existing assets and findings",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
+    "/graph/relation-types": {
+      "get": {
+        "operationId": "GraphController_relationTypes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationTypesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get all relation types in use + vocabulary suggestions",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
+    "/graph/edges/manual": {
+      "post": {
+        "operationId": "GraphController_createManualEdge",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateManualEdgeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a manual edge between two entities (user-defined relation type)",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
+    "/graph/edges/{id}": {
+      "patch": {
+        "operationId": "GraphController_updateEdge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEdgeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rename an edge relation type",
+        "tags": [
+          "graph"
+        ]
+      },
+      "delete": {
+        "operationId": "GraphController_deleteEdge",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete an edge",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
     "/sources/{sourceId}/run": {
       "post": {
         "operationId": "CliRunnerController_startRunner",
@@ -4927,7 +6824,7 @@
         ]
       },
       "delete": {
-        "description": "Deletes a sandbox run record and its associated S3 file (if no other runs share it). If the run is currently in progress the CLI process is killed first.",
+        "description": "Deletes a sandbox run record and its stored input file. If the run is currently in progress the CLI process is killed first.",
         "operationId": "SandboxController_deleteRun",
         "parameters": [
           {
@@ -5046,6 +6943,337 @@
         "summary": "Clear all findings for a run",
         "tags": [
           "Sandbox"
+        ]
+      }
+    },
+    "/autopilot/trigger": {
+      "post": {
+        "operationId": "AutopilotController_trigger",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriggerAutopilotDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerAutopilotResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Manually trigger an autopilot cycle over existing data, with an optional steering instruction",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/runs": {
+      "get": {
+        "operationId": "AutopilotController_listRuns",
+        "parameters": [
+          {
+            "name": "agentKind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INQUIRY",
+                "CASE"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "RUNNING",
+                "COMPLETED",
+                "FAILED",
+                "SKIPPED"
+              ]
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List autopilot agent runs (newest first)",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/runs/{id}": {
+      "get": {
+        "operationId": "AutopilotController_getRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get one autopilot run with all decisions and rationales",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/runs/{id}/logs": {
+      "get": {
+        "operationId": "AutopilotController_listLogs",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "required": false,
+            "in": "query",
+            "description": "BUSINESS = analyst narrative, TECHNICAL = mechanics/raw model I/O",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TECHNICAL",
+                "BUSINESS"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentLogListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output)",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/memory": {
+      "get": {
+        "operationId": "AutopilotController_listMemory",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "GLOSSARY",
+                "DECISION_PRECEDENT",
+                "TOPIC_INQUIRY_MAP"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Substring search over key and content",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentMemoryListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the agent memory (glossary, precedents, topic map)",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "post": {
+        "operationId": "AutopilotController_createMemory",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentMemoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentMemoryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add (or overwrite) a memory entry to steer the agent",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/memory/{id}": {
+      "patch": {
+        "operationId": "AutopilotController_updateMemory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentMemoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentMemoryDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Edit a memory entry (content, tags, weight)",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "delete": {
+        "operationId": "AutopilotController_deleteMemory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a memory entry the agent learned",
+        "tags": [
+          "autopilot"
         ]
       }
     }
@@ -6494,6 +8722,13 @@
           "lastDetectedBefore": {
             "format": "date-time",
             "type": "string"
+          },
+          "excludeIds": {
+            "description": "Finding UUIDs to exclude from results (e.g. already-attached findings)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -8470,6 +10705,31 @@
             "description": "Id of the AI provider credential used as the instance-wide default. Null when unset.",
             "nullable": true
           },
+          "autopilotInquiryEnabled": {
+            "type": "boolean",
+            "description": "When true, the autopilot inquiry agent manages inquiries automatically after scans.",
+            "example": false
+          },
+          "autopilotInquiryDesired": {
+            "type": "string",
+            "description": "Operator guidance for the inquiry agent: what is desired / worth investigating.",
+            "nullable": true
+          },
+          "autopilotInquirySearchable": {
+            "type": "string",
+            "description": "Operator guidance for the inquiry agent: what is searchable in this instance.",
+            "nullable": true
+          },
+          "autopilotCaseEnabled": {
+            "type": "boolean",
+            "description": "When true, the autopilot case agent manages investigation cases automatically after scans.",
+            "example": false
+          },
+          "autopilotCaseGuidance": {
+            "type": "string",
+            "description": "Operator guidance for the case agent.",
+            "nullable": true
+          },
           "demoMode": {
             "type": "boolean",
             "description": "Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.",
@@ -8492,6 +10752,11 @@
           "timezone",
           "timeFormat",
           "aiProviderConfigId",
+          "autopilotInquiryEnabled",
+          "autopilotInquiryDesired",
+          "autopilotInquirySearchable",
+          "autopilotCaseEnabled",
+          "autopilotCaseGuidance",
           "demoMode",
           "createdAt",
           "updatedAt"
@@ -8536,6 +10801,31 @@
           "aiProviderConfigId": {
             "type": "string",
             "description": "Id of the AI provider credential to use as the instance-wide default. Pass null or an empty string to clear the selection.",
+            "nullable": true
+          },
+          "autopilotInquiryEnabled": {
+            "type": "boolean",
+            "description": "When true, the autopilot inquiry agent manages inquiries automatically after scans.",
+            "example": false
+          },
+          "autopilotInquiryDesired": {
+            "type": "string",
+            "description": "Operator guidance for the inquiry agent: what is desired / worth investigating.",
+            "nullable": true
+          },
+          "autopilotInquirySearchable": {
+            "type": "string",
+            "description": "Operator guidance for the inquiry agent: what is searchable in this instance.",
+            "nullable": true
+          },
+          "autopilotCaseEnabled": {
+            "type": "boolean",
+            "description": "When true, the autopilot case agent manages investigation cases automatically after scans.",
+            "example": false
+          },
+          "autopilotCaseGuidance": {
+            "type": "string",
+            "description": "Operator guidance for the case agent.",
             "nullable": true
           }
         }
@@ -9050,6 +11340,2111 @@
           "content",
           "model",
           "provider"
+        ]
+      },
+      "CreateCaseDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "CLOSED",
+              "ARCHIVED"
+            ],
+            "default": "OPEN"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ],
+            "default": "MEDIUM"
+          },
+          "assignee": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "inquiryIds": {
+            "description": "Link these questions to the new case (guides)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "EvidenceEntityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "assetType": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ]
+      },
+      "CaseFindingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseEvidenceId": {
+            "type": "string"
+          },
+          "findingId": {
+            "type": "string"
+          },
+          "findingLabel": {
+            "type": "string",
+            "description": "Finding type label (e.g. \"Contains PII\")"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "customDetectorName": {
+            "type": "string",
+            "description": "Human-readable name for custom detectors (snapshotted at attach time)"
+          },
+          "matchedContent": {
+            "type": "string",
+            "description": "Matched content snippet snapshotted from the finding at attach time"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "caseEvidenceId",
+          "findingId",
+          "findingLabel",
+          "createdAt"
+        ]
+      },
+      "CaseEvidenceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "addedBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "entity": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceEntityDto"
+              }
+            ]
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseFindingDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "entityType",
+          "entityId",
+          "createdAt"
+        ]
+      },
+      "CaseLinkedInquiryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED"
+            ]
+          },
+          "matchCount": {
+            "type": "number",
+            "description": "Findings currently matching this inquiry"
+          },
+          "newMatchCount": {
+            "type": "number",
+            "description": "Matches that appeared since the inquiry was last viewed"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "matchCount",
+          "newMatchCount"
+        ]
+      },
+      "CaseResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "CLOSED",
+              "ARCHIVED"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ]
+          },
+          "aiMode": {
+            "type": "string",
+            "enum": [
+              "INHERIT",
+              "MANAGED",
+              "OBSERVE_ONLY"
+            ]
+          },
+          "assignee": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "conclusion": {
+            "type": "string"
+          },
+          "evidenceCount": {
+            "type": "number"
+          },
+          "hypothesisCount": {
+            "type": "number"
+          },
+          "inquiryCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseEvidenceDto"
+            }
+          },
+          "inquiries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseLinkedInquiryDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "severity",
+          "aiMode",
+          "evidenceCount",
+          "hypothesisCount",
+          "inquiryCount",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CaseListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseResponseDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ]
+      },
+      "UpdateCaseDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "CLOSED",
+              "ARCHIVED"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ]
+          },
+          "assignee": {
+            "type": "string"
+          },
+          "conclusion": {
+            "type": "string"
+          },
+          "aiMode": {
+            "type": "string",
+            "enum": [
+              "INHERIT",
+              "MANAGED",
+              "OBSERVE_ONLY"
+            ],
+            "description": "AI autopilot mode for this case. INHERIT follows the instance setting; OBSERVE_ONLY blocks autopilot mutations."
+          }
+        }
+      },
+      "AddEvidenceDto": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "description": "Entity kind — must be \"asset\""
+          },
+          "entityId": {
+            "type": "string",
+            "description": "Asset UUID"
+          },
+          "hypothesisIds": {
+            "description": "Hypothesis UUIDs to link this evidence to (optional)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "note": {
+            "type": "string"
+          },
+          "addedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "entityType",
+          "entityId"
+        ]
+      },
+      "UpdateEvidenceNoteDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "Analyst note. Pass null or empty string to clear."
+          }
+        }
+      },
+      "AddFindingDto": {
+        "type": "object",
+        "properties": {
+          "findingId": {
+            "type": "string",
+            "description": "Finding UUID"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "findingId"
+        ]
+      },
+      "AttachFindingsDto": {
+        "type": "object",
+        "properties": {
+          "findingIds": {
+            "description": "Finding UUIDs to attach as case evidence",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "addedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "findingIds"
+        ]
+      },
+      "AttachFindingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "attached": {
+            "type": "number",
+            "description": "Findings newly attached to the case"
+          }
+        },
+        "required": [
+          "attached"
+        ]
+      },
+      "UpdateCaseFindingNoteDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "Analyst note. Pass null or empty string to clear."
+          }
+        }
+      },
+      "LinkInquiriesDto": {
+        "type": "object",
+        "properties": {
+          "inquiryIds": {
+            "description": "Inquiry UUIDs to link",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "inquiryIds"
+        ]
+      },
+      "CloseCaseDto": {
+        "type": "object",
+        "properties": {
+          "conclusion": {
+            "type": "string",
+            "description": "Final conclusion — required to close the case"
+          },
+          "closedBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "conclusion"
+        ]
+      },
+      "CloseCaseResponseDto": {
+        "type": "object",
+        "properties": {
+          "case": {
+            "$ref": "#/components/schemas/CaseResponseDto"
+          },
+          "archivedInquiries": {
+            "type": "number",
+            "description": "Linked inquiries archived by closing this case"
+          }
+        },
+        "required": [
+          "case",
+          "archivedInquiries"
+        ]
+      },
+      "PullFromInquiryDto": {
+        "type": "object",
+        "properties": {
+          "inquiryId": {
+            "type": "string",
+            "description": "Question to pull matches from"
+          },
+          "findingIds": {
+            "description": "Specific finding IDs (omit = all current matches)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "inquiryId"
+        ]
+      },
+      "PullFromInquiryResponseDto": {
+        "type": "object",
+        "properties": {
+          "pulled": {
+            "type": "number",
+            "description": "Number of findings pulled into the case"
+          }
+        },
+        "required": [
+          "pulled"
+        ]
+      },
+      "GraphNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "\"asset\" | \"finding\""
+          },
+          "label": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "number",
+            "description": "Hop distance from the seed/case evidence"
+          },
+          "assetType": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "customDetectorName": {
+            "type": "string",
+            "description": "For CUSTOM findings: the custom detector display name"
+          },
+          "status": {
+            "type": "string"
+          },
+          "matchedContent": {
+            "type": "string",
+            "description": "For finding nodes: truncated matched text"
+          },
+          "assetName": {
+            "type": "string",
+            "description": "For finding nodes: name of the parent asset"
+          },
+          "assetId": {
+            "type": "string",
+            "description": "For finding nodes: parent asset id"
+          },
+          "hypothesisIds": {
+            "description": "Hypothesis IDs this node is directly affiliated with (as evidence or case finding)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "caseFindingId": {
+            "type": "string",
+            "description": "For finding nodes: the CaseFinding record ID (used to unlink)"
+          },
+          "missing": {
+            "type": "boolean",
+            "description": "True when the underlying row no longer exists"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "label",
+          "depth"
+        ]
+      },
+      "GraphEdgeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fromType": {
+            "type": "string"
+          },
+          "fromId": {
+            "type": "string"
+          },
+          "toType": {
+            "type": "string"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "relationType": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "SOURCE_DERIVED",
+              "INFERRED",
+              "MANUAL"
+            ]
+          },
+          "crossHypothesis": {
+            "type": "boolean",
+            "description": "True when this edge bridges nodes affiliated with different hypotheses"
+          }
+        },
+        "required": [
+          "id",
+          "fromType",
+          "fromId",
+          "toType",
+          "toId",
+          "relationType",
+          "confidence",
+          "origin"
+        ]
+      },
+      "GraphResponseDto": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphNodeDto"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphEdgeDto"
+            }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the node cap was hit and the graph is partial"
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "truncated"
+        ]
+      },
+      "CreateInquiryDto": {
+        "type": "object",
+        "properties": {
+          "matchAllSources": {
+            "type": "boolean",
+            "description": "Match findings from any source (ignores sourceIds)"
+          },
+          "sourceIds": {
+            "description": "Source IDs to match",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detectorTypes": {
+            "type": "array",
+            "description": "Empty = any detector",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            }
+          },
+          "customDetectorKeys": {
+            "description": "Custom detector keys to match",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypes": {
+            "description": "Exact findingType matches",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypeRegex": {
+            "description": "Regex patterns matched against findingType",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingValueRegex": {
+            "description": "Regex patterns matched against matchedContent (the detected value). Empty = any.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "title": {
+            "type": "string",
+            "description": "The question / monitor name"
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "InquiryLinkedCaseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status"
+        ]
+      },
+      "InquiryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "cases": {
+            "description": "Cases this inquiry drives",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InquiryLinkedCaseDto"
+            }
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED"
+            ]
+          },
+          "aiMode": {
+            "type": "string",
+            "enum": [
+              "INHERIT",
+              "MANAGED",
+              "OBSERVE_ONLY"
+            ]
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "matchAllSources": {
+            "type": "boolean"
+          },
+          "sourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detectorTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            }
+          },
+          "customDetectorKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypeRegex": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingValueRegex": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "matchCount": {
+            "type": "number",
+            "description": "Findings currently matching this query"
+          },
+          "newMatchCount": {
+            "type": "number",
+            "description": "Matches that appeared since you last viewed"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "cases",
+          "title",
+          "status",
+          "aiMode",
+          "matchAllSources",
+          "sourceIds",
+          "detectorTypes",
+          "customDetectorKeys",
+          "findingTypes",
+          "findingTypeRegex",
+          "findingValueRegex",
+          "matchCount",
+          "newMatchCount",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PreviewInquiryDto": {
+        "type": "object",
+        "properties": {
+          "matchAllSources": {
+            "type": "boolean",
+            "description": "Match findings from any source (ignores sourceIds)"
+          },
+          "sourceIds": {
+            "description": "Source IDs to match",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detectorTypes": {
+            "type": "array",
+            "description": "Empty = any detector",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            }
+          },
+          "customDetectorKeys": {
+            "description": "Custom detector keys to match",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypes": {
+            "description": "Exact findingType matches",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypeRegex": {
+            "description": "Regex patterns matched against findingType",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingValueRegex": {
+            "description": "Regex patterns matched against matchedContent (the detected value). Empty = any.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "InquiryMatchDto": {
+        "type": "object",
+        "properties": {
+          "findingId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "matchedContent": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "assetName": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string"
+          },
+          "matchedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "isNew": {
+            "type": "boolean",
+            "description": "Appeared since the question was last viewed"
+          }
+        },
+        "required": [
+          "findingId",
+          "label",
+          "assetId",
+          "matchedAt",
+          "isNew"
+        ]
+      },
+      "PreviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Total findings currently matching"
+          },
+          "sample": {
+            "description": "Sample of matches (capped)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InquiryMatchDto"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "sample"
+        ]
+      },
+      "MatchOptionSourceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type"
+        ]
+      },
+      "MatchOptionCustomDetectorDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ]
+      },
+      "MatchOptionFindingTypeDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "detectorType": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "value",
+          "detectorType",
+          "count"
+        ]
+      },
+      "MatchOptionsResponseDto": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatchOptionSourceDto"
+            }
+          },
+          "customDetectors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatchOptionCustomDetectorDto"
+            }
+          },
+          "findingTypes": {
+            "description": "Distinct finding types (optionally scoped to selected sources)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatchOptionFindingTypeDto"
+            }
+          }
+        },
+        "required": [
+          "sources",
+          "customDetectors",
+          "findingTypes"
+        ]
+      },
+      "InquiryListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InquiryResponseDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ]
+      },
+      "UpdateInquiryDto": {
+        "type": "object",
+        "properties": {
+          "matchAllSources": {
+            "type": "boolean",
+            "description": "Match findings from any source (ignores sourceIds)"
+          },
+          "sourceIds": {
+            "description": "Source IDs to match",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detectorTypes": {
+            "type": "array",
+            "description": "Empty = any detector",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SECRETS",
+                "PII",
+                "YARA",
+                "BROKEN_LINKS",
+                "CODE_SECURITY",
+                "CUSTOM"
+              ]
+            }
+          },
+          "customDetectorKeys": {
+            "description": "Custom detector keys to match",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypes": {
+            "description": "Exact findingType matches",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingTypeRegex": {
+            "description": "Regex patterns matched against findingType",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "findingValueRegex": {
+            "description": "Regex patterns matched against matchedContent (the detected value). Empty = any.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED"
+            ]
+          },
+          "aiMode": {
+            "type": "string",
+            "enum": [
+              "INHERIT",
+              "MANAGED",
+              "OBSERVE_ONLY"
+            ],
+            "description": "AI autopilot mode for this inquiry. INHERIT follows the instance setting; OBSERVE_ONLY blocks autopilot mutations."
+          }
+        }
+      },
+      "InquiryMatchListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InquiryMatchDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Total matches after filters"
+          },
+          "newCount": {
+            "type": "number",
+            "description": "New matches after filters (appeared since last seen)"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "newCount",
+          "skip",
+          "limit"
+        ]
+      },
+      "RematchResponseDto": {
+        "type": "object",
+        "properties": {
+          "landed": {
+            "type": "number",
+            "description": "Findings newly recorded as matches"
+          }
+        },
+        "required": [
+          "landed"
+        ]
+      },
+      "CaseActivityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string"
+          },
+          "activityType": {
+            "type": "string",
+            "enum": [
+              "CASE_CREATED",
+              "CASE_UPDATED",
+              "CONCLUSION_UPDATED",
+              "INQUIRY_LINKED",
+              "INQUIRY_UNLINKED",
+              "INQUIRY_PULLED",
+              "EVIDENCE_ADDED",
+              "EVIDENCE_REMOVED",
+              "EVIDENCE_NOTE_UPDATED",
+              "FINDING_ADDED",
+              "FINDING_REMOVED",
+              "FINDING_NOTE_UPDATED",
+              "THREAD_CREATED",
+              "THREAD_ENTRY_ADDED",
+              "THREAD_STATEMENT_UPDATED",
+              "THREAD_STATUS_CHANGED",
+              "THREAD_CONFIDENCE_CHANGED",
+              "SUPPORT_LINKED",
+              "SUPPORT_UNLINKED",
+              "SUPPORT_UPDATED"
+            ]
+          },
+          "actor": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "caseId",
+          "activityType",
+          "payload",
+          "createdAt"
+        ]
+      },
+      "CaseTimelineResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseActivityDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "ThreadSupportLinkDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "evidence",
+              "finding"
+            ]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "SUPPORTS",
+              "CONTRADICTS",
+              "NEUTRAL"
+            ]
+          },
+          "weight": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          },
+          "targetLabel": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "stance",
+          "targetLabel",
+          "createdAt"
+        ]
+      },
+      "ThreadEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "entryType": {
+            "type": "string",
+            "enum": [
+              "NOTE",
+              "STATEMENT",
+              "STATUS_CHANGE",
+              "CONFIDENCE_CHANGE"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "author": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "threadId",
+          "entryType",
+          "createdAt"
+        ]
+      },
+      "ThreadResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "HYPOTHESIS",
+              "DISCUSSION"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "SUPPORTED",
+              "REFUTED",
+              "INCONCLUSIVE"
+            ],
+            "nullable": true
+          },
+          "confidence": {
+            "type": "number",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "supportingCount": {
+            "type": "number",
+            "description": "Count of SUPPORTS links"
+          },
+          "contradictingCount": {
+            "type": "number",
+            "description": "Count of CONTRADICTS links"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThreadSupportLinkDto"
+            }
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThreadEntryDto"
+            }
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "caseId",
+          "kind",
+          "title",
+          "supportingCount",
+          "contradictingCount",
+          "links",
+          "entries",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateThreadDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "HYPOTHESIS",
+              "DISCUSSION"
+            ],
+            "default": "HYPOTHESIS"
+          },
+          "title": {
+            "type": "string",
+            "description": "Short display title (hypothesis name or discussion topic)"
+          },
+          "statement": {
+            "type": "string",
+            "description": "Initial statement body (hypothesis threads)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "SUPPORTED",
+              "REFUTED",
+              "INCONCLUSIVE"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "createdBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title"
+        ]
+      },
+      "UpdateThreadDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "SUPPORTED",
+              "REFUTED",
+              "INCONCLUSIVE"
+            ],
+            "nullable": true
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "actor": {
+            "type": "string"
+          }
+        }
+      },
+      "AddThreadEntryDto": {
+        "type": "object",
+        "properties": {
+          "entryType": {
+            "type": "string",
+            "enum": [
+              "NOTE",
+              "STATEMENT",
+              "STATUS_CHANGE",
+              "CONFIDENCE_CHANGE"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "entryType"
+        ]
+      },
+      "ThreadEntriesResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThreadEntryDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "LinkThreadSupportDto": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "evidence",
+              "finding"
+            ]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "SUPPORTS",
+              "CONTRADICTS",
+              "NEUTRAL"
+            ]
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetType",
+          "targetId"
+        ]
+      },
+      "HypothesisSupportLinkDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "evidence",
+              "finding"
+            ]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "SUPPORTS",
+              "CONTRADICTS",
+              "NEUTRAL"
+            ]
+          },
+          "weight": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          },
+          "targetLabel": {
+            "type": "string",
+            "description": "Display label for the linked target"
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "stance",
+          "targetLabel"
+        ]
+      },
+      "HypothesisResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "SUPPORTED",
+              "REFUTED",
+              "INCONCLUSIVE"
+            ]
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "supportingCount": {
+            "type": "number",
+            "description": "Count of SUPPORTS links"
+          },
+          "contradictingCount": {
+            "type": "number",
+            "description": "Count of CONTRADICTS links"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "description": "Custom hex color for graph visualization",
+            "nullable": true
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HypothesisSupportLinkDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "caseId",
+          "statement",
+          "status",
+          "supportingCount",
+          "contradictingCount",
+          "createdAt",
+          "updatedAt",
+          "links"
+        ]
+      },
+      "CreateHypothesisDto": {
+        "type": "object",
+        "properties": {
+          "statement": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "SUPPORTED",
+              "REFUTED",
+              "INCONCLUSIVE"
+            ],
+            "default": "PROPOSED"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "createdBy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "statement"
+        ]
+      },
+      "UpdateHypothesisDto": {
+        "type": "object",
+        "properties": {
+          "statement": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "SUPPORTED",
+              "REFUTED",
+              "INCONCLUSIVE"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "description": "Hex color string for graph visualization (e.g. \"#ef4444\")",
+            "nullable": true
+          }
+        }
+      },
+      "LinkSupportDto": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "evidence",
+              "finding"
+            ],
+            "description": "What is being linked"
+          },
+          "targetId": {
+            "type": "string",
+            "description": "QuestionEvidence.id or QuestionFinding.id"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "SUPPORTS",
+              "CONTRADICTS",
+              "NEUTRAL"
+            ],
+            "default": "SUPPORTS"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetType",
+          "targetId"
+        ]
+      },
+      "ExpandGraphDto": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "description": "Seed entity kind: \"asset\" | \"finding\""
+          },
+          "entityId": {
+            "type": "string",
+            "description": "Seed entity UUID"
+          },
+          "depth": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1,
+            "maximum": 3
+          },
+          "direction": {
+            "type": "string",
+            "default": "both",
+            "enum": [
+              "both",
+              "out",
+              "in"
+            ]
+          },
+          "relationTypes": {
+            "description": "Restrict traversal to these relation types",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "entityType",
+          "entityId"
+        ]
+      },
+      "PivotGraphDto": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "description": "Entity kind: \"asset\" | \"finding\""
+          },
+          "entityId": {
+            "type": "string",
+            "description": "Entity UUID"
+          },
+          "pivot": {
+            "type": "string",
+            "enum": [
+              "who_touched",
+              "upstream_lineage",
+              "downstream_lineage",
+              "access",
+              "emails",
+              "similar_findings"
+            ],
+            "description": "Named investigation question"
+          },
+          "depth": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1,
+            "maximum": 3
+          }
+        },
+        "required": [
+          "entityType",
+          "entityId",
+          "pivot"
+        ]
+      },
+      "IngestEdgeDto": {
+        "type": "object",
+        "properties": {
+          "fromType": {
+            "type": "string",
+            "description": "Source entity kind: \"asset\" | \"finding\""
+          },
+          "fromId": {
+            "type": "string",
+            "description": "Source entity UUID (use fromId OR fromHash)"
+          },
+          "fromHash": {
+            "type": "string",
+            "description": "Source asset hash (alternative to fromId — API resolves to UUID)"
+          },
+          "toType": {
+            "type": "string",
+            "description": "Target entity kind: \"asset\" | \"finding\""
+          },
+          "toId": {
+            "type": "string",
+            "description": "Target entity UUID (use toId OR toHash)"
+          },
+          "toHash": {
+            "type": "string",
+            "description": "Target asset hash (alternative to toId — API resolves to UUID)"
+          },
+          "relationType": {
+            "type": "string",
+            "description": "Relation type: OWNS | ACCESSED | READS | WRITES | GENERATED_FROM | EXPORTED_TO | ATTACHED_TO | SENT_TO | EXECUTED | MENTIONS | CONTAINS | REFERENCES"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 1
+          }
+        },
+        "required": [
+          "fromType",
+          "toType",
+          "relationType"
+        ]
+      },
+      "BulkIngestEdgesDto": {
+        "type": "object",
+        "properties": {
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngestEdgeDto"
+            }
+          }
+        },
+        "required": [
+          "edges"
+        ]
+      },
+      "BulkIngestEdgesResponseDto": {
+        "type": "object",
+        "properties": {
+          "upserted": {
+            "type": "number",
+            "description": "Number of edges upserted"
+          }
+        },
+        "required": [
+          "upserted"
+        ]
+      },
+      "RebuildEdgesResponseDto": {
+        "type": "object",
+        "properties": {
+          "edgeCount": {
+            "type": "number",
+            "description": "Total edges present after the rebuild"
+          }
+        },
+        "required": [
+          "edgeCount"
+        ]
+      },
+      "RelationTypesResponseDto": {
+        "type": "object",
+        "properties": {
+          "inUse": {
+            "description": "All relation types in use, sorted by frequency",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "suggestions": {
+            "description": "Vocabulary suggestions (built-in + inUse)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "inUse",
+          "suggestions"
+        ]
+      },
+      "CreateManualEdgeDto": {
+        "type": "object",
+        "properties": {
+          "fromType": {
+            "type": "string",
+            "description": "Source entity kind: \"asset\" | \"finding\""
+          },
+          "fromId": {
+            "type": "string",
+            "description": "Source entity UUID"
+          },
+          "toType": {
+            "type": "string",
+            "description": "Target entity kind: \"asset\" | \"finding\""
+          },
+          "toId": {
+            "type": "string",
+            "description": "Target entity UUID"
+          },
+          "relationType": {
+            "type": "string",
+            "description": "Relation type — free-form string (e.g. \"READS\", \"SENT_TO\", \"my custom link\")"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 1
+          }
+        },
+        "required": [
+          "fromType",
+          "fromId",
+          "toType",
+          "toId",
+          "relationType"
+        ]
+      },
+      "EdgeDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fromType": {
+            "type": "string"
+          },
+          "fromId": {
+            "type": "string"
+          },
+          "toType": {
+            "type": "string"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "relationType": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "INFERRED",
+              "SOURCE_DERIVED",
+              "MANUAL"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "fromType",
+          "fromId",
+          "toType",
+          "toId",
+          "relationType",
+          "confidence",
+          "origin"
+        ]
+      },
+      "UpdateEdgeDto": {
+        "type": "object",
+        "properties": {
+          "relationType": {
+            "type": "string",
+            "description": "New relation type label for this edge"
+          }
+        },
+        "required": [
+          "relationType"
         ]
       },
       "StartRunnerDto": {
@@ -10270,6 +14665,482 @@
         "required": [
           "detectors"
         ]
+      },
+      "TriggerAutopilotDto": {
+        "type": "object",
+        "properties": {
+          "instruction": {
+            "type": "string",
+            "description": "What the agents should pay attention to in this cycle (highest-priority prompt section)."
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "Limit the review to one source. Omit to review all sources."
+          }
+        }
+      },
+      "TriggerAutopilotResponseDto": {
+        "type": "object",
+        "properties": {
+          "cycleKey": {
+            "type": "string",
+            "description": "Cycle identity — runs will carry this cycleKey"
+          },
+          "enqueued": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cycleKey",
+          "enqueued"
+        ]
+      },
+      "AgentRunDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "agentKind": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "SKIPPED"
+            ]
+          },
+          "sourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "runnerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "trigger": {
+            "type": "string",
+            "description": "\"scan_completed\" or \"manual\""
+          },
+          "instruction": {
+            "type": "string",
+            "description": "Operator instruction for manual cycles",
+            "nullable": true
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "decisionCount": {
+            "type": "number"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "agentKind",
+          "status",
+          "trigger",
+          "attempts",
+          "decisionCount",
+          "createdAt"
+        ]
+      },
+      "AgentRunListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRunDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ]
+      },
+      "AgentDecisionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "CREATE_INQUIRY",
+              "UPDATE_INQUIRY",
+              "ENRICH_INQUIRY_MATCHERS",
+              "SIGNAL_CASE_READY",
+              "CREATE_CASE",
+              "UPDATE_CASE",
+              "ADD_HYPOTHESIS",
+              "UPDATE_HYPOTHESIS",
+              "ADD_EVIDENCE",
+              "ATTACH_FINDINGS",
+              "ADD_NOTE",
+              "ADD_THREAD_ENTRY",
+              "CREATE_EDGE",
+              "CHANGE_STATUS",
+              "LINK_INQUIRY",
+              "NO_ACTION"
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "SKIPPED_OBSERVE_ONLY",
+              "FAILED"
+            ]
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true,
+            "description": "\"inquiry\" | \"case\""
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why the agent made (or skipped) this change"
+          },
+          "payload": {
+            "type": "object",
+            "description": "Exact mutation input / rejection detail",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "outcome",
+          "rationale",
+          "createdAt"
+        ]
+      },
+      "AgentRunDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "agentKind": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "SKIPPED"
+            ]
+          },
+          "sourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "runnerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "trigger": {
+            "type": "string",
+            "description": "\"scan_completed\" or \"manual\""
+          },
+          "instruction": {
+            "type": "string",
+            "description": "Operator instruction for manual cycles",
+            "nullable": true
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "decisionCount": {
+            "type": "number"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentDecisionDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "agentKind",
+          "status",
+          "trigger",
+          "attempts",
+          "decisionCount",
+          "createdAt",
+          "decisions"
+        ]
+      },
+      "AgentLogDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "TECHNICAL",
+              "BUSINESS"
+            ]
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "DEBUG",
+              "INFO",
+              "WARN",
+              "ERROR"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "description": "Structured detail — raw model output, prompt sizes, errors",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "level",
+          "message",
+          "createdAt"
+        ]
+      },
+      "AgentLogListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentLogDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "AgentMemoryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "GLOSSARY",
+              "DECISION_PRECEDENT",
+              "TOPIC_INQUIRY_MAP"
+            ]
+          },
+          "key": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "refType": {
+            "type": "string",
+            "nullable": true
+          },
+          "refId": {
+            "type": "string",
+            "nullable": true
+          },
+          "weight": {
+            "type": "number",
+            "description": "Reinforcement counter — higher = recalled first"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "key",
+          "content",
+          "tags",
+          "weight",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AgentMemoryListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentMemoryDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ]
+      },
+      "CreateAgentMemoryDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "GLOSSARY",
+              "DECISION_PRECEDENT",
+              "TOPIC_INQUIRY_MAP"
+            ]
+          },
+          "key": {
+            "type": "string",
+            "description": "Normalized lookup key (topic slug, term)"
+          },
+          "content": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "content"
+        ]
+      },
+      "UpdateAgentMemoryDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "weight": {
+            "type": "number",
+            "description": "Set the reinforcement weight directly"
+          }
+        }
       }
     }
   }

@@ -709,15 +709,16 @@ priorityClasses:
 
 telemetry:
   # -- Enable OpenTelemetry instrumentation for API, web, and CLI components.
-  # -- When false, TELEMETRY_DISABLED=1 is injected into all workloads.
-  # -- Opt out: set enabled=false, or set TELEMETRY_DISABLED=1 / DO_NOT_TRACK=1 at runtime.
-  enabled: true
+  # -- Disabled by default. When enabled, traces/metrics/logs are exported
+  # -- via OTLP to telemetry.otlpEndpoint.
+  # -- Opt out (already default): set enabled=false, or set TELEMETRY_DISABLED=1 / DO_NOT_TRACK=1 at runtime.
+  enabled: false
 
   # -- OTLP endpoint all components export to (traces, metrics, logs).
-  # -- Defaults to the Classifyre-hosted receiver. Override to point at your own
-  # -- OTel Collector (e.g. deploy helm/otel-receiver in your own cluster):
+  # -- Required when telemetry.enabled=true. Deploy helm/otel-receiver in your
+  # -- own cluster and point at it, e.g.:
   # --   otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318"
-  otlpEndpoint: "https://otel.classifyre.com"
+  otlpEndpoint: ""
 
   # -- OTLP export protocol: "http/protobuf" (default) or "grpc".
   otlpProtocol: "http/protobuf"

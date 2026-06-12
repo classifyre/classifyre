@@ -16,6 +16,7 @@
     "assets": "Assets",
     "sources": "Quellen",
     "detectors": "Custom-Detektoren",
+    "investigations": "Ermittlungen",
     "scans": "Scans",
     "sandbox": "Sandbox",
     "operations": "Operationen",
@@ -153,6 +154,32 @@
       "disabledHint": "Aktivieren Sie den Assistenten, um ein Modell zu wählen.",
       "usingNone": "Kein Modell ausgewählt",
       "loading": "Assistenteneinstellungen werden geladen…"
+    },
+    "autopilot": {
+      "subtitle": "Ermittlungs-Autopilot",
+      "title": "Autopilot",
+      "description": "Autonome KI-Agenten, die nach jedem Scan Anfragen und Ermittlungsfälle verwalten. Alle Aktionen werden der KI zugeordnet und vollständig protokolliert.",
+      "inquiryEnable": "Automatische Anfragenverwaltung",
+      "inquiryEnableDesc": "Nach jedem Scan prüft die KI neue Funde, erstellt oder erweitert Anfragen, vermeidet Duplikate und signalisiert, wenn ein Fall angebracht ist.",
+      "inquiryDesired": "Was gewünscht ist",
+      "inquiryDesiredPlaceholder": "Beschreiben Sie, worauf sich die KI konzentrieren soll, z. B. geleakte Zugangsdaten in Kundenbereichen, PII in öffentlichen Dokumenten…",
+      "inquirySearchable": "Was durchsuchbar ist",
+      "inquirySearchablePlaceholder": "Beschreiben Sie, welche Daten vorhanden und relevant sind, z. B. Confluence-Bereiche mit API-Doku, Jira-Projekte mit Support-Tickets…",
+      "caseEnable": "Vollständige Fallverwaltung",
+      "caseEnableDesc": "Die KI erstellt und entwickelt Ermittlungsfälle aus Anfragen: Hypothesen, Beweise, Funde, Notizen, Kanten und Statusänderungen.",
+      "caseGuidance": "Fall-Leitlinien",
+      "caseGuidancePlaceholder": "Zusätzliche Anweisungen für die Fallverwaltung, z. B. Schweregrad-Konventionen, wann ein Fall geschlossen wird, Namensregeln…",
+      "enabledToast": "Autopilot-Einstellung gespeichert",
+      "guidanceSaved": "Leitlinien gespeichert",
+      "requiresAi": "Aktivieren Sie den KI-Assistenten und wählen Sie einen Anbieter, um den Autopiloten zu nutzen.",
+      "aiMode": "KI-Autopilot",
+      "aiModeInherit": "Erben",
+      "aiModeManaged": "Verwaltet",
+      "aiModeObserveOnly": "Nur beobachten",
+      "aiModeDesc": "„Erben“ folgt der Instanz-Einstellung. „Nur beobachten“ erlaubt der KI zu lesen, aber nie zu ändern.",
+      "aiBadge": "KI",
+      "aiBadgeTooltip": "Vom Ermittlungs-Autopilot ausgeführt",
+      "saveGuidance": "Leitlinien speichern"
     }
   },
   "sources": {
@@ -1395,36 +1422,83 @@
       }
     }
   },
-  "forms": {
-    "title": "Protokolle",
-    "description": "Geparste Runner-Protokolle mit Level-Erkennung",
-    "search": "Nachricht suchen",
-    "allLevels": "Alle Level",
-    "searchLevels": "Level suchen…",
-    "noLevelsFound": "Keine Level gefunden",
-    "newestFirst": "Neueste zuerst",
-    "oldestFirst": "Älteste zuerst",
-    "noLogs": "Keine Protokolle verfügbar",
-    "noLogsHint": "Keine Protokolleinträge entsprechen Ihrer Suche.",
-    "autoRefresh": "Automatische Aktualisierung",
-    "wrapLines": "Zeilenumbruch",
-    "refresh": "Aktualisieren",
-    "downloadVisible": "Sichtbare herunterladen",
-    "downloadAll": "Alle herunterladen",
-    "loadMore": "Mehr laden",
-    "jumpToLatest": "Zum Neuesten springen",
-    "showing": "{{filtered}} / {{total}} geladen angezeigt",
-    "autoRefreshEnabled": "Automatische Aktualisierung aktiviert (alle 2 Sek.)",
-    "autoRefreshPaused": "Automatische Aktualisierung pausiert",
-    "runnerCompleted": "Runner abgeschlossen",
-    "copyRow": "Zeile kopieren",
-    "copied": "Kopiert",
-    "downloaded": "Sichtbare Protokolle heruntergeladen",
-    "downloadedCount": "{{count}} Protokolleinträge heruntergeladen",
-    "copiedRows": "{{count}} Protokollzeilen kopiert",
-    "noLogsDownload": "Keine Protokolle zum Herunterladen verfügbar",
-    "noRowsToCopy": "Mindestens eine Zeile zum Kopieren auswählen",
-    "loadedEntries": "geladen"
+  "cases": {
+    "search": "Ermittlungen suchen…",
+    "noInvestigations": "Keine Ermittlungen gefunden",
+    "noInvestigationsHint": "Filter anpassen, um die Suche zu erweitern.",
+    "loading": "Ermittlungen werden geladen...",
+    "columns": {
+      "title": "Titel",
+      "status": "Status",
+      "severity": "Schweregrad",
+      "inquiries": "Anfragen",
+      "updated": "Aktualisiert"
+    },
+    "statusLabels": {
+      "OPEN": "Offen",
+      "IN_PROGRESS": "In Bearbeitung",
+      "CLOSED": "Geschlossen",
+      "ARCHIVED": "Archiviert"
+    },
+    "severityLabels": {
+      "CRITICAL": "Kritisch",
+      "HIGH": "Hoch",
+      "MEDIUM": "Mittel",
+      "LOW": "Niedrig",
+      "INFO": "Info"
+    },
+    "evidence": {
+      "search": "Beweise suchen…",
+      "noEvidence": "Noch keine Beweise",
+      "noEvidenceHint": "Aus einer verknüpften Frage übernehmen oder Assets manuell hinzufügen.",
+      "addEvidence": "Beweis hinzufügen",
+      "columns": {
+        "entity": "Entität",
+        "type": "Typ",
+        "sourceType": "Quelltyp",
+        "assetType": "Asset-Typ",
+        "findings": "Befunde",
+        "note": "Notiz",
+        "added": "Hinzugefügt",
+        "actions": "Aktionen"
+      },
+      "tooltips": {
+        "entity": "Asset oder Entität, die als Beweis verwendet wird",
+        "type": "Entitätstyp (Asset, Befund, …)",
+        "sourceType": "Quell-Connector-Typ",
+        "assetType": "Asset-Art (Seite, Datei, …)",
+        "findings": "Angehängte Befunde · Chip zeigt verfügbare Anzahl",
+        "note": "Analystennotiz, Stift klicken zum Bearbeiten",
+        "added": "Wann dieser Beweis hinzugefügt wurde",
+        "sortEntity": "Nach Entitätsname sortieren",
+        "sortFindings": "Nach Anzahl der Befunde sortieren",
+        "sortAdded": "Nach Hinzufügedatum sortieren"
+      },
+      "subTable": {
+        "noFindings": "Keine Befunde angehängt",
+        "findingLabel": "Befund",
+        "detectorType": "Detektor",
+        "matchedContent": "Treffer-Inhalt",
+        "severity": "Schweregrad",
+        "note": "Notiz",
+        "added": "Hinzugefügt",
+        "attachedFindings": "Angehängte Befunde",
+        "availableFindings": "Verfügbare Befunde für dieses Asset",
+        "attachSelected": "Ausgewählte anhängen",
+        "tooltips": {
+          "findingLabel": "Erkannter Befundtyp",
+          "detectorType": "Detektortyp, der diesen Befund ausgelöst hat",
+          "matchedContent": "Inhaltsfragment, das diesen Befund ausgelöst hat",
+          "severity": "Risikoniveau dieses Befunds",
+          "note": "Analystennotiz, Stift klicken zum Bearbeiten",
+          "added": "Wann dieser Befund dem Fall hinzugefügt wurde",
+          "sortByFinding": "Nach Befundtyp sortieren",
+          "sortByDetector": "Nach Detektortyp sortieren",
+          "sortBySeverity": "Nach Schweregrad sortieren",
+          "sortByAdded": "Nach Hinzufügedatum sortieren"
+        }
+      }
+    }
   },
   "forms": {
     "sourceName": "Quellenname",
@@ -1458,7 +1532,7 @@
     "template": "Vorlage",
     "noTemplatesAvailable": "Für diese Quelle sind noch keine Vorlagen verfügbar."
   },
-"mcp": {
+  "mcp": {
     "enable": "MCP aktivieren",
     "cursorWorkspace": "Cursor lokaler Arbeitsbereich",
     "tokenCreated": "MCP-Token erstellt. Kopieren Sie ihn jetzt, da er nicht erneut angezeigt wird.",
@@ -1540,7 +1614,7 @@
       "weekly": "Sonntagabend"
     }
   },
-"aiProvider": {
+  "aiProvider": {
     "saved": "KI-Anbietereinstellungen gespeichert",
     "title": "KI-Anbieter",
     "configuration": "KI-Anbieterkonfiguration",
@@ -1693,4 +1767,3 @@
     "sandbox": "Sandbox"
   }
 }
-
