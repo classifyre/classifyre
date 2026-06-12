@@ -4929,6 +4929,60 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Substring match on finding type, asset name or matched content",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "CRITICAL",
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW",
+                  "INFO"
+                ]
+              }
+            }
+          },
+          {
+            "name": "onlyNew",
+            "required": false,
+            "in": "query",
+            "description": "Only matches that appeared since last seen",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -4937,16 +4991,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/InquiryMatchDto"
-                  }
+                  "$ref": "#/components/schemas/InquiryMatchListResponseDto"
                 }
               }
             }
           }
         },
-        "summary": "List the findings currently matching this inquiry",
+        "summary": "List the findings currently matching this inquiry (paginated)",
         "tags": [
           "inquiries"
         ]
@@ -12483,6 +12534,38 @@
             "description": "AI autopilot mode for this inquiry. INHERIT follows the instance setting; OBSERVE_ONLY blocks autopilot mutations."
           }
         }
+      },
+      "InquiryMatchListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InquiryMatchDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Total matches after filters"
+          },
+          "newCount": {
+            "type": "number",
+            "description": "New matches after filters (appeared since last seen)"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "newCount",
+          "skip",
+          "limit"
+        ]
       },
       "RematchResponseDto": {
         "type": "object",

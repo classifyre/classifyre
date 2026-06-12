@@ -145,7 +145,7 @@ All URIs are relative to *http://localhost*
 *InquiriesApi* | [**inquiriesControllerCreate**](docs/InquiriesApi.md#inquiriescontrollercreate) | **POST** /inquiries | Create an inquiry (a saved query) and seed its matches
 *InquiriesApi* | [**inquiriesControllerFindOne**](docs/InquiriesApi.md#inquiriescontrollerfindone) | **GET** /inquiries/{id} | Get an inquiry
 *InquiriesApi* | [**inquiriesControllerList**](docs/InquiriesApi.md#inquiriescontrollerlist) | **GET** /inquiries | List inquiries (with match counts)
-*InquiriesApi* | [**inquiriesControllerListMatches**](docs/InquiriesApi.md#inquiriescontrollerlistmatches) | **GET** /inquiries/{id}/matches | List the findings currently matching this inquiry
+*InquiriesApi* | [**inquiriesControllerListMatches**](docs/InquiriesApi.md#inquiriescontrollerlistmatches) | **GET** /inquiries/{id}/matches | List the findings currently matching this inquiry (paginated)
 *InquiriesApi* | [**inquiriesControllerMarkSeen**](docs/InquiriesApi.md#inquiriescontrollermarkseen) | **POST** /inquiries/{id}/seen | Mark the current matches as seen (clears the \&quot;new\&quot; badge)
 *InquiriesApi* | [**inquiriesControllerMatchOptions**](docs/InquiriesApi.md#inquiriescontrollermatchoptions) | **GET** /inquiries/match-options | Sources, custom detectors and distinct finding types for the matcher form
 *InquiriesApi* | [**inquiriesControllerPreview**](docs/InquiriesApi.md#inquiriescontrollerpreview) | **POST** /inquiries/preview | Preview findings a matcher config currently selects (no save)
@@ -304,6 +304,7 @@ All URIs are relative to *http://localhost*
 - [InquiryLinkedCaseDto](docs/InquiryLinkedCaseDto.md)
 - [InquiryListResponseDto](docs/InquiryListResponseDto.md)
 - [InquiryMatchDto](docs/InquiryMatchDto.md)
+- [InquiryMatchListResponseDto](docs/InquiryMatchListResponseDto.md)
 - [InquiryResponseDto](docs/InquiryResponseDto.md)
 - [InstanceSettingsResponseDto](docs/InstanceSettingsResponseDto.md)
 - [LatestRunnerSummaryDto](docs/LatestRunnerSummaryDto.md)

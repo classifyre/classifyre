@@ -141,8 +141,8 @@ export class InquiryAgentService {
       ctx.run.id,
       'Requesting inquiry decisions from the model.',
       {
-        systemPromptChars: systemPrompt.length,
-        userPromptChars: userPrompt.length,
+        systemPrompt,
+        userPrompt,
         memoriesRecalled: memories.length,
       },
     );

@@ -7,7 +7,7 @@ All URIs are relative to *http://localhost*
 | [**inquiriesControllerCreate**](InquiriesApi.md#inquiriescontrollercreate) | **POST** /inquiries | Create an inquiry (a saved query) and seed its matches |
 | [**inquiriesControllerFindOne**](InquiriesApi.md#inquiriescontrollerfindone) | **GET** /inquiries/{id} | Get an inquiry |
 | [**inquiriesControllerList**](InquiriesApi.md#inquiriescontrollerlist) | **GET** /inquiries | List inquiries (with match counts) |
-| [**inquiriesControllerListMatches**](InquiriesApi.md#inquiriescontrollerlistmatches) | **GET** /inquiries/{id}/matches | List the findings currently matching this inquiry |
+| [**inquiriesControllerListMatches**](InquiriesApi.md#inquiriescontrollerlistmatches) | **GET** /inquiries/{id}/matches | List the findings currently matching this inquiry (paginated) |
 | [**inquiriesControllerMarkSeen**](InquiriesApi.md#inquiriescontrollermarkseen) | **POST** /inquiries/{id}/seen | Mark the current matches as seen (clears the \&quot;new\&quot; badge) |
 | [**inquiriesControllerMatchOptions**](InquiriesApi.md#inquiriescontrollermatchoptions) | **GET** /inquiries/match-options | Sources, custom detectors and distinct finding types for the matcher form |
 | [**inquiriesControllerPreview**](InquiriesApi.md#inquiriescontrollerpreview) | **POST** /inquiries/preview | Preview findings a matcher config currently selects (no save) |
@@ -226,9 +226,9 @@ No authorization required
 
 ## inquiriesControllerListMatches
 
-> Array&lt;InquiryMatchDto&gt; inquiriesControllerListMatches(id)
+> InquiryMatchListResponseDto inquiriesControllerListMatches(id, search, severity, onlyNew, skip, limit)
 
-List the findings currently matching this inquiry
+List the findings currently matching this inquiry (paginated)
 
 ### Example
 
@@ -246,6 +246,16 @@ async function example() {
   const body = {
     // string
     id: id_example,
+    // string | Substring match on finding type, asset name or matched content (optional)
+    search: search_example,
+    // Array<'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'> (optional)
+    severity: ...,
+    // boolean | Only matches that appeared since last seen (optional)
+    onlyNew: true,
+    // number (optional)
+    skip: 8.14,
+    // number (optional)
+    limit: 8.14,
   } satisfies InquiriesControllerListMatchesRequest;
 
   try {
@@ -266,10 +276,15 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **id** | `string` |  | [Defaults to `undefined`] |
+| **search** | `string` | Substring match on finding type, asset name or matched content | [Optional] [Defaults to `undefined`] |
+| **severity** | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFO` |  | [Optional] [Enum: CRITICAL, HIGH, MEDIUM, LOW, INFO] |
+| **onlyNew** | `boolean` | Only matches that appeared since last seen | [Optional] [Defaults to `undefined`] |
+| **skip** | `number` |  | [Optional] [Defaults to `0`] |
+| **limit** | `number` |  | [Optional] [Defaults to `50`] |
 
 ### Return type
 
-[**Array&lt;InquiryMatchDto&gt;**](InquiryMatchDto.md)
+[**InquiryMatchListResponseDto**](InquiryMatchListResponseDto.md)
 
 ### Authorization
 

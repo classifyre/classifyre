@@ -14,8 +14,9 @@ import {
   PreviewResponseDto,
   QueryInquiriesDto,
   InquiryListResponseDto,
-  InquiryMatchDto,
+  InquiryMatchListResponseDto,
   InquiryMatchersDto,
+  QueryInquiryMatchesDto,
   InquiryResponseDto,
   UpdateInquiryDto,
 } from './dto/inquiry.dto';
@@ -149,9 +150,12 @@ export class InquiriesService {
   }
 
   /** Findings currently matching the query (live query, never persisted). */
-  async listMatches(id: string): Promise<InquiryMatchDto[]> {
+  async listMatches(
+    id: string,
+    query: QueryInquiryMatchesDto = {},
+  ): Promise<InquiryMatchListResponseDto> {
     await this.ensureExists(id);
-    return this.matching.getLiveMatches(id);
+    return this.matching.getLiveMatches(id, query);
   }
 
   /** Mark the current matches as seen (clears the "new" badge). */

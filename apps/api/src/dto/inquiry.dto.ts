@@ -10,7 +10,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { DetectorType, InquiryStatus, AiManagementMode } from '@prisma/client';
+import { DetectorType, InquiryStatus, AiManagementMode, Severity } from '@prisma/client';
 
 /** Matcher fields shared by create/update/preview — what findings a query selects. */
 export class InquiryMatchersDto {
@@ -271,6 +271,56 @@ export class InquiryMatchDto {
 
   @ApiProperty({ description: 'Appeared since the question was last viewed' })
   isNew!: boolean;
+}
+
+export class QueryInquiryMatchesDto {
+  @ApiPropertyOptional({ description: 'Substring match on finding type, asset name or matched content' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
+
+  @ApiPropertyOptional({ enum: Severity, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(Severity, { each: true })
+  severity?: Severity[];
+
+  @ApiPropertyOptional({ description: 'Only matches that appeared since last seen' })
+  @IsOptional()
+  @IsBoolean()
+  onlyNew?: boolean;
+
+  @ApiPropertyOptional({ default: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number = 0;
+
+  @ApiPropertyOptional({ default: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number = 50;
+}
+
+export class InquiryMatchListResponseDto {
+  @ApiProperty({ type: [InquiryMatchDto] })
+  items!: InquiryMatchDto[];
+
+  @ApiProperty({ description: 'Total matches after filters' })
+  total!: number;
+
+  @ApiProperty({ description: 'New matches after filters (appeared since last seen)' })
+  newCount!: number;
+
+  @ApiProperty()
+  skip!: number;
+
+  @ApiProperty()
+  limit!: number;
 }
 
 /** Preview the current matches of a matcher config before saving a question. */

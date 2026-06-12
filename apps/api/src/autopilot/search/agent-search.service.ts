@@ -157,8 +157,10 @@ export class AgentSearchService {
       value?: string;
     }>
   > {
-    const matches = await this.matching.getLiveMatches(inquiryId);
-    return matches.slice(0, MAX_FINDINGS_PER_INQUIRY).map((m) => ({
+    const matches = await this.matching.getLiveMatches(inquiryId, {
+      limit: MAX_FINDINGS_PER_INQUIRY,
+    });
+    return matches.items.map((m) => ({
       findingId: m.findingId,
       assetId: m.assetId,
       label: m.label,

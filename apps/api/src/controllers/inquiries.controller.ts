@@ -19,8 +19,9 @@ import {
   PreviewInquiryDto,
   PreviewResponseDto,
   QueryInquiriesDto,
+  QueryInquiryMatchesDto,
   InquiryListResponseDto,
-  InquiryMatchDto,
+  InquiryMatchListResponseDto,
   InquiryResponseDto,
   UpdateInquiryDto,
 } from '../dto/inquiry.dto';
@@ -91,10 +92,13 @@ export class InquiriesController {
   }
 
   @Get(':id/matches')
-  @ApiOperation({ summary: 'List the findings currently matching this inquiry' })
-  @ApiResponse({ status: 200, type: [InquiryMatchDto] })
-  listMatches(@Param('id') id: string): Promise<InquiryMatchDto[]> {
-    return this.inquiries.listMatches(id);
+  @ApiOperation({ summary: 'List the findings currently matching this inquiry (paginated)' })
+  @ApiResponse({ status: 200, type: InquiryMatchListResponseDto })
+  listMatches(
+    @Param('id') id: string,
+    @Query() query: QueryInquiryMatchesDto,
+  ): Promise<InquiryMatchListResponseDto> {
+    return this.inquiries.listMatches(id, query);
   }
 
   @Post(':id/seen')

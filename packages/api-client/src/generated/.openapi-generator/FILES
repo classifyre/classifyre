@@ -106,6 +106,7 @@ docs/InquiriesApi.md
 docs/InquiryLinkedCaseDto.md
 docs/InquiryListResponseDto.md
 docs/InquiryMatchDto.md
+docs/InquiryMatchListResponseDto.md
 docs/InquiryResponseDto.md
 docs/InstanceSettingsApi.md
 docs/InstanceSettingsResponseDto.md
@@ -351,6 +352,7 @@ src/models/IngestEdgeDto.ts
 src/models/InquiryLinkedCaseDto.ts
 src/models/InquiryListResponseDto.ts
 src/models/InquiryMatchDto.ts
+src/models/InquiryMatchListResponseDto.ts
 src/models/InquiryResponseDto.ts
 src/models/InstanceSettingsResponseDto.ts
 src/models/LatestRunnerSummaryDto.ts

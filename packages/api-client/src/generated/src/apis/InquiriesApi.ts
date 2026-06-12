@@ -17,7 +17,7 @@ import * as runtime from '../runtime';
 import type {
   CreateInquiryDto,
   InquiryListResponseDto,
-  InquiryMatchDto,
+  InquiryMatchListResponseDto,
   InquiryResponseDto,
   MatchOptionsResponseDto,
   PreviewInquiryDto,
@@ -30,8 +30,8 @@ import {
     CreateInquiryDtoToJSON,
     InquiryListResponseDtoFromJSON,
     InquiryListResponseDtoToJSON,
-    InquiryMatchDtoFromJSON,
-    InquiryMatchDtoToJSON,
+    InquiryMatchListResponseDtoFromJSON,
+    InquiryMatchListResponseDtoToJSON,
     InquiryResponseDtoFromJSON,
     InquiryResponseDtoToJSON,
     MatchOptionsResponseDtoFromJSON,
@@ -64,6 +64,11 @@ export interface InquiriesControllerListRequest {
 
 export interface InquiriesControllerListMatchesRequest {
     id: string;
+    search?: string;
+    severity?: Array<InquiriesControllerListMatchesSeverityEnum>;
+    onlyNew?: boolean;
+    skip?: number;
+    limit?: number;
 }
 
 export interface InquiriesControllerMarkSeenRequest {
@@ -222,9 +227,9 @@ export class InquiriesApi extends runtime.BaseAPI {
     }
 
     /**
-     * List the findings currently matching this inquiry
+     * List the findings currently matching this inquiry (paginated)
      */
-    async inquiriesControllerListMatchesRaw(requestParameters: InquiriesControllerListMatchesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<InquiryMatchDto>>> {
+    async inquiriesControllerListMatchesRaw(requestParameters: InquiriesControllerListMatchesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<InquiryMatchListResponseDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -233,6 +238,26 @@ export class InquiriesApi extends runtime.BaseAPI {
         }
 
         const queryParameters: any = {};
+
+        if (requestParameters['search'] != null) {
+            queryParameters['search'] = requestParameters['search'];
+        }
+
+        if (requestParameters['severity'] != null) {
+            queryParameters['severity'] = requestParameters['severity'];
+        }
+
+        if (requestParameters['onlyNew'] != null) {
+            queryParameters['onlyNew'] = requestParameters['onlyNew'];
+        }
+
+        if (requestParameters['skip'] != null) {
+            queryParameters['skip'] = requestParameters['skip'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
 
         const headerParameters: runtime.HTTPHeaders = {};
 
@@ -247,13 +272,13 @@ export class InquiriesApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(InquiryMatchDtoFromJSON));
+        return new runtime.JSONApiResponse(response, (jsonValue) => InquiryMatchListResponseDtoFromJSON(jsonValue));
     }
 
     /**
-     * List the findings currently matching this inquiry
+     * List the findings currently matching this inquiry (paginated)
      */
-    async inquiriesControllerListMatches(requestParameters: InquiriesControllerListMatchesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<InquiryMatchDto>> {
+    async inquiriesControllerListMatches(requestParameters: InquiriesControllerListMatchesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<InquiryMatchListResponseDto> {
         const response = await this.inquiriesControllerListMatchesRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -496,3 +521,14 @@ export const InquiriesControllerListStatusEnum = {
     Archived: 'ARCHIVED'
 } as const;
 export type InquiriesControllerListStatusEnum = typeof InquiriesControllerListStatusEnum[keyof typeof InquiriesControllerListStatusEnum];
+/**
+ * @export
+ */
+export const InquiriesControllerListMatchesSeverityEnum = {
+    Critical: 'CRITICAL',
+    High: 'HIGH',
+    Medium: 'MEDIUM',
+    Low: 'LOW',
+    Info: 'INFO'
+} as const;
+export type InquiriesControllerListMatchesSeverityEnum = typeof InquiriesControllerListMatchesSeverityEnum[keyof typeof InquiriesControllerListMatchesSeverityEnum];

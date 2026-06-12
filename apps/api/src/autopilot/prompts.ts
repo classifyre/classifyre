@@ -1,3 +1,6 @@
+import type { JsonSchema } from '../ai';
+import { inquiryDecisionSchema } from './schemas/inquiry-decision.schema';
+import { caseDecisionSchema } from './schemas/case-decision.schema';
 import type {
   CaseSummary,
   FindingGroupSummary,
@@ -19,6 +22,81 @@ security-findings platform. Glossary of the domain:
 - Case: an investigation workspace. It links inquiries (guides), owns evidence (assets), case findings, hypothesis threads (with status PROPOSED/SUPPORTED/REFUTED/INCONCLUSIVE and confidence 0–1), notes and graph edges.
 You run automatically after each source scan. You never talk to a user; your only output is structured JSON decisions. Every decision — including doing nothing — must carry a clear rationale an analyst can audit later.`;
 
+/**
+ * The output contract is embedded verbatim into each system prompt — the
+ * provider layer does not do native structured output, so the model must see
+ * the exact JSON schema it will be validated against (AJV, no extra
+ * properties allowed).
+ */
+function outputContract(schema: JsonSchema, example: unknown): string {
+  return [
+    `## Output format (STRICT)`,
+    `Your entire response must be ONE JSON object that validates against this JSON Schema. ` +
+      `Top-level keys are exactly "decisions" (non-empty array) and "memoryWrites" (array, may be empty). ` +
+      `No other top-level keys. No additional properties anywhere. ` +
+      `"memoryWrites" lives at the TOP level only — never inside a decision.`,
+    'JSON Schema:',
+    JSON.stringify(schema),
+    'Minimal valid example:',
+    JSON.stringify(example, null, 1),
+  ].join('\n');
+}
+
+const INQUIRY_OUTPUT_EXAMPLE = {
+  decisions: [
+    {
+      action: 'CREATE_INQUIRY',
+      rationale:
+        'Recurring AWS access keys across 3 assets form a coherent secrets-exposure topic no inquiry covers.',
+      inquiry: {
+        title: 'Leaked AWS access keys',
+        detectorTypes: ['SECRETS'],
+        findingTypes: ['aws-access-key'],
+        matchAllSources: true,
+      },
+    },
+    {
+      action: 'NO_ACTION',
+      rationale:
+        'The remaining BROKEN_LINKS findings are routine and already monitored by an existing inquiry.',
+    },
+  ],
+  memoryWrites: [
+    {
+      kind: 'GLOSSARY',
+      key: 'aws-access-key',
+      content: 'AKIA-prefixed credentials; always investigation-worthy.',
+    },
+  ],
+};
+
+const CASE_OUTPUT_EXAMPLE = {
+  decisions: [
+    {
+      action: 'UPDATE_CASE',
+      rationale:
+        'New credential findings strengthen the existing key-leak investigation.',
+      caseId: '00000000-0000-0000-0000-000000000000',
+      operations: [
+        {
+          op: 'ATTACH_FINDINGS',
+          rationale: 'These three findings are direct evidence of the leak.',
+          findingIds: ['00000000-0000-0000-0000-000000000001'],
+        },
+        {
+          op: 'ADD_HYPOTHESIS',
+          rationale: 'All keys share one prefix, suggesting a single origin.',
+          title: 'Single CI pipeline origin',
+          statement:
+            'The leaked keys all come from one misconfigured CI pipeline.',
+          confidence: 0.6,
+        },
+      ],
+    },
+  ],
+  memoryWrites: [],
+};
+
 export function buildInquirySystemPrompt(guidance: {
   desired: string | null;
   searchable: string | null;
@@ -39,6 +117,7 @@ Rules:
     guidance.searchable
       ? `Operator guidance — what is SEARCHABLE (data/topics worth matching in this instance):\n${guidance.searchable}`
       : '',
+    outputContract(inquiryDecisionSchema, INQUIRY_OUTPUT_EXAMPLE),
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -86,6 +165,7 @@ Rules:
 7. If nothing should change, return exactly one NO_ACTION decision explaining why.
 8. Propose memoryWrites (GLOSSARY / DECISION_PRECEDENT) that improve future cycles.`,
     guidance ? `Operator guidance for case management:\n${guidance}` : '',
+    outputContract(caseDecisionSchema, CASE_OUTPUT_EXAMPLE),
   ]
     .filter(Boolean)
     .join('\n\n');

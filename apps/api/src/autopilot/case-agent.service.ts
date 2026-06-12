@@ -193,8 +193,8 @@ export class CaseAgentService {
       ctx.run.id,
       'Requesting case decisions from the model.',
       {
-        systemPromptChars: systemPrompt.length,
-        userPromptChars: userPrompt.length,
+        systemPrompt,
+        userPrompt,
         memoriesRecalled: memories.length,
       },
     );

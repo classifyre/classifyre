@@ -4,19 +4,18 @@ import * as React from "react";
 import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft,
   ArrowRight,
   CheckCircle2,
   DownloadCloud,
   Lightbulb,
   Link2,
   Loader2,
-  MessageSquare,
   Paperclip,
   Pencil,
   RotateCcw,
   Save,
   Sparkles,
+  Workflow,
   X,
 } from "lucide-react";
 import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
@@ -59,6 +58,7 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { CaseStatusBadge } from "@/components/case-status-badge";
+import { DetailBackButton } from "@/components/detail-back-button";
 import { EvidenceTable } from "@/components/evidence-table";
 import { CaseThreads } from "@/components/case-threads";
 import { CaseTimeline } from "@/components/case-timeline";
@@ -68,8 +68,10 @@ const CaseGraphView = dynamic(
   { ssr: false },
 );
 
-const TABS = ["overview", "evidence", "threads", "timeline", "graph"] as const;
+// The graph is the case's front door — every other view is a drill-down.
+const TABS = ["graph", "evidence", "threads", "timeline", "overview"] as const;
 type TabValue = (typeof TABS)[number];
+const DEFAULT_TAB: TabValue = "graph";
 
 const STATUSES = ["OPEN", "IN_PROGRESS", "CLOSED", "ARCHIVED"] as const;
 const nodeKey = (type: string, id: string) => `${type}:${id}`;
@@ -77,35 +79,6 @@ const HYP_PALETTE = [
   "#ef4444", "#3b82f6", "#22c55e", "#f59e0b",
   "#a855f7", "#ec4899", "#06b6d4", "#84cc16",
 ];
-
-function StatCard({
-  label,
-  value,
-  hint,
-  icon,
-  onClick,
-}: {
-  label: string;
-  value: React.ReactNode;
-  hint?: string;
-  icon: React.ReactNode;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={!onClick}
-      className="rounded-[4px] border-2 border-border bg-card p-4 text-left shadow-[0_1px_3px_rgba(28,25,23,0.04)] transition-colors enabled:hover:border-foreground/30"
-    >
-      <div className="text-muted-foreground flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em]">
-        {icon}
-        {label}
-      </div>
-      <p className="mt-1.5 font-serif text-2xl font-black tabular-nums">{value}</p>
-      {hint && <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>}
-    </button>
-  );
-}
 
 export default function CaseWorkspacePage() {
   return (
@@ -123,13 +96,13 @@ function CaseWorkspaceInner() {
 
   const urlTab = searchParams.get("tab");
   const [tab, setTab] = React.useState<TabValue>(
-    TABS.includes(urlTab as TabValue) ? (urlTab as TabValue) : "overview",
+    TABS.includes(urlTab as TabValue) ? (urlTab as TabValue) : DEFAULT_TAB,
   );
   const changeTab = (value: string) => {
     const next = value as TabValue;
     setTab(next);
     const sp = new URLSearchParams(searchParams.toString());
-    if (next === "overview") sp.delete("tab");
+    if (next === DEFAULT_TAB) sp.delete("tab");
     else sp.set("tab", next);
     router.replace(`/investigations/${caseId}${sp.size > 0 ? `?${sp}` : ""}`, { scroll: false });
   };
@@ -421,120 +394,144 @@ function CaseWorkspaceInner() {
   return (
     <div className="space-y-6">
       {/* ── Header ── */}
-      <div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-ml-2 mb-2"
-          onClick={() => router.push("/investigations")}
-        >
-          <ArrowLeft className="h-4 w-4" /> Cases
-        </Button>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-serif text-2xl font-black uppercase tracking-[0.03em]">
-            {caseData.title}
-          </h1>
-          <CaseStatusBadge status={caseData.status} />
-          <SeverityBadge severity={caseData.severity.toLowerCase() as never}>
-            {caseData.severity}
-          </SeverityBadge>
-          {isAiActor(caseData.createdBy) && <AiActorBadge />}
-          {caseData.assignee && (
-            <Badge variant="outline" className="text-xs">
-              {caseData.assignee}
-            </Badge>
-          )}
-          <div className="ml-auto flex items-center gap-2">
-            <AiModeSelect
-              value={(caseData.aiMode ?? "INHERIT") as AiMode}
-              onChange={(mode) => void setAiMode(mode)}
-            />
-            {!isClosed && (
-              <Select value={caseData.status} onValueChange={changeStatus}>
-                <SelectTrigger className="h-8 w-40 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUSES.filter((s) => s !== "CLOSED").map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s.replace("_", " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {isClosed && (
-              <Button variant="outline" size="sm" onClick={reopen}>
-                <RotateCcw className="h-3.5 w-3.5" /> Reopen
-              </Button>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-4">
+          <DetailBackButton fallbackHref="/investigations" />
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-serif text-2xl font-black uppercase tracking-[0.03em]">
+                {caseData.title}
+              </h1>
+              <CaseStatusBadge status={caseData.status} />
+              <SeverityBadge severity={caseData.severity.toLowerCase() as never}>
+                {caseData.severity}
+              </SeverityBadge>
+              {isAiActor(caseData.createdBy) && <AiActorBadge />}
+              {caseData.assignee && (
+                <Badge variant="outline" className="text-xs">
+                  {caseData.assignee}
+                </Badge>
+              )}
+            </div>
+            {caseData.description && (
+              <p className="text-muted-foreground max-w-3xl text-sm">
+                {caseData.description}
+              </p>
             )}
           </div>
         </div>
-        {caseData.description && (
-          <p className="text-muted-foreground mt-1 max-w-3xl text-sm">{caseData.description}</p>
-        )}
+        <div className="flex shrink-0 items-center gap-2 self-start">
+          <AiModeSelect
+            value={(caseData.aiMode ?? "INHERIT") as AiMode}
+            onChange={(mode) => void setAiMode(mode)}
+          />
+          {!isClosed && (
+            <Select value={caseData.status} onValueChange={changeStatus}>
+              <SelectTrigger className="h-8 w-40 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUSES.filter((s) => s !== "CLOSED").map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s.replace("_", " ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {isClosed && (
+            <Button variant="outline" size="sm" onClick={reopen}>
+              <RotateCcw className="h-3.5 w-3.5" /> Reopen
+            </Button>
+          )}
+        </div>
       </div>
 
+      {/* ── New matches alert (always visible) ── */}
+      {newMatchTotal > 0 && !isClosed && (
+        <Card className="border-[color:var(--color-amber-600,#d97706)]/50">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <p className="text-sm">
+              <Sparkles className="mr-1.5 inline h-4 w-4 text-[color:var(--color-amber-600,#d97706)]" />
+              {newMatchTotal} new match{newMatchTotal === 1 ? "" : "es"} appeared in the
+              linked inquir{linkedInquiries.length === 1 ? "y" : "ies"} since last review.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const target =
+                  linkedInquiries.find((q) => q.newMatchCount > 0) ?? linkedInquiries[0];
+                router.push(`/investigations/inquiries/${target?.id}?caseId=${caseId}`);
+              }}
+            >
+              Review matches <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs value={tab} onValueChange={changeTab}>
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="evidence">Evidence ({evidence.length})</TabsTrigger>
-          <TabsTrigger value="threads">Threads ({threads.length})</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          <TabsTrigger value="graph">Graph</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TabsList>
+            <TabsTrigger value="graph">
+              <Workflow className="h-3.5 w-3.5" /> Graph
+            </TabsTrigger>
+            <TabsTrigger value="evidence">
+              <Paperclip className="h-3.5 w-3.5" /> Evidence ({evidence.length})
+            </TabsTrigger>
+            <TabsTrigger value="threads">
+              <Lightbulb className="h-3.5 w-3.5" /> Threads ({threads.length})
+            </TabsTrigger>
+            <TabsTrigger value="timeline">Timeline</TabsTrigger>
+            <TabsTrigger value="overview">Case file</TabsTrigger>
+          </TabsList>
+          <p className="text-muted-foreground hidden font-mono text-[10px] uppercase tracking-[0.14em] lg:block">
+            {evidence.length} evidence · {findingCount} finding{findingCount === 1 ? "" : "s"} ·{" "}
+            {hypothesisThreads.length} hypothes{hypothesisThreads.length === 1 ? "is" : "es"}
+            {verdictSummary ? ` (${verdictSummary})` : ""}
+          </p>
+        </div>
 
-        {/* ════ Overview ════ */}
-        <TabsContent value="overview" className="space-y-6">
-          {/* New matches alert */}
-          {newMatchTotal > 0 && !isClosed && (
-            <Card className="border-[color:var(--color-amber-600,#d97706)]/50">
-              <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-                <p className="text-sm">
-                  <Sparkles className="mr-1.5 inline h-4 w-4 text-[color:var(--color-amber-600,#d97706)]" />
-                  {newMatchTotal} new match{newMatchTotal === 1 ? "" : "es"} appeared in the
-                  linked inquir{linkedInquiries.length === 1 ? "y" : "ies"} since last review.
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const target =
-                      linkedInquiries.find((q) => q.newMatchCount > 0) ?? linkedInquiries[0];
-                    router.push(`/investigations/inquiries/${target?.id}?caseId=${caseId}`);
+        {/* ════ Graph — the case's main entrance ════ */}
+        <TabsContent value="graph">
+          <div className="h-[calc(100vh-300px)] min-h-[520px]">
+            {graphLoading && nodes.length === 0 ? (
+              <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" /> Building graph…
+              </div>
+            ) : nodes.length > 0 ? (
+              <CaseGraphView
+                caseId={caseId}
+                nodes={nodes}
+                edges={edges}
+                hypotheses={hypothesisThreads}
+                hypothesisColors={hypothesisColors}
+                evidence={evidence}
+                onReload={reloadAll}
+                onMergeExpansion={mergeExpansion}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center border-2 border-border bg-card">
+                <EmptyState
+                  title="Empty graph"
+                  description="Add evidence to seed the relationship graph — pull matches from a linked inquiry or attach findings directly."
+                  action={{
+                    label: "Add evidence",
+                    onClick: () => router.push(`/investigations/${caseId}/evidence/add`),
                   }}
-                >
-                  Review matches <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Stats */}
-          <div className="grid gap-3 sm:grid-cols-3">
-            <StatCard
-              label="Evidence"
-              value={evidence.length}
-              hint={`${findingCount} finding${findingCount === 1 ? "" : "s"} attached`}
-              icon={<Paperclip className="h-3 w-3" />}
-              onClick={() => changeTab("evidence")}
-            />
-            <StatCard
-              label="Hypotheses"
-              value={hypothesisThreads.length}
-              hint={verdictSummary || "none yet"}
-              icon={<Lightbulb className="h-3 w-3" />}
-              onClick={() => changeTab("threads")}
-            />
-            <StatCard
-              label="Discussions"
-              value={threads.length - hypothesisThreads.length}
-              hint="open threads"
-              icon={<MessageSquare className="h-3 w-3" />}
-              onClick={() => changeTab("threads")}
-            />
+                  secondaryAction={{
+                    label: "Open case file",
+                    onClick: () => changeTab("overview"),
+                  }}
+                />
+              </div>
+            )}
           </div>
+        </TabsContent>
 
+        {/* ════ Case file ════ */}
+        <TabsContent value="overview" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
             {/* ── Conclusion / close flow ── */}
             <div className="space-y-3">
@@ -810,35 +807,6 @@ function CaseWorkspaceInner() {
         {/* ════ Timeline ════ */}
         <TabsContent value="timeline">
           <CaseTimeline caseId={caseId} />
-        </TabsContent>
-
-        {/* ════ Graph ════ */}
-        <TabsContent value="graph">
-          <div className="h-[calc(100vh-220px)] min-h-[560px]">
-            {graphLoading && nodes.length === 0 ? (
-              <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" /> Building graph…
-              </div>
-            ) : nodes.length > 0 ? (
-              <CaseGraphView
-                caseId={caseId}
-                nodes={nodes}
-                edges={edges}
-                hypotheses={hypothesisThreads}
-                hypothesisColors={hypothesisColors}
-                evidence={evidence}
-                onReload={reloadAll}
-                onMergeExpansion={mergeExpansion}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center border-2 border-border bg-card">
-                <EmptyState
-                  title="Empty graph"
-                  description="Add evidence to seed the relationship graph."
-                />
-              </div>
-            )}
-          </div>
         </TabsContent>
       </Tabs>
     </div>

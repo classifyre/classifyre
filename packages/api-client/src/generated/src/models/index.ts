@@ -92,6 +92,7 @@ export * from './IngestEdgeDto';
 export * from './InquiryLinkedCaseDto';
 export * from './InquiryListResponseDto';
 export * from './InquiryMatchDto';
+export * from './InquiryMatchListResponseDto';
 export * from './InquiryResponseDto';
 export * from './InstanceSettingsResponseDto';
 export * from './LatestRunnerSummaryDto';

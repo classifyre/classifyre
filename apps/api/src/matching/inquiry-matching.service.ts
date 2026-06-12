@@ -5,7 +5,12 @@ import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { CompiledMatcher, InquiryMatchers } from './inquiry-matcher';
 import { INQUIRY_MATCH_QUEUE } from './matching.constants';
-import { PreviewResponseDto, InquiryMatchDto } from '../dto/inquiry.dto';
+import {
+  PreviewResponseDto,
+  InquiryMatchDto,
+  InquiryMatchListResponseDto,
+  QueryInquiryMatchesDto,
+} from '../dto/inquiry.dto';
 
 interface FindingRow {
   id: string;
@@ -133,12 +138,28 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
     return { landed: matches.length };
   }
 
-  /** Return live matching findings for an inquiry (used by listMatches endpoint). */
-  async getLiveMatches(inquiryId: string): Promise<InquiryMatchDto[]> {
-    const q = await this.prisma.inquiry.findUnique({ where: { id: inquiryId }, select: this.matcherSelect });
-    if (!q) return [];
+  /**
+   * Return live matching findings for an inquiry (used by listMatches endpoint).
+   * Matching is computed in-app (regex matchers), so filters and pagination are
+   * applied after the match pass — the page envelope keeps responses bounded.
+   */
+  async getLiveMatches(
+    inquiryId: string,
+    query: QueryInquiryMatchesDto = {},
+  ): Promise<InquiryMatchListResponseDto> {
+    const skip = Math.max(0, Number(query.skip ?? 0) || 0);
+    const limit = Math.min(Math.max(1, Number(query.limit ?? 50) || 50), 200);
+    const empty = { items: [], total: 0, newCount: 0, skip, limit };
+
+    const q = await this.prisma.inquiry.findUnique({
+      where: { id: inquiryId },
+      select: { ...this.matcherSelect, matchesSeenAt: true },
+    });
+    if (!q) return empty;
+    const seenAt = q.matchesSeenAt;
+
     const rows = await this.candidateFindings(q, true);
-    return rows.map((f) => ({
+    let matches: InquiryMatchDto[] = rows.map((f) => ({
       findingId: f.id,
       label: f.findingType,
       severity: String(f.severity),
@@ -148,8 +169,36 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
       assetName: f.asset?.name,
       sourceType: f.asset ? String(f.asset.sourceType) : undefined,
       matchedAt: f.createdAt ?? new Date(),
-      isNew: false,
+      isNew: seenAt ? (f.createdAt ?? new Date(0)) > seenAt : false,
     }));
+
+    const term = typeof query.search === 'string' ? query.search.trim().toLowerCase() : '';
+    if (term.length > 0) {
+      matches = matches.filter(
+        (m) =>
+          m.label.toLowerCase().includes(term) ||
+          (m.assetName ?? '').toLowerCase().includes(term) ||
+          (m.matchedContent ?? '').toLowerCase().includes(term),
+      );
+    }
+    const severities = (Array.isArray(query.severity) ? query.severity : query.severity ? [query.severity] : [])
+      .map((s) => String(s).toUpperCase());
+    if (severities.length > 0) {
+      matches = matches.filter((m) => severities.includes((m.severity ?? '').toUpperCase()));
+    }
+    const onlyNew = query.onlyNew === true || String(query.onlyNew) === 'true';
+    const newCount = matches.filter((m) => m.isNew).length;
+    if (onlyNew) matches = matches.filter((m) => m.isNew);
+
+    matches.sort((a, b) => b.matchedAt.getTime() - a.matchedAt.getTime());
+
+    return {
+      items: matches.slice(skip, skip + limit),
+      total: matches.length,
+      newCount,
+      skip,
+      limit,
+    };
   }
 
   /** Return live matching finding IDs for an inquiry (used by pullFromInquiry). */

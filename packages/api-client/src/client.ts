@@ -75,6 +75,7 @@ export type {
   InquiryResponseDto,
   InquiryListResponseDto,
   InquiryMatchDto,
+  InquiryMatchListResponseDto,
   PreviewInquiryDto,
   PreviewResponseDto,
   MatchOptionsResponseDto,
@@ -124,6 +125,10 @@ export {
   CasesControllerListStatusEnum,
   CasesControllerListSeverityEnum,
 } from "./generated/src/apis/CasesApi";
+export {
+  InquiriesControllerListStatusEnum,
+  InquiriesControllerListMatchesSeverityEnum,
+} from "./generated/src/apis/InquiriesApi";
 export {
   SandboxControllerListRunsContentTypeEnum,
   SandboxControllerListRunsDetectorTypeEnum,
