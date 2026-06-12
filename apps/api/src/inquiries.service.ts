@@ -6,6 +6,7 @@ import {
 import { DetectorType, Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
+import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 import { InquiryMatchers } from './matching/inquiry-matcher';
 import {
   CreateInquiryDto,
@@ -58,6 +59,7 @@ export class InquiriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly matching: InquiryMatchingService,
+    private readonly agentMemory: AgentMemoryService,
   ) {}
 
   private readonly caseInclude = {
@@ -145,8 +147,15 @@ export class InquiriesService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.ensureExists(id);
+    const existing = await this.prisma.inquiry.findUnique({
+      where: { id },
+      select: { title: true },
+    });
+    if (!existing) throw new NotFoundException(`Inquiry ${id} not found`);
     await this.prisma.inquiry.delete({ where: { id } });
+    // Keep the autopilot's memory consistent: drop memories referencing the
+    // dead inquiry and remember that the operator deleted it on purpose.
+    await this.agentMemory.recordEntityDeletion('inquiry', id, existing.title);
   }
 
   /** Findings currently matching the query (live query, never persisted). */

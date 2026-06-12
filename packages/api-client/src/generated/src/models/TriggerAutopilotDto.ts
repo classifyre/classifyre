@@ -31,7 +31,30 @@ export interface TriggerAutopilotDto {
      * @memberof TriggerAutopilotDto
      */
     sourceId?: string;
+    /**
+     * Run only one agent. Omit to run both (inquiry then case). Implied CASE when caseId is set.
+     * @type {string}
+     * @memberof TriggerAutopilotDto
+     */
+    agentKind?: TriggerAutopilotDtoAgentKindEnum;
+    /**
+     * Focus the case agent on ONE case: it receives the full case detail (hypotheses, evidence, findings, edges) and can connect/disconnect edges, build evidence paths and create/update hypotheses with supporting evidence — steered by the instruction.
+     * @type {string}
+     * @memberof TriggerAutopilotDto
+     */
+    caseId?: string;
 }
+
+
+/**
+ * @export
+ */
+export const TriggerAutopilotDtoAgentKindEnum = {
+    Inquiry: 'INQUIRY',
+    Case: 'CASE'
+} as const;
+export type TriggerAutopilotDtoAgentKindEnum = typeof TriggerAutopilotDtoAgentKindEnum[keyof typeof TriggerAutopilotDtoAgentKindEnum];
+
 
 /**
  * Check if a given object implements the TriggerAutopilotDto interface.
@@ -52,6 +75,8 @@ export function TriggerAutopilotDtoFromJSONTyped(json: any, ignoreDiscriminator:
         
         'instruction': json['instruction'] == null ? undefined : json['instruction'],
         'sourceId': json['sourceId'] == null ? undefined : json['sourceId'],
+        'agentKind': json['agentKind'] == null ? undefined : json['agentKind'],
+        'caseId': json['caseId'] == null ? undefined : json['caseId'],
     };
 }
 
@@ -68,6 +93,8 @@ export function TriggerAutopilotDtoToJSONTyped(value?: TriggerAutopilotDto | nul
         
         'instruction': value['instruction'],
         'sourceId': value['sourceId'],
+        'agentKind': value['agentKind'],
+        'caseId': value['caseId'],
     };
 }
 

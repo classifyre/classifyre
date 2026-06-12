@@ -10,7 +10,12 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { DetectorType, InquiryStatus, AiManagementMode, Severity } from '@prisma/client';
+import {
+  DetectorType,
+  InquiryStatus,
+  AiManagementMode,
+  Severity,
+} from '@prisma/client';
 
 /** Matcher fields shared by create/update/preview — what findings a query selects. */
 export class InquiryMatchersDto {
@@ -274,7 +279,10 @@ export class InquiryMatchDto {
 }
 
 export class QueryInquiryMatchesDto {
-  @ApiPropertyOptional({ description: 'Substring match on finding type, asset name or matched content' })
+  @ApiPropertyOptional({
+    description:
+      'Substring match on finding type, asset name or matched content',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -286,7 +294,9 @@ export class QueryInquiryMatchesDto {
   @IsEnum(Severity, { each: true })
   severity?: Severity[];
 
-  @ApiPropertyOptional({ description: 'Only matches that appeared since last seen' })
+  @ApiPropertyOptional({
+    description: 'Only matches that appeared since last seen',
+  })
   @IsOptional()
   @IsBoolean()
   onlyNew?: boolean;
@@ -313,7 +323,9 @@ export class InquiryMatchListResponseDto {
   @ApiProperty({ description: 'Total matches after filters' })
   total!: number;
 
-  @ApiProperty({ description: 'New matches after filters (appeared since last seen)' })
+  @ApiProperty({
+    description: 'New matches after filters (appeared since last seen)',
+  })
   newCount!: number;
 
   @ApiProperty()

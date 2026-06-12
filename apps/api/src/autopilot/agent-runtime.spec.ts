@@ -22,9 +22,13 @@ function makeCtx(
 
 describe('agent-runtime', () => {
   const saveStep = jest.fn();
-  const audit = { saveStep } as unknown as AgentAuditService;
+  const isCancelled = jest.fn().mockResolvedValue(false);
+  const audit = { saveStep, isCancelled } as unknown as AgentAuditService;
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    isCancelled.mockResolvedValue(false);
+  });
 
   it('runs steps in order and persists each output', async () => {
     const ctx = makeCtx();

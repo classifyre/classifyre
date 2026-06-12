@@ -15,7 +15,10 @@ export class CreateHypothesisDto {
   @IsString()
   statement!: string;
 
-  @ApiPropertyOptional({ enum: HypothesisStatus, default: HypothesisStatus.PROPOSED })
+  @ApiPropertyOptional({
+    enum: HypothesisStatus,
+    default: HypothesisStatus.PROPOSED,
+  })
   @IsOptional()
   @IsEnum(HypothesisStatus)
   status?: HypothesisStatus;
@@ -51,7 +54,10 @@ export class UpdateHypothesisDto {
   @Max(1)
   confidence?: number | null;
 
-  @ApiPropertyOptional({ description: 'Hex color string for graph visualization (e.g. "#ef4444")', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Hex color string for graph visualization (e.g. "#ef4444")',
+    nullable: true,
+  })
   @IsOptional()
   @IsString()
   color?: string | null;
@@ -59,7 +65,10 @@ export class UpdateHypothesisDto {
 
 /** Link a piece of question evidence OR a question finding to a hypothesis with a stance. */
 export class LinkSupportDto {
-  @ApiProperty({ enum: ['evidence', 'finding'], description: 'What is being linked' })
+  @ApiProperty({
+    enum: ['evidence', 'finding'],
+    description: 'What is being linked',
+  })
   @IsIn(['evidence', 'finding'])
   targetType!: 'evidence' | 'finding';
 
@@ -67,7 +76,10 @@ export class LinkSupportDto {
   @IsString()
   targetId!: string;
 
-  @ApiPropertyOptional({ enum: EvidenceStance, default: EvidenceStance.SUPPORTS })
+  @ApiPropertyOptional({
+    enum: EvidenceStance,
+    default: EvidenceStance.SUPPORTS,
+  })
   @IsOptional()
   @IsEnum(EvidenceStance)
   stance?: EvidenceStance;
@@ -139,7 +151,10 @@ export class HypothesisResponseDto {
   @ApiProperty()
   updatedAt!: Date;
 
-  @ApiPropertyOptional({ description: 'Custom hex color for graph visualization', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Custom hex color for graph visualization',
+    nullable: true,
+  })
   color?: string | null;
 
   @ApiProperty({ type: [HypothesisSupportLinkDto] })

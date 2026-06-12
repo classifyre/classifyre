@@ -22,11 +22,15 @@ export class CreateThreadDto {
   @IsEnum(CaseThreadKind)
   kind!: CaseThreadKind;
 
-  @ApiProperty({ description: 'Short display title (hypothesis name or discussion topic)' })
+  @ApiProperty({
+    description: 'Short display title (hypothesis name or discussion topic)',
+  })
   @IsString()
   title!: string;
 
-  @ApiPropertyOptional({ description: 'Initial statement body (hypothesis threads)' })
+  @ApiPropertyOptional({
+    description: 'Initial statement body (hypothesis threads)',
+  })
   @IsOptional()
   @IsString()
   statement?: string;

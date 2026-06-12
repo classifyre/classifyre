@@ -98,6 +98,11 @@ export const inquiryDecisionSchema: JsonSchema = {
         },
       },
     },
-    memoryWrites: { type: 'array', maxItems: 15, items: memoryWriteSchema },
+    memoryWrites: {
+      type: 'array',
+      maxItems: 15,
+      default: [],
+      items: memoryWriteSchema,
+    },
   },
 };

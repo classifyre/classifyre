@@ -17,6 +17,7 @@ import {
   AgentMemoryDto,
   AgentMemoryListResponseDto,
   AgentRunDetailDto,
+  AgentRunDto,
   AgentRunListResponseDto,
   CreateAgentMemoryDto,
   QueryAgentLogsDto,
@@ -45,6 +46,17 @@ export class AutopilotController {
     return this.autopilot.trigger(dto);
   }
 
+  @Post('dream')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary:
+      'Trigger a dream cycle now (memory consolidation — dedupe, prune noise, distill notes)',
+  })
+  @ApiResponse({ status: 202, type: TriggerAutopilotResponseDto })
+  triggerDream(): Promise<TriggerAutopilotResponseDto> {
+    return this.autopilot.triggerDream();
+  }
+
   @Get('runs')
   @ApiOperation({ summary: 'List autopilot agent runs (newest first)' })
   @ApiResponse({ status: 200, type: AgentRunListResponseDto })
@@ -61,6 +73,28 @@ export class AutopilotController {
   @ApiResponse({ status: 200, type: AgentRunDetailDto })
   getRun(@Param('id') id: string): Promise<AgentRunDetailDto> {
     return this.autopilot.getRun(id);
+  }
+
+  @Post('runs/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Stop a pending/running agent run (it aborts before its next step)',
+  })
+  @ApiResponse({ status: 200, type: AgentRunDto })
+  cancelRun(@Param('id') id: string): Promise<AgentRunDto> {
+    return this.autopilot.cancelRun(id);
+  }
+
+  @Post('runs/:id/rerun')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary:
+      'Re-execute one specific agent run from scratch under its original cycle identity',
+  })
+  @ApiResponse({ status: 202, type: TriggerAutopilotResponseDto })
+  rerunRun(@Param('id') id: string): Promise<TriggerAutopilotResponseDto> {
+    return this.autopilot.rerunRun(id);
   }
 
   @Get('runs/:id/logs')

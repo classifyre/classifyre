@@ -8,6 +8,7 @@ import { PrismaService } from './prisma.service';
 import { GraphService } from './graph.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { CaseActivityService } from './case-activity.service';
+import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 import {
   AddEvidenceDto,
   AddFindingDto,
@@ -54,6 +55,7 @@ export class CasesService {
     private readonly graph: GraphService,
     private readonly matching: InquiryMatchingService,
     private readonly activity: CaseActivityService,
+    private readonly agentMemory: AgentMemoryService,
   ) {}
 
   async create(dto: CreateCaseDto): Promise<CaseResponseDto> {
@@ -305,8 +307,15 @@ export class CasesService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.ensureExists(id);
+    const existing = await this.prisma.case.findUnique({
+      where: { id },
+      select: { title: true },
+    });
+    if (!existing) throw new NotFoundException(`Case with ID ${id} not found`);
     await this.prisma.case.delete({ where: { id } });
+    // Keep the autopilot's memory consistent: drop memories referencing the
+    // dead case and remember that the operator deleted it on purpose.
+    await this.agentMemory.recordEntityDeletion('case', id, existing.title);
   }
 
   async addEvidence(

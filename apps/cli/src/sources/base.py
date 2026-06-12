@@ -317,7 +317,6 @@ class BaseSource(ABC):
         """
         return normalize_http_url(link)
 
-
     async def collect_relationships(self) -> list[IngestEdge]:
         """Return source-derived relationship edges for the investigation graph.
 
