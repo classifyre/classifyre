@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -10,7 +9,6 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
-  CustomDetectorTypesGrid,
   DetectorCatalog,
   detectorCatalogGroups,
   resolveDetectorGroupId,
@@ -31,23 +29,23 @@ import { normalizeSiteUrl, safeJsonLdStringify } from "@/lib/seo";
 import { AssistantDemo } from "@/components/assistant-demo";
 
 export const metadata: Metadata = {
-  title: "Detect, Classify, and Label Any Source",
+  title: "The Open-Source Investigation Platform for Your Data",
   description:
-    "Classifyre detects, classifies, and labels data across databases, lakehouses, collaboration tools, analytics systems, and public content with an open-source core from Docker evaluation to production Kubernetes.",
+    "Classifyre turns raw findings into real investigations. Connect the systems you already run, detect what matters, and let an AI autopilot open inquiries, build cases, and draft hypotheses — with every decision explained.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Classifyre | Detect, Classify, and Label Any Source",
+    title: "Classifyre | Detect. Investigate. Resolve.",
     description:
-      "Run Classifyre in one Docker command, deploy the open-source core on Kubernetes, or add enterprise governance and support.",
+      "An open-source investigation platform: detectors surface evidence, inquiries keep watch, cases and hypotheses organize the work, and an AI autopilot does the legwork.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Classifyre | Detect, Classify, and Label Any Source",
+    title: "Classifyre | Detect. Investigate. Resolve.",
     description:
-      "Open-source core, enterprise deployment path, custom detectors, and an MCP-native assistant that can actually operate the product.",
+      "Open-source core, an AI autopilot that acts instead of chats, custom detectors from regex to any model, and a clear path from laptop to enterprise.",
   },
 };
 
@@ -67,76 +65,145 @@ const helmInstallCommand = [
   `  --version ${softwareVersion}`,
 ];
 const enterpriseContactEmail = "contact@classifyre.com";
+
 const enterpriseCapabilities = [
-  "Authorization, governance, and SLA-backed support for production programs",
-  "Cloud deployment support across Kubernetes and OpenShift estates",
-  "Multilanguage support for global compliance and operations teams",
-  "Custom sources and detectors built around your domain and workflows",
+  "Authentication, authorization, and governance — the layer the open-source core intentionally leaves out",
+  "Custom models and instance fine-tuning so detection speaks your business language",
+  "SLA-backed support with upgrade and deployment assistance across Kubernetes and OpenShift",
+  "Custom sources, detectors, and multilanguage support built around your domain",
 ] as const;
 
-const customDetectorMethods = [
+const investigationPillars = [
   {
-    method: "RULESET",
-    title: "Lock in exact business rules",
+    marker: "INQUIRIES",
+    title: "Standing questions that keep watching",
     description:
-      "Match policy phrases, internal codes, contract clauses, campaign markers, and other deterministic patterns with regex or keyword rules.",
+      "Phrase what you actually want to know — “Are credentials leaking through CI logs?” — and the inquiry keeps matching new topics and findings against it, scan after scan.",
   },
   {
-    method: "CLASSIFIER",
-    title: "Tag meaning, intent, and tone",
+    marker: "CASES",
+    title: "Evidence with an owner and a lifecycle",
     description:
-      "Create contextual labels for things like renewal risk, promotional content, escalation language, or category intent, then improve them with reviewed examples over time.",
+      "Findings get attached to cases instead of dying in a CSV export. Each case carries its evidence, status, and history toward an actual resolution.",
   },
   {
-    method: "ENTITY",
-    title: "Pull the entities your team tracks",
+    marker: "HYPOTHESES",
+    title: "Competing explanations, pinned to evidence",
     description:
-      "Extract parties, products, locations, IDs, jurisdictions, owners, and other domain-specific entities using labels written in your own language.",
+      "Work a case like an analyst: propose explanations, link each one to the findings that support or contradict it, and watch the graph confirm or kill it.",
+  },
+  {
+    marker: "COLLABORATION",
+    title: "Humans and AI in one audit trail",
+    description:
+      "Teammates and the autopilot operate on the same cases, with every action — human or AI — attributed and explained in a shared record.",
   },
 ] as const;
 
-const customDetectorGlossaryExamples = [
-  "Strategic account",
-  "Renewal risk",
-  "Partner pricing language",
-  "Regulated vendor",
-  "Executive escalation",
-  "Campaign theme",
+const autopilotCycle = [
+  {
+    step: "01",
+    title: "A scan completes",
+    description: "New findings land. Nobody has to remember to look at them.",
+  },
+  {
+    step: "02",
+    title: "Autopilot wakes",
+    description:
+      "It recalls what it has learned about your instance: your glossary, your past decisions, which topics map to which inquiries.",
+  },
+  {
+    step: "03",
+    title: "Inquiries get answered",
+    description:
+      "The inquiry agent opens new standing questions, matches fresh findings to existing ones, and surfaces what changed.",
+  },
+  {
+    step: "04",
+    title: "Cases get built",
+    description:
+      "The case agent groups related evidence, opens or updates cases, and drafts hypotheses for your team to confirm or reject.",
+  },
+  {
+    step: "05",
+    title: "Every move is explained",
+    description:
+      "Each action — and each deliberate non-action — is recorded with a written rationale. A flight recorder, not a black box.",
+  },
 ] as const;
 
-const customDetectorWorkflow = [
-  "Define the business terms and tags your teams already use.",
-  "Choose rulesets for exact patterns, classifiers for context, and entity extraction for named items.",
-  "When a match lands, attach fields like owner, amount, clause, date, or routing metadata for downstream action.",
+const autopilotControls = [
+  {
+    marker: "IT LEARNS",
+    title: "Teach it once, it remembers",
+    description:
+      "The autopilot builds a memory of your instance: business glossary, decision precedents, topic-to-inquiry mappings. You can inspect and edit every memory it holds.",
+  },
+  {
+    marker: "IT ACTS",
+    title: "No prompt required",
+    description:
+      "It creates and manages inquiries, cases, and hypotheses on its own after every scan. Want to point it somewhere? Steer it with a one-line instruction.",
+  },
+  {
+    marker: "YOU COMMAND",
+    title: "Observe-only when you want it",
+    description:
+      "Flip the whole instance — or a single case — into observe-only mode and the autopilot proposes without touching. Dual business and technical logs show exactly what it did and why.",
+  },
 ] as const;
 
-const customDetectorFieldExamples = [
-  "contract party",
-  "renewal date",
-  "risk clause",
-  "region",
-  "owner",
-  "amount",
+const detectorLadder = [
+  {
+    tier: "01",
+    power: 1,
+    marker: "RULESET",
+    title: "Regex & rules",
+    description:
+      "Deterministic pattern matching for IDs, secrets formats, policy phrases, and internal codes. Instant, explainable, zero ML overhead.",
+    tags: ["deterministic", "fast", "no GPU"],
+  },
+  {
+    tier: "02",
+    power: 2,
+    marker: "TEXT INTELLIGENCE",
+    title: "Entities & classification",
+    description:
+      "Extract entities and classify text in a single model pass, using labels written in your own words. Contextual understanding without training a model.",
+    tags: ["zero-shot", "your labels", "one pass"],
+  },
+  {
+    tier: "03",
+    power: 3,
+    marker: "TRANSFORMERS",
+    title: "Any Hugging Face model",
+    description:
+      "Plug in open models for text classification, image classification, object detection, and embeddings. Yes — Classifyre sees images, not just text.",
+    tags: ["text + vision", "open models", "embeddings"],
+  },
+  {
+    tier: "04",
+    power: 4,
+    marker: "AI DETECTOR",
+    title: "Bring any LLM",
+    description:
+      "Write a prompt, define labels and extraction fields, and any configured LLM provider becomes a detector — for signals too fuzzy to define any other way.",
+    tags: ["any provider", "prompt-defined", "extraction"],
+  },
 ] as const;
 
-const assistantClientExamples = [
-  "Claude",
-  "Codex CLI",
-  "Gemini CLI",
-  "Cursor",
-  "VS Code",
-  "Windsurf",
-  "Continue",
-  "Custom MCP clients",
-] as const;
-
-function Marker({ label }: { label: string }) {
+function Marker({ label, inverted = false }: { label: string; inverted?: boolean }) {
   return (
-    <div className="inline-flex items-center justify-center border-2 border-border bg-background px-3 py-2">
-      <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]">
-        {label}
-      </span>
-    </div>
+    <span
+      className={cn(
+        "inline-flex items-center border-2 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em]",
+        inverted
+          ? "border-accent bg-accent text-black"
+          : "border-border bg-background text-foreground",
+      )}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -210,6 +277,152 @@ function CommandBlock({
   );
 }
 
+/**
+ * Static illustration of a Classifyre case graph: one case, two competing
+ * hypotheses, severity-colored findings, a manual analyst link, and a
+ * cross-hypothesis link. Strokes use currentColor so it adapts to theme.
+ */
+function CaseGraphIllustration() {
+  const severity = {
+    critical: "#ff2b2b",
+    high: "#ff6b35",
+    medium: "#f5a623",
+    low: "#0ea5e9",
+  } as const;
+
+  return (
+    <svg
+      viewBox="0 0 720 460"
+      role="img"
+      aria-label="Case graph showing a case linked to two hypotheses with severity-colored findings"
+      className="h-auto w-full"
+    >
+      <defs>
+        <pattern id="cg-dots" width="26" height="26" patternUnits="userSpaceOnUse">
+          <circle cx="1.5" cy="1.5" r="1.5" fill="currentColor" opacity="0.12" />
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="720" height="460" fill="url(#cg-dots)" />
+
+      {/* edges: case -> hypotheses */}
+      <line x1="360" y1="92" x2="190" y2="196" stroke="currentColor" strokeWidth="2" opacity="0.45" />
+      <line x1="360" y1="92" x2="530" y2="196" stroke="currentColor" strokeWidth="2" opacity="0.45" />
+
+      {/* edges: hypotheses -> findings */}
+      <line x1="190" y1="252" x2="110" y2="340" stroke="currentColor" strokeWidth="2" opacity="0.45" />
+      <line x1="190" y1="252" x2="210" y2="350" stroke="currentColor" strokeWidth="2" opacity="0.45" />
+      <line x1="530" y1="252" x2="470" y2="350" stroke="currentColor" strokeWidth="2" opacity="0.45" />
+      <line x1="530" y1="252" x2="590" y2="340" stroke="currentColor" strokeWidth="2" opacity="0.45" />
+
+      {/* manual analyst link (dashed amber) */}
+      <line
+        x1="210"
+        y1="350"
+        x2="470"
+        y2="350"
+        stroke="#d97706"
+        strokeWidth="2.5"
+        strokeDasharray="7 6"
+      />
+      <text x="340" y="338" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="10" fill="#d97706" letterSpacing="0.12em">
+        ANALYST LINK
+      </text>
+
+      {/* cross-hypothesis link (purple) */}
+      <path
+        d="M 110 340 C 180 440, 520 440, 590 340"
+        fill="none"
+        stroke="#a855f7"
+        strokeWidth="2.5"
+        strokeDasharray="3 5"
+      />
+      <text x="360" y="432" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="10" fill="#a855f7" letterSpacing="0.12em">
+        CROSS-HYPOTHESIS
+      </text>
+
+      {/* case node */}
+      <g>
+        <rect x="252" y="34" width="216" height="58" fill="var(--color-accent)" stroke="currentColor" strokeWidth="3" />
+        <rect x="260" y="42" width="216" height="58" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.35" />
+        <text x="360" y="58" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="10" fill="#0a0a0a" letterSpacing="0.2em" fontWeight="700">
+          CASE #42 · OPEN
+        </text>
+        <text x="360" y="78" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="12" fill="#0a0a0a" fontWeight="700">
+          Credential exposure
+        </text>
+      </g>
+
+      {/* hypothesis 1 */}
+      <g>
+        <rect x="92" y="196" width="196" height="56" rx="4" fill="none" stroke="currentColor" strokeWidth="2.5" />
+        <text x="190" y="219" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="10" fill="currentColor" opacity="0.6" letterSpacing="0.18em">
+          HYPOTHESIS 1
+        </text>
+        <text x="190" y="238" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="12" fill="currentColor" fontWeight="700">
+          Leak via CI logs
+        </text>
+      </g>
+
+      {/* hypothesis 2 */}
+      <g>
+        <rect x="432" y="196" width="196" height="56" rx="4" fill="none" stroke="currentColor" strokeWidth="2.5" />
+        <text x="530" y="219" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="10" fill="currentColor" opacity="0.6" letterSpacing="0.18em">
+          HYPOTHESIS 2
+        </text>
+        <text x="530" y="238" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="12" fill="currentColor" fontWeight="700">
+          Stale S3 export
+        </text>
+      </g>
+
+      {/* findings */}
+      <g>
+        <circle cx="110" cy="340" r="20" fill={severity.critical} stroke="currentColor" strokeWidth="2.5" />
+        <text x="110" y="344" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="10" fill="#ffffff" fontWeight="700">
+          SEC
+        </text>
+        <circle cx="210" cy="350" r="20" fill={severity.high} stroke="currentColor" strokeWidth="2.5" />
+        <text x="210" y="354" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="10" fill="#0a0a0a" fontWeight="700">
+          PII
+        </text>
+        <circle cx="470" cy="350" r="20" fill={severity.medium} stroke="currentColor" strokeWidth="2.5" />
+        <text x="470" y="354" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="10" fill="#0a0a0a" fontWeight="700">
+          IBN
+        </text>
+        <circle cx="590" cy="340" r="20" fill={severity.low} stroke="currentColor" strokeWidth="2.5" />
+        <text x="590" y="344" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="10" fill="#0a0a0a" fontWeight="700">
+          SEC
+        </text>
+      </g>
+
+      {/* autopilot tag near hypothesis 2 */}
+      <g>
+        <rect x="560" y="160" width="118" height="24" fill="var(--color-accent)" stroke="currentColor" strokeWidth="2" />
+        <text x="619" y="176" textAnchor="middle" fontFamily="var(--font-mono, monospace)" fontSize="9" fill="#0a0a0a" letterSpacing="0.14em" fontWeight="700">
+          BY AUTOPILOT
+        </text>
+        <line x1="600" y1="184" x2="556" y2="196" stroke="currentColor" strokeWidth="1.5" opacity="0.5" />
+      </g>
+    </svg>
+  );
+}
+
+function PowerMeter({ level }: { level: number }) {
+  return (
+    <div className="flex items-end gap-1" aria-hidden="true">
+      {[1, 2, 3, 4].map((bar) => (
+        <span
+          key={bar}
+          className={cn(
+            "w-2 border border-border",
+            bar <= level ? "bg-accent" : "bg-foreground/10",
+          )}
+          style={{ height: `${6 + bar * 4}px` }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function HomePage() {
   const sourceDocs = getAllSourceDocs();
   const detectorDocs = getAllDetectorDocs();
@@ -250,11 +463,11 @@ export default function HomePage() {
     operatingSystem: "Docker, Kubernetes, Web",
     url: siteUrl,
     description:
-      "Classifyre detects, classifies, and labels data across modern source systems with an open-source core and enterprise-ready deployment model.",
+      "Classifyre is an open-source investigation platform: detectors surface evidence across modern source systems, and an AI autopilot opens inquiries, builds cases, and drafts hypotheses with a full audit trail.",
     offers: [
       {
         "@type": "Offer",
-        name: "Docker Evaluation",
+        name: "Run Locally (Docker)",
         price: "0",
         priceCurrency: "USD",
       },
@@ -284,28 +497,30 @@ export default function HomePage() {
         }}
       />
 
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section>
         <LandingSectionShell tone="signal" fullWidth className="bg-black">
           <div className="space-y-7">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-12">
               <div className="space-y-5 lg:flex-1">
-                <h1 className="font-serif text-[clamp(3.9rem,9vw,6.8rem)] font-black uppercase leading-[0.84] tracking-[0.08em] text-white">
+                <h1 className="font-serif text-[clamp(3.2rem,8vw,5.8rem)] font-black uppercase leading-[0.84] tracking-[0.08em] text-white">
                   <span className="block text-white">Detect.</span>
                   <span className="block">
                     <span className="inline-block bg-accent px-[0.14em] text-black">
-                      Classify.
+                      Investigate.
                     </span>
                   </span>
-                  <span className="block text-white">Label.</span>
+                  <span className="block text-white">Resolve.</span>
                 </h1>
               </div>
 
               <div className="space-y-6 lg:flex-1">
                 <p className="max-w-2xl text-left text-base leading-7 text-white/78 sm:text-lg lg:text-left">
-                  Classifyre turns messy, distributed source data into governed
-                  signals. Connect the systems you already run, detect what
-                  matters, classify content and findings, and label data for
-                  security, privacy, moderation, and operational workflows.
+                  Classifyre is an open-source investigation platform for your
+                  data estate. Connect the systems you already run, let
+                  detectors surface the evidence — then work it like an
+                  analyst, with standing inquiries, cases, hypotheses, and an
+                  AI autopilot that does the legwork between scans.
                 </p>
 
                 <div className="flex flex-wrap gap-3 lg:justify-start">
@@ -359,17 +574,18 @@ export default function HomePage() {
                   {activeDetectorItems.length}
                 </p>
                 <p className="mt-1 text-sm text-white/68">
-                  From secrets and PII to moderation, quality, and governance
-                  tags.
+                  Built-in packs for PII, secrets, and security — plus four
+                  custom engines from regex to any LLM.
                 </p>
               </div>
               <div className="border border-white/20 bg-white/8 p-4">
                 <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/54">
-                  Deployment Modes
+                  AI Decisions Explained
                 </p>
-                <p className="mt-2 text-3xl font-black text-accent">1 → N</p>
+                <p className="mt-2 text-3xl font-black text-accent">100%</p>
                 <p className="mt-1 text-sm text-white/68">
-                  Docker evaluation, Kubernetes core, then enterprise.
+                  Every autopilot action lands in the audit trail with a
+                  written rationale.
                 </p>
               </div>
             </div>
@@ -377,144 +593,134 @@ export default function HomePage() {
         </LandingSectionShell>
       </section>
 
-      <section aria-labelledby="runtime-title">
-        <LandingSectionShell tone="plain" fullWidth>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start pb-10">
-            <h2
-              id="runtime-title"
-              className="font-serif text-4xl font-black uppercase leading-[0.9] sm:text-5xl tracking-wider"
-            >
-              From fast evaluation to enterprise rollout
-            </h2>
-            <p className="mt-3 max-w-2xl text-muted-foreground">
-              Start with the single-container runtime to test the workflow, move
-              to the Helm chart when you are ready for a real cluster, and
-              contact us when the rollout needs enterprise controls and
-              commercial support.
-            </p>
-          </div>
+      {/* ── Investigation layer ──────────────────────────────────────────── */}
+      <section aria-labelledby="investigation-title">
+        <LandingSectionShell tone="plain">
+          <div className="space-y-8">
+            <div className="space-y-3">
+              <Marker label="The investigation layer" inverted />
+              <h2
+                id="investigation-title"
+                className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
+              >
+                Findings are evidence.
+                <br />
+                Cases are the product.
+              </h2>
+              <p className="max-w-3xl text-muted-foreground">
+                Most scanners stop at a findings table and wish you luck.
+                Classifyre treats every finding as evidence in an ongoing
+                investigation — connected to the questions you are asking, the
+                cases you are working, and the explanations you are testing.
+              </p>
+            </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Card className="panel-card h-full rounded-[16px] border-2 bg-card">
-              <CardHeader className="gap-4">
-                <div className="space-y-2">
-                  <CardTitle className="text-2xl uppercase tracking-[0.04em]">
-                    01 Evaluate
-                  </CardTitle>
-                  <CardDescription className="text-sm leading-6 text-muted-foreground">
-                    Bring up the full product locally in one Docker command. Use
-                    it for testing, demos, and first-touch evaluation.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col gap-4">
-                <CommandBlock
-                  label="Quick start"
-                  lines={dockerRunCommand}
-                  inverted
-                />
-                <p className="text-sm leading-6 text-muted-foreground">
-                  Fastest setup, but not the production topology.
-                </p>
-                <div className="mt-auto pt-2">
-                  <Button
-                    asChild
-                    variant="secondary"
-                    className="w-full border-2 border-border"
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                {investigationPillars.map((pillar) => (
+                  <div
+                    key={pillar.marker}
+                    className="flex flex-col gap-2 border-2 border-border bg-background p-4 shadow-[4px_4px_0_var(--color-border)]"
                   >
-                    <a
-                      href="https://docs.classifyre.com/deployment/docker/"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      All-in-One Docker docs
-                    </a>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="panel-card h-full rounded-[16px] border-2 bg-foreground text-primary-foreground">
-              <CardHeader className="gap-4">
-                <div className="space-y-2">
-                  <CardTitle className="text-2xl uppercase tracking-[0.04em] text-primary-foreground">
-                    02 Run in production
-                  </CardTitle>
-                  <CardDescription className="text-sm leading-6 text-primary-foreground/72">
-                    Production-ready deployment to Kubernetes using Helm on your
-                    own cluster, whether self-hosted or in the cloud.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col gap-4">
-                <CommandBlock label="Helm install" lines={helmInstallCommand} />
-                <p className="text-sm leading-6 text-primary-foreground/72">
-                  Production-ready core for Kubernetes clusters, without
-                  enterprise authorization, governance, or SLA coverage.
-                </p>
-                <div className="mt-auto pt-2">
-                  <Button
-                    asChild
-                    variant="secondary"
-                    className="w-full border-2 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/16"
-                  >
-                    <a
-                      href="https://docs.classifyre.com/deployment/kubernetes/"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Helm chart docs
-                    </a>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="panel-card h-full rounded-[16px] border-2 bg-background">
-              <CardHeader className="gap-4">
-                <div className="space-y-2">
-                  <CardTitle className="text-2xl uppercase tracking-[0.04em]">
-                    03 Add enterprise
-                  </CardTitle>
-                  <CardDescription className="text-sm leading-6 text-muted-foreground">
-                    Turn the open-source core into a supported platform for
-                    regulated, global, and heavily customized deployments.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col gap-4">
-                <div>
-                  <div className="space-y-3">
-                    {enterpriseCapabilities.map((capability) => (
-                      <label
-                        key={capability}
-                        className="flex items-start gap-3 text-sm leading-6 text-foreground"
-                      >
-                        <Checkbox
-                          checked
-                          tabIndex={-1}
-                          aria-readonly="true"
-                          className="pointer-events-none mt-1"
-                        />
-                        <span>{capability}</span>
-                      </label>
-                    ))}
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent-foreground/60 dark:text-accent">
+                      {pillar.marker}
+                    </span>
+                    <p className="font-serif text-base font-black uppercase leading-tight tracking-[0.04em]">
+                      {pillar.title}
+                    </p>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {pillar.description}
+                    </p>
                   </div>
-                </div>
-                <div className="mt-auto pt-2">
-                  <Button
-                    asChild
-                    className="w-full border-2 border-accent bg-accent text-accent-foreground hover:bg-accent/90"
-                  >
-                    <a href={`mailto:${enterpriseContactEmail}`}>Contact Us</a>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                ))}
+              </div>
+
+              <figure className="border-2 border-border bg-background p-4 shadow-[6px_6px_0_var(--color-border)]">
+                <CaseGraphIllustration />
+                <figcaption className="mt-2 border-t-2 border-border pt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  A live case graph: hypotheses linked to severity-rated
+                  evidence, analyst links, and autopilot contributions.
+                </figcaption>
+              </figure>
+            </div>
           </div>
         </LandingSectionShell>
       </section>
 
+      {/* ── Autopilot ────────────────────────────────────────────────────── */}
+      <section aria-labelledby="autopilot-title">
+        <LandingSectionShell tone="signal">
+          <div className="space-y-8">
+            <div className="space-y-3">
+              <h2
+                id="autopilot-title"
+                className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
+              >
+                Autopilot,{" "}
+                <span className="inline-block bg-accent px-[0.14em] text-black">
+                  not copilot
+                </span>
+              </h2>
+              <p className="max-w-3xl text-primary-foreground/72">
+                A copilot waits for you to type a prompt. Classifyre&apos;s
+                autopilot doesn&apos;t wait. It wakes after every scan, recalls
+                what it has learned about your instance, and moves the
+                investigation forward on its own — opening inquiries, building
+                cases, drafting hypotheses.
+              </p>
+            </div>
+
+            <ol className="grid gap-3 md:grid-cols-5">
+              {autopilotCycle.map((stage) => (
+                <li
+                  key={stage.step}
+                  className="relative border border-primary-foreground/25 bg-primary-foreground/5 p-4"
+                >
+                  <span className="font-mono text-2xl font-black text-accent">
+                    {stage.step}
+                  </span>
+                  <p className="mt-2 text-sm font-bold uppercase tracking-[0.06em]">
+                    {stage.title}
+                  </p>
+                  <p className="mt-1.5 text-xs leading-5 text-primary-foreground/65">
+                    {stage.description}
+                  </p>
+                </li>
+              ))}
+            </ol>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              {autopilotControls.map((control) => (
+                <div
+                  key={control.marker}
+                  className="border-2 border-primary-foreground/30 bg-primary-foreground/8 p-5"
+                >
+                  <span className="inline-flex bg-accent px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-black">
+                    {control.marker}
+                  </span>
+                  <p className="mt-3 font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
+                    {control.title}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-primary-foreground/72">
+                    {control.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </LandingSectionShell>
+      </section>
+
+      {/* ── Assistant (setup) ────────────────────────────────────────────── */}
+      <section aria-labelledby="assistant-demo-title">
+        <LandingSectionShell tone="plain">
+          <div className="space-y-6">
+            <AssistantDemo />
+          </div>
+        </LandingSectionShell>
+      </section>
+
+      {/* ── Sources ──────────────────────────────────────────────────────── */}
       <section aria-labelledby="sources-title">
         <LandingSectionShell tone="plain">
           <div className="space-y-6">
@@ -530,7 +736,8 @@ export default function HomePage() {
                   <p className="mt-3 max-w-3xl text-muted-foreground">
                     Classifyre is built for mixed estates: operational
                     databases, lakehouse and warehouse platforms, collaboration
-                    systems, analytics assets, and public-facing content.
+                    systems, analytics assets, and public-facing content — all
+                    feeding evidence into the same investigation layer.
                   </p>
                 </div>
               </div>
@@ -574,6 +781,7 @@ export default function HomePage() {
         </LandingSectionShell>
       </section>
 
+      {/* ── Built-in detectors ───────────────────────────────────────────── */}
       <section aria-labelledby="detectors-title">
         <LandingSectionShell tone="signal">
           <div className="space-y-6">
@@ -583,12 +791,12 @@ export default function HomePage() {
                   id="detectors-title"
                   className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
                 >
-                  From built-ins to your business language
+                  Evidence on day one
                 </h2>
                 <p className="mt-3 max-w-3xl text-primary-foreground/72">
-                  Built-in detectors cover the risk, moderation, and governance
-                  paths teams need first. Then you can layer your own glossary,
-                  business tags, and operational routing on top.
+                  Switch on curated built-in packs — PII, secrets, security,
+                  moderation, quality — and findings start flowing into your
+                  investigations immediately. No model wrangling required.
                 </p>
               </div>
             </div>
@@ -601,22 +809,26 @@ export default function HomePage() {
           </div>
         </LandingSectionShell>
       </section>
-      <section aria-labelledby="detector-methods-title">
+
+      {/* ── Custom detector ladder ───────────────────────────────────────── */}
+      <section aria-labelledby="detector-ladder-title">
         <LandingSectionShell tone="plain">
           <div className="space-y-6">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div className="space-y-3">
+                <Marker label="Custom detectors" inverted />
                 <h2
-                  id="detector-methods-title"
+                  id="detector-ladder-title"
                   className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
                 >
-                  Seven methods to match any signal
+                  From a regex to any model
                 </h2>
                 <p className="max-w-3xl text-muted-foreground">
-                  Every custom detector you build runs on one of these engines.
-                  Choose a deterministic ruleset for exact patterns, a fine-tuned
-                  model for nuanced classification, or an LLM prompt for signals
-                  that are hard to define explicitly.
+                  Custom detection is a ladder, not a leap. Start with a
+                  deterministic rule, climb to zero-shot text understanding,
+                  plug in open transformer models for text and images, and top
+                  out with an LLM detector for the signals nothing else can
+                  catch. Every rung feeds the same findings stream.
                 </p>
               </div>
               <Button
@@ -629,105 +841,193 @@ export default function HomePage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Detector method docs
+                  Custom detector docs
                 </a>
               </Button>
             </div>
-            <CustomDetectorTypesGrid
-              hrefBase="https://docs.classifyre.com/custom-detectors/"
-              variant="marketing"
-            />
+
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {detectorLadder.map((rung, index) => (
+                <div
+                  key={rung.tier}
+                  className={cn(
+                    "group flex flex-col border-2 border-border bg-background p-5 shadow-[4px_4px_0_var(--color-border)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_var(--color-border)]",
+                    index === detectorLadder.length - 1 &&
+                      "border-accent shadow-[4px_4px_0_var(--color-accent)] hover:shadow-[6px_6px_0_var(--color-accent)]",
+                  )}
+                >
+                  <div className="flex items-start justify-between">
+                    <span className="font-mono text-3xl font-black text-foreground/15">
+                      {rung.tier}
+                    </span>
+                    <PowerMeter level={rung.power} />
+                  </div>
+                  <span className="mt-3 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    {rung.marker}
+                  </span>
+                  <p className="mt-1 font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
+                    {rung.title}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {rung.description}
+                  </p>
+                  <div className="mt-auto flex flex-wrap gap-1 pt-4">
+                    {rung.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="border border-border/40 bg-foreground/5 px-1.5 py-0.5 font-mono text-[10px]"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </LandingSectionShell>
       </section>
 
-      <section>
-        <LandingSectionShell tone="plain">
-          <Card className="bg-background border-0 shadow-none">
-            <div className="absolute inset-x-0 bottom-0 h-24" />
-            <CardHeader className="relative flex flex-col gap-6 pb-5 md:flex-row md:items-start md:justify-between">
-              <div className="max-w-3xl space-y-4">
-                <CardTitle className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl">
-                  Business glossary that actually runs
-                </CardTitle>
-                <CardDescription>
-                  Turn Classifyre into a tagging system built around your own
-                  language. Name the concepts that matter to revenue,
-                  operations, compliance, or support, then detect them across
-                  documents, tickets, chats, dashboards, and public content.
-                </CardDescription>
-              </div>
-              <Button asChild variant="secondary" className="w-full md:w-auto">
-                <a
-                  href="https://docs.classifyre.com/detectors/custom-detectors/"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Custom detector docs
-                </a>
-              </Button>
-            </CardHeader>
-            <CardContent className="relative space-y-6">
-              <div className="flex flex-wrap gap-2">
-                {customDetectorGlossaryExamples.map((example) => (
-                  <Badge variant="default" key={example}>
-                    {example}
-                  </Badge>
-                ))}
-              </div>
+      {/* ── Deployment path ──────────────────────────────────────────────── */}
+      <section aria-labelledby="runtime-title">
+        <LandingSectionShell tone="plain" fullWidth>
+          <div className="grid grid-cols-1 gap-6 pb-10 lg:grid-cols-2 lg:items-start">
+            <h2
+              id="runtime-title"
+              className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-wider sm:text-5xl"
+            >
+              Run it tonight. Scale it later.
+            </h2>
+            <p className="mt-3 max-w-2xl text-muted-foreground">
+              Spin up the whole platform on your own machine and start your
+              first investigation. Move to Kubernetes when the team joins in.
+              Add the enterprise layer when governance, custom models, and
+              guaranteed support become requirements.
+            </p>
+          </div>
 
-              <div className="grid gap-3 lg:grid-cols-3">
-                {customDetectorMethods.map((method) => (
-                  <Card key={method.method} className="p-4">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-accent-foreground/68">
-                      {method.method}
-                    </p>
-                    <CardTitle>{method.title}</CardTitle>
-                    <CardDescription>{method.description}</CardDescription>
-                  </Card>
-                ))}
-              </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Card className="panel-card h-full rounded-[16px] border-2 bg-card">
+              <CardHeader className="gap-4">
+                <div className="space-y-2">
+                  <CardTitle className="text-2xl uppercase tracking-[0.04em]">
+                    01 Run it locally
+                  </CardTitle>
+                  <CardDescription className="text-sm leading-6 text-muted-foreground">
+                    One Docker command brings up the full platform on your
+                    laptop. Connect a source, switch on detectors, and start
+                    investigating — no signup, no cluster, no sales call.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col gap-4">
+                <CommandBlock
+                  label="One command"
+                  lines={dockerRunCommand}
+                  inverted
+                />
+                <p className="text-sm leading-6 text-muted-foreground">
+                  The complete product, single-container topology. Everything
+                  you build here carries over to production.
+                </p>
+                <div className="mt-auto pt-2">
+                  <Button
+                    asChild
+                    variant="secondary"
+                    className="w-full border-2 border-border"
+                  >
+                    <a
+                      href="https://docs.classifyre.com/deployment/docker/"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      All-in-One Docker docs
+                    </a>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(240px,0.85fr)]">
-                <Card className="p-4 bg-background">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-accent-foreground/68">
-                    How teams use it
-                  </p>
-                  <ul className="mt-4 space-y-3 text-sm leading-6">
-                    {customDetectorWorkflow.map((step) => (
-                      <li key={step} className="flex items-start gap-3">
-                        <span className="mt-1.5 inline-block h-2.5 w-2.5 shrink-0 border border-current" />
-                        <span>{step}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
+            <Card className="panel-card h-full rounded-[16px] border-2 bg-foreground text-primary-foreground">
+              <CardHeader className="gap-4">
+                <div className="space-y-2">
+                  <CardTitle className="text-2xl uppercase tracking-[0.04em] text-primary-foreground">
+                    02 Go production
+                  </CardTitle>
+                  <CardDescription className="text-sm leading-6 text-primary-foreground/72">
+                    Deploy the open-source core to Kubernetes with Helm —
+                    self-hosted or in your cloud — with properly separated
+                    components and ephemeral processing workers.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col gap-4">
+                <CommandBlock label="Helm install" lines={helmInstallCommand} />
+                <p className="text-sm leading-6 text-primary-foreground/72">
+                  Production-ready core for real clusters. Enterprise
+                  authentication, governance, and SLA coverage live one step
+                  up.
+                </p>
+                <div className="mt-auto pt-2">
+                  <Button
+                    asChild
+                    variant="secondary"
+                    className="w-full border-2 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/16"
+                  >
+                    <a
+                      href="https://docs.classifyre.com/deployment/kubernetes/"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Helm chart docs
+                    </a>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-                <Card className="bg-foreground p-4 text-primary-foreground">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-primary-foreground/58">
-                    After a match
-                  </p>
-                  <p className="mt-3 text-sm leading-6 text-primary-foreground/78">
-                    Capture the fields downstream teams need for triage,
-                    routing, and reporting.
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {customDetectorFieldExamples.map((field) => (
-                      <Badge variant="secondary" key={field}>
-                        {field}
-                      </Badge>
+            <Card className="panel-card h-full rounded-[16px] border-2 border-accent bg-background">
+              <CardHeader className="gap-4">
+                <div className="space-y-2">
+                  <CardTitle className="text-2xl uppercase tracking-[0.04em]">
+                    03 Add enterprise
+                  </CardTitle>
+                  <CardDescription className="text-sm leading-6 text-muted-foreground">
+                    Everything the open-source core deliberately doesn&apos;t
+                    ship — for regulated, global, and heavily customized
+                    rollouts.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col gap-4">
+                <div>
+                  <div className="space-y-3">
+                    {enterpriseCapabilities.map((capability) => (
+                      <label
+                        key={capability}
+                        className="flex items-start gap-3 text-sm leading-6 text-foreground"
+                      >
+                        <Checkbox
+                          checked
+                          tabIndex={-1}
+                          aria-readonly="true"
+                          className="pointer-events-none mt-1"
+                        />
+                        <span>{capability}</span>
+                      </label>
                     ))}
                   </div>
-                </Card>
-              </div>
-            </CardContent>
-          </Card>
-        </LandingSectionShell>
-      </section>
-      <section aria-labelledby="assistant-demo-title">
-        <LandingSectionShell tone="plain">
-          <div className="space-y-6">
-            <AssistantDemo />
+                </div>
+                <div className="mt-auto pt-2">
+                  <Button
+                    asChild
+                    className="w-full border-2 border-accent bg-accent text-accent-foreground hover:bg-accent/90"
+                  >
+                    <a href={`mailto:${enterpriseContactEmail}`}>Contact Us</a>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </LandingSectionShell>
       </section>
