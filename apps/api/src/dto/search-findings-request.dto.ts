@@ -144,7 +144,8 @@ export class SearchFindingsFiltersInputDto {
 
   @ApiPropertyOptional({
     type: [String],
-    description: 'Finding UUIDs to exclude from results (e.g. already-attached findings)',
+    description:
+      'Finding UUIDs to exclude from results (e.g. already-attached findings)',
   })
   @IsOptional()
   @Transform(({ value }) => normalizeToStringArray(value))

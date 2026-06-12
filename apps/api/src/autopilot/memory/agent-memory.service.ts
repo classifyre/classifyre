@@ -116,6 +116,98 @@ export class AgentMemoryService {
     return written;
   }
 
+  // ── Dream-mode consolidation primitives ────────────────────────────────────
+
+  /** Full memory inventory (capped) for the dream agent to review. */
+  async listForConsolidation(limit = 500): Promise<
+    Array<{
+      id: string;
+      kind: string;
+      key: string;
+      content: string;
+      tags: string[];
+      weight: number;
+      updatedAt: Date;
+    }>
+  > {
+    const rows = await this.prisma.agentMemory.findMany({
+      orderBy: [{ updatedAt: 'desc' }],
+      take: limit,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      kind: String(r.kind),
+      key: r.key,
+      content: r.content,
+      tags: r.tags,
+      weight: r.weight,
+      updatedAt: r.updatedAt,
+    }));
+  }
+
+  /** Delete one memory by id. Returns false when it no longer exists. */
+  async deleteById(id: string): Promise<boolean> {
+    const result = await this.prisma.agentMemory.deleteMany({ where: { id } });
+    return result.count > 0;
+  }
+
+  /** Rewrite one memory's content (and optionally tags). False when missing. */
+  async rewriteById(
+    id: string,
+    content: string,
+    tags?: string[],
+  ): Promise<boolean> {
+    const result = await this.prisma.agentMemory.updateMany({
+      where: { id },
+      data: {
+        content: content.trim(),
+        ...(tags
+          ? {
+              tags: tags
+                .map((t) => t.trim().toLowerCase())
+                .filter(Boolean)
+                .slice(0, 10),
+            }
+          : {}),
+      },
+    });
+    return result.count > 0;
+  }
+
+  /**
+   * Sync memory with an operator deletion of an inquiry/case: drop memories
+   * referencing the dead entity and record a precedent so the agent never
+   * recreates the topic on its own. Best-effort — must not break the delete.
+   */
+  async recordEntityDeletion(
+    entityType: 'inquiry' | 'case',
+    entityId: string,
+    title: string,
+  ): Promise<void> {
+    try {
+      await this.prisma.agentMemory.deleteMany({
+        where: {
+          OR: [
+            { refType: entityType, refId: entityId },
+            { content: { contains: entityId } },
+          ],
+        },
+      });
+      await this.writeMany([
+        {
+          kind: 'DECISION_PRECEDENT',
+          key: `deleted-${entityType}-${entityId}`,
+          content: `The operator deleted ${entityType} "${title}". Do not recreate this ${entityType} or its topic unless the operator explicitly asks for it.`,
+          tags: ['operator-deletion', entityType],
+        },
+      ]);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to sync agent memory after ${entityType} deletion: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   /** Record the canonical topic→inquiry mapping for a created/enriched inquiry. */
   async rememberTopicInquiry(
     topicKey: string,

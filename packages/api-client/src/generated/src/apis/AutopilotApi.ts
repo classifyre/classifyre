@@ -19,6 +19,7 @@ import type {
   AgentMemoryDto,
   AgentMemoryListResponseDto,
   AgentRunDetailDto,
+  AgentRunDto,
   AgentRunListResponseDto,
   CreateAgentMemoryDto,
   TriggerAutopilotDto,
@@ -34,6 +35,8 @@ import {
     AgentMemoryListResponseDtoToJSON,
     AgentRunDetailDtoFromJSON,
     AgentRunDetailDtoToJSON,
+    AgentRunDtoFromJSON,
+    AgentRunDtoToJSON,
     AgentRunListResponseDtoFromJSON,
     AgentRunListResponseDtoToJSON,
     CreateAgentMemoryDtoFromJSON,
@@ -45,6 +48,10 @@ import {
     UpdateAgentMemoryDtoFromJSON,
     UpdateAgentMemoryDtoToJSON,
 } from '../models/index';
+
+export interface AutopilotControllerCancelRunRequest {
+    id: string;
+}
 
 export interface AutopilotControllerCreateMemoryRequest {
     createAgentMemoryDto: CreateAgentMemoryDto;
@@ -72,9 +79,14 @@ export interface AutopilotControllerListMemoryRequest {
 
 export interface AutopilotControllerListRunsRequest {
     agentKind?: AutopilotControllerListRunsAgentKindEnum;
+    caseId?: string;
     status?: AutopilotControllerListRunsStatusEnum;
     skip?: number;
     limit?: number;
+}
+
+export interface AutopilotControllerRerunRunRequest {
+    id: string;
 }
 
 export interface AutopilotControllerTriggerRequest {
@@ -90,6 +102,43 @@ export interface AutopilotControllerUpdateMemoryRequest {
  * 
  */
 export class AutopilotApi extends runtime.BaseAPI {
+
+    /**
+     * Stop a pending/running agent run (it aborts before its next step)
+     */
+    async autopilotControllerCancelRunRaw(requestParameters: AutopilotControllerCancelRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentRunDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling autopilotControllerCancelRun().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/runs/{id}/cancel`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AgentRunDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Stop a pending/running agent run (it aborts before its next step)
+     */
+    async autopilotControllerCancelRun(requestParameters: AutopilotControllerCancelRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentRunDto> {
+        const response = await this.autopilotControllerCancelRunRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Add (or overwrite) a memory entry to steer the agent
@@ -299,6 +348,10 @@ export class AutopilotApi extends runtime.BaseAPI {
             queryParameters['agentKind'] = requestParameters['agentKind'];
         }
 
+        if (requestParameters['caseId'] != null) {
+            queryParameters['caseId'] = requestParameters['caseId'];
+        }
+
         if (requestParameters['status'] != null) {
             queryParameters['status'] = requestParameters['status'];
         }
@@ -331,6 +384,43 @@ export class AutopilotApi extends runtime.BaseAPI {
      */
     async autopilotControllerListRuns(requestParameters: AutopilotControllerListRunsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentRunListResponseDto> {
         const response = await this.autopilotControllerListRunsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Re-execute one specific agent run from scratch under its original cycle identity
+     */
+    async autopilotControllerRerunRunRaw(requestParameters: AutopilotControllerRerunRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TriggerAutopilotResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling autopilotControllerRerunRun().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/runs/{id}/rerun`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TriggerAutopilotResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Re-execute one specific agent run from scratch under its original cycle identity
+     */
+    async autopilotControllerRerunRun(requestParameters: AutopilotControllerRerunRunRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TriggerAutopilotResponseDto> {
+        const response = await this.autopilotControllerRerunRunRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -370,6 +460,35 @@ export class AutopilotApi extends runtime.BaseAPI {
      */
     async autopilotControllerTrigger(requestParameters: AutopilotControllerTriggerRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TriggerAutopilotResponseDto> {
         const response = await this.autopilotControllerTriggerRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Trigger a dream cycle now (memory consolidation — dedupe, prune noise, distill notes)
+     */
+    async autopilotControllerTriggerDreamRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TriggerAutopilotResponseDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/dream`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TriggerAutopilotResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Trigger a dream cycle now (memory consolidation — dedupe, prune noise, distill notes)
+     */
+    async autopilotControllerTriggerDream(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TriggerAutopilotResponseDto> {
+        const response = await this.autopilotControllerTriggerDreamRaw(initOverrides);
         return await response.value();
     }
 
@@ -444,7 +563,8 @@ export type AutopilotControllerListMemoryKindEnum = typeof AutopilotControllerLi
  */
 export const AutopilotControllerListRunsAgentKindEnum = {
     Inquiry: 'INQUIRY',
-    Case: 'CASE'
+    Case: 'CASE',
+    Dream: 'DREAM'
 } as const;
 export type AutopilotControllerListRunsAgentKindEnum = typeof AutopilotControllerListRunsAgentKindEnum[keyof typeof AutopilotControllerListRunsAgentKindEnum];
 /**
@@ -455,6 +575,7 @@ export const AutopilotControllerListRunsStatusEnum = {
     Running: 'RUNNING',
     Completed: 'COMPLETED',
     Failed: 'FAILED',
-    Skipped: 'SKIPPED'
+    Skipped: 'SKIPPED',
+    Cancelled: 'CANCELLED'
 } as const;
 export type AutopilotControllerListRunsStatusEnum = typeof AutopilotControllerListRunsStatusEnum[keyof typeof AutopilotControllerListRunsStatusEnum];

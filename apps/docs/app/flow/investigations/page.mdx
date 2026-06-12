@@ -1,0 +1,61 @@
+---
+title: Investigations
+description: How the investigations feature works — from inquiries to cases with evidence, hypotheses, and the knowledge graph.
+---
+
+# Investigations
+
+The investigation system is a structured workflow for triaging and analysing
+findings. It consists of two core concepts: **inquiries** (saved queries that
+continuously surface matching findings) and **cases** (workspaces where
+evidence, hypotheses, and conclusions are organised).
+
+```mermaid
+graph TD
+    Findings["Findings<br/>Raw signals from detectors"]
+    Inquiry["Inquiry<br/>A saved question over findings"]
+    Case["Case<br/>An investigation workspace"]
+    Evidence["Evidence<br/>Snapshotted assets attached to a case"]
+    CaseFinding["Case Finding<br/>A finding pulled into evidence"]
+    Thread["Thread<br/>Hypothesis or discussion"]
+    Graph["Graph<br/>Entity-relationship knowledge graph"]
+
+    Findings -- "matched by" --> Inquiry
+    Inquiry -- "drives" --> Case
+    Case -- "contains" --> Evidence
+    Evidence -- "has" --> CaseFinding
+    CaseFinding -- "linked to" --> Thread
+    Case -- "explored via" --> Graph
+    Thread -- "linked to" --> CaseFinding
+```
+
+## Lifecycle
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Inquiry: Define a saved query
+    Inquiry --> InquirySeeded: Matches computed
+    InquirySeeded --> Case: Open case from inquiry
+    Case --> EvidenceAdded: Pull matches as evidence
+    Case --> HypothesisProposed: Create hypothesis threads
+    EvidenceAdded --> HypothesisProposed
+    HypothesisProposed --> ConclusionReached: Analyse & conclude
+    ConclusionReached --> CaseClosed: Close case
+    CaseClosed --> [*]
+
+    note right of Inquiry
+        Runs continuously — new
+        findings are auto-matched
+    end note
+```
+
+- **Inquiry** — Define matchers (detector types, finding types, regex patterns)
+  and get a live count of matching findings. Rescan anytime.
+- **Case** — A workspace to collect evidence, weigh hypotheses, and reach a
+  conclusion. Linked inquiries keep the case fed with fresh matches.
+- **Evidence** — Assets snapshotted into the case, with attached case findings.
+- **Threads** — Hypothesis and discussion threads with support-links to
+  evidence, status/confidence tracking, and structured entries.
+- **Graph** — A force-directed knowledge graph visualising entities,
+  relationships, and evidence overlay across the investigation.

@@ -6978,6 +6978,28 @@
         ]
       }
     },
+    "/autopilot/dream": {
+      "post": {
+        "operationId": "AutopilotController_triggerDream",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerAutopilotResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Trigger a dream cycle now (memory consolidation — dedupe, prune noise, distill notes)",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
     "/autopilot/runs": {
       "get": {
         "operationId": "AutopilotController_listRuns",
@@ -6990,8 +7012,18 @@
               "type": "string",
               "enum": [
                 "INQUIRY",
-                "CASE"
+                "CASE",
+                "DREAM"
               ]
+            }
+          },
+          {
+            "name": "caseId",
+            "required": false,
+            "in": "query",
+            "description": "Only runs focused on this case",
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -7005,7 +7037,8 @@
                 "RUNNING",
                 "COMPLETED",
                 "FAILED",
-                "SKIPPED"
+                "SKIPPED",
+                "CANCELLED"
               ]
             }
           },
@@ -7072,6 +7105,68 @@
           }
         },
         "summary": "Get one autopilot run with all decisions and rationales",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/runs/{id}/cancel": {
+      "post": {
+        "operationId": "AutopilotController_cancelRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stop a pending/running agent run (it aborts before its next step)",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/runs/{id}/rerun": {
+      "post": {
+        "operationId": "AutopilotController_rerunRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerAutopilotResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Re-execute one specific agent run from scratch under its original cycle identity",
         "tags": [
           "autopilot"
         ]
@@ -14676,6 +14771,18 @@
           "sourceId": {
             "type": "string",
             "description": "Limit the review to one source. Omit to review all sources."
+          },
+          "agentKind": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE"
+            ],
+            "description": "Run only one agent. Omit to run both (inquiry then case). Implied CASE when caseId is set."
+          },
+          "caseId": {
+            "type": "string",
+            "description": "Focus the case agent on ONE case: it receives the full case detail (hypotheses, evidence, findings, edges) and can connect/disconnect edges, build evidence paths and create/update hypotheses with supporting evidence — steered by the instruction."
           }
         }
       },
@@ -14705,7 +14812,8 @@
             "type": "string",
             "enum": [
               "INQUIRY",
-              "CASE"
+              "CASE",
+              "DREAM"
             ]
           },
           "status": {
@@ -14715,7 +14823,8 @@
               "RUNNING",
               "COMPLETED",
               "FAILED",
-              "SKIPPED"
+              "SKIPPED",
+              "CANCELLED"
             ]
           },
           "sourceId": {
@@ -14726,9 +14835,14 @@
             "type": "string",
             "nullable": true
           },
+          "caseId": {
+            "type": "string",
+            "description": "Case this run is focused on (case-targeted manual runs)",
+            "nullable": true
+          },
           "trigger": {
             "type": "string",
-            "description": "\"scan_completed\" or \"manual\""
+            "description": "\"scan_completed\", \"manual\" or \"schedule\""
           },
           "instruction": {
             "type": "string",
@@ -14822,8 +14936,11 @@
               "ADD_NOTE",
               "ADD_THREAD_ENTRY",
               "CREATE_EDGE",
+              "REMOVE_EDGE",
+              "LINK_SUPPORT",
               "CHANGE_STATUS",
               "LINK_INQUIRY",
+              "CONSOLIDATE_MEMORY",
               "NO_ACTION"
             ]
           },
@@ -14876,7 +14993,8 @@
             "type": "string",
             "enum": [
               "INQUIRY",
-              "CASE"
+              "CASE",
+              "DREAM"
             ]
           },
           "status": {
@@ -14886,7 +15004,8 @@
               "RUNNING",
               "COMPLETED",
               "FAILED",
-              "SKIPPED"
+              "SKIPPED",
+              "CANCELLED"
             ]
           },
           "sourceId": {
@@ -14897,9 +15016,14 @@
             "type": "string",
             "nullable": true
           },
+          "caseId": {
+            "type": "string",
+            "description": "Case this run is focused on (case-targeted manual runs)",
+            "nullable": true
+          },
           "trigger": {
             "type": "string",
-            "description": "\"scan_completed\" or \"manual\""
+            "description": "\"scan_completed\", \"manual\" or \"schedule\""
           },
           "instruction": {
             "type": "string",

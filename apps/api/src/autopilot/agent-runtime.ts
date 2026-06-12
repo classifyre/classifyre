@@ -5,6 +5,14 @@ import type { AgentContext, AgentStep } from './autopilot.types';
 
 const logger = new Logger('AgentRuntime');
 
+/** Thrown between steps when the operator cancelled the run. */
+export class AgentRunCancelledError extends Error {
+  constructor(runId: string) {
+    super(`Agent run ${runId} was cancelled by the operator`);
+    this.name = 'AgentRunCancelledError';
+  }
+}
+
 /**
  * Generic resumable step pipeline. Each step's JSON-serializable output is
  * persisted to AgentRun.stepState after it finishes; when a run is resumed
@@ -23,6 +31,17 @@ export async function runPipeline(
   ctx.state = { ...persisted, ...ctx.state };
 
   for (const step of steps) {
+    // Honor operator stop requests at step boundaries — a long LLM call is
+    // never interrupted mid-flight, but no further step starts.
+    if (await audit.isCancelled(ctx.run.id)) {
+      await log?.business(
+        ctx.run.id,
+        `Run cancelled by the operator — stopping before step "${step.name}".`,
+        undefined,
+        'WARN',
+      );
+      throw new AgentRunCancelledError(ctx.run.id);
+    }
     if (step.name in ctx.state) {
       logger.debug(
         `Run ${ctx.run.id}: step ${step.name} already done, skipping`,

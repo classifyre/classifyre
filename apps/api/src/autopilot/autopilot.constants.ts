@@ -21,6 +21,13 @@ export const AUTOPILOT_RETRY_AFTER_SECONDS = 60;
 /** Give up resuming a run after this many worker attempts. */
 export const AUTOPILOT_MAX_ATTEMPTS = 3;
 
+/**
+ * "Dreaming" cadence: every other day at 03:10 the agent consolidates its
+ * memory (dedupe, prune noise, distill important notes). Registered as a
+ * pg-boss schedule on the autopilot queue.
+ */
+export const AUTOPILOT_DREAM_CRON = '10 3 */2 * *';
+
 // ── Context bounds (token budget guards) ─────────────────────────────────────
 export const MAX_FINDING_GROUPS = 40;
 export const MAX_SAMPLE_VALUES_PER_GROUP = 15;

@@ -22,5 +22,9 @@ export { CustomDetectorTestsController } from './custom-detector-tests.controlle
 export { CasesController } from './cases.controller';
 export { InquiriesController } from './inquiries.controller';
 export { HypothesesController } from './hypotheses.controller';
-export { CaseTimelineController, CaseThreadsController, HypothesisAliasController } from './case-threads.controller';
+export {
+  CaseTimelineController,
+  CaseThreadsController,
+  HypothesisAliasController,
+} from './case-threads.controller';
 export { GraphController } from './graph.controller';

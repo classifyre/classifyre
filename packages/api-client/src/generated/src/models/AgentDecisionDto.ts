@@ -87,8 +87,11 @@ export const AgentDecisionDtoActionEnum = {
     AddNote: 'ADD_NOTE',
     AddThreadEntry: 'ADD_THREAD_ENTRY',
     CreateEdge: 'CREATE_EDGE',
+    RemoveEdge: 'REMOVE_EDGE',
+    LinkSupport: 'LINK_SUPPORT',
     ChangeStatus: 'CHANGE_STATUS',
     LinkInquiry: 'LINK_INQUIRY',
+    ConsolidateMemory: 'CONSOLIDATE_MEMORY',
     NoAction: 'NO_ACTION'
 } as const;
 export type AgentDecisionDtoActionEnum = typeof AgentDecisionDtoActionEnum[keyof typeof AgentDecisionDtoActionEnum];

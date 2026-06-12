@@ -6,6 +6,7 @@ import {
   CaseStatus,
   CaseThreadEntryType,
   CaseThreadKind,
+  EvidenceStance,
   HypothesisStatus,
   Severity,
 } from '@prisma/client';
@@ -571,17 +572,19 @@ export class DecisionApplierService {
         break;
       }
       case 'ADD_NOTE': {
-        if (!op.body) return failOp('body required');
+        const body = op.body ?? op.note;
+        if (!body) return failOp('body required');
         const threadId = await this.resolveNotesThread(caseId);
         await this.threads.addEntry(threadId, {
           entryType: CaseThreadEntryType.NOTE,
-          body: op.body,
+          body,
           author: AI_ACTOR,
         });
         break;
       }
       case 'ADD_THREAD_ENTRY': {
-        if (!op.threadId || !op.body)
+        const entryBody = op.body ?? op.note;
+        if (!op.threadId || !entryBody)
           return failOp('threadId and body required');
         const threads = await this.search.existingIds('caseThread', [
           op.threadId,
@@ -589,7 +592,7 @@ export class DecisionApplierService {
         if (!threads.has(op.threadId)) return failOp('Unknown threadId');
         await this.threads.addEntry(op.threadId, {
           entryType: CaseThreadEntryType.NOTE,
-          body: op.body,
+          body: entryBody,
           author: AI_ACTOR,
         });
         break;
@@ -623,6 +626,37 @@ export class DecisionApplierService {
           relationType: op.relationType,
           confidence: op.confidence,
         });
+        break;
+      }
+      case 'REMOVE_EDGE': {
+        if (!op.edgeId) return failOp('edgeId required');
+        try {
+          // deleteEdge validates existence and refuses INFERRED edges
+          // (those are re-created automatically and cannot be removed).
+          await this.graph.deleteEdge(op.edgeId);
+        } catch (error) {
+          return failOp(error instanceof Error ? error.message : String(error));
+        }
+        break;
+      }
+      case 'LINK_SUPPORT': {
+        if (!op.threadId || !op.targetType || !op.targetId)
+          return failOp('threadId, targetType and targetId required');
+        const supportThreads = await this.search.existingIds('caseThread', [
+          op.threadId,
+        ]);
+        if (!supportThreads.has(op.threadId)) return failOp('Unknown threadId');
+        try {
+          // linkSupport validates the target belongs to this case.
+          await this.threads.linkSupport(op.threadId, {
+            targetType: op.targetType,
+            targetId: op.targetId,
+            stance: op.stance ? EvidenceStance[op.stance] : undefined,
+            note: op.note,
+          });
+        } catch (error) {
+          return failOp(error instanceof Error ? error.message : String(error));
+        }
         break;
       }
       case 'CHANGE_STATUS': {

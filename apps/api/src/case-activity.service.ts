@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { CaseActivityType, Prisma, PrismaClient } from '@prisma/client';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type JsonInput = any;
 import { PrismaService } from './prisma.service';
 import { CaseTimelineResponseDto } from './dto/case-activity.dto';
 
-type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
+type TxClient = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
 
 export type ActivityPayload = Record<string, unknown>;
 
@@ -24,7 +26,12 @@ export class CaseActivityService {
   ): Promise<void> {
     const client = tx ?? this.prisma;
     await client.caseActivity.create({
-      data: { caseId, activityType, payload: payload as JsonInput, actor: actor ?? null },
+      data: {
+        caseId,
+        activityType,
+        payload: payload as JsonInput,
+        actor: actor ?? null,
+      },
     });
   }
 
@@ -48,7 +55,7 @@ export class CaseActivityService {
 
     const hasMore = rows.length > take;
     const items = rows.slice(0, take);
-    const nextCursor = hasMore ? items[items.length - 1]!.id : null;
+    const nextCursor = hasMore ? items[items.length - 1].id : null;
 
     return {
       items: items.map((r) => ({
