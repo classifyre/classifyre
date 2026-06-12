@@ -3,9 +3,8 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, Generator
 from typing import TYPE_CHECKING, Any
 
-from ..outputs.rest import IngestEdge
-
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
+from ..outputs.rest import IngestEdge
 
 if TYPE_CHECKING:
     from ..utils.file_parser import ParsedBytes
