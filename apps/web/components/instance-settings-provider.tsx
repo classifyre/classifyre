@@ -62,6 +62,11 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   timezone: "AUTOMATIC",
   timeFormat: InstanceSettingsResponseDtoTimeFormatEnum.Automatic,
   aiProviderConfigId: null,
+  autopilotInquiryEnabled: false,
+  autopilotInquiryDesired: null,
+  autopilotInquirySearchable: null,
+  autopilotCaseEnabled: false,
+  autopilotCaseGuidance: null,
   createdAt: new Date(0),
   updatedAt: new Date(0),
 };

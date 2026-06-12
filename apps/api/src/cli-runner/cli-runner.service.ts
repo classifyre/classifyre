@@ -11,6 +11,12 @@ import {
 import { spawn, ChildProcess } from 'child_process';
 import { PrismaService } from '../prisma.service';
 import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
+import { PgBossService } from '../scheduler/pg-boss.service';
+import { INQUIRY_MATCH_QUEUE } from '../matching/matching.constants';
+import {
+  AUTOPILOT_QUEUE,
+  AUTOPILOT_START_AFTER_SECONDS,
+} from '../autopilot/autopilot.constants';
 import {
   AssetType,
   Prisma,
@@ -84,7 +90,46 @@ export class CliRunnerService implements OnApplicationBootstrap {
     @Optional()
     @Inject(RunnerEventsGateway)
     private runnerEventsGateway?: RunnerEventsGateway,
+    @Optional()
+    private pgBossService?: PgBossService,
   ) {}
+
+  /**
+   * Tell the question-matching engine a source finished ingesting. Decoupled from
+   * ingestion: we only drop a pg-boss message (singletonKey dedupes rapid
+   * completions). Never let a matching failure break run completion.
+   */
+  private async enqueueQuestionMatching(
+    sourceId: string,
+    runnerId: string,
+  ): Promise<void> {
+    if (!this.pgBossService) return;
+    try {
+      const boss = await this.pgBossService.getBossAsync();
+      await boss.send(
+        INQUIRY_MATCH_QUEUE,
+        { sourceId, runnerId },
+        { singletonKey: sourceId },
+      );
+      // Autopilot cycle for the same scan — deliberately delayed so inquiry
+      // matching lands first; singletonKey debounces rapid rescans.
+      await boss.send(
+        AUTOPILOT_QUEUE,
+        { sourceId, runnerId, cycleKey: `scan:${sourceId}:${runnerId}` },
+        {
+          singletonKey: `autopilot:${sourceId}`,
+          startAfter: AUTOPILOT_START_AFTER_SECONDS,
+          retryLimit: 2,
+          retryDelay: 120,
+          retryBackoff: true,
+        },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to enqueue question matching for source ${sourceId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 
   async onApplicationBootstrap(): Promise<void> {
     const inFlightRunners = await this.prisma.runner.findMany({
@@ -1764,6 +1809,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
     if (runnerDto && this.runnerEventsGateway) {
       this.runnerEventsGateway.emitRunnerUpdate(runnerDto as any);
     }
+
+    // Kick the question-matching engine for this source (fire-and-forget).
+    await this.enqueueQuestionMatching(runner.sourceId, runnerId);
 
     if (runner?.source) {
       const sourceName = runner.source.name;

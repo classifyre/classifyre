@@ -103,6 +103,12 @@ export interface SearchFindingsFiltersInputDto {
      * @memberof SearchFindingsFiltersInputDto
      */
     lastDetectedBefore?: Date;
+    /**
+     * Finding UUIDs to exclude from results (e.g. already-attached findings)
+     * @type {Array<string>}
+     * @memberof SearchFindingsFiltersInputDto
+     */
+    excludeIds?: Array<string>;
 }
 
 
@@ -174,6 +180,7 @@ export function SearchFindingsFiltersInputDtoFromJSONTyped(json: any, ignoreDisc
         'detectionIdentity': json['detectionIdentity'] == null ? undefined : json['detectionIdentity'],
         'firstDetectedAfter': json['firstDetectedAfter'] == null ? undefined : (new Date(json['firstDetectedAfter'])),
         'lastDetectedBefore': json['lastDetectedBefore'] == null ? undefined : (new Date(json['lastDetectedBefore'])),
+        'excludeIds': json['excludeIds'] == null ? undefined : json['excludeIds'],
     };
 }
 
@@ -202,6 +209,7 @@ export function SearchFindingsFiltersInputDtoToJSONTyped(value?: SearchFindingsF
         'detectionIdentity': value['detectionIdentity'],
         'firstDetectedAfter': value['firstDetectedAfter'] == null ? value['firstDetectedAfter'] : value['firstDetectedAfter'].toISOString(),
         'lastDetectedBefore': value['lastDetectedBefore'] == null ? value['lastDetectedBefore'] : value['lastDetectedBefore'].toISOString(),
+        'excludeIds': value['excludeIds'],
     };
 }
 

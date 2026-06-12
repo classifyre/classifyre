@@ -51,9 +51,6 @@ export default async function SourceTypePage({ params }: SourcePageProps) {
 
   const toc = [
     { id: "source-overview", value: "Overview" },
-    ...(sourceDoc.knowledgeSections.length > 0
-      ? [{ id: "common-questions", value: "Commonly Asked Questions" }]
-      : []),
     { id: "schema-reference", value: "Schema Reference" },
     { id: "required-fields", value: "Required Fields" },
     { id: "masked-fields", value: "Masked Fields" },

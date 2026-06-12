@@ -202,12 +202,13 @@ export function AssistantDemo() {
       <div className="grid gap-6 grid-cols-1 xl:grid-cols-2">
         <div className="space-y-4">
           <h2 className="font-serif text-4xl uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl">
-            See the assistant drive setup
+            When you do want to talk, the assistant drives setup
           </h2>
           <p className="max-w-3xl text-base leading-7 sm:text-lg">
-            The assistant narrows scope, stages source and detector
-            configuration, and returns an exact operating plan instead of
-            leaving the user in a generic chat loop.
+            The autopilot runs your investigations without being prompted. For
+            everything else there&apos;s the assistant: it narrows scope,
+            stages source and detector configuration, and hands back an exact
+            operating plan instead of leaving you in a generic chat loop.
           </p>
         </div>
 

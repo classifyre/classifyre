@@ -16,6 +16,7 @@
     "assets": "Assets",
     "sources": "Sources",
     "detectors": "Custom Detectors",
+    "investigations": "Investigations",
     "scans": "Scans",
     "sandbox": "Sandbox",
     "operations": "Operations",
@@ -153,6 +154,32 @@
       "disabledHint": "Enable the assistant to choose a model.",
       "usingNone": "No model selected",
       "loading": "Loading assistant settings…"
+    },
+    "autopilot": {
+      "subtitle": "Investigation Autopilot",
+      "title": "Autopilot",
+      "description": "Autonomous AI agents that manage inquiries and investigation cases after every scan. All actions are attributed to the AI and fully audited.",
+      "inquiryEnable": "Automatic inquiry management",
+      "inquiryEnableDesc": "After each scan, the AI reviews new findings, creates or enriches inquiries, avoids duplicates and flags when a case is warranted.",
+      "inquiryDesired": "What is desired",
+      "inquiryDesiredPlaceholder": "Describe what the AI should focus on investigating, e.g. leaked credentials in customer-facing spaces, PII in public docs…",
+      "inquirySearchable": "What is searchable",
+      "inquirySearchablePlaceholder": "Describe what data exists and is worth matching, e.g. Confluence spaces with API docs, Jira projects with support tickets…",
+      "caseEnable": "Full case management",
+      "caseEnableDesc": "The AI builds and advances investigation cases from inquiries: hypotheses, evidence, findings, notes, edges and status changes.",
+      "caseGuidance": "Case guidance",
+      "caseGuidancePlaceholder": "Extra instructions for case management, e.g. severity conventions, when to close a case, naming rules…",
+      "enabledToast": "Autopilot setting saved",
+      "guidanceSaved": "Guidance saved",
+      "requiresAi": "Enable the AI assistant and select a provider to use the autopilot.",
+      "aiMode": "AI autopilot",
+      "aiModeInherit": "Inherit",
+      "aiModeManaged": "Managed",
+      "aiModeObserveOnly": "Observe only",
+      "aiModeDesc": "Inherit follows the instance setting. Observe only lets the AI read but never change this item.",
+      "aiBadge": "AI",
+      "aiBadgeTooltip": "Done by Investigation Autopilot",
+      "saveGuidance": "Save guidance"
     }
   },
   "sources": {
@@ -1395,6 +1422,84 @@
       }
     }
   },
+  "cases": {
+    "search": "Search investigations…",
+    "noInvestigations": "No investigations found",
+    "noInvestigationsHint": "Adjust filters to broaden your search.",
+    "loading": "Loading investigations...",
+    "columns": {
+      "title": "Title",
+      "status": "Status",
+      "severity": "Severity",
+      "inquiries": "Inquiries",
+      "updated": "Updated"
+    },
+    "statusLabels": {
+      "OPEN": "Open",
+      "IN_PROGRESS": "In Progress",
+      "CLOSED": "Closed",
+      "ARCHIVED": "Archived"
+    },
+    "severityLabels": {
+      "CRITICAL": "Critical",
+      "HIGH": "High",
+      "MEDIUM": "Medium",
+      "LOW": "Low",
+      "INFO": "Info"
+    },
+    "evidence": {
+      "search": "Search evidence…",
+      "noEvidence": "No evidence yet",
+      "noEvidenceHint": "Pull from a linked inquiry or add assets manually.",
+      "addEvidence": "Add evidence",
+      "columns": {
+        "entity": "Entity",
+        "type": "Type",
+        "sourceType": "Source type",
+        "assetType": "Asset type",
+        "findings": "Findings",
+        "note": "Note",
+        "added": "Added",
+        "actions": "Actions"
+      },
+      "tooltips": {
+        "entity": "Asset or entity used as evidence",
+        "type": "Entity type (asset, finding, …)",
+        "sourceType": "Source connector type",
+        "assetType": "Asset kind (page, file, …)",
+        "findings": "Attached findings · chip shows addable count",
+        "note": "Analyst note, click pencil to edit",
+        "added": "When this evidence was added",
+        "sortEntity": "Sort by entity name",
+        "sortFindings": "Sort by number of findings",
+        "sortAdded": "Sort by date added"
+      },
+      "subTable": {
+        "noFindings": "No findings attached",
+        "findingLabel": "Finding",
+        "detectorType": "Detector",
+        "matchedContent": "Matched content",
+        "severity": "Severity",
+        "note": "Note",
+        "added": "Added",
+        "attachedFindings": "Attached findings",
+        "availableFindings": "Available findings for this asset",
+        "attachSelected": "Attach selected",
+        "tooltips": {
+          "findingLabel": "Finding type that was detected",
+          "detectorType": "Detector type that fired on this finding",
+          "matchedContent": "Content snippet that triggered this finding",
+          "severity": "Risk level assigned to this finding",
+          "note": "Analyst note, click pencil to edit",
+          "added": "When this finding was attached to the case",
+          "sortByFinding": "Sort by finding type",
+          "sortByDetector": "Sort by detector type",
+          "sortBySeverity": "Sort by severity",
+          "sortByAdded": "Sort by date added"
+        }
+      }
+    }
+  },
   "forms": {
     "sourceName": "Source Name",
     "sourceNameDesc": "Give this source a clear, unique name so it stands out later.",
@@ -1662,4 +1767,3 @@
     "sandbox": "Sandbox"
   }
 }
-

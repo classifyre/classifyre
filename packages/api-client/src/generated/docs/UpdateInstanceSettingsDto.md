@@ -12,6 +12,11 @@ Name | Type
 `timezone` | string
 `timeFormat` | string
 `aiProviderConfigId` | string
+`autopilotInquiryEnabled` | boolean
+`autopilotInquiryDesired` | string
+`autopilotInquirySearchable` | string
+`autopilotCaseEnabled` | boolean
+`autopilotCaseGuidance` | string
 
 ## Example
 
@@ -26,6 +31,11 @@ const example = {
   "timezone": America/New_York,
   "timeFormat": TWELVE_HOUR,
   "aiProviderConfigId": null,
+  "autopilotInquiryEnabled": false,
+  "autopilotInquiryDesired": null,
+  "autopilotInquirySearchable": null,
+  "autopilotCaseEnabled": false,
+  "autopilotCaseGuidance": null,
 } satisfies UpdateInstanceSettingsDto
 
 console.log(example)

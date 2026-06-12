@@ -1,0 +1,163 @@
+---
+sidebarTitle: Pre-built Detectors
+title: Pre-built Detectors
+description: Reference for every built-in detector — what it detects and when to use it.
+---
+
+# Pre-built Detectors
+
+Classifyre ships with six pre-built detectors that cover the most common
+content-scanning requirements: credentials, personal data, malware, link
+integrity, code vulnerabilities, and custom detection pipelines. Each detector
+is independently configurable, and multiple detectors can run on the same
+ingestion source.
+
+---
+
+## Secrets Detector
+
+**Detects** hardcoded credentials, API keys, tokens, and other confidential
+strings that should never appear in plaintext.
+
+The Secrets detector combines pattern matching for well-known credential
+formats (AWS keys, GitHub tokens, OpenAI keys, PEM private keys, JWTs, and
+more) with entropy analysis to catch custom or obfuscated secrets. Results
+are purely static — no secrets are ever verified against live services, making
+the scan safe for air-gapped environments.
+
+Each finding includes a confidence score (0–1) and a severity level based on
+the type of secret matched.
+
+**When to use it** — enable on any source that ingests code repositories,
+configuration files, environment exports, JSON/YAML documents, or internal
+wiki pages. Recommended for all pipelines.
+
+**Supported content** — text/plain, JSON, YAML, XML.
+
+---
+
+## PII Detector
+
+**Detects** personally identifiable information across 42 entity types and
+10 jurisdictions, including names, email addresses, phone numbers, credit
+cards, government IDs, and region-specific identifiers.
+
+The PII detector uses Presidio with a spaCy NLP pipeline. For structured
+content (tables, key-value pairs), detection is scoped per field — for
+example, a column named `email` is only checked for email addresses, while
+a column named `name` checks for person names. Unstructured content is
+analysed in full-text mode.
+
+Custom recognizers let you define regex patterns, deny lists, and context
+words for proprietary identifiers (e.g., employee IDs, internal project codes).
+
+**When to use it** — required for any source containing customer data, employee
+records, HR documents, financial reports, healthcare notes, or legal
+correspondence. Supports compliance with GDPR, CCPA, HIPAA, PIPEDA, and
+regional data protection laws.
+
+**Supported content** — text/plain, HTML, JSON, XML.
+
+---
+
+## YARA Detector
+
+**Detects** malware patterns, suspicious scripts, supply-chain threats, and
+known-attack indicators using YARA rules.
+
+The YARA detector scans content against a configurable set of rules covering:
+
+- Cloud credentials and API tokens
+- Malware indicators (process injection APIs, known offensive tools)
+- Suspicious scripts (PowerShell download cradles, base64 commands, shell
+  pipe-to-exec, Python exec obfuscation)
+- Office macro threats (VBA auto-execution, shell spawning, network downloads)
+- PDF threat indicators (embedded JavaScript, auto-open actions)
+- Supply chain threats (crypto miners, reverse shells, obfuscated npm/pip
+  hooks, exfiltration services)
+- Network threat indicators (C2 framework artifacts, known RAT strings)
+- Credential theft patterns (keylogger APIs, phishing forms)
+- Custom internal token formats
+
+Rules are written in a structured config format (not raw YARA source), making
+them easier to compose and maintain.
+
+**When to use it** — enable on sources that handle third-party content, user
+uploads, email attachments, or any untrusted data. Also valuable for scanning
+internal code repositories and document stores for supply-chain risk.
+
+**Supported content** — text/plain, HTML, CSV, markdown, Python, shell scripts,
+JavaScript, JSON, XML, PDF, Office documents, and binary.
+
+---
+
+## Code Security Detector
+
+**Detects** insecure patterns in Python code snippets using Bandit static
+analysis.
+
+The detector covers SQL injection, hardcoded passwords, unsafe deserialisation,
+assert usage, shell injection, and 100+ additional security issues. You can
+choose which tests to run or exclude specific checks, and set a minimum
+severity threshold for reporting.
+
+**When to use it** — essential for any source that ingests code (GitHub, GitLab,
+code snippets in wikis or knowledge bases). Detects problems that the Secrets
+detector doesn't cover: insecure code patterns, not just leaked credentials.
+
+**Supported content** — text/plain, HTML, markdown, JSON, binary.
+
+---
+
+## Broken Links Detector
+
+**Detects** unreachable or empty URLs in document content.
+
+Each URL extracted from an asset is checked by sending a request. URLs that
+return HTTP 4xx/5xx are marked as unreachable; URLs that resolve to an empty
+body are flagged as empty content. Duplicate URLs are checked only once.
+
+**When to use it** — enable on documentation sources, knowledge bases, or any
+content that references external or internal links. Suitable for scheduled
+quality audits.
+
+**Supported content** — extracted link lists from the ingestion pipeline.
+
+---
+
+## Custom Detector
+
+**Executes** user-defined detection pipelines using one of seven pluggable
+engines. Detection is driven entirely by configuration — no code changes
+needed.
+
+**Pipeline engines:**
+
+- **GLiNER2** — multilingual NER for entity extraction and zero-shot
+  classification. Extract structured fields (order IDs, regulatory references,
+  vendor names) without labelled training data.
+- **Regex** — deterministic pattern matching for SKU codes, IBANs, date
+  formats, internal identifiers.
+- **AI Detector** — LLM-powered classification and extraction for nuanced
+  tasks: contract risk assessment, policy compliance, escalation detection.
+- **Text Classification** — HuggingFace transformers for spam filtering,
+  sentiment analysis, topic classification.
+- **Image Classification** — HuggingFace image models for NSFW detection and
+  content moderation.
+- **Feature Extraction** — sentence-transformers for semantic search,
+  clustering, and RAG enrichment.
+- **Object Detection** — HuggingFace object detection for security screening
+  and document image analysis.
+
+Each runner can be paired with a structured extractor that pulls typed fields
+from the matched content after detection.
+
+**When to use it** — whenever a pre-built detector doesn't cover your domain.
+Common use cases: support ticket extraction, contract risk analysis, internal
+code-name leakage detection, invoice data parsing, content moderation.
+
+**Supported content** — text (all runners), image and PDF (AI Detector, image
+classification, object detection runners).
+
+See [Custom Detectors](/detectors/custom-detectors) for detailed configuration
+and examples for each engine.
