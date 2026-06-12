@@ -286,7 +286,7 @@ class RestOutputSink:
         if not edges:
             return
 
-        _EDGE_BATCH = 500
+        _edge_batch = 500
         for i in range(0, len(edges), _EDGE_BATCH):
             chunk = edges[i : i + _EDGE_BATCH]
             payload = BulkIngestEdgesRequest(edges=chunk)
