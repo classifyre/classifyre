@@ -25,6 +25,12 @@ export class QueryAgentRunsDto {
   @IsEnum(AgentKind)
   agentKind?: AgentKind;
 
+  @ApiPropertyOptional({ description: 'Only runs focused on this case' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  caseId?: string;
+
   @ApiPropertyOptional({ enum: AgentRunStatus })
   @IsOptional()
   @IsEnum(AgentRunStatus)
@@ -90,7 +96,13 @@ export class AgentRunDto {
   @ApiPropertyOptional({ nullable: true })
   runnerId!: string | null;
 
-  @ApiProperty({ description: '"scan_completed" or "manual"' })
+  @ApiPropertyOptional({
+    description: 'Case this run is focused on (case-targeted manual runs)',
+    nullable: true,
+  })
+  caseId!: string | null;
+
+  @ApiProperty({ description: '"scan_completed", "manual" or "schedule"' })
   trigger!: string;
 
   @ApiPropertyOptional({
@@ -200,6 +212,24 @@ export class TriggerAutopilotDto {
   @IsString()
   @MaxLength(64)
   sourceId?: string;
+
+  @ApiPropertyOptional({
+    enum: [AgentKind.INQUIRY, AgentKind.CASE],
+    description:
+      'Run only one agent. Omit to run both (inquiry then case). Implied CASE when caseId is set.',
+  })
+  @IsOptional()
+  @IsEnum(AgentKind)
+  agentKind?: AgentKind;
+
+  @ApiPropertyOptional({
+    description:
+      'Focus the case agent on ONE case: it receives the full case detail (hypotheses, evidence, findings, edges) and can connect/disconnect edges, build evidence paths and create/update hypotheses with supporting evidence — steered by the instruction.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  caseId?: string;
 }
 
 export class TriggerAutopilotResponseDto {

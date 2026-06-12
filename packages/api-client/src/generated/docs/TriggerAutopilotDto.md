@@ -8,6 +8,8 @@ Name | Type
 ------------ | -------------
 `instruction` | string
 `sourceId` | string
+`agentKind` | string
+`caseId` | string
 
 ## Example
 
@@ -18,6 +20,8 @@ import type { TriggerAutopilotDto } from '@workspace/api-client'
 const example = {
   "instruction": null,
   "sourceId": null,
+  "agentKind": null,
+  "caseId": null,
 } satisfies TriggerAutopilotDto
 
 console.log(example)

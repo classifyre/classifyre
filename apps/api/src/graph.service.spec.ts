@@ -127,9 +127,15 @@ describe('GraphService', () => {
 
       expect(mockPrisma.$executeRaw).toHaveBeenCalled();
       const createArg = mockPrisma.edge.createMany.mock.calls[0][0];
-      const targets = createArg.data.map((r: { toId: string }) => r.toId).sort();
+      const targets = createArg.data
+        .map((r: { toId: string }) => r.toId)
+        .sort();
       expect(targets).toEqual(['a2', 'a9']);
-      expect(createArg.data.every((r: { relationType: string }) => r.relationType === 'REFERENCES')).toBe(true);
+      expect(
+        createArg.data.every(
+          (r: { relationType: string }) => r.relationType === 'REFERENCES',
+        ),
+      ).toBe(true);
       expect(result.edgeCount).toBe(5);
     });
 
@@ -200,7 +206,14 @@ describe('GraphService', () => {
           assetType: 'file',
           sourceType: 'S3_COMPATIBLE_STORAGE',
           findings: [
-            { id: 'cf1', findingId: 'f1', label: 'Contains PII', severity: 'HIGH', detectorType: 'PII', matchedContent: null },
+            {
+              id: 'cf1',
+              findingId: 'f1',
+              label: 'Contains PII',
+              severity: 'HIGH',
+              detectorType: 'PII',
+              matchedContent: null,
+            },
           ],
         },
       ]);

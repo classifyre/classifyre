@@ -26,7 +26,9 @@ export class HypothesesController {
   @Get('cases/:caseId/hypotheses')
   @ApiOperation({ summary: 'List hypotheses for a case' })
   @ApiResponse({ status: 200, type: [HypothesisResponseDto] })
-  async list(@Param('caseId') caseId: string): Promise<HypothesisResponseDto[]> {
+  async list(
+    @Param('caseId') caseId: string,
+  ): Promise<HypothesisResponseDto[]> {
     return this.hypothesesService.list(caseId);
   }
 
@@ -44,7 +46,10 @@ export class HypothesesController {
   @Patch('hypotheses/:id')
   @ApiOperation({ summary: 'Update a hypothesis' })
   @ApiResponse({ status: 200, type: HypothesisResponseDto })
-  async update(@Param('id') id: string, @Body() dto: UpdateHypothesisDto): Promise<HypothesisResponseDto> {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateHypothesisDto,
+  ): Promise<HypothesisResponseDto> {
     return this.hypothesesService.update(id, dto);
   }
 
@@ -56,7 +61,9 @@ export class HypothesesController {
   }
 
   @Post('hypotheses/:id/support')
-  @ApiOperation({ summary: 'Link evidence or a finding to a hypothesis with a stance' })
+  @ApiOperation({
+    summary: 'Link evidence or a finding to a hypothesis with a stance',
+  })
   @ApiResponse({ status: 200, type: HypothesisResponseDto })
   async linkSupport(
     @Param('id') id: string,
