@@ -18,7 +18,10 @@ export class GeminiProvider implements IAiProvider {
     config: AiProviderRuntimeConfig,
     options: AiCompletionOptions,
   ): Promise<string> {
-    const client = new GoogleGenAI({ apiKey: config.apiKey });
+    const client = new GoogleGenAI({
+      apiKey: config.apiKey,
+      httpOptions: { timeout: 30 * 60 * 1000 },
+    });
 
     const systemParts = messages.filter((m) => m.role === 'system');
     const systemInstruction =

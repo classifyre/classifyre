@@ -10,8 +10,11 @@ import { AgentLoggerService } from './audit/agent-logger.service';
 import { AgentSearchService } from './search/agent-search.service';
 import { InquiryAgentService } from './inquiry-agent.service';
 import { CaseAgentService } from './case-agent.service';
+import { DreamAgentService, DreamSummary } from './dream-agent.service';
+import { AgentRunCancelledError } from './agent-runtime';
 import type { ApplySummary } from './decision-applier.service';
 import {
+  AUTOPILOT_DREAM_CRON,
   AUTOPILOT_QUEUE,
   AUTOPILOT_RETRY_AFTER_SECONDS,
 } from './autopilot.constants';
@@ -26,6 +29,10 @@ interface CycleInput {
   trigger: string;
   manual: boolean;
   instruction: string | null;
+  /** Rerun of one specific agent — execute only it, bypassing enable-flags. */
+  only?: AgentKind | null;
+  /** Case-focused run: the case agent works on exactly this case. */
+  caseId?: string | null;
 }
 
 /**
@@ -50,6 +57,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
     private readonly search: AgentSearchService,
     private readonly inquiryAgent: InquiryAgentService,
     private readonly caseAgent: CaseAgentService,
+    private readonly dreamAgent: DreamAgentService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -58,6 +66,19 @@ export class AutopilotWorker implements OnApplicationBootstrap {
     await boss.work(AUTOPILOT_QUEUE, { localConcurrency: 1 }, (jobs: Job[]) =>
       this.handle(jobs),
     );
+    // Every-other-day "dreaming": memory consolidation on a pg-boss schedule.
+    try {
+      await boss.schedule(
+        AUTOPILOT_QUEUE,
+        AUTOPILOT_DREAM_CRON,
+        { dream: true },
+        { tz: 'UTC' },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to register dream schedule: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     this.logger.log(`Registered worker for queue ${AUTOPILOT_QUEUE}`);
   }
 
@@ -69,11 +90,25 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       const runnerId =
         typeof data?.runnerId === 'string' ? data.runnerId : null;
       const manual = data?.manual === true;
-      if (!sourceId && !manual) continue;
+      const only =
+        data?.agentKind && data.agentKind in AgentKind ? data.agentKind : null;
+      if (data?.dream === true || only === AgentKind.DREAM) {
+        await this.runDreamCycle({
+          cycleKey:
+            typeof data?.cycleKey === 'string' && data.cycleKey
+              ? data.cycleKey
+              : `dream:${new Date().toISOString().slice(0, 10)}`,
+          trigger: manual || only ? 'manual' : 'schedule',
+        });
+        continue;
+      }
+      if (!sourceId && !manual && !only) continue;
       await this.runCycle({
         sourceId,
         runnerId,
         manual,
+        only,
+        caseId: typeof data?.caseId === 'string' ? data.caseId : null,
         instruction:
           typeof data?.instruction === 'string' && data.instruction.trim()
             ? data.instruction.trim()
@@ -85,6 +120,33 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         trigger: manual ? 'manual' : 'scan_completed',
       });
     }
+  }
+
+  /** Scheduled or manually requested dream (memory consolidation) cycle. */
+  private async runDreamCycle(input: {
+    cycleKey: string;
+    trigger: string;
+  }): Promise<void> {
+    const settings = await this.prisma.instanceSettings.findUnique({
+      where: { id: INSTANCE_SETTINGS_ID },
+    });
+    if (!settings?.aiEnabled) {
+      this.logger.debug('AI disabled — skipping dream cycle');
+      return;
+    }
+    await this.runAgent(
+      AgentKind.DREAM,
+      settings,
+      {
+        sourceId: null,
+        runnerId: null,
+        cycleKey: input.cycleKey,
+        trigger: input.trigger,
+        manual: input.trigger === 'manual',
+        instruction: null,
+      },
+      'agent memory',
+    );
   }
 
   async runCycle(cycle: CycleInput): Promise<void> {
@@ -100,6 +162,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
     // OBSERVE_ONLY is still enforced by the decision applier).
     if (
       !cycle.manual &&
+      !cycle.only &&
       !settings.autopilotInquiryEnabled &&
       !settings.autopilotCaseEnabled
     ) {
@@ -126,6 +189,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         {
           startAfter: AUTOPILOT_RETRY_AFTER_SECONDS,
           singletonKey: `autopilot:${cycle.sourceId}`,
+          expireInSeconds: 3 * 3600,
         },
       );
       return;
@@ -135,12 +199,18 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       ? await this.search.sourceName(cycle.sourceId)
       : 'all sources';
 
-    const inquiryEnabled = cycle.manual || settings.autopilotInquiryEnabled;
-    const caseEnabled = cycle.manual || settings.autopilotCaseEnabled;
+    // A rerun of one specific agent ("only") is explicit operator intent:
+    // run exactly that agent and skip the other without a SKIPPED record.
+    const inquiryEnabled = cycle.only
+      ? cycle.only === AgentKind.INQUIRY
+      : cycle.manual || settings.autopilotInquiryEnabled;
+    const caseEnabled = cycle.only
+      ? cycle.only === AgentKind.CASE
+      : cycle.manual || settings.autopilotCaseEnabled;
 
     if (inquiryEnabled) {
       await this.runAgent(AgentKind.INQUIRY, settings, cycle, sourceName);
-    } else {
+    } else if (!cycle.only) {
       await this.audit.recordSkippedRun(
         AgentKind.INQUIRY,
         cycle.sourceId ?? 'all',
@@ -151,7 +221,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
 
     if (caseEnabled) {
       await this.runAgent(AgentKind.CASE, settings, cycle, sourceName);
-    } else {
+    } else if (!cycle.only) {
       await this.audit.recordSkippedRun(
         AgentKind.CASE,
         cycle.sourceId ?? 'all',
@@ -173,26 +243,30 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       cycleKey: cycle.cycleKey,
       trigger: cycle.trigger,
       instruction: cycle.instruction,
+      caseId: agentKind === AgentKind.CASE ? (cycle.caseId ?? null) : null,
     });
     if (run.status !== AgentRunStatus.RUNNING) return;
 
     await this.log.business(
       run.id,
-      cycle.manual
-        ? `Manual ${agentKind.toLowerCase()} review started for ${sourceName}${cycle.instruction ? ' with operator instruction.' : '.'}`
-        : `${agentKind === AgentKind.INQUIRY ? 'Inquiry' : 'Case'} cycle started after a scan of ${sourceName}.`,
+      agentKind === AgentKind.DREAM
+        ? `Dream cycle started: consolidating agent memory (${cycle.trigger}).`
+        : cycle.manual
+          ? `Manual ${agentKind.toLowerCase()} review started for ${sourceName}${cycle.instruction ? ' with operator instruction.' : '.'}`
+          : `${agentKind === AgentKind.INQUIRY ? 'Inquiry' : 'Case'} cycle started after a scan of ${sourceName}.`,
       cycle.instruction ? { instruction: cycle.instruction } : undefined,
     );
 
-    // Manual runs override the instance flags (explicit operator intent);
-    // the applier still enforces per-entity OBSERVE_ONLY.
-    const effectiveSettings: InstanceSettings = cycle.manual
-      ? {
-          ...settings,
-          autopilotInquiryEnabled: true,
-          autopilotCaseEnabled: true,
-        }
-      : settings;
+    // Manual runs and targeted reruns override the instance flags (explicit
+    // operator intent); the applier still enforces per-entity OBSERVE_ONLY.
+    const effectiveSettings: InstanceSettings =
+      cycle.manual || cycle.only
+        ? {
+            ...settings,
+            autopilotInquiryEnabled: true,
+            autopilotCaseEnabled: true,
+          }
+        : settings;
 
     const ctx: AgentContext = {
       run,
@@ -202,10 +276,15 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       runnerId: cycle.runnerId,
       manual: cycle.manual,
       instruction: cycle.instruction,
+      caseId: agentKind === AgentKind.CASE ? (cycle.caseId ?? null) : null,
       state: {},
     };
     const agent =
-      agentKind === AgentKind.INQUIRY ? this.inquiryAgent : this.caseAgent;
+      agentKind === AgentKind.INQUIRY
+        ? this.inquiryAgent
+        : agentKind === AgentKind.CASE
+          ? this.caseAgent
+          : this.dreamAgent;
 
     try {
       const summary = await agent.execute(ctx);
@@ -218,6 +297,12 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         `${agentKind} agent run ${run.id} completed: ${formatSummary(summary)}`,
       );
     } catch (error) {
+      if (error instanceof AgentRunCancelledError) {
+        // Operator stop request — the run is already CANCELLED; just close
+        // the narrative and let the job complete normally (no retry).
+        this.logger.log(`${agentKind} agent run ${run.id} cancelled`);
+        return;
+      }
       if (error instanceof AiSchemaError) {
         // The model could not produce valid output even after completeJson's
         // correction retries — store every raw response so the operator can
@@ -276,7 +361,10 @@ export class AutopilotWorker implements OnApplicationBootstrap {
   }
 }
 
-function formatSummary(s: ApplySummary): string {
+function formatSummary(s: ApplySummary | DreamSummary): string {
+  if ('journal' in s) {
+    return `${s.deleted} memory deletion(s), ${s.rewritten} rewrite(s), ${s.created} new note(s), ${s.failed} failed. ${s.journal}`;
+  }
   const parts = [
     `${s.applied} applied`,
     `${s.skippedObserveOnly} observe-only`,

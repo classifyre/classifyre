@@ -16,6 +16,16 @@ export interface AutopilotJob {
   instruction?: string;
   /** Stable cycle identity for resuming the right run on redelivery. */
   cycleKey?: string;
+  /** Scheduled "dreaming" cycle: memory consolidation, no inquiry/case work. */
+  dream?: boolean;
+  /**
+   * Rerun of one specific run, or a manual trigger of one agent: execute only
+   * this agent and treat the job as explicit operator intent (instance
+   * enable-flags are bypassed).
+   */
+  agentKind?: 'INQUIRY' | 'CASE' | 'DREAM';
+  /** Focus the case agent on one case (full case detail in context). */
+  caseId?: string;
 }
 
 /** Aggregated view of one group of new findings (token-bounded). */
@@ -62,6 +72,51 @@ export interface CaseSummary {
   findingCount: number;
 }
 
+/**
+ * Full detail of ONE case for focused (case-targeted) runs: every id the
+ * model may reference — hypothesis threads, evidence, findings, edges — so a
+ * natural-language instruction alone can target anything in the case.
+ */
+export interface FocusedCaseDetail {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  severity: string;
+  hypotheses: Array<{
+    threadId: string;
+    title: string;
+    status: string | null;
+    confidence: number | null;
+    supportCount: number;
+  }>;
+  evidence: Array<{
+    evidenceId: string;
+    assetId: string;
+    label: string | null;
+    note: string | null;
+  }>;
+  findings: Array<{
+    caseFindingId: string;
+    findingId: string;
+    evidenceId: string;
+    label: string;
+    severity: string | null;
+    detectorType: string | null;
+    matchedContent: string | null;
+  }>;
+  edges: Array<{
+    edgeId: string;
+    fromType: string;
+    fromId: string;
+    toType: string;
+    toId: string;
+    relationType: string;
+    origin: string;
+  }>;
+  linkedInquiryIds: string[];
+}
+
 export interface RecalledMemory {
   kind: string;
   key: string;
@@ -80,6 +135,8 @@ export interface AgentContext {
   manual: boolean;
   /** Operator instruction for this cycle (manual runs only). */
   instruction: string | null;
+  /** Case-focused run: the case agent works on exactly this case. */
+  caseId?: string | null;
   /** Validated output of each completed step, keyed by step name. */
   state: Record<string, unknown>;
 }
@@ -138,6 +195,8 @@ export type CaseOperation = {
     | 'ADD_NOTE'
     | 'ADD_THREAD_ENTRY'
     | 'CREATE_EDGE'
+    | 'REMOVE_EDGE'
+    | 'LINK_SUPPORT'
     | 'CHANGE_STATUS'
     | 'LINK_INQUIRY';
   rationale: string;
@@ -160,6 +219,12 @@ export type CaseOperation = {
   toType?: string;
   toId?: string;
   relationType?: string;
+  /** REMOVE_EDGE */
+  edgeId?: string;
+  /** LINK_SUPPORT — assign evidence/findings to a hypothesis thread */
+  targetType?: 'evidence' | 'finding';
+  targetId?: string;
+  stance?: 'SUPPORTS' | 'CONTRADICTS';
   /** CHANGE_STATUS */
   caseStatus?: 'OPEN' | 'IN_PROGRESS' | 'CLOSED' | 'ARCHIVED';
   severity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';

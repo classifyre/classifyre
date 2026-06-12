@@ -38,7 +38,10 @@ describe('HypothesesService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [HypothesesService, { provide: PrismaService, useValue: mockPrisma }],
+      providers: [
+        HypothesesService,
+        { provide: PrismaService, useValue: mockPrisma },
+      ],
     }).compile();
     service = module.get<HypothesesService>(HypothesesService);
     jest.clearAllMocks();
@@ -55,14 +58,31 @@ describe('HypothesesService', () => {
     mockPrisma.hypothesis.findUnique.mockResolvedValueOnce({ caseId: 'q1' });
     mockPrisma.hypothesis.findUnique.mockResolvedValueOnce(
       makeHypRow([
-        { id: 'l1', targetType: 'evidence', targetId: 'ev1', stance: 'SUPPORTS', weight: null, note: null },
-        { id: 'l2', targetType: 'finding', targetId: 'cf1', stance: 'CONTRADICTS', weight: null, note: null },
+        {
+          id: 'l1',
+          targetType: 'evidence',
+          targetId: 'ev1',
+          stance: 'SUPPORTS',
+          weight: null,
+          note: null,
+        },
+        {
+          id: 'l2',
+          targetType: 'finding',
+          targetId: 'cf1',
+          stance: 'CONTRADICTS',
+          weight: null,
+          note: null,
+        },
       ]),
     );
     mockPrisma.caseEvidence.findMany.mockResolvedValue([evRow]);
     mockPrisma.caseFinding.findMany.mockResolvedValue([cfRow]);
 
-    const result = await service.linkSupport('h1', { targetType: 'evidence', targetId: 'ev1' });
+    const result = await service.linkSupport('h1', {
+      targetType: 'evidence',
+      targetId: 'ev1',
+    });
 
     expect(result.supportingCount).toBe(1);
     expect(result.contradictingCount).toBe(1);

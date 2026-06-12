@@ -137,6 +137,8 @@ export {
   SandboxControllerListRunsStatusEnum,
 } from "./generated/src/apis/SandboxApi";
 
+export { TriggerAutopilotDtoAgentKindEnum } from "./generated/src/models/TriggerAutopilotDto";
+
 // Re-export types from generated models
 export type {
   CreateSourceDto,

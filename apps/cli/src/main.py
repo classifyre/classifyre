@@ -379,9 +379,13 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             edges = await source.collect_relationships()
                             if edges:
                                 await sink.emit_edges(edges)
-                                logger.info("Emitted %d source-derived relationship edges", len(edges))
+                                logger.info(
+                                    "Emitted %d source-derived relationship edges", len(edges)
+                                )
                         except Exception as rel_error:
-                            logger.warning("Relationship emission failed (non-fatal): %s", rel_error)
+                            logger.warning(
+                                "Relationship emission failed (non-fatal): %s", rel_error
+                            )
                 except Exception as extraction_error:
                     if _is_timeout_error(extraction_error):
                         logger.warning(

@@ -13,6 +13,7 @@ import {
 import type {
   CaseSummary,
   FindingGroupSummary,
+  FocusedCaseDetail,
   InquirySummary,
 } from '../autopilot.types';
 
@@ -120,6 +121,55 @@ export class AgentSearchService {
     }));
   }
 
+  /**
+   * Recently archived inquiries — intentionally closed topics the agent must
+   * not blindly recreate.
+   */
+  async listRecentlyArchivedInquiries(): Promise<
+    Array<{
+      id: string;
+      title: string;
+      description: string | null;
+      archivedAt: Date;
+    }>
+  > {
+    const rows = await this.prisma.inquiry.findMany({
+      where: { status: 'ARCHIVED' },
+      select: { id: true, title: true, description: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 15,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      archivedAt: r.updatedAt,
+    }));
+  }
+
+  /** Recently closed/archived cases with their conclusions — solved topics. */
+  async listRecentlyClosedCases(): Promise<
+    Array<{
+      id: string;
+      title: string;
+      status: string;
+      conclusion: string | null;
+    }>
+  > {
+    const rows = await this.prisma.case.findMany({
+      where: { status: { in: ['CLOSED', 'ARCHIVED'] } },
+      select: { id: true, title: true, status: true, conclusion: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      status: String(r.status),
+      conclusion: r.conclusion,
+    }));
+  }
+
   /** Open/in-progress cases (capped) as compact summaries. */
   async listOpenCases(): Promise<CaseSummary[]> {
     const rows = await this.prisma.case.findMany({
@@ -144,6 +194,96 @@ export class AgentSearchService {
       evidenceCount: r._count.evidence,
       findingCount: r._count.findings,
     }));
+  }
+
+  /**
+   * Full detail of one case for focused runs: hypotheses, evidence, findings
+   * and graph edges — every id with bounded text so the model can target any
+   * element from a natural-language instruction. Null when the case is gone.
+   */
+  async caseDetail(caseId: string): Promise<FocusedCaseDetail | null> {
+    const row = await this.prisma.case.findUnique({
+      where: { id: caseId },
+      include: {
+        inquiryLinks: { select: { inquiryId: true } },
+        threads: {
+          where: { kind: 'HYPOTHESIS' },
+          include: { _count: { select: { support: true } } },
+          orderBy: { createdAt: 'asc' },
+        },
+        evidence: {
+          orderBy: { createdAt: 'asc' },
+          take: 60,
+        },
+        findings: {
+          orderBy: { createdAt: 'asc' },
+          take: 100,
+        },
+      },
+    });
+    if (!row) return null;
+
+    // Edges touching anything in the case (assets in evidence + findings).
+    const assetIds = row.evidence
+      .filter((e) => e.entityType === 'asset')
+      .map((e) => e.entityId);
+    const findingIds = row.findings.map((f) => f.findingId);
+    const endpointIds = [...new Set([...assetIds, ...findingIds])];
+    const edges =
+      endpointIds.length > 0
+        ? await this.prisma.edge.findMany({
+            where: {
+              OR: [
+                { fromId: { in: endpointIds } },
+                { toId: { in: endpointIds } },
+              ],
+            },
+            orderBy: { createdAt: 'asc' },
+            take: 150,
+          })
+        : [];
+
+    return {
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      status: String(row.status),
+      severity: String(row.severity),
+      hypotheses: row.threads.map((t) => ({
+        threadId: t.id,
+        title: t.title,
+        status: t.status ? String(t.status) : null,
+        confidence: t.confidence !== null ? Number(t.confidence) : null,
+        supportCount: t._count.support,
+      })),
+      evidence: row.evidence.map((e) => ({
+        evidenceId: e.id,
+        assetId: e.entityId,
+        label: e.label,
+        note: e.note ? truncate(e.note, 200) : null,
+      })),
+      findings: row.findings.map((f) => ({
+        caseFindingId: f.id,
+        findingId: f.findingId,
+        evidenceId: f.caseEvidenceId,
+        label: f.label,
+        severity: f.severity,
+        detectorType: f.detectorType,
+        matchedContent: f.matchedContent
+          ? truncate(f.matchedContent, MAX_SAMPLE_VALUE_LENGTH)
+          : null,
+      })),
+      edges: edges.map((e) => ({
+        edgeId: e.id,
+        fromType: e.fromType,
+        fromId: e.fromId,
+        toType: e.toType,
+        toId: e.toId,
+        relationType: e.relationType,
+        origin: String(e.origin),
+      })),
+      linkedInquiryIds: row.inquiryLinks.map((l) => l.inquiryId),
+    };
   }
 
   /** Bounded sample of findings currently matching an inquiry. */

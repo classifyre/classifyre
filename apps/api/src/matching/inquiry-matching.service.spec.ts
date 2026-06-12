@@ -46,15 +46,44 @@ describe('InquiryMatchingService', () => {
   });
 
   it('increments newMatchCount by hits from the run and refreshes matchCount', async () => {
-    mockPrisma.inquiry.findMany.mockResolvedValue([inquiry({ findingTypes: ['email'] })]);
+    mockPrisma.inquiry.findMany.mockResolvedValue([
+      inquiry({ findingTypes: ['email'] }),
+    ]);
     // First call: run's new findings. Second call: all OPEN findings for matchCount recompute.
     mockPrisma.finding.findMany
       .mockResolvedValueOnce([
-        { id: 'f1', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'email', severity: 'HIGH', matchedContent: 'a@b.com' },
-        { id: 'f2', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'ssn', severity: 'HIGH', matchedContent: '...' },
+        {
+          id: 'f1',
+          assetId: 'a1',
+          sourceId: 's1',
+          detectorType: 'PII',
+          customDetectorKey: null,
+          findingType: 'email',
+          severity: 'HIGH',
+          matchedContent: 'a@b.com',
+        },
+        {
+          id: 'f2',
+          assetId: 'a1',
+          sourceId: 's1',
+          detectorType: 'PII',
+          customDetectorKey: null,
+          findingType: 'ssn',
+          severity: 'HIGH',
+          matchedContent: '...',
+        },
       ])
       .mockResolvedValueOnce([
-        { id: 'f1', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'email', severity: 'HIGH', matchedContent: 'a@b.com' },
+        {
+          id: 'f1',
+          assetId: 'a1',
+          sourceId: 's1',
+          detectorType: 'PII',
+          customDetectorKey: null,
+          findingType: 'email',
+          severity: 'HIGH',
+          matchedContent: 'a@b.com',
+        },
       ]);
 
     const result = await service.processSourceCompletion('s1', 'run-1');
@@ -63,7 +92,10 @@ describe('InquiryMatchingService', () => {
     expect(mockPrisma.inquiry.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'q1' },
-        data: expect.objectContaining({ matchCount: 1, newMatchCount: { increment: 1 } }),
+        data: expect.objectContaining({
+          matchCount: 1,
+          newMatchCount: { increment: 1 },
+        }),
       }),
     );
   });
@@ -71,7 +103,16 @@ describe('InquiryMatchingService', () => {
   it('resets newMatchCount to 0 on rematch', async () => {
     mockPrisma.inquiry.findUnique.mockResolvedValue(inquiry());
     mockPrisma.finding.findMany.mockResolvedValue([
-      { id: 'f1', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'email', severity: 'HIGH', matchedContent: 'x' },
+      {
+        id: 'f1',
+        assetId: 'a1',
+        sourceId: 's1',
+        detectorType: 'PII',
+        customDetectorKey: null,
+        findingType: 'email',
+        severity: 'HIGH',
+        matchedContent: 'x',
+      },
     ]);
 
     await service.rematchInquiry('q1');
@@ -84,7 +125,18 @@ describe('InquiryMatchingService', () => {
 
   it('preview returns total + a capped sample without persisting', async () => {
     mockPrisma.finding.findMany.mockResolvedValue([
-      { id: 'f1', assetId: 'a1', sourceId: 's1', detectorType: 'PII', customDetectorKey: null, findingType: 'ssn', severity: 'HIGH', matchedContent: 'x', createdAt: new Date(), asset: { name: 'a.csv', sourceType: 'S3_COMPATIBLE_STORAGE' } },
+      {
+        id: 'f1',
+        assetId: 'a1',
+        sourceId: 's1',
+        detectorType: 'PII',
+        customDetectorKey: null,
+        findingType: 'ssn',
+        severity: 'HIGH',
+        matchedContent: 'x',
+        createdAt: new Date(),
+        asset: { name: 'a.csv', sourceType: 'S3_COMPATIBLE_STORAGE' },
+      },
     ]);
     const result = await service.preview({
       matchAllSources: true,
@@ -96,7 +148,11 @@ describe('InquiryMatchingService', () => {
       findingValueRegex: [],
     });
     expect(result.total).toBe(1);
-    expect(result.sample[0]).toMatchObject({ findingId: 'f1', label: 'ssn', assetName: 'a.csv' });
+    expect(result.sample[0]).toMatchObject({
+      findingId: 'f1',
+      label: 'ssn',
+      assetName: 'a.csv',
+    });
     expect(mockPrisma.inquiry.update).not.toHaveBeenCalled();
   });
 });
