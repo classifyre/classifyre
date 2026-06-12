@@ -8,6 +8,7 @@ import {
 import type {
   CaseSummary,
   FindingGroupSummary,
+  FocusedCaseDetail,
   InquirySummary,
   RecalledMemory,
 } from './autopilot.types';
@@ -168,19 +169,30 @@ export function buildInquiryUserPrompt(input: {
     .join('\n\n');
 }
 
-export function buildCaseSystemPrompt(guidance: string | null): string {
+export function buildCaseSystemPrompt(
+  guidance: string | null,
+  opts?: { focused?: boolean },
+): string {
   return [
     DOMAIN_PRIMER,
-    `Your job in this cycle: manage INVESTIGATION CASES based on inquiries with new matches.
-Rules:
+    opts?.focused
+      ? `Your job in this cycle: a FOCUSED run on ONE case. The operator asked you to work on exactly this case — its full detail (hypothesis threads, evidence, findings, graph edges, all with their real ids) is in the user message. Follow the operator instruction; if there is none, do whatever most advances the investigation. Emit UPDATE_CASE decisions for this case (CREATE_CASE only if the instruction explicitly demands a new case).
+Your toolbox on this case:
+- Connect the dots: CREATE_EDGE between assets/findings whose data supports a relationship; REMOVE_EDGE (by edgeId) for MANUAL edges the evidence no longer supports (INFERRED edges cannot be removed).
+- Build evidence paths: a chain of CREATE_EDGE operations that links evidence step by step (A REFERENCES B, B SENT_TO C…), plus an ADD_NOTE narrating the path and what it shows.
+- Hypotheses: ADD_HYPOTHESIS (testable statement + confidence) or UPDATE_HYPOTHESIS (threadId; status SUPPORTED/REFUTED/INCONCLUSIVE + confidence), then assign the evidence that bears on them with LINK_SUPPORT (threadId + targetType "evidence"/"finding" + targetId from the case detail, stance SUPPORTS or CONTRADICTS).
+- ADD_EVIDENCE / ATTACH_FINDINGS to bring in material the case is missing, ADD_NOTE for analyst-readable observations, CHANGE_STATUS when warranted.`
+      : `Your job in this cycle: manage INVESTIGATION CASES based on inquiries with new matches.`,
+    `Rules:
 1. Check existing open cases first. If a case already investigates the topic, UPDATE_CASE: add hypotheses, attach findings, add evidence, add notes, link inquiries, adjust status/severity — whatever moves the investigation forward.
 2. CREATE_CASE only for a coherent new investigation that no open case covers. Give it a precise title, a description stating the investigation question, and LINK_INQUIRY + ATTACH_FINDINGS operations so it starts with substance.
 3. Hypotheses are the heart of every case. A case you CREATE must include at least one ADD_HYPOTHESIS operation (title + a testable statement + confidence 0–1). When you UPDATE a case that has no hypothesis yet, add one. When evidence accumulates, move hypotheses with UPDATE_HYPOTHESIS (SUPPORTED/REFUTED + new confidence) — never leave them stale.
 4. Use ADD_NOTE for analyst-readable observations about what this scan changed.
-5. Connect the dots with CREATE_EDGE: when two assets in the context share the same matched value, when one asset clearly references another, or when a finding ties two pieces of evidence together, add an edge (fromType/fromId → toType/toId with a relationType such as REFERENCES, MENTIONS, SENT_TO). Only use asset/finding ids that appear in the provided context. Edges make the case graph tell the story — prefer one good edge over none.
-6. Only reference ids that appear in the provided context. Never invent ids.
-7. If nothing should change, return exactly one NO_ACTION decision explaining why.
-8. Propose memoryWrites (GLOSSARY / DECISION_PRECEDENT) that improve future cycles.`,
+5. Connect the dots with CREATE_EDGE: when two assets in the context share the same matched value, when one asset clearly references another, or when a finding ties two pieces of evidence together, add an edge (fromType/fromId → toType/toId with a relationType such as REFERENCES, MENTIONS, SENT_TO). Only use asset/finding ids that appear in the provided context. Edges make the case graph tell the story — prefer one good edge over none. REMOVE_EDGE (edgeId) disconnects a MANUAL edge the data no longer supports.
+6. Tie evidence to hypotheses with LINK_SUPPORT: threadId of the hypothesis + targetType ("evidence" or "finding") + targetId, with stance SUPPORTS or CONTRADICTS — a hypothesis without linked support is just a guess.
+7. Only reference ids that appear in the provided context. Never invent ids.
+8. If nothing should change, return exactly one NO_ACTION decision explaining why.
+9. Propose memoryWrites (GLOSSARY / DECISION_PRECEDENT) that improve future cycles.`,
     guidance ? `Operator guidance for case management:\n${guidance}` : '',
     outputContract(caseDecisionSchema, CASE_OUTPUT_EXAMPLE),
   ]
@@ -207,9 +219,15 @@ export function buildCaseUserPrompt(input: {
   >;
   openCases: CaseSummary[];
   closedCases: Array<{ id: string; title: string; status: string; conclusion: string | null }>;
+  focusCase?: FocusedCaseDetail | null;
   memories: RecalledMemory[];
 }): string {
   return [
+    input.focusCase
+      ? `## FOCUSED CASE — work on this case (caseId ${input.focusCase.id})\n` +
+        `Every id below is real and may be referenced in operations: hypothesis threadIds, evidenceIds, caseFindingIds/findingIds, assetIds and edgeIds.\n` +
+        json(input.focusCase)
+      : '',
     input.manual
       ? `## Manual review requested by the operator\nScope: ${input.sourceName}. Candidate inquiries include ALL with current matches — this is not a scan delta.`
       : `## Scan that just finished\nSource: ${input.sourceName}`,

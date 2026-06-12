@@ -48,6 +48,7 @@ export class AgentAuditService {
       cycleKey: string;
       trigger: string;
       instruction?: string | null;
+      caseId?: string | null;
     },
   ): Promise<AgentRun> {
     const existing = await this.prisma.agentRun.findFirst({
@@ -84,6 +85,7 @@ export class AgentAuditService {
         cycleKey: cycle.cycleKey,
         trigger: cycle.trigger,
         instruction: cycle.instruction ?? null,
+        caseId: cycle.caseId ?? null,
         status: AgentRunStatus.RUNNING,
         attempts: 1,
         startedAt: new Date(),

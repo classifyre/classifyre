@@ -32,6 +32,7 @@ import type {
   AgentContext,
   CaseDecisionOutput,
   CaseSummary,
+  FocusedCaseDetail,
   InquirySummary,
   RecalledMemory,
 } from './autopilot.types';
@@ -57,6 +58,8 @@ interface GatheredCaseContext {
     status: string;
     conclusion: string | null;
   }>;
+  /** Set on case-targeted runs: the one case this run works on, in full. */
+  focusCase: FocusedCaseDetail | null;
 }
 
 /**
@@ -97,13 +100,19 @@ export class CaseAgentService {
   }
 
   private async gatherContext(ctx: AgentContext): Promise<GatheredCaseContext> {
-    const [inquiries, openCases, closedCases, caseReadyIds] =
+    const [inquiries, openCases, closedCases, caseReadyIds, focusCase] =
       await Promise.all([
         this.search.listActiveInquiries(),
         this.search.listOpenCases(),
         this.search.listRecentlyClosedCases(),
         this.caseReadySignals(ctx),
+        ctx.caseId ? this.search.caseDetail(ctx.caseId) : Promise.resolve(null),
       ]);
+    if (ctx.caseId && !focusCase) {
+      throw new Error(
+        `Case ${ctx.caseId} no longer exists — cannot run a focused cycle.`,
+      );
+    }
 
     const candidates: CandidateInquiry[] = [];
     for (const q of inquiries) {
@@ -123,9 +132,11 @@ export class CaseAgentService {
     }
     await this.log.business(
       ctx.run.id,
-      `Reviewing ${candidates.length} candidate inquir${candidates.length === 1 ? 'y' : 'ies'} against ${openCases.length} open case(s).`,
+      focusCase
+        ? `Focused run on case "${focusCase.title}": ${focusCase.hypotheses.length} hypothes${focusCase.hypotheses.length === 1 ? 'is' : 'es'}, ${focusCase.evidence.length} evidence item(s), ${focusCase.findings.length} finding(s), ${focusCase.edges.length} edge(s).`
+        : `Reviewing ${candidates.length} candidate inquir${candidates.length === 1 ? 'y' : 'ies'} against ${openCases.length} open case(s).`,
     );
-    return { candidates, openCases, closedCases };
+    return { candidates, openCases, closedCases, focusCase };
   }
 
   /** SIGNAL_CASE_READY decisions recorded by this cycle's inquiry run. */
@@ -152,13 +163,16 @@ export class CaseAgentService {
   }
 
   private async recallMemory(ctx: AgentContext): Promise<RecalledMemory[]> {
-    const { candidates } = stepOutput<GatheredCaseContext>(
+    const { candidates, focusCase } = stepOutput<GatheredCaseContext>(
       ctx,
       'gather-context',
     );
     const terms = [
       ctx.sourceName,
       ...candidates.flatMap((c) => [c.title, ...c.findingTypes]),
+      ...(focusCase
+        ? [focusCase.title, ...focusCase.hypotheses.map((h) => h.title)]
+        : []),
     ];
     const [glossary, related] = await Promise.all([
       this.memory.topByWeight(AgentMemoryKind.GLOSSARY, MAX_GLOSSARY_ENTRIES),
@@ -171,11 +185,13 @@ export class CaseAgentService {
   }
 
   private async decide(ctx: AgentContext): Promise<CaseDecisionOutput> {
-    const { candidates, openCases, closedCases } =
+    const { candidates, openCases, closedCases, focusCase } =
       stepOutput<GatheredCaseContext>(ctx, 'gather-context');
     const memories = stepOutput<RecalledMemory[]>(ctx, 'recall-memory');
 
-    if (candidates.length === 0) {
+    // Focused runs always consult the model — the operator explicitly asked
+    // for work on this case, even when no inquiry has new matches.
+    if (candidates.length === 0 && !focusCase) {
       await this.log.business(
         ctx.run.id,
         'No candidate inquiries — skipping the model call.',
@@ -193,6 +209,7 @@ export class CaseAgentService {
 
     const systemPrompt = buildCaseSystemPrompt(
       ctx.settings.autopilotCaseGuidance,
+      { focused: focusCase !== null },
     );
     const buildPrompt = (
       chunk: CandidateInquiry[],
@@ -205,6 +222,7 @@ export class CaseAgentService {
         candidateInquiries: chunk,
         openCases,
         closedCases,
+        focusCase,
         memories,
         part,
       });
@@ -213,12 +231,16 @@ export class CaseAgentService {
     // chunks instead of truncating.
     const budget = promptCharBudget(await this.ai.getContextSize());
     const fixedChars = systemPrompt.length + buildPrompt([]).length;
-    const chunks = chunkByBudget(
-      candidates,
-      fixedChars,
-      budget,
-      (c) => JSON.stringify(c).length + 40,
-    );
+    // A focused run may have zero candidates and still needs one model call.
+    const chunks =
+      candidates.length === 0
+        ? [[] as CandidateInquiry[]]
+        : chunkByBudget(
+            candidates,
+            fixedChars,
+            budget,
+            (c) => JSON.stringify(c).length + 40,
+          );
     if (chunks.length > 1) {
       await this.log.technical(
         ctx.run.id,

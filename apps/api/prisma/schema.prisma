@@ -1016,6 +1016,10 @@ enum AgentDecisionAction {
   ADD_NOTE
   ADD_THREAD_ENTRY
   CREATE_EDGE
+  // Disconnect a manual edge the data no longer supports (focused case runs).
+  REMOVE_EDGE
+  // Link evidence/findings to a hypothesis thread (supports/contradicts).
+  LINK_SUPPORT
   CHANGE_STATUS
   LINK_INQUIRY
   // Dream-mode memory maintenance (prune / rewrite / merge).
@@ -1044,6 +1048,9 @@ model AgentRun {
   status      AgentRunStatus @default(PENDING)
   sourceId    String?        @map("source_id")
   runnerId    String?        @map("runner_id")
+  // Case this run is focused on (case-targeted manual runs) — lets the case
+  // workspace show "AI is working here" and surface the results.
+  caseId      String?        @map("case_id")
   trigger     String         @default("scan_completed")
   // Operator instruction for manually triggered cycles ("steer" runs).
   instruction String?        @db.Text
@@ -1065,6 +1072,7 @@ model AgentRun {
   @@index([agentKind, createdAt(sort: Desc)])
   @@index([status])
   @@index([cycleKey])
+  @@index([caseId, createdAt(sort: Desc)])
   @@map("agent_runs")
 }
 

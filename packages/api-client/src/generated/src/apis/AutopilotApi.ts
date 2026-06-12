@@ -79,6 +79,7 @@ export interface AutopilotControllerListMemoryRequest {
 
 export interface AutopilotControllerListRunsRequest {
     agentKind?: AutopilotControllerListRunsAgentKindEnum;
+    caseId?: string;
     status?: AutopilotControllerListRunsStatusEnum;
     skip?: number;
     limit?: number;
@@ -345,6 +346,10 @@ export class AutopilotApi extends runtime.BaseAPI {
 
         if (requestParameters['agentKind'] != null) {
             queryParameters['agentKind'] = requestParameters['agentKind'];
+        }
+
+        if (requestParameters['caseId'] != null) {
+            queryParameters['caseId'] = requestParameters['caseId'];
         }
 
         if (requestParameters['status'] != null) {

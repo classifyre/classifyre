@@ -68,6 +68,28 @@ export class AutopilotService {
         throw new BadRequestException(`Source ${dto.sourceId} does not exist`);
       }
     }
+    if (dto.caseId) {
+      const found = await this.prisma.case.findUnique({
+        where: { id: dto.caseId },
+        select: { id: true },
+      });
+      if (!found) {
+        throw new BadRequestException(`Case ${dto.caseId} does not exist`);
+      }
+      if (dto.agentKind && dto.agentKind !== AgentKind.CASE) {
+        throw new BadRequestException(
+          'A case-focused run targets the CASE agent — omit agentKind or set it to CASE.',
+        );
+      }
+    }
+    if (dto.agentKind === AgentKind.DREAM) {
+      throw new BadRequestException(
+        'Use POST /autopilot/dream to trigger a dream cycle.',
+      );
+    }
+
+    // Focusing on a case implies the case agent only.
+    const agentKind = dto.caseId ? AgentKind.CASE : dto.agentKind;
 
     const cycleKey = `manual:${randomUUID()}`;
     const boss = await this.pgBoss.getBossAsync();
@@ -78,6 +100,8 @@ export class AutopilotService {
         cycleKey,
         instruction: dto.instruction?.trim() || undefined,
         sourceId: dto.sourceId || undefined,
+        agentKind: agentKind ?? undefined,
+        caseId: dto.caseId || undefined,
       },
       // Spaced retries so provider rate limits (429) get room to clear;
       // resumed deliveries skip already-completed steps via stepState.
@@ -171,6 +195,7 @@ export class AutopilotService {
         instruction: run.instruction ?? undefined,
         sourceId: run.sourceId ?? undefined,
         runnerId: run.runnerId ?? undefined,
+        caseId: run.caseId ?? undefined,
       },
       { retryLimit: 2, retryDelay: 90, retryBackoff: true, expireInSeconds: 3 * 3600 },
     );
@@ -301,6 +326,7 @@ export class AutopilotService {
     const where: Prisma.AgentRunWhereInput = {};
     if (query.agentKind) where.agentKind = query.agentKind;
     if (query.status) where.status = query.status;
+    if (query.caseId) where.caseId = query.caseId;
 
     const [rows, total] = await Promise.all([
       this.prisma.agentRun.findMany({
@@ -343,6 +369,7 @@ export class AutopilotService {
       status: run.status,
       sourceId: run.sourceId,
       runnerId: run.runnerId,
+      caseId: run.caseId,
       trigger: run.trigger,
       instruction: run.instruction,
       attempts: run.attempts,

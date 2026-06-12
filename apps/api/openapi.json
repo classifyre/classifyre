@@ -7018,6 +7018,15 @@
             }
           },
           {
+            "name": "caseId",
+            "required": false,
+            "in": "query",
+            "description": "Only runs focused on this case",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "status",
             "required": false,
             "in": "query",
@@ -14762,6 +14771,18 @@
           "sourceId": {
             "type": "string",
             "description": "Limit the review to one source. Omit to review all sources."
+          },
+          "agentKind": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE"
+            ],
+            "description": "Run only one agent. Omit to run both (inquiry then case). Implied CASE when caseId is set."
+          },
+          "caseId": {
+            "type": "string",
+            "description": "Focus the case agent on ONE case: it receives the full case detail (hypotheses, evidence, findings, edges) and can connect/disconnect edges, build evidence paths and create/update hypotheses with supporting evidence — steered by the instruction."
           }
         }
       },
@@ -14814,9 +14835,14 @@
             "type": "string",
             "nullable": true
           },
+          "caseId": {
+            "type": "string",
+            "description": "Case this run is focused on (case-targeted manual runs)",
+            "nullable": true
+          },
           "trigger": {
             "type": "string",
-            "description": "\"scan_completed\" or \"manual\""
+            "description": "\"scan_completed\", \"manual\" or \"schedule\""
           },
           "instruction": {
             "type": "string",
@@ -14910,6 +14936,8 @@
               "ADD_NOTE",
               "ADD_THREAD_ENTRY",
               "CREATE_EDGE",
+              "REMOVE_EDGE",
+              "LINK_SUPPORT",
               "CHANGE_STATUS",
               "LINK_INQUIRY",
               "CONSOLIDATE_MEMORY",
@@ -14988,9 +15016,14 @@
             "type": "string",
             "nullable": true
           },
+          "caseId": {
+            "type": "string",
+            "description": "Case this run is focused on (case-targeted manual runs)",
+            "nullable": true
+          },
           "trigger": {
             "type": "string",
-            "description": "\"scan_completed\" or \"manual\""
+            "description": "\"scan_completed\", \"manual\" or \"schedule\""
           },
           "instruction": {
             "type": "string",

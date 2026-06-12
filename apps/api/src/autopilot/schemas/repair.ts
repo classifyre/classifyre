@@ -21,6 +21,13 @@ const OP_ALIASES: Record<string, string> = {
   ADD_EDGE: 'CREATE_EDGE',
   LINK_EDGE: 'CREATE_EDGE',
   CONNECT: 'CREATE_EDGE',
+  DELETE_EDGE: 'REMOVE_EDGE',
+  DISCONNECT: 'REMOVE_EDGE',
+  DISCONNECT_EDGE: 'REMOVE_EDGE',
+  SUPPORT_HYPOTHESIS: 'LINK_SUPPORT',
+  ASSIGN_TO_HYPOTHESIS: 'LINK_SUPPORT',
+  LINK_EVIDENCE: 'LINK_SUPPORT',
+  ADD_SUPPORT: 'LINK_SUPPORT',
   ADD_COMMENT: 'ADD_NOTE',
   ADD_OBSERVATION: 'ADD_NOTE',
 };
@@ -129,11 +136,16 @@ export function repairCaseOutput(value: unknown): unknown {
       alias(op, 'type', 'op');
       op.op = OP_ALIASES[normalizeEnum(op.op)] ?? normalizeEnum(op.op);
       repairRationale(op);
-      // ADD_NOTE / ADD_THREAD_ENTRY want `body`.
-      alias(op, 'note', 'body');
+      // ADD_NOTE / ADD_THREAD_ENTRY want `body` ("note" stays a real field
+      // on ADD_EVIDENCE / LINK_SUPPORT — only alias it for note-like ops).
+      if (op.op === 'ADD_NOTE' || op.op === 'ADD_THREAD_ENTRY') {
+        alias(op, 'note', 'body');
+      }
       alias(op, 'text', 'body');
       alias(op, 'message', 'body');
       alias(op, 'content', 'body');
+      // Hypothesis threads are addressed by threadId.
+      alias(op, 'hypothesisId', 'threadId');
       // CHANGE_STATUS synonyms.
       alias(op, 'status', 'caseStatus');
       // ATTACH_FINDINGS synonyms.

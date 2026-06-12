@@ -6,6 +6,7 @@ import {
   CaseStatus,
   CaseThreadEntryType,
   CaseThreadKind,
+  EvidenceStance,
   HypothesisStatus,
   Severity,
 } from '@prisma/client';
@@ -625,6 +626,41 @@ export class DecisionApplierService {
           relationType: op.relationType,
           confidence: op.confidence,
         });
+        break;
+      }
+      case 'REMOVE_EDGE': {
+        if (!op.edgeId) return failOp('edgeId required');
+        try {
+          // deleteEdge validates existence and refuses INFERRED edges
+          // (those are re-created automatically and cannot be removed).
+          await this.graph.deleteEdge(op.edgeId);
+        } catch (error) {
+          return failOp(
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+        break;
+      }
+      case 'LINK_SUPPORT': {
+        if (!op.threadId || !op.targetType || !op.targetId)
+          return failOp('threadId, targetType and targetId required');
+        const supportThreads = await this.search.existingIds('caseThread', [
+          op.threadId,
+        ]);
+        if (!supportThreads.has(op.threadId)) return failOp('Unknown threadId');
+        try {
+          // linkSupport validates the target belongs to this case.
+          await this.threads.linkSupport(op.threadId, {
+            targetType: op.targetType,
+            targetId: op.targetId,
+            stance: op.stance ? EvidenceStance[op.stance] : undefined,
+            note: op.note,
+          });
+        } catch (error) {
+          return failOp(
+            error instanceof Error ? error.message : String(error),
+          );
+        }
         break;
       }
       case 'CHANGE_STATUS': {
