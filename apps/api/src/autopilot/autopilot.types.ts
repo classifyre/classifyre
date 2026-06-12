@@ -16,6 +16,13 @@ export interface AutopilotJob {
   instruction?: string;
   /** Stable cycle identity for resuming the right run on redelivery. */
   cycleKey?: string;
+  /** Scheduled "dreaming" cycle: memory consolidation, no inquiry/case work. */
+  dream?: boolean;
+  /**
+   * Rerun of one specific run: execute only this agent and treat the job as
+   * explicit operator intent (instance enable-flags are bypassed).
+   */
+  agentKind?: 'INQUIRY' | 'CASE' | 'DREAM';
 }
 
 /** Aggregated view of one group of new findings (token-bounded). */

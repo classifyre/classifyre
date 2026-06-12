@@ -16,6 +16,7 @@ import { AgentLoggerService } from './audit/agent-logger.service';
 import { DecisionApplierService } from './decision-applier.service';
 import { InquiryAgentService } from './inquiry-agent.service';
 import { CaseAgentService } from './case-agent.service';
+import { DreamAgentService } from './dream-agent.service';
 import { AutopilotWorker } from './autopilot.worker';
 import { AutopilotService } from './autopilot.service';
 import { AutopilotController } from './autopilot.controller';
@@ -46,6 +47,7 @@ import { AutopilotController } from './autopilot.controller';
     DecisionApplierService,
     InquiryAgentService,
     CaseAgentService,
+    DreamAgentService,
     AutopilotWorker,
     AutopilotService,
   ],

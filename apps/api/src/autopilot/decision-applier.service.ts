@@ -571,17 +571,19 @@ export class DecisionApplierService {
         break;
       }
       case 'ADD_NOTE': {
-        if (!op.body) return failOp('body required');
+        const body = op.body ?? op.note;
+        if (!body) return failOp('body required');
         const threadId = await this.resolveNotesThread(caseId);
         await this.threads.addEntry(threadId, {
           entryType: CaseThreadEntryType.NOTE,
-          body: op.body,
+          body,
           author: AI_ACTOR,
         });
         break;
       }
       case 'ADD_THREAD_ENTRY': {
-        if (!op.threadId || !op.body)
+        const entryBody = op.body ?? op.note;
+        if (!op.threadId || !entryBody)
           return failOp('threadId and body required');
         const threads = await this.search.existingIds('caseThread', [
           op.threadId,
@@ -589,7 +591,7 @@ export class DecisionApplierService {
         if (!threads.has(op.threadId)) return failOp('Unknown threadId');
         await this.threads.addEntry(op.threadId, {
           entryType: CaseThreadEntryType.NOTE,
-          body: op.body,
+          body: entryBody,
           author: AI_ACTOR,
         });
         break;

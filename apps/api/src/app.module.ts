@@ -18,6 +18,7 @@ import { SandboxModule } from './sandbox/sandbox.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { MatchingModule } from './matching/matching.module';
 import { AutopilotModule } from './autopilot/autopilot.module';
+import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 import { ExportModule } from './export/export.module';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import { InstanceSettingsService } from './instance-settings.service';
@@ -121,6 +122,7 @@ import {
     InquiriesService,
     CaseThreadsService,
     GraphService,
+    AgentMemoryService,
   ],
 })
 export class AppModule {}

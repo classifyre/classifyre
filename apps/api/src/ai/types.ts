@@ -23,6 +23,22 @@ export interface AiCompletionOptions {
    * instance-wide default selected in Settings is used.
    */
   configId?: string;
+  /**
+   * JSON Schema the response must match. Providers that support native
+   * structured output (OpenAI-compatible response_format) enforce it
+   * server-side; others fall back to the prompt hint + validation loop.
+   */
+  jsonSchema?: JsonSchema;
+  /**
+   * Optional repair hook run after JSON extraction and before validation —
+   * fixes known model shape quirks (e.g. singular keys, nested arrays).
+   */
+  repair?: (value: unknown) => unknown;
+  /**
+   * Retries on provider rate limiting / connection blips, with increasing
+   * delays. Default: 3 (delays 60s/120s/240s). Set 0 to fail fast.
+   */
+  rateLimitRetries?: number;
 }
 
 export interface AiResponse<T = string> {

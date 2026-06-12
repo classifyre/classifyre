@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { AiProviderConfigService } from '../ai-provider-config.service';
 import type { AiSchemaAttempt } from './errors';
 import {
@@ -11,7 +11,7 @@ import {
 } from './errors';
 import { extractJson } from './json-extract';
 import { createProvider } from './providers';
-import { validateAgainstSchema } from './schema-validate';
+import { normalizeAgainstSchema } from './schema-validate';
 import type {
   AiCompletionOptions,
   AiMessage,
@@ -25,6 +25,8 @@ const JSON_SYSTEM_HINT =
 
 @Injectable()
 export class AiClientService {
+  private readonly logger = new Logger(AiClientService.name);
+
   constructor(
     private readonly providerConfigService: AiProviderConfigService,
   ) {}
@@ -46,7 +48,12 @@ export class AiClientService {
   ): Promise<AiResponse<string>> {
     const config = await this.getRuntimeConfig(options.configId);
     const provider = createProvider(config.provider);
-    const raw = await provider.complete(messages, config, options);
+    const raw = await this.completeWithBackoff(
+      provider,
+      messages,
+      config,
+      options,
+    );
     return { content: raw, model: config.model, provider: config.provider };
   }
 
@@ -70,6 +77,10 @@ export class AiClientService {
     const config = await this.getRuntimeConfig(options.configId);
     const provider = createProvider(config.provider);
     const maxRetries = options.maxRetries ?? 2;
+    const providerOptions: AiCompletionOptions = {
+      ...options,
+      jsonSchema: options.jsonSchema ?? schema,
+    };
 
     // Inject JSON system hint once, before the first user message
     const baseMessages = injectJsonHint(messages);
@@ -81,10 +92,16 @@ export class AiClientService {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       let raw = '';
       try {
-        raw = await provider.complete(currentMessages, config, options);
+        raw = await this.completeWithBackoff(
+          provider,
+          currentMessages,
+          config,
+          providerOptions,
+        );
 
-        const parsed = extractJson(raw) as T;
-        validateAgainstSchema(parsed, schema);
+        let parsed = extractJson(raw) as T;
+        if (options.repair) parsed = options.repair(parsed) as T;
+        parsed = normalizeAgainstSchema(parsed, schema);
 
         return {
           content: parsed,
@@ -124,7 +141,53 @@ export class AiClientService {
     );
   }
 
+  /**
+   * Context window (tokens) of the provider credential, as configured in
+   * settings. Null when unknown — callers should assume a large window.
+   */
+  async getContextSize(configId?: string): Promise<number | null> {
+    try {
+      const config = await this.getRuntimeConfig(configId);
+      return config.contextSize ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   // ── Internal helpers ────────────────────────────────────────────────────────
+
+  /**
+   * Calls the provider, retrying rate limits (429) and connection blips with
+   * increasing delays. Providers can be busy for minutes — slow is fine.
+   */
+  private async completeWithBackoff(
+    provider: ReturnType<typeof createProvider>,
+    messages: AiMessage[],
+    config: AiProviderRuntimeConfig,
+    options: AiCompletionOptions,
+  ): Promise<string> {
+    const retries = options.rateLimitRetries ?? 3;
+    const delaysMs = [60_000, 120_000, 240_000];
+
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await provider.complete(messages, config, options);
+      } catch (err) {
+        const retryable =
+          err instanceof AiRateLimitError ||
+          (err instanceof AiProviderError &&
+            (err.statusCode === undefined ||
+              err.statusCode === 429 ||
+              err.statusCode >= 500));
+        if (!retryable || attempt >= retries) throw err;
+        const delay = delaysMs[Math.min(attempt, delaysMs.length - 1)]!;
+        this.logger.warn(
+          `Provider busy (${err instanceof Error ? err.message : String(err)}); retrying in ${delay / 1000}s (attempt ${attempt + 1}/${retries})`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
 
   private async getRuntimeConfig(
     configId?: string,

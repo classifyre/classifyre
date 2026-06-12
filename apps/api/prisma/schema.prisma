@@ -987,6 +987,9 @@ enum AiManagementMode {
 enum AgentKind {
   INQUIRY
   CASE
+  // Periodic "dreaming": memory consolidation — dedupe, prune noise, distill
+  // important lessons. No inquiry/case mutations.
+  DREAM
 }
 
 enum AgentRunStatus {
@@ -995,6 +998,8 @@ enum AgentRunStatus {
   COMPLETED
   FAILED
   SKIPPED
+  // Stopped by the operator; the runtime aborts before the next step.
+  CANCELLED
 }
 
 enum AgentDecisionAction {
@@ -1013,6 +1018,8 @@ enum AgentDecisionAction {
   CREATE_EDGE
   CHANGE_STATUS
   LINK_INQUIRY
+  // Dream-mode memory maintenance (prune / rewrite / merge).
+  CONSOLIDATE_MEMORY
   NO_ACTION
 }
 

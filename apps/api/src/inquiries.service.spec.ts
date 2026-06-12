@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { InquiriesService } from './inquiries.service';
 import { PrismaService } from './prisma.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
+import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 
 describe('InquiriesService', () => {
   let service: InquiriesService;
@@ -22,6 +23,7 @@ describe('InquiriesService', () => {
     finding: { groupBy: jest.fn() },
   };
   const mockMatching = { rematchInquiry: jest.fn(), getLiveMatches: jest.fn(), preview: jest.fn() };
+  const mockAgentMemory = { recordEntityDeletion: jest.fn() };
 
   const row = (over: Record<string, unknown> = {}) => ({
     id: 'q1',
@@ -51,6 +53,7 @@ describe('InquiriesService', () => {
         InquiriesService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: InquiryMatchingService, useValue: mockMatching },
+        { provide: AgentMemoryService, useValue: mockAgentMemory },
       ],
     }).compile();
     service = module.get(InquiriesService);

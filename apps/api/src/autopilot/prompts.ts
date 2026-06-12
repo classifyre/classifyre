@@ -1,6 +1,10 @@
 import type { JsonSchema } from '../ai';
 import { inquiryDecisionSchema } from './schemas/inquiry-decision.schema';
 import { caseDecisionSchema } from './schemas/case-decision.schema';
+import {
+  DREAM_OUTPUT_EXAMPLE,
+  dreamConsolidationSchema,
+} from './schemas/dream.schema';
 import type {
   CaseSummary,
   FindingGroupSummary,
@@ -130,7 +134,9 @@ export function buildInquiryUserPrompt(input: {
   instruction: string | null;
   findingGroups: FindingGroupSummary[];
   inquiries: InquirySummary[];
+  archivedInquiries: Array<{ id: string; title: string; description: string | null }>;
   memories: RecalledMemory[];
+  part?: { index: number; total: number };
 }): string {
   return [
     input.manual
@@ -139,10 +145,21 @@ export function buildInquiryUserPrompt(input: {
     input.instruction
       ? `## Operator instruction for THIS cycle (highest priority — follow it)\n${input.instruction}`
       : '',
+    partNote(input.part),
     `## ${input.manual ? 'Open findings in scope' : 'New findings from this scan'} (grouped; ${input.findingGroups.length} group(s))`,
     json(input.findingGroups.map(compactGroup)),
     `## Existing ACTIVE inquiries (${input.inquiries.length})`,
     json(input.inquiries.map(compactInquiry)),
+    input.archivedInquiries.length > 0
+      ? `## Recently ARCHIVED inquiries (intentionally closed — do NOT recreate these topics unless the operator explicitly asks)\n` +
+        json(
+          input.archivedInquiries.map((q) => ({
+            id: q.id,
+            title: q.title,
+            ...(q.description ? { description: q.description.slice(0, 200) } : {}),
+          })),
+        )
+      : '',
     `## Your memories (glossary, precedents, topic→inquiry map)`,
     json(input.memories),
     `Respond with the decision JSON.`,
@@ -158,9 +175,9 @@ export function buildCaseSystemPrompt(guidance: string | null): string {
 Rules:
 1. Check existing open cases first. If a case already investigates the topic, UPDATE_CASE: add hypotheses, attach findings, add evidence, add notes, link inquiries, adjust status/severity — whatever moves the investigation forward.
 2. CREATE_CASE only for a coherent new investigation that no open case covers. Give it a precise title, a description stating the investigation question, and LINK_INQUIRY + ATTACH_FINDINGS operations so it starts with substance.
-3. Hypotheses are testable statements (ADD_HYPOTHESIS with title + statement; confidence 0–1). Update them (UPDATE_HYPOTHESIS) when new findings support or refute them.
+3. Hypotheses are the heart of every case. A case you CREATE must include at least one ADD_HYPOTHESIS operation (title + a testable statement + confidence 0–1). When you UPDATE a case that has no hypothesis yet, add one. When evidence accumulates, move hypotheses with UPDATE_HYPOTHESIS (SUPPORTED/REFUTED + new confidence) — never leave them stale.
 4. Use ADD_NOTE for analyst-readable observations about what this scan changed.
-5. Use CREATE_EDGE only for relationships you can justify from the data (asset/finding ids you were given).
+5. Connect the dots with CREATE_EDGE: when two assets in the context share the same matched value, when one asset clearly references another, or when a finding ties two pieces of evidence together, add an edge (fromType/fromId → toType/toId with a relationType such as REFERENCES, MENTIONS, SENT_TO). Only use asset/finding ids that appear in the provided context. Edges make the case graph tell the story — prefer one good edge over none.
 6. Only reference ids that appear in the provided context. Never invent ids.
 7. If nothing should change, return exactly one NO_ACTION decision explaining why.
 8. Propose memoryWrites (GLOSSARY / DECISION_PRECEDENT) that improve future cycles.`,
@@ -175,6 +192,7 @@ export function buildCaseUserPrompt(input: {
   sourceName: string;
   manual: boolean;
   instruction: string | null;
+  part?: { index: number; total: number };
   candidateInquiries: Array<
     InquirySummary & {
       caseReadySignal: boolean;
@@ -188,6 +206,7 @@ export function buildCaseUserPrompt(input: {
     }
   >;
   openCases: CaseSummary[];
+  closedCases: Array<{ id: string; title: string; status: string; conclusion: string | null }>;
   memories: RecalledMemory[];
 }): string {
   return [
@@ -197,6 +216,7 @@ export function buildCaseUserPrompt(input: {
     input.instruction
       ? `## Operator instruction for THIS cycle (highest priority — follow it)\n${input.instruction}`
       : '',
+    partNote(input.part),
     `## Candidate inquiries (matches and/or flagged case-ready)`,
     json(
       input.candidateInquiries.map((q) => ({
@@ -207,6 +227,16 @@ export function buildCaseUserPrompt(input: {
     ),
     `## Open cases (${input.openCases.length})`,
     json(input.openCases),
+    input.closedCases.length > 0
+      ? `## Recently CLOSED cases with their conclusions (solved topics — do not reopen; learn from how they were resolved)\n` +
+        json(
+          input.closedCases.map((c) => ({
+            title: c.title,
+            status: c.status,
+            ...(c.conclusion ? { conclusion: c.conclusion.slice(0, 300) } : {}),
+          })),
+        )
+      : '',
     `## Your memories`,
     json(input.memories),
     `Respond with the decision JSON.`,
@@ -247,6 +277,87 @@ function compactInquiry(q: InquirySummary): Record<string, unknown> {
     newMatchCount: q.newMatchCount,
     linkedCaseIds: q.linkedCaseIds,
   };
+}
+
+// ── Dream agent (memory consolidation) ───────────────────────────────────────
+
+export function buildDreamSystemPrompt(): string {
+  return [
+    DOMAIN_PRIMER,
+    `Your job in this cycle: DREAM — consolidate your own long-term memory. No inquiry or case is touched; you only maintain the memory store that future cycles recall from.
+Rules:
+1. DELETE noise: one-off observations tied to a single scan, stale facts, entries about inquiries/cases that no longer exist, anything that will not improve a future decision.
+2. MERGE duplicates: when several entries say the same thing, rewrite the strongest one into a single crisp lesson and delete the rest.
+3. REWRITE verbose entries into short, generalized lessons (what to do next time, not what happened once).
+4. KEEP operator-set knowledge: entries recording operator deletions or explicit corrections (e.g. "operator deleted …", "do not recreate …") are sacred — never delete or weaken them.
+5. KEEP topic→inquiry mappings that point at inquiries which still exist; they are your main duplicate-prevention tool.
+6. CREATE at most a few new entries that distill the recent run summaries into important notes and decision precedents.
+7. Every operation needs a rationale an analyst can audit. The "summary" is your dream journal entry: what you cleaned up and the important notes you took.`,
+    dreamOutputContract(dreamConsolidationSchema, DREAM_OUTPUT_EXAMPLE),
+  ].join('\n\n');
+}
+
+export function buildDreamUserPrompt(input: {
+  memories: Array<{
+    id: string;
+    kind: string;
+    key: string;
+    content: string;
+    tags: string[];
+    weight: number;
+    updatedAt: Date;
+  }>;
+  recentRuns: Array<{
+    agentKind: string;
+    status: string;
+    summary: string | null;
+    finishedAt: Date | null;
+  }>;
+  liveInquiryTitles: string[];
+  openCaseTitles: string[];
+  part?: { index: number; total: number };
+}): string {
+  return [
+    `You are dreaming: review and consolidate your memory store.`,
+    partNote(input.part),
+    `## Your memory entries (${input.memories.length})`,
+    json(input.memories),
+    `## Recent run summaries (for new notes/precedents)`,
+    json(input.recentRuns),
+    `## Inquiries that still exist (titles)`,
+    json(input.liveInquiryTitles),
+    `## Open cases (titles)`,
+    json(input.openCaseTitles),
+    `Respond with the consolidation JSON.`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function dreamOutputContract(schema: JsonSchema, example: unknown): string {
+  return [
+    `## Output format (STRICT)`,
+    `Your entire response must be ONE JSON object that validates against this JSON Schema. ` +
+      `Top-level keys are exactly "deletions", "rewrites", "creations" (arrays, may be empty) and "summary" (string). ` +
+      `No other top-level keys. No additional properties anywhere. Only reference memory ids that appear in the provided entries.`,
+    'JSON Schema:',
+    JSON.stringify(schema),
+    'Minimal valid example:',
+    JSON.stringify(example, null, 1),
+  ].join('\n');
+}
+
+/**
+ * When the data exceeds the context window it is assessed in parts; the model
+ * must not assume the visible slice is everything.
+ */
+function partNote(part?: { index: number; total: number }): string {
+  if (!part || part.total <= 1) return '';
+  return (
+    `## Note: data part ${part.index} of ${part.total}\n` +
+    `The data below is one slice of a larger set; the other slices are assessed in separate calls. ` +
+    `Judge only what you see, rely on the existing-inquiry list and your topic-map memories to avoid duplicates across parts.`
+  );
 }
 
 function json(value: unknown): string {

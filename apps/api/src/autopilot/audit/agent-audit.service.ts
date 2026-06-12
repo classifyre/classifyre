@@ -135,6 +135,37 @@ export class AgentAuditService {
     });
   }
 
+  /** Operator stop request: flips a PENDING/RUNNING/FAILED run to CANCELLED. */
+  async cancel(runId: string): Promise<boolean> {
+    const result = await this.prisma.agentRun.updateMany({
+      where: {
+        id: runId,
+        status: {
+          in: [
+            AgentRunStatus.PENDING,
+            AgentRunStatus.RUNNING,
+            AgentRunStatus.FAILED,
+          ],
+        },
+      },
+      data: {
+        status: AgentRunStatus.CANCELLED,
+        finishedAt: new Date(),
+        error: 'Cancelled by the operator',
+      },
+    });
+    return result.count > 0;
+  }
+
+  /** Polled by the pipeline between steps to honor stop requests. */
+  async isCancelled(runId: string): Promise<boolean> {
+    const run = await this.prisma.agentRun.findUnique({
+      where: { id: runId },
+      select: { status: true },
+    });
+    return run?.status === AgentRunStatus.CANCELLED;
+  }
+
   /** Create a SKIPPED run directly (autopilot disabled, no provider, …). */
   async recordSkippedRun(
     agentKind: AgentKind,

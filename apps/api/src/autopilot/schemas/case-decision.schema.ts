@@ -77,6 +77,7 @@ export const caseDecisionSchema: JsonSchema = {
     memoryWrites: {
       type: 'array',
       maxItems: 15,
+      default: [],
       items: MEMORY_WRITES_SCHEMA_FRAGMENT,
     },
   },
