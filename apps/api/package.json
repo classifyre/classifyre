@@ -1,10 +1,10 @@
 {
   "name": "@classifyre/api",
-  "version": "0.4.14",
+  "version": "0.4.15",
   "description": "",
   "author": "",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",

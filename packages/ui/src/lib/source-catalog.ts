@@ -210,6 +210,13 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     category: "COLLABORATION",
     keywords: ["wiki", "pages", "databases", "blocks", "notes"],
   },
+  EMAIL: {
+    description:
+      "Scan IMAP mailboxes (Gmail, Outlook/M365, and more) for messages and attachments.",
+    icon: CreateSourceDtoTypeEnum.Email,
+    category: "COLLABORATION",
+    keywords: ["imap", "gmail", "outlook", "mailbox", "messages", "attachments"],
+  },
 };
 
 export function resolveSourceCatalogMeta(

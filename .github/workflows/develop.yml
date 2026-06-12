@@ -23,6 +23,22 @@ on:
         options:
           - "true"
           - "false"
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        default: "classifyre-develop"
+      image_tag:
+        type: string
+        default: "develop"
+      demo_mode:
+        type: string
+        default: "true"
+    secrets:
+      DOCKER_USERNAME:
+        required: true
+      KUBECONFIG:
+        required: true
 
 permissions:
   contents: read

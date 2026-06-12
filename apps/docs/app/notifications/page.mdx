@@ -8,7 +8,14 @@ import { NotificationCenter, SeverityBadge } from "@workspace/ui/components"
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components"
 import { NOTIFICATION_EVENTS } from "@workspace/ui/mocks/notification-events"
 
-# Notifications
+<div className="flex items-center gap-3">
+  <img src="/icons/dark_not_active/bell.png" alt="" width={28} height={28} />
+  <h1>Notifications</h1>
+</div>
+
+<p className="text-muted-foreground">
+  Operational feed for scan events, findings, source changes, and system signals.
+</p>
 
 Classifyre is quiet by default. If you're not hearing from it, everything is running normally. Notifications only appear when something genuinely needs your attention — a scan failing, unusual activity, or a milestone worth knowing about.
 
@@ -34,6 +41,9 @@ The notification bell lives in the top-right corner of the app. A red badge show
     <div>
       <p className="font-semibold">Mark all read</p>
       <p className="text-muted-foreground">Clears the badge and marks every item as read in one click.</p>
+    </div>
+    <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
+      Showing notifications — newest first
     </div>
   </div>
 </div>
