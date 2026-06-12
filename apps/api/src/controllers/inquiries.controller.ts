@@ -11,7 +11,13 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiProperty, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiProperty,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { InquiriesService } from '../inquiries.service';
 import {
   CreateInquiryDto,
@@ -38,7 +44,9 @@ export class InquiriesController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create an inquiry (a saved query) and seed its matches' })
+  @ApiOperation({
+    summary: 'Create an inquiry (a saved query) and seed its matches',
+  })
   @ApiResponse({ status: 201, type: InquiryResponseDto })
   create(@Body() dto: CreateInquiryDto): Promise<InquiryResponseDto> {
     return this.inquiries.create(dto);
@@ -46,18 +54,29 @@ export class InquiriesController {
 
   @Post('preview')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Preview findings a matcher config currently selects (no save)' })
+  @ApiOperation({
+    summary: 'Preview findings a matcher config currently selects (no save)',
+  })
   @ApiResponse({ status: 200, type: PreviewResponseDto })
   preview(@Body() dto: PreviewInquiryDto): Promise<PreviewResponseDto> {
     return this.inquiries.preview(dto);
   }
 
   @Get('match-options')
-  @ApiOperation({ summary: 'Sources, custom detectors and distinct finding types for the matcher form' })
+  @ApiOperation({
+    summary:
+      'Sources, custom detectors and distinct finding types for the matcher form',
+  })
   @ApiQuery({ name: 'sourceIds', required: false, isArray: true, type: String })
   @ApiResponse({ status: 200, type: MatchOptionsResponseDto })
-  matchOptions(@Query('sourceIds') sourceIds?: string | string[]): Promise<MatchOptionsResponseDto> {
-    const ids = Array.isArray(sourceIds) ? sourceIds : sourceIds ? [sourceIds] : undefined;
+  matchOptions(
+    @Query('sourceIds') sourceIds?: string | string[],
+  ): Promise<MatchOptionsResponseDto> {
+    const ids = Array.isArray(sourceIds)
+      ? sourceIds
+      : sourceIds
+        ? [sourceIds]
+        : undefined;
     return this.inquiries.matchOptions(ids);
   }
 
@@ -78,9 +97,14 @@ export class InquiriesController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update an inquiry (matchers change → matches recomputed)' })
+  @ApiOperation({
+    summary: 'Update an inquiry (matchers change → matches recomputed)',
+  })
   @ApiResponse({ status: 200, type: InquiryResponseDto })
-  update(@Param('id') id: string, @Body() dto: UpdateInquiryDto): Promise<InquiryResponseDto> {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateInquiryDto,
+  ): Promise<InquiryResponseDto> {
     return this.inquiries.update(id, dto);
   }
 
@@ -92,7 +116,9 @@ export class InquiriesController {
   }
 
   @Get(':id/matches')
-  @ApiOperation({ summary: 'List the findings currently matching this inquiry (paginated)' })
+  @ApiOperation({
+    summary: 'List the findings currently matching this inquiry (paginated)',
+  })
   @ApiResponse({ status: 200, type: InquiryMatchListResponseDto })
   listMatches(
     @Param('id') id: string,
@@ -103,7 +129,9 @@ export class InquiriesController {
 
   @Post(':id/seen')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Mark the current matches as seen (clears the "new" badge)' })
+  @ApiOperation({
+    summary: 'Mark the current matches as seen (clears the "new" badge)',
+  })
   async markSeen(@Param('id') id: string): Promise<void> {
     await this.inquiries.markSeen(id);
   }

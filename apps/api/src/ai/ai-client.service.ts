@@ -180,7 +180,7 @@ export class AiClientService {
               err.statusCode === 429 ||
               err.statusCode >= 500));
         if (!retryable || attempt >= retries) throw err;
-        const delay = delaysMs[Math.min(attempt, delaysMs.length - 1)]!;
+        const delay = delaysMs[Math.min(attempt, delaysMs.length - 1)];
         this.logger.warn(
           `Provider busy (${err instanceof Error ? err.message : String(err)}); retrying in ${delay / 1000}s (attempt ${attempt + 1}/${retries})`,
         );

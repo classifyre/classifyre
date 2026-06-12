@@ -35,7 +35,11 @@ export const dreamConsolidationSchema: JsonSchema = {
         properties: {
           id: { type: 'string' },
           content: { type: 'string', minLength: 5, maxLength: 2000 },
-          tags: { type: 'array', items: { type: 'string', maxLength: 60 }, maxItems: 10 },
+          tags: {
+            type: 'array',
+            items: { type: 'string', maxLength: 60 },
+            maxItems: 10,
+          },
           rationale: { type: 'string', minLength: 10, maxLength: 500 },
         },
       },
@@ -49,10 +53,16 @@ export const dreamConsolidationSchema: JsonSchema = {
         required: ['kind', 'key', 'content', 'rationale'],
         additionalProperties: false,
         properties: {
-          kind: { enum: ['GLOSSARY', 'DECISION_PRECEDENT', 'TOPIC_INQUIRY_MAP'] },
+          kind: {
+            enum: ['GLOSSARY', 'DECISION_PRECEDENT', 'TOPIC_INQUIRY_MAP'],
+          },
           key: { type: 'string', minLength: 2, maxLength: 200 },
           content: { type: 'string', minLength: 5, maxLength: 2000 },
-          tags: { type: 'array', items: { type: 'string', maxLength: 60 }, maxItems: 10 },
+          tags: {
+            type: 'array',
+            items: { type: 'string', maxLength: 60 },
+            maxItems: 10,
+          },
           rationale: { type: 'string', minLength: 10, maxLength: 500 },
         },
       },
@@ -63,7 +73,12 @@ export const dreamConsolidationSchema: JsonSchema = {
 
 export interface DreamConsolidationOutput {
   deletions: Array<{ id: string; rationale: string }>;
-  rewrites: Array<{ id: string; content: string; tags?: string[]; rationale: string }>;
+  rewrites: Array<{
+    id: string;
+    content: string;
+    tags?: string[];
+    rationale: string;
+  }>;
   creations: Array<{
     kind: 'GLOSSARY' | 'DECISION_PRECEDENT' | 'TOPIC_INQUIRY_MAP';
     key: string;
@@ -84,8 +99,10 @@ const EXAMPLE: DreamConsolidationOutput = {
   rewrites: [
     {
       id: '00000000-0000-0000-0000-000000000001',
-      content: 'PERSON findings in HR sources are routine; only escalate when paired with credentials.',
-      rationale: 'Two verbose entries said the same thing; condensed into one lesson.',
+      content:
+        'PERSON findings in HR sources are routine; only escalate when paired with credentials.',
+      rationale:
+        'Two verbose entries said the same thing; condensed into one lesson.',
     },
   ],
   creations: [],
@@ -114,7 +131,11 @@ export function repairDreamOutput(value: unknown): unknown {
     }
   }
   if (typeof root.summary !== 'string' || root.summary.length < 20) {
-    root.summary = `(model omitted summary) ${String(root.summary ?? '')}`.padEnd(20, '.');
+    root.summary =
+      `(model omitted summary) ${typeof root.summary === 'string' ? root.summary : ''}`.padEnd(
+        20,
+        '.',
+      );
   }
   return root;
 }

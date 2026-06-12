@@ -22,7 +22,11 @@ describe('InquiriesService', () => {
     customDetector: { findMany: jest.fn() },
     finding: { groupBy: jest.fn() },
   };
-  const mockMatching = { rematchInquiry: jest.fn(), getLiveMatches: jest.fn(), preview: jest.fn() };
+  const mockMatching = {
+    rematchInquiry: jest.fn(),
+    getLiveMatches: jest.fn(),
+    preview: jest.fn(),
+  };
   const mockAgentMemory = { recordEntityDeletion: jest.fn() };
 
   const row = (over: Record<string, unknown> = {}) => ({
@@ -65,14 +69,20 @@ describe('InquiriesService', () => {
     mockPrisma.inquiry.findUnique.mockResolvedValue(row());
     mockMatching.rematchInquiry.mockResolvedValue({ landed: 3 });
 
-    const result = await service.create({ title: 'Exfil monitor', matchAllSources: true, findingTypes: ['ssn'] });
+    const result = await service.create({
+      title: 'Exfil monitor',
+      matchAllSources: true,
+      findingTypes: ['ssn'],
+    });
 
     expect(mockMatching.rematchInquiry).toHaveBeenCalledWith('q1');
     expect(result.matchCount).toBe(3);
   });
 
   it('rejects an invalid regex matcher', async () => {
-    await expect(service.create({ title: 'q', findingTypeRegex: ['('] })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.create({ title: 'q', findingTypeRegex: ['('] }),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(mockPrisma.inquiry.create).not.toHaveBeenCalled();
   });
 
@@ -100,12 +110,18 @@ describe('InquiriesService', () => {
     const result = await service.preview({ matchAllSources: true });
     expect(result.total).toBe(5);
     expect(mockMatching.preview).toHaveBeenCalledWith(
-      expect.objectContaining({ matchAllSources: true, sourceIds: [], findingTypeRegex: [] }),
+      expect.objectContaining({
+        matchAllSources: true,
+        sourceIds: [],
+        findingTypeRegex: [],
+      }),
     );
   });
 
   it('reads matchCount and newMatchCount directly from the inquiry row', async () => {
-    mockPrisma.inquiry.findUnique.mockResolvedValue(row({ matchCount: 7, newMatchCount: 2 }));
+    mockPrisma.inquiry.findUnique.mockResolvedValue(
+      row({ matchCount: 7, newMatchCount: 2 }),
+    );
 
     const result = await service.findOne('q1');
     expect(result?.matchCount).toBe(7);

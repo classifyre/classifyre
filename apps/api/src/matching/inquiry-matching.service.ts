@@ -56,15 +56,21 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
   async onApplicationBootstrap(): Promise<void> {
     const boss = await this.pgBoss.getBossAsync();
     await boss.createQueue(INQUIRY_MATCH_QUEUE);
-    await boss.work(INQUIRY_MATCH_QUEUE, { localConcurrency: 1 }, (jobs: Job[]) => this.handle(jobs));
+    await boss.work(
+      INQUIRY_MATCH_QUEUE,
+      { localConcurrency: 1 },
+      (jobs: Job[]) => this.handle(jobs),
+    );
     this.logger.log(`Registered worker for queue ${INQUIRY_MATCH_QUEUE}`);
   }
 
   private async handle(jobs: Job[]): Promise<void> {
     for (const job of jobs) {
       const data = job.data as Record<string, unknown>;
-      const sourceId = typeof data?.sourceId === 'string' ? data.sourceId : null;
-      const runnerId = typeof data?.runnerId === 'string' ? data.runnerId : null;
+      const sourceId =
+        typeof data?.sourceId === 'string' ? data.sourceId : null;
+      const runnerId =
+        typeof data?.runnerId === 'string' ? data.runnerId : null;
       if (!sourceId) continue;
       try {
         await this.processSourceCompletion(sourceId, runnerId);
@@ -82,16 +88,24 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
    * ACTIVE inquiry, increment newMatchCount by that delta, and refresh matchCount
    * (total OPEN findings across all runs).
    */
-  async processSourceCompletion(sourceId: string, runnerId: string | null): Promise<{ landed: number }> {
+  async processSourceCompletion(
+    sourceId: string,
+    runnerId: string | null,
+  ): Promise<{ landed: number }> {
     const inquiries = await this.prisma.inquiry.findMany({
-      where: { status: 'ACTIVE', OR: [{ matchAllSources: true }, { sourceIds: { has: sourceId } }] },
+      where: {
+        status: 'ACTIVE',
+        OR: [{ matchAllSources: true }, { sourceIds: { has: sourceId } }],
+      },
       select: { ...this.matcherSelect, matchCount: true },
     });
     if (inquiries.length === 0) return { landed: 0 };
 
     // Findings specifically from this run (the "new" ones).
     const runFindings = (await this.prisma.finding.findMany({
-      where: runnerId ? { runnerId, status: 'OPEN' } : { sourceId, status: 'OPEN' },
+      where: runnerId
+        ? { runnerId, status: 'OPEN' }
+        : { sourceId, status: 'OPEN' },
       select: FINDING_SELECT,
     })) as FindingRow[];
 
@@ -118,7 +132,10 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
       }
     }
 
-    if (landed > 0) this.logger.log(`Recorded ${landed} new match(es) for source ${sourceId}`);
+    if (landed > 0)
+      this.logger.log(
+        `Recorded ${landed} new match(es) for source ${sourceId}`,
+      );
     return { landed };
   }
 
@@ -128,7 +145,10 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
    * newMatchCount to 0 (fresh baseline).
    */
   async rematchInquiry(inquiryId: string): Promise<{ landed: number }> {
-    const q = await this.prisma.inquiry.findUnique({ where: { id: inquiryId }, select: this.matcherSelect });
+    const q = await this.prisma.inquiry.findUnique({
+      where: { id: inquiryId },
+      select: this.matcherSelect,
+    });
     if (!q) return { landed: 0 };
     const matches = await this.candidateFindings(q, false);
     await this.prisma.inquiry.update({
@@ -172,7 +192,8 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
       isNew: seenAt ? (f.createdAt ?? new Date(0)) > seenAt : false,
     }));
 
-    const term = typeof query.search === 'string' ? query.search.trim().toLowerCase() : '';
+    const term =
+      typeof query.search === 'string' ? query.search.trim().toLowerCase() : '';
     if (term.length > 0) {
       matches = matches.filter(
         (m) =>
@@ -181,10 +202,17 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
           (m.matchedContent ?? '').toLowerCase().includes(term),
       );
     }
-    const severities = (Array.isArray(query.severity) ? query.severity : query.severity ? [query.severity] : [])
-      .map((s) => String(s).toUpperCase());
+    const severities = (
+      Array.isArray(query.severity)
+        ? query.severity
+        : query.severity
+          ? [query.severity]
+          : []
+    ).map((s) => String(s).toUpperCase());
     if (severities.length > 0) {
-      matches = matches.filter((m) => severities.includes((m.severity ?? '').toUpperCase()));
+      matches = matches.filter((m) =>
+        severities.includes((m.severity ?? '').toUpperCase()),
+      );
     }
     const onlyNew = query.onlyNew === true || String(query.onlyNew) === 'true';
     const newCount = matches.filter((m) => m.isNew).length;
@@ -203,7 +231,10 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
 
   /** Return live matching finding IDs for an inquiry (used by pullFromInquiry). */
   async getMatchingFindingIds(inquiryId: string): Promise<string[]> {
-    const q = await this.prisma.inquiry.findUnique({ where: { id: inquiryId }, select: this.matcherSelect });
+    const q = await this.prisma.inquiry.findUnique({
+      where: { id: inquiryId },
+      select: this.matcherSelect,
+    });
     if (!q) return [];
     const rows = await this.candidateFindings(q, false);
     return rows.map((r) => r.id);
@@ -241,25 +272,41 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
   } satisfies Prisma.InquirySelect;
 
   /** SQL-prefilter by source/detector/exact-type, then app-filter (regex) via the matcher. */
-  private async candidateFindings(m: InquiryMatchers, withAsset: boolean): Promise<FindingRow[]> {
-    const hasDetectorFilter = m.detectorTypes.length > 0 || m.customDetectorKeys.length > 0;
+  private async candidateFindings(
+    m: InquiryMatchers,
+    withAsset: boolean,
+  ): Promise<FindingRow[]> {
+    const hasDetectorFilter =
+      m.detectorTypes.length > 0 || m.customDetectorKeys.length > 0;
     const where: Prisma.FindingWhereInput = { status: 'OPEN' };
     if (!m.matchAllSources) where.sourceId = { in: m.sourceIds };
     if (hasDetectorFilter) {
       where.OR = [
-        ...(m.detectorTypes.length > 0 ? [{ detectorType: { in: m.detectorTypes } }] : []),
-        ...(m.customDetectorKeys.length > 0 ? [{ customDetectorKey: { in: m.customDetectorKeys } }] : []),
+        ...(m.detectorTypes.length > 0
+          ? [{ detectorType: { in: m.detectorTypes } }]
+          : []),
+        ...(m.customDetectorKeys.length > 0
+          ? [{ customDetectorKey: { in: m.customDetectorKeys } }]
+          : []),
       ];
     }
     // Exact-type SQL prefilter: only safe when there are no type-regexes AND no value-regexes.
-    if (m.findingTypeRegex.length === 0 && m.findingValueRegex.length === 0 && m.findingTypes.length > 0) {
+    if (
+      m.findingTypeRegex.length === 0 &&
+      m.findingValueRegex.length === 0 &&
+      m.findingTypes.length > 0
+    ) {
       where.findingType = { in: m.findingTypes };
     }
 
     const rows = (await this.prisma.finding.findMany({
       where,
       select: withAsset
-        ? { ...FINDING_SELECT, createdAt: true, asset: { select: { name: true, sourceType: true } } }
+        ? {
+            ...FINDING_SELECT,
+            createdAt: true,
+            asset: { select: { name: true, sourceType: true } },
+          }
         : FINDING_SELECT,
     })) as FindingRow[];
 

@@ -55,7 +55,7 @@ function alias(o: Obj, from: string, to: string): void {
 }
 
 function normalizeEnum(value: unknown): string {
-  return String(value ?? '')
+  return (typeof value === 'string' ? value : '')
     .toUpperCase()
     .trim()
     .replace(/[\s-]+/g, '_');
@@ -68,10 +68,11 @@ function repairRationale(o: Obj): void {
   alias(o, 'explanation', 'rationale');
   // Rationale is mandatory — synthesize a stub rather than failing the run.
   if (typeof o.rationale !== 'string' || o.rationale.trim().length < 20) {
-    o.rationale = `(model omitted rationale) ${String(o.rationale ?? '')}`.padEnd(
-      20,
-      '.',
-    );
+    o.rationale =
+      `(model omitted rationale) ${typeof o.rationale === 'string' ? o.rationale : ''}`.padEnd(
+        20,
+        '.',
+      );
   }
 }
 
@@ -115,7 +116,8 @@ export function repairInquiryOutput(value: unknown): unknown {
   const root = repairEnvelope(value);
   for (const d of root.decisions as unknown[]) {
     if (!isObj(d)) continue;
-    d.action = ACTION_ALIASES[normalizeEnum(d.action)] ?? normalizeEnum(d.action);
+    d.action =
+      ACTION_ALIASES[normalizeEnum(d.action)] ?? normalizeEnum(d.action);
     repairRationale(d);
     alias(d, 'matchers', 'inquiry');
   }
@@ -126,7 +128,8 @@ export function repairCaseOutput(value: unknown): unknown {
   const root = repairEnvelope(value);
   for (const d of root.decisions as unknown[]) {
     if (!isObj(d)) continue;
-    d.action = ACTION_ALIASES[normalizeEnum(d.action)] ?? normalizeEnum(d.action);
+    d.action =
+      ACTION_ALIASES[normalizeEnum(d.action)] ?? normalizeEnum(d.action);
     repairRationale(d);
     alias(d, 'ops', 'operations');
     if (!Array.isArray(d.operations)) continue;

@@ -635,9 +635,7 @@ export class DecisionApplierService {
           // (those are re-created automatically and cannot be removed).
           await this.graph.deleteEdge(op.edgeId);
         } catch (error) {
-          return failOp(
-            error instanceof Error ? error.message : String(error),
-          );
+          return failOp(error instanceof Error ? error.message : String(error));
         }
         break;
       }
@@ -657,9 +655,7 @@ export class DecisionApplierService {
             note: op.note,
           });
         } catch (error) {
-          return failOp(
-            error instanceof Error ? error.message : String(error),
-          );
+          return failOp(error instanceof Error ? error.message : String(error));
         }
         break;
       }

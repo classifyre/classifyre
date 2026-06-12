@@ -105,7 +105,12 @@ export class AutopilotService {
       },
       // Spaced retries so provider rate limits (429) get room to clear;
       // resumed deliveries skip already-completed steps via stepState.
-      { retryLimit: 2, retryDelay: 90, retryBackoff: true, expireInSeconds: 3 * 3600 },
+      {
+        retryLimit: 2,
+        retryDelay: 90,
+        retryBackoff: true,
+        expireInSeconds: 3 * 3600,
+      },
     );
     return { cycleKey, enqueued: true };
   }
@@ -129,7 +134,12 @@ export class AutopilotService {
     await boss.send(
       AUTOPILOT_QUEUE,
       { dream: true, manual: true, cycleKey },
-      { retryLimit: 2, retryDelay: 90, retryBackoff: true, expireInSeconds: 3 * 3600 },
+      {
+        retryLimit: 2,
+        retryDelay: 90,
+        retryBackoff: true,
+        expireInSeconds: 3 * 3600,
+      },
     );
     return { cycleKey, enqueued: true };
   }
@@ -197,7 +207,12 @@ export class AutopilotService {
         runnerId: run.runnerId ?? undefined,
         caseId: run.caseId ?? undefined,
       },
-      { retryLimit: 2, retryDelay: 90, retryBackoff: true, expireInSeconds: 3 * 3600 },
+      {
+        retryLimit: 2,
+        retryDelay: 90,
+        retryBackoff: true,
+        expireInSeconds: 3 * 3600,
+      },
     );
     return { cycleKey: run.cycleKey, enqueued: true };
   }

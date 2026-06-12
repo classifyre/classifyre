@@ -38,7 +38,9 @@ export class CaseTimelineController {
   constructor(private readonly activity: CaseActivityService) {}
 
   @Get('cases/:caseId/timeline')
-  @ApiOperation({ summary: 'Paginated unified case activity feed (newest first)' })
+  @ApiOperation({
+    summary: 'Paginated unified case activity feed (newest first)',
+  })
   @ApiQuery({ name: 'cursor', required: false })
   @ApiQuery({ name: 'limit', required: false })
   @ApiResponse({ status: 200, type: CaseTimelineResponseDto })
@@ -47,7 +49,11 @@ export class CaseTimelineController {
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ): Promise<CaseTimelineResponseDto> {
-    return this.activity.getTimeline(caseId, cursor, limit ? Number(limit) : 50);
+    return this.activity.getTimeline(
+      caseId,
+      cursor,
+      limit ? Number(limit) : 50,
+    );
   }
 }
 
@@ -59,7 +65,9 @@ export class CaseThreadsController {
   constructor(private readonly threads: CaseThreadsService) {}
 
   @Get('cases/:caseId/threads')
-  @ApiOperation({ summary: 'List threads (hypothesis + discussion) for a case' })
+  @ApiOperation({
+    summary: 'List threads (hypothesis + discussion) for a case',
+  })
   @ApiResponse({ status: 200, type: [ThreadResponseDto] })
   async list(@Param('caseId') caseId: string): Promise<ThreadResponseDto[]> {
     return this.threads.list(caseId);
@@ -77,9 +85,14 @@ export class CaseThreadsController {
   }
 
   @Patch('threads/:id')
-  @ApiOperation({ summary: 'Update thread title / status / confidence / color' })
+  @ApiOperation({
+    summary: 'Update thread title / status / confidence / color',
+  })
   @ApiResponse({ status: 200, type: ThreadResponseDto })
-  async update(@Param('id') id: string, @Body() dto: UpdateThreadDto): Promise<ThreadResponseDto> {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateThreadDto,
+  ): Promise<ThreadResponseDto> {
     return this.threads.update(id, dto);
   }
 
@@ -91,9 +104,14 @@ export class CaseThreadsController {
   }
 
   @Post('threads/:id/entries')
-  @ApiOperation({ summary: 'Add a note, statement revision, or status entry to a thread' })
+  @ApiOperation({
+    summary: 'Add a note, statement revision, or status entry to a thread',
+  })
   @ApiResponse({ status: 200, type: ThreadResponseDto })
-  async addEntry(@Param('id') id: string, @Body() dto: AddThreadEntryDto): Promise<ThreadResponseDto> {
+  async addEntry(
+    @Param('id') id: string,
+    @Body() dto: AddThreadEntryDto,
+  ): Promise<ThreadResponseDto> {
     return this.threads.addEntry(id, dto);
   }
 
@@ -123,7 +141,10 @@ export class CaseThreadsController {
   @Delete('threads/:id/support/:linkId')
   @ApiOperation({ summary: 'Unlink evidence or finding from a thread' })
   @ApiResponse({ status: 200, type: ThreadResponseDto })
-  async unlinkSupport(@Param('id') id: string, @Param('linkId') linkId: string): Promise<ThreadResponseDto> {
+  async unlinkSupport(
+    @Param('id') id: string,
+    @Param('linkId') linkId: string,
+  ): Promise<ThreadResponseDto> {
     return this.threads.unlinkSupport(id, linkId);
   }
 }
@@ -161,16 +182,25 @@ export class HypothesisAliasController {
   constructor(private readonly threads: CaseThreadsService) {}
 
   @Get('cases/:caseId/hypotheses')
-  @ApiOperation({ summary: '[Deprecated] List hypotheses — use GET /cases/:caseId/threads?kind=HYPOTHESIS' })
+  @ApiOperation({
+    summary:
+      '[Deprecated] List hypotheses — use GET /cases/:caseId/threads?kind=HYPOTHESIS',
+  })
   @ApiResponse({ status: 200, type: [HypothesisResponseDto] })
-  async list(@Param('caseId') caseId: string): Promise<HypothesisResponseDto[]> {
+  async list(
+    @Param('caseId') caseId: string,
+  ): Promise<HypothesisResponseDto[]> {
     const all = await this.threads.list(caseId);
-    return all.filter((t) => t.kind === CaseThreadKind.HYPOTHESIS).map(threadToHypothesis);
+    return all
+      .filter((t) => t.kind === CaseThreadKind.HYPOTHESIS)
+      .map(threadToHypothesis);
   }
 
   @Post('cases/:caseId/hypotheses')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: '[Deprecated] Create hypothesis — use POST /cases/:caseId/threads' })
+  @ApiOperation({
+    summary: '[Deprecated] Create hypothesis — use POST /cases/:caseId/threads',
+  })
   @ApiResponse({ status: 201, type: HypothesisResponseDto })
   async create(
     @Param('caseId') caseId: string,
@@ -188,9 +218,14 @@ export class HypothesisAliasController {
   }
 
   @Patch('hypotheses/:id')
-  @ApiOperation({ summary: '[Deprecated] Update hypothesis — use PATCH /threads/:id' })
+  @ApiOperation({
+    summary: '[Deprecated] Update hypothesis — use PATCH /threads/:id',
+  })
   @ApiResponse({ status: 200, type: HypothesisResponseDto })
-  async update(@Param('id') id: string, @Body() dto: UpdateHypothesisDto): Promise<HypothesisResponseDto> {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateHypothesisDto,
+  ): Promise<HypothesisResponseDto> {
     const thread = await this.threads.update(id, {
       title: dto.statement?.slice(0, 200),
       status: dto.status,
@@ -202,15 +237,22 @@ export class HypothesisAliasController {
 
   @Delete('hypotheses/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: '[Deprecated] Delete hypothesis — use DELETE /threads/:id' })
+  @ApiOperation({
+    summary: '[Deprecated] Delete hypothesis — use DELETE /threads/:id',
+  })
   async remove(@Param('id') id: string): Promise<void> {
     await this.threads.remove(id);
   }
 
   @Post('hypotheses/:id/support')
-  @ApiOperation({ summary: '[Deprecated] Link support — use POST /threads/:id/support' })
+  @ApiOperation({
+    summary: '[Deprecated] Link support — use POST /threads/:id/support',
+  })
   @ApiResponse({ status: 200, type: HypothesisResponseDto })
-  async linkSupport(@Param('id') id: string, @Body() dto: LinkSupportDto): Promise<HypothesisResponseDto> {
+  async linkSupport(
+    @Param('id') id: string,
+    @Body() dto: LinkSupportDto,
+  ): Promise<HypothesisResponseDto> {
     const thread = await this.threads.linkSupport(id, {
       targetType: dto.targetType,
       targetId: dto.targetId,
@@ -222,9 +264,15 @@ export class HypothesisAliasController {
   }
 
   @Delete('hypotheses/:id/support/:linkId')
-  @ApiOperation({ summary: '[Deprecated] Unlink support — use DELETE /threads/:id/support/:linkId' })
+  @ApiOperation({
+    summary:
+      '[Deprecated] Unlink support — use DELETE /threads/:id/support/:linkId',
+  })
   @ApiResponse({ status: 200, type: HypothesisResponseDto })
-  async unlinkSupport(@Param('id') id: string, @Param('linkId') linkId: string): Promise<HypothesisResponseDto> {
+  async unlinkSupport(
+    @Param('id') id: string,
+    @Param('linkId') linkId: string,
+  ): Promise<HypothesisResponseDto> {
     const thread = await this.threads.unlinkSupport(id, linkId);
     return threadToHypothesis(thread);
   }

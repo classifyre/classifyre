@@ -135,7 +135,11 @@ export function buildInquiryUserPrompt(input: {
   instruction: string | null;
   findingGroups: FindingGroupSummary[];
   inquiries: InquirySummary[];
-  archivedInquiries: Array<{ id: string; title: string; description: string | null }>;
+  archivedInquiries: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+  }>;
   memories: RecalledMemory[];
   part?: { index: number; total: number };
 }): string {
@@ -157,7 +161,9 @@ export function buildInquiryUserPrompt(input: {
           input.archivedInquiries.map((q) => ({
             id: q.id,
             title: q.title,
-            ...(q.description ? { description: q.description.slice(0, 200) } : {}),
+            ...(q.description
+              ? { description: q.description.slice(0, 200) }
+              : {}),
           })),
         )
       : '',
@@ -218,7 +224,12 @@ export function buildCaseUserPrompt(input: {
     }
   >;
   openCases: CaseSummary[];
-  closedCases: Array<{ id: string; title: string; status: string; conclusion: string | null }>;
+  closedCases: Array<{
+    id: string;
+    title: string;
+    status: string;
+    conclusion: string | null;
+  }>;
   focusCase?: FocusedCaseDetail | null;
   memories: RecalledMemory[];
 }): string {

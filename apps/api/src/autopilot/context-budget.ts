@@ -19,7 +19,8 @@ const DEFAULT_CONTEXT_TOKENS = 100_000;
 export function promptCharBudget(
   contextSize: number | null | undefined,
 ): number {
-  const tokens = contextSize && contextSize > 0 ? contextSize : DEFAULT_CONTEXT_TOKENS;
+  const tokens =
+    contextSize && contextSize > 0 ? contextSize : DEFAULT_CONTEXT_TOKENS;
   const usable = Math.max(1_000, tokens - RESERVED_TOKENS);
   return usable * CHARS_PER_TOKEN;
 }
@@ -106,14 +107,15 @@ export async function runChunked<T, R>(
 export function mergeDecisionOutputs<
   D extends { action: string },
   M extends { kind: string; key: string },
->(outputs: Array<{ decisions: D[]; memoryWrites: M[] }>): {
+>(
+  outputs: Array<{ decisions: D[]; memoryWrites: M[] }>,
+): {
   decisions: D[];
   memoryWrites: M[];
 } {
   const decisions = outputs.flatMap((o) => o.decisions);
   const real = decisions.filter((d) => d.action !== 'NO_ACTION');
-  const merged =
-    real.length > 0 ? real : decisions.slice(0, 1); // keep one documented no-op
+  const merged = real.length > 0 ? real : decisions.slice(0, 1); // keep one documented no-op
 
   const seen = new Set<string>();
   const memoryWrites: M[] = [];

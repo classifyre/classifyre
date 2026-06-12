@@ -12,11 +12,7 @@ import {
   repairDreamOutput,
   type DreamConsolidationOutput,
 } from './schemas/dream.schema';
-import {
-  chunkByBudget,
-  promptCharBudget,
-  runChunked,
-} from './context-budget';
+import { chunkByBudget, promptCharBudget, runChunked } from './context-budget';
 import { buildDreamSystemPrompt, buildDreamUserPrompt } from './prompts';
 import type { AgentContext } from './autopilot.types';
 

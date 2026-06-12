@@ -54,18 +54,23 @@ export class CompiledMatcher {
     if (!this.matchAllSources && !this.sourceIds.has(f.sourceId)) return false;
 
     // 2. Detector (built-in type OR custom key)
-    const hasDetectorFilter = this.detectorTypes.size > 0 || this.customDetectorKeys.size > 0;
+    const hasDetectorFilter =
+      this.detectorTypes.size > 0 || this.customDetectorKeys.size > 0;
     if (hasDetectorFilter) {
       const detectorOk =
         this.detectorTypes.has(f.detectorType) ||
-        (f.customDetectorKey != null && this.customDetectorKeys.has(f.customDetectorKey));
+        (f.customDetectorKey != null &&
+          this.customDetectorKeys.has(f.customDetectorKey));
       if (!detectorOk) return false;
     }
 
     // 3. Finding type (exact match OR typeRegex; empty = any)
-    const noTypeFilter = this.findingTypes.size === 0 && this.typeRegexes.length === 0;
+    const noTypeFilter =
+      this.findingTypes.size === 0 && this.typeRegexes.length === 0;
     if (!noTypeFilter) {
-      const typeOk = this.findingTypes.has(f.findingType) || this.typeRegexes.some((re) => re.test(f.findingType));
+      const typeOk =
+        this.findingTypes.has(f.findingType) ||
+        this.typeRegexes.some((re) => re.test(f.findingType));
       if (!typeOk) return false;
     }
 
