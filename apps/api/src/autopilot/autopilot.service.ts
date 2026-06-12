@@ -69,12 +69,18 @@ export class AutopilotService {
 
     const cycleKey = `manual:${randomUUID()}`;
     const boss = await this.pgBoss.getBossAsync();
-    await boss.send(AUTOPILOT_QUEUE, {
-      manual: true,
-      cycleKey,
-      instruction: dto.instruction?.trim() || undefined,
-      sourceId: dto.sourceId || undefined,
-    });
+    await boss.send(
+      AUTOPILOT_QUEUE,
+      {
+        manual: true,
+        cycleKey,
+        instruction: dto.instruction?.trim() || undefined,
+        sourceId: dto.sourceId || undefined,
+      },
+      // Spaced retries so provider rate limits (429) get room to clear;
+      // resumed deliveries skip already-completed steps via stepState.
+      { retryLimit: 2, retryDelay: 90, retryBackoff: true },
+    );
     return { cycleKey, enqueued: true };
   }
 

@@ -20,7 +20,6 @@ import { toast } from "sonner";
 import {
   api,
   type CaseResponseDto,
-  type InquiryMatchDto,
   type InquiryResponseDto,
 } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
@@ -45,7 +44,10 @@ import {
   AlertDialogTrigger,
 } from "@workspace/ui/components/alert-dialog";
 import { CaseStatusBadge } from "@/components/case-status-badge";
-import { InquiryMatchesTable } from "@/components/inquiry-matches-table";
+import {
+  InquiryMatchesPanel,
+  type InquiryMatchesStats,
+} from "@/components/inquiry-matches-panel";
 
 export default function InquiryDetailPage() {
   return (
@@ -63,7 +65,11 @@ function InquiryDetailInner() {
   const preferredCaseId = searchParams.get("caseId");
 
   const [inquiry, setInquiry] = React.useState<InquiryResponseDto | null>(null);
-  const [matches, setMatches] = React.useState<InquiryMatchDto[]>([]);
+  const [matchStats, setMatchStats] = React.useState<InquiryMatchesStats>({
+    total: 0,
+    newCount: 0,
+  });
+  const [matchesReloadKey, setMatchesReloadKey] = React.useState(0);
   const [targetCaseId, setTargetCaseId] = React.useState<string | null>(null);
   const [targetCase, setTargetCase] = React.useState<CaseResponseDto | null>(null);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
@@ -71,12 +77,9 @@ function InquiryDetailInner() {
   const [pulling, setPulling] = React.useState(false);
 
   const load = React.useCallback(async () => {
-    const [q, m] = await Promise.all([
-      api.inquiries.inquiriesControllerFindOne({ id: inquiryId }),
-      api.inquiries.inquiriesControllerListMatches({ id: inquiryId }),
-    ]);
+    const q = await api.inquiries.inquiriesControllerFindOne({ id: inquiryId });
     setInquiry(q);
-    setMatches(m);
+    setMatchesReloadKey((k) => k + 1);
     setSelected(new Set());
     // Pick the pull target: explicit ?caseId, else the only linked case.
     setTargetCaseId((prev) => {
@@ -84,11 +87,21 @@ function InquiryDetailInner() {
       if (preferredCaseId && q.cases.some((c) => c.id === preferredCaseId)) return preferredCaseId;
       return q.cases.length === 1 ? q.cases[0]!.id : null;
     });
-    // Viewing the detail clears the "new" badge.
-    if (q.newMatchCount > 0) {
-      await api.inquiries.inquiriesControllerMarkSeen({ id: inquiryId }).catch(() => {});
-    }
   }, [inquiryId, preferredCaseId]);
+
+  // Viewing the matches clears the "new" badge — but only after the first page
+  // has loaded, so the server still flags rows as new for that initial fetch.
+  const seenMarked = React.useRef(false);
+  const handleMatchStats = React.useCallback(
+    (stats: InquiryMatchesStats) => {
+      setMatchStats(stats);
+      if (!seenMarked.current && (stats.newCount > 0 || (inquiry?.newMatchCount ?? 0) > 0)) {
+        seenMarked.current = true;
+        void api.inquiries.inquiriesControllerMarkSeen({ id: inquiryId }).catch(() => {});
+      }
+    },
+    [inquiryId, inquiry?.newMatchCount],
+  );
 
   React.useEffect(() => {
     void load();
@@ -198,7 +211,7 @@ function InquiryDetailInner() {
     ...inquiry.findingTypeRegex.map((r) => `/${r}/`),
   ];
   const isArchived = inquiry.status === "ARCHIVED";
-  const newCount = matches.filter((m) => m.isNew && !inCaseFindingIds.has(m.findingId)).length;
+  const newCount = matchStats.newCount;
 
   return (
     <div className="space-y-6">
@@ -352,7 +365,7 @@ function InquiryDetailInner() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-baseline gap-2">
             <h2 className="font-serif text-lg font-black uppercase tracking-[0.04em]">Matches</h2>
-            <span className="text-muted-foreground text-sm tabular-nums">{matches.length}</span>
+            <span className="text-muted-foreground text-sm tabular-nums">{matchStats.total}</span>
             {newCount > 0 && (
               <Badge
                 variant="outline"
@@ -404,8 +417,10 @@ function InquiryDetailInner() {
           </p>
         )}
 
-        <InquiryMatchesTable
-          matches={matches}
+        <InquiryMatchesPanel
+          inquiryId={inquiryId}
+          reloadKey={matchesReloadKey}
+          onStats={handleMatchStats}
           inCaseFindingIds={targetCaseId ? inCaseFindingIds : undefined}
           selected={targetCaseId ? selected : undefined}
           onSelectedChange={targetCaseId ? setSelected : undefined}

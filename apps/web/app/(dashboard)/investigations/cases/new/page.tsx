@@ -97,11 +97,11 @@ function NewCasePageInner() {
       if (matchesByInquiry.has(id) || loadingMatches.has(id)) continue;
       setLoadingMatches((prev) => new Set(prev).add(id));
       api.inquiries
-        .inquiriesControllerListMatches({ id })
-        .then((m) => {
-          setMatchesByInquiry((prev) => new Map(prev).set(id, m));
+        .inquiriesControllerListMatches({ id, limit: 200 })
+        .then((res) => {
+          setMatchesByInquiry((prev) => new Map(prev).set(id, res.items));
           setSelectedByInquiry((prev) =>
-            new Map(prev).set(id, new Set(m.map((x) => x.findingId))),
+            new Map(prev).set(id, new Set(res.items.map((x) => x.findingId))),
           );
         })
         .catch((err) => {
