@@ -58,7 +58,13 @@ export interface AgentRunDetailDto {
      */
     runnerId?: string | null;
     /**
-     * "scan_completed" or "manual"
+     * Case this run is focused on (case-targeted manual runs)
+     * @type {string}
+     * @memberof AgentRunDetailDto
+     */
+    caseId?: string | null;
+    /**
+     * "scan_completed", "manual" or "schedule"
      * @type {string}
      * @memberof AgentRunDetailDto
      */
@@ -174,6 +180,7 @@ export function AgentRunDetailDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'status': json['status'],
         'sourceId': json['sourceId'] == null ? undefined : json['sourceId'],
         'runnerId': json['runnerId'] == null ? undefined : json['runnerId'],
+        'caseId': json['caseId'] == null ? undefined : json['caseId'],
         'trigger': json['trigger'],
         'instruction': json['instruction'] == null ? undefined : json['instruction'],
         'attempts': json['attempts'],
@@ -203,6 +210,7 @@ export function AgentRunDetailDtoToJSONTyped(value?: AgentRunDetailDto | null, i
         'status': value['status'],
         'sourceId': value['sourceId'],
         'runnerId': value['runnerId'],
+        'caseId': value['caseId'],
         'trigger': value['trigger'],
         'instruction': value['instruction'],
         'attempts': value['attempts'],

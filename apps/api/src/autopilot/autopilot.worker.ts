@@ -31,6 +31,8 @@ interface CycleInput {
   instruction: string | null;
   /** Rerun of one specific agent — execute only it, bypassing enable-flags. */
   only?: AgentKind | null;
+  /** Case-focused run: the case agent works on exactly this case. */
+  caseId?: string | null;
 }
 
 /**
@@ -108,6 +110,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         runnerId,
         manual,
         only,
+        caseId: typeof data?.caseId === 'string' ? data.caseId : null,
         instruction:
           typeof data?.instruction === 'string' && data.instruction.trim()
             ? data.instruction.trim()
@@ -242,6 +245,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       cycleKey: cycle.cycleKey,
       trigger: cycle.trigger,
       instruction: cycle.instruction,
+      caseId: agentKind === AgentKind.CASE ? (cycle.caseId ?? null) : null,
     });
     if (run.status !== AgentRunStatus.RUNNING) return;
 
@@ -274,6 +278,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       runnerId: cycle.runnerId,
       manual: cycle.manual,
       instruction: cycle.instruction,
+      caseId: agentKind === AgentKind.CASE ? (cycle.caseId ?? null) : null,
       state: {},
     };
     const agent =

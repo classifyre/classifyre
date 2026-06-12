@@ -422,7 +422,7 @@ No authorization required
 
 ## autopilotControllerListRuns
 
-> AgentRunListResponseDto autopilotControllerListRuns(agentKind, status, skip, limit)
+> AgentRunListResponseDto autopilotControllerListRuns(agentKind, caseId, status, skip, limit)
 
 List autopilot agent runs (newest first)
 
@@ -442,6 +442,8 @@ async function example() {
   const body = {
     // 'INQUIRY' | 'CASE' | 'DREAM' (optional)
     agentKind: agentKind_example,
+    // string | Only runs focused on this case (optional)
+    caseId: caseId_example,
     // 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED' | 'CANCELLED' (optional)
     status: status_example,
     // number (optional)
@@ -468,6 +470,7 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **agentKind** | `INQUIRY`, `CASE`, `DREAM` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM] |
+| **caseId** | `string` | Only runs focused on this case | [Optional] [Defaults to `undefined`] |
 | **status** | `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `SKIPPED`, `CANCELLED` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, FAILED, SKIPPED, CANCELLED] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **limit** | `number` |  | [Optional] [Defaults to `50`] |

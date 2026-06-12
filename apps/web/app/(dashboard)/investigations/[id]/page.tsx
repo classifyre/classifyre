@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
+  Bot,
   CheckCircle2,
   DownloadCloud,
   Lightbulb,
@@ -58,6 +59,8 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { CaseStatusBadge } from "@/components/case-status-badge";
+import { RunAutopilotDialog } from "@/components/autopilot/run-autopilot-dialog";
+import { CaseAutopilotStatus } from "@/components/autopilot/case-autopilot-status";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { EvidenceTable } from "@/components/evidence-table";
 import { CaseThreads } from "@/components/case-threads";
@@ -113,6 +116,9 @@ function CaseWorkspaceInner() {
   const [inquiryToLink, setInquiryToLink] = React.useState("");
   const [linkingInquiry, setLinkingInquiry] = React.useState(false);
   const [recentActivity, setRecentActivity] = React.useState<CaseActivityDto[]>([]);
+
+  const [aiDialogOpen, setAiDialogOpen] = React.useState(false);
+  const [aiRefreshKey, setAiRefreshKey] = React.useState(0);
 
   const [conclusion, setConclusion] = React.useState("");
   const [savingConclusion, setSavingConclusion] = React.useState(false);
@@ -421,6 +427,16 @@ function CaseWorkspaceInner() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 self-start">
+          {!isClosed && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAiDialogOpen(true)}
+            >
+              <Bot className="h-3.5 w-3.5 text-[color:var(--color-amber-600,#d97706)]" />{" "}
+              Run AI
+            </Button>
+          )}
           <AiModeSelect
             value={(caseData.aiMode ?? "INHERIT") as AiMode}
             onChange={(mode) => void setAiMode(mode)}
@@ -446,6 +462,20 @@ function CaseWorkspaceInner() {
           )}
         </div>
       </div>
+
+      {/* ── AI autopilot visibility: working banner / latest result ── */}
+      <CaseAutopilotStatus
+        caseId={caseId}
+        refreshKey={aiRefreshKey}
+        onFinished={reloadAll}
+      />
+      <RunAutopilotDialog
+        open={aiDialogOpen}
+        onOpenChange={setAiDialogOpen}
+        caseId={caseId}
+        caseTitle={caseData.title}
+        onTriggered={() => setAiRefreshKey((k) => k + 1)}
+      />
 
       {/* ── New matches alert (always visible) ── */}
       {newMatchTotal > 0 && !isClosed && (

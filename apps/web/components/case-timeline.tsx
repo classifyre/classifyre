@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   Activity,
+  Bot,
   ChevronDown,
   Download,
   FileText,
@@ -22,7 +23,10 @@ import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
 
 // ─── Event metadata ───────────────────────────────────────────────────────────
 
-type EventGroup = "case" | "inquiry" | "evidence" | "thread";
+type EventGroup = "case" | "inquiry" | "evidence" | "thread" | "ai";
+
+/** Synthetic activityType for autopilot runs blended into the timeline. */
+const AUTOPILOT_RUN = "AUTOPILOT_RUN";
 
 const TYPE_META: Record<
   string,
@@ -48,6 +52,7 @@ const TYPE_META: Record<
   SUPPORT_LINKED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Evidence linked to thread", color: "text-blue-600 dark:text-blue-400", group: "thread" },
   SUPPORT_UNLINKED: { icon: <Link2 className="h-3.5 w-3.5" />, label: "Evidence unlinked from thread", color: "text-muted-foreground", group: "thread" },
   SUPPORT_UPDATED: { icon: <Pencil className="h-3.5 w-3.5" />, label: "Support updated", color: "text-muted-foreground", group: "thread" },
+  [AUTOPILOT_RUN]: { icon: <Bot className="h-3.5 w-3.5" />, label: "AI autopilot run", color: "text-amber-600 dark:text-amber-400", group: "ai" },
 };
 
 const GROUP_FILTERS: Array<{ key: "ALL" | EventGroup; label: string }> = [
@@ -56,6 +61,7 @@ const GROUP_FILTERS: Array<{ key: "ALL" | EventGroup; label: string }> = [
   { key: "inquiry", label: "Inquiries" },
   { key: "evidence", label: "Evidence" },
   { key: "thread", label: "Threads" },
+  { key: "ai", label: "AI" },
 ];
 
 function str(v: unknown): string | null {
@@ -69,6 +75,8 @@ function strList(v: unknown): string[] {
 /** Subject of the event — the entity it happened to, shown emphasized. */
 function eventSubject(item: CaseActivityDto): string | null {
   const p = (item.payload ?? {}) as Record<string, unknown>;
+  // Synthetic AI-run events are not part of the generated activity enum.
+  if ((item.activityType as string) === AUTOPILOT_RUN) return str(p.instruction);
   switch (item.activityType) {
     case "INQUIRY_LINKED":
     case "INQUIRY_UNLINKED":
@@ -101,6 +109,19 @@ function eventSubject(item: CaseActivityDto): string | null {
 function EventDetail({ item }: { item: CaseActivityDto }) {
   const p = (item.payload ?? {}) as Record<string, unknown>;
   const lines: React.ReactNode[] = [];
+
+  if ((item.activityType as string) === AUTOPILOT_RUN) {
+    const status = str(p.status) ?? "?";
+    return (
+      <div className="text-muted-foreground mt-0.5 space-y-1 text-xs">
+        <span>
+          <span className="font-medium text-foreground">{status.toLowerCase()}</span>
+          {str(p.summary) ? ` — ${String(p.summary)}` : ""}
+          {status === "FAILED" && str(p.error) ? ` — ${String(p.error)}` : ""}
+        </span>
+      </div>
+    );
+  }
 
   switch (item.activityType) {
     case "INQUIRY_PULLED": {
@@ -230,6 +251,7 @@ function timeLabel(date: Date): string {
 
 export function CaseTimeline({ caseId }: { caseId: string }) {
   const [items, setItems] = React.useState<CaseActivityDto[]>([]);
+  const [aiRuns, setAiRuns] = React.useState<CaseActivityDto[]>([]);
   const [cursor, setCursor] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [filter, setFilter] = React.useState<"ALL" | EventGroup>("ALL");
@@ -245,6 +267,36 @@ export function CaseTimeline({ caseId }: { caseId: string }) {
         });
         setItems((prev) => (append ? [...prev, ...res.items] : res.items));
         setCursor(res.nextCursor ?? null);
+        if (!append) {
+          // Blend case-focused autopilot runs into the stream as synthetic
+          // events, so the AI's work shows up where it happened in time.
+          try {
+            const runs = await api.autopilot.autopilotControllerListRuns({
+              caseId,
+              limit: 50,
+            });
+            setAiRuns(
+              runs.items.map(
+                (r): CaseActivityDto => ({
+                  id: `ai-run-${r.id}`,
+                  caseId,
+                  activityType: AUTOPILOT_RUN as CaseActivityDto["activityType"],
+                  payload: {
+                    status: r.status,
+                    summary: r.summary,
+                    instruction: r.instruction,
+                    error: r.error,
+                    runId: r.id,
+                  },
+                  actor: "ai-autopilot",
+                  createdAt: r.createdAt,
+                }),
+              ),
+            );
+          } catch {
+            setAiRuns([]);
+          }
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -258,13 +310,14 @@ export function CaseTimeline({ caseId }: { caseId: string }) {
     void load();
   }, [load]);
 
-  const visible = React.useMemo(
-    () =>
-      filter === "ALL"
-        ? items
-        : items.filter((i) => (TYPE_META[i.activityType]?.group ?? "case") === filter),
-    [items, filter],
-  );
+  const visible = React.useMemo(() => {
+    const merged = [...items, ...aiRuns].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    return filter === "ALL"
+      ? merged
+      : merged.filter((i) => (TYPE_META[i.activityType]?.group ?? "case") === filter);
+  }, [items, aiRuns, filter]);
 
   // Group by day, newest day first (API returns newest first).
   const days = React.useMemo(() => {
