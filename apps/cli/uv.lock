@@ -606,7 +606,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.4.16"
+version = "0.4.17.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -732,7 +732,7 @@ neo4j = [
 ocr = [
     { name = "chardet" },
     { name = "docling", version = "2.99.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
-    { name = "docling", version = "2.101.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
+    { name = "docling", version = "2.102.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
     { name = "filetype" },
     { name = "openpyxl" },
     { name = "pdfplumber" },
@@ -946,7 +946,7 @@ threat-ml = [
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.4.16"
+version = "0.4.17.dev0"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
@@ -1254,7 +1254,7 @@ wheels = [
 
 [[package]]
 name = "docling"
-version = "2.101.0"
+version = "2.102.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'linux'",
@@ -1267,11 +1267,11 @@ resolution-markers = [
     "python_full_version < '3.13' and sys_platform != 'darwin' and sys_platform != 'linux'",
 ]
 dependencies = [
-    { name = "docling-slim", version = "2.101.0", source = { registry = "https://pypi.org/simple" }, extra = ["standard"], marker = "sys_platform != 'darwin'" },
+    { name = "docling-slim", version = "2.102.0", source = { registry = "https://pypi.org/simple" }, extra = ["standard"], marker = "sys_platform != 'darwin'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a8/03/3fc134bd4255397960df9c2adcfd48318e221f33588137d20322441d5fca/docling-2.101.0.tar.gz", hash = "sha256:7d50eeee0c73b206e433b7e45bd42b74f688557293ebdfb8cec8a79ff267abc9", size = 8845, upload-time = "2026-06-10T16:04:07.053Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c4/10/e05723a54bed125b97d2bc4fce09fcdea10ea0b56c94cf3e36053b0546aa/docling-2.102.0.tar.gz", hash = "sha256:e73b1f309481f80754bab6a03abf557a108509e9b6e4fe187706a0d392496144", size = 8844, upload-time = "2026-06-12T12:25:43.078Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ae/2e/90efdee1d0c3d329b347b5810c007bb19f822873455c4bd61acacee3cbfa/docling-2.101.0-py3-none-any.whl", hash = "sha256:f3cd3e1b5e2daeb7c06bcef6ea7cb2596537fd2e7b44174a952956c7a0715888", size = 5015, upload-time = "2026-06-10T16:04:05.911Z" },
+    { url = "https://files.pythonhosted.org/packages/16/4c/3b0e89b761e4c0c075f87a99878fef5bf6cab98186ab8373cf88d6777cc6/docling-2.102.0-py3-none-any.whl", hash = "sha256:d69a5be3a809c17794ee9f4d21d78fe44a8253286748bf1a7b702999bbe7b328", size = 5015, upload-time = "2026-06-12T12:25:41.996Z" },
 ]
 
 [[package]]
@@ -1509,7 +1509,7 @@ standard = [
 
 [[package]]
 name = "docling-slim"
-version = "2.101.0"
+version = "2.102.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'linux'",
@@ -1531,9 +1531,9 @@ dependencies = [
     { name = "requests", marker = "sys_platform != 'darwin'" },
     { name = "tqdm", marker = "sys_platform != 'darwin'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d8/1d/1f7b82f1a9a2116accc215fcefe79d0c8ddd6757c6496b0f3eb02989e45a/docling_slim-2.101.0.tar.gz", hash = "sha256:7c2f098885892ca74522130ffcbabe62cbdc26afd483249a841798387fb49235", size = 415777, upload-time = "2026-06-10T16:02:45.835Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d9/d0/c2f6ecca520cff55e9d422559026e6bb6be5ae0ed0dc32f4873ca30e63eb/docling_slim-2.102.0.tar.gz", hash = "sha256:a7de1a133a5bca759e48d60f0f34e0d416e8119c31f15ffde67189c23ef11e0d", size = 420212, upload-time = "2026-06-12T12:24:23.739Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/31/4b/cce1670a139a74f9e8505ac4ef2c84d1125661307336b0d3dc4aa93ae590/docling_slim-2.101.0-py3-none-any.whl", hash = "sha256:3b8f2acf0aeb30b2c0e5245e4663e76500d513ea2bf3555ecb68e46aa30a5276", size = 537763, upload-time = "2026-06-10T16:02:44.016Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/f2/886775d6e7b387f58b6067f212482e430aaeda0cfb66494010d61b8f09a3/docling_slim-2.102.0-py3-none-any.whl", hash = "sha256:91557781d2b765c18b884a9c7734761f0c43a22d11060788d8a3d4f39c2c1966", size = 542243, upload-time = "2026-06-12T12:24:22.027Z" },
 ]
 
 [package.optional-dependencies]
