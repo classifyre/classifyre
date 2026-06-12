@@ -287,8 +287,8 @@ class RestOutputSink:
             return
 
         _edge_batch = 500
-        for i in range(0, len(edges), _EDGE_BATCH):
-            chunk = edges[i : i + _EDGE_BATCH]
+        for i in range(0, len(edges), _edge_batch):
+            chunk = edges[i : i + _edge_batch]
             payload = BulkIngestEdgesRequest(edges=chunk)
             try:
                 self._request_json(
