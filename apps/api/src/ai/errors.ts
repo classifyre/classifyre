@@ -34,15 +34,23 @@ export class AiModelNotFoundError extends Error {
   }
 }
 
+/** One failed structured-output attempt: the raw model response + why it was rejected. */
+export interface AiSchemaAttempt {
+  raw: string;
+  error: string;
+}
+
 /**
  * Structured-output parsing or schema validation failed after all retries.
- * `cause` contains the last parse/validation error.
+ * `cause` contains the last parse/validation error; `attempts` the raw model
+ * responses so callers can log exactly what came back.
  */
 export class AiSchemaError extends Error {
   readonly code = 'AI_SCHEMA_ERROR' as const;
   constructor(
     message: string,
     public readonly cause?: unknown,
+    public readonly attempts: AiSchemaAttempt[] = [],
   ) {
     super(message);
     this.name = 'AiSchemaError';

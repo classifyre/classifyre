@@ -13,6 +13,11 @@ Name | Type
 `timezone` | string
 `timeFormat` | string
 `aiProviderConfigId` | string
+`autopilotInquiryEnabled` | boolean
+`autopilotInquiryDesired` | string
+`autopilotInquirySearchable` | string
+`autopilotCaseEnabled` | boolean
+`autopilotCaseGuidance` | string
 `demoMode` | boolean
 `createdAt` | Date
 `updatedAt` | Date
@@ -31,6 +36,11 @@ const example = {
   "timezone": AUTOMATIC,
   "timeFormat": TWELVE_HOUR,
   "aiProviderConfigId": null,
+  "autopilotInquiryEnabled": false,
+  "autopilotInquiryDesired": null,
+  "autopilotInquirySearchable": null,
+  "autopilotCaseEnabled": false,
+  "autopilotCaseGuidance": null,
   "demoMode": false,
   "createdAt": null,
   "updatedAt": null,

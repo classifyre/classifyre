@@ -16,6 +16,8 @@ import { CliRunnerModule } from './cli-runner/cli-runner.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { SandboxModule } from './sandbox/sandbox.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { MatchingModule } from './matching/matching.module';
+import { AutopilotModule } from './autopilot/autopilot.module';
 import { ExportModule } from './export/export.module';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import { InstanceSettingsService } from './instance-settings.service';
@@ -26,6 +28,11 @@ import { McpTokenService } from './mcp-token.service';
 import { McpServerFactoryService } from './mcp-server.factory';
 import { McpToolExecutorService } from './mcp-tool-executor.service';
 import { AssistantService } from './assistant.service';
+import { CasesService } from './cases.service';
+import { InquiriesService } from './inquiries.service';
+import { CaseThreadsService } from './case-threads.service';
+import { CaseActivityService } from './case-activity.service';
+import { GraphService } from './graph.service';
 
 // Import organized controllers
 import {
@@ -45,6 +52,12 @@ import {
   AssistantController,
   CustomDetectorExtractionsController,
   CustomDetectorTestsController,
+  CasesController,
+  InquiriesController,
+  CaseThreadsController,
+  CaseTimelineController,
+  HypothesisAliasController,
+  GraphController,
 } from './controllers';
 
 @Module({
@@ -53,6 +66,8 @@ import {
     WebSocketModule,
     SandboxModule,
     SchedulerModule,
+    MatchingModule,
+    AutopilotModule,
     ExportModule,
   ],
   controllers: [
@@ -72,6 +87,12 @@ import {
     AiProviderConfigController,
     AiController,
     AssistantController,
+    CasesController,
+    InquiriesController,
+    CaseTimelineController,
+    CaseThreadsController,
+    HypothesisAliasController,
+    GraphController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: DemoModeGuard },
@@ -95,6 +116,11 @@ import {
     McpToolExecutorService,
     McpServerFactoryService,
     AssistantService,
+    CaseActivityService,
+    CasesService,
+    InquiriesService,
+    CaseThreadsService,
+    GraphService,
   ],
 })
 export class AppModule {}

@@ -108,6 +108,14 @@ type FindingsTableProps = {
   onBulkUpdate?: () => void;
   onFiltersChange?: (filters: SearchFindingsRequestDto["filters"]) => void;
   lockedFilters?: SearchFindingsRequestDto["filters"];
+  /** When true the table skips URL read/write — safe to embed in dialogs. */
+  disableUrlSync?: boolean;
+  /**
+   * Finding IDs (FindingResponseDto.id) to hide from the table.
+   * Applied client-side after fetch — useful to exclude already-attached rows
+   * without requiring a backend filter. Pagination counts may be slightly off.
+   */
+  excludedFindingIds?: string[];
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -251,25 +259,37 @@ export function FindingsTable({
   onBulkUpdate,
   onFiltersChange,
   lockedFilters,
+  disableUrlSync = false,
+  excludedFindingIds,
 }: FindingsTableProps = {}) {
   const { t } = useTranslation();
   const router = useRouter();
   const { searchParams, setParams } = useUrlParams();
 
   const [searchInput, setSearchInput] = useState(
-    () => searchParams.get("q") ?? DEFAULT_DRAFT.search,
+    () =>
+      disableUrlSync
+        ? DEFAULT_DRAFT.search
+        : (searchParams.get("q") ?? DEFAULT_DRAFT.search),
   );
   const [draft, setDraft] = useState<FilterDraft>(() => ({
-    search: searchParams.get("q") ?? DEFAULT_DRAFT.search,
-    detectorTypes: searchParams.getAll(
-      "detector",
-    ) as FilterDraft["detectorTypes"],
-    statuses: searchParams.getAll("status") as FilterDraft["statuses"],
-    sourceIds: searchParams.getAll("source"),
-    customDetectorKeys: searchParams.getAll("customDetector"),
+    search: disableUrlSync
+      ? DEFAULT_DRAFT.search
+      : (searchParams.get("q") ?? DEFAULT_DRAFT.search),
+    detectorTypes: disableUrlSync
+      ? DEFAULT_DRAFT.detectorTypes
+      : (searchParams.getAll("detector") as FilterDraft["detectorTypes"]),
+    statuses: disableUrlSync
+      ? DEFAULT_DRAFT.statuses
+      : (searchParams.getAll("status") as FilterDraft["statuses"]),
+    sourceIds: disableUrlSync ? DEFAULT_DRAFT.sourceIds : searchParams.getAll("source"),
+    customDetectorKeys: disableUrlSync
+      ? DEFAULT_DRAFT.customDetectorKeys
+      : searchParams.getAll("customDetector"),
     // Prefer externally-supplied severities (panel cards); fall back to URL
-    severity: (severities ??
-      searchParams.getAll("severity")) as SeverityValue[],
+    severity: disableUrlSync
+      ? ((severities ?? DEFAULT_DRAFT.severity) as SeverityValue[])
+      : ((severities ?? searchParams.getAll("severity")) as SeverityValue[]),
   }));
 
   // When the parent panel cards change the severity prop, sync into draft
@@ -340,6 +360,7 @@ export function FindingsTable({
   // ── Sync draft to URL ─────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (disableUrlSync) return;
     setParams({
       q: draft.search || null,
       detector: draft.detectorTypes.length > 0 ? draft.detectorTypes : null,
@@ -349,7 +370,7 @@ export function FindingsTable({
       source: draft.sourceIds.length > 0 ? draft.sourceIds : null,
       severity: draft.severity.length > 0 ? draft.severity : null,
     });
-  }, [draft, setParams]);
+  }, [draft, setParams, disableUrlSync]);
 
   // ── Load sources ──────────────────────────────────────────────────────────
 
@@ -499,7 +520,13 @@ export function FindingsTable({
         } else {
           next.set(finding.id, finding);
         }
-        notifySelection(next, false, currentFilters, currentTotal);
+        // Defer the parent notification outside the state-updater callback.
+        // Calling onSelectionChange (a parent setState) inside a state-updater
+        // triggers the React "Cannot update a component while rendering a
+        // different component" warning.
+        queueMicrotask(() =>
+          notifySelection(next, false, currentFilters, currentTotal),
+        );
         return next;
       });
     },
@@ -540,7 +567,11 @@ export function FindingsTable({
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
-  const findings = currentFindings;
+  // Apply client-side exclusion (already-attached findings in dialog mode)
+  const findings =
+    excludedFindingIds && excludedFindingIds.length > 0
+      ? currentFindings.filter((f) => !excludedFindingIds.includes(f.id))
+      : currentFindings;
   const total = data?.total ?? 0;
   const hasRows = findings.length > 0;
   const showInitialLoading = isLoading && data === null;

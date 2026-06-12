@@ -1,0 +1,134 @@
+---
+title: PostgreSQL Database
+sidebarTitle: PostgreSQL
+description: Configuring embedded, external, or CloudNativePG database modes for Classifyre.
+---
+
+import { Callout, Steps, Tabs } from "nextra/components"
+
+# PostgreSQL Database
+
+Classifyre requires a **PostgreSQL (14+)** database to store application configuration, scan schedules, runner execution logs, and detected security findings. 
+
+Our official Helm chart supports three deployment modes for the database, configured via the `postgres.mode` value:
+1. **Embedded Database** (default, for test/evaluation)
+2. **External Database** (recommended for production)
+3. **CloudNativePG (CNPG) Operator** (for cloud-native high availability)
+
+---
+
+## Database Modes
+
+<Tabs items={['Embedded', 'External', 'CNPG']}>
+  <Tabs.Tab>
+    ### Embedded PostgreSQL (`postgres.mode: embedded`)
+    
+    In embedded mode, the Helm chart deploys a single PostgreSQL pod within your cluster namespace.
+
+    - **Usecase:** Evaluations, sales demos, and local development.
+    - **Persistence:** Enabled by default via a PersistentVolumeClaim (`postgres.embedded.persistence.size: 20Gi`).
+    - **Configuration Group:** `postgres.embedded.*`
+    
+    ```yaml
+    postgres:
+      mode: embedded
+      embedded:
+        image:
+          repository: postgres
+          tag: "18"
+        persistence:
+          enabled: true
+          size: 20Gi
+    ```
+
+    <Callout type="warning">
+      **Not for Production:** Embedded mode runs a single database pod without replicas, automated backups, or high availability. Do not use this mode for production workloads.
+    </Callout>
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    ### External PostgreSQL (`postgres.mode: external`)
+
+    In external mode, Classifyre connects to a PostgreSQL database provisioned outside of the Helm chart namespace.
+
+    - **Usecase:** Production environments, cloud-managed database instances (such as AWS RDS, GCP Cloud SQL, or Azure Database for PostgreSQL).
+    - **Configuration Group:** `postgres.external.*`
+    
+    ```yaml
+    postgres:
+      mode: external
+      external:
+        host: "postgres-prod.internal.net"
+        port: 5432
+        database: "classifyre"
+        username: "classifyre"
+        existingSecret: "classifyre-db-secret"
+        existingSecretPasswordKey: "db-password"
+    ```
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    ### CloudNativePG Operator (`postgres.mode: cnpg`)
+
+    For Kubernetes-native high availability, Classifyre can configure a Postgres cluster managed by the [CloudNativePG (CNPG) operator](https://cloudnative-pg.io/).
+
+    - **Usecase:** Highly-available, resilient in-cluster production deployments.
+    - **Replica Nodes:** Deploys a multi-instance cluster (default: 3 instances) with automated failover and backup policies.
+    - **Configuration Group:** `postgres.cnpg.*`
+
+    ```yaml
+    postgres:
+      mode: cnpg
+      cnpg:
+        clusterName: "classifyre-cnpg"
+        instances: 3
+        imageName: "ghcr.io/cloudnative-pg/postgresql:17"
+        storage:
+          size: 20Gi
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+---
+
+## Connection Security (SSL)
+
+You can enforce SSL mode for the connection between the NestJS API and the database using `postgres.connection.sslMode`.
+
+Available options:
+- `disable` (default for local environments/embedded mode)
+- `require` (establishes SSL but does not verify CA)
+- `verify-ca` (verifies the server CA certificate)
+- `verify-full` (verifies both the server CA certificate and host name matches)
+
+```yaml
+postgres:
+  connection:
+    sslMode: require
+```
+
+---
+
+## Credentials Management
+
+For security, we highly recommend storing database passwords in pre-created Kubernetes Secrets rather than passing them in plain-text inside your Helm values file.
+
+### Using standard Kubernetes Secrets
+Provide the name of the secret and the key hosting the password:
+
+```yaml
+postgres:
+  external:
+    existingSecret: "my-custom-secret"
+    existingSecretPasswordKey: "postgres-password"
+```
+
+### Direct connection URI override
+Alternatively, you can supply a pre-formatted `DATABASE_URL` string inside an existing secret:
+
+```yaml
+postgres:
+  external:
+    existingSecret: "my-custom-secret"
+    existingSecretUrlKey: "DATABASE_URL"
+```

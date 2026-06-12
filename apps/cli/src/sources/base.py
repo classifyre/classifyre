@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator, Generator
 from typing import TYPE_CHECKING, Any
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
+from ..outputs.rest import IngestEdge
 
 if TYPE_CHECKING:
     from ..utils.file_parser import ParsedBytes
@@ -315,3 +316,15 @@ class BaseSource(ABC):
         this and map those identifiers back to their original URLs.
         """
         return normalize_http_url(link)
+
+
+    async def collect_relationships(self) -> list[IngestEdge]:
+        """Return source-derived relationship edges for the investigation graph.
+
+        Connectors override this to emit typed edges (READS, ATTACHED_TO,
+        SENT_TO, OWNS, ACCESSED, etc.) discovered during extraction. The caller
+        (main.py) will forward these to ``RestOutputSink.emit_edges()``.
+
+        Default: no relationships (empty list).
+        """
+        return []

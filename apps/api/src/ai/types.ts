@@ -29,6 +29,8 @@ export interface AiResponse<T = string> {
   content: T;
   model: string;
   provider: AiProviderType;
+  /** Raw provider output the content was parsed from (set by completeJson). */
+  raw?: string;
 }
 
 export type AiProviderType = 'OPENAI_COMPATIBLE' | 'CLAUDE' | 'GEMINI';

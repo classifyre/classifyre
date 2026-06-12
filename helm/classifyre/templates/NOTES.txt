@@ -48,8 +48,7 @@ Database mode: {{ .Values.postgres.mode }}
   !! HPA will report <unknown> metrics and autoscaling will not function.
   !! Install: kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 {{- end }}
-{{- if and .Values.telemetry.enabled (eq .Values.telemetry.otlpEndpoint "https://otel.classifyre.com") }}
-  !! NOTE: Telemetry is enabled and reporting to https://otel.classifyre.com (the default).
-  !! For air-gapped or compliance-sensitive deployments set telemetry.enabled=false or
-  !! override telemetry.otlpEndpoint to point at your own OTel Collector.
+{{- if and .Values.telemetry.enabled (not .Values.telemetry.otlpEndpoint) }}
+  !! NOTE: Telemetry is enabled but telemetry.otlpEndpoint is empty.
+  !! Set telemetry.otlpEndpoint to the URL of your OTel Collector or disable telemetry.
 {{- end }}

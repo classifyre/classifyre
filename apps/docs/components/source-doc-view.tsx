@@ -76,18 +76,18 @@ function SectionTable({
   rows: SourceDocFieldRow[];
 }) {
   return (
-    <Card id={id} className="panel-card scroll-mt-24 rounded-[6px]">
-      <CardHeader>
+    <Card id={id} className="p-0 border-none shadow-none bg-background">
+      <CardHeader className="p-0">
         <CardTitle className="text-lg">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No fields in this section.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-[4px] border-2 border-border">
+          <div className="overflow-x-auto rounded-[4px] border-2 border-border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -141,27 +141,18 @@ function AssetsMetadataSection({ assets }: { assets: SourceAssetMetadata[] }) {
   return (
     <Card
       id="extracted-metadata"
-      className="panel-card scroll-mt-24 rounded-[6px]"
+      className="p-0 border-none shadow-none bg-background"
     >
-      <CardHeader>
+      <CardHeader className="p-0">
         <CardTitle className="text-lg">Extracted Metadata</CardTitle>
-        <CardDescription>
-          Metadata attached to each asset this source produces, composed from
-          reusable content types. Declared in{" "}
-          <code>all_input_sources.json</code> (<code>x-asset-metadata</code>)
-          and enforced by the CLI.
-        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 p-0">
         {assets.map((asset) => (
           <div key={asset.assetKind} className="space-y-2">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold">{asset.label}</h3>
-              <Badge variant="outline" className="font-mono text-[10px]">
-                {asset.assetKind}
-              </Badge>
             </div>
-            <div className="overflow-x-auto rounded-[4px] border-2 border-border">
+            <div className="overflow-x-auto rounded-[4px] border-2 border-border bg-card">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -219,80 +210,9 @@ export function SourceDocView({ source }: SourceDocViewProps) {
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
               {source.label}
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Schema-driven source documentation.
-            </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 text-xs">
-          <Badge variant="secondary" className="border border-border">
-            {source.sourceType}
-          </Badge>
-          <Badge variant="outline">{source.fieldRows.length} fields</Badge>
-          <Badge variant="outline">{source.examples.length} examples</Badge>
-        </div>
       </header>
-
-      {source.knowledgeSections.length > 0 ? (
-        <Card
-          id="common-questions"
-          className="panel-card scroll-mt-24 rounded-[6px]"
-        >
-          <CardHeader>
-            <CardTitle className="text-lg">Commonly Asked Questions</CardTitle>
-            <CardDescription>
-              Assistant knowledge mapped to this source type from{" "}
-              <code>assistant_knowledge.json</code>.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Accordion type="multiple" className="w-full">
-              {source.knowledgeSections.map((section) => (
-                <AccordionItem key={section.key} value={section.key}>
-                  <AccordionTrigger className="font-semibold">
-                    {section.title}
-                  </AccordionTrigger>
-                  <AccordionContent className="space-y-3">
-                    {section.summary ? (
-                      <p className="text-sm text-muted-foreground">
-                        {section.summary}
-                      </p>
-                    ) : null}
-                    {section.suggestions.length > 0 ? (
-                      <div>
-                        <p className="mb-1 text-xs font-mono uppercase tracking-[0.14em] text-muted-foreground">
-                          Suggestions
-                        </p>
-                        <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                          {section.suggestions.map((suggestion, index) => (
-                            <li key={`${section.key}-suggestion-${index}`}>
-                              {suggestion}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-                    {section.questions.length > 0 ? (
-                      <div>
-                        <p className="mb-1 text-xs font-mono uppercase tracking-[0.14em] text-muted-foreground">
-                          Typical Questions
-                        </p>
-                        <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                          {section.questions.map((question, index) => (
-                            <li key={`${section.key}-question-${index}`}>
-                              {question}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </CardContent>
-        </Card>
-      ) : null}
 
       <Tabs defaultValue="reference" className="space-y-4">
         <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">
@@ -300,7 +220,7 @@ export function SourceDocView({ source }: SourceDocViewProps) {
             Schema Reference
           </TabsTrigger>
           <TabsTrigger value="json" className="rounded-[3px]">
-            Raw JSON Schema
+            JSON Schema
           </TabsTrigger>
         </TabsList>
 
@@ -312,19 +232,19 @@ export function SourceDocView({ source }: SourceDocViewProps) {
           <SectionTable
             id="required-fields"
             title="Required"
-            description="Fields required for a valid configuration payload under `config.required`."
+            description="Fields required for a valid configuration."
             rows={requiredRows}
           />
           <SectionTable
             id="masked-fields"
             title="Masked"
-            description="Sensitive fields under `config.masked` (secrets/credentials)."
+            description="Sensitive fields under(secrets/credentials)."
             rows={maskedRows}
           />
           <SectionTable
             id="optional-fields"
             title="Optional"
-            description="Optional configuration fields under `config.optional`."
+            description="Optional configuration fields."
             rows={optionalRows}
           />
 
@@ -346,29 +266,34 @@ export function SourceDocView({ source }: SourceDocViewProps) {
           ) : (
             <Card
               id="source-examples"
-              className="panel-card scroll-mt-24 rounded-[6px]"
+              className="p-0 border-none shadow-none bg-background"
             >
-              <CardHeader>
+              <CardHeader className="p-0">
                 <CardTitle className="text-lg">Examples</CardTitle>
-                <CardDescription>
-                  Reference payloads generated from shared source examples JSON.
-                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 p-0">
                 {source.examples.map((example, index) => (
                   <Card
                     key={`${example.name}-${index}`}
-                    className="rounded-[6px] border-2 border-border shadow-none"
+                    className="p-0 border-none shadow-none bg-background"
                   >
-                    <CardHeader>
+                    <CardHeader className="p-0">
                       <CardTitle className="text-base">
                         {example.name}
                       </CardTitle>
-                      <CardDescription>
+                      <CardDescription className="p-0">
                         {example.description || "Example configuration."}
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="space-y-3 p-0">
+                      <div>
+                        <p className="mb-2 text-xs font-mono uppercase tracking-[0.14em] text-muted-foreground">
+                          Config Payload
+                        </p>
+                        <pre className="overflow-x-auto rounded-[4px] border-2 border-border bg-card p-3 font-mono text-xs leading-6">
+                          {prettyJson(example.config)}
+                        </pre>
+                      </div>
                       {example.schedule ? (
                         <div>
                           <p className="mb-2 text-xs font-mono uppercase tracking-[0.14em] text-muted-foreground">
@@ -379,14 +304,7 @@ export function SourceDocView({ source }: SourceDocViewProps) {
                           </pre>
                         </div>
                       ) : null}
-                      <div>
-                        <p className="mb-2 text-xs font-mono uppercase tracking-[0.14em] text-muted-foreground">
-                          Config Payload
-                        </p>
-                        <pre className="overflow-x-auto rounded-[4px] border-2 border-border bg-card p-3 font-mono text-xs leading-6">
-                          {prettyJson(example.config)}
-                        </pre>
-                      </div>
+
                     </CardContent>
                   </Card>
                 ))}

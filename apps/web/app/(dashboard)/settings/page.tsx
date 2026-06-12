@@ -32,6 +32,7 @@ import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { McpSettingsCard } from "@/components/mcp-settings-card";
 import { AiProvidersCard } from "@/components/ai-providers-card";
 import { AiAssistantSettingsCard } from "@/components/ai-assistant-settings-card";
+import { AutopilotSettingsCard } from "@/components/autopilot-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
 import { AppIcon } from "@/components/app-icon";
 import { useTranslation } from "@/hooks/use-translation";
@@ -355,6 +356,8 @@ export default function SettingsPage() {
           </Card>
 
           <AiAssistantSettingsCard />
+
+          <AutopilotSettingsCard />
         </TabsContent>
 
         <TabsContent

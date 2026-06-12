@@ -1,0 +1,77 @@
+---
+title: Settings
+description: Manage instance-wide configuration — locale, AI integration, and MCP connectivity.
+---
+
+# Settings
+
+The Settings page controls instance-wide preferences and integrations. It is
+organised into three tabs:
+
+| Tab | What it controls |
+|---|---|
+| **General** | Instance locale (language, timezone, time format), AI assistant toggle and default model |
+| **AI Providers** | API credentials for LLM providers used by the AI assistant and AI-powered custom detectors |
+| **MCP Server** | MCP endpoint configuration, bearer tokens, and client setup guides |
+
+---
+
+## General settings
+
+The General tab manages how the UI displays content and whether AI assistant
+features are enabled.
+
+### Language, timezone and time format
+
+These three settings each support two modes: **automatic** (detected from the
+user's browser) or **a fixed value** set at the instance level.
+
+| Setting | Options | Auto-detection |
+|---|---|---|
+| Language | `Automatic`, `English`, `German` | Browser language |
+| Timezone | `Automatic` or any IANA timezone | Browser timezone |
+| Time format | `Automatic`, `12-hour`, `24-hour` | Browser hour cycle preference |
+
+When **Automatic** is selected, the system uses the browser's built-in
+capabilities to detect the user's preference — no IP geolocation or server-side
+detection is involved. A user can also override the language for their session
+via a cookie without affecting the instance default.
+
+See [Instance Settings](/settings/instance-settings) for full details.
+
+### AI assistant
+
+The AI assistant toggle enables or disables AI-powered features across the
+entire instance. When enabled, you must select a **default AI provider** and
+model that the assistant uses for all AI interactions. This default provider
+is configured separately on the AI Providers tab.
+
+---
+
+## AI Providers
+
+AI Providers store the API credentials and model configuration for the LLM
+providers that power the AI assistant and custom AI detectors. Classifyre
+supports three provider types:
+
+- **OpenAI-Compatible** — any API that follows the OpenAI chat completions
+  format (OpenAI, Azure OpenAI, Together AI, OpenRouter, Groq, etc.)
+- **Claude (Anthropic)**
+- **Gemini (Google)**
+
+Each provider configuration includes the model identifier, API key, optional
+base URL (for OpenAI-compatible endpoints), context size, and vision support
+flag. A built-in test connection button validates credentials before saving.
+
+See [AI Providers](/settings/ai-providers) for configuration reference.
+
+---
+
+## MCP Server
+
+The Model Context Protocol (MCP) server exposes Classifyre's data and
+operations to AI clients like Claude, Cursor, and Codex CLI over a
+standardised HTTP API. Each client authenticates with a unique bearer token.
+
+See [MCP Server](/settings/mcp-server) for connection setup, client
+configuration guides, capability reference, and troubleshooting.

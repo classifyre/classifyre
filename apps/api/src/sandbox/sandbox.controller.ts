@@ -236,7 +236,7 @@ file is reused from storage — no re-upload, never S3.`,
   @ApiOperation({
     summary: 'Delete a sandbox run',
     description:
-      'Deletes a sandbox run record and its associated S3 file (if no other runs share it). If the run is currently in progress the CLI process is killed first.',
+      'Deletes a sandbox run record and its stored input file. If the run is currently in progress the CLI process is killed first.',
   })
   @ApiResponse({ status: 204, description: 'Run deleted' })
   deleteRun(@Param('id') id: string): Promise<void> {

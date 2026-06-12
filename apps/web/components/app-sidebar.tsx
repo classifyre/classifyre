@@ -31,6 +31,7 @@ export function AppSidebar() {
     { title: t("nav.assets"), href: "/assets", iconName: "docs" },
     { title: t("nav.sources"), href: "/sources", iconName: "binders" },
     { title: t("nav.detectors"), href: "/detectors", iconName: "single-probe" },
+    { title: t("nav.investigations"), href: "/investigations", iconName: "dna" },
   ];
 
   const operationsNavigation: { title: string; href: string; iconName: IconName }[] = [

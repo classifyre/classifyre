@@ -1,0 +1,93 @@
+---
+title: Deployment Models
+sidebarTitle: Overview
+description: Deployment models and infrastructure setup options for the Classifyre platform.
+---
+
+
+# Deployment Models
+
+Classifyre supports two primary deployment pathways depending on your environment: a development-oriented **Docker All-in-One** setup, or a production-ready **Kubernetes Helm Chart**.
+
+```mermaid
+graph TD
+    %% Docker All-in-One Path
+    Docker["Docker All-in-One"]
+    AIO["classifyre/all-in-one"]
+    PG_Embed["PostgreSQL (Embedded)"]
+    Caddy["Caddy Reverse Proxy"]
+    Web_Docker["Web UI"]
+    API_Docker["API"]
+    CLI_Docker["CLI (Child Process)"]
+
+    %% Kubernetes Path
+    K8s["Kubernetes Cluster"]
+    Helm["Helm Chart"]
+    PG_Ext["PostgreSQL (External e.g. RDS)"]
+    S3_Ext["Object Storage (S3)"]
+    Web_K8s["Web UI (Deployment)"]
+    API_K8s["API (Deployment)"]
+    CLI_K8s["CLI (K8s Job)"]
+
+    Docker --> AIO
+    AIO --> PG_Embed
+    AIO --> Caddy
+    Caddy --> Web_Docker
+    Caddy --> API_Docker
+    API_Docker -- "Spawns" --> CLI_Docker
+
+    K8s --> Helm
+    Helm --> Web_K8s
+    Helm --> API_K8s
+    Helm --> PG_Ext
+    Helm --> S3_Ext
+    API_K8s -- "Spawns ephemeral job" --> CLI_K8s
+    CLI_K8s -.->|Exits when done| API_K8s
+
+    style Docker fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style AIO fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style Web_Docker fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style API_Docker fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style CLI_Docker fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style Caddy fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+
+    style K8s fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style Helm fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style Web_K8s fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style API_K8s fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style CLI_K8s fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+
+    style PG_Embed fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+    style PG_Ext fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+    style S3_Ext fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+```
+
+---
+
+## Deployment Modes
+
+### 1. Docker All-in-One (Development / Demo)
+Designed for local evaluation, software exploration, sales demos, and offline testing.
+- **Bundled Image:** The `classifyre/all-in-one` image packages PostgreSQL, the API, the Web UI, and a Caddy reverse proxy into a single container.
+- **Process Supervisor:** Manages boot ordering and process health inside the container via `s6-overlay`.
+- **CLI Execution:** The API spawns CLI processes locally using child process spawning.
+- **Learn More:** Check out the [Docker Deployment Guide](/deployment/docker).
+
+### 2. Kubernetes (Production)
+Our recommended setup for production workloads, designed for high availability, durability, and horizontal scale.
+- **Orchestration:** Deployed using the official Classifyre Helm Chart.
+- **Scalability:** The API and Web UI run as standard, horizontally autoscalable Kubernetes deployments.
+- **Database & Storage:** You specify your own production-grade PostgreSQL instance (e.g., AWS RDS) and S3 bucket endpoint.
+- **CLI Execution:** The API spawns an isolated, ephemeral Kubernetes Job for every scan run. When the scan finishes, the job pod exits, releasing cluster resources.
+- **Learn More:** Check out the [Kubernetes Deployment Guide](/deployment/kubernetes).
+
+---
+
+## Infrastructure Configuration
+
+To configure external storage, database options, and other deployment operations, see the dedicated reference guides:
+
+- **[PostgreSQL Database](/deployment/database):** Embedded vs external database setup, connection security (SSL), and credentials management.
+- **[S3 Object Storage](/deployment/storage):** Configuration parameters, bucket setup, and provider integration guides (AWS, MinIO, Backblaze B2).
+- **[Analytics with PostHog](/deployment/analytics):** Product analytics proxy and reporting options.
+- **[Chart Publishing](/deployment/publishing):** Release process and versioning rules.
