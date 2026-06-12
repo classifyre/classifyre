@@ -200,7 +200,7 @@ export class InquiryAgentService {
       return content;
     });
 
-    const content = mergeDecisionOutputs(outputs) as InquiryDecisionOutput;
+    const content = mergeDecisionOutputs(outputs);
     await this.log.business(
       ctx.run.id,
       `Model proposed ${content.decisions.length} inquiry decision(s): ${content.decisions.map((d) => d.action).join(', ')}.`,

@@ -277,7 +277,6 @@ function toDetectorType(value: string): DetectorType | null {
   return valid.includes(upper as DetectorType) ? (upper as DetectorType) : null;
 }
 
-
 function extractDetectorTypesFromRun(run: {
   detectors: unknown;
   findings: unknown;

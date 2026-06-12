@@ -126,7 +126,12 @@ export class AgentSearchService {
    * not blindly recreate.
    */
   async listRecentlyArchivedInquiries(): Promise<
-    Array<{ id: string; title: string; description: string | null; archivedAt: Date }>
+    Array<{
+      id: string;
+      title: string;
+      description: string | null;
+      archivedAt: Date;
+    }>
   > {
     const rows = await this.prisma.inquiry.findMany({
       where: { status: 'ARCHIVED' },
@@ -144,7 +149,12 @@ export class AgentSearchService {
 
   /** Recently closed/archived cases with their conclusions — solved topics. */
   async listRecentlyClosedCases(): Promise<
-    Array<{ id: string; title: string; status: string; conclusion: string | null }>
+    Array<{
+      id: string;
+      title: string;
+      status: string;
+      conclusion: string | null;
+    }>
   > {
     const rows = await this.prisma.case.findMany({
       where: { status: { in: ['CLOSED', 'ARCHIVED'] } },
@@ -223,7 +233,10 @@ export class AgentSearchService {
       endpointIds.length > 0
         ? await this.prisma.edge.findMany({
             where: {
-              OR: [{ fromId: { in: endpointIds } }, { toId: { in: endpointIds } }],
+              OR: [
+                { fromId: { in: endpointIds } },
+                { toId: { in: endpointIds } },
+              ],
             },
             orderBy: { createdAt: 'asc' },
             take: 150,

@@ -91,9 +91,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         typeof data?.runnerId === 'string' ? data.runnerId : null;
       const manual = data?.manual === true;
       const only =
-        data?.agentKind && data.agentKind in AgentKind
-          ? (data.agentKind as AgentKind)
-          : null;
+        data?.agentKind && data.agentKind in AgentKind ? data.agentKind : null;
       if (data?.dream === true || only === AgentKind.DREAM) {
         await this.runDreamCycle({
           cycleKey:

@@ -61,7 +61,7 @@ export class OpenAiProvider implements IAiProvider {
             type: 'json_schema',
             json_schema: {
               name: 'output',
-              schema: options.jsonSchema as Record<string, unknown>,
+              schema: options.jsonSchema,
             },
           });
         } catch (err) {
