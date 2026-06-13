@@ -48,6 +48,7 @@ import {
   InquiryMatchesPanel,
   type InquiryMatchesStats,
 } from "@/components/inquiry-matches-panel";
+import { useTranslation } from "@/hooks/use-translation";
 
 export default function InquiryDetailPage() {
   return (
@@ -61,6 +62,7 @@ function InquiryDetailInner() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const inquiryId = params.id as string;
   const preferredCaseId = searchParams.get("caseId");
 
@@ -142,11 +144,11 @@ function InquiryDetailInner() {
     setBusy(true);
     try {
       const res = await api.inquiries.inquiriesControllerRematch({ id: inquiryId });
-      toast.success(`Re-scanned — ${res.landed} new match${res.landed === 1 ? "" : "es"}`);
+      toast.success(t("investigations.inquiryDetail.rescanned", { count: String(res.landed) }));
       await load();
     } catch (err) {
       console.error(err);
-      toast.error("Re-scan failed");
+      toast.error(t("investigations.inquiryDetail.rescanFailed"));
     } finally {
       setBusy(false);
     }
@@ -160,13 +162,13 @@ function InquiryDetailInner() {
         id: targetCaseId,
         pullFromInquiryDto: { inquiryId, findingIds: pullableSelected },
       });
-      toast.success(`Added ${res.pulled} finding${res.pulled === 1 ? "" : "s"} to the case`);
+      toast.success(t("investigations.inquiryDetail.addedToCase", { count: String(res.pulled) }));
       const c = await api.cases.casesControllerFindOne({ id: targetCaseId });
       setTargetCase(c);
       setSelected(new Set());
     } catch (err) {
       console.error(err);
-      toast.error("Failed to add to case");
+      toast.error(t("investigations.inquiryDetail.failedToAddToCase"));
     } finally {
       setPulling(false);
     }
@@ -177,7 +179,7 @@ function InquiryDetailInner() {
       id: inquiryId,
       updateInquiryDto: { aiMode: mode as never },
     });
-    toast.success("AI mode updated");
+    toast.success(t("investigations.inquiryDetail.aiModeUpdated"));
     await load();
   };
 
@@ -186,20 +188,20 @@ function InquiryDetailInner() {
       id: inquiryId,
       updateInquiryDto: { status: "ARCHIVED" as never },
     });
-    toast.success("Inquiry archived");
+    toast.success(t("investigations.inquiryDetail.archived"));
     await load();
   };
 
   const remove = async () => {
     await api.inquiries.inquiriesControllerRemove({ id: inquiryId });
-    toast.success("Inquiry deleted");
+    toast.success(t("investigations.inquiryDetail.deleted"));
     router.push("/investigations?tab=inquiries");
   };
 
   if (!inquiry) {
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading inquiry…
+        <Loader2 className="h-4 w-4 animate-spin" /> {t("investigations.inquiryDetail.loading")}
       </div>
     );
   }
@@ -223,7 +225,7 @@ function InquiryDetailInner() {
           className="-ml-2 mb-2"
           onClick={() => router.push("/investigations?tab=inquiries")}
         >
-          <ArrowLeft className="h-4 w-4" /> Inquiries
+          <ArrowLeft className="h-4 w-4" /> {t("investigations.page.tabInquiries")}
         </Button>
         <div className="flex flex-wrap items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-[4px] border-2 border-border bg-card shadow-[2px_2px_0_var(--color-border)]">
@@ -249,34 +251,33 @@ function InquiryDetailInner() {
                 size="sm"
                 onClick={() => router.push(`/investigations/inquiries/${inquiryId}/edit`)}
               >
-                <Pencil className="h-3.5 w-3.5" /> Edit query
+                <Pencil className="h-3.5 w-3.5" /> {t("investigations.inquiryDetail.editQuery")}
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={rescan} disabled={busy}>
-              <RefreshCw className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} /> Re-scan
+              <RefreshCw className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} /> {t("investigations.inquiryDetail.rescan")}
             </Button>
             {!isArchived && (
               <Button variant="outline" size="sm" onClick={archive}>
-                <Archive className="h-3.5 w-3.5" /> Archive
+                <Archive className="h-3.5 w-3.5" /> {t("investigations.inquiryDetail.archive")}
               </Button>
             )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="ghost" size="sm" className="text-destructive">
-                  <Trash2 className="h-3.5 w-3.5" /> Delete
+                  <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete this inquiry?</AlertDialogTitle>
+                  <AlertDialogTitle>{t("investigations.inquiryDetail.deleteTitle")}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    The saved query and its match history are removed. Evidence already pulled
-                    into cases is kept.
+                    {t("investigations.inquiryDetail.deleteDesc")}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={remove}>Delete</AlertDialogAction>
+                  <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                  <AlertDialogAction onClick={remove}>{t("common.delete")}</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -292,7 +293,7 @@ function InquiryDetailInner() {
         <CardContent className="space-y-3 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
-              Cases driven by this inquiry ({inquiry.cases.length})
+              {t("investigations.inquiryDetail.casesDriven")} ({inquiry.cases.length})
             </p>
             {!isArchived && (
               <Button
@@ -300,14 +301,13 @@ function InquiryDetailInner() {
                 variant={inquiry.cases.length === 0 ? "default" : "outline"}
                 onClick={() => router.push(`/investigations/cases/new?inquiryId=${inquiryId}`)}
               >
-                <FolderPlus className="h-3.5 w-3.5" /> Open new case
+                <FolderPlus className="h-3.5 w-3.5" /> {t("investigations.inquiryDetail.openNewCase")}
               </Button>
             )}
           </div>
           {inquiry.cases.length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              Matches are computed live — they are not evidence yet. Open a case to start an
-              investigation and keep a snapshot of what you select.
+              {t("investigations.inquiryDetail.matchesLiveDesc")}
             </p>
           ) : (
             <div className="space-y-1.5">
@@ -335,17 +335,17 @@ function InquiryDetailInner() {
       <Card>
         <CardContent className="space-y-2 p-4">
           <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
-            This query lands findings from
+            {t("investigations.inquiryDetail.thisQueryLands")}
           </p>
           <div className="flex flex-wrap items-center gap-1.5 text-sm">
             <Badge variant="outline" className="font-medium">
               {inquiry.matchAllSources
-                ? "all sources"
+                ? t("investigations.inquiryDetail.allSources")
                 : `${inquiry.sourceIds.length} source${inquiry.sourceIds.length === 1 ? "" : "s"}`}
             </Badge>
             <span className="text-muted-foreground">·</span>
             {typeTokens.length === 0 ? (
-              <span className="text-muted-foreground">any finding type</span>
+              <span className="text-muted-foreground">{t("investigations.inquiryDetail.anyFindingType")}</span>
             ) : (
               typeTokens.map((t) => (
                 <span
@@ -364,7 +364,7 @@ function InquiryDetailInner() {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-baseline gap-2">
-            <h2 className="font-serif text-lg font-black uppercase tracking-[0.04em]">Matches</h2>
+            <h2 className="font-serif text-lg font-black uppercase tracking-[0.04em]">{t("investigations.inquiryDetail.matchesTab")}</h2>
             <span className="text-muted-foreground text-sm tabular-nums">{matchStats.total}</span>
             {newCount > 0 && (
               <Badge
@@ -383,7 +383,7 @@ function InquiryDetailInner() {
                   onValueChange={(v) => setTargetCaseId(v || null)}
                 >
                   <SelectTrigger className="h-8 w-56 text-xs">
-                    <SelectValue placeholder="Target case…" />
+                    <SelectValue placeholder={t("investigations.inquiryDetail.targetCase")} />
                   </SelectTrigger>
                   <SelectContent>
                     {inquiry.cases.map((c) => (
@@ -404,16 +404,14 @@ function InquiryDetailInner() {
                 ) : (
                   <DownloadCloud className="h-3.5 w-3.5" />
                 )}
-                Add {pullableSelected.length > 0 ? `${pullableSelected.length} ` : ""}to{" "}
-                {inquiry.cases.length === 1 ? "case" : "selected case"}
+                {t("investigations.inquiryDetail.addToCase")}
               </Button>
             </div>
           )}
         </div>
         {inquiry.cases.length > 1 && targetCase && (
           <p className="text-muted-foreground text-xs">
-            Rows marked “in case” are already evidence in{" "}
-            <span className="font-medium">{targetCase.title}</span>.
+            {t("investigations.inquiryDetail.alreadyInCase", { title: targetCase.title })}
           </p>
         )}
 
