@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-cli"
-version = "0.4.17"
+version = "0.4.18"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -100,6 +100,9 @@ custom = [
     "scikit-learn>=1.7.2",
     "gliner2>=1.3.1",
     "sentence-transformers>=5.5.0",
+    # Direct declaration so the [tool.uv.sources] cpu-index pin applies (timm
+    # pulls torchvision transitively; see the ocr group note).
+    "torchvision>=0.27.0",
 ]
 regex = [
     "google-re2>=1.1",
@@ -135,6 +138,12 @@ ocr = [
     { include-group = "file-processing" },
     "docling>=2.94.0",
     "rapidocr-onnxruntime>=1.4.0",
+    # torchvision is a transitive dep of docling-ibm-models, but [tool.uv.sources]
+    # index pins only apply to dependencies declared directly in this project.
+    # Without this entry uv resolves the CUDA-built PyPI wheel, which fails to
+    # import against torch+cpu (surfaces as transformers "Could not import
+    # module 'AutoProcessor'").
+    "torchvision>=0.27.0",
 ]
 postgresql = [
     "psycopg2-binary>=2.9.12,<3.0.0",
