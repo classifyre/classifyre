@@ -1296,6 +1296,10 @@
               "type": "boolean",
               "description": "Whether a transcript/caption track was fetched"
             },
+            "transcript_source": {
+              "type": "string",
+              "description": "Origin of the transcript text: 'captions' (caption track) or 'whisper' (audio transcribed with faster-whisper)"
+            },
             "transcript_language": {
               "type": "string",
               "description": "Language code of the fetched transcript"
@@ -1414,6 +1418,11 @@
           "default": false,
           "description": "When true, enable OCR/text extraction for supported binary documents and images before routing text-capable detectors."
         },
+        "enable_transcription": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, transcribe audio and video files to text (via faster-whisper) before routing text-capable detectors. Slower and requires the transcription dependency."
+        },
         "order_by_column": {
           "type": "string",
           "description": "Column to use for LATEST sampling mode in tabular sources (usually created_at/updated_at). Auto-detected when not set."
@@ -1442,6 +1451,7 @@
       "default": {
         "strategy": "RANDOM",
         "enable_ocr": false,
+        "enable_transcription": false,
         "fallback_to_random": true,
         "include_column_names": true,
         "rows_per_page": 100

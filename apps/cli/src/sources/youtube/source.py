@@ -6,11 +6,15 @@ Pipeline:
         -> video ids
         -> youtube-transcript-api (fetch captions)
             -> transcript found -> asset + metadata, transcript is detector content
-            -> no transcript     -> asset + metadata only (no detector content)
+            -> no transcript:
+                -> sampling.enable_transcription set -> download audio (yt-dlp) and
+                   transcribe with faster-whisper -> transcript is detector content
+                -> otherwise -> asset + metadata only (no detector content)
 
 Both libraries scrape public data and need no API key. ``yt-dlp`` and
 ``youtube-transcript-api`` are optional dependencies (``[youtube]`` group) and
-are imported lazily so the base CLI loads without them.
+are imported lazily so the base CLI loads without them. The Whisper fallback
+additionally requires the ``[transcription]`` group (faster-whisper).
 """
 
 from __future__ import annotations
@@ -59,6 +63,9 @@ class _TranscriptResult:
     language: str | None
     is_generated: bool | None
     available_languages: list[str] = field(default_factory=list)
+    # Where the text came from: "captions" (youtube-transcript-api) or
+    # "whisper" (downloaded audio transcribed via faster-whisper).
+    source: str = "captions"
 
 
 class YouTubeSource(BaseSource):
@@ -80,9 +87,7 @@ class YouTubeSource(BaseSource):
         self.channels: list[str] = list(required.channels or [])
         self.video_urls: list[str] = list(required.video_urls or [])
         if not self.channels and not self.video_urls:
-            raise ValueError(
-                "YouTube source requires at least one of 'channels' or 'video_urls'."
-            )
+            raise ValueError("YouTube source requires at least one of 'channels' or 'video_urls'.")
 
         # Transcript text keyed by hash / external_url / video_id so the detector
         # pipeline (which probes both external_url and hash) resolves content.
@@ -279,9 +284,7 @@ class YouTubeSource(BaseSource):
             raise ImportError(_INSTALL_HINT) from exc
 
         proxy = self._proxy_url()
-        proxy_config = (
-            GenericProxyConfig(http_url=proxy, https_url=proxy) if proxy else None
-        )
+        proxy_config = GenericProxyConfig(http_url=proxy, https_url=proxy) if proxy else None
         return YouTubeTranscriptApi(proxy_config=proxy_config)
 
     def _fetch_transcript(self, video_id: str) -> _TranscriptResult | None:
@@ -289,10 +292,9 @@ class YouTubeSource(BaseSource):
 
         Handles the documented failure cases (captions disabled, no captions,
         age-restricted/private, rate limiting) by logging and returning None so
-        the asset is still emitted without detector content.
-
-        TODO(future): when audio processing exists, fall back to Whisper
-        transcription here for videos that have no captions.
+        the asset is still emitted without detector content. When no captions
+        exist, ``_build_video_asset`` falls back to ``_transcribe_audio`` if the
+        source has ``sampling.enable_transcription`` set.
         """
         try:
             from youtube_transcript_api import (
@@ -338,6 +340,64 @@ class YouTubeSource(BaseSource):
             logger.warning("Transcript fetch failed for video %s: %s", video_id, exc)
             return None
 
+    def _download_audio(self, video_id: str, dest_dir: Path) -> Path | None:
+        """Download the best audio-only stream for a video into ``dest_dir``.
+
+        Returns the path to the downloaded file, or None on failure. No yt-dlp
+        post-processing is used, so the raw audio container (.m4a/.webm/…) is
+        written directly — faster-whisper decodes it via bundled PyAV, so no
+        system ffmpeg is required.
+        """
+        opts = self._base_ydl_opts()
+        opts["skip_download"] = False
+        opts["format"] = "bestaudio/best"
+        opts["noplaylist"] = True
+        opts["outtmpl"] = str(dest_dir / "%(id)s.%(ext)s")
+        url = _WATCH_URL.format(video_id=video_id)
+        try:
+            with self._ydl_class()(opts) as ydl:
+                ydl.extract_info(url, download=True)
+        except Exception as exc:
+            logger.warning("Failed to download audio for video %s: %s", video_id, exc)
+            return None
+        files = [p for p in dest_dir.iterdir() if p.is_file()]
+        if not files:
+            logger.warning("Audio download produced no file for video %s", video_id)
+            return None
+        # bestaudio yields a single file; pick the largest if a sidecar slipped in.
+        return max(files, key=lambda p: p.stat().st_size)
+
+    def _transcribe_audio(self, video_id: str) -> _TranscriptResult | None:
+        """Download a video's audio and transcribe it with faster-whisper.
+
+        Used as a fallback when captions are unavailable. Returns None when the
+        download or transcription fails so the asset is still emitted.
+        """
+        from ...utils.transcription import transcribe_media
+
+        with tempfile.TemporaryDirectory(prefix="yt_audio_") as tmp:
+            path = self._download_audio(video_id, Path(tmp))
+            if path is None:
+                return None
+            text, error = transcribe_media(
+                path.read_bytes(),
+                mime_type="",
+                file_name=path.name,
+            )
+        if error:
+            logger.warning("Whisper transcription failed for video %s: %s", video_id, error)
+            return None
+        if not text:
+            return None
+        logger.info("Transcribed video %s via faster-whisper (%d chars)", video_id, len(text))
+        return _TranscriptResult(
+            text=text,
+            language=None,
+            is_generated=True,
+            available_languages=[],
+            source="whisper",
+        )
+
     # ------------------------------------------------------------------
     # Asset construction
     # ------------------------------------------------------------------
@@ -352,9 +412,7 @@ class YouTubeSource(BaseSource):
             return int(value)
         return None
 
-    def _build_video_asset(
-        self, video_id: str, info: dict[str, Any]
-    ) -> SingleAssetScanResults:
+    def _build_video_asset(self, video_id: str, info: dict[str, Any]) -> SingleAssetScanResults:
         title = str(info.get("title") or "").strip() or f"YouTube video {video_id}"
         external_url = str(info.get("webpage_url") or _WATCH_URL.format(video_id=video_id))
         asset_hash = self.generate_hash_id(video_id)
@@ -371,6 +429,10 @@ class YouTubeSource(BaseSource):
         transcript: _TranscriptResult | None = None
         if not self._transcript_options().skip_transcript:
             transcript = self._fetch_transcript(video_id)
+            # No captions: fall back to downloading the audio and transcribing it
+            # with faster-whisper when the source has transcription enabled.
+            if transcript is None and self.transcription_enabled():
+                transcript = self._transcribe_audio(video_id)
         if transcript is not None:
             self._transcripts[asset_hash] = transcript.text
             self._transcripts[external_url] = transcript.text
@@ -400,6 +462,7 @@ class YouTubeSource(BaseSource):
 
         asset_metadata["transcript_available"] = transcript is not None
         if transcript is not None:
+            asset_metadata["transcript_source"] = transcript.source
             if transcript.language:
                 asset_metadata["transcript_language"] = transcript.language
             if transcript.is_generated is not None:
@@ -498,9 +561,7 @@ class YouTubeSource(BaseSource):
 
     def generate_hash_id(self, asset_id: str) -> str:
         type_value = (
-            self.config.type.value
-            if hasattr(self.config.type, "value")
-            else str(self.config.type)
+            self.config.type.value if hasattr(self.config.type, "value") else str(self.config.type)
         )
         return hash_id(type_value, asset_id)
 

@@ -163,6 +163,53 @@ async def test_extract_without_transcript_skips_phase2(monkeypatch: pytest.Monke
 
 
 @pytest.mark.asyncio
+async def test_whisper_fallback_when_no_captions(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = _source({"sampling": {"strategy": "LATEST", "enable_transcription": True}})
+    monkeypatch.setattr(source, "_list_channel_video_ids", lambda _c, _l: ["vid1"])
+    monkeypatch.setattr(source, "_extract_video_info", lambda _v: _video_info("vid1"))
+    monkeypatch.setattr(source, "_fetch_transcript", lambda _v: None)
+    monkeypatch.setattr(
+        source,
+        "_transcribe_audio",
+        lambda _v: _TranscriptResult(
+            text="spoken transcript from audio",
+            language=None,
+            is_generated=True,
+            available_languages=[],
+            source="whisper",
+        ),
+    )
+
+    assets = [a for batch in [b async for b in source.extract_raw()] for a in batch]
+    assert len(assets) == 1
+    asset = assets[0]
+    assert asset.metadata["transcript_available"] is True
+    assert asset.metadata["transcript_source"] == "whisper"
+
+    content = await source.fetch_content(asset.hash)
+    assert content is not None
+    assert "spoken transcript" in content[0]
+
+
+@pytest.mark.asyncio
+async def test_no_whisper_fallback_when_transcription_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _source()  # enable_transcription not set
+    monkeypatch.setattr(source, "_list_channel_video_ids", lambda _c, _l: ["vid1"])
+    monkeypatch.setattr(source, "_extract_video_info", lambda _v: _video_info("vid1"))
+    monkeypatch.setattr(source, "_fetch_transcript", lambda _v: None)
+
+    def fail_if_called(_v: str) -> Any:
+        raise AssertionError("Whisper fallback must not run when transcription is disabled")
+
+    monkeypatch.setattr(source, "_transcribe_audio", fail_if_called)
+
+    assets = [a for batch in [b async for b in source.extract_raw()] for a in batch]
+    assert assets[0].metadata["transcript_available"] is False
+
+
+@pytest.mark.asyncio
 async def test_explicit_video_urls(monkeypatch: pytest.MonkeyPatch) -> None:
     source = _source(
         {
