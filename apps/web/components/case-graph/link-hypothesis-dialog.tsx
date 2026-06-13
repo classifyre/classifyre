@@ -28,17 +28,12 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select";
 import { Loader2 } from "lucide-react";
+import { useTranslation } from "@/hooks/use-translation";
 
 export type LinkTarget = {
   targetType: LinkThreadSupportDtoTargetTypeEnum;
   targetId: string;
 };
-
-const STANCE_OPTIONS: Array<{ value: LinkThreadSupportDtoStanceEnum; label: string }> = [
-  { value: LinkThreadSupportDtoStanceEnum.Supports, label: "Supports — evidence for it" },
-  { value: LinkThreadSupportDtoStanceEnum.Contradicts, label: "Contradicts — evidence against it" },
-  { value: LinkThreadSupportDtoStanceEnum.Neutral, label: "Neutral — related context" },
-];
 
 export interface LinkHypothesisDialogProps {
   open: boolean;
@@ -63,12 +58,19 @@ export function LinkHypothesisDialog({
   resolveTarget,
   onLinked,
 }: LinkHypothesisDialogProps) {
+  const { t } = useTranslation();
   const [threadId, setThreadId] = React.useState("");
   const [stance, setStance] = React.useState<LinkThreadSupportDtoStanceEnum>(
     LinkThreadSupportDtoStanceEnum.Supports,
   );
   const [note, setNote] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+
+  const STANCE_OPTIONS: Array<{ value: LinkThreadSupportDtoStanceEnum; label: string }> = [
+    { value: LinkThreadSupportDtoStanceEnum.Supports, label: t("caseGraph.linkHypothesisDialog.supportsLabel") },
+    { value: LinkThreadSupportDtoStanceEnum.Contradicts, label: t("caseGraph.linkHypothesisDialog.contradictsLabel") },
+    { value: LinkThreadSupportDtoStanceEnum.Neutral, label: t("caseGraph.linkHypothesisDialog.neutralLabel") },
+  ];
 
   React.useEffect(() => {
     if (open) {
@@ -92,12 +94,12 @@ export function LinkHypothesisDialog({
           note: note.trim() || undefined,
         },
       });
-      toast.success("Linked to hypothesis");
+      toast.success(t("caseGraph.linkHypothesisDialog.linked"));
       onOpenChange(false);
       onLinked();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to link to hypothesis");
+      toast.error(t("caseGraph.linkHypothesisDialog.failedToLink"));
     } finally {
       setSaving(false);
     }
@@ -107,18 +109,18 @@ export function LinkHypothesisDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Link to hypothesis</DialogTitle>
+          <DialogTitle>{t("caseGraph.linkHypothesisDialog.title")}</DialogTitle>
           <DialogDescription>
-            {node ? `Record what “${node.label}” means for a hypothesis.` : ""}
-            {node && node.type !== "finding" ? " It will be added as evidence if it isn't yet." : ""}
+            {node ? t("caseGraph.linkHypothesisDialog.recordDesc", { label: node.label }) : ""}
+            {node && node.type !== "finding" ? ` ${t("caseGraph.linkHypothesisDialog.addedIfNeeded")}` : ""}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label>Hypothesis</Label>
+            <Label>{t("caseGraph.linkHypothesisDialog.hypothesisLabel")}</Label>
             <Select value={threadId} onValueChange={setThreadId}>
               <SelectTrigger>
-                <SelectValue placeholder="Choose a hypothesis…" />
+                <SelectValue placeholder={t("caseGraph.linkHypothesisDialog.hypothesisPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
                 {hypotheses.map((h) => (
@@ -136,7 +138,7 @@ export function LinkHypothesisDialog({
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Stance</Label>
+            <Label>{t("caseGraph.linkHypothesisDialog.stanceLabel")}</Label>
             <Select
               value={stance}
               onValueChange={(v) => setStance(v as LinkThreadSupportDtoStanceEnum)}
@@ -154,22 +156,22 @@ export function LinkHypothesisDialog({
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Note (optional)</Label>
+            <Label>{t("caseGraph.linkHypothesisDialog.noteLabel")}</Label>
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Why does this evidence matter for the hypothesis?"
+              placeholder={t("caseGraph.linkHypothesisDialog.notePlaceholder")}
               rows={3}
             />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={link} disabled={!node || !threadId || saving}>
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Link
+            {t("caseGraph.linkHypothesisDialog.link")}
           </Button>
         </DialogFooter>
       </DialogContent>

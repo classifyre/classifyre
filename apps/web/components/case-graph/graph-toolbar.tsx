@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import type { GraphMode, PathResult } from "./graph-types";
+import { useTranslation } from "@/hooks/use-translation";
 
 function ModeButton({
   active,
@@ -104,6 +105,7 @@ export function GraphToolbar({
   findingsVisible,
   onToggleFindings,
 }: GraphToolbarProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-wrap items-center gap-2 border-b-2 border-border bg-card px-3 py-2">
       <div className="flex items-center gap-1">
@@ -111,8 +113,8 @@ export function GraphToolbar({
           active={mode.kind === "select"}
           onClick={() => onModeChange({ kind: "select" })}
           icon={<MousePointer2 className="h-3 w-3" />}
-          label="Select"
-          title="Select and drag nodes"
+          label={t("caseGraph.toolbar.select")}
+          title={t("caseGraph.toolbar.selectTitle")}
         />
         <ModeButton
           active={mode.kind === "connect"}
@@ -120,8 +122,8 @@ export function GraphToolbar({
             onModeChange(mode.kind === "connect" ? { kind: "select" } : { kind: "connect", sourceKey: null })
           }
           icon={<GitBranch className="h-3 w-3" />}
-          label="Connect"
-          title="Click a source node, then a target node, to create an edge"
+          label={t("caseGraph.toolbar.connect")}
+          title={t("caseGraph.toolbar.connectTitle")}
         />
         <ModeButton
           active={mode.kind === "path"}
@@ -129,8 +131,8 @@ export function GraphToolbar({
             onModeChange(mode.kind === "path" ? { kind: "select" } : { kind: "path", firstKey: null })
           }
           icon={<Route className="h-3 w-3" />}
-          label="Path"
-          title="Click two nodes to highlight the path between them (or shift-click in select mode)"
+          label={t("caseGraph.toolbar.path")}
+          title={t("caseGraph.toolbar.pathTitle")}
         />
       </div>
 
@@ -139,14 +141,14 @@ export function GraphToolbar({
       <ActionButton
         onClick={onAddEvidence}
         icon={<Plus className="h-3 w-3" />}
-        label="Evidence"
-        title="Add evidence to this case"
+        label={t("caseGraph.toolbar.evidenceLabel")}
+        title={t("caseGraph.toolbar.evidenceTitle")}
       />
       <ActionButton
         onClick={onNewHypothesis}
         icon={<Lightbulb className="h-3 w-3" />}
-        label="Hypothesis"
-        title="Create a new hypothesis"
+        label={t("caseGraph.toolbar.hypothesisLabel")}
+        title={t("caseGraph.toolbar.hypothesisTitle")}
       />
 
       <div className="h-5 w-0.5 bg-border" />
@@ -157,7 +159,7 @@ export function GraphToolbar({
         <input
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="search graph…"
+          placeholder={t("caseGraph.toolbar.searchPlaceholder")}
           className="h-[26px] w-[180px] border-2 border-border bg-card pr-6 font-mono text-[11px] outline-none placeholder:text-muted-foreground focus:border-foreground"
           style={{ paddingLeft: 24 }}
         />
@@ -165,7 +167,7 @@ export function GraphToolbar({
           <button
             onClick={() => onSearchChange("")}
             className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            aria-label="Clear search"
+            aria-label={t("caseGraph.toolbar.clearSearch")}
           >
             <X className="h-3 w-3" />
           </button>
@@ -176,8 +178,8 @@ export function GraphToolbar({
         active={findingsVisible}
         onClick={onToggleFindings}
         icon={findingsVisible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-        label="Findings"
-        title={findingsVisible ? "Collapse all findings into their assets" : "Show findings as separate nodes"}
+        label={t("caseGraph.toolbar.findingsLabel")}
+        title={findingsVisible ? t("caseGraph.toolbar.collapseFindings") : t("caseGraph.toolbar.expandFindings")}
       />
 
       {/* Mode hint / path chip */}
@@ -192,20 +194,20 @@ export function GraphToolbar({
           </button>
         ) : mode.kind === "connect" ? (
           <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-            {mode.sourceKey ? "now click the target node" : "click the source node"} · esc to cancel
+            {mode.sourceKey ? t("caseGraph.toolbar.connectingTarget") : t("caseGraph.toolbar.connectingSource")} · {t("caseGraph.toolbar.connectingEsc")}
           </span>
         ) : mode.kind === "path" ? (
           <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-            {mode.firstKey ? "click the destination node" : "click the start node"} · esc to cancel
+            {mode.firstKey ? t("caseGraph.toolbar.pathTarget") : t("caseGraph.toolbar.pathSource")} · {t("caseGraph.toolbar.connectingEsc")}
           </span>
         ) : null}
       </div>
 
       <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-        {nodeCount} nodes · {edgeCount} edges
+        {t("caseGraph.toolbar.stats", { nodeCount: String(nodeCount), edgeCount: String(edgeCount) })}
       </span>
-      <ActionButton onClick={onZoomToFit} icon={<Maximize2 className="h-3 w-3" />} title="Zoom to fit" />
-      <ActionButton onClick={onReload} icon={<RotateCcw className="h-3 w-3" />} title="Reload graph" />
+      <ActionButton onClick={onZoomToFit} icon={<Maximize2 className="h-3 w-3" />} title={t("caseGraph.toolbar.zoomFit")} />
+      <ActionButton onClick={onReload} icon={<RotateCcw className="h-3 w-3" />} title={t("caseGraph.toolbar.reloadGraph")} />
     </div>
   );
 }
