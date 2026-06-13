@@ -391,6 +391,8 @@
       "strategy": "Strategie",
       "enableOcr": "OCR aktivieren",
       "enableOcrDesc": "Text aus Bildern und gescannten PDFs per optischer Zeichenerkennung extrahieren (langsamer, erfordert OCR-Abhängigkeiten).",
+      "enableTranscription": "Transkription aktivieren",
+      "enableTranscriptionDesc": "Audio- und Videodateien vor der Erkennung in Text transkribieren (langsamer, erfordert Transkriptions-Abhängigkeiten).",
       "advanced": "Erweitert",
       "orderByColumn": "Sortieren nach Spalte",
       "orderByPlaceholder": "z.B. updated_at",

@@ -116,6 +116,10 @@ class SamplingConfig(BaseModel):
         False,
         description='When true, enable OCR/text extraction for supported binary documents and images before routing text-capable detectors.',
     )
+    enable_transcription: bool | None = Field(
+        False,
+        description='When true, transcribe audio and video files to text (via faster-whisper) before routing text-capable detectors. Slower and requires the transcription dependency.',
+    )
     order_by_column: str | None = Field(
         None,
         description='Column to use for LATEST sampling mode in tabular sources (usually created_at/updated_at). Auto-detected when not set.',
