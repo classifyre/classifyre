@@ -40,6 +40,11 @@ const TABULAR_TYPES = new Set([
   'SQLITE',
 ]);
 
-export function getSourceCategory(type: string): 'TABULAR' | 'UNSTRUCTURED' {
+const SOCIAL_MEDIA_TYPES = new Set(['YOUTUBE']);
+
+export function getSourceCategory(
+  type: string,
+): 'TABULAR' | 'UNSTRUCTURED' | 'SOCIAL_MEDIA' {
+  if (SOCIAL_MEDIA_TYPES.has(type)) return 'SOCIAL_MEDIA';
   return TABULAR_TYPES.has(type) ? 'TABULAR' : 'UNSTRUCTURED';
 }

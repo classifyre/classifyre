@@ -1,5 +1,55 @@
 {
   "sources": {
+    "YOUTUBE": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Name the source after the channels or campaign you are scanning.",
+          "suggestions": [
+            "Reference the brand or channel set (example: Brand channels).",
+            "Distinguish multiple YouTube sources by audience or region."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Provide at least one of channels (to list videos) or video_urls (explicit videos).",
+          "suggestions": [
+            "Use channel handles or URLs like @OpenAI or https://www.youtube.com/@OpenAI.",
+            "Use video_urls for a fixed set of watch URLs to audit.",
+            "You can combine channels and explicit video_urls in one source."
+          ],
+          "questions": [
+            "Which channels or specific videos do you want to scan?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "No credentials are needed for public videos; optionally supply cookies.",
+          "suggestions": [
+            "Leave masked empty for public content.",
+            "Provide Netscape-format cookies only to reach age-restricted or members-only videos."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.transcript for caption languages and optional.connection for proxy/timeout tuning.",
+          "suggestions": [
+            "Set optional.transcript.languages (example: [\"en\"]) to prefer specific caption languages.",
+            "Enable optional.transcript.skip_transcript for metadata-only scans (no detector content).",
+            "Set optional.connection.proxy_url to mitigate rate limiting at scale."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many channel videos are processed per run.",
+          "suggestions": [
+            "Use LATEST with rows_per_page to scan the newest N videos per channel.",
+            "Use RANDOM for broad spot checks across a channel.",
+            "Use ALL only when a full channel backfill is required."
+          ]
+        }
+      }
+    },
     "EMAIL": {
       "sections": {
         "name": {
