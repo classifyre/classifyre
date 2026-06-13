@@ -44,15 +44,17 @@ class AssetType(StrEnum):
     SQLITE = 'SQLITE'
     NOTION = 'NOTION'
     EMAIL = 'EMAIL'
+    YOUTUBE = 'YOUTUBE'
 
 
 class SourceCategory(StrEnum):
     """
-    Category of the source: TABULAR for structured databases (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake), UNSTRUCTURED for text/web/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk)
+    Category of the source: TABULAR for structured databases (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake), UNSTRUCTURED for text/web/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk), SOCIAL_MEDIA for social/video platforms (YouTube)
     """
 
     TABULAR = 'TABULAR'
     UNSTRUCTURED = 'UNSTRUCTURED'
+    SOCIAL_MEDIA = 'SOCIAL_MEDIA'
 
 
 class DetectorType(StrEnum):
@@ -316,6 +318,115 @@ class EmailOptional(BaseModel):
     )
     connection: EmailOptionalConnection | None = None
     scope: EmailOptionalScope | None = None
+
+
+class Type(StrEnum):
+    """
+    Type of the asset or source
+    """
+
+    WORDPRESS = 'WORDPRESS'
+    SLACK = 'SLACK'
+    S3_COMPATIBLE_STORAGE = 'S3_COMPATIBLE_STORAGE'
+    AZURE_BLOB_STORAGE = 'AZURE_BLOB_STORAGE'
+    GOOGLE_CLOUD_STORAGE = 'GOOGLE_CLOUD_STORAGE'
+    POSTGRESQL = 'POSTGRESQL'
+    MYSQL = 'MYSQL'
+    MSSQL = 'MSSQL'
+    ORACLE = 'ORACLE'
+    HIVE = 'HIVE'
+    DATABRICKS = 'DATABRICKS'
+    SNOWFLAKE = 'SNOWFLAKE'
+    MONGODB = 'MONGODB'
+    NEO4J = 'NEO4J'
+    POWERBI = 'POWERBI'
+    TABLEAU = 'TABLEAU'
+    CONFLUENCE = 'CONFLUENCE'
+    JIRA = 'JIRA'
+    SERVICEDESK = 'SERVICEDESK'
+    SQLITE = 'SQLITE'
+    NOTION = 'NOTION'
+    EMAIL = 'EMAIL'
+    YOUTUBE = 'YOUTUBE'
+
+
+class YouTubeRequired(BaseModel):
+    """
+    Provide at least one of channels or video_urls (enforced at runtime).
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    channels: list[str] | None = Field(
+        None,
+        description='Channel URLs or handles to list videos from (e.g. https://www.youtube.com/@OpenAI or @OpenAI). At least one of channels/video_urls is required.',
+    )
+    video_urls: list[str] | None = Field(
+        None,
+        description='Explicit video watch URLs to scan (e.g. https://www.youtube.com/watch?v=dQw4w9WgXcQ). At least one of channels/video_urls is required.',
+    )
+
+
+class YouTubeMasked(BaseModel):
+    """
+    Optional credentials. Leave empty for public videos.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    cookies: str | None = Field(
+        None,
+        description='Netscape-format cookie file contents, used by yt-dlp to access age-restricted or members-only videos.',
+    )
+
+
+class YouTubeOptionalTranscript(BaseModel):
+    """
+    Transcript/caption fetching controls.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    languages: list[str] | None = Field(
+        None,
+        description='Preferred caption language codes in priority order (e.g. ["en"]). Empty means accept any available language.',
+    )
+    skip_transcript: bool | None = Field(
+        False,
+        description='When true, skip transcript fetching entirely (metadata-only assets, no detector content).',
+    )
+
+
+class YouTubeOptionalConnection(BaseModel):
+    """
+    Network controls for yt-dlp and transcript fetching.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    proxy_url: str | None = Field(
+        None,
+        description='Optional HTTP/HTTPS/SOCKS proxy URL to mitigate rate-limiting when scanning at scale.',
+    )
+    request_timeout_seconds: int | None = Field(
+        30, description='Socket timeout for yt-dlp network operations.', ge=1, le=300
+    )
+    ignore_errors: bool | None = Field(
+        True,
+        description='Continue past individual videos that fail to extract instead of aborting the run.',
+    )
+
+
+class YouTubeOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    transcript: YouTubeOptionalTranscript | None = None
+    connection: YouTubeOptionalConnection | None = None
 
 
 class SlackRequired(BaseModel):
@@ -1926,35 +2037,6 @@ class CoreInput(BaseModel):
     resources: ResourceOverrides | None = None
 
 
-class Type(StrEnum):
-    """
-    Type of the asset or source
-    """
-
-    WORDPRESS = 'WORDPRESS'
-    SLACK = 'SLACK'
-    S3_COMPATIBLE_STORAGE = 'S3_COMPATIBLE_STORAGE'
-    AZURE_BLOB_STORAGE = 'AZURE_BLOB_STORAGE'
-    GOOGLE_CLOUD_STORAGE = 'GOOGLE_CLOUD_STORAGE'
-    POSTGRESQL = 'POSTGRESQL'
-    MYSQL = 'MYSQL'
-    MSSQL = 'MSSQL'
-    ORACLE = 'ORACLE'
-    HIVE = 'HIVE'
-    DATABRICKS = 'DATABRICKS'
-    SNOWFLAKE = 'SNOWFLAKE'
-    MONGODB = 'MONGODB'
-    NEO4J = 'NEO4J'
-    POWERBI = 'POWERBI'
-    TABLEAU = 'TABLEAU'
-    CONFLUENCE = 'CONFLUENCE'
-    JIRA = 'JIRA'
-    SERVICEDESK = 'SERVICEDESK'
-    SQLITE = 'SQLITE'
-    NOTION = 'NOTION'
-    EMAIL = 'EMAIL'
-
-
 class SlackInput(CoreInput):
     type: Literal['SLACK'] = Field('SLACK', description='Type of the asset or source')
     required: SlackRequired
@@ -2428,7 +2510,7 @@ class ConfluenceOptionalConnection(BaseModel):
     )
 
 
-class Type17(StrEnum):
+class Type18(StrEnum):
     """
     Filter spaces by space type
     """
@@ -2465,7 +2547,7 @@ class ConfluenceOptionalScopeSpaces(BaseModel):
     keys: list[str] | None = Field(
         None, description='Filter spaces by keys (up to 250)', max_length=250
     )
-    type: Type17 | None = Field(None, description='Filter spaces by space type')
+    type: Type18 | None = Field(None, description='Filter spaces by space type')
     status: Status | None = Field(None, description='Filter spaces by status')
     labels: list[str] | None = Field(
         None,
@@ -2731,7 +2813,7 @@ class ServiceDeskOptional(BaseModel):
     content: ServiceDeskOptionalContent | None = None
 
 
-class Type18(StrEnum):
+class Type19(StrEnum):
     """
     Type of the asset or source
     """
@@ -2758,6 +2840,7 @@ class Type18(StrEnum):
     SQLITE = 'SQLITE'
     NOTION = 'NOTION'
     EMAIL = 'EMAIL'
+    YOUTUBE = 'YOUTUBE'
 
 
 class ConfluenceInput(CoreInput):
@@ -2995,6 +3078,24 @@ class NotionInput(CoreInput):
     resources: ResourceOverrides | None = None
 
 
+class YouTubeInput(CoreInput):
+    type: Literal['YOUTUBE'] = Field(
+        'YOUTUBE', description='Type of the asset or source'
+    )
+    required: YouTubeRequired
+    masked: YouTubeMasked | None = None
+    optional: YouTubeOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
 class SourceInput(
     RootModel[
         SlackInput
@@ -3019,6 +3120,7 @@ class SourceInput(
         | SQLiteInput
         | NotionInput
         | EmailInput
+        | YouTubeInput
     ]
 ):
     root: (
@@ -3044,6 +3146,7 @@ class SourceInput(
         | SQLiteInput
         | NotionInput
         | EmailInput
+        | YouTubeInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

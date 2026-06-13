@@ -723,7 +723,18 @@
           "parent_email_hash": "Parent Email",
           "sha256": "SHA-256",
           "is_inline": "Inline",
-          "content_id": "Content ID"
+          "content_id": "Content ID",
+          "video_id": "Video ID",
+          "channel_id": "Channel ID",
+          "channel_name": "Channel",
+          "duration_seconds": "Duration",
+          "view_count": "Views",
+          "like_count": "Likes",
+          "upload_date": "Upload Date",
+          "transcript_available": "Transcript Available",
+          "transcript_language": "Transcript Language",
+          "transcript_is_generated": "Auto-generated Transcript",
+          "caption_tracks": "Caption Languages"
         }
       },
       "unknownSource": "Unknown source",
