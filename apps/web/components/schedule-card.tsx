@@ -314,6 +314,7 @@ export function ScheduleCard({
                     handleApply();
                   }
                 }}
+                autoComplete="off"
                 disabled={disabled}
                 className={cn(
                   "font-mono text-xs border-2 rounded-[4px] h-9 pr-8",

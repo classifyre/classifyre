@@ -66,6 +66,7 @@ import {
 } from "@workspace/ui/components/source-icon";
 import { ScheduleCard, type ScheduleValue } from "@/components/schedule-card";
 import { SamplingCard, type SamplingValue } from "@/components/sampling-card";
+import { useAntiAutofill, removeInputProtection } from "@/lib/use-anti-autofill";
 
 const LONG_TEXT_THRESHOLD = 120;
 
@@ -1159,6 +1160,7 @@ function ObjectJsonEditorControl({
                 value={editorValue}
                 onChange={(event) => handleEditorChange(event.target.value)}
                 className="min-h-[240px] rounded-none border-0"
+                autoComplete="off"
                 disabled={disabled}
               />
             }
@@ -1955,6 +1957,7 @@ function SchemaField({
                 {...field}
                 value={field.value ?? ""}
                 autoComplete="new-password"
+                data-form-type="other"
                 disabled={disabled}
                 data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
               />
@@ -2080,6 +2083,8 @@ export const JsonSchemaForm = React.forwardRef<
   ref,
 ) {
   const { t } = useTranslation();
+  const formRef = React.useRef<HTMLFormElement | null>(null);
+  useAntiAutofill(formRef);
   const finalSubmitLabel = submitLabel || t("common.submit");
   const finalCancelLabel = cancelLabel || t("common.cancel");
 
@@ -2165,6 +2170,9 @@ export const JsonSchemaForm = React.forwardRef<
   );
 
   const handleSubmit = (data: FormValues) => {
+    if (formRef.current) {
+      removeInputProtection(formRef.current);
+    }
     onSubmit(data);
   };
 
@@ -2325,9 +2333,12 @@ export const JsonSchemaForm = React.forwardRef<
   return (
     <Form {...form}>
       <form
+        ref={formRef}
         onSubmit={form.handleSubmit(handleSubmit)}
         className="space-y-6"
         autoComplete="off"
+        data-1p-ignore
+        data-lpignore="true"
       >
         {nameSchema &&
           (() => {

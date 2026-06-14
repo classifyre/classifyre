@@ -243,6 +243,7 @@ export function SamplingCard({
                   placeholder="100"
                   value={value.rows_per_page ?? ""}
                   onChange={(e) => handleRowsPerPageChange(e.target.value)}
+                  autoComplete="off"
                   disabled={disabled}
                   className="font-mono text-xs border-2 border-border/40 focus:border-border rounded-[4px] h-9"
                   data-testid="input-rows-per-page"
@@ -262,6 +263,7 @@ export function SamplingCard({
                     placeholder={t("sources.sampling.orderByPlaceholder")}
                     value={value.order_by_column ?? ""}
                     onChange={(e) => handleOrderByColumnChange(e.target.value)}
+                    autoComplete="off"
                     disabled={disabled}
                     className="font-mono text-xs border-2 border-border/40 focus:border-border rounded-[4px] h-9"
                   />
