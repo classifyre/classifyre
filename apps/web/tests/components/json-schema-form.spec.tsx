@@ -183,6 +183,74 @@ test("oneOf selector switches branches when options share property names", async
   ).toHaveCount(0);
 });
 
+test("form element renders anti-autofill attributes", async ({ mount }) => {
+  const component = await mount(
+    <JsonSchemaForm
+      schema={timeoutSchema}
+      defaultValues={{}}
+      onSubmit={() => {}}
+      showCancel={false}
+    />,
+  );
+
+  const form = component;
+  await expect(form).toHaveAttribute("autocomplete", "off");
+  await expect(form).toHaveAttribute("data-1p-ignore");
+  await expect(form).toHaveAttribute("data-lpignore", "true");
+});
+
+test("password inputs render autocomplete=new-password and data-form-type=other", async ({
+  mount,
+}) => {
+  const maskedSchema: JSONSchema7 = {
+    type: "object",
+    properties: {
+      api_token: {
+        type: "string",
+      },
+    },
+    required: ["api_token"],
+  };
+
+  const component = await mount(
+    <JsonSchemaForm
+      schema={maskedSchema}
+      defaultValues={{}}
+      onSubmit={() => {}}
+      showCancel={false}
+    />,
+  );
+
+  const passwordInput = component.getByLabel(/api token/i);
+  await expect(passwordInput).toHaveAttribute("type", "password");
+  await expect(passwordInput).toHaveAttribute("autocomplete", "new-password");
+  await expect(passwordInput).toHaveAttribute("data-form-type", "other");
+});
+
+test("text inputs render autocomplete=off", async ({ mount }) => {
+  const textSchema: JSONSchema7 = {
+    type: "object",
+    properties: {
+      hostname: {
+        type: "string",
+      },
+    },
+    required: ["hostname"],
+  };
+
+  const component = await mount(
+    <JsonSchemaForm
+      schema={textSchema}
+      defaultValues={{}}
+      onSubmit={() => {}}
+      showCancel={false}
+    />,
+  );
+
+  const textInput = component.getByLabel(/hostname/i);
+  await expect(textInput).toHaveAttribute("autocomplete", "off");
+});
+
 test("free-form object fields render a JSON editor", async ({ mount }) => {
   const hiveSchema: JSONSchema7 = {
     type: "object",

@@ -812,6 +812,7 @@ export const SourceScanConfig = React.forwardRef<
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder={t("sources.scanConfig.searchPlaceholder")}
+              autoComplete="off"
               className="h-10 rounded-[4px] border-2 border-border bg-background pl-9 text-sm shadow-[3px_3px_0_var(--color-border)] focus-visible:ring-0"
             />
             {searchQuery ? (
