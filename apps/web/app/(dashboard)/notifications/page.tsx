@@ -53,7 +53,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
-import { AppIcon, type IconName } from "@/components/app-icon";
+import { AppIcon } from "@/components/app-icon";
 import { formatRelative, formatShortUTC } from "@/lib/date";
 import { useNotificationsWebSocket } from "@/hooks/use-notifications-websocket";
 import { useTranslation } from "@/hooks/use-translation";

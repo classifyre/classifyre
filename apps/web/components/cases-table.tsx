@@ -13,7 +13,6 @@ import {
 } from "@workspace/api-client";
 import { FINDING_SEVERITY_COLOR_BY_ENUM } from "@workspace/ui/lib/finding-severity";
 import {
-  Button,
   EmptyState,
   Input,
   MultiSelect,
