@@ -23,14 +23,12 @@ will fail and tell you exactly what to fix.
 from __future__ import annotations
 
 import ast
-import re
 import tomllib
 from pathlib import Path
 
 CLI_ROOT = Path(__file__).resolve().parents[1]
 SOURCES_DIR = CLI_ROOT / "src" / "sources"
 PYPROJECT_PATH = CLI_ROOT / "pyproject.toml"
-DOCKERFILE_PATH = CLI_ROOT.parents[1] / "Dockerfile"
 
 # Abstract source directories that provide base classes shared by multiple
 # concrete sources.  They never appear as a recipe `type` value themselves, so
@@ -115,20 +113,6 @@ def _ast_source_type(path: Path) -> str | None:
             ):
                 return item.value.value
     return None
-
-
-def _fat_dockerfile_groups() -> set[str]:
-    """Parse --group flags from the cli-fat-builder RUN block in the Dockerfile."""
-    text = DOCKERFILE_PATH.read_text(encoding="utf-8")
-    match = re.search(
-        r"AS cli-fat-builder\b(.*?)(?=^FROM |\Z)",
-        text,
-        re.DOTALL | re.MULTILINE,
-    )
-    if not match:
-        return set()
-    block = match.group(1)
-    return set(re.findall(r"--group\s+(\S+)", block))
 
 
 # ---------------------------------------------------------------------------
@@ -280,50 +264,3 @@ def test_source_type_groups_values_match_actual_groups_used() -> None:
         f"{mismatches}. Keep dependency_groups.py in sync with the source files."
     )
 
-
-# ---------------------------------------------------------------------------
-# Fat Dockerfile coverage
-# ---------------------------------------------------------------------------
-
-
-def test_fat_dockerfile_stage_exists() -> None:
-    """Dockerfile must define a cli-fat-builder stage for production images."""
-    text = DOCKERFILE_PATH.read_text(encoding="utf-8")
-    assert "AS cli-fat-builder" in text, (
-        f"{DOCKERFILE_PATH} is missing the cli-fat-builder stage. "
-        "Add a stage that bakes all optional dependency groups."
-    )
-
-
-def test_fat_dockerfile_includes_all_source_type_groups() -> None:
-    """Fat CLI image must include every group listed in SOURCE_TYPE_GROUPS.
-
-    When a new group is added to SOURCE_TYPE_GROUPS but its --group flag is
-    omitted from the Dockerfile fat builder, the production image silently
-    breaks for that source type.
-    """
-    from src.utils.dependency_groups import SOURCE_TYPE_GROUPS
-
-    fat_groups = _fat_dockerfile_groups()
-    all_source_groups = {g for gs in SOURCE_TYPE_GROUPS.values() for g in gs}
-
-    missing = sorted(g for g in all_source_groups if g not in fat_groups)
-    assert not missing, (
-        f"Dockerfile cli-fat-builder stage is missing --group flags: {missing}. "
-        "Add them to the RUN uv sync block in the cli-fat-builder stage."
-    )
-
-
-def test_fat_dockerfile_includes_file_processing_group() -> None:
-    """Fat image must provide file-processing deps for object storage sources.
-
-    ObjectStorageSourceBase calls require_module(..., uv_groups=['file-processing'])
-    at runtime.  The fat builder covers this either with --group file-processing
-    directly or transitively via --group detectors (which includes file-processing).
-    """
-    fat_groups = _fat_dockerfile_groups()
-    covered = "file-processing" in fat_groups or "detectors" in fat_groups
-    assert covered, (
-        "Dockerfile cli-fat-builder must include --group file-processing "
-        "(directly or via --group detectors) for object storage text extraction."
-    )

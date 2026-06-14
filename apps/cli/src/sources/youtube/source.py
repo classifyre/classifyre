@@ -290,9 +290,7 @@ class YouTubeSource(BaseSource):
         exist, ``_build_video_asset`` falls back to ``_transcribe_audio`` if the
         source has ``sampling.enable_transcription`` set.
         """
-        mod = require_module("youtube_transcript_api", "YouTube", uv_groups=["youtube"])
-        CouldNotRetrieveTranscript = mod.CouldNotRetrieveTranscript
-        YouTubeTranscriptApiException = mod.YouTubeTranscriptApiException
+        yt_mod = require_module("youtube_transcript_api", "YouTube", uv_groups=["youtube"])
 
         languages = self._transcript_options().languages or []
         try:
@@ -323,7 +321,7 @@ class YouTubeSource(BaseSource):
                 is_generated=fetched.is_generated,
                 available_languages=available or [fetched.language_code],
             )
-        except (CouldNotRetrieveTranscript, YouTubeTranscriptApiException) as exc:
+        except (yt_mod.CouldNotRetrieveTranscript, yt_mod.YouTubeTranscriptApiException) as exc:
             logger.warning("No transcript for video %s: %s", video_id, exc)
             return None
         except Exception as exc:
