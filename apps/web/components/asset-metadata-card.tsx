@@ -46,6 +46,18 @@ const METADATA_KEY_TO_I18N: Record<string, TranslationKey> = {
   sha256: "assets.detail.assetMetadata.keys.sha256",
   is_inline: "assets.detail.assetMetadata.keys.is_inline",
   content_id: "assets.detail.assetMetadata.keys.content_id",
+  video_id: "assets.detail.assetMetadata.keys.video_id",
+  channel_id: "assets.detail.assetMetadata.keys.channel_id",
+  channel_name: "assets.detail.assetMetadata.keys.channel_name",
+  duration_seconds: "assets.detail.assetMetadata.keys.duration_seconds",
+  view_count: "assets.detail.assetMetadata.keys.view_count",
+  like_count: "assets.detail.assetMetadata.keys.like_count",
+  upload_date: "assets.detail.assetMetadata.keys.upload_date",
+  transcript_available: "assets.detail.assetMetadata.keys.transcript_available",
+  transcript_language: "assets.detail.assetMetadata.keys.transcript_language",
+  transcript_is_generated:
+    "assets.detail.assetMetadata.keys.transcript_is_generated",
+  caption_tracks: "assets.detail.assetMetadata.keys.caption_tracks",
 };
 
 // Keys that carry a human-readable byte size and should be formatted as such.

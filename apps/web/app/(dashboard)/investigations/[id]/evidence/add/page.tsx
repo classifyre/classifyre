@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { api, type CaseResponseDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { FindingsTable, type FindingSelection } from "@/components/findings-table";
+import { useTranslation } from "@/hooks/use-translation";
 
 /**
  * Dedicated page for attaching findings to a case as evidence. Reuses the full
@@ -25,6 +26,7 @@ function AddCaseEvidencePageInner() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const caseId = params.id as string;
   // Optional asset context (e.g. "add more findings for this evidence row").
   const assetId = searchParams.get("assetId");
@@ -67,11 +69,11 @@ function AddCaseEvidencePageInner() {
         id: caseId,
         attachFindingsDto: { findingIds: selection.findings.map((f) => f.id) },
       });
-      toast.success(`Attached ${res.attached} finding${res.attached === 1 ? "" : "s"} as evidence`);
+      toast.success(t("investigations.addEvidence.attached", { count: String(res.attached) }));
       router.push(`/investigations/${caseId}?tab=evidence`);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to attach findings");
+      toast.error(t("investigations.addEvidence.failedToAttach"));
       setAttaching(false);
     }
   };
@@ -85,22 +87,22 @@ function AddCaseEvidencePageInner() {
           className="-ml-2 mb-2"
           onClick={() => router.push(`/investigations/${caseId}?tab=evidence`)}
         >
-          <ArrowLeft className="h-4 w-4" /> Back to case
+          <ArrowLeft className="h-4 w-4" /> {t("investigations.addEvidence.backToCase")}
         </Button>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="font-serif text-2xl font-black uppercase tracking-[0.03em]">
-              Add evidence
+              {t("investigations.addEvidence.title")}
             </h1>
             <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
               {caseData ? (
                 <>
-                  Attach findings to <span className="font-medium">{caseData.title}</span>.
-                  Findings already in the case are hidden. The matching asset is added as
-                  evidence automatically.
+                  {t("investigations.addEvidence.attachFindingsTo")}{" "}
+                  <span className="font-medium">{caseData.title}</span>.{" "}
+                  {t("investigations.addEvidence.attachFindingsDesc")}
                 </>
               ) : (
-                "Loading case…"
+                t("investigations.addEvidence.loading")
               )}
             </p>
           </div>
@@ -111,8 +113,8 @@ function AddCaseEvidencePageInner() {
               <Paperclip className="h-4 w-4" />
             )}
             {selCount > 0
-              ? `Attach ${selCount} finding${selCount === 1 ? "" : "s"}`
-              : "Attach selected"}
+              ? t("investigations.addEvidence.attachCount", { count: String(selCount) })
+              : t("investigations.addEvidence.attachSelected")}
           </Button>
         </div>
       </div>

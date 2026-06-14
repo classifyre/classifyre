@@ -68,7 +68,7 @@
     },
     "/sources": {
       "post": {
-        "description": "Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk).",
+        "description": "Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, YouTube).",
         "operationId": "SourcesController_createSource",
         "parameters": [],
         "requestBody": {
@@ -132,6 +132,32 @@
                       "sampling": {
                         "strategy": "RANDOM",
                         "limit": 100
+                      }
+                    }
+                  }
+                },
+                "youtube": {
+                  "summary": "YouTube Source",
+                  "value": {
+                    "type": "YOUTUBE",
+                    "name": "Brand channels",
+                    "config": {
+                      "type": "YOUTUBE",
+                      "required": {
+                        "channels": [
+                          "https://www.youtube.com/@OpenAI"
+                        ]
+                      },
+                      "optional": {
+                        "transcript": {
+                          "languages": [
+                            "en"
+                          ]
+                        }
+                      },
+                      "sampling": {
+                        "strategy": "LATEST",
+                        "rows_per_page": 25
                       }
                     }
                   }
@@ -1143,6 +1169,7 @@
                   "POWERBI",
                   "TABLEAU",
                   "EMAIL",
+                  "YOUTUBE",
                   "CUSTOM"
                 ]
               }
@@ -1485,6 +1512,7 @@
                   "POWERBI",
                   "TABLEAU",
                   "EMAIL",
+                  "YOUTUBE",
                   "CUSTOM"
                 ]
               }
@@ -1849,6 +1877,7 @@
                   "POWERBI",
                   "TABLEAU",
                   "EMAIL",
+                  "YOUTUBE",
                   "CUSTOM"
                 ]
               }
@@ -7375,7 +7404,7 @@
   },
   "info": {
     "title": "Classifyre API",
-    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, and Email sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.",
+    "description": "Metadata ingestion and detection API for unstructured data sources. Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, and YouTube sources. Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.",
     "version": "1.0.0",
     "contact": {
       "name": "Classifyre Team",
@@ -7443,7 +7472,8 @@
               "SERVICEDESK",
               "SQLITE",
               "NOTION",
-              "EMAIL"
+              "EMAIL",
+              "YOUTUBE"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -7627,7 +7657,8 @@
               "SERVICEDESK",
               "SQLITE",
               "NOTION",
-              "EMAIL"
+              "EMAIL",
+              "YOUTUBE"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -7753,6 +7784,7 @@
                 "POWERBI",
                 "TABLEAU",
                 "EMAIL",
+                "YOUTUBE",
                 "CUSTOM"
               ]
             }
@@ -8060,6 +8092,7 @@
               "POWERBI",
               "TABLEAU",
               "EMAIL",
+              "YOUTUBE",
               "CUSTOM"
             ]
           },
@@ -8196,6 +8229,7 @@
                 "POWERBI",
                 "TABLEAU",
                 "EMAIL",
+                "YOUTUBE",
                 "CUSTOM"
               ]
             }
@@ -8961,6 +8995,7 @@
               "POWERBI",
               "TABLEAU",
               "EMAIL",
+              "YOUTUBE",
               "CUSTOM"
             ]
           }
@@ -14087,6 +14122,7 @@
                 "POWERBI",
                 "TABLEAU",
                 "EMAIL",
+                "YOUTUBE",
                 "CUSTOM"
               ]
             }

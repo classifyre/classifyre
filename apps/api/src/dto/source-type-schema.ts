@@ -28,18 +28,3 @@ if (!Array.isArray(sourceTypeValues) || sourceTypeValues.length === 0) {
 
 export const SOURCE_TYPE_ENUM = sourceTypeValues as [string, ...string[]];
 export type SourceType = (typeof SOURCE_TYPE_ENUM)[number];
-
-const TABULAR_TYPES = new Set([
-  'POSTGRESQL',
-  'MYSQL',
-  'MSSQL',
-  'ORACLE',
-  'HIVE',
-  'DATABRICKS',
-  'SNOWFLAKE',
-  'SQLITE',
-]);
-
-export function getSourceCategory(type: string): 'TABULAR' | 'UNSTRUCTURED' {
-  return TABULAR_TYPES.has(type) ? 'TABULAR' : 'UNSTRUCTURED';
-}
