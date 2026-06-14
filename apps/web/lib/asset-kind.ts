@@ -10,6 +10,7 @@ import {
   Notebook,
   Paperclip,
   Table,
+  Video,
   Workflow,
   type LucideIcon,
 } from "lucide-react";
@@ -35,6 +36,7 @@ const assetKindIconMap: Record<string, LucideIcon> = {
   pipeline: Workflow,
   label: Hash,
   item: File,
+  video: Video,
 };
 
 export function getAssetKindIcon(kind?: string | null): LucideIcon {

@@ -360,14 +360,16 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         )
         normalized_mime = mime_type.split(";", 1)[0].strip().lower()
 
-        # Non-extractable types (images, audio, video, opaque binary) carry no text.
-        # Everything else defers extraction to fetch_content_pages() so detectors
-        # receive content in configurable-sized pages instead of one monolithic blob.
-        is_non_extractable = normalized_mime.startswith(
-            ("image/", "audio/", "video/")
-        ) or normalized_mime in (
-            "application/octet-stream",
-            "application/zip",
+        # Non-extractable types (images, opaque binary) carry no text. Audio/video
+        # are extractable only when transcription is enabled — otherwise they are
+        # treated as opaque binary. Everything else defers extraction to
+        # fetch_content_pages() so detectors receive content in configurable-sized
+        # pages instead of one monolithic blob.
+        is_media = normalized_mime.startswith(("audio/", "video/"))
+        is_non_extractable = (
+            normalized_mime.startswith("image/")
+            or (is_media and not self.transcription_enabled())
+            or normalized_mime in ("application/octet-stream", "application/zip")
         )
 
         return ContentSnapshot(

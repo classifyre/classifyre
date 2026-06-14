@@ -214,6 +214,12 @@ class BaseSource(ABC):
         sampling = getattr(config, "sampling", None) if config is not None else None
         return bool(getattr(sampling, "enable_ocr", False))
 
+    def transcription_enabled(self) -> bool:
+        """Return whether sampling-level audio/video transcription is enabled."""
+        config = getattr(self, "config", None)
+        sampling = getattr(config, "sampling", None) if config is not None else None
+        return bool(getattr(sampling, "enable_transcription", False))
+
     def parse_asset_bytes(
         self,
         file_bytes: bytes,
@@ -228,6 +234,7 @@ class BaseSource(ABC):
             declared_mime_type=declared_mime_type,
             file_name=file_name,
             enable_ocr=self.ocr_enabled(),
+            enable_transcription=self.transcription_enabled(),
         )
 
     def iter_asset_pages(
@@ -248,6 +255,7 @@ class BaseSource(ABC):
             include_column_names,
             file_name=file_name,
             enable_ocr=self.ocr_enabled(),
+            enable_transcription=self.transcription_enabled(),
         )
 
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:

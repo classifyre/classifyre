@@ -15,6 +15,7 @@ import {
   Pin,
   Route,
 } from "lucide-react";
+import { useTranslation } from "@/hooks/use-translation";
 
 export type ContextMenuTarget =
   | { kind: "node"; node: GraphNodeDto }
@@ -84,16 +85,17 @@ function MenuItem({
   );
 }
 
-const STANCES: Array<{ stance: Stance; symbol: string; title: string; cls: string }> = [
-  { stance: LinkThreadSupportDtoStanceEnum.Supports, symbol: "✓", title: "Supports", cls: "hover:bg-green-600 hover:text-white" },
-  { stance: LinkThreadSupportDtoStanceEnum.Contradicts, symbol: "✗", title: "Contradicts", cls: "hover:bg-destructive hover:text-white" },
-  { stance: LinkThreadSupportDtoStanceEnum.Neutral, symbol: "○", title: "Neutral", cls: "hover:bg-foreground hover:text-background" },
-];
-
 export function GraphContextMenu(props: GraphContextMenuProps) {
   const { menu, onClose } = props;
+  const { t } = useTranslation();
   const ref = React.useRef<HTMLDivElement>(null);
   const [hypsOpen, setHypsOpen] = React.useState(false);
+
+  const STANCES: Array<{ stance: Stance; symbol: string; title: string; cls: string }> = [
+    { stance: LinkThreadSupportDtoStanceEnum.Supports, symbol: "✓", title: t("caseGraph.contextMenu.supports"), cls: "hover:bg-green-600 hover:text-white" },
+    { stance: LinkThreadSupportDtoStanceEnum.Contradicts, symbol: "✗", title: t("caseGraph.contextMenu.contradicts"), cls: "hover:bg-destructive hover:text-white" },
+    { stance: LinkThreadSupportDtoStanceEnum.Neutral, symbol: "○", title: t("caseGraph.contextMenu.neutral"), cls: "hover:bg-foreground hover:text-background" },
+  ];
 
   React.useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -132,20 +134,20 @@ export function GraphContextMenu(props: GraphContextMenuProps) {
       >
         <div className="mb-1 border-b-2 border-border px-3 py-1.5">
           <span className="block font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-            {edge.origin} edge
+            {t("caseGraph.edgeDetail.originLabel", { origin: edge.origin })}
           </span>
           <span className="font-medium lowercase">{edge.relationType}</span>
         </div>
         {manual ? (
           <>
-            <MenuItem onClick={close(() => props.onRenameEdge(edge))}>Rename relation…</MenuItem>
+            <MenuItem onClick={close(() => props.onRenameEdge(edge))}>{t("caseGraph.contextMenu.renameRelation")}</MenuItem>
             <MenuItem destructive onClick={close(() => props.onDeleteEdge(edge))}>
-              Delete edge
+              {t("caseGraph.contextMenu.deleteEdge")}
             </MenuItem>
           </>
         ) : (
           <div className="px-3 py-2 text-xs text-muted-foreground">
-            Inferred edges are auto-generated and read-only. Create a manual edge instead.
+            {t("caseGraph.contextMenu.inferredReadOnly")}
           </div>
         )}
       </div>
@@ -170,22 +172,22 @@ export function GraphContextMenu(props: GraphContextMenuProps) {
       {/* Evidence membership */}
       {!isFinding && !evidence && (
         <MenuItem icon={<Paperclip className="h-3.5 w-3.5" />} onClick={close(() => props.onAddEvidence(node))}>
-          Add as evidence
+          {t("caseGraph.contextMenu.addAsEvidence")}
         </MenuItem>
       )}
       {!isFinding && evidence && (
         <MenuItem destructive icon={<Paperclip className="h-3.5 w-3.5" />} onClick={close(() => props.onRemoveEvidence(node))}>
-          Remove from evidence
+          {t("caseGraph.contextMenu.removeFromEvidence")}
         </MenuItem>
       )}
       {isFinding && !node.caseFindingId && (
         <MenuItem icon={<Paperclip className="h-3.5 w-3.5" />} onClick={close(() => props.onAttachFinding(node))}>
-          Attach finding to case
+          {t("caseGraph.contextMenu.attachFinding")}
         </MenuItem>
       )}
       {isFinding && node.caseFindingId && (
         <MenuItem destructive icon={<Paperclip className="h-3.5 w-3.5" />} onClick={close(() => props.onUnlinkFinding(node))}>
-          Unlink finding from case
+          {t("caseGraph.contextMenu.unlinkFinding")}
         </MenuItem>
       )}
 
@@ -195,13 +197,13 @@ export function GraphContextMenu(props: GraphContextMenuProps) {
         onClick={() => setHypsOpen((v) => !v)}
       >
         <Lightbulb className="h-3.5 w-3.5 text-muted-foreground" />
-        Link to hypothesis
+        {t("caseGraph.contextMenu.linkToHypothesis")}
         <ChevronRight className={`ml-auto h-3.5 w-3.5 transition-transform ${hypsOpen ? "rotate-90" : ""}`} />
       </button>
       {hypsOpen && (
         <div className="border-y border-border bg-muted/40 py-0.5">
           {props.hypotheses.length === 0 && (
-            <p className="px-3 py-1.5 text-xs text-muted-foreground">No hypotheses yet.</p>
+            <p className="px-3 py-1.5 text-xs text-muted-foreground">{t("caseGraph.contextMenu.noHypotheses")}</p>
           )}
           {props.hypotheses.map((h) => (
             <div key={h.id} className="flex items-center gap-2 px-3 py-1">
@@ -223,20 +225,20 @@ export function GraphContextMenu(props: GraphContextMenuProps) {
             </div>
           ))}
           <MenuItem onClick={close(() => props.onLinkHypothesisDialog(node))}>
-            <span className="text-xs text-muted-foreground">Link with note…</span>
+            <span className="text-xs text-muted-foreground">{t("caseGraph.contextMenu.linkWithNote")}</span>
           </MenuItem>
           <MenuItem onClick={close(() => props.onNewHypothesis(node))}>
-            <span className="text-xs text-muted-foreground">+ New hypothesis from this node…</span>
+            <span className="text-xs text-muted-foreground">{t("caseGraph.contextMenu.newHypothesisFromNode")}</span>
           </MenuItem>
         </div>
       )}
 
       {/* Graph actions */}
       <MenuItem icon={<GitBranch className="h-3.5 w-3.5" />} onClick={close(() => props.onConnectFrom(node))}>
-        Connect from here
+        {t("caseGraph.contextMenu.connectFromHere")}
       </MenuItem>
       <MenuItem icon={<Route className="h-3.5 w-3.5" />} onClick={close(() => props.onPathFrom(node))}>
-        Find path from here
+        {t("caseGraph.contextMenu.findPathFromHere")}
       </MenuItem>
       {node.type === "asset" && props.attachedCount(node) > 0 && (
         <MenuItem
@@ -250,31 +252,31 @@ export function GraphContextMenu(props: GraphContextMenuProps) {
           onClick={close(() => props.onToggleCollapse(node))}
         >
           {props.isAssetExpanded(node)
-            ? `Collapse ${props.attachedCount(node)} finding${props.attachedCount(node) === 1 ? "" : "s"} into asset`
-            : `Expand ${props.attachedCount(node)} finding${props.attachedCount(node) === 1 ? "" : "s"}`}
+            ? t("caseGraph.contextMenu.collapseFindings", { count: String(props.attachedCount(node)) })
+            : t("caseGraph.contextMenu.expandFindings", { count: String(props.attachedCount(node)) })}
         </MenuItem>
       )}
       <MenuItem icon={<Network className="h-3.5 w-3.5" />} onClick={close(() => props.onExpand(node))}>
-        Load related entities
+        {t("caseGraph.contextMenu.loadRelated")}
       </MenuItem>
       {node.type === "asset" && attachable > 0 && (
         <MenuItem icon={<Paperclip className="h-3.5 w-3.5" />} onClick={close(() => props.onAttachFindingsDialog(node))}>
-          Review {attachable} unattached finding{attachable === 1 ? "" : "s"}…
+          {t("caseGraph.contextMenu.reviewUnattached", { count: String(attachable) })}
         </MenuItem>
       )}
       {props.isPinned(node) && (
         <MenuItem icon={<Pin className="h-3.5 w-3.5" />} onClick={close(() => props.onReleasePin(node))}>
-          Release pin
+          {t("caseGraph.contextMenu.releasePin")}
         </MenuItem>
       )}
       {node.type === "asset" && (
         <MenuItem icon={<ExternalLink className="h-3.5 w-3.5" />} onClick={close(() => props.onOpenAsset(node))}>
-          Open asset ↗
+          {t("caseGraph.contextMenu.openAsset")}
         </MenuItem>
       )}
       {isFinding && (
         <MenuItem icon={<ExternalLink className="h-3.5 w-3.5" />} onClick={close(() => props.onOpenFinding(node))}>
-          Open finding ↗
+          {t("caseGraph.contextMenu.openFinding")}
         </MenuItem>
       )}
     </div>

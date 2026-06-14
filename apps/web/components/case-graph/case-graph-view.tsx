@@ -49,6 +49,7 @@ import {
   type GraphSelection,
   type PathResult,
 } from "./graph-types";
+import { useTranslation } from "@/hooks/use-translation";
 
 export interface CaseGraphViewProps {
   caseId: string;
@@ -73,6 +74,7 @@ export function CaseGraphView({
   onMergeExpansion,
 }: CaseGraphViewProps) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   // ── Derived collections ───────────────────────────────────────────────────
 
@@ -436,11 +438,11 @@ export function CaseGraphView({
         id: caseId,
         addEvidenceDto: { entityType: node.type, entityId: node.id },
       });
-      toast.success("Added to evidence");
+      toast.success(t("caseGraph.graphView.addedToEvidence"));
       onReload();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to add evidence");
+      toast.error(t("caseGraph.graphView.failedToAddEvidence"));
     }
   };
 
@@ -449,12 +451,12 @@ export function CaseGraphView({
     if (!evidenceId) return;
     try {
       await api.cases.casesControllerRemoveEvidence({ id: caseId, evidenceId });
-      toast.success("Removed from evidence");
+      toast.success(t("caseGraph.graphView.removedFromEvidence"));
       setSelection(null);
       onReload();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to remove evidence");
+      toast.error(t("caseGraph.graphView.failedToRemoveEvidence"));
     }
   };
 
@@ -464,11 +466,11 @@ export function CaseGraphView({
         id: caseId,
         attachFindingsDto: { findingIds: [node.id] },
       });
-      toast.success("Finding attached to case");
+      toast.success(t("caseGraph.graphView.findingAttached"));
       onReload();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to attach finding");
+      toast.error(t("caseGraph.graphView.failedToAttach"));
     }
   };
 
@@ -479,12 +481,12 @@ export function CaseGraphView({
         id: caseId,
         caseFindingId: node.caseFindingId,
       });
-      toast.success("Finding unlinked");
+      toast.success(t("caseGraph.graphView.findingUnlinked"));
       setSelection(null);
       onReload();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to unlink finding");
+      toast.error(t("caseGraph.graphView.failedToUnlink"));
     }
   };
 
@@ -537,11 +539,11 @@ export function CaseGraphView({
         id: threadId,
         linkThreadSupportDto: { ...target, stance },
       });
-      toast.success(`Linked (${stance.toLowerCase()})`);
+      toast.success(t("caseGraph.graphView.linkedToHypothesis", { stance: stance.toLowerCase() }));
       onReload();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to link to hypothesis");
+      toast.error(t("caseGraph.graphView.failedToLink"));
     }
   };
 
@@ -552,10 +554,10 @@ export function CaseGraphView({
         expandGraphDto: { entityType: node.type, entityId: node.id, depth: 1, direction: "both" },
       });
       onMergeExpansion(g.nodes, g.edges);
-      toast.success(`Expanded — ${g.nodes.length} nodes`);
+      toast.success(t("caseGraph.graphView.expanded", { count: String(g.nodes.length) }));
     } catch (err) {
       console.error(err);
-      toast.error("Failed to expand");
+      toast.error(t("caseGraph.graphView.failedToExpand"));
     } finally {
       setExpandingKey(null);
     }
@@ -564,13 +566,13 @@ export function CaseGraphView({
   const deleteEdge = async (edge: GraphEdgeDto) => {
     try {
       await api.graph.graphControllerDeleteEdge({ id: edge.id });
-      toast.success("Edge deleted");
+      toast.success(t("caseGraph.graphView.edgeDeleted"));
       setSelection(null);
       onReload();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       toast.error(
-        msg.includes("Inferred") ? "Inferred edges cannot be deleted." : "Failed to delete edge",
+        msg.includes("Inferred") ? t("caseGraph.graphView.inferredCannotDelete") : t("caseGraph.graphView.failedToDeleteEdge"),
       );
     }
   };
@@ -580,7 +582,7 @@ export function CaseGraphView({
   const computePath = (fromKey: string, toKey: string) => {
     const result = shortestPath(fromKey, toKey, visibleEdges);
     if (!result) {
-      toast.info("No connection between these nodes in the current view");
+      toast.info(t("caseGraph.graphView.noPath"));
       return;
     }
     setPath(result);
@@ -879,7 +881,7 @@ export function CaseGraphView({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this edge?</AlertDialogTitle>
             <AlertDialogDescription>
-              The manual relation “{edgeToDelete?.relationType}” is removed from the graph. The
+              The manual relation "{edgeToDelete?.relationType}" is removed from the graph. The
               connected nodes are not affected.
             </AlertDialogDescription>
           </AlertDialogHeader>

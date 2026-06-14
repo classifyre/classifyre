@@ -1911,5 +1911,97 @@
         ]
       }
     }
+  ],
+  "YOUTUBE": [
+    {
+      "name": "Brand channels transcript scan",
+      "description": "Scan the latest videos from brand channels and run PII/secrets detection over English transcripts",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "30 7 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "YOUTUBE",
+        "required": {
+          "channels": [
+            "https://www.youtube.com/@OpenAI",
+            "@AnthropicAI"
+          ]
+        },
+        "optional": {
+          "transcript": {
+            "languages": [
+              "en"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 25
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Specific videos audit",
+      "description": "Scan an explicit list of video URLs and process all of their transcripts",
+      "config": {
+        "type": "YOUTUBE",
+        "required": {
+          "video_urls": [
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+          ]
+        },
+        "sampling": {
+          "strategy": "ALL"
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Random sampling via proxy",
+      "description": "Randomly sample videos from a channel through a proxy to mitigate rate limiting",
+      "config": {
+        "type": "YOUTUBE",
+        "required": {
+          "channels": [
+            "https://www.youtube.com/@GoogleDevelopers/videos"
+          ]
+        },
+        "optional": {
+          "connection": {
+            "proxy_url": "http://proxy.internal:8080",
+            "request_timeout_seconds": 60
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 50
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    }
   ]
 }

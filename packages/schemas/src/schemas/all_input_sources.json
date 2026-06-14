@@ -68,6 +68,9 @@
     },
     {
       "$ref": "#/definitions/EmailInput"
+    },
+    {
+      "$ref": "#/definitions/YouTubeInput"
     }
   ],
   "x-asset-metadata": {
@@ -1253,6 +1256,71 @@
             "size_bytes"
           ]
         }
+      },
+      "YOUTUBE": {
+        "video": {
+          "properties": {
+            "video_id": {
+              "type": "string",
+              "description": "YouTube video id (11-char watch id)"
+            },
+            "title": {
+              "type": "string",
+              "description": "Video title"
+            },
+            "channel_id": {
+              "type": "string",
+              "description": "Channel id the video belongs to"
+            },
+            "channel_name": {
+              "type": "string",
+              "description": "Channel/uploader display name"
+            },
+            "duration_seconds": {
+              "type": "integer",
+              "description": "Video duration in seconds"
+            },
+            "view_count": {
+              "type": "integer",
+              "description": "View count at extraction time"
+            },
+            "like_count": {
+              "type": "integer",
+              "description": "Like count at extraction time"
+            },
+            "upload_date": {
+              "type": "string",
+              "description": "Upload date (YYYYMMDD as reported by yt-dlp)"
+            },
+            "transcript_available": {
+              "type": "boolean",
+              "description": "Whether a transcript/caption track was fetched"
+            },
+            "transcript_source": {
+              "type": "string",
+              "description": "Origin of the transcript text: 'captions' (caption track) or 'whisper' (audio transcribed with faster-whisper)"
+            },
+            "transcript_language": {
+              "type": "string",
+              "description": "Language code of the fetched transcript"
+            },
+            "transcript_is_generated": {
+              "type": "boolean",
+              "description": "Whether the transcript is auto-generated (vs creator-uploaded)"
+            },
+            "caption_tracks": {
+              "type": "array",
+              "description": "Available caption language codes",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "video_id",
+            "title"
+          ]
+        }
       }
     }
   },
@@ -1281,17 +1349,10 @@
         "SERVICEDESK",
         "SQLITE",
         "NOTION",
-        "EMAIL"
+        "EMAIL",
+        "YOUTUBE"
       ],
       "description": "Type of the asset or source"
-    },
-    "SourceCategory": {
-      "type": "string",
-      "enum": [
-        "TABULAR",
-        "UNSTRUCTURED"
-      ],
-      "description": "Category of the source: TABULAR for structured databases (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake), UNSTRUCTURED for text/web/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk)"
     },
     "DetectorType": {
       "type": "string",
@@ -1348,6 +1409,11 @@
           "default": false,
           "description": "When true, enable OCR/text extraction for supported binary documents and images before routing text-capable detectors."
         },
+        "enable_transcription": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, transcribe audio and video files to text (via faster-whisper) before routing text-capable detectors. Slower and requires the transcription dependency."
+        },
         "order_by_column": {
           "type": "string",
           "description": "Column to use for LATEST sampling mode in tabular sources (usually created_at/updated_at). Auto-detected when not set."
@@ -1376,6 +1442,7 @@
       "default": {
         "strategy": "RANDOM",
         "enable_ocr": false,
+        "enable_transcription": false,
         "fallback_to_random": true,
         "include_column_names": true,
         "rows_per_page": 100
@@ -1646,6 +1713,140 @@
         },
         "scope": {
           "$ref": "#/definitions/EmailOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "YouTubeInput": {
+      "title": "YouTubeInput",
+      "label": "YouTube",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "YOUTUBE"
+            },
+            "required": {
+              "$ref": "#/definitions/YouTubeRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/YouTubeMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/YouTubeOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "YouTubeRequired": {
+      "title": "YouTubeRequired",
+      "type": "object",
+      "description": "Provide at least one of channels or video_urls (enforced at runtime).",
+      "properties": {
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Channel URLs or handles to list videos from (e.g. https://www.youtube.com/@OpenAI or @OpenAI). At least one of channels/video_urls is required."
+        },
+        "video_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Explicit video watch URLs to scan (e.g. https://www.youtube.com/watch?v=dQw4w9WgXcQ). At least one of channels/video_urls is required."
+        }
+      },
+      "additionalProperties": false
+    },
+    "YouTubeMasked": {
+      "title": "YouTubeMasked",
+      "type": "object",
+      "description": "Optional credentials. Leave empty for public videos.",
+      "properties": {
+        "cookies": {
+          "type": "string",
+          "description": "Netscape-format cookie file contents, used by yt-dlp to access age-restricted or members-only videos."
+        }
+      },
+      "additionalProperties": false
+    },
+    "YouTubeOptionalTranscript": {
+      "title": "YouTubeOptionalTranscript",
+      "type": "object",
+      "description": "Transcript/caption fetching controls.",
+      "properties": {
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Preferred caption language codes in priority order (e.g. [\"en\"]). Empty means accept any available language."
+        },
+        "skip_transcript": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, skip transcript fetching entirely (metadata-only assets, no detector content)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "YouTubeOptionalConnection": {
+      "title": "YouTubeOptionalConnection",
+      "type": "object",
+      "description": "Network controls for yt-dlp and transcript fetching.",
+      "properties": {
+        "proxy_url": {
+          "type": "string",
+          "description": "Optional HTTP/HTTPS/SOCKS proxy URL to mitigate rate-limiting when scanning at scale."
+        },
+        "request_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 30,
+          "description": "Socket timeout for yt-dlp network operations."
+        },
+        "ignore_errors": {
+          "type": "boolean",
+          "default": true,
+          "description": "Continue past individual videos that fail to extract instead of aborting the run."
+        }
+      },
+      "additionalProperties": false
+    },
+    "YouTubeOptional": {
+      "title": "YouTubeOptional",
+      "type": "object",
+      "properties": {
+        "transcript": {
+          "$ref": "#/definitions/YouTubeOptionalTranscript"
+        },
+        "connection": {
+          "$ref": "#/definitions/YouTubeOptionalConnection"
         }
       },
       "additionalProperties": false

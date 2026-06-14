@@ -12,6 +12,7 @@ import {
   MultiSelectValue,
 } from "@workspace/ui/components/multi-select";
 import { ACCENT, CROSS_HYP_COLOR, MANUAL_EDGE_COLOR } from "./graph-types";
+import { useTranslation } from "@/hooks/use-translation";
 
 export function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -45,20 +46,21 @@ export function HypothesisLegend({
   onToggleFocus,
   onNewHypothesis,
 }: HypothesisLegendProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <SectionTitle>Hypotheses</SectionTitle>
+        <SectionTitle>{t("caseGraph.sidebar.hypothesesTitle")}</SectionTitle>
         <button
           onClick={onNewHypothesis}
           className="flex items-center gap-1 border-2 border-border bg-card px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide transition-colors hover:border-foreground"
         >
-          <Plus className="h-3 w-3" /> New
+          <Plus className="h-3 w-3" /> {t("common.new")}
         </button>
       </div>
       {hypotheses.length === 0 && (
         <p className="text-xs text-muted-foreground">
-          None yet. Hypotheses let you group evidence into competing explanations.
+          {t("caseGraph.sidebar.noHypotheses")}
         </p>
       )}
       <div className="space-y-1.5">
@@ -70,7 +72,7 @@ export function HypothesisLegend({
             <button
               key={h.id}
               onClick={() => onToggleFocus(h.id)}
-              title={focused ? "Click to clear focus" : "Click to focus this hypothesis"}
+              title={focused ? t("caseGraph.sidebar.clearFocus") : t("caseGraph.sidebar.focusHypothesis")}
               className={`w-full border-2 bg-card p-2 text-left transition-colors ${
                 focused ? "border-foreground shadow-[3px_3px_0_0_var(--color-border)]" : "border-border hover:border-foreground/50"
               }`}
@@ -132,12 +134,13 @@ export function HighlightFilters({
   onSourceChange,
   onDetectorChange,
 }: HighlightFiltersProps) {
+  const { t } = useTranslation();
   const active = sourceFilter.length > 0 || detectorFilter.length > 0;
   if (sourceOptions.length === 0 && detectorOptions.length === 0) return null;
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <SectionTitle>Highlight</SectionTitle>
+        <SectionTitle>{t("caseGraph.sidebar.highlight")}</SectionTitle>
         {active && (
           <button
             onClick={() => {
@@ -146,17 +149,17 @@ export function HighlightFilters({
             }}
             className="font-mono text-[10px] uppercase text-muted-foreground underline"
           >
-            clear
+            {t("caseGraph.sidebar.clear")}
           </button>
         )}
       </div>
       {sourceOptions.length > 0 && (
         <MultiSelect values={sourceFilter} onValuesChange={onSourceChange}>
           <MultiSelectTrigger className="h-8 w-full border-2 border-border rounded-[2px] text-xs">
-            <MultiSelectValue placeholder="Sources…" overflowBehavior="cutoff" />
+            <MultiSelectValue placeholder={t("caseGraph.sidebar.sourcesPlaceholder")} overflowBehavior="cutoff" />
           </MultiSelectTrigger>
           <MultiSelectContent
-            search={{ placeholder: "Search sources…", emptyMessage: "No sources" }}
+            search={{ placeholder: t("caseGraph.sidebar.searchSources"), emptyMessage: t("caseGraph.sidebar.noSources") }}
           >
             <MultiSelectGroup>
               {sourceOptions.map((o) => (
@@ -172,10 +175,10 @@ export function HighlightFilters({
       {detectorOptions.length > 0 && (
         <MultiSelect values={detectorFilter} onValuesChange={onDetectorChange}>
           <MultiSelectTrigger className="h-8 w-full border-2 border-border rounded-[2px] text-xs">
-            <MultiSelectValue placeholder="Finding categories…" overflowBehavior="cutoff" />
+            <MultiSelectValue placeholder={t("caseGraph.sidebar.categoriesPlaceholder")} overflowBehavior="cutoff" />
           </MultiSelectTrigger>
           <MultiSelectContent
-            search={{ placeholder: "Search categories…", emptyMessage: "No categories" }}
+            search={{ placeholder: t("caseGraph.sidebar.searchCategories"), emptyMessage: t("caseGraph.sidebar.noCategories") }}
           >
             <MultiSelectGroup>
               {detectorOptions.map((o) => (
@@ -200,14 +203,15 @@ export interface EdgeTypeFiltersProps {
 }
 
 export function EdgeTypeFilters({ edgeTypes, activeEdgeTypes, onToggle, onClear }: EdgeTypeFiltersProps) {
+  const { t } = useTranslation();
   if (edgeTypes.length === 0) return null;
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <SectionTitle>Edge types</SectionTitle>
+        <SectionTitle>{t("caseGraph.sidebar.edgeTypes")}</SectionTitle>
         {activeEdgeTypes.size > 0 && (
           <button onClick={onClear} className="font-mono text-[10px] uppercase text-muted-foreground underline">
-            clear
+            {t("caseGraph.sidebar.clear")}
           </button>
         )}
       </div>
@@ -243,38 +247,39 @@ export interface GraphStatsProps {
 }
 
 export function GraphLegendAndStats(props: GraphStatsProps) {
+  const { t } = useTranslation();
   const rows: Array<[string, number]> = [
-    ["Assets", props.assetCount],
-    ["Findings", props.findingCount],
-    ["Evidence records", props.evidenceCount],
-    ["Manual edges", props.manualEdgeCount],
-    ["Inferred edges", props.inferredEdgeCount],
-    ["Unattached findings", props.attachableTotal],
+    [t("caseGraph.sidebar.statsAssets"), props.assetCount],
+    [t("caseGraph.sidebar.statsFindings"), props.findingCount],
+    [t("caseGraph.sidebar.statsEvidenceRecords"), props.evidenceCount],
+    [t("caseGraph.sidebar.statsManualEdges"), props.manualEdgeCount],
+    [t("caseGraph.sidebar.statsInferredEdges"), props.inferredEdgeCount],
+    [t("caseGraph.sidebar.statsUnattached"), props.attachableTotal],
   ];
   return (
     <div className="space-y-2">
-      <SectionTitle>Reading the graph</SectionTitle>
+      <SectionTitle>{t("caseGraph.sidebar.legendTitle")}</SectionTitle>
       <div className="space-y-1.5 text-[11px]">
         <div className="flex items-center gap-2">
           <span className="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2" style={{ borderColor: ACCENT }} />
-          <span className="text-muted-foreground">green ring = case evidence</span>
+          <span className="text-muted-foreground">{t("caseGraph.sidebar.legendEvidence")}</span>
         </div>
         <div className="flex items-center gap-2">
           <span
             className="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-dashed"
             style={{ borderColor: CROSS_HYP_COLOR }}
           />
-          <span className="text-muted-foreground">dashed purple = spans hypotheses</span>
+          <span className="text-muted-foreground">{t("caseGraph.sidebar.legendHypothesis")}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="inline-block h-0.5 w-3.5 shrink-0" style={{ background: MANUAL_EDGE_COLOR }} />
-          <span className="text-muted-foreground">amber dashed edge = manual link</span>
+          <span className="text-muted-foreground">{t("caseGraph.sidebar.legendManual")}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center border font-mono text-[8px] font-bold" style={{ background: ACCENT, color: "#0a0a0a" }}>
             +n
           </span>
-          <span className="text-muted-foreground">findings not yet attached — click to review</span>
+          <span className="text-muted-foreground">{t("caseGraph.sidebar.legendUnattached")}</span>
         </div>
       </div>
       <div className="divide-y divide-border border-2 border-border bg-card">
