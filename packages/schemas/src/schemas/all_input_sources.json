@@ -1354,15 +1354,6 @@
       ],
       "description": "Type of the asset or source"
     },
-    "SourceCategory": {
-      "type": "string",
-      "enum": [
-        "TABULAR",
-        "UNSTRUCTURED",
-        "SOCIAL_MEDIA"
-      ],
-      "description": "Category of the source: TABULAR for structured databases (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake), UNSTRUCTURED for text/web/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk), SOCIAL_MEDIA for social/video platforms (YouTube)"
-    },
     "DetectorType": {
       "type": "string",
       "enum": [

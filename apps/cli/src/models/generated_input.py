@@ -47,16 +47,6 @@ class AssetType(StrEnum):
     YOUTUBE = 'YOUTUBE'
 
 
-class SourceCategory(StrEnum):
-    """
-    Category of the source: TABULAR for structured databases (PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks Unity Catalog, Snowflake), UNSTRUCTURED for text/web/document sources (WordPress, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, Slack, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk), SOCIAL_MEDIA for social/video platforms (YouTube)
-    """
-
-    TABULAR = 'TABULAR'
-    UNSTRUCTURED = 'UNSTRUCTURED'
-    SOCIAL_MEDIA = 'SOCIAL_MEDIA'
-
-
 class DetectorType(StrEnum):
     """
     Type of detector for content analysis

@@ -28,23 +28,3 @@ if (!Array.isArray(sourceTypeValues) || sourceTypeValues.length === 0) {
 
 export const SOURCE_TYPE_ENUM = sourceTypeValues as [string, ...string[]];
 export type SourceType = (typeof SOURCE_TYPE_ENUM)[number];
-
-const TABULAR_TYPES = new Set([
-  'POSTGRESQL',
-  'MYSQL',
-  'MSSQL',
-  'ORACLE',
-  'HIVE',
-  'DATABRICKS',
-  'SNOWFLAKE',
-  'SQLITE',
-]);
-
-const SOCIAL_MEDIA_TYPES = new Set(['YOUTUBE']);
-
-export function getSourceCategory(
-  type: string,
-): 'TABULAR' | 'UNSTRUCTURED' | 'SOCIAL_MEDIA' {
-  if (SOCIAL_MEDIA_TYPES.has(type)) return 'SOCIAL_MEDIA';
-  return TABULAR_TYPES.has(type) ? 'TABULAR' : 'UNSTRUCTURED';
-}
