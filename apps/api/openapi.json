@@ -7042,7 +7042,8 @@
               "enum": [
                 "INQUIRY",
                 "CASE",
-                "DREAM"
+                "DREAM",
+                "DUPLICATES"
               ]
             }
           },
@@ -7398,6 +7399,200 @@
         "summary": "Delete a memory entry the agent learned",
         "tags": [
           "autopilot"
+        ]
+      }
+    },
+    "/correlation/graph": {
+      "get": {
+        "operationId": "CorrelationController_graph",
+        "parameters": [
+          {
+            "name": "assetId",
+            "required": false,
+            "in": "query",
+            "description": "Scope to one asset's identity cluster; omit for all clusters",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Correlation (\"evidence fingerprints\") graph: assets linked through the findings they share",
+        "tags": [
+          "correlation"
+        ]
+      }
+    },
+    "/correlation/config": {
+      "get": {
+        "operationId": "CorrelationController_getConfig",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrelationConfigResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Correlation tuning: per-label weights (dynamic) + match thresholds",
+        "tags": [
+          "correlation"
+        ]
+      },
+      "put": {
+        "operationId": "CorrelationController_updateConfig",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCorrelationConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrelationConfigResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update correlation tuning and schedule a full recompute (logged)",
+        "tags": [
+          "correlation"
+        ]
+      }
+    },
+    "/correlation/case-action": {
+      "post": {
+        "operationId": "CorrelationController_caseAction",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseActionRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseActionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a case (or add to one) from assets selected in the fingerprints graph",
+        "tags": [
+          "correlation"
+        ]
+      }
+    },
+    "/assets/{id}/recompute-correlation": {
+      "post": {
+        "operationId": "CorrelationController_recompute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecomputeCorrelationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Recompute correlation for a single asset (on demand)",
+        "tags": [
+          "correlation"
+        ]
+      }
+    },
+    "/findings/occurrences": {
+      "get": {
+        "operationId": "CorrelationController_occurrences",
+        "parameters": [
+          {
+            "name": "label",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "value",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "valueHash",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValueOccurrencesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Where else a normalized finding value appears (reverse index)",
+        "tags": [
+          "correlation"
         ]
       }
     }
@@ -14849,7 +15044,8 @@
             "enum": [
               "INQUIRY",
               "CASE",
-              "DREAM"
+              "DREAM",
+              "DUPLICATES"
             ]
           },
           "status": {
@@ -14977,6 +15173,8 @@
               "CHANGE_STATUS",
               "LINK_INQUIRY",
               "CONSOLIDATE_MEMORY",
+              "LINK_DUPLICATE",
+              "UPDATE_CLUSTER",
               "NO_ACTION"
             ]
           },
@@ -15030,7 +15228,8 @@
             "enum": [
               "INQUIRY",
               "CASE",
-              "DREAM"
+              "DREAM",
+              "DUPLICATES"
             ]
           },
           "status": {
@@ -15301,6 +15500,243 @@
             "description": "Set the reinforcement weight directly"
           }
         }
+      },
+      "CorrelationLabelWeightDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Normalized finding label (dynamic)"
+          },
+          "weight": {
+            "type": "number",
+            "description": "Effective weight used in scoring"
+          },
+          "inUse": {
+            "type": "boolean",
+            "description": "Whether the label currently appears in the data"
+          }
+        },
+        "required": [
+          "label",
+          "weight",
+          "inUse"
+        ]
+      },
+      "CorrelationConfigResponseDto": {
+        "type": "object",
+        "properties": {
+          "defaultWeight": {
+            "type": "number",
+            "description": "Fallback weight for any unlisted label"
+          },
+          "relatedMin": {
+            "type": "number",
+            "description": "Min weighted match to record a related link (0-1)"
+          },
+          "duplicateMin": {
+            "type": "number",
+            "description": "Min weighted match for a likely duplicate (0-1)"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CorrelationLabelWeightDto"
+            }
+          }
+        },
+        "required": [
+          "defaultWeight",
+          "relatedMin",
+          "duplicateMin",
+          "labels"
+        ]
+      },
+      "UpdateCorrelationConfigDto": {
+        "type": "object",
+        "properties": {
+          "defaultWeight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "relatedMin": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "duplicateMin": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "labelWeights": {
+            "type": "object",
+            "description": "Per-label weight overrides ({ label: weight })",
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      "CaseActionRequestDto": {
+        "type": "object",
+        "properties": {
+          "assetIds": {
+            "description": "Assets to add (graph selection)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "caseId": {
+            "type": "string",
+            "description": "Existing case to extend; omit to create one"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title for a newly created case"
+          },
+          "description": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ]
+          },
+          "attachFindings": {
+            "type": "boolean",
+            "description": "Also attach the assets' findings"
+          }
+        },
+        "required": [
+          "assetIds"
+        ]
+      },
+      "CaseActionResponseDto": {
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string"
+          },
+          "caseTitle": {
+            "type": "string"
+          },
+          "created": {
+            "type": "boolean"
+          },
+          "assetsAdded": {
+            "type": "number"
+          },
+          "findingsAttached": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "caseId",
+          "caseTitle",
+          "created",
+          "assetsAdded",
+          "findingsAttached"
+        ]
+      },
+      "RecomputeCorrelationResponseDto": {
+        "type": "object",
+        "properties": {
+          "assetsProcessed": {
+            "type": "number"
+          },
+          "valuesIndexed": {
+            "type": "number"
+          },
+          "relatedPairs": {
+            "type": "number"
+          },
+          "duplicatePairs": {
+            "type": "number"
+          },
+          "clustersTouched": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "assetsProcessed",
+          "valuesIndexed",
+          "relatedPairs",
+          "duplicatePairs",
+          "clustersTouched"
+        ]
+      },
+      "ValueOccurrenceAssetDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "externalUrl": {
+            "type": "string"
+          },
+          "assetType": {
+            "type": "string"
+          },
+          "sourceType": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "clusterId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "assetId",
+          "name",
+          "externalUrl",
+          "assetType",
+          "sourceType",
+          "sourceId",
+          "sourceName"
+        ]
+      },
+      "ValueOccurrencesResponseDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "valueHash": {
+            "type": "string"
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValueOccurrenceAssetDto"
+            }
+          }
+        },
+        "required": [
+          "label",
+          "value",
+          "valueHash",
+          "assets"
+        ]
       }
     }
   }

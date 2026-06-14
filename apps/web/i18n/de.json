@@ -1786,7 +1786,8 @@
       "newCase": "Neuer Fall",
       "tabCases": "Fälle",
       "tabInquiries": "Anfragen",
-      "tabAutopilot": "Autopilot"
+      "tabAutopilot": "Autopilot",
+      "tabFingerprints": "Fingerabdrücke"
     },
     "caseDetail": {
       "loading": "Fall wird geladen…",
@@ -2084,6 +2085,85 @@
       "linked": "Mit Hypothese verknüpft",
       "failedToLink": "Verknüpfung mit Hypothese fehlgeschlagen",
       "link": "Verknüpfen"
+    }
+  },
+  "correlation": {
+    "findingsTab": "Funde",
+    "relatedTab": "Fingerabdrücke",
+    "fingerprints": {
+      "title": "Beweis-Fingerabdrücke",
+      "loadFailed": "Fingerabdruck-Graph konnte nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "empty": "Noch keine Korrelationen",
+      "emptyDesc": "Assets werden hier verbunden, wenn sie dieselben Funde teilen (E-Mails, Telefonnummern, Kennungen…).",
+      "search": "Knoten suchen…",
+      "counts": "{{assets}} Assets · {{values}} gemeinsame Werte",
+      "truncated": "Teilweise",
+      "asset": "Asset",
+      "sharedValue": "Gemeinsamer Wert",
+      "openAsset": "Asset öffnen",
+      "sharedValueHint": "Dieser Wert wird von den verbundenen Assets geteilt.",
+      "legend": "Legende",
+      "legendHint": "Assets sind über die Funde verbunden, die sie gemeinsam haben.",
+      "legendAsset": "Asset ({{count}})",
+      "legendValue": "Gemeinsamer Wert ({{count}})",
+      "tune": "Justieren",
+      "filterSource": "Quelle",
+      "filterLabel": "Label",
+      "actions": "Aktionen",
+      "actionsHint": "{{count}} Asset(s) sichtbar — daraus eine Untersuchung machen.",
+      "useInCase": "In einem Fall verwenden",
+      "backToActions": "Zurück",
+      "sharedValuesN": "{{count}} gemeinsame Werte",
+      "bundleTitle": "{{count}} gemeinsame Werte",
+      "bundleBetween": "Geteilt zwischen diesen Assets:",
+      "legendBundle": "Gebündelte Verbindung (>5 geteilt)",
+      "unconnected": "{{count}} Asset(s) ohne sichtbare Verbindung ausgeblendet (z. B. abgeschnitten oder gefiltert)."
+    },
+    "tune": {
+      "title": "Korrelation justieren",
+      "desc": "Gewichte gelten pro Fund-Label (dynamisch). Speichern berechnet alle Fingerabdrücke neu — als Duplicates-Finder-Lauf protokolliert.",
+      "loadFailed": "Justierung konnte nicht geladen werden",
+      "saved": "Gespeichert — Fingerabdrücke werden im Hintergrund neu berechnet",
+      "saveFailed": "Justierung konnte nicht gespeichert werden",
+      "save": "Speichern & neu berechnen",
+      "saving": "Speichern…",
+      "relatedMin": "Schwelle „verwandt“",
+      "relatedMinHint": "Minimale gewichtete Übereinstimmung, um zwei Assets als verwandt zu verknüpfen.",
+      "duplicateMin": "Schwelle „Duplikat“",
+      "duplicateMinHint": "Minimale gewichtete Übereinstimmung, um Assets als dieselbe Entität (Cluster) zu behandeln.",
+      "defaultWeight": "Standardgewicht",
+      "defaultWeightHint": "Wird für jedes Label ohne explizites Gewicht verwendet.",
+      "labelWeights": "Label-Gewichte",
+      "noLabels": "Noch keine Labels in den Daten.",
+      "retired": "nicht in Daten"
+    },
+    "caseAction": {
+      "title": "Assets → Fall",
+      "desc": "{{count}} Asset(s) aus dem Graphen in einem Untersuchungsfall verwenden.",
+      "newCase": "Neuer Fall",
+      "existingCase": "Bestehender Fall",
+      "caseTitle": "Titel",
+      "caseTitlePlaceholder": "z. B. Quellenübergreifendes Identitätsleck",
+      "description": "Beschreibung",
+      "severity": "Schweregrad",
+      "pickCase": "Fall",
+      "pickCasePlaceholder": "Fall auswählen…",
+      "attachFindings": "Auch die Funde der Assets anhängen",
+      "submit": "Anwenden",
+      "working": "Wird angewendet…",
+      "titleRequired": "Falltitel eingeben",
+      "caseRequired": "Fall auswählen",
+      "done": "{{assets}} Asset(s) und {{findings}} Fund(e) hinzugefügt",
+      "failed": "Fallaktion fehlgeschlagen"
+    },
+    "occurrences": {
+      "title": "Wo sonst gefunden",
+      "desc": "Weitere Assets, in denen dieser exakte Wert vorkommt.",
+      "none": "Nirgendwo sonst gefunden",
+      "noneDesc": "Dieser Wert kommt in keinem anderen Asset vor.",
+      "loadFailed": "Vorkommen konnten nicht geladen werden",
+      "foundIn": "In {{count}} Asset(s) gefunden"
     }
   }
 }
