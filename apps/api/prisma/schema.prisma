@@ -11,7 +11,6 @@ model Source {
   name                String
   description         String?        @db.Text
   type                AssetType
-  sourceCategory      SourceCategory @default(UNSTRUCTURED) @map("source_category")
   config              Json
   runnerStatus        RunnerStatus?  @default(PENDING) @map("runner_status")
   consecutiveFailures Int            @default(0) @map("consecutive_failures")
@@ -441,12 +440,6 @@ model McpAccessToken {
   @@index([revokedAt])
   @@index([lastUsedAt])
   @@map("mcp_access_tokens")
-}
-
-enum SourceCategory {
-  TABULAR
-  UNSTRUCTURED
-  SOCIAL_MEDIA
 }
 
 enum AssetType {
