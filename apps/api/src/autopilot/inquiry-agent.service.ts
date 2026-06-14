@@ -22,6 +22,7 @@ import { buildInquirySystemPrompt, buildInquiryUserPrompt } from './prompts';
 import { MAX_GLOSSARY_ENTRIES } from './autopilot.constants';
 import type {
   AgentContext,
+  DuplicateSummary,
   FindingGroupSummary,
   InquiryDecisionOutput,
   InquirySummary,
@@ -36,6 +37,7 @@ interface GatheredContext {
     title: string;
     description: string | null;
   }>;
+  duplicates: DuplicateSummary;
 }
 
 /**
@@ -75,19 +77,24 @@ export class InquiryAgentService {
 
   private async gatherContext(ctx: AgentContext): Promise<GatheredContext> {
     // Manual "steer" cycles review all open findings in scope, not the delta.
-    const [findingGroups, inquiries, archivedInquiries] = await Promise.all([
-      this.search.summarizeNewFindings(
-        ctx.sourceId,
-        ctx.manual ? null : ctx.runnerId,
-      ),
-      this.search.listActiveInquiries(),
-      this.search.listRecentlyArchivedInquiries(),
-    ]);
+    const [findingGroups, inquiries, archivedInquiries, duplicates] =
+      await Promise.all([
+        this.search.summarizeNewFindings(
+          ctx.sourceId,
+          ctx.manual ? null : ctx.runnerId,
+        ),
+        this.search.listActiveInquiries(),
+        this.search.listRecentlyArchivedInquiries(),
+        this.search.summarizeDuplicatesForRunner(
+          ctx.sourceId,
+          ctx.manual ? null : ctx.runnerId,
+        ),
+      ]);
     await this.log.business(
       ctx.run.id,
-      `Observed ${findingGroups.reduce((n, g) => n + g.count, 0)} open finding(s) in ${findingGroups.length} group(s) across ${ctx.sourceName}; ${inquiries.length} active inquiries to compare against.`,
+      `Observed ${findingGroups.reduce((n, g) => n + g.count, 0)} open finding(s) in ${findingGroups.length} group(s) across ${ctx.sourceName}; ${inquiries.length} active inquiries to compare against; ${duplicates.clusters.length} duplicate cluster(s) in scope.`,
     );
-    return { findingGroups, inquiries, archivedInquiries };
+    return { findingGroups, inquiries, archivedInquiries, duplicates };
   }
 
   private async recallMemory(ctx: AgentContext): Promise<RecalledMemory[]> {
@@ -114,7 +121,7 @@ export class InquiryAgentService {
   }
 
   private async decide(ctx: AgentContext): Promise<InquiryDecisionOutput> {
-    const { findingGroups, inquiries, archivedInquiries } =
+    const { findingGroups, inquiries, archivedInquiries, duplicates } =
       stepOutput<GatheredContext>(ctx, 'gather-context');
     const memories = stepOutput<RecalledMemory[]>(ctx, 'recall-memory');
 
@@ -152,6 +159,7 @@ export class InquiryAgentService {
         inquiries,
         archivedInquiries,
         memories,
+        duplicates,
         part,
       });
 

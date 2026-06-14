@@ -132,7 +132,8 @@ export interface AgentRunDetailDto {
 export const AgentRunDetailDtoAgentKindEnum = {
     Inquiry: 'INQUIRY',
     Case: 'CASE',
-    Dream: 'DREAM'
+    Dream: 'DREAM',
+    Duplicates: 'DUPLICATES'
 } as const;
 export type AgentRunDetailDtoAgentKindEnum = typeof AgentRunDetailDtoAgentKindEnum[keyof typeof AgentRunDetailDtoAgentKindEnum];
 

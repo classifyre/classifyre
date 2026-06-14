@@ -101,6 +101,12 @@ All URIs are relative to *http://localhost*
 *CasesApi* | [**casesControllerRemoveFinding**](docs/CasesApi.md#casescontrollerremovefinding) | **DELETE** /cases/{id}/findings/{caseFindingId} | Remove a finding from the case
 *CasesApi* | [**casesControllerUnlinkInquiry**](docs/CasesApi.md#casescontrollerunlinkinquiry) | **DELETE** /cases/{id}/inquiries/{inquiryId} | Unlink an inquiry from a case (the inquiry is untouched)
 *CasesApi* | [**casesControllerUpdate**](docs/CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case
+*CorrelationApi* | [**correlationControllerCaseAction**](docs/CorrelationApi.md#correlationcontrollercaseaction) | **POST** /correlation/case-action | Create a case (or add to one) from assets selected in the fingerprints graph
+*CorrelationApi* | [**correlationControllerGetConfig**](docs/CorrelationApi.md#correlationcontrollergetconfig) | **GET** /correlation/config | Correlation tuning: per-label weights (dynamic) + match thresholds
+*CorrelationApi* | [**correlationControllerGraph**](docs/CorrelationApi.md#correlationcontrollergraph) | **GET** /correlation/graph | Correlation (\&quot;evidence fingerprints\&quot;) graph: assets linked through the findings they share
+*CorrelationApi* | [**correlationControllerOccurrences**](docs/CorrelationApi.md#correlationcontrolleroccurrences) | **GET** /findings/occurrences | Where else a normalized finding value appears (reverse index)
+*CorrelationApi* | [**correlationControllerRecompute**](docs/CorrelationApi.md#correlationcontrollerrecompute) | **POST** /assets/{id}/recompute-correlation | Recompute correlation for a single asset (on demand)
+*CorrelationApi* | [**correlationControllerUpdateConfig**](docs/CorrelationApi.md#correlationcontrollerupdateconfig) | **PUT** /correlation/config | Update correlation tuning and schedule a full recompute (logged)
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerCoverage**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollercoverage) | **GET** /custom-detectors/{id}/extractions/coverage | 
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerGetByFinding**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollergetbyfinding) | **GET** /findings/{findingId}/extraction | 
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerSearch**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollersearch) | **GET** /custom-detectors/{id}/extractions | 
@@ -251,6 +257,8 @@ All URIs are relative to *http://localhost*
 - [BulkIngestEdgesResponseDto](docs/BulkIngestEdgesResponseDto.md)
 - [BulkUpdateFindingsDto](docs/BulkUpdateFindingsDto.md)
 - [BulkUpdateFindingsResponseDto](docs/BulkUpdateFindingsResponseDto.md)
+- [CaseActionRequestDto](docs/CaseActionRequestDto.md)
+- [CaseActionResponseDto](docs/CaseActionResponseDto.md)
 - [CaseActivityDto](docs/CaseActivityDto.md)
 - [CaseEvidenceDto](docs/CaseEvidenceDto.md)
 - [CaseFindingDto](docs/CaseFindingDto.md)
@@ -261,6 +269,8 @@ All URIs are relative to *http://localhost*
 - [CliRunnerControllerUpdateRunnerStatusRequest](docs/CliRunnerControllerUpdateRunnerStatusRequest.md)
 - [CloseCaseDto](docs/CloseCaseDto.md)
 - [CloseCaseResponseDto](docs/CloseCaseResponseDto.md)
+- [CorrelationConfigResponseDto](docs/CorrelationConfigResponseDto.md)
+- [CorrelationLabelWeightDto](docs/CorrelationLabelWeightDto.md)
 - [CreateAgentMemoryDto](docs/CreateAgentMemoryDto.md)
 - [CreateAiProviderConfigDto](docs/CreateAiProviderConfigDto.md)
 - [CreateCaseDto](docs/CreateCaseDto.md)
@@ -340,6 +350,7 @@ All URIs are relative to *http://localhost*
 - [PullFromInquiryDto](docs/PullFromInquiryDto.md)
 - [PullFromInquiryResponseDto](docs/PullFromInquiryResponseDto.md)
 - [RebuildEdgesResponseDto](docs/RebuildEdgesResponseDto.md)
+- [RecomputeCorrelationResponseDto](docs/RecomputeCorrelationResponseDto.md)
 - [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)
 - [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
 - [RelationTypesResponseDto](docs/RelationTypesResponseDto.md)
@@ -421,6 +432,7 @@ All URIs are relative to *http://localhost*
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
 - [UpdateCaseDto](docs/UpdateCaseDto.md)
 - [UpdateCaseFindingNoteDto](docs/UpdateCaseFindingNoteDto.md)
+- [UpdateCorrelationConfigDto](docs/UpdateCorrelationConfigDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
 - [UpdateEdgeDto](docs/UpdateEdgeDto.md)
 - [UpdateEvidenceNoteDto](docs/UpdateEvidenceNoteDto.md)
@@ -433,6 +445,8 @@ All URIs are relative to *http://localhost*
 - [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)
 - [UpdateThreadDto](docs/UpdateThreadDto.md)
+- [ValueOccurrenceAssetDto](docs/ValueOccurrenceAssetDto.md)
+- [ValueOccurrencesResponseDto](docs/ValueOccurrencesResponseDto.md)
 
 ### Authorization
 
