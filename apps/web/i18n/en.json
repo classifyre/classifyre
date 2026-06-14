@@ -2118,7 +2118,10 @@
       "bundleTitle": "{{count}} shared values",
       "bundleBetween": "Shared across these assets:",
       "legendBundle": "Bundled link (>5 shared)",
-      "unconnected": "{{count}} asset(s) hidden with no visible connection (e.g. truncated or filtered)."
+      "unconnected": "{{count}} asset(s) hidden with no visible connection (e.g. truncated or filtered).",
+      "focusedHint": "Focused on {{count}} connected asset(s) — create/update a case from exactly these.",
+      "clearFocus": "Clear focus",
+      "focusHelp": "Click any node to focus its connections; everything else dims."
     },
     "tune": {
       "title": "Tune correlation",

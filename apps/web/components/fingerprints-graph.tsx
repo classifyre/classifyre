@@ -33,7 +33,12 @@ import { GraphCanvas } from "./case-graph/graph-canvas";
 import { useForceLayout } from "./case-graph/use-force-layout";
 import { usePanZoom } from "./case-graph/use-pan-zoom";
 import { nodesBBox } from "./case-graph/graph-utils";
-import { keyOf, type GraphSelection } from "./case-graph/graph-types";
+import {
+  keyOf,
+  nodeKey,
+  type GraphSelection,
+  type PathResult,
+} from "./case-graph/graph-types";
 import { CorrelationTuningDialog } from "./correlation-tuning-dialog";
 import { FingerprintsCaseDialog } from "./fingerprints-case-dialog";
 import { useTranslation } from "@/hooks/use-translation";
@@ -49,6 +54,38 @@ const BUNDLE_EDGE_PREFIX = "bundle-edge:";
 interface BundleDetail {
   assetIds: string[];
   values: Array<{ label: string; value: string }>;
+}
+
+/**
+ * The connected component (transitive neighbourhood) of a node — "everything
+ * connected to this thing". Clicking any node focuses its component; the rest of
+ * the graph dims and goes non-interactive, cutting cross-cluster noise.
+ */
+function focusComponent(
+  startKey: string,
+  edges: GraphEdgeDto[],
+): PathResult {
+  const adj = new Map<string, Array<{ key: string; edgeId: string }>>();
+  for (const e of edges) {
+    const a = nodeKey(e.fromType, e.fromId);
+    const b = nodeKey(e.toType, e.toId);
+    (adj.get(a) ?? adj.set(a, []).get(a)!).push({ key: b, edgeId: e.id });
+    (adj.get(b) ?? adj.set(b, []).get(b)!).push({ key: a, edgeId: e.id });
+  }
+  const nodeKeys = new Set<string>([startKey]);
+  const edgeIds = new Set<string>();
+  const queue = [startKey];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    for (const { key, edgeId } of adj.get(cur) ?? []) {
+      edgeIds.add(edgeId);
+      if (!nodeKeys.has(key)) {
+        nodeKeys.add(key);
+        queue.push(key);
+      }
+    }
+  }
+  return { nodeKeys, edgeIds };
 }
 
 /**
@@ -69,8 +106,15 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
   const [sourceFilter, setSourceFilter] = React.useState<string[]>([]);
   const [labelFilter, setLabelFilter] = React.useState<string[]>([]);
   const [selection, setSelection] = React.useState<GraphSelection>(null);
+  // Focused component ("path") around the last-clicked node; dims everything else.
+  const [path, setPath] = React.useState<PathResult | null>(null);
   const [tuneOpen, setTuneOpen] = React.useState(false);
   const [caseOpen, setCaseOpen] = React.useState(false);
+
+  const clearFocus = React.useCallback(() => {
+    setPath(null);
+    setSelection(null);
+  }, []);
 
   const load = React.useCallback(() => {
     let active = true;
@@ -315,6 +359,41 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
     [nodes],
   );
 
+  // A change in the underlying/filtered graph invalidates the focused path
+  // (its node keys may no longer exist → would dim everything).
+  React.useEffect(() => {
+    clearFocus();
+  }, [nodes, search, sourceFilter, labelFilter, clearFocus]);
+
+  // ── Click = focus this node's component (path); greyed nodes are inert ───────
+  const onNodeClick = React.useCallback(
+    (node: GraphNodeDto) => {
+      const key = keyOf(node);
+      if (path && !path.nodeKeys.has(key)) return; // dimmed → non-clickable
+      setPath(focusComponent(key, dEdges));
+      setSelection({ type: "node", key });
+    },
+    [path, dEdges],
+  );
+  const onEdgeClick = React.useCallback(
+    (edge: GraphEdgeDto) => {
+      if (path && !path.edgeIds.has(edge.id)) return;
+      setPath(focusComponent(nodeKey(edge.fromType, edge.fromId), dEdges));
+      setSelection({ type: "edge", id: edge.id });
+    },
+    [path, dEdges],
+  );
+
+  // When a path is focused, case actions pull exactly its assets.
+  const targetAssetIds = React.useMemo(() => {
+    if (!path) return visibleAssetIds;
+    const ids: string[] = [];
+    for (const key of path.nodeKeys) {
+      if (key.startsWith("asset:")) ids.push(key.slice("asset:".length));
+    }
+    return ids;
+  }, [path, visibleAssetIds]);
+
   const selectedNode =
     selection?.type === "node" ? (nodeIndex.get(selection.key) ?? null) : null;
   const selectedDetail: BundleDetail | null =
@@ -417,12 +496,12 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
             selection={selection}
             mode={SELECT_MODE}
             activeNodeKeys={null}
-            path={null}
-            onNodeClick={(node) => setSelection({ type: "node", key: keyOf(node) })}
+            path={path}
+            onNodeClick={onNodeClick}
             onNodeContextMenu={() => undefined}
-            onEdgeClick={(edge) => setSelection({ type: "edge", id: edge.id })}
+            onEdgeClick={onEdgeClick}
             onEdgeContextMenu={() => undefined}
-            onBackgroundClick={() => setSelection(null)}
+            onBackgroundClick={clearFocus}
             onAttachBadgeClick={() => undefined}
             onToggleCollapse={() => undefined}
           />
@@ -450,91 +529,92 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
 
         {/* ── Detail / actions rail ── */}
         <aside className="w-[260px] shrink-0 space-y-4 overflow-y-auto border-l-2 border-border bg-background p-3">
-          {selectedDetail ? (
-            <div className="space-y-3">
-              <Badge variant="outline" className="text-[10px] uppercase">
-                {t("correlation.fingerprints.bundleTitle", {
-                  count: String(selectedDetail.values.length),
-                })}
-              </Badge>
-              <p className="text-xs text-muted-foreground">
-                {t("correlation.fingerprints.bundleBetween")}
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {selectedDetail.assetIds.map((id) => (
-                  <a key={id} href={`/assets/${id}`} target="_blank" rel="noreferrer">
-                    <Badge variant="secondary" className="max-w-[220px] truncate">
-                      {assetLabel(id)}
-                    </Badge>
-                  </a>
-                ))}
-              </div>
-              <div className="max-h-[40vh] space-y-1 overflow-y-auto border-t border-border/60 pt-2">
-                {selectedDetail.values.map((v, i) => (
-                  <div
-                    key={`${v.value}-${i}`}
-                    className="flex items-center gap-2 rounded-[3px] px-1.5 py-1 text-xs"
-                  >
-                    <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
-                      {v.label}
-                    </span>
-                    <span className="truncate font-mono" title={v.value}>
-                      {v.value}
-                    </span>
+          {selection ? (
+            <div className="space-y-4">
+              {selectedDetail ? (
+                <div className="space-y-3">
+                  <Badge variant="outline" className="text-[10px] uppercase">
+                    {t("correlation.fingerprints.bundleTitle", {
+                      count: String(selectedDetail.values.length),
+                    })}
+                  </Badge>
+                  <p className="text-xs text-muted-foreground">
+                    {t("correlation.fingerprints.bundleBetween")}
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedDetail.assetIds.map((id) => (
+                      <a key={id} href={`/assets/${id}`} target="_blank" rel="noreferrer">
+                        <Badge variant="secondary" className="max-w-[220px] truncate">
+                          {assetLabel(id)}
+                        </Badge>
+                      </a>
+                    ))}
                   </div>
-                ))}
+                  <div className="max-h-[40vh] space-y-1 overflow-y-auto border-t border-border/60 pt-2">
+                    {selectedDetail.values.map((v, i) => (
+                      <div
+                        key={`${v.value}-${i}`}
+                        className="flex items-center gap-2 rounded-[3px] px-1.5 py-1 text-xs"
+                      >
+                        <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
+                          {v.label}
+                        </span>
+                        <span className="truncate font-mono" title={v.value}>
+                          {v.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : selectedNode && selectedNode.type === "asset" ? (
+                <div className="space-y-3">
+                  <Badge variant="outline" className="text-[10px] uppercase">
+                    {t("correlation.fingerprints.asset")}
+                  </Badge>
+                  <p className="break-words font-mono text-sm font-semibold">
+                    {selectedNode.label}
+                  </p>
+                  <Button size="sm" variant="outline" asChild className="w-full">
+                    <a href={`/assets/${selectedNode.id}`} target="_blank" rel="noreferrer">
+                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                      {t("correlation.fingerprints.openAsset")}
+                    </a>
+                  </Button>
+                </div>
+              ) : selectedNode ? (
+                <div className="space-y-3">
+                  <Badge variant="outline" className="text-[10px] uppercase">
+                    {t("correlation.fingerprints.sharedValue")}
+                  </Badge>
+                  <p className="break-words font-mono text-sm font-semibold">
+                    {selectedNode.label}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("correlation.fingerprints.sharedValueHint")}
+                  </p>
+                </div>
+              ) : null}
+
+              {/* Focused-path actions: pull exactly the connected assets. */}
+              <div className="space-y-2 border-t border-border/60 pt-3">
+                <p className="text-xs text-muted-foreground">
+                  {t("correlation.fingerprints.focusedHint", {
+                    count: String(targetAssetIds.length),
+                  })}
+                </p>
+                <Button
+                  size="sm"
+                  className="w-full"
+                  disabled={targetAssetIds.length === 0}
+                  onClick={() => setCaseOpen(true)}
+                >
+                  <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
+                  {t("correlation.fingerprints.useInCase")}
+                </Button>
+                <Button size="sm" variant="ghost" className="w-full" onClick={clearFocus}>
+                  {t("correlation.fingerprints.clearFocus")}
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="w-full"
-                onClick={() => setSelection(null)}
-              >
-                {t("correlation.fingerprints.backToActions")}
-              </Button>
-            </div>
-          ) : selectedNode && selectedNode.type === "asset" ? (
-            <div className="space-y-3">
-              <Badge variant="outline" className="text-[10px] uppercase">
-                {t("correlation.fingerprints.asset")}
-              </Badge>
-              <p className="break-words font-mono text-sm font-semibold">
-                {selectedNode.label}
-              </p>
-              <Button size="sm" variant="outline" asChild className="w-full">
-                <a href={`/assets/${selectedNode.id}`} target="_blank" rel="noreferrer">
-                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                  {t("correlation.fingerprints.openAsset")}
-                </a>
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="w-full"
-                onClick={() => setSelection(null)}
-              >
-                {t("correlation.fingerprints.backToActions")}
-              </Button>
-            </div>
-          ) : selectedNode ? (
-            <div className="space-y-3">
-              <Badge variant="outline" className="text-[10px] uppercase">
-                {t("correlation.fingerprints.sharedValue")}
-              </Badge>
-              <p className="break-words font-mono text-sm font-semibold">
-                {selectedNode.label}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {t("correlation.fingerprints.sharedValueHint")}
-              </p>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="w-full"
-                onClick={() => setSelection(null)}
-              >
-                {t("correlation.fingerprints.backToActions")}
-              </Button>
             </div>
           ) : (
             <>
@@ -556,6 +636,9 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
                   <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
                   {t("correlation.fingerprints.useInCase")}
                 </Button>
+                <p className="text-[11px] text-muted-foreground">
+                  {t("correlation.fingerprints.focusHelp")}
+                </p>
               </div>
 
               <div className="space-y-2 border-t border-border/60 pt-3">
@@ -596,7 +679,7 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
       <FingerprintsCaseDialog
         open={caseOpen}
         onOpenChange={setCaseOpen}
-        assetIds={visibleAssetIds}
+        assetIds={targetAssetIds}
       />
     </div>
   );

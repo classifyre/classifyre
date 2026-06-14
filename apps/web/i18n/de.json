@@ -2118,7 +2118,10 @@
       "bundleTitle": "{{count}} gemeinsame Werte",
       "bundleBetween": "Geteilt zwischen diesen Assets:",
       "legendBundle": "Gebündelte Verbindung (>5 geteilt)",
-      "unconnected": "{{count}} Asset(s) ohne sichtbare Verbindung ausgeblendet (z. B. abgeschnitten oder gefiltert)."
+      "unconnected": "{{count}} Asset(s) ohne sichtbare Verbindung ausgeblendet (z. B. abgeschnitten oder gefiltert).",
+      "focusedHint": "Fokus auf {{count}} verbundene(s) Asset(s) — genau daraus einen Fall erstellen/aktualisieren.",
+      "clearFocus": "Fokus aufheben",
+      "focusHelp": "Auf einen Knoten klicken, um seine Verbindungen zu fokussieren; der Rest wird abgeblendet."
     },
     "tune": {
       "title": "Korrelation justieren",
