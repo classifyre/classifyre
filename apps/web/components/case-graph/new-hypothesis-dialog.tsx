@@ -20,6 +20,7 @@ import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Loader2 } from "lucide-react";
+import { useTranslation } from "@/hooks/use-translation";
 
 export interface NewHypothesisDialogProps {
   open: boolean;
@@ -37,6 +38,7 @@ export function NewHypothesisDialog({
   linkNodeLabel,
   onCreated,
 }: NewHypothesisDialogProps) {
+  const { t } = useTranslation();
   const [title, setTitle] = React.useState("");
   const [statement, setStatement] = React.useState("");
   const [saving, setSaving] = React.useState(false);
@@ -60,12 +62,12 @@ export function NewHypothesisDialog({
           statement: statement.trim() || undefined,
         },
       });
-      toast.success("Hypothesis created");
+      toast.success(t("caseGraph.newHypothesisDialog.hypothesisCreated"));
       onOpenChange(false);
       onCreated(thread);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to create hypothesis");
+      toast.error(t("caseGraph.newHypothesisDialog.failedToCreate"));
     } finally {
       setSaving(false);
     }
@@ -75,40 +77,40 @@ export function NewHypothesisDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New hypothesis</DialogTitle>
+          <DialogTitle>{t("caseGraph.newHypothesisDialog.title")}</DialogTitle>
           <DialogDescription>
             {linkNodeLabel
-              ? `“${linkNodeLabel}” will be linked to it as the first piece of evidence.`
-              : "A competing explanation you can attach supporting or contradicting evidence to."}
+              ? t("caseGraph.newHypothesisDialog.linkedNode", { label: linkNodeLabel })
+              : t("caseGraph.newHypothesisDialog.description")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label>Title</Label>
+            <Label>{t("caseGraph.newHypothesisDialog.titleLabel")}</Label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Credentials leaked through CI logs"
+              placeholder={t("caseGraph.newHypothesisDialog.titlePlaceholder")}
               autoFocus
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Statement (optional)</Label>
+            <Label>{t("caseGraph.newHypothesisDialog.statementLabel")}</Label>
             <Textarea
               value={statement}
               onChange={(e) => setStatement(e.target.value)}
-              placeholder="What exactly does this hypothesis claim, and what would prove or refute it?"
+              placeholder={t("caseGraph.newHypothesisDialog.statementPlaceholder")}
               rows={3}
             />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={create} disabled={!title.trim() || saving}>
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Create hypothesis
+            {t("caseGraph.newHypothesisDialog.create")}
           </Button>
         </DialogFooter>
       </DialogContent>

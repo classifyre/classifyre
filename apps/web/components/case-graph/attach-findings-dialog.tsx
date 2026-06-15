@@ -16,6 +16,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { SeverityBadge } from "@workspace/ui/components/severity-badge";
 import { Loader2 } from "lucide-react";
+import { useTranslation } from "@/hooks/use-translation";
 
 export interface AttachFindingsDialogProps {
   open: boolean;
@@ -36,6 +37,7 @@ export function AttachFindingsDialog({
   onAttached,
 }: AttachFindingsDialogProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [saving, setSaving] = React.useState(false);
 
@@ -59,12 +61,12 @@ export function AttachFindingsDialog({
         id: caseId,
         attachFindingsDto: { findingIds: Array.from(selected) },
       });
-      toast.success(`Attached ${res.attached} finding${res.attached === 1 ? "" : "s"} as evidence`);
+      toast.success(t("caseGraph.attachDialog.attached", { count: String(res.attached) }));
       onOpenChange(false);
       onAttached();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to attach findings");
+      toast.error(t("caseGraph.attachDialog.failedToAttach"));
     } finally {
       setSaving(false);
     }
@@ -74,10 +76,12 @@ export function AttachFindingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Unattached findings</DialogTitle>
+          <DialogTitle>{t("caseGraph.attachDialog.title")}</DialogTitle>
           <DialogDescription>
-            {asset?.label} has {findings.length} finding{findings.length === 1 ? "" : "s"} that are
-            not part of this case yet. Attach the relevant ones as evidence.
+            {t("caseGraph.attachDialog.description", {
+              label: asset?.label ?? "",
+              count: String(findings.length),
+            })}
           </DialogDescription>
         </DialogHeader>
 
@@ -119,15 +123,15 @@ export function AttachFindingsDialog({
               router.push(`/investigations/${caseId}/evidence/add${asset ? `?assetId=${asset.id}` : ""}`)
             }
           >
-            Open full picker
+            {t("caseGraph.attachDialog.openFullPicker")}
           </Button>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={attach} disabled={selected.size === 0 || saving}>
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Attach {selected.size > 0 ? selected.size : ""} finding{selected.size === 1 ? "" : "s"}
+              {t("caseGraph.attachDialog.attachFindings", { count: String(selected.size) })}
             </Button>
           </div>
         </DialogFooter>

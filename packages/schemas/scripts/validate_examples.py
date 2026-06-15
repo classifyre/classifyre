@@ -31,6 +31,7 @@ TYPE_TO_DEFINITION = {
     "SQLITE": "SQLiteInput",
     "NOTION": "NotionInput",
     "EMAIL": "EmailInput",
+    "YOUTUBE": "YouTubeInput",
 }
 
 SCHEMAS_DIR = Path(__file__).parent.parent / "src" / "schemas"

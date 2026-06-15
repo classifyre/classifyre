@@ -21,7 +21,6 @@ import {
   SearchSourceItemDto,
   SearchSourcesResponseDto,
 } from './dto/search-sources-response.dto';
-import { getSourceCategory } from './dto/source-type-schema';
 
 /**
  * Round-trip the config through JSON serialization to:
@@ -148,7 +147,6 @@ export class SourceService {
         name,
         description: description ?? null,
         type: assetType,
-        sourceCategory: getSourceCategory(type),
         config: assertSerializableConfig(encryptedConfig),
       },
     });

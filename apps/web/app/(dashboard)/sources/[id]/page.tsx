@@ -41,6 +41,8 @@ import {
 import { isIngestionSourceType } from "@workspace/ui/components/source-icon";
 import { getSourceLabel } from "@workspace/schemas/source-labels";
 import { AssetsTable } from "@/components/assets-table";
+import { FingerprintsGraph } from "@/components/fingerprints-graph";
+import { AssetLinksGraph } from "@/components/asset-links-graph";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { DeleteSourceAction } from "@/components/delete-source-action";
 import { FindingsTable } from "@/components/findings-table";
@@ -467,6 +469,9 @@ export default function SourceViewPage() {
           <TabsTrigger value="assets" className="rounded-[3px]">
             {t("sources.detail.tabAssets")}
           </TabsTrigger>
+          <TabsTrigger value="fingerprints" className="rounded-[3px]">
+            {t("sources.detail.tabFingerprints")}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -491,6 +496,15 @@ export default function SourceViewPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+
+          <div>
+            <h2 className="mb-2 font-serif text-sm font-black uppercase tracking-[0.08em]">
+              {t("links.title")}
+            </h2>
+            <div className="h-[480px]">
+              <AssetLinksGraph sourceId={sourceId} />
+            </div>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
@@ -788,6 +802,12 @@ export default function SourceViewPage() {
           <Suspense>
             <AssetsTable scope={{ sourceId }} />
           </Suspense>
+        </TabsContent>
+
+        <TabsContent value="fingerprints" className="space-y-4">
+          <div className="h-[72vh]">
+            <FingerprintsGraph sourceId={sourceId} />
+          </div>
         </TabsContent>
       </Tabs>
 

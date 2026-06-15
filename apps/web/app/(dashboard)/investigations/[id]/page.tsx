@@ -65,6 +65,7 @@ import { DetailBackButton } from "@/components/detail-back-button";
 import { EvidenceTable } from "@/components/evidence-table";
 import { CaseThreads } from "@/components/case-threads";
 import { CaseTimeline } from "@/components/case-timeline";
+import { useTranslation } from "@/hooks/use-translation";
 
 const CaseGraphView = dynamic(
   () => import("@/components/case-graph/case-graph-view").then((m) => m.CaseGraphView),
@@ -95,6 +96,7 @@ function CaseWorkspaceInner() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const caseId = params.id as string;
 
   const urlTab = searchParams.get("tab");
@@ -221,11 +223,11 @@ function CaseWorkspaceInner() {
         id: caseId,
         updateCaseDto: { aiMode: mode as never },
       });
-      toast.success("AI mode updated");
+      toast.success(t("investigations.caseDetail.aiModeUpdated"));
       reloadAll();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to change AI mode");
+      toast.error(t("investigations.caseDetail.failedToChangeAiMode"));
     }
   };
 
@@ -235,11 +237,11 @@ function CaseWorkspaceInner() {
         id: caseId,
         updateCaseDto: { status: status as never },
       });
-      toast.success(`Status set to ${status.replace("_", " ").toLowerCase()}`);
+      toast.success(t("investigations.caseDetail.statusSet", { status: status.replace("_", " ").toLowerCase() }));
       reloadAll();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to change status");
+      toast.error(t("investigations.caseDetail.failedToChangeStatus"));
     }
   };
 
@@ -247,11 +249,11 @@ function CaseWorkspaceInner() {
     setSavingConclusion(true);
     try {
       await api.cases.casesControllerUpdate({ id: caseId, updateCaseDto: { conclusion } });
-      toast.success("Conclusion saved");
+      toast.success(t("investigations.caseDetail.conclusionSaved"));
       reloadAll();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to save conclusion");
+      toast.error(t("investigations.caseDetail.failedToSaveConclusion"));
     } finally {
       setSavingConclusion(false);
     }
@@ -266,14 +268,14 @@ function CaseWorkspaceInner() {
       });
       toast.success(
         res.archivedInquiries > 0
-          ? `Case closed — ${res.archivedInquiries} inquir${res.archivedInquiries === 1 ? "y" : "ies"} archived`
-          : "Case closed",
+          ? t("investigations.caseDetail.caseClosedWithArchived", { count: String(res.archivedInquiries), suffix: res.archivedInquiries === 1 ? "y" : "ies" })
+          : t("investigations.caseDetail.caseClosed"),
       );
       setCaseData(res._case);
       reloadAll();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to close case");
+      toast.error(t("investigations.caseDetail.failedToCloseCase"));
     } finally {
       setClosing(false);
     }
@@ -289,12 +291,12 @@ function CaseWorkspaceInner() {
         id: caseId,
         linkInquiriesDto: { inquiryIds: [inquiryToLink] },
       });
-      toast.success("Inquiry linked");
+      toast.success(t("investigations.caseDetail.inquiryLinked"));
       setInquiryToLink("");
       reloadAll();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to link inquiry");
+      toast.error(t("investigations.caseDetail.failedToLinkInquiry"));
     } finally {
       setLinkingInquiry(false);
     }
@@ -303,11 +305,11 @@ function CaseWorkspaceInner() {
   const unlinkInquiry = async (inquiryId: string) => {
     try {
       await api.cases.casesControllerUnlinkInquiry({ id: caseId, inquiryId });
-      toast.success("Inquiry unlinked");
+      toast.success(t("investigations.caseDetail.inquiryUnlinked"));
       reloadAll();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to unlink inquiry");
+      toast.error(t("investigations.caseDetail.failedToUnlinkInquiry"));
     }
   };
 
@@ -318,11 +320,11 @@ function CaseWorkspaceInner() {
         id: caseId,
         pullFromInquiryDto: { inquiryId },
       });
-      toast.success(`Pulled ${res.pulled} finding${res.pulled === 1 ? "" : "s"} into evidence`);
+      toast.success(t("investigations.caseDetail.pulled", { count: String(res.pulled) }));
       reloadAll();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to pull matches");
+      toast.error(t("investigations.caseDetail.failedToPull"));
     } finally {
       setPulling(null);
     }
@@ -345,7 +347,7 @@ function CaseWorkspaceInner() {
       });
     } catch (err) {
       console.error(err);
-      toast.error("Failed to save note");
+      toast.error(t("investigations.caseDetail.failedToSaveNote"));
     }
   };
   const updateFindingNote = async (caseFindingId: string, note: string) => {
@@ -357,7 +359,7 @@ function CaseWorkspaceInner() {
       });
     } catch (err) {
       console.error(err);
-      toast.error("Failed to save note");
+      toast.error(t("investigations.caseDetail.failedToSaveNote"));
     }
   };
 
@@ -385,7 +387,7 @@ function CaseWorkspaceInner() {
   if (!caseData) {
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading case…
+        <Loader2 className="h-4 w-4 animate-spin" /> {t("investigations.caseDetail.loading")}
       </div>
     );
   }
@@ -434,7 +436,7 @@ function CaseWorkspaceInner() {
               onClick={() => setAiDialogOpen(true)}
             >
               <Bot className="h-3.5 w-3.5 text-[color:var(--color-amber-600,#d97706)]" />{" "}
-              Run AI
+              {t("investigations.caseDetail.runAI")}
             </Button>
           )}
           <AiModeSelect
@@ -457,7 +459,7 @@ function CaseWorkspaceInner() {
           )}
           {isClosed && (
             <Button variant="outline" size="sm" onClick={reopen}>
-              <RotateCcw className="h-3.5 w-3.5" /> Reopen
+              <RotateCcw className="h-3.5 w-3.5" /> {t("investigations.caseDetail.reopen")}
             </Button>
           )}
         </div>
@@ -483,8 +485,7 @@ function CaseWorkspaceInner() {
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
             <p className="text-sm">
               <Sparkles className="mr-1.5 inline h-4 w-4 text-[color:var(--color-amber-600,#d97706)]" />
-              {newMatchTotal} new match{newMatchTotal === 1 ? "" : "es"} appeared in the
-              linked inquir{linkedInquiries.length === 1 ? "y" : "ies"} since last review.
+              {t("investigations.caseDetail.newMatchesBanner", { count: String(newMatchTotal) })}
             </p>
             <Button
               size="sm"
@@ -495,7 +496,7 @@ function CaseWorkspaceInner() {
                 router.push(`/investigations/inquiries/${target?.id}?caseId=${caseId}`);
               }}
             >
-              Review matches <ArrowRight className="h-3.5 w-3.5" />
+              {t("investigations.caseDetail.reviewMatches")} <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </CardContent>
         </Card>
@@ -505,16 +506,16 @@ function CaseWorkspaceInner() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <TabsList>
             <TabsTrigger value="graph">
-              <Workflow className="h-3.5 w-3.5" /> Graph
+              <Workflow className="h-3.5 w-3.5" /> {t("investigations.caseDetail.tabGraph")}
             </TabsTrigger>
             <TabsTrigger value="evidence">
-              <Paperclip className="h-3.5 w-3.5" /> Evidence ({evidence.length})
+              <Paperclip className="h-3.5 w-3.5" /> {t("investigations.caseDetail.tabEvidence")} ({evidence.length})
             </TabsTrigger>
             <TabsTrigger value="threads">
-              <Lightbulb className="h-3.5 w-3.5" /> Threads ({threads.length})
+              <Lightbulb className="h-3.5 w-3.5" /> {t("investigations.caseDetail.tabThreads")} ({threads.length})
             </TabsTrigger>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-            <TabsTrigger value="overview">Case file</TabsTrigger>
+            <TabsTrigger value="timeline">{t("investigations.caseDetail.tabTimeline")}</TabsTrigger>
+            <TabsTrigger value="overview">{t("investigations.caseDetail.tabCaseFile")}</TabsTrigger>
           </TabsList>
           <p className="text-muted-foreground hidden font-mono text-[10px] uppercase tracking-[0.14em] lg:block">
             {evidence.length} evidence · {findingCount} finding{findingCount === 1 ? "" : "s"} ·{" "}
@@ -528,7 +529,7 @@ function CaseWorkspaceInner() {
           <div className="h-[calc(100vh-300px)] min-h-[520px]">
             {graphLoading && nodes.length === 0 ? (
               <div className="text-muted-foreground flex h-full items-center justify-center gap-2 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" /> Building graph…
+                <Loader2 className="h-4 w-4 animate-spin" /> {t("investigations.caseDetail.buildingGraph")}
               </div>
             ) : nodes.length > 0 ? (
               <CaseGraphView
@@ -544,14 +545,14 @@ function CaseWorkspaceInner() {
             ) : (
               <div className="flex h-full items-center justify-center border-2 border-border bg-card">
                 <EmptyState
-                  title="Empty graph"
-                  description="Add evidence to seed the relationship graph — pull matches from a linked inquiry or attach findings directly."
+                  title={t("investigations.caseDetail.emptyGraph")}
+                  description={t("investigations.caseDetail.emptyGraphDesc")}
                   action={{
-                    label: "Add evidence",
+                    label: t("investigations.caseDetail.addEvidence"),
                     onClick: () => router.push(`/investigations/${caseId}/evidence/add`),
                   }}
                   secondaryAction={{
-                    label: "Open case file",
+                    label: t("investigations.caseDetail.openCaseFile"),
                     onClick: () => changeTab("overview"),
                   }}
                 />
@@ -566,16 +567,16 @@ function CaseWorkspaceInner() {
             {/* ── Conclusion / close flow ── */}
             <div className="space-y-3">
               <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
-                Conclusion
+                {t("investigations.caseDetail.conclusion")}
               </p>
               {isClosed ? (
                 <Card>
                   <CardContent className="space-y-2 p-4">
                     <p className="flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400">
-                      <CheckCircle2 className="h-4 w-4" /> Case closed
+                      <CheckCircle2 className="h-4 w-4" /> {t("investigations.caseDetail.caseClosed")}
                     </p>
                     <p className="whitespace-pre-wrap text-sm">
-                      {caseData.conclusion || "No conclusion recorded."}
+                      {caseData.conclusion || t("investigations.caseDetail.noConclusion")}
                     </p>
                   </CardContent>
                 </Card>
@@ -584,7 +585,7 @@ function CaseWorkspaceInner() {
                   <Textarea
                     value={conclusion}
                     onChange={(e) => setConclusion(e.target.value)}
-                    placeholder="Summarize what the evidence shows, which hypothesis it supports, and how strongly. Closing the case archives its inquiry."
+                    placeholder={t("investigations.caseDetail.conclusionDesc")}
                     rows={6}
                   />
                   <div className="flex items-center gap-2">
@@ -594,34 +595,30 @@ function CaseWorkspaceInner() {
                       onClick={saveConclusion}
                       disabled={savingConclusion}
                     >
-                      <Save className="h-3.5 w-3.5" /> Save draft
+                      <Save className="h-3.5 w-3.5" /> {t("investigations.caseDetail.saveDraft")}
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button size="sm" disabled={closing || conclusion.trim().length === 0}>
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Close case
+                          <CheckCircle2 className="h-3.5 w-3.5" /> {t("investigations.caseDetail.closeCase")}
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Close this case?</AlertDialogTitle>
+                          <AlertDialogTitle>{t("investigations.caseDetail.closeCaseTitle")}</AlertDialogTitle>
                           <AlertDialogDescription>
-                            The conclusion is recorded, the case is marked closed and{" "}
-                            {linkedInquiries.length > 0
-                              ? "its linked inquiry is archived (it stops surfacing new matches)."
-                              : "no inquiries are affected."}{" "}
-                            You can reopen later.
+                            {t("investigations.caseDetail.closeCaseDesc")}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={closeCase}>Close case</AlertDialogAction>
+                          <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                          <AlertDialogAction onClick={closeCase}>{t("investigations.caseDetail.closeCase")}</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
                     {conclusion.trim().length === 0 && (
                       <span className="text-muted-foreground text-xs">
-                        a conclusion is required to close
+                        {t("investigations.caseDetail.conclusionRequired")}
                       </span>
                     )}
                   </div>
@@ -633,13 +630,12 @@ function CaseWorkspaceInner() {
             <div className="space-y-5">
               <div className="space-y-2">
                 <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
-                  Driving inquiries ({linkedInquiries.length})
+                  {t("investigations.caseDetail.drivingInquiries")} ({linkedInquiries.length})
                 </p>
                 {linkedInquiries.length === 0 && (
                   <Card>
                     <CardContent className="text-muted-foreground p-3 text-xs">
-                      No inquiry linked — evidence is added manually. Link one below to pull
-                      its matches as evidence.
+                      {t("investigations.caseDetail.noInquiryLinked")}
                     </CardContent>
                   </Card>
                 )}
@@ -666,7 +662,7 @@ function CaseWorkspaceInner() {
                             size="icon"
                             variant="ghost"
                             className="h-6 w-6"
-                            aria-label="Edit inquiry query"
+                            aria-label={t("investigations.caseDetail.editInquiryQuery")}
                             onClick={() =>
                               router.push(`/investigations/inquiries/${q.id}/edit`)
                             }
@@ -681,23 +677,22 @@ function CaseWorkspaceInner() {
                                 size="icon"
                                 variant="ghost"
                                 className="h-6 w-6 text-muted-foreground"
-                                aria-label="Unlink inquiry"
+                                aria-label={t("investigations.caseDetail.unlinkInquiry")}
                               >
                                 <X className="h-3 w-3" />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Unlink “{q.title}”?</AlertDialogTitle>
+                                <AlertDialogTitle>{t("investigations.caseDetail.unlinkInquiryTitle", { title: q.title })}</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  The inquiry and the evidence already pulled from it are
-                                  kept — only the link to this case is removed.
+                                  {t("investigations.caseDetail.unlinkInquiryDesc")}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => unlinkInquiry(q.id)}>
-                                  Unlink
+                                  {t("investigations.caseDetail.unlink")}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -723,21 +718,21 @@ function CaseWorkspaceInner() {
                               router.push(`/investigations/inquiries/${q.id}?caseId=${caseId}`)
                             }
                           >
-                            Select matches to pull <ArrowRight className="h-3.5 w-3.5" />
+                            {t("investigations.caseDetail.selectMatchesToPull")} <ArrowRight className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             disabled={pulling === q.id}
                             onClick={() => pullInquiry(q.id)}
-                            title="Pull all current matches"
+                            title={t("investigations.caseDetail.pullAllMatches")}
                           >
                             {pulling === q.id ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
                               <DownloadCloud className="h-3.5 w-3.5" />
                             )}
-                            All
+                            {t("investigations.caseDetail.all")}
                           </Button>
                         </div>
                       )}
@@ -748,7 +743,7 @@ function CaseWorkspaceInner() {
                   <div className="flex gap-1.5">
                     <Select value={inquiryToLink} onValueChange={setInquiryToLink}>
                       <SelectTrigger className="h-8 flex-1 text-xs">
-                        <SelectValue placeholder="Link another inquiry…" />
+                        <SelectValue placeholder={t("investigations.caseDetail.linkAnotherInquiry")} />
                       </SelectTrigger>
                       <SelectContent>
                         {linkableInquiries.map((q) => (
@@ -770,7 +765,7 @@ function CaseWorkspaceInner() {
                       ) : (
                         <Link2 className="h-3.5 w-3.5" />
                       )}
-                      Link
+                      {t("investigations.caseDetail.link")}
                     </Button>
                   </div>
                 )}
@@ -779,17 +774,17 @@ function CaseWorkspaceInner() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
-                    Recent activity
+                    {t("investigations.caseDetail.recentActivity")}
                   </p>
                   <button
                     className="text-muted-foreground text-xs underline"
                     onClick={() => changeTab("timeline")}
                   >
-                    Full timeline
+                    {t("investigations.caseDetail.fullTimeline")}
                   </button>
                 </div>
                 {recentActivity.length === 0 ? (
-                  <p className="text-muted-foreground text-xs">No activity yet.</p>
+                  <p className="text-muted-foreground text-xs">{t("investigations.caseDetail.noActivity")}</p>
                 ) : (
                   <div className="divide-y divide-border rounded-[4px] border-2 border-border bg-card">
                     {recentActivity.map((a) => (
@@ -812,9 +807,7 @@ function CaseWorkspaceInner() {
         {/* ════ Evidence ════ */}
         <TabsContent value="evidence" className="space-y-4">
           <p className="text-muted-foreground max-w-2xl text-xs">
-            The persisted record of this case — snapshots survive even if the source data
-            changes. Pull from the driving inquiry on the Overview tab, or attach findings
-            directly.
+            {t("investigations.caseDetail.evidenceTabDesc")}
           </p>
           <EvidenceTable
             evidence={evidence}

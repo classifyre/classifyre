@@ -264,6 +264,15 @@ function normalizeSampling(config: JsonRecord) {
     delete sampling.enable_ocr;
   }
 
+  const enableTranscription =
+    asBoolean(sampling.enable_transcription) ??
+    asBoolean(optionalSampling?.enable_transcription);
+  if (typeof enableTranscription === 'boolean') {
+    sampling.enable_transcription = enableTranscription;
+  } else {
+    delete sampling.enable_transcription;
+  }
+
   removeUndefinedKeys(sampling);
   config.sampling = sampling;
 

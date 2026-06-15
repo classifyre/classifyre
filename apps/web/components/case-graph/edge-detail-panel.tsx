@@ -5,6 +5,7 @@ import type { GraphEdgeDto, GraphNodeDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Pencil, Trash2 } from "lucide-react";
 import { SectionTitle } from "./graph-sidebar";
+import { useTranslation } from "@/hooks/use-translation";
 
 export interface EdgeDetailPanelProps {
   edge: GraphEdgeDto;
@@ -24,6 +25,7 @@ function EndpointButton({
   node: GraphNodeDto | undefined;
   onClick: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-baseline gap-2">
       <span className="w-9 shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
@@ -35,7 +37,7 @@ function EndpointButton({
           {node.label}
         </button>
       ) : (
-        <span className="text-xs text-muted-foreground">not in view</span>
+        <span className="text-xs text-muted-foreground">{t("caseGraph.edgeDetail.notInView")}</span>
       )}
     </div>
   );
@@ -49,21 +51,22 @@ export function EdgeDetailPanel({
   onRename,
   onDelete,
 }: EdgeDetailPanelProps) {
+  const { t } = useTranslation();
   const manual = edge.origin === "MANUAL";
   return (
     <div className="space-y-4">
       <div>
-        <SectionTitle>{edge.origin} edge</SectionTitle>
+        <SectionTitle>{t("caseGraph.edgeDetail.originLabel", { origin: edge.origin })}</SectionTitle>
         <p className="mt-1 font-mono text-sm font-medium lowercase">{edge.relationType}</p>
       </div>
 
       <div className="space-y-1.5">
-        <EndpointButton label="from" node={fromNode} onClick={() => fromNode && onSelectNode(fromNode)} />
-        <EndpointButton label="to" node={toNode} onClick={() => toNode && onSelectNode(toNode)} />
+        <EndpointButton label={t("caseGraph.edgeDetail.from")} node={fromNode} onClick={() => fromNode && onSelectNode(fromNode)} />
+        <EndpointButton label={t("caseGraph.edgeDetail.to")} node={toNode} onClick={() => toNode && onSelectNode(toNode)} />
         {typeof edge.confidence === "number" && (
           <div className="flex items-baseline gap-2">
             <span className="w-9 shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
-              conf
+              {t("caseGraph.edgeDetail.conf")}
             </span>
             <span className="font-mono text-xs tabular-nums">{Math.round(edge.confidence * 100)}%</span>
           </div>
@@ -73,16 +76,15 @@ export function EdgeDetailPanel({
       {manual ? (
         <div className="flex flex-col gap-1.5">
           <Button size="sm" variant="outline" onClick={onRename}>
-            <Pencil className="h-3.5 w-3.5" /> Rename relation
+            <Pencil className="h-3.5 w-3.5" /> {t("caseGraph.edgeDetail.rename")}
           </Button>
           <Button size="sm" variant="outline" className="text-destructive" onClick={onDelete}>
-            <Trash2 className="h-3.5 w-3.5" /> Delete edge
+            <Trash2 className="h-3.5 w-3.5" /> {t("caseGraph.edgeDetail.delete")}
           </Button>
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">
-          Inferred edges are derived from the data and cannot be edited. Create a manual edge to
-          record your own relationship.
+          {t("caseGraph.edgeDetail.inferredReadOnly")}
         </p>
       )}
     </div>

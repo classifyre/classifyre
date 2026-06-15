@@ -1325,6 +1325,239 @@
           "top_k": 50
         }
       }
+    },
+    {
+      "name": "Financial Sentiment (FinBERT)",
+      "description": "Classify financial text — earnings calls, news articles, analyst reports — as positive, negative, or neutral using ProsusAI/finbert. Trained on financial phrase bank; negative findings surface for review in risk workflows.",
+      "config": {
+        "custom_detector_key": "finbert_sentiment",
+        "name": "Financial Sentiment (FinBERT)",
+        "description": "Detect negative or uncertain sentiment in financial documents",
+        "languages": ["en"],
+        "pipeline_schema": {
+          "type": "TEXT_CLASSIFICATION",
+          "model": "ProsusAI/finbert",
+          "device": "cpu",
+          "confidence_threshold": 0.75,
+          "severity": "info",
+          "severity_map": [
+            { "pattern": "negative", "severity": "high" },
+            { "pattern": "neutral", "severity": "low" },
+            { "pattern": "positive", "severity": "info" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Social Media Sentiment (RoBERTa)",
+      "description": "Sentiment analysis tuned for social media language — abbreviations, hashtags, informal phrasing — using cardiffnlp/twitter-roberta-base-sentiment-latest. Negative signals elevated to medium for brand monitoring pipelines.",
+      "config": {
+        "custom_detector_key": "twitter_roberta_sentiment",
+        "name": "Social Media Sentiment (RoBERTa)",
+        "description": "Detect negative or neutral sentiment in social media and user-generated content",
+        "languages": ["en"],
+        "pipeline_schema": {
+          "type": "TEXT_CLASSIFICATION",
+          "model": "cardiffnlp/twitter-roberta-base-sentiment-latest",
+          "device": "cpu",
+          "confidence_threshold": 0.7,
+          "severity": "info",
+          "severity_map": [
+            { "pattern": "negative", "severity": "medium" },
+            { "pattern": "neutral", "severity": "low" },
+            { "pattern": "positive", "severity": "info" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Language Detector (XLM-RoBERTa)",
+      "description": "Identify the language of any text asset across ~20 languages using papluca/xlm-roberta-base-language-detection. Useful for routing assets to the correct PII recognizer or flagging unexpected languages in compliance-controlled data stores.",
+      "config": {
+        "custom_detector_key": "language_detector",
+        "name": "Language Detector (XLM-RoBERTa)",
+        "description": "Detect the language of document content for routing and compliance",
+        "languages": ["en", "de", "fr", "es", "it", "nl", "pt", "ru", "zh", "ja", "ar"],
+        "pipeline_schema": {
+          "type": "TEXT_CLASSIFICATION",
+          "model": "papluca/xlm-roberta-base-language-detection",
+          "device": "cpu",
+          "top_k": 3,
+          "confidence_threshold": 0.8,
+          "severity": "info"
+        }
+      }
+    },
+    {
+      "name": "Prompt Injection Guard",
+      "description": "Detect jailbreak and prompt-injection attempts in user-submitted text before it reaches downstream LLM pipelines. Uses Meta Prompt Guard 86M — a lightweight classifier trained on adversarial prompt datasets. Injections are surfaced as critical findings.",
+      "config": {
+        "custom_detector_key": "prompt_injection_guard",
+        "name": "Prompt Injection Guard",
+        "description": "Flag jailbreak and prompt-injection payloads in user-submitted content",
+        "languages": ["en"],
+        "pipeline_schema": {
+          "type": "TEXT_CLASSIFICATION",
+          "model": "meta-llama/Prompt-Guard-86M",
+          "device": "cpu",
+          "confidence_threshold": 0.7,
+          "severity": "info",
+          "severity_map": [
+            { "pattern": "jailbreak", "severity": "critical" },
+            { "pattern": "injection", "severity": "critical" },
+            { "pattern": "benign", "severity": "info" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Toxic Content Detector",
+      "description": "Flag toxic, hateful, or abusive language in user-generated content using a fine-tuned BERT classifier. Suited for moderation queues, forum exports, and internal communication audits where unsafe content must be quarantined before review.",
+      "config": {
+        "custom_detector_key": "toxic_content_detector",
+        "name": "Toxic Content Detector",
+        "description": "Detect toxic and abusive language in user-generated content",
+        "languages": ["en"],
+        "pipeline_schema": {
+          "type": "TEXT_CLASSIFICATION",
+          "model": "martin-ha/toxic-comment-model",
+          "device": "cpu",
+          "confidence_threshold": 0.75,
+          "severity": "info",
+          "severity_map": [
+            { "pattern": "toxic", "severity": "high" },
+            { "pattern": "non-toxic", "severity": "info" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "High-Quality Embeddings (MPNet)",
+      "description": "Dense sentence embeddings via sentence-transformers/all-mpnet-base-v2 — 768-dimensional vectors optimized for semantic similarity and document retrieval. Stronger than MiniLM at the cost of higher latency; recommended for production RAG indexes.",
+      "config": {
+        "custom_detector_key": "mpnet_embedder",
+        "name": "High-Quality Embeddings (MPNet)",
+        "description": "768-dimensional sentence embeddings for semantic search and RAG",
+        "languages": ["en"],
+        "pipeline_schema": {
+          "type": "FEATURE_EXTRACTION",
+          "model": "sentence-transformers/all-mpnet-base-v2",
+          "device": "cpu",
+          "pooling_strategy": "mean",
+          "normalize_embeddings": true,
+          "truncation": true,
+          "batch_size": 16
+        }
+      }
+    },
+    {
+      "name": "Retrieval Embeddings (GTE Large)",
+      "description": "High-ranking general-text embeddings via thenlper/gte-large — consistently top-performing on the MTEB retrieval benchmark. Use for semantic search over large document corpora where recall quality matters more than latency.",
+      "config": {
+        "custom_detector_key": "gte_large_embedder",
+        "name": "Retrieval Embeddings (GTE Large)",
+        "description": "MTEB top-performing embeddings for retrieval and re-ranking",
+        "languages": ["en"],
+        "pipeline_schema": {
+          "type": "FEATURE_EXTRACTION",
+          "model": "thenlper/gte-large",
+          "device": "cpu",
+          "pooling_strategy": "mean",
+          "normalize_embeddings": true,
+          "truncation": true,
+          "batch_size": 8
+        }
+      }
+    },
+    {
+      "name": "CNN Image Classifier (ResNet-50)",
+      "description": "Classic ImageNet-1k convolutional baseline via microsoft/resnet-50. Faster than ViT on CPU and well-understood; useful as a lightweight sanity check or when a simple 1,000-class label is sufficient for document image triage.",
+      "config": {
+        "custom_detector_key": "resnet50_classifier",
+        "name": "CNN Image Classifier (ResNet-50)",
+        "description": "Lightweight ImageNet-1k classification via ResNet-50 CNN",
+        "pipeline_schema": {
+          "type": "IMAGE_CLASSIFICATION",
+          "model": "microsoft/resnet-50",
+          "device": "cpu",
+          "top_k": 5,
+          "confidence_threshold": 0.5
+        }
+      }
+    },
+    {
+      "name": "Efficient Vision Classifier (DeiT)",
+      "description": "Data-efficient image transformer via facebook/deit-base-distilled-patch16-224 — matches ViT accuracy with a distillation trick that requires less training data. Good balance of accuracy and throughput for ImageNet-1k classification on CPU.",
+      "config": {
+        "custom_detector_key": "deit_classifier",
+        "name": "Efficient Vision Classifier (DeiT)",
+        "description": "Data-efficient image transformer for ImageNet-1k classification",
+        "pipeline_schema": {
+          "type": "IMAGE_CLASSIFICATION",
+          "model": "facebook/deit-base-distilled-patch16-224",
+          "device": "cpu",
+          "top_k": 5,
+          "confidence_threshold": 0.5
+        }
+      }
+    },
+    {
+      "name": "Broad-Category Classifier (BEiT 22k)",
+      "description": "ImageNet-22k classification via microsoft/beit-base-patch16-224-pt22k-ft22k — 21,841 fine-grained categories covering animals, vehicles, plants, food, and objects. Use when the 1,000-class label set is too coarse for your categorization workflow.",
+      "config": {
+        "custom_detector_key": "beit_22k_classifier",
+        "name": "Broad-Category Classifier (BEiT 22k)",
+        "description": "Fine-grained 21k-class image classification for detailed document image triage",
+        "pipeline_schema": {
+          "type": "IMAGE_CLASSIFICATION",
+          "model": "microsoft/beit-base-patch16-224-pt22k-ft22k",
+          "device": "cpu",
+          "top_k": 5,
+          "confidence_threshold": 0.4
+        }
+      }
+    },
+    {
+      "name": "Lightweight Object Detection (YOLOS)",
+      "description": "Compact ViT-based object detector via hustvl/yolos-small — pre-trained on ImageNet, fine-tuned on COCO 2017. Lower memory footprint than DETR; suitable for edge inference or high-throughput pipelines where DETR is too heavy.",
+      "config": {
+        "custom_detector_key": "yolos_small_detector",
+        "name": "Lightweight Object Detection (YOLOS)",
+        "description": "Small vision-transformer object detector for COCO 80-class detection",
+        "pipeline_schema": {
+          "type": "OBJECT_DETECTION",
+          "model": "hustvl/yolos-small",
+          "device": "cpu",
+          "confidence_threshold": 0.5,
+          "top_k": 20,
+          "severity_map": [
+            { "pattern": "knife|weapon|gun|rifle|pistol", "severity": "critical" },
+            { "pattern": "person|human", "severity": "high" },
+            { "pattern": "car|truck|bus|motorcycle", "severity": "medium" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Conditional DETR Detector",
+      "description": "End-to-end COCO object detection via microsoft/conditional-detr-resnet-50 — faster convergence than original DETR thanks to conditional cross-attention. Use as an alternative to DETR when you need faster training for fine-tuning on domain-specific classes.",
+      "config": {
+        "custom_detector_key": "conditional_detr_detector",
+        "name": "Conditional DETR Detector",
+        "description": "Conditional cross-attention DETR for COCO 80-class object detection",
+        "pipeline_schema": {
+          "type": "OBJECT_DETECTION",
+          "model": "microsoft/conditional-detr-resnet-50",
+          "device": "cpu",
+          "confidence_threshold": 0.5,
+          "top_k": 30,
+          "severity_map": [
+            { "pattern": "knife|weapon|gun|rifle|pistol", "severity": "critical" },
+            { "pattern": "person|human", "severity": "high" },
+            { "pattern": "car|truck|bus|motorcycle", "severity": "medium" }
+          ]
+        }
+      }
     }
   ]
 }

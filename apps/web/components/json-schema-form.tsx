@@ -2244,6 +2244,7 @@ export const JsonSchemaForm = React.forwardRef<
     SQLITE: true,
     NOTION: false,
     EMAIL: false,
+    YOUTUBE: false,
   };
   const isTabular =
     assistantSourceType && isIngestionSourceType(assistantSourceType)

@@ -145,6 +145,7 @@ def test_s3_storage_iter_asset_pages_enables_ocr_from_sampling(
         *,
         file_name: str = "",
         enable_ocr: bool = False,
+        enable_transcription: bool = False,
     ):
         captured["file_bytes"] = file_bytes
         captured["mime_type"] = mime_type
@@ -152,6 +153,7 @@ def test_s3_storage_iter_asset_pages_enables_ocr_from_sampling(
         captured["include_column_names"] = include_column_names
         captured["file_name"] = file_name
         captured["enable_ocr"] = enable_ocr
+        captured["enable_transcription"] = enable_transcription
         yield "ocr page"
 
     monkeypatch.setattr("src.utils.file_parser.iter_file_pages", _iter_file_pages)
