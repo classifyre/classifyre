@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { toast } from "sonner";
 import {
+  Ban,
   ExternalLink,
   Fingerprint,
   FolderPlus,
@@ -13,6 +15,7 @@ import {
 } from "lucide-react";
 import {
   api,
+  type AssetSimilarityDto,
   type GraphEdgeDto,
   type GraphNodeDto,
 } from "@workspace/api-client";
@@ -20,6 +23,7 @@ import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { Input } from "@workspace/ui/components/input";
+import { Slider } from "@workspace/ui/components/slider";
 import { Spinner } from "@workspace/ui/components/spinner";
 import {
   MultiSelect,
@@ -36,6 +40,7 @@ import { nodesBBox } from "./case-graph/graph-utils";
 import {
   keyOf,
   nodeKey,
+  STRENGTH_GRADIENT,
   type GraphSelection,
   type PathResult,
 } from "./case-graph/graph-types";
@@ -54,7 +59,11 @@ const BUNDLE_EDGE_PREFIX = "bundle-edge:";
 interface BundleDetail {
   assetIds: string[];
   values: Array<{ label: string; value: string }>;
+  /** Pairwise weighted match % (only for 2-asset bundles). */
+  matchPercent?: number;
 }
+
+const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
 /**
  * The connected component (transitive neighbourhood) of a node — "everything
@@ -99,22 +108,45 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
   const { t } = useTranslation();
   const [nodes, setNodes] = React.useState<GraphNodeDto[]>([]);
   const [edges, setEdges] = React.useState<GraphEdgeDto[]>([]);
+  const [similarities, setSimilarities] = React.useState<AssetSimilarityDto[]>([]);
   const [truncated, setTruncated] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [sourceFilter, setSourceFilter] = React.useState<string[]>([]);
   const [labelFilter, setLabelFilter] = React.useState<string[]>([]);
+  const [minSimilarity, setMinSimilarity] = React.useState(0);
   const [selection, setSelection] = React.useState<GraphSelection>(null);
   // Focused component ("path") around the last-clicked node; dims everything else.
   const [path, setPath] = React.useState<PathResult | null>(null);
   const [tuneOpen, setTuneOpen] = React.useState(false);
   const [caseOpen, setCaseOpen] = React.useState(false);
+  const [ctxMenu, setCtxMenu] = React.useState<{
+    x: number;
+    y: number;
+    node: GraphNodeDto;
+  } | null>(null);
 
   const clearFocus = React.useCallback(() => {
     setPath(null);
     setSelection(null);
+    setCtxMenu(null);
   }, []);
+
+  // Right-click a real shared-value node → quick-exclude it from correlation.
+  const onNodeContextMenu = React.useCallback(
+    (node: GraphNodeDto, x: number, y: number) => {
+      if (
+        node.type !== "finding" ||
+        node.detectorType === "BUNDLE" ||
+        node.id.startsWith("bundle-node:")
+      ) {
+        return;
+      }
+      setCtxMenu({ x, y, node });
+    },
+    [],
+  );
 
   const load = React.useCallback(() => {
     let active = true;
@@ -126,6 +158,7 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
         if (!active) return;
         setNodes(g.nodes ?? []);
         setEdges(g.edges ?? []);
+        setSimilarities(g.similarities ?? []);
         setTruncated(Boolean(g.truncated));
       })
       .catch((e: unknown) => {
@@ -143,6 +176,28 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
   }, [assetId, t]);
 
   React.useEffect(() => load(), [load]);
+
+  const exclude = React.useCallback(
+    async (node: GraphNodeDto, mode: "value" | "label") => {
+      setCtxMenu(null);
+      try {
+        await api.correlation.correlationControllerAddExclusion({
+          addExclusionDto: {
+            mode,
+            label: (node.detectorType ?? "").toLowerCase() || null,
+            value: mode === "value" ? node.label : null,
+          },
+        });
+        toast.success(t("correlation.exclude.done"));
+        load();
+      } catch (e) {
+        toast.error(
+          e instanceof Error ? e.message : t("correlation.exclude.failed"),
+        );
+      }
+    },
+    [t, load],
+  );
 
   // ── Filter options ──────────────────────────────────────────────────────────
   const sourceOptions = React.useMemo(() => {
@@ -167,7 +222,17 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
       .sort((a, b) => a.value.localeCompare(b.value));
   }, [nodes]);
 
-  // ── Filter → collapse → drop isolated assets ────────────────────────────────
+  // Pairwise similarity lookup (0-1), keyed by sorted asset pair.
+  const simByPair = React.useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of similarities) {
+      const k = pairKey(s.fromId, s.toId);
+      m.set(k, Math.max(m.get(k) ?? 0, s.weighted));
+    }
+    return m;
+  }, [similarities]);
+
+  // ── Filters → similarity → search → collapse → drop isolated assets ─────────
   const {
     dNodes,
     dEdges,
@@ -176,47 +241,95 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
     unconnectedCount,
     valueCount,
   } = React.useMemo(() => {
-    // 1) filter
-    const q = search.trim().toLowerCase();
+    const valueById = new Map(
+      nodes.filter((n) => n.type === "finding").map((n) => [n.id, n]),
+    );
+    const assetById = new Map(
+      nodes.filter((n) => n.type === "asset").map((n) => [n.id, n]),
+    );
+
+    // 1) hard filters: source (assets) and label (values).
     const srcSet = new Set(sourceFilter);
     const labelSet = new Set(labelFilter);
-    const matches = (n: GraphNodeDto) =>
-      !q ||
-      [n.label, n.detectorType, n.sourceType, n.assetType]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(q);
-    const assetOk = (n: GraphNodeDto) =>
-      n.type === "asset" &&
-      (srcSet.size === 0 || (n.sourceType && srcSet.has(n.sourceType))) &&
-      matches(n);
-    const valueOk = (n: GraphNodeDto) =>
-      n.type === "finding" &&
-      (labelSet.size === 0 || (n.detectorType && labelSet.has(n.detectorType))) &&
-      matches(n);
-
-    const passAssets = new Set(nodes.filter(assetOk).map((n) => n.id));
-    const passValues = new Set(nodes.filter(valueOk).map((n) => n.id));
-    const filteredEdges = edges.filter(
+    const passAssets = new Set(
+      nodes
+        .filter(
+          (n) =>
+            n.type === "asset" &&
+            (srcSet.size === 0 || (n.sourceType && srcSet.has(n.sourceType))),
+        )
+        .map((n) => n.id),
+    );
+    let passValues = new Set(
+      nodes
+        .filter(
+          (n) =>
+            n.type === "finding" &&
+            (labelSet.size === 0 ||
+              (n.detectorType && labelSet.has(n.detectorType))),
+        )
+        .map((n) => n.id),
+    );
+    let activeEdges = edges.filter(
       (e) => passAssets.has(e.fromId) && passValues.has(e.toId),
     );
-    const valueById = new Map(nodes.filter((n) => n.type === "finding").map((n) => [n.id, n]));
-    const assetById = new Map(nodes.filter((n) => n.type === "asset").map((n) => [n.id, n]));
 
-    // 2) collapse: group surviving value nodes by the exact asset-set they bind
-    const valueNeighbors = new Map<string, string[]>();
-    for (const e of filteredEdges) {
-      const arr = valueNeighbors.get(e.toId) ?? [];
-      arr.push(e.fromId);
-      valueNeighbors.set(e.toId, arr);
+    // neighbours of each surviving value node (asset ids).
+    const neighborsOf = (es: GraphEdgeDto[]) => {
+      const m = new Map<string, string[]>();
+      for (const e of es) (m.get(e.toId) ?? m.set(e.toId, []).get(e.toId)!).push(e.fromId);
+      return m;
+    };
+
+    // 2) similarity slider: keep a value only if its strongest asset-pair meets
+    //    the threshold (0 keeps everything).
+    if (minSimilarity > 0) {
+      const vn = neighborsOf(activeEdges);
+      passValues = new Set(
+        [...passValues].filter((vId) => {
+          const ns = [...new Set(vn.get(vId) ?? [])];
+          let best = 0;
+          for (let i = 0; i < ns.length; i++)
+            for (let j = i + 1; j < ns.length; j++)
+              best = Math.max(best, simByPair.get(pairKey(ns[i]!, ns[j]!)) ?? 0);
+          return best * 100 >= minSimilarity;
+        }),
+      );
+      activeEdges = activeEdges.filter((e) => passValues.has(e.toId));
     }
-    const groups = new Map<string, string[]>(); // assetSetKey → valueIds
-    for (const [valueId, neighbors] of valueNeighbors) {
-      const key = [...new Set(neighbors)].sort().join("|");
-      const arr = groups.get(key) ?? [];
-      arr.push(valueId);
-      groups.set(key, arr);
+
+    // 3) full-text search (case-insensitive) over asset names AND shared values:
+    //    keep matches plus their 1-hop neighbours so a value match reveals its
+    //    assets and an asset-name match reveals its shared values.
+    const q = search.trim().toLowerCase();
+    if (q) {
+      const isMatch = (n?: GraphNodeDto) =>
+        !!n &&
+        [n.label, n.detectorType, n.sourceType, n.assetType]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q);
+      const matched = new Set<string>();
+      for (const id of passAssets) if (isMatch(assetById.get(id))) matched.add(id);
+      for (const id of passValues) if (isMatch(valueById.get(id))) matched.add(id);
+      const keep = new Set(matched);
+      for (const e of activeEdges) {
+        if (matched.has(e.fromId)) keep.add(e.toId);
+        if (matched.has(e.toId)) keep.add(e.fromId);
+      }
+      for (const id of [...passAssets]) if (!keep.has(id)) passAssets.delete(id);
+      passValues = new Set([...passValues].filter((id) => keep.has(id)));
+      activeEdges = activeEdges.filter(
+        (e) => passAssets.has(e.fromId) && passValues.has(e.toId),
+      );
+    }
+
+    // 4) collapse dense shared-value groups (by the exact asset-set they bind).
+    const groups = new Map<string, string[]>();
+    for (const [valueId, ns] of neighborsOf(activeEdges)) {
+      const key = [...new Set(ns)].sort().join("|");
+      (groups.get(key) ?? groups.set(key, []).get(key)!).push(valueId);
     }
 
     const outNodes: GraphNodeDto[] = [...passAssets].map((id) => assetById.get(id)!);
@@ -225,20 +338,33 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
 
     for (const [key, valueIds] of groups) {
       const assetIds = key ? key.split("|") : [];
-      const collapse = valueIds.length > COLLAPSE_THRESHOLD && assetIds.length >= 2;
+      // Strength of this asset-set = strongest pair within it (drives edge colour).
+      let groupStrength = 0;
+      for (let i = 0; i < assetIds.length; i++)
+        for (let j = i + 1; j < assetIds.length; j++)
+          groupStrength = Math.max(
+            groupStrength,
+            simByPair.get(pairKey(assetIds[i]!, assetIds[j]!)) ?? 0,
+          );
+      const collapse =
+        valueIds.length > COLLAPSE_THRESHOLD && assetIds.length >= 2;
       if (!collapse) {
-        // keep individual value nodes + their edges
+        const valueSet = new Set(valueIds);
         for (const vId of valueIds) {
           const vn = valueById.get(vId);
           if (vn) outNodes.push(vn);
         }
-        for (const e of filteredEdges) {
-          if (valueIds.includes(e.toId)) outEdges.push(e);
+        for (const e of activeEdges) {
+          if (valueSet.has(e.toId))
+            outEdges.push({ ...e, confidence: groupStrength });
         }
         continue;
       }
+      const pct =
+        assetIds.length === 2 ? Math.round(groupStrength * 100) : undefined;
       const detail: BundleDetail = {
         assetIds,
+        matchPercent: pct,
         values: valueIds
           .map((vId) => valueById.get(vId))
           .filter((v): v is GraphNodeDto => Boolean(v))
@@ -248,7 +374,6 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
         count: String(valueIds.length),
       });
       if (assetIds.length === 2) {
-        // a single special asset↔asset edge (amber via MANUAL origin)
         const id = `${BUNDLE_EDGE_PREFIX}${key}`;
         outEdges.push({
           id,
@@ -256,13 +381,12 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
           fromId: assetIds[0]!,
           toType: "asset",
           toId: assetIds[1]!,
-          relationType: countLabel,
-          confidence: 1,
+          relationType: pct != null ? `${pct}% · ${countLabel}` : countLabel,
+          confidence: groupStrength,
           origin: "MANUAL",
         });
         details.set(id, detail);
       } else {
-        // hyper-group (>2 assets): one bundle node linking all of them
         const nodeId = `${BUNDLE_NODE_PREFIX}${key}`;
         outNodes.push({
           id: nodeId,
@@ -279,7 +403,7 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
             toType: "finding",
             toId: nodeId,
             relationType: "shared",
-            confidence: 1,
+            confidence: groupStrength,
             origin: "INFERRED",
           });
         }
@@ -287,7 +411,7 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
       }
     }
 
-    // 3) drop isolated assets (no incident edge) — surface the count instead
+    // 5) drop isolated assets (no incident edge) — surface the count instead.
     const connected = new Set<string>();
     for (const e of outEdges) {
       if (e.fromType === "asset") connected.add(e.fromId);
@@ -307,7 +431,7 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
       unconnectedCount: unconnected,
       valueCount: values,
     };
-  }, [nodes, edges, search, sourceFilter, labelFilter, t]);
+  }, [nodes, edges, search, sourceFilter, labelFilter, minSimilarity, simByPair, t]);
 
   // ── Layout / viewport ──────────────────────────────────────────────────────
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -363,7 +487,7 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
   // (its node keys may no longer exist → would dim everything).
   React.useEffect(() => {
     clearFocus();
-  }, [nodes, search, sourceFilter, labelFilter, clearFocus]);
+  }, [nodes, search, sourceFilter, labelFilter, minSimilarity, clearFocus]);
 
   // ── Click = focus this node's component (path); greyed nodes are inert ───────
   const onNodeClick = React.useCallback(
@@ -461,6 +585,24 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
           </MultiSelect>
         )}
 
+        {similarities.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="whitespace-nowrap font-mono text-[11px] text-muted-foreground">
+              {t("correlation.fingerprints.minSimilarity", {
+                count: String(minSimilarity),
+              })}
+            </span>
+            <Slider
+              min={0}
+              max={100}
+              step={5}
+              value={[minSimilarity]}
+              onValueChange={(v) => setMinSimilarity(v[0] ?? 0)}
+              className="w-28"
+            />
+          </div>
+        )}
+
         {truncated && (
           <Badge variant="outline" className="text-[10px] uppercase">
             {t("correlation.fingerprints.truncated")}
@@ -497,8 +639,9 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
             mode={SELECT_MODE}
             activeNodeKeys={null}
             path={path}
+            colorByStrength
             onNodeClick={onNodeClick}
-            onNodeContextMenu={() => undefined}
+            onNodeContextMenu={onNodeContextMenu}
             onEdgeClick={onEdgeClick}
             onEdgeContextMenu={() => undefined}
             onBackgroundClick={clearFocus}
@@ -533,11 +676,20 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
             <div className="space-y-4">
               {selectedDetail ? (
                 <div className="space-y-3">
-                  <Badge variant="outline" className="text-[10px] uppercase">
-                    {t("correlation.fingerprints.bundleTitle", {
-                      count: String(selectedDetail.values.length),
-                    })}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="text-[10px] uppercase">
+                      {t("correlation.fingerprints.bundleTitle", {
+                        count: String(selectedDetail.values.length),
+                      })}
+                    </Badge>
+                    {selectedDetail.matchPercent != null && (
+                      <Badge className="text-[10px]">
+                        {t("correlation.fingerprints.matchPercent", {
+                          count: String(selectedDetail.matchPercent),
+                        })}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {t("correlation.fingerprints.bundleBetween")}
                   </p>
@@ -639,6 +791,9 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
                 <p className="text-[11px] text-muted-foreground">
                   {t("correlation.fingerprints.focusHelp")}
                 </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {t("correlation.fingerprints.excludeHelp")}
+                </p>
               </div>
 
               <div className="space-y-2 border-t border-border/60 pt-3">
@@ -656,11 +811,20 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
                     <span className="inline-block h-2.5 w-2.5 rounded-full bg-foreground/70" />
                     {t("correlation.fingerprints.legendValue", { count: String(valueCount) })}
                   </li>
-                  <li className="flex items-center gap-2">
-                    <span className="inline-block h-0.5 w-4 bg-amber-600" />
-                    {t("correlation.fingerprints.legendBundle")}
-                  </li>
                 </ul>
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <span>{t("correlation.fingerprints.strengthWeak")}</span>
+                    <span>{t("correlation.fingerprints.strengthStrong")}</span>
+                  </div>
+                  <div
+                    className="h-2 w-full rounded-full"
+                    style={{ background: STRENGTH_GRADIENT }}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    {t("correlation.fingerprints.strengthHint")}
+                  </p>
+                </div>
                 {unconnectedCount > 0 && (
                   <p className="flex items-start gap-1.5 pt-1 text-[11px] text-muted-foreground">
                     <Layers className="mt-0.5 h-3 w-3 shrink-0" />
@@ -674,6 +838,45 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
           )}
         </aside>
       </div>
+
+      {/* Right-click quick-exclude menu */}
+      {ctxMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setCtxMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setCtxMenu(null);
+            }}
+          />
+          <div
+            className="fixed z-50 w-60 overflow-hidden rounded-[4px] border-2 border-border bg-popover shadow-md"
+            style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          >
+            <div className="truncate border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
+              <span className="font-mono uppercase">{ctxMenu.node.detectorType}</span>{" "}
+              <span className="font-mono text-foreground">{ctxMenu.node.label}</span>
+            </div>
+            <button
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+              onClick={() => void exclude(ctxMenu.node, "value")}
+            >
+              <Ban className="h-3.5 w-3.5" />
+              {t("correlation.exclude.value")}
+            </button>
+            <button
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+              onClick={() => void exclude(ctxMenu.node, "label")}
+            >
+              <Ban className="h-3.5 w-3.5" />
+              {t("correlation.exclude.label", {
+                label: (ctxMenu.node.detectorType ?? "").toLowerCase(),
+              })}
+            </button>
+          </div>
+        </>
+      )}
 
       <CorrelationTuningDialog open={tuneOpen} onOpenChange={setTuneOpen} onSaved={load} />
       <FingerprintsCaseDialog

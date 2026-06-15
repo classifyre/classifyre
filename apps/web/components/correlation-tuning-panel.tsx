@@ -2,21 +2,21 @@
 
 import * as React from "react";
 import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 import {
   api,
   type CorrelationConfigResponseDto,
   type ExclusionRuleDto,
 } from "@workspace/api-client";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@workspace/ui/components/dialog";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Slider } from "@workspace/ui/components/slider";
@@ -28,22 +28,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
-import { Trash2 } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 
 /**
- * Fine-tune the (DB-backed) correlation engine: per-label weights — labels are
- * dynamic and auto-discovered from the data — plus the related/duplicate match
- * thresholds. Saving schedules a full recompute (a DUPLICATES FINDER run).
+ * Correlation tuning form — DB-backed weights, thresholds and exclusion rules.
+ * Used both inline (the Fingerprints "Tune" tab) and inside a dialog. Saving
+ * schedules a full recompute (a DUPLICATES FINDER run); `onSaved` fires after.
  */
-export function CorrelationTuningDialog({
-  open,
-  onOpenChange,
+export function CorrelationTuningPanel({
   onSaved,
+  layout = "page",
 }: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
   onSaved?: () => void;
+  layout?: "page" | "dialog";
 }) {
   const { t } = useTranslation();
   const [config, setConfig] = React.useState<CorrelationConfigResponseDto | null>(null);
@@ -57,12 +54,8 @@ export function CorrelationTuningDialog({
   const [exValue, setExValue] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
-  React.useEffect(() => {
-    if (!open) return;
+  const reload = React.useCallback(() => {
     setConfig(null);
-    setExMode("value");
-    setExLabel("");
-    setExValue("");
     api.correlation
       .correlationControllerGetConfig()
       .then((c) => {
@@ -76,7 +69,9 @@ export function CorrelationTuningDialog({
       .catch((e: unknown) =>
         toast.error(e instanceof Error ? e.message : t("correlation.tune.loadFailed")),
       );
-  }, [open, t]);
+  }, [t]);
+
+  React.useEffect(() => reload(), [reload]);
 
   const save = async () => {
     setSaving(true);
@@ -91,7 +86,6 @@ export function CorrelationTuningDialog({
         },
       });
       toast.success(t("correlation.tune.saved"));
-      onOpenChange(false);
       onSaved?.();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("correlation.tune.saveFailed"));
@@ -118,21 +112,34 @@ export function CorrelationTuningDialog({
     return r.mode === "regex" ? `${scope}/${r.value}/` : `${scope}"${r.value}"`;
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t("correlation.tune.title")}</DialogTitle>
-          <DialogDescription>{t("correlation.tune.desc")}</DialogDescription>
-        </DialogHeader>
+  if (!config) {
+    return (
+      <div className="flex h-48 items-center justify-center">
+        <Spinner size="lg" label={t("correlation.tune.title")} />
+      </div>
+    );
+  }
 
-        {!config ? (
-          <div className="flex h-48 items-center justify-center">
-            <Spinner label={t("correlation.tune.title")} />
-          </div>
-        ) : (
-          <div className="space-y-5 overflow-y-auto pr-1">
-            {/* Thresholds */}
+  const colsClass =
+    layout === "page" ? "grid gap-4 lg:grid-cols-2" : "space-y-4";
+
+  const Wrap = layout === "page" ? Card : React.Fragment;
+  const wrapProps = layout === "page" ? {} : {};
+
+  return (
+    <div className="space-y-4">
+      <div className={colsClass}>
+        {/* ── Scoring ── */}
+        <Wrap {...wrapProps}>
+          {layout === "page" && (
+            <CardHeader>
+              <CardTitle className="text-base">
+                {t("correlation.tune.scoringTitle")}
+              </CardTitle>
+              <CardDescription>{t("correlation.tune.desc")}</CardDescription>
+            </CardHeader>
+          )}
+          <ContentWrap layout={layout}>
             <div className="space-y-4 rounded-[4px] border border-border bg-muted/30 p-3">
               <ThresholdSlider
                 label={t("correlation.tune.relatedMin")}
@@ -148,7 +155,6 @@ export function CorrelationTuningDialog({
               />
             </div>
 
-            {/* Default weight */}
             <div className="flex items-center justify-between gap-3">
               <div>
                 <Label className="text-sm">{t("correlation.tune.defaultWeight")}</Label>
@@ -166,7 +172,6 @@ export function CorrelationTuningDialog({
               />
             </div>
 
-            {/* Per-label weights */}
             <div className="space-y-2">
               <Label className="text-sm">{t("correlation.tune.labelWeights")}</Label>
               {config.labels.length === 0 ? (
@@ -174,7 +179,7 @@ export function CorrelationTuningDialog({
                   {t("correlation.tune.noLabels")}
                 </p>
               ) : (
-                <div className="max-h-64 space-y-1.5 overflow-y-auto">
+                <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
                   {config.labels.map((l) => (
                     <div
                       key={l.label}
@@ -194,10 +199,7 @@ export function CorrelationTuningDialog({
                         max={100}
                         value={weights[l.label] ?? defaultWeight}
                         onChange={(e) =>
-                          setWeights((w) => ({
-                            ...w,
-                            [l.label]: Number(e.target.value),
-                          }))
+                          setWeights((w) => ({ ...w, [l.label]: Number(e.target.value) }))
                         }
                         className="h-7 w-16"
                       />
@@ -206,106 +208,133 @@ export function CorrelationTuningDialog({
                 </div>
               )}
             </div>
+          </ContentWrap>
+        </Wrap>
 
-            {/* Exclusions */}
-            <div className="space-y-2 border-t border-border/60 pt-4">
-              <Label className="text-sm">{t("correlation.tune.exclusions")}</Label>
+        {/* ── Exclusions ── */}
+        <Wrap {...wrapProps}>
+          {layout === "page" && (
+            <CardHeader>
+              <CardTitle className="text-base">
+                {t("correlation.tune.exclusions")}
+              </CardTitle>
+              <CardDescription>{t("correlation.tune.exclusionsHint")}</CardDescription>
+            </CardHeader>
+          )}
+          <ContentWrap layout={layout}>
+            {layout === "dialog" && (
+              <div className="space-y-1">
+                <Label className="text-sm">{t("correlation.tune.exclusions")}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {t("correlation.tune.exclusionsHint")}
+                </p>
+              </div>
+            )}
+            {exclusions.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                {t("correlation.tune.exclusionsHint")}
+                {t("correlation.tune.noExclusions")}
               </p>
-              {exclusions.length > 0 && (
-                <div className="space-y-1.5">
-                  {exclusions.map((r, i) => (
-                    <div
-                      key={r.id ?? i}
-                      className="flex items-center justify-between gap-2 rounded-[4px] border border-border/60 px-2.5 py-1.5"
-                    >
-                      <div className="flex min-w-0 items-center gap-2">
-                        <Badge variant="outline" className="text-[9px] uppercase">
-                          {r.mode}
-                        </Badge>
-                        <span className="truncate font-mono text-xs" title={ruleText(r)}>
-                          {ruleText(r)}
-                        </span>
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6 shrink-0"
-                        onClick={() =>
-                          setExclusions((prev) => prev.filter((_, j) => j !== i))
-                        }
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="flex items-end gap-2">
-                <div className="w-28 shrink-0 space-y-1">
-                  <Label className="text-[10px] uppercase text-muted-foreground">
-                    {t("correlation.tune.exMode")}
-                  </Label>
-                  <Select
-                    value={exMode}
-                    onValueChange={(v) => setExMode(v as typeof exMode)}
+            ) : (
+              <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+                {exclusions.map((r, i) => (
+                  <div
+                    key={r.id ?? i}
+                    className="flex items-center justify-between gap-2 rounded-[4px] border border-border/60 px-2.5 py-1.5"
                   >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="value">{t("correlation.tune.exValueMode")}</SelectItem>
-                      <SelectItem value="regex">{t("correlation.tune.exRegexMode")}</SelectItem>
-                      <SelectItem value="label">{t("correlation.tune.exLabelMode")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="w-24 shrink-0 space-y-1">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Badge variant="outline" className="text-[9px] uppercase">
+                        {r.mode}
+                      </Badge>
+                      <span className="truncate font-mono text-xs" title={ruleText(r)}>
+                        {ruleText(r)}
+                      </span>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 shrink-0"
+                      onClick={() => setExclusions((prev) => prev.filter((_, j) => j !== i))}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-end gap-2 pt-1">
+              <div className="w-28 shrink-0 space-y-1">
+                <Label className="text-[10px] uppercase text-muted-foreground">
+                  {t("correlation.tune.exMode")}
+                </Label>
+                <Select value={exMode} onValueChange={(v) => setExMode(v as typeof exMode)}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="value">{t("correlation.tune.exValueMode")}</SelectItem>
+                    <SelectItem value="regex">{t("correlation.tune.exRegexMode")}</SelectItem>
+                    <SelectItem value="label">{t("correlation.tune.exLabelMode")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-24 shrink-0 space-y-1">
+                <Label className="text-[10px] uppercase text-muted-foreground">
+                  {t("correlation.tune.exLabelField")}
+                </Label>
+                <Input
+                  value={exLabel}
+                  onChange={(e) => setExLabel(e.target.value)}
+                  placeholder={exMode === "label" ? "person" : t("correlation.tune.exAny")}
+                  className="h-8 text-xs"
+                />
+              </div>
+              {exMode !== "label" && (
+                <div className="min-w-0 flex-1 space-y-1">
                   <Label className="text-[10px] uppercase text-muted-foreground">
-                    {t("correlation.tune.exLabelField")}
+                    {exMode === "regex"
+                      ? t("correlation.tune.exPatternField")
+                      : t("correlation.tune.exValueField")}
                   </Label>
                   <Input
-                    value={exLabel}
-                    onChange={(e) => setExLabel(e.target.value)}
-                    placeholder={exMode === "label" ? "person" : t("correlation.tune.exAny")}
+                    value={exValue}
+                    onChange={(e) => setExValue(e.target.value)}
+                    placeholder={exMode === "regex" ? "^(null|n/a)$" : "null"}
                     className="h-8 text-xs"
                   />
                 </div>
-                {exMode !== "label" && (
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <Label className="text-[10px] uppercase text-muted-foreground">
-                      {exMode === "regex"
-                        ? t("correlation.tune.exPatternField")
-                        : t("correlation.tune.exValueField")}
-                    </Label>
-                    <Input
-                      value={exValue}
-                      onChange={(e) => setExValue(e.target.value)}
-                      placeholder={exMode === "regex" ? "^(null|n/a)$" : "null"}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                )}
-                <Button size="sm" variant="outline" className="h-8" onClick={addRule}>
-                  {t("correlation.tune.exAdd")}
-                </Button>
-              </div>
+              )}
+              <Button size="sm" variant="outline" className="h-8" onClick={addRule}>
+                {t("correlation.tune.exAdd")}
+              </Button>
             </div>
-          </div>
-        )}
+          </ContentWrap>
+        </Wrap>
+      </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            {t("common.cancel")}
-          </Button>
-          <Button onClick={save} disabled={saving || !config}>
-            {saving ? t("correlation.tune.saving") : t("correlation.tune.save")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <div className="flex items-center justify-end gap-2">
+        <span className="mr-auto text-xs text-muted-foreground">
+          {t("correlation.tune.recomputeNote")}
+        </span>
+        <Button variant="outline" onClick={reload} disabled={saving}>
+          {t("correlation.tune.reset")}
+        </Button>
+        <Button onClick={save} disabled={saving}>
+          {saving ? t("correlation.tune.saving") : t("correlation.tune.save")}
+        </Button>
+      </div>
+    </div>
   );
+}
+
+function ContentWrap({
+  layout,
+  children,
+}: {
+  layout: "page" | "dialog";
+  children: React.ReactNode;
+}) {
+  if (layout === "page") return <CardContent className="space-y-4">{children}</CardContent>;
+  return <div className="space-y-4">{children}</div>;
 }
 
 function ThresholdSlider({
@@ -323,9 +352,7 @@ function ThresholdSlider({
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <Label className="text-sm">{label}</Label>
-        <span className="font-mono text-xs tabular-nums">
-          {Math.round(value * 100)}%
-        </span>
+        <span className="font-mono text-xs tabular-nums">{Math.round(value * 100)}%</span>
       </div>
       <Slider
         min={0}

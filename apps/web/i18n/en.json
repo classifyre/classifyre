@@ -2121,7 +2121,19 @@
       "unconnected": "{{count}} asset(s) hidden with no visible connection (e.g. truncated or filtered).",
       "focusedHint": "Focused on {{count}} connected asset(s) — create/update a case from exactly these.",
       "clearFocus": "Clear focus",
-      "focusHelp": "Click any node to focus its connections; everything else dims."
+      "focusHelp": "Click any node to focus its connections; everything else dims.",
+      "minSimilarity": "Min similarity ≥ {{count}}%",
+      "matchPercent": "{{count}}% match",
+      "strengthWeak": "Weak",
+      "strengthStrong": "Strong",
+      "strengthHint": "Link colour = similarity strength between assets.",
+      "excludeHelp": "Right-click a value to exclude noise (e.g. \"null\")."
+    },
+    "exclude": {
+      "value": "Exclude this value",
+      "label": "Exclude all '{{label}}'",
+      "done": "Excluded — recomputing in the background",
+      "failed": "Failed to add exclusion"
     },
     "tune": {
       "title": "Tune correlation",
@@ -2139,7 +2151,18 @@
       "defaultWeightHint": "Used for any label without an explicit weight.",
       "labelWeights": "Label weights",
       "noLabels": "No labels in the data yet.",
-      "retired": "not in data"
+      "retired": "not in data",
+      "exclusions": "Exclusions",
+      "exclusionsHint": "Values to ignore when correlating (noise like \"null\"). Saved with a recompute.",
+      "exMode": "Mode",
+      "exValueMode": "Value",
+      "exRegexMode": "Regex",
+      "exLabelMode": "Label",
+      "exLabelField": "Label",
+      "exValueField": "Value",
+      "exPatternField": "Pattern",
+      "exAny": "any",
+      "exAdd": "Add"
     },
     "caseAction": {
       "title": "Assets → case",

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -14,11 +15,12 @@ import { PgBossService } from '../scheduler/pg-boss.service';
 import { CorrelationService } from './correlation.service';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
 import { CORRELATION_QUEUE } from './correlation.constants';
-import { GraphResponseDto } from '../dto/graph.dto';
 import {
+  AddExclusionDto,
   CaseActionRequestDto,
   CaseActionResponseDto,
   CorrelationConfigResponseDto,
+  CorrelationGraphResponseDto,
   RecomputeCorrelationResponseDto,
   UpdateCorrelationConfigDto,
   ValueOccurrencesResponseDto,
@@ -41,11 +43,33 @@ export class CorrelationController {
   @ApiQuery({
     name: 'assetId',
     required: false,
-    description: "Scope to one asset's identity cluster; omit for all clusters",
+    description: "Scope to one asset's identity cluster",
   })
-  @ApiResponse({ status: 200, type: GraphResponseDto })
-  async graph(@Query('assetId') assetId?: string): Promise<GraphResponseDto> {
-    return this.correlation.buildGraph(assetId ? { assetId } : undefined);
+  @ApiQuery({
+    name: 'sourceId',
+    required: false,
+    description: 'Scope to clusters touching this source (external flagged)',
+  })
+  @ApiResponse({ status: 200, type: CorrelationGraphResponseDto })
+  async graph(
+    @Query('assetId') assetId?: string,
+    @Query('sourceId') sourceId?: string,
+  ): Promise<CorrelationGraphResponseDto> {
+    if (assetId) return this.correlation.buildGraph({ assetId });
+    if (sourceId) return this.correlation.buildGraph({ sourceId });
+    return this.correlation.buildGraph();
+  }
+
+  @Get('correlation/links-graph')
+  @ApiOperation({
+    summary: "A source's assets connected by their links (hash references)",
+  })
+  @ApiQuery({ name: 'sourceId', required: true })
+  @ApiResponse({ status: 200, type: CorrelationGraphResponseDto })
+  async linksGraph(
+    @Query('sourceId') sourceId: string,
+  ): Promise<CorrelationGraphResponseDto> {
+    return this.correlation.buildLinksGraph(sourceId);
   }
 
   @Get('correlation/config')
@@ -67,7 +91,41 @@ export class CorrelationController {
     @Body() dto: UpdateCorrelationConfigDto,
   ): Promise<CorrelationConfigResponseDto> {
     const config = await this.correlation.saveConfig(dto);
-    // Recompute everything in the background; surfaces as a DUPLICATES run.
+    await this.scheduleRecompute();
+    return config;
+  }
+
+  @Post('correlation/exclusions')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Add an exclusion rule (ignore noisy values) and recompute',
+  })
+  @ApiResponse({ status: 200, type: CorrelationConfigResponseDto })
+  async addExclusion(
+    @Body() dto: AddExclusionDto,
+  ): Promise<CorrelationConfigResponseDto> {
+    const config = await this.correlation.addExclusion({
+      mode: dto.mode,
+      label: dto.label ?? null,
+      value: dto.value ?? null,
+    });
+    await this.scheduleRecompute();
+    return config;
+  }
+
+  @Delete('correlation/exclusions/:id')
+  @ApiOperation({ summary: 'Remove an exclusion rule and recompute' })
+  @ApiResponse({ status: 200, type: CorrelationConfigResponseDto })
+  async removeExclusion(
+    @Param('id') id: string,
+  ): Promise<CorrelationConfigResponseDto> {
+    const config = await this.correlation.removeExclusion(id);
+    await this.scheduleRecompute();
+    return config;
+  }
+
+  /** Recompute everything in the background; surfaces as a DUPLICATES run. */
+  private async scheduleRecompute(): Promise<void> {
     try {
       const boss = await this.pgBoss.getBossAsync();
       await boss.send(
@@ -81,7 +139,6 @@ export class CorrelationController {
     } catch {
       // Non-fatal: config is saved; it will apply on the next scan recompute.
     }
-    return config;
   }
 
   @Post('correlation/case-action')

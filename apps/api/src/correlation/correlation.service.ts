@@ -1,11 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { DetectorType, EdgeOrigin, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
-import type {
-  GraphEdgeDto,
-  GraphNodeDto,
-  GraphResponseDto,
-} from '../dto/graph.dto';
+import type { GraphEdgeDto, GraphNodeDto } from '../dto/graph.dto';
 import {
   CANDIDATE_CAP,
   DEFAULT_LABEL_WEIGHT,
@@ -73,13 +70,28 @@ const ASSET_NODE_SELECT = {
   externalUrl: true,
   assetType: true,
   sourceType: true,
+  sourceId: true,
 } satisfies Prisma.AssetSelect;
+
+/**
+ * A value to ignore when fingerprinting. `mode` decides how `value` is matched
+ * against a finding's normalized value; `label` optionally scopes it (and is the
+ * excluded label itself when mode === 'label').
+ */
+export interface ExclusionRule {
+  id: string;
+  mode: 'value' | 'regex' | 'label';
+  label: string | null;
+  value: string | null;
+}
 
 /** DB-backed tuning resolved into fast lookups for a recompute pass. */
 interface ResolvedConfig {
   weightOf: (label: string) => number;
   relatedMin: number;
   duplicateMin: number;
+  /** True when a (normalized) label/value should be ignored. */
+  isExcluded: (label: string, value: string) => boolean;
 }
 
 export interface CorrelationConfigDto {
@@ -88,6 +100,7 @@ export interface CorrelationConfigDto {
   duplicateMin: number;
   /** Every label currently present in the index, with its effective weight. */
   labels: Array<{ label: string; weight: number; inUse: boolean }>;
+  exclusions: ExclusionRule[];
 }
 
 export interface SaveCorrelationConfigInput {
@@ -95,6 +108,29 @@ export interface SaveCorrelationConfigInput {
   relatedMin?: number;
   duplicateMin?: number;
   labelWeights?: Record<string, number>;
+  exclusions?: Array<{
+    id?: string;
+    mode: ExclusionRule['mode'];
+    label?: string | null;
+    value?: string | null;
+  }>;
+}
+
+/** Pairwise asset similarity (from the asset↔asset correlation edges). */
+export interface AssetSimilarity {
+  fromId: string;
+  toId: string;
+  /** Weighted match in [0,1]. */
+  weighted: number;
+  relationType: string;
+}
+
+export interface CorrelationGraphResult {
+  nodes: GraphNodeDto[];
+  edges: GraphEdgeDto[];
+  truncated: boolean;
+  /** Strength of each correlated asset pair, for display + slider filtering. */
+  similarities: AssetSimilarity[];
 }
 
 export interface ValueOccurrenceDto {
@@ -165,6 +201,7 @@ export class CorrelationService {
       weightOf: (label: string) => weights[normalizeLabel(label)] ?? def,
       relatedMin: row ? Number(row.relatedMin) : RELATED_MIN,
       duplicateMin: row ? Number(row.duplicateMin) : DUPLICATE_MIN,
+      isExcluded: buildExclusionPredicate(parseExclusions(row?.exclusions)),
     };
   }
 
@@ -197,7 +234,31 @@ export class CorrelationService {
       relatedMin: row ? Number(row.relatedMin) : RELATED_MIN,
       duplicateMin: row ? Number(row.duplicateMin) : DUPLICATE_MIN,
       labels,
+      exclusions: parseExclusions(row?.exclusions),
     };
+  }
+
+  /** Append one exclusion rule (server-assigned id). Caller schedules recompute. */
+  async addExclusion(
+    rule: Omit<ExclusionRule, 'id'>,
+  ): Promise<CorrelationConfigDto> {
+    const existing = await this.prisma.correlationConfig.findUnique({
+      where: { id: 1 },
+    });
+    const rules = parseExclusions(existing?.exclusions);
+    rules.push({ ...normalizeRule(rule), id: randomUUID() });
+    return this.saveConfig({ exclusions: rules });
+  }
+
+  /** Remove an exclusion rule by id. Caller schedules recompute. */
+  async removeExclusion(id: string): Promise<CorrelationConfigDto> {
+    const existing = await this.prisma.correlationConfig.findUnique({
+      where: { id: 1 },
+    });
+    const rules = parseExclusions(existing?.exclusions).filter(
+      (r) => r.id !== id,
+    );
+    return this.saveConfig({ exclusions: rules });
   }
 
   /** Upsert the singleton config. Does NOT recompute — the caller schedules it. */
@@ -230,11 +291,29 @@ export class CorrelationService {
       input.duplicateMin ??
         (existing ? Number(existing.duplicateMin) : DUPLICATE_MIN),
     );
+    const exclusions = (
+      input.exclusions ?? parseExclusions(existing?.exclusions)
+    )
+      .map((r) => ({ ...normalizeRule(r), id: r.id || randomUUID() }))
+      .filter((r) => isUsableRule(r));
 
     await this.prisma.correlationConfig.upsert({
       where: { id: 1 },
-      create: { id: 1, labelWeights, defaultWeight, relatedMin, duplicateMin },
-      update: { labelWeights, defaultWeight, relatedMin, duplicateMin },
+      create: {
+        id: 1,
+        labelWeights,
+        defaultWeight,
+        relatedMin,
+        duplicateMin,
+        exclusions: exclusions,
+      },
+      update: {
+        labelWeights,
+        defaultWeight,
+        relatedMin,
+        duplicateMin,
+        exclusions: exclusions,
+      },
     });
     return this.getConfig();
   }
@@ -252,14 +331,15 @@ export class CorrelationService {
     };
     if (touchedIds.length === 0) return empty;
 
-    // 1. Rebuild fingerprints (reverse-index rows + signature) for each asset.
-    let valuesIndexed = 0;
-    for (const assetId of touchedIds) {
-      valuesIndexed += await this.rebuildAssetValues(assetId);
-    }
-
     // Load the (DB-backed, dynamic) tuning once per recompute.
     const cfg = await this.loadConfig();
+
+    // 1. Rebuild fingerprints (reverse-index rows + signature) for each asset,
+    //    skipping any values matched by exclusion rules.
+    let valuesIndexed = 0;
+    for (const assetId of touchedIds) {
+      valuesIndexed += await this.rebuildAssetValues(assetId, cfg);
+    }
 
     // 2. Score touched assets against candidates and (re)link them.
     const { relatedPairs, duplicatePairs, topMatch, affectedAssetIds } =
@@ -281,7 +361,10 @@ export class CorrelationService {
   // ── Fingerprints ──────────────────────────────────────────────────────────
 
   /** Rebuild an asset's correlation values + signature from its findings. */
-  private async rebuildAssetValues(assetId: string): Promise<number> {
+  private async rebuildAssetValues(
+    assetId: string,
+    cfg: ResolvedConfig,
+  ): Promise<number> {
     const asset = await this.prisma.asset.findUnique({
       where: { id: assetId },
       select: { id: true, sourceId: true },
@@ -311,10 +394,13 @@ export class CorrelationService {
     for (const f of findings) {
       const normalized = normalizeValue(f.findingType, f.matchedContent);
       if (!normalized) continue;
+      const label = normalizeLabel(f.findingType);
+      // Drop noise the operator excluded (e.g. Person "null").
+      if (cfg.isExcluded(label, normalized)) continue;
       const hash = valueHash(f.findingType, normalized);
       if (rows.has(hash)) continue;
       rows.set(hash, {
-        label: normalizeLabel(f.findingType),
+        label,
         detectorType: f.detectorType,
         customDetectorKey: f.customDetectorKey ?? null,
         normalizedValue: normalized,
@@ -702,8 +788,13 @@ export class CorrelationService {
    * through the shared finding-values that bind them — "Asset ↔ value ↔ Asset".
    * Scope is one asset's cluster (assetId) or the largest clusters instance-wide.
    */
-  async buildGraph(opts?: { assetId?: string }): Promise<GraphResponseDto> {
+  async buildGraph(opts?: {
+    assetId?: string;
+    /** Scope to clusters that touch this source; flags external members. */
+    sourceId?: string;
+  }): Promise<CorrelationGraphResult> {
     const NODE_CAP = 500;
+    const scopeSourceId = opts?.sourceId;
 
     let clusterIds: string[];
     if (opts?.assetId) {
@@ -717,9 +808,22 @@ export class CorrelationService {
           where: { id: opts.assetId },
           select: ASSET_NODE_SELECT,
         });
-        return { nodes: a ? [assetNode(a)] : [], edges: [], truncated: false };
+        return {
+          nodes: a ? [assetNode(a)] : [],
+          edges: [],
+          truncated: false,
+          similarities: [],
+        };
       }
       clusterIds = [member.clusterId];
+    } else if (scopeSourceId) {
+      // Clusters that contain at least one asset from this source.
+      const rows = await this.prisma.assetClusterMember.findMany({
+        where: { asset: { sourceId: scopeSourceId } },
+        select: { clusterId: true },
+        distinct: ['clusterId'],
+      });
+      clusterIds = rows.map((r) => r.clusterId);
     } else {
       const clusters = await this.prisma.assetCluster.findMany({
         orderBy: { memberCount: 'desc' },
@@ -729,7 +833,7 @@ export class CorrelationService {
       clusterIds = clusters.map((c) => c.id);
     }
     if (clusterIds.length === 0)
-      return { nodes: [], edges: [], truncated: false };
+      return { nodes: [], edges: [], truncated: false, similarities: [] };
 
     const members = await this.prisma.assetClusterMember.findMany({
       where: { clusterId: { in: clusterIds } },
@@ -737,7 +841,7 @@ export class CorrelationService {
     });
     const assetIds = members.map((m) => m.assetId);
     if (assetIds.length === 0)
-      return { nodes: [], edges: [], truncated: false };
+      return { nodes: [], edges: [], truncated: false, similarities: [] };
 
     const [assets, values] = await Promise.all([
       this.prisma.asset.findMany({
@@ -773,7 +877,7 @@ export class CorrelationService {
       entry.assetIds.push(v.assetId);
     }
 
-    const nodes: GraphNodeDto[] = assets.map(assetNode);
+    const nodes: GraphNodeDto[] = assets.map((a) => assetNode(a, scopeSourceId));
     const edges: GraphEdgeDto[] = [];
     let truncated = false;
 
@@ -804,7 +908,119 @@ export class CorrelationService {
         });
       }
     }
-    return { nodes, edges, truncated };
+
+    // Pairwise similarity strength (for display + the min-similarity slider),
+    // straight from the asset↔asset correlation edges between included assets.
+    const assetIdSet = new Set(assetIds);
+    const simEdges = await this.prisma.edge.findMany({
+      where: {
+        fromType: ASSET_REL,
+        toType: ASSET_REL,
+        relationType: { in: CORRELATION_RELATION_TYPES },
+        fromId: { in: assetIds },
+        toId: { in: assetIds },
+      },
+      select: {
+        fromId: true,
+        toId: true,
+        relationType: true,
+        confidence: true,
+        metadata: true,
+      },
+    });
+    const similarities: AssetSimilarity[] = simEdges
+      .filter((e) => assetIdSet.has(e.fromId) && assetIdSet.has(e.toId))
+      .map((e) => {
+        const meta = (e.metadata ?? {}) as { weighted?: number };
+        return {
+          fromId: e.fromId,
+          toId: e.toId,
+          weighted: meta.weighted ?? Number(e.confidence),
+          relationType: e.relationType,
+        };
+      });
+
+    return { nodes, edges, truncated, similarities };
+  }
+
+  /**
+   * Asset-link graph for a source: assets connected by their `links` (each link
+   * is a hash; a hash may resolve to several assets). Assets in other sources
+   * are flagged external. Lone assets (no links) still render. Returns the
+   * shared graph shape so it draws on the case-graph canvas.
+   */
+  async buildLinksGraph(sourceId: string): Promise<CorrelationGraphResult> {
+    const NODE_CAP = 600;
+    const sourceAssets = await this.prisma.asset.findMany({
+      where: { sourceId },
+      select: { ...ASSET_NODE_SELECT, hash: true, links: true },
+      take: NODE_CAP,
+    });
+    if (sourceAssets.length === 0)
+      return { nodes: [], edges: [], truncated: false, similarities: [] };
+
+    // Collect every link hash referenced by this source's assets.
+    const linkHashes = new Set<string>();
+    for (const a of sourceAssets) {
+      const links = Array.isArray(a.links) ? (a.links as unknown[]) : [];
+      for (const l of links) if (typeof l === 'string' && l) linkHashes.add(l);
+    }
+
+    // Resolve link hashes → assets (may include external sources).
+    const targets =
+      linkHashes.size > 0
+        ? await this.prisma.asset.findMany({
+            where: { hash: { in: Array.from(linkHashes) } },
+            select: { ...ASSET_NODE_SELECT, hash: true },
+          })
+        : [];
+    const byHash = new Map<string, typeof targets>();
+    for (const t of targets) {
+      (byHash.get(t.hash) ?? byHash.set(t.hash, []).get(t.hash)!).push(t);
+    }
+
+    const nodeById = new Map<string, GraphNodeDto>();
+    for (const a of sourceAssets) nodeById.set(a.id, assetNode(a, sourceId));
+
+    const edges: GraphEdgeDto[] = [];
+    const seen = new Set<string>();
+    let truncated = false;
+    for (const a of sourceAssets) {
+      const links = Array.isArray(a.links) ? (a.links as unknown[]) : [];
+      for (const l of links) {
+        if (typeof l !== 'string') continue;
+        for (const target of byHash.get(l) ?? []) {
+          if (target.id === a.id) continue;
+          if (!nodeById.has(target.id)) {
+            if (nodeById.size >= NODE_CAP) {
+              truncated = true;
+              continue;
+            }
+            nodeById.set(target.id, assetNode(target, sourceId));
+          }
+          const key = a.id < target.id ? `${a.id}|${target.id}` : `${target.id}|${a.id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          edges.push({
+            id: `link:${key}`,
+            fromType: ASSET_REL,
+            fromId: a.id,
+            toType: ASSET_REL,
+            toId: target.id,
+            relationType: 'links_to',
+            confidence: 1,
+            origin: EdgeOrigin.INFERRED,
+          });
+        }
+      }
+    }
+
+    return {
+      nodes: Array.from(nodeById.values()),
+      edges,
+      truncated,
+      similarities: [],
+    };
   }
 
   async getValueOccurrences(args: {
@@ -957,13 +1173,17 @@ function pickReuseCluster(
 }
 
 /** Map an asset row to a graph node (matches the case-graph node shape). */
-function assetNode(a: {
-  id: string;
-  name: string;
-  externalUrl: string;
-  assetType: string;
-  sourceType: string;
-}): GraphNodeDto {
+function assetNode(
+  a: {
+    id: string;
+    name: string;
+    externalUrl: string;
+    assetType: string;
+    sourceType: string;
+    sourceId: string;
+  },
+  scopeSourceId?: string,
+): GraphNodeDto {
   return {
     id: a.id,
     type: ASSET_REL,
@@ -971,6 +1191,99 @@ function assetNode(a: {
     depth: 0,
     assetType: a.assetType,
     sourceType: a.sourceType,
+    // Flag assets outside the scoping source so the UI can mark/expand them.
+    status: scopeSourceId && a.sourceId !== scopeSourceId ? 'external' : undefined,
+  };
+}
+
+// ── Exclusion rules ──────────────────────────────────────────────────────────
+
+/** Parse the JSONB exclusions column into typed rules (defensive). */
+function parseExclusions(raw: unknown): ExclusionRule[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ExclusionRule[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== 'object') continue;
+    const o = r as Record<string, unknown>;
+    const mode = o.mode;
+    if (mode !== 'value' && mode !== 'regex' && mode !== 'label') continue;
+    out.push({
+      id: typeof o.id === 'string' ? o.id : randomUUID(),
+      mode,
+      label: typeof o.label === 'string' ? o.label : null,
+      value: typeof o.value === 'string' ? o.value : null,
+    });
+  }
+  return out;
+}
+
+/** Normalize a rule's label/value to match how the engine stores tokens. */
+function normalizeRule(rule: {
+  mode: ExclusionRule['mode'];
+  label?: string | null;
+  value?: string | null;
+}): {
+  mode: ExclusionRule['mode'];
+  label: string | null;
+  value: string | null;
+} {
+  const label = rule.label ? normalizeLabel(rule.label) : null;
+  if (rule.mode === 'label') return { mode: 'label', label, value: null };
+  if (rule.mode === 'regex')
+    return { mode: 'regex', label, value: (rule.value ?? '').trim() || null };
+  // exact value: compared case-insensitively against the normalized value.
+  return {
+    mode: 'value',
+    label,
+    value: (rule.value ?? '').trim().toLowerCase() || null,
+  };
+}
+
+function isUsableRule(r: ExclusionRule): boolean {
+  if (r.mode === 'label') return !!r.label;
+  if (r.mode === 'regex') {
+    if (!r.value) return false;
+    try {
+      new RegExp(r.value);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return !!r.value;
+}
+
+/** Compile rules into a fast (label, value) → excluded? predicate. */
+function buildExclusionPredicate(
+  rules: ExclusionRule[],
+): (label: string, value: string) => boolean {
+  const labelSet = new Set<string>();
+  const exact: Array<{ label: string | null; value: string }> = [];
+  const regexes: Array<{ label: string | null; re: RegExp }> = [];
+  for (const r of rules) {
+    if (!isUsableRule(r)) continue;
+    if (r.mode === 'label' && r.label) labelSet.add(r.label);
+    else if (r.mode === 'value' && r.value)
+      exact.push({ label: r.label, value: r.value });
+    else if (r.mode === 'regex' && r.value) {
+      try {
+        regexes.push({ label: r.label, re: new RegExp(r.value, 'i') });
+      } catch {
+        // skip invalid pattern
+      }
+    }
+  }
+  if (labelSet.size === 0 && exact.length === 0 && regexes.length === 0)
+    return () => false;
+  return (label: string, value: string) => {
+    if (labelSet.has(label)) return true;
+    for (const e of exact)
+      if ((e.label === null || e.label === label) && e.value === value)
+        return true;
+    for (const rx of regexes)
+      if ((rx.label === null || rx.label === label) && rx.re.test(value))
+        return true;
+    return false;
   };
 }
 
