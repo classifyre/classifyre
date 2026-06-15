@@ -39,6 +39,7 @@ export { GraphApi } from "./generated/src/apis/GraphApi";
 export { HypothesesApi } from "./generated/src/apis/HypothesesApi";
 export { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 export { AutopilotApi } from "./generated/src/apis/AutopilotApi";
+export { CorrelationApi } from "./generated/src/apis/CorrelationApi";
 export type {
   AgentRunDto,
   AgentRunDetailDto,
@@ -227,6 +228,19 @@ export type {
   SandboxRunListResponseDto,
   // Asset list types used by web app directly
   AssetListItemDto,
+  // Correlation / duplicate detection
+  ValueOccurrencesResponseDto,
+  ValueOccurrenceAssetDto,
+  RecomputeCorrelationResponseDto,
+  CorrelationGraphResponseDto,
+  AssetSimilarityDto,
+  CorrelationConfigResponseDto,
+  CorrelationLabelWeightDto,
+  UpdateCorrelationConfigDto,
+  ExclusionRuleDto,
+  AddExclusionDto,
+  CaseActionRequestDto,
+  CaseActionResponseDto,
 } from "./generated/src/models";
 
 export { RunnerDtoFromJSON } from "./generated/src/models/RunnerDto";
@@ -842,6 +856,7 @@ import { GraphApi } from "./generated/src/apis/GraphApi";
 import { HypothesesApi } from "./generated/src/apis/HypothesesApi";
 import { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 import { AutopilotApi } from "./generated/src/apis/AutopilotApi";
+import { CorrelationApi } from "./generated/src/apis/CorrelationApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -902,6 +917,7 @@ class ApiClient {
   public hypotheses: HypothesesApi;
   public threads: ThreadsApi;
   public autopilot: AutopilotApi;
+  public correlation: CorrelationApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -921,6 +937,7 @@ class ApiClient {
     this.hypotheses = new HypothesesApi(this.config);
     this.threads = new ThreadsApi(this.config);
     this.autopilot = new AutopilotApi(this.config);
+    this.correlation = new CorrelationApi(this.config);
   }
 
   async searchAssets(

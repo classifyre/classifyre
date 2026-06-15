@@ -18,6 +18,7 @@ import { SandboxModule } from './sandbox/sandbox.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { MatchingModule } from './matching/matching.module';
 import { AutopilotModule } from './autopilot/autopilot.module';
+import { CorrelationModule } from './correlation/correlation.module';
 import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 import { ExportModule } from './export/export.module';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
@@ -69,6 +70,7 @@ import {
     SchedulerModule,
     MatchingModule,
     AutopilotModule,
+    CorrelationModule,
     ExportModule,
   ],
   controllers: [

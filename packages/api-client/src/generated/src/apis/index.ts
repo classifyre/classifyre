@@ -6,6 +6,7 @@ export { AssetsApi } from './AssetsApi';
 export { AssistantApi } from './AssistantApi';
 export { AutopilotApi } from './AutopilotApi';
 export { CasesApi } from './CasesApi';
+export { CorrelationApi } from './CorrelationApi';
 export { CustomDetectorExtractionsApi } from './CustomDetectorExtractionsApi';
 export { CustomDetectorTestsApi } from './CustomDetectorTestsApi';
 export { CustomDetectorsApi } from './CustomDetectorsApi';
