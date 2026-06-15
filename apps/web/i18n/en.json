@@ -17,6 +17,7 @@
     "sources": "Sources",
     "detectors": "Custom Detectors",
     "investigations": "Investigations",
+    "fingerprints": "Fingerprints",
     "scans": "Scans",
     "sandbox": "Sandbox",
     "operations": "Operations",
@@ -286,7 +287,8 @@
       "tabOverview": "Overview",
       "tabFindings": "Findings",
       "tabAssets": "Assets",
-      "runSummaryLine": "{{findings}} findings · {{assets}} assets scanned"
+      "runSummaryLine": "{{findings}} findings · {{assets}} assets scanned",
+      "tabFingerprints": "Fingerprints"
     },
     "edit": {
       "loading": "Loading source configuration...",
@@ -2127,7 +2129,9 @@
       "strengthWeak": "Weak",
       "strengthStrong": "Strong",
       "strengthHint": "Link colour = similarity strength between assets.",
-      "excludeHelp": "Right-click a value to exclude noise (e.g. \"null\")."
+      "excludeHelp": "Right-click a value to exclude noise (e.g. \"null\").",
+      "recomputing": "Recomputing…",
+      "external": "External ({{count}})"
     },
     "exclude": {
       "value": "Exclude this value",
@@ -2162,7 +2166,11 @@
       "exValueField": "Value",
       "exPatternField": "Pattern",
       "exAny": "any",
-      "exAdd": "Add"
+      "exAdd": "Add",
+      "scoringTitle": "Scoring",
+      "noExclusions": "No exclusions yet.",
+      "recomputeNote": "Saving recomputes all fingerprints (a Duplicates Finder run).",
+      "reset": "Reset"
     },
     "caseAction": {
       "title": "Assets → case",
@@ -2191,5 +2199,25 @@
       "loadFailed": "Failed to load occurrences",
       "foundIn": "Found in {{count}} asset(s)"
     }
+  },
+  "fingerprints": {
+    "subtitle": "Deterministic correlation across all sources — assets bound by the findings they share.",
+    "tabGraph": "Fingerprints",
+    "tabTune": "Tune correlation"
+  },
+  "links": {
+    "title": "Asset links",
+    "loadFailed": "Failed to load the links graph",
+    "empty": "No assets",
+    "emptyDesc": "This source has no assets yet.",
+    "truncated": "Partial",
+    "external": "External ({{count}})",
+    "asset": "Asset",
+    "externalBadge": "External source",
+    "openAsset": "Open asset",
+    "legend": "Legend",
+    "legendHint": "Assets are connected by their link references (hash → asset).",
+    "legendAsset": "Asset in this source",
+    "legendExternal": "Linked asset in another source"
   }
 }

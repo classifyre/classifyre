@@ -17,6 +17,7 @@
     "sources": "Quellen",
     "detectors": "Custom-Detektoren",
     "investigations": "Ermittlungen",
+    "fingerprints": "Fingerabdrücke",
     "scans": "Scans",
     "sandbox": "Sandbox",
     "operations": "Operationen",
@@ -286,7 +287,8 @@
       "tabOverview": "Übersicht",
       "tabFindings": "Befunde",
       "tabAssets": "Assets",
-      "runSummaryLine": "{{findings}} Befunde · {{assets}} Assets gescannt"
+      "runSummaryLine": "{{findings}} Befunde · {{assets}} Assets gescannt",
+      "tabFingerprints": "Fingerabdrücke"
     },
     "edit": {
       "loading": "Quellkonfiguration wird geladen...",
@@ -2127,7 +2129,9 @@
       "strengthWeak": "Schwach",
       "strengthStrong": "Stark",
       "strengthHint": "Linienfarbe = Ähnlichkeitsstärke zwischen Assets.",
-      "excludeHelp": "Rechtsklick auf einen Wert, um Rauschen auszuschließen (z. B. \"null\")."
+      "excludeHelp": "Rechtsklick auf einen Wert, um Rauschen auszuschließen (z. B. \"null\").",
+      "recomputing": "Neuberechnung…",
+      "external": "Extern ({{count}})"
     },
     "exclude": {
       "value": "Diesen Wert ausschließen",
@@ -2162,7 +2166,11 @@
       "exValueField": "Wert",
       "exPatternField": "Muster",
       "exAny": "beliebig",
-      "exAdd": "Hinzufügen"
+      "exAdd": "Hinzufügen",
+      "scoringTitle": "Bewertung",
+      "noExclusions": "Noch keine Ausschlüsse.",
+      "recomputeNote": "Speichern berechnet alle Fingerabdrücke neu (ein Duplicates-Finder-Lauf).",
+      "reset": "Zurücksetzen"
     },
     "caseAction": {
       "title": "Assets → Fall",
@@ -2191,5 +2199,25 @@
       "loadFailed": "Vorkommen konnten nicht geladen werden",
       "foundIn": "In {{count}} Asset(s) gefunden"
     }
+  },
+  "fingerprints": {
+    "subtitle": "Deterministische Korrelation über alle Quellen — Assets, verbunden durch gemeinsame Funde.",
+    "tabGraph": "Fingerabdrücke",
+    "tabTune": "Korrelation justieren"
+  },
+  "links": {
+    "title": "Asset-Verknüpfungen",
+    "loadFailed": "Verknüpfungsgraph konnte nicht geladen werden",
+    "empty": "Keine Assets",
+    "emptyDesc": "Diese Quelle hat noch keine Assets.",
+    "truncated": "Teilweise",
+    "external": "Extern ({{count}})",
+    "asset": "Asset",
+    "externalBadge": "Externe Quelle",
+    "openAsset": "Asset öffnen",
+    "legend": "Legende",
+    "legendHint": "Assets sind über ihre Verknüpfungen verbunden (Hash → Asset).",
+    "legendAsset": "Asset in dieser Quelle",
+    "legendExternal": "Verknüpftes Asset in anderer Quelle"
   }
 }

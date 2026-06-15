@@ -877,7 +877,9 @@ export class CorrelationService {
       entry.assetIds.push(v.assetId);
     }
 
-    const nodes: GraphNodeDto[] = assets.map((a) => assetNode(a, scopeSourceId));
+    const nodes: GraphNodeDto[] = assets.map((a) =>
+      assetNode(a, scopeSourceId),
+    );
     const edges: GraphEdgeDto[] = [];
     let truncated = false;
 
@@ -998,7 +1000,8 @@ export class CorrelationService {
             }
             nodeById.set(target.id, assetNode(target, sourceId));
           }
-          const key = a.id < target.id ? `${a.id}|${target.id}` : `${target.id}|${a.id}`;
+          const key =
+            a.id < target.id ? `${a.id}|${target.id}` : `${target.id}|${a.id}`;
           if (seen.has(key)) continue;
           seen.add(key);
           edges.push({
@@ -1192,7 +1195,8 @@ function assetNode(
     assetType: a.assetType,
     sourceType: a.sourceType,
     // Flag assets outside the scoping source so the UI can mark/expand them.
-    status: scopeSourceId && a.sourceId !== scopeSourceId ? 'external' : undefined,
+    status:
+      scopeSourceId && a.sourceId !== scopeSourceId ? 'external' : undefined,
   };
 }
 

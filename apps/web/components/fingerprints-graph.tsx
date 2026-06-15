@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Fingerprint,
   FolderPlus,
+  Globe,
   Layers,
   Maximize2,
   RotateCw,
@@ -104,18 +105,33 @@ function focusComponent(
  * a tuning dialog, case actions, and bundling of dense shared-value groups into
  * a single clickable "N shared values" element to cut visual noise.
  */
-export function FingerprintsGraph({ assetId }: { assetId?: string }) {
+export function FingerprintsGraph({
+  assetId,
+  sourceId,
+  onTune,
+  pendingRecomputeAt,
+}: {
+  assetId?: string;
+  /** Scope to a source's clusters; external assets get a show/hide toggle. */
+  sourceId?: string;
+  /** When set, the toolbar "Tune" button calls this instead of opening a dialog. */
+  onTune?: () => void;
+  /** Bump (e.g. timestamp) to make the graph wait for a recompute + reload. */
+  pendingRecomputeAt?: number;
+}) {
   const { t } = useTranslation();
   const [nodes, setNodes] = React.useState<GraphNodeDto[]>([]);
   const [edges, setEdges] = React.useState<GraphEdgeDto[]>([]);
   const [similarities, setSimilarities] = React.useState<AssetSimilarityDto[]>([]);
   const [truncated, setTruncated] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
+  const [recomputing, setRecomputing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [sourceFilter, setSourceFilter] = React.useState<string[]>([]);
   const [labelFilter, setLabelFilter] = React.useState<string[]>([]);
   const [minSimilarity, setMinSimilarity] = React.useState(0);
+  const [showExternal, setShowExternal] = React.useState(false);
   const [selection, setSelection] = React.useState<GraphSelection>(null);
   // Focused component ("path") around the last-clicked node; dims everything else.
   const [path, setPath] = React.useState<PathResult | null>(null);
@@ -152,8 +168,9 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
     let active = true;
     setLoading(true);
     setError(null);
+    const req = assetId ? { assetId } : sourceId ? { sourceId } : {};
     api.correlation
-      .correlationControllerGraph(assetId ? { assetId } : {})
+      .correlationControllerGraph(req)
       .then((g) => {
         if (!active) return;
         setNodes(g.nodes ?? []);
@@ -173,13 +190,59 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
     return () => {
       active = false;
     };
-  }, [assetId, t]);
+  }, [assetId, sourceId, t]);
 
   React.useEffect(() => load(), [load]);
+
+  /**
+   * After a config/exclusion change the recompute runs as a background
+   * DUPLICATES run. Poll until a run started after `since` finishes, then
+   * reload — so the graph never shows the stale pre-recompute state.
+   */
+  const waitForRecompute = React.useCallback(
+    async (since: number) => {
+      setRecomputing(true);
+      const deadline = Date.now() + 90_000;
+      try {
+        // small grace so the job is enqueued/visible
+        await new Promise((r) => setTimeout(r, 800));
+        while (Date.now() < deadline) {
+          let done = false;
+          try {
+            const res = await api.autopilot.autopilotControllerListRuns({
+              agentKind: "DUPLICATES",
+              limit: 5,
+            });
+            done = (res.items ?? []).some(
+              (r) =>
+                ["COMPLETED", "FAILED", "SKIPPED", "CANCELLED"].includes(
+                  r.status,
+                ) && new Date(r.createdAt).getTime() >= since - 2000,
+            );
+          } catch {
+            done = true; // can't poll → stop waiting, just refresh
+          }
+          if (done) break;
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      } finally {
+        load();
+        setRecomputing(false);
+      }
+    },
+    [load],
+  );
+
+  // External trigger (e.g. the Tune tab saved) → wait for recompute + reload.
+  React.useEffect(() => {
+    if (pendingRecomputeAt) void waitForRecompute(pendingRecomputeAt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRecomputeAt]);
 
   const exclude = React.useCallback(
     async (node: GraphNodeDto, mode: "value" | "label") => {
       setCtxMenu(null);
+      const since = Date.now();
       try {
         await api.correlation.correlationControllerAddExclusion({
           addExclusionDto: {
@@ -189,14 +252,14 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
           },
         });
         toast.success(t("correlation.exclude.done"));
-        load();
+        void waitForRecompute(since);
       } catch (e) {
         toast.error(
           e instanceof Error ? e.message : t("correlation.exclude.failed"),
         );
       }
     },
-    [t, load],
+    [t, waitForRecompute],
   );
 
   // ── Filter options ──────────────────────────────────────────────────────────
@@ -240,6 +303,7 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
     visibleAssetIds,
     unconnectedCount,
     valueCount,
+    externalAssetCount,
   } = React.useMemo(() => {
     const valueById = new Map(
       nodes.filter((n) => n.type === "finding").map((n) => [n.id, n]),
@@ -248,15 +312,20 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
       nodes.filter((n) => n.type === "asset").map((n) => [n.id, n]),
     );
 
-    // 1) hard filters: source (assets) and label (values).
+    // 1) hard filters: source (assets), label (values), and (source-scoped)
+    //    external assets unless "show external" is on.
     const srcSet = new Set(sourceFilter);
     const labelSet = new Set(labelFilter);
+    const externalAssetCount = nodes.filter(
+      (n) => n.type === "asset" && n.status === "external",
+    ).length;
     const passAssets = new Set(
       nodes
         .filter(
           (n) =>
             n.type === "asset" &&
-            (srcSet.size === 0 || (n.sourceType && srcSet.has(n.sourceType))),
+            (srcSet.size === 0 || (n.sourceType && srcSet.has(n.sourceType))) &&
+            (showExternal || n.status !== "external"),
         )
         .map((n) => n.id),
     );
@@ -430,8 +499,19 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
       visibleAssetIds: [...connected],
       unconnectedCount: unconnected,
       valueCount: values,
+      externalAssetCount,
     };
-  }, [nodes, edges, search, sourceFilter, labelFilter, minSimilarity, simByPair, t]);
+  }, [
+    nodes,
+    edges,
+    search,
+    sourceFilter,
+    labelFilter,
+    minSimilarity,
+    simByPair,
+    showExternal,
+    t,
+  ]);
 
   // ── Layout / viewport ──────────────────────────────────────────────────────
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -487,7 +567,7 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
   // (its node keys may no longer exist → would dim everything).
   React.useEffect(() => {
     clearFocus();
-  }, [nodes, search, sourceFilter, labelFilter, minSimilarity, clearFocus]);
+  }, [nodes, search, sourceFilter, labelFilter, minSimilarity, showExternal, clearFocus]);
 
   // ── Click = focus this node's component (path); greyed nodes are inert ───────
   const onNodeClick = React.useCallback(
@@ -603,6 +683,20 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
           </div>
         )}
 
+        {sourceId && externalAssetCount > 0 && (
+          <Button
+            variant={showExternal ? "default" : "outline"}
+            size="sm"
+            className="h-8"
+            onClick={() => setShowExternal((v) => !v)}
+          >
+            <Globe className="mr-1.5 h-3.5 w-3.5" />
+            {t("correlation.fingerprints.external", {
+              count: String(externalAssetCount),
+            })}
+          </Button>
+        )}
+
         {truncated && (
           <Badge variant="outline" className="text-[10px] uppercase">
             {t("correlation.fingerprints.truncated")}
@@ -610,7 +704,12 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
         )}
 
         <div className="ml-auto flex items-center gap-1">
-          <Button variant="outline" size="sm" className="h-8" onClick={() => setTuneOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => (onTune ? onTune() : setTuneOpen(true))}
+          >
             <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
             {t("correlation.fingerprints.tune")}
           </Button>
@@ -648,9 +747,11 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
             onAttachBadgeClick={() => undefined}
             onToggleCollapse={() => undefined}
           />
-          {(loading || error || showEmpty) && (
+          {(loading || recomputing || error || showEmpty) && (
             <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-sm">
-              {loading ? (
+              {recomputing ? (
+                <Spinner size="lg" label={t("correlation.fingerprints.recomputing")} />
+              ) : loading ? (
                 <Spinner size="lg" label={t("correlation.fingerprints.title")} />
               ) : error ? (
                 <EmptyState
@@ -878,7 +979,11 @@ export function FingerprintsGraph({ assetId }: { assetId?: string }) {
         </>
       )}
 
-      <CorrelationTuningDialog open={tuneOpen} onOpenChange={setTuneOpen} onSaved={load} />
+      <CorrelationTuningDialog
+        open={tuneOpen}
+        onOpenChange={setTuneOpen}
+        onSaved={() => void waitForRecompute(Date.now())}
+      />
       <FingerprintsCaseDialog
         open={caseOpen}
         onOpenChange={setCaseOpen}

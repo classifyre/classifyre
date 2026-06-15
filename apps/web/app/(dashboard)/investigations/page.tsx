@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/componen
 import { CasesTable } from "@/components/cases-table";
 import { InquiriesTable } from "@/components/inquiries-table";
 import { AutopilotPanel } from "@/components/autopilot/autopilot-panel";
-import { FingerprintsGraph } from "@/components/fingerprints-graph";
 import { useTranslation } from "@/hooks/use-translation";
 
 export default function InvestigationsPage() {
@@ -25,11 +24,7 @@ function InvestigationsPageInner() {
   const { t } = useTranslation();
   const tabParam = searchParams.get("tab");
   const defaultTab =
-    tabParam === "inquiries" ||
-    tabParam === "autopilot" ||
-    tabParam === "fingerprints"
-      ? tabParam
-      : "cases";
+    tabParam === "inquiries" || tabParam === "autopilot" ? tabParam : "cases";
 
   return (
     <div className="space-y-6">
@@ -59,9 +54,6 @@ function InvestigationsPageInner() {
         <TabsList>
           <TabsTrigger value="cases">{t("investigations.page.tabCases")}</TabsTrigger>
           <TabsTrigger value="inquiries">{t("investigations.page.tabInquiries")}</TabsTrigger>
-          <TabsTrigger value="fingerprints">
-            {t("investigations.page.tabFingerprints")}
-          </TabsTrigger>
           <TabsTrigger value="autopilot">{t("investigations.page.tabAutopilot")}</TabsTrigger>
         </TabsList>
 
@@ -71,12 +63,6 @@ function InvestigationsPageInner() {
 
         <TabsContent value="inquiries">
           <InquiriesTable />
-        </TabsContent>
-
-        <TabsContent value="fingerprints">
-          <div className="h-[72vh]">
-            <FingerprintsGraph />
-          </div>
         </TabsContent>
 
         <TabsContent value="autopilot">
