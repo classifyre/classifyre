@@ -7410,7 +7410,16 @@
             "name": "assetId",
             "required": false,
             "in": "query",
-            "description": "Scope to one asset's identity cluster; omit for all clusters",
+            "description": "Scope to one asset's identity cluster",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": false,
+            "in": "query",
+            "description": "Scope to clusters touching this source (external flagged)",
             "schema": {
               "type": "string"
             }
@@ -7422,13 +7431,44 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GraphResponseDto"
+                  "$ref": "#/components/schemas/CorrelationGraphResponseDto"
                 }
               }
             }
           }
         },
         "summary": "Correlation (\"evidence fingerprints\") graph: assets linked through the findings they share",
+        "tags": [
+          "correlation"
+        ]
+      }
+    },
+    "/correlation/links-graph": {
+      "get": {
+        "operationId": "CorrelationController_linksGraph",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrelationGraphResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "A source's assets connected by their links (hash references)",
         "tags": [
           "correlation"
         ]
@@ -7481,6 +7521,69 @@
           }
         },
         "summary": "Update correlation tuning and schedule a full recompute (logged)",
+        "tags": [
+          "correlation"
+        ]
+      }
+    },
+    "/correlation/exclusions": {
+      "post": {
+        "operationId": "CorrelationController_addExclusion",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddExclusionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrelationConfigResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add an exclusion rule (ignore noisy values) and recompute",
+        "tags": [
+          "correlation"
+        ]
+      }
+    },
+    "/correlation/exclusions/{id}": {
+      "delete": {
+        "operationId": "CorrelationController_removeExclusion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrelationConfigResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Remove an exclusion rule and recompute",
         "tags": [
           "correlation"
         ]
@@ -15501,6 +15604,64 @@
           }
         }
       },
+      "AssetSimilarityDto": {
+        "type": "object",
+        "properties": {
+          "fromId": {
+            "type": "string"
+          },
+          "toId": {
+            "type": "string"
+          },
+          "weighted": {
+            "type": "number",
+            "description": "Weighted match in [0,1]"
+          },
+          "relationType": {
+            "type": "string",
+            "description": "\"related\" | \"likely_duplicate\""
+          }
+        },
+        "required": [
+          "fromId",
+          "toId",
+          "weighted",
+          "relationType"
+        ]
+      },
+      "CorrelationGraphResponseDto": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphNodeDto"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphEdgeDto"
+            }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the node cap was hit and the graph is partial"
+          },
+          "similarities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetSimilarityDto"
+            }
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "truncated",
+          "similarities"
+        ]
+      },
       "CorrelationLabelWeightDto": {
         "type": "object",
         "properties": {
@@ -15523,6 +15684,37 @@
           "inUse"
         ]
       },
+      "ExclusionRuleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Server-assigned id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "value",
+              "regex",
+              "label"
+            ],
+            "description": "value = exact normalized value; regex = pattern on value; label = ignore the whole label"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true,
+            "description": "Label scope (or the excluded label when mode=label)"
+          },
+          "value": {
+            "type": "string",
+            "nullable": true,
+            "description": "Exact value (mode=value) or regex source (mode=regex)"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
       "CorrelationConfigResponseDto": {
         "type": "object",
         "properties": {
@@ -15543,13 +15735,20 @@
             "items": {
               "$ref": "#/components/schemas/CorrelationLabelWeightDto"
             }
+          },
+          "exclusions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExclusionRuleDto"
+            }
           }
         },
         "required": [
           "defaultWeight",
           "relatedMin",
           "duplicateMin",
-          "labels"
+          "labels",
+          "exclusions"
         ]
       },
       "UpdateCorrelationConfigDto": {
@@ -15576,8 +15775,39 @@
             "additionalProperties": {
               "type": "number"
             }
+          },
+          "exclusions": {
+            "description": "Full replacement list of exclusion rules",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExclusionRuleDto"
+            }
           }
         }
+      },
+      "AddExclusionDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "value",
+              "regex",
+              "label"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "mode"
+        ]
       },
       "CaseActionRequestDto": {
         "type": "object",

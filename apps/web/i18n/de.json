@@ -2121,7 +2121,19 @@
       "unconnected": "{{count}} Asset(s) ohne sichtbare Verbindung ausgeblendet (z. B. abgeschnitten oder gefiltert).",
       "focusedHint": "Fokus auf {{count}} verbundene(s) Asset(s) — genau daraus einen Fall erstellen/aktualisieren.",
       "clearFocus": "Fokus aufheben",
-      "focusHelp": "Auf einen Knoten klicken, um seine Verbindungen zu fokussieren; der Rest wird abgeblendet."
+      "focusHelp": "Auf einen Knoten klicken, um seine Verbindungen zu fokussieren; der Rest wird abgeblendet.",
+      "minSimilarity": "Min. Ähnlichkeit ≥ {{count}}%",
+      "matchPercent": "{{count}}% Übereinstimmung",
+      "strengthWeak": "Schwach",
+      "strengthStrong": "Stark",
+      "strengthHint": "Linienfarbe = Ähnlichkeitsstärke zwischen Assets.",
+      "excludeHelp": "Rechtsklick auf einen Wert, um Rauschen auszuschließen (z. B. \"null\")."
+    },
+    "exclude": {
+      "value": "Diesen Wert ausschließen",
+      "label": "Alle '{{label}}' ausschließen",
+      "done": "Ausgeschlossen — wird im Hintergrund neu berechnet",
+      "failed": "Ausschluss konnte nicht hinzugefügt werden"
     },
     "tune": {
       "title": "Korrelation justieren",
@@ -2139,7 +2151,18 @@
       "defaultWeightHint": "Wird für jedes Label ohne explizites Gewicht verwendet.",
       "labelWeights": "Label-Gewichte",
       "noLabels": "Noch keine Labels in den Daten.",
-      "retired": "nicht in Daten"
+      "retired": "nicht in Daten",
+      "exclusions": "Ausschlüsse",
+      "exclusionsHint": "Werte, die bei der Korrelation ignoriert werden (Rauschen wie \"null\"). Wird mit Neuberechnung gespeichert.",
+      "exMode": "Modus",
+      "exValueMode": "Wert",
+      "exRegexMode": "Regex",
+      "exLabelMode": "Label",
+      "exLabelField": "Label",
+      "exValueField": "Wert",
+      "exPatternField": "Muster",
+      "exAny": "beliebig",
+      "exAdd": "Hinzufügen"
     },
     "caseAction": {
       "title": "Assets → Fall",

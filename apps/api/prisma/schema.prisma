@@ -804,6 +804,10 @@ model CorrelationConfig {
   defaultWeight Int      @default(1) @map("default_weight")
   relatedMin    Decimal  @default(0.30) @map("related_min") @db.Decimal(3, 2)
   duplicateMin  Decimal  @default(0.60) @map("duplicate_min") @db.Decimal(3, 2)
+  // Values to ignore when fingerprinting (noise like Person "null"). Array of
+  // { id, mode: "value"|"regex"|"label", label, value }. Applied at indexing
+  // time; editing triggers a full recompute.
+  exclusions    Json     @default("[]") @map("exclusions") @db.JsonB
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("correlation_config")

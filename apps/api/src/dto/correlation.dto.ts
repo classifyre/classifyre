@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsNumber,
   IsObject,
@@ -11,6 +12,20 @@ import {
   Min,
 } from 'class-validator';
 import { Severity } from '@prisma/client';
+import { GraphResponseDto } from './graph.dto';
+
+export class AssetSimilarityDto {
+  @ApiProperty() fromId!: string;
+  @ApiProperty() toId!: string;
+  @ApiProperty({ description: 'Weighted match in [0,1]' }) weighted!: number;
+  @ApiProperty({ description: '"related" | "likely_duplicate"' })
+  relationType!: string;
+}
+
+export class CorrelationGraphResponseDto extends GraphResponseDto {
+  @ApiProperty({ type: [AssetSimilarityDto] })
+  similarities!: AssetSimilarityDto[];
+}
 
 export class CorrelationLabelWeightDto {
   @ApiProperty({ description: 'Normalized finding label (dynamic)' })
@@ -21,6 +36,37 @@ export class CorrelationLabelWeightDto {
     description: 'Whether the label currently appears in the data',
   })
   inUse!: boolean;
+}
+
+export class ExclusionRuleDto {
+  @ApiPropertyOptional({ description: 'Server-assigned id' })
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @ApiProperty({
+    enum: ['value', 'regex', 'label'],
+    description:
+      'value = exact normalized value; regex = pattern on value; label = ignore the whole label',
+  })
+  @IsIn(['value', 'regex', 'label'])
+  mode!: 'value' | 'regex' | 'label';
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Label scope (or the excluded label when mode=label)',
+  })
+  @IsOptional()
+  @IsString()
+  label?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Exact value (mode=value) or regex source (mode=regex)',
+  })
+  @IsOptional()
+  @IsString()
+  value?: string | null;
 }
 
 export class CorrelationConfigResponseDto {
@@ -36,6 +82,8 @@ export class CorrelationConfigResponseDto {
   duplicateMin!: number;
   @ApiProperty({ type: [CorrelationLabelWeightDto] })
   labels!: CorrelationLabelWeightDto[];
+  @ApiProperty({ type: [ExclusionRuleDto] })
+  exclusions!: ExclusionRuleDto[];
 }
 
 export class UpdateCorrelationConfigDto {
@@ -68,6 +116,31 @@ export class UpdateCorrelationConfigDto {
   @IsOptional()
   @IsObject()
   labelWeights?: Record<string, number>;
+
+  @ApiPropertyOptional({
+    type: [ExclusionRuleDto],
+    description: 'Full replacement list of exclusion rules',
+  })
+  @IsOptional()
+  @IsArray()
+  exclusions?: ExclusionRuleDto[];
+}
+
+/** Append a single exclusion rule (right-click quick-exclude). */
+export class AddExclusionDto {
+  @ApiProperty({ enum: ['value', 'regex', 'label'] })
+  @IsIn(['value', 'regex', 'label'])
+  mode!: 'value' | 'regex' | 'label';
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  label?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  value?: string | null;
 }
 
 export class CaseActionRequestDto {
