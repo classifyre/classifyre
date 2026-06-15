@@ -68,6 +68,26 @@ describe('normalizeSourceConfig sampling', () => {
     );
   });
 
+  it('preserves enable_transcription from sampling and legacy optional.sampling', () => {
+    const normalized = normalizeSourceConfig('POSTGRESQL', {
+      type: 'POSTGRESQL',
+      required: { host: 'db.local', port: 5432 },
+      optional: {
+        sampling: {
+          enable_transcription: false,
+        },
+      },
+      sampling: {
+        strategy: 'ALL',
+        enable_transcription: true,
+      },
+    });
+
+    expect(
+      (normalized.sampling as Record<string, unknown>)?.enable_transcription,
+    ).toBe(true);
+  });
+
   it('strips legacy limit and max_columns from sampling', () => {
     const normalized = normalizeSourceConfig('POSTGRESQL', {
       type: 'POSTGRESQL',

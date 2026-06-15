@@ -7,6 +7,7 @@ import {
 } from './schemas/dream.schema';
 import type {
   CaseSummary,
+  DuplicateSummary,
   FindingGroupSummary,
   FocusedCaseDetail,
   InquirySummary,
@@ -141,12 +142,14 @@ export function buildInquiryUserPrompt(input: {
     description: string | null;
   }>;
   memories: RecalledMemory[];
+  duplicates?: DuplicateSummary;
   part?: { index: number; total: number };
 }): string {
   return [
     input.manual
       ? `## Manual review requested by the operator\nScope: ${input.sourceName}. Review ALL existing open findings below — this is not a scan delta.`
       : `## Scan that just finished\nSource: ${input.sourceName}${input.sourceId ? ` (id: ${input.sourceId})` : ''}`,
+    duplicatesSection(input.duplicates),
     input.instruction
       ? `## Operator instruction for THIS cycle (highest priority — follow it)\n${input.instruction}`
       : '',
@@ -232,6 +235,7 @@ export function buildCaseUserPrompt(input: {
   }>;
   focusCase?: FocusedCaseDetail | null;
   memories: RecalledMemory[];
+  duplicates?: DuplicateSummary;
 }): string {
   return [
     input.focusCase
@@ -242,6 +246,7 @@ export function buildCaseUserPrompt(input: {
     input.manual
       ? `## Manual review requested by the operator\nScope: ${input.sourceName}. Candidate inquiries include ALL with current matches — this is not a scan delta.`
       : `## Scan that just finished\nSource: ${input.sourceName}`,
+    duplicatesSection(input.duplicates),
     input.instruction
       ? `## Operator instruction for THIS cycle (highest priority — follow it)\n${input.instruction}`
       : '',
@@ -272,6 +277,28 @@ export function buildCaseUserPrompt(input: {
   ]
     .filter(Boolean)
     .join('\n\n');
+}
+
+/**
+ * Render the DUPLICATES FINDER AGENT's results so the inquiry/case agents can
+ * account for same-entity / cross-source duplicates (e.g. avoid treating one
+ * leaked identity re-ingested under many filenames as many separate problems).
+ */
+function duplicatesSection(duplicates?: DuplicateSummary): string {
+  if (
+    !duplicates ||
+    (duplicates.clusters.length === 0 && duplicates.topPairs.length === 0)
+  ) {
+    return '';
+  }
+  return (
+    `## Duplicate detection for this scan (from the deterministic Duplicates Finder — take these into account)\n` +
+    `Identity clusters group assets that are very likely the same entity across files/sources; related/duplicate pairs share concrete findings.\n` +
+    json({
+      clusters: duplicates.clusters,
+      topPairs: duplicates.topPairs,
+    })
+  );
 }
 
 function compactGroup(g: FindingGroupSummary): Record<string, unknown> {

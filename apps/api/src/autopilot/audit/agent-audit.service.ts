@@ -15,7 +15,7 @@ export interface RecordDecisionInput {
   action: AgentDecisionAction;
   outcome: AgentDecisionOutcome;
   rationale: string;
-  entityType?: 'inquiry' | 'case';
+  entityType?: 'inquiry' | 'case' | 'asset' | 'cluster';
   entityId?: string;
   /** Exact mutation input (or rejection detail) for auditability/replay. */
   payload?: Record<string, unknown>;

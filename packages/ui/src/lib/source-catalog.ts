@@ -7,6 +7,7 @@ export type SourceCatalogCategory =
   | "GRAPH_DATABASES"
   | "WAREHOUSE_LAKEHOUSE"
   | "WEB_AND_UGC"
+  | "SOCIAL_MEDIA"
   | "COLLABORATION"
   | "ANALYTICS_BI"
   | "OTHER";
@@ -50,6 +51,10 @@ export const SOURCE_CATEGORY_META: Record<
     label: "Web & UGC",
     description: "Public-facing websites and user-generated content.",
   },
+  SOCIAL_MEDIA: {
+    label: "Social Media",
+    description: "Social and video platforms with public posts and transcripts.",
+  },
   COLLABORATION: {
     label: "Collaboration",
     description: "Team communication and workspace activity streams.",
@@ -70,6 +75,7 @@ export const SOURCE_CATEGORY_ORDER: SourceCatalogCategory[] = [
   "GRAPH_DATABASES",
   "WAREHOUSE_LAKEHOUSE",
   "WEB_AND_UGC",
+  "SOCIAL_MEDIA",
   "COLLABORATION",
   "ANALYTICS_BI",
   "OTHER",
@@ -216,6 +222,13 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     icon: CreateSourceDtoTypeEnum.Email,
     category: "COLLABORATION",
     keywords: ["imap", "gmail", "outlook", "mailbox", "messages", "attachments"],
+  },
+  YOUTUBE: {
+    description:
+      "Scan YouTube channels and videos, fetching metadata and transcripts for detection.",
+    icon: CreateSourceDtoTypeEnum.Youtube,
+    category: "SOCIAL_MEDIA",
+    keywords: ["video", "social media", "ugc", "captions", "transcript", "channel"],
   },
 };
 

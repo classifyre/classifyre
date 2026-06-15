@@ -35,6 +35,8 @@ export interface GraphCanvasProps {
   /** Node keys rendered at full opacity; null = nothing is dimmed. */
   activeNodeKeys: Set<string> | null;
   path: PathResult | null;
+  /** Colour edges by edge.confidence (0..1) as a similarity-strength heat. */
+  colorByStrength?: boolean;
   onNodeClick: (node: GraphNodeDto, shiftKey: boolean) => void;
   onNodeContextMenu: (node: GraphNodeDto, clientX: number, clientY: number) => void;
   onEdgeClick: (edge: GraphEdgeDto) => void;
@@ -57,6 +59,7 @@ export function GraphCanvas({
   mode,
   activeNodeKeys,
   path,
+  colorByStrength,
   onNodeClick,
   onNodeContextMenu,
   onEdgeClick,
@@ -174,6 +177,7 @@ export function GraphCanvas({
                 isSelected={selection?.type === "edge" && selection.id === e.id}
                 isDimmed={isEdgeDimmed(e)}
                 isOnPath={path?.edgeIds.has(e.id) ?? false}
+                colorByStrength={colorByStrength}
                 onClick={onEdgeClick}
                 onContextMenu={(edge, ev) => onEdgeContextMenu(edge, ev.clientX, ev.clientY)}
               />

@@ -33,6 +33,7 @@ import {
 } from "@workspace/ui/components/multi-select";
 import { ArrowLeft } from "lucide-react";
 import { InquiryMatchesTable } from "@/components/inquiry-matches-table";
+import { useTranslation } from "@/hooks/use-translation";
 
 const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
 
@@ -52,6 +53,7 @@ export default function NewCasePage() {
 function NewCasePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const initialInquiryId = searchParams.get("inquiryId");
 
   const [allInquiries, setAllInquiries] = React.useState<InquiryResponseDto[]>([]);
@@ -80,7 +82,7 @@ function NewCasePageInner() {
       .then((res) => setAllInquiries(res.items))
       .catch((err) => {
         console.error(err);
-        toast.error("Failed to load inquiries");
+        toast.error(t("investigations.newCase.failedToLoadInquiries"));
       });
   }, []);
 
@@ -106,7 +108,7 @@ function NewCasePageInner() {
         })
         .catch((err) => {
           console.error(err);
-          toast.error("Failed to load inquiry matches");
+          toast.error(t("investigations.newCase.failedToLoadMatches"));
         })
         .finally(() =>
           setLoadingMatches((prev) => {
@@ -125,7 +127,7 @@ function NewCasePageInner() {
 
   const create = async () => {
     if (!title.trim()) {
-      toast.error("Give the case a title");
+      toast.error(t("investigations.newCase.titleRequired"));
       return;
     }
     setCreating(true);
@@ -156,16 +158,16 @@ function NewCasePageInner() {
         }
       }
       if (pullFailed) {
-        toast.warning("Case opened, but some evidence could not be pulled — pull again from the case.");
+        toast.warning(t("investigations.newCase.pullFailed"));
       } else if (pulled > 0) {
-        toast.success(`Case opened — ${pulled} finding${pulled === 1 ? "" : "s"} added as evidence`);
+        toast.success(t("investigations.newCase.caseOpenedWithFindings", { count: String(pulled) }));
       } else {
-        toast.success("Case opened");
+        toast.success(t("investigations.newCase.caseOpened"));
       }
       router.push(`/investigations/${created.id}`);
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Failed to open case");
+      toast.error(err instanceof Error ? err.message : t("investigations.newCase.failedToOpenCase"));
       setCreating(false);
     }
   };
@@ -176,11 +178,9 @@ function NewCasePageInner() {
         <Button variant="ghost" size="sm" className="-ml-2 mb-2" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
-        <h1 className="font-serif text-2xl font-black uppercase tracking-[0.03em]">Open a case</h1>
+        <h1 className="font-serif text-2xl font-black uppercase tracking-[0.03em]">{t("investigations.newCase.title")}</h1>
         <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-          A case is the workspace for one investigation: it keeps its own copy of evidence,
-          tracks hypotheses and discussion, and ends with a conclusion. Link any number of
-          inquiries to drive it — or start blank and add evidence directly.
+          {t("investigations.newCase.description")}
         </p>
       </div>
 
@@ -188,30 +188,30 @@ function NewCasePageInner() {
         {/* ── Case details ── */}
         <div className="space-y-4">
           <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
-            Case details
+            {t("investigations.newCase.caseDetails")}
           </p>
           <div className="space-y-1.5">
-            <Label htmlFor="case-title">Title</Label>
+            <Label htmlFor="case-title">{t("investigations.newCase.titleLabel")}</Label>
             <Input
               id="case-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="What is being investigated?"
+              placeholder={t("investigations.newCase.titlePlaceholder")}
               maxLength={300}
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="case-description">Description</Label>
+            <Label htmlFor="case-description">{t("investigations.newCase.descriptionLabel")}</Label>
             <Textarea
               id="case-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Context, scope, what triggered this investigation…"
+              placeholder={t("investigations.newCase.descriptionPlaceholder")}
               rows={4}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Severity</Label>
+            <Label>{t("investigations.newCase.severityLabel")}</Label>
             <Select value={severity} onValueChange={setSeverity}>
               <SelectTrigger className="w-full">
                 <SelectValue />
@@ -226,22 +226,22 @@ function NewCasePageInner() {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="case-assignee">Assignee</Label>
+            <Label htmlFor="case-assignee">{t("investigations.newCase.assigneeLabel")}</Label>
             <Input
               id="case-assignee"
               value={assignee}
               onChange={(e) => setAssignee(e.target.value)}
-              placeholder="Who leads this case? (optional)"
+              placeholder={t("investigations.newCase.assigneePlaceholder")}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Driving inquiries</Label>
+            <Label>{t("investigations.newCase.drivingInquiries")}</Label>
             <MultiSelect values={selectedInquiryIds} onValuesChange={setSelectedInquiryIds}>
               <MultiSelectTrigger className="w-full">
-                <MultiSelectValue placeholder="Select inquiries (optional)" />
+                <MultiSelectValue placeholder={t("investigations.newCase.selectInquiries")} />
               </MultiSelectTrigger>
               <MultiSelectContent
-                search={{ placeholder: "Search inquiries…", emptyMessage: "No inquiries found" }}
+                search={{ placeholder: t("investigations.newCase.searchInquiries"), emptyMessage: t("investigations.newCase.noInquiriesFound") }}
               >
                 <MultiSelectGroup>
                   {allInquiries.map((q) => (
@@ -249,7 +249,7 @@ function NewCasePageInner() {
                       <span className="inline-flex items-center gap-1.5">
                         {q.title}
                         <span className="text-muted-foreground text-xs">
-                          ({q.matchCount} match{q.matchCount === 1 ? "" : "es"})
+                          {t("investigations.newCase.matchCount", { count: String(q.matchCount) })}
                         </span>
                       </span>
                     </MultiSelectItem>
@@ -258,7 +258,7 @@ function NewCasePageInner() {
               </MultiSelectContent>
             </MultiSelect>
             <p className="text-muted-foreground text-xs">
-              An inquiry can drive several cases at once.
+              {t("investigations.newCase.inquiryDrivesMany")}
             </p>
           </div>
 
@@ -270,8 +270,8 @@ function NewCasePageInner() {
                 <FolderPlus className="h-4 w-4" />
               )}
               {totalSelected > 0
-                ? `Open case with ${totalSelected} finding${totalSelected === 1 ? "" : "s"}`
-                : "Open case"}
+                ? t("investigations.newCase.openCaseWithFindings", { count: String(totalSelected) })
+                : t("investigations.newCase.openCase")}
             </Button>
           </div>
         </div>
@@ -281,9 +281,7 @@ function NewCasePageInner() {
           {selectedInquiryIds.length === 0 ? (
             <Card>
               <CardContent className="text-muted-foreground p-4 text-sm">
-                This case starts empty. Select inquiries on the left to bring their matches
-                in as initial evidence — or add evidence directly from the case workspace
-                later.
+                {t("investigations.newCase.emptyStartDesc")}
               </CardContent>
             </Card>
           ) : (
@@ -298,13 +296,13 @@ function NewCasePageInner() {
                     <span className="text-sm font-medium">{inquiry?.title ?? inquiryId}</span>
                     {matches && (
                       <Badge variant="outline" className="text-[10px]">
-                        {selected.size}/{matches.length} selected
+                        {t("investigations.newCase.selectionCount", { selected: String(selected.size), total: String(matches.length) })}
                       </Badge>
                     )}
                   </div>
                   {!matches ? (
                     <div className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Loading matches…
+                      <Loader2 className="h-4 w-4 animate-spin" /> {t("investigations.newCase.loadingMatches")}
                     </div>
                   ) : (
                     <InquiryMatchesTable
@@ -321,8 +319,7 @@ function NewCasePageInner() {
           )}
           {selectedInquiryIds.length > 0 && (
             <p className="text-muted-foreground text-xs">
-              Selected matches are copied into the case as evidence — the case keeps its own
-              snapshot, and you can pull newer matches at any time.
+              {t("investigations.newCase.selectionDesc")}
             </p>
           )}
         </div>

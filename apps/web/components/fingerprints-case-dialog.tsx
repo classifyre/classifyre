@@ -1,0 +1,202 @@
+"use client";
+
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { api, type CaseResponseDto } from "@workspace/api-client";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog";
+import { Button } from "@workspace/ui/components/button";
+import { Input } from "@workspace/ui/components/input";
+import { Label } from "@workspace/ui/components/label";
+import { Textarea } from "@workspace/ui/components/textarea";
+import { Switch } from "@workspace/ui/components/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@workspace/ui/components/tabs";
+import { useTranslation } from "@/hooks/use-translation";
+
+const SEVERITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
+
+/**
+ * Create a case (or add to an existing one) from the assets currently visible
+ * in the fingerprints graph. Adds them as evidence and optionally attaches their
+ * findings — handled server-side and logged as a DUPLICATES run.
+ */
+export function FingerprintsCaseDialog({
+  open,
+  onOpenChange,
+  assetIds,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  assetIds: string[];
+}) {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const [mode, setMode] = React.useState<"new" | "existing">("new");
+  const [title, setTitle] = React.useState("");
+  const [description, setDescription] = React.useState("");
+  const [severity, setSeverity] = React.useState<(typeof SEVERITIES)[number]>("MEDIUM");
+  const [attachFindings, setAttachFindings] = React.useState(true);
+  const [cases, setCases] = React.useState<CaseResponseDto[]>([]);
+  const [caseId, setCaseId] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open) return;
+    setMode("new");
+    setTitle("");
+    setDescription("");
+    setSeverity("MEDIUM");
+    setAttachFindings(true);
+    setCaseId("");
+    api.cases
+      .casesControllerList({})
+      .then((r) => setCases(r.items ?? []))
+      .catch(() => setCases([]));
+  }, [open]);
+
+  const submit = async () => {
+    if (mode === "new" && !title.trim()) {
+      toast.error(t("correlation.caseAction.titleRequired"));
+      return;
+    }
+    if (mode === "existing" && !caseId) {
+      toast.error(t("correlation.caseAction.caseRequired"));
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await api.correlation.correlationControllerCaseAction({
+        caseActionRequestDto: {
+          assetIds,
+          attachFindings,
+          ...(mode === "existing"
+            ? { caseId }
+            : { title: title.trim(), description: description.trim() || undefined, severity }),
+        },
+      });
+      toast.success(
+        t("correlation.caseAction.done", {
+          assets: String(res.assetsAdded),
+          findings: String(res.findingsAttached),
+        }),
+      );
+      onOpenChange(false);
+      router.push(`/investigations/${res.caseId}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("correlation.caseAction.failed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("correlation.caseAction.title")}</DialogTitle>
+          <DialogDescription>
+            {t("correlation.caseAction.desc", { count: String(assetIds.length) })}
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "new" | "existing")}>
+          <TabsList className="w-full">
+            <TabsTrigger value="new" className="flex-1">
+              {t("correlation.caseAction.newCase")}
+            </TabsTrigger>
+            <TabsTrigger value="existing" className="flex-1">
+              {t("correlation.caseAction.existingCase")}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="new" className="space-y-3 pt-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="fp-case-title">{t("correlation.caseAction.caseTitle")}</Label>
+              <Input
+                id="fp-case-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={t("correlation.caseAction.caseTitlePlaceholder")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="fp-case-desc">{t("correlation.caseAction.description")}</Label>
+              <Textarea
+                id="fp-case-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("correlation.caseAction.severity")}</Label>
+              <Select value={severity} onValueChange={(v) => setSeverity(v as typeof severity)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SEVERITIES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="existing" className="space-y-3 pt-2">
+            <div className="space-y-1.5">
+              <Label>{t("correlation.caseAction.pickCase")}</Label>
+              <Select value={caseId} onValueChange={setCaseId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t("correlation.caseAction.pickCasePlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {cases.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <label className="flex items-center justify-between gap-3 rounded-[4px] border border-border/60 px-3 py-2">
+          <span className="text-sm">{t("correlation.caseAction.attachFindings")}</span>
+          <Switch checked={attachFindings} onCheckedChange={setAttachFindings} />
+        </label>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+            {t("common.cancel")}
+          </Button>
+          <Button onClick={submit} disabled={busy || assetIds.length === 0}>
+            {busy ? t("correlation.caseAction.working") : t("correlation.caseAction.submit")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

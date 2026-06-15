@@ -6,9 +6,11 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleDashed,
+  Copy,
   FolderSearch,
   Loader2,
   Megaphone,
+  Moon,
   Terminal,
   Workflow,
   XCircle,
@@ -27,6 +29,34 @@ import { cn } from "@workspace/ui/lib/utils";
 import { formatRelative } from "@/lib/date";
 
 const POLL_MS = 5000;
+
+function agentKindLabel(kind: string): string {
+  switch (kind) {
+    case "INQUIRY":
+      return "Inquiry agent";
+    case "CASE":
+      return "Case agent";
+    case "DREAM":
+      return "Dream agent";
+    case "DUPLICATES":
+      return "Duplicates finder";
+    default:
+      return kind;
+  }
+}
+
+function AgentKindIcon({
+  kind,
+  className,
+}: {
+  kind: string;
+  className?: string;
+}) {
+  if (kind === "INQUIRY") return <FolderSearch className={className} />;
+  if (kind === "DREAM") return <Moon className={className} />;
+  if (kind === "DUPLICATES") return <Copy className={className} />;
+  return <Workflow className={className} />;
+}
 
 const STATUS_META: Record<string, { dot: string; label: string }> = {
   PENDING: { dot: "bg-stone-400", label: "Pending" },
@@ -164,13 +194,12 @@ export function AutopilotActivity() {
               >
                 <div className="flex items-center gap-2">
                   <span className={cn("h-2 w-2 shrink-0 rounded-full", meta.dot)} />
-                  {run.agentKind === "INQUIRY" ? (
-                    <FolderSearch className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <Workflow className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  )}
+                  <AgentKindIcon
+                    kind={run.agentKind}
+                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                  />
                   <span className="font-mono text-[11px] uppercase tracking-wide">
-                    {run.agentKind === "INQUIRY" ? "Inquiry agent" : "Case agent"}
+                    {agentKindLabel(run.agentKind)}
                   </span>
                   {run.trigger === "manual" && (
                     <Badge
@@ -206,7 +235,7 @@ export function AutopilotActivity() {
                 )}
               />
               <p className="font-serif text-base font-black uppercase tracking-[0.03em]">
-                {detail.agentKind === "INQUIRY" ? "Inquiry agent" : "Case agent"}
+                {agentKindLabel(detail.agentKind)}
               </p>
               <Badge variant="outline" className="text-[10px] uppercase">
                 {STATUS_META[detail.status]?.label ?? detail.status}

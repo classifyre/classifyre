@@ -12,6 +12,7 @@ import {
   DeleteObjectCommand,
   CreateBucketCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   NoSuchKey,
 } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
@@ -142,6 +143,74 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
+
+  /** True when S3 persistence is configured (S3_BUCKET set). */
+  get isS3Enabled(): boolean {
+    return this.s3 !== null;
+  }
+
+  /**
+   * List every persisted log object under the configured prefix.
+   * Used by the nightly cleanup job to detect orphaned logs (objects whose
+   * runner row no longer exists). Returns an empty list when S3 is disabled.
+   */
+  async listStoredLogObjects(): Promise<
+    Array<{
+      sourceId: string;
+      runnerId: string;
+      key: string;
+      size: number;
+      lastModified: Date | null;
+    }>
+  > {
+    if (!this.s3) return [];
+    const { client, bucket, prefix } = this.s3;
+    const out: Array<{
+      sourceId: string;
+      runnerId: string;
+      key: string;
+      size: number;
+      lastModified: Date | null;
+    }> = [];
+
+    let continuationToken: string | undefined;
+    do {
+      const res = await client.send(
+        new ListObjectsV2Command({
+          Bucket: bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+      for (const obj of res.Contents ?? []) {
+        if (!obj.Key) continue;
+        const parsed = this.parseLogKey(obj.Key);
+        if (!parsed) continue;
+        out.push({
+          ...parsed,
+          key: obj.Key,
+          size: obj.Size ?? 0,
+          lastModified: obj.LastModified ?? null,
+        });
+      }
+      continuationToken = res.IsTruncated
+        ? res.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+
+    return out;
+  }
+
+  /** Parse a `{prefix}{sourceId}/{runnerId}.ndjson` key back into its parts. */
+  private parseLogKey(
+    key: string,
+  ): { sourceId: string; runnerId: string } | null {
+    if (!this.s3 || !key.startsWith(this.s3.prefix)) return null;
+    const rest = key.slice(this.s3.prefix.length);
+    const match = rest.match(/^(.+)\/([^/]+)\.ndjson$/);
+    if (!match) return null;
+    return { sourceId: match[1], runnerId: match[2] };
+  }
 
   /** Returns the sourceId recorded at initializeRunner time, or undefined if unknown. */
   getRunnerSourceId(runnerId: string): string | undefined {

@@ -249,6 +249,82 @@ class TestExtractText:
         assert "Heading" in text
         assert err is None
 
+    def test_audio_is_transcribed_when_enabled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "src.utils.transcription.transcribe_media",
+            lambda *_args, **_kwargs: ("hello from the recording", None),
+        )
+
+        text, err = extract_text(
+            b"fake-audio-bytes",
+            "audio/mpeg",
+            file_name="clip.mp3",
+            enable_transcription=True,
+        )
+
+        assert text == "hello from the recording"
+        assert err is None
+
+    def test_video_is_transcribed_when_enabled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "src.utils.transcription.transcribe_media",
+            lambda *_args, **_kwargs: ("spoken words from video", None),
+        )
+
+        text, err = extract_text(
+            b"fake-video-bytes",
+            "video/mp4",
+            file_name="clip.mp4",
+            enable_transcription=True,
+        )
+
+        assert text == "spoken words from video"
+        assert err is None
+
+    def test_audio_not_transcribed_when_disabled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def fail_if_called(*_args: Any, **_kwargs: Any) -> None:
+            raise AssertionError("transcription must not run when disabled")
+
+        monkeypatch.setattr("src.utils.transcription.transcribe_media", fail_if_called)
+
+        text, err = extract_text(
+            b"fake-audio-bytes",
+            "audio/mpeg",
+            file_name="clip.mp3",
+            enable_transcription=False,
+        )
+
+        assert text == ""
+        assert err is None
+
+    def test_transcription_error_propagates(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "src.utils.transcription.transcribe_media",
+            lambda *_args, **_kwargs: ("", "Transcription failed: boom"),
+        )
+
+        text, err = extract_text(
+            b"fake-audio-bytes",
+            "audio/mpeg",
+            file_name="clip.mp3",
+            enable_transcription=True,
+        )
+
+        assert text == ""
+        assert err == "Transcription failed: boom"
+
 
 # ---------------------------------------------------------------------------
 # _supports_docling_ocr

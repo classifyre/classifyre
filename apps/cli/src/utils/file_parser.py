@@ -75,6 +75,24 @@ _MIME_HINTS_BY_EXTENSION = {
     ".tif": "image/tiff",
     ".tiff": "image/tiff",
     ".webp": "image/webp",
+    # Audio
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".ogg": "audio/ogg",
+    ".oga": "audio/ogg",
+    ".opus": "audio/opus",
+    ".flac": "audio/flac",
+    # Video
+    ".mp4": "video/mp4",
+    ".m4v": "video/mp4",
+    ".mkv": "video/x-matroska",
+    ".mov": "video/quicktime",
+    ".webm": "video/webm",
+    ".avi": "video/x-msvideo",
+    ".wmv": "video/x-ms-wmv",
+    ".flv": "video/x-flv",
 }
 
 _DOCLING_IMAGE_MIME_TYPES = {
@@ -122,6 +140,10 @@ class _DoclingState:
         self.converter: object = None
         self.error: str | None = None
         self.attempted: bool = False
+        # Allow one retry when a MissingSourceDependencyError indicates the uv
+        # sync itself failed (transient: network blip, registry timeout). A
+        # genuine broken package fails on the retry too and is cached then.
+        self.install_retry_remaining: int = 1
 
 
 _docling_state = _DoclingState()
@@ -157,7 +179,22 @@ def _get_docling_converter() -> tuple[object, str | None]:
             )
             _docling_state.converter = converter_module.DocumentConverter()
         except Exception as exc:
-            _docling_state.error = str(exc)
+            from ..sources.dependencies import MissingSourceDependencyError
+
+            if (
+                isinstance(exc, MissingSourceDependencyError)
+                and _docling_state.install_retry_remaining > 0
+            ):
+                # The uv sync may have failed transiently (network blip, registry
+                # timeout). Reset so the next call retries once; on second failure
+                # the error is cached permanently regardless of exception type.
+                _docling_state.install_retry_remaining -= 1
+                _docling_state.attempted = False
+                logger.warning(
+                    "OCR dependency install failed (may be transient); will retry once: %s", exc
+                )
+            else:
+                _docling_state.error = str(exc)
     return _docling_state.converter, _docling_state.error
 
 
@@ -167,6 +204,7 @@ def _reset_docling_singleton() -> None:
         _docling_state.converter = None
         _docling_state.error = None
         _docling_state.attempted = False
+        _docling_state.install_retry_remaining = 1
 
 
 def _require_file_processing(module_name: str) -> object:
@@ -396,6 +434,7 @@ def extract_text(
     *,
     file_name: str = "",
     enable_ocr: bool = False,
+    enable_transcription: bool = False,
 ) -> tuple[str, str | None]:
     """
     Extract plain text from file bytes based on MIME type.
@@ -430,8 +469,25 @@ def extract_text(
         if error:
             logger.warning("OCR extraction failed for %s: %s", file_name or mime_type, error)
 
-    # Binary media types — no text extraction
-    if mime_type.startswith(("image/", "audio/", "video/")):
+    # Audio / video — transcribe to text via faster-whisper when enabled.
+    if mime_type.startswith(("audio/", "video/")):
+        if enable_transcription:
+            from .transcription import transcribe_media
+
+            text, error = transcribe_media(
+                file_bytes,
+                mime_type=mime_type,
+                file_name=file_name,
+            )
+            if text:
+                return text, None
+            if error:
+                logger.warning("Transcription failed for %s: %s", file_name or mime_type, error)
+            return "", error
+        return "", None
+
+    # Images — no native text extraction (OCR handled above when enabled)
+    if mime_type.startswith("image/"):
         return "", None
 
     # PDF
@@ -564,6 +620,7 @@ def parse_bytes(
     declared_mime_type: str | None = None,
     file_name: str = "",
     enable_ocr: bool = False,
+    enable_transcription: bool = False,
 ) -> ParsedBytes:
     """
     Parse in-memory bytes: resolve MIME type and extract raw/text content.
@@ -582,6 +639,7 @@ def parse_bytes(
         mime_type,
         file_name=file_name,
         enable_ocr=enable_ocr,
+        enable_transcription=enable_transcription,
     )
     raw_content = _decode_bytes(file_bytes) if _is_text_like_mime_type(mime_type) else ""
 
@@ -613,6 +671,7 @@ def iter_file_pages(
     *,
     file_name: str = "",
     enable_ocr: bool = False,
+    enable_transcription: bool = False,
 ) -> Generator[str, None, None]:
     """
     Iterate over file content in pages of up to batch_size rows or lines.
@@ -620,7 +679,8 @@ def iter_file_pages(
     Parquet / CSV / TSV  → yields batch_size *rows* per page with labelled columns.
     All other extractable types (PDF, DOCX, TXT, JSON, XML, XLSX, …) → extracts the
     full text once via extract_text(), then yields batch_size *lines* per page.
-    Non-extractable types (images, audio, video, unknown binary) → yields nothing.
+    Audio/video → transcript lines when enable_transcription is set, else nothing.
+    Non-extractable types (images, unknown binary) → yields nothing.
 
     New file formats only need to be added to extract_text() — not here.
     """
@@ -636,6 +696,7 @@ def iter_file_pages(
             normalized,
             file_name=file_name,
             enable_ocr=enable_ocr,
+            enable_transcription=enable_transcription,
         )
         if error:
             logger.warning("Text extraction error (%s): %s", mime_type, error)
