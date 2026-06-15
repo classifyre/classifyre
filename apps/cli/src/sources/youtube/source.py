@@ -44,6 +44,7 @@ from ...models.generated_single_asset_scan_results import (
 )
 from ...utils.hashing import hash_id
 from ..base import BaseSource
+from ..dependencies import require_module
 
 if TYPE_CHECKING:
     pass
@@ -51,10 +52,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _WATCH_URL = "https://www.youtube.com/watch?v={video_id}"
-_INSTALL_HINT = (
-    "YouTube source requires yt-dlp and youtube-transcript-api. "
-    "Install with: uv sync --group youtube"
-)
 
 
 @dataclass
@@ -143,11 +140,8 @@ class YouTubeSource(BaseSource):
     # ------------------------------------------------------------------
 
     def _ydl_class(self) -> Any:
-        try:
-            from yt_dlp import YoutubeDL
-        except ImportError as exc:  # pragma: no cover - exercised via test_connection
-            raise ImportError(_INSTALL_HINT) from exc
-        return YoutubeDL
+        mod = require_module("yt_dlp", "YouTube", uv_groups=["youtube"])
+        return mod.YoutubeDL
 
     def _base_ydl_opts(self) -> dict[str, Any]:
         opts: dict[str, Any] = {
@@ -277,15 +271,15 @@ class YouTubeSource(BaseSource):
     # ------------------------------------------------------------------
 
     def _transcript_api(self) -> Any:
-        try:
-            from youtube_transcript_api import YouTubeTranscriptApi
-            from youtube_transcript_api.proxies import GenericProxyConfig
-        except ImportError as exc:  # pragma: no cover - exercised via test_connection
-            raise ImportError(_INSTALL_HINT) from exc
-
+        mod = require_module("youtube_transcript_api", "YouTube", uv_groups=["youtube"])
         proxy = self._proxy_url()
-        proxy_config = GenericProxyConfig(http_url=proxy, https_url=proxy) if proxy else None
-        return YouTubeTranscriptApi(proxy_config=proxy_config)
+        proxy_config = None
+        if proxy:
+            proxies_mod = require_module(
+                "youtube_transcript_api.proxies", "YouTube", uv_groups=["youtube"]
+            )
+            proxy_config = proxies_mod.GenericProxyConfig(http_url=proxy, https_url=proxy)
+        return mod.YouTubeTranscriptApi(proxy_config=proxy_config)
 
     def _fetch_transcript(self, video_id: str) -> _TranscriptResult | None:
         """Fetch captions for a video. Returns None when unavailable.
@@ -296,13 +290,7 @@ class YouTubeSource(BaseSource):
         exist, ``_build_video_asset`` falls back to ``_transcribe_audio`` if the
         source has ``sampling.enable_transcription`` set.
         """
-        try:
-            from youtube_transcript_api import (
-                CouldNotRetrieveTranscript,
-                YouTubeTranscriptApiException,
-            )
-        except ImportError as exc:  # pragma: no cover
-            raise ImportError(_INSTALL_HINT) from exc
+        yt_mod = require_module("youtube_transcript_api", "YouTube", uv_groups=["youtube"])
 
         languages = self._transcript_options().languages or []
         try:
@@ -333,7 +321,7 @@ class YouTubeSource(BaseSource):
                 is_generated=fetched.is_generated,
                 available_languages=available or [fetched.language_code],
             )
-        except (CouldNotRetrieveTranscript, YouTubeTranscriptApiException) as exc:
+        except (yt_mod.CouldNotRetrieveTranscript, yt_mod.YouTubeTranscriptApiException) as exc:
             logger.warning("No transcript for video %s: %s", video_id, exc)
             return None
         except Exception as exc:
@@ -504,7 +492,7 @@ class YouTubeSource(BaseSource):
         try:
             ydl_cls = self._ydl_class()
             self._transcript_api()  # surfaces missing youtube-transcript-api
-        except ImportError as exc:
+        except Exception as exc:
             result["status"] = "FAILURE"
             result["message"] = str(exc)
             return result

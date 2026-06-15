@@ -45,6 +45,7 @@ SOURCE_TYPE_GROUPS: dict[str, set[str]] = {
     "AZURE_BLOB_STORAGE": {"azure-blob-storage"},
     "GOOGLE_CLOUD_STORAGE": {"google-cloud-storage"},
     "EMAIL": {"email"},
+    "YOUTUBE": {"youtube"},
 }
 
 
