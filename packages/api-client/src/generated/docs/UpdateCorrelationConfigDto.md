@@ -10,6 +10,7 @@ Name | Type
 `relatedMin` | number
 `duplicateMin` | number
 `labelWeights` | { [key: string]: number; }
+`exclusions` | [Array&lt;ExclusionRuleDto&gt;](ExclusionRuleDto.md)
 
 ## Example
 
@@ -22,6 +23,7 @@ const example = {
   "relatedMin": null,
   "duplicateMin": null,
   "labelWeights": null,
+  "exclusions": null,
 } satisfies UpdateCorrelationConfigDto
 
 console.log(example)
