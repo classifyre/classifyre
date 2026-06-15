@@ -440,7 +440,7 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'INQUIRY' | 'CASE' | 'DREAM' (optional)
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' (optional)
     agentKind: agentKind_example,
     // string | Only runs focused on this case (optional)
     caseId: caseId_example,
@@ -469,7 +469,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **agentKind** | `INQUIRY`, `CASE`, `DREAM` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM] |
+| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES] |
 | **caseId** | `string` | Only runs focused on this case | [Optional] [Defaults to `undefined`] |
 | **status** | `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `SKIPPED`, `CANCELLED` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, FAILED, SKIPPED, CANCELLED] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |

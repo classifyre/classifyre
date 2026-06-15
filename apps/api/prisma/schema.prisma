@@ -59,6 +59,9 @@ model Asset {
   source        Source      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   findings      Finding[]
   customDetectorExtractions CustomDetectorExtraction[]
+  correlationValues AssetCorrelationValue[]
+  signature         AssetSignature?
+  clusterMember     AssetClusterMember?
 
   @@index([hash])
   @@index([sourceType])
@@ -706,6 +709,110 @@ model Edge {
   @@map("edges")
 }
 
+// ─── ASSET CORRELATION / DUPLICATE DETECTION ─────────────────────────────
+//
+// Deterministic "evidence fingerprints" derived from findings. No embeddings:
+// each finding's normalized value becomes a correlatable token; the reverse
+// index (value_hash → assets) keeps candidate lookups cheap, and weighted +
+// Jaccard overlap produces explainable similarity. See apps/api/src/correlation.
+
+// One normalized, correlatable finding value attached to an asset. This is the
+// reverse index: querying by `valueHash` yields every asset sharing a value.
+// `label` is the finding's free-form type (email, phone, custom labels, …) so
+// correlation stays label-agnostic.
+model AssetCorrelationValue {
+  id                String       @id @default(uuid())
+  assetId           String       @map("asset_id")
+  sourceId          String       @map("source_id")
+  label             String
+  detectorType      DetectorType @map("detector_type")
+  customDetectorKey String?      @map("custom_detector_key")
+  normalizedValue   String       @map("normalized_value") @db.Text
+  // sha256(label + ':' + normalizedValue) — the reverse-index key.
+  valueHash         String       @map("value_hash") @db.VarChar(64)
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, valueHash])
+  @@index([valueHash])
+  @@index([assetId])
+  @@index([sourceId])
+  @@map("asset_correlation_values")
+}
+
+// Per-asset signature: component hashes (one per label) for fast same-category
+// matching plus an all-values hash that buckets exact duplicates.
+model AssetSignature {
+  assetId         String   @id @map("asset_id")
+  sourceId        String   @map("source_id")
+  // { "email": "<hash>", "phone": "<hash>", ... } — hash of sorted values per label.
+  componentHashes Json     @map("component_hashes") @db.JsonB
+  allValuesHash   String   @map("all_values_hash") @db.VarChar(64)
+  valueCount      Int      @map("value_count")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([allValuesHash])
+  @@index([sourceId])
+  @@map("asset_signatures")
+}
+
+// An identity cluster: a connected group of assets that share enough strong
+// evidence to be treated as the same entity. Members are maintained by the
+// duplicates finder via union-find over likely-duplicate edges.
+model AssetCluster {
+  id          String   @id @default(uuid())
+  label       String?
+  memberCount Int      @default(0) @map("member_count")
+  sourceCount Int      @default(0) @map("source_count")
+  // Common findings across members, e.g. [{ label, value, count }] — for the UI.
+  topValues   Json?    @map("top_values") @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  members AssetClusterMember[]
+
+  @@index([memberCount])
+  @@map("asset_clusters")
+}
+
+model AssetClusterMember {
+  clusterId String   @map("cluster_id")
+  assetId   String   @map("asset_id")
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  cluster AssetCluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  asset   Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@id([clusterId, assetId])
+  // An asset belongs to at most one cluster.
+  @@unique([assetId])
+  @@index([clusterId])
+  @@map("asset_cluster_members")
+}
+
+// Singleton tuning for the correlation engine. Weights are keyed by the
+// (normalized) finding label and are fully dynamic — any label, including
+// custom-detector ones, can be given a weight; unlisted labels fall back to
+// defaultWeight. Editing this triggers a full recompute (logged as a
+// DUPLICATES FINDER run). Defaults mirror correlation.constants.ts.
+model CorrelationConfig {
+  id            Int      @id @default(1)
+  labelWeights  Json     @default("{}") @map("label_weights") @db.JsonB
+  defaultWeight Int      @default(1) @map("default_weight")
+  relatedMin    Decimal  @default(0.30) @map("related_min") @db.Decimal(3, 2)
+  duplicateMin  Decimal  @default(0.60) @map("duplicate_min") @db.Decimal(3, 2)
+  // Values to ignore when fingerprinting (noise like Person "null"). Array of
+  // { id, mode: "value"|"regex"|"label", label, value }. Applied at indexing
+  // time; editing triggers a full recompute.
+  exclusions    Json     @default("[]") @map("exclusions") @db.JsonB
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("correlation_config")
+}
+
 enum InquiryStatus {
   ACTIVE
   ARCHIVED
@@ -985,6 +1092,10 @@ enum AgentKind {
   // Periodic "dreaming": memory consolidation — dedupe, prune noise, distill
   // important lessons. No inquiry/case mutations.
   DREAM
+  // Deterministic asset-correlation step (no LLM). Runs after a scan, before
+  // the inquiry/case agents, and records its work in the autopilot log so the
+  // results are visible and the AI agents can take them into account.
+  DUPLICATES
 }
 
 enum AgentRunStatus {
@@ -1019,6 +1130,10 @@ enum AgentDecisionAction {
   LINK_INQUIRY
   // Dream-mode memory maintenance (prune / rewrite / merge).
   CONSOLIDATE_MEMORY
+  // Duplicates finder: a pairwise asset-correlation link was created/updated.
+  LINK_DUPLICATE
+  // Duplicates finder: an identity cluster was created/grown/merged.
+  UPDATE_CLUSTER
   NO_ACTION
 }
 
