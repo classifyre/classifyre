@@ -232,9 +232,13 @@ export type {
   ValueOccurrencesResponseDto,
   ValueOccurrenceAssetDto,
   RecomputeCorrelationResponseDto,
+  CorrelationGraphResponseDto,
+  AssetSimilarityDto,
   CorrelationConfigResponseDto,
   CorrelationLabelWeightDto,
   UpdateCorrelationConfigDto,
+  ExclusionRuleDto,
+  AddExclusionDto,
   CaseActionRequestDto,
   CaseActionResponseDto,
 } from "./generated/src/models";

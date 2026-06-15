@@ -101,11 +101,14 @@ All URIs are relative to *http://localhost*
 *CasesApi* | [**casesControllerRemoveFinding**](docs/CasesApi.md#casescontrollerremovefinding) | **DELETE** /cases/{id}/findings/{caseFindingId} | Remove a finding from the case
 *CasesApi* | [**casesControllerUnlinkInquiry**](docs/CasesApi.md#casescontrollerunlinkinquiry) | **DELETE** /cases/{id}/inquiries/{inquiryId} | Unlink an inquiry from a case (the inquiry is untouched)
 *CasesApi* | [**casesControllerUpdate**](docs/CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case
+*CorrelationApi* | [**correlationControllerAddExclusion**](docs/CorrelationApi.md#correlationcontrolleraddexclusion) | **POST** /correlation/exclusions | Add an exclusion rule (ignore noisy values) and recompute
 *CorrelationApi* | [**correlationControllerCaseAction**](docs/CorrelationApi.md#correlationcontrollercaseaction) | **POST** /correlation/case-action | Create a case (or add to one) from assets selected in the fingerprints graph
 *CorrelationApi* | [**correlationControllerGetConfig**](docs/CorrelationApi.md#correlationcontrollergetconfig) | **GET** /correlation/config | Correlation tuning: per-label weights (dynamic) + match thresholds
 *CorrelationApi* | [**correlationControllerGraph**](docs/CorrelationApi.md#correlationcontrollergraph) | **GET** /correlation/graph | Correlation (\&quot;evidence fingerprints\&quot;) graph: assets linked through the findings they share
+*CorrelationApi* | [**correlationControllerLinksGraph**](docs/CorrelationApi.md#correlationcontrollerlinksgraph) | **GET** /correlation/links-graph | A source\&#39;s assets connected by their links (hash references)
 *CorrelationApi* | [**correlationControllerOccurrences**](docs/CorrelationApi.md#correlationcontrolleroccurrences) | **GET** /findings/occurrences | Where else a normalized finding value appears (reverse index)
 *CorrelationApi* | [**correlationControllerRecompute**](docs/CorrelationApi.md#correlationcontrollerrecompute) | **POST** /assets/{id}/recompute-correlation | Recompute correlation for a single asset (on demand)
+*CorrelationApi* | [**correlationControllerRemoveExclusion**](docs/CorrelationApi.md#correlationcontrollerremoveexclusion) | **DELETE** /correlation/exclusions/{id} | Remove an exclusion rule and recompute
 *CorrelationApi* | [**correlationControllerUpdateConfig**](docs/CorrelationApi.md#correlationcontrollerupdateconfig) | **PUT** /correlation/config | Update correlation tuning and schedule a full recompute (logged)
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerCoverage**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollercoverage) | **GET** /custom-detectors/{id}/extractions/coverage | 
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerGetByFinding**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollergetbyfinding) | **GET** /findings/{findingId}/extraction | 
@@ -223,6 +226,7 @@ All URIs are relative to *http://localhost*
 ### Models
 
 - [AddEvidenceDto](docs/AddEvidenceDto.md)
+- [AddExclusionDto](docs/AddExclusionDto.md)
 - [AddFindingDto](docs/AddFindingDto.md)
 - [AddThreadEntryDto](docs/AddThreadEntryDto.md)
 - [AgentDecisionDto](docs/AgentDecisionDto.md)
@@ -247,6 +251,7 @@ All URIs are relative to *http://localhost*
 - [AssetListItemDto](docs/AssetListItemDto.md)
 - [AssetListResponseDto](docs/AssetListResponseDto.md)
 - [AssetResponseDto](docs/AssetResponseDto.md)
+- [AssetSimilarityDto](docs/AssetSimilarityDto.md)
 - [AssistantControllerRespond200Response](docs/AssistantControllerRespond200Response.md)
 - [AssistantControllerRespondRequest](docs/AssistantControllerRespondRequest.md)
 - [AssistantControllerRespondRequestMessagesInner](docs/AssistantControllerRespondRequestMessagesInner.md)
@@ -270,6 +275,7 @@ All URIs are relative to *http://localhost*
 - [CloseCaseDto](docs/CloseCaseDto.md)
 - [CloseCaseResponseDto](docs/CloseCaseResponseDto.md)
 - [CorrelationConfigResponseDto](docs/CorrelationConfigResponseDto.md)
+- [CorrelationGraphResponseDto](docs/CorrelationGraphResponseDto.md)
 - [CorrelationLabelWeightDto](docs/CorrelationLabelWeightDto.md)
 - [CreateAgentMemoryDto](docs/CreateAgentMemoryDto.md)
 - [CreateAiProviderConfigDto](docs/CreateAiProviderConfigDto.md)
@@ -292,6 +298,7 @@ All URIs are relative to *http://localhost*
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
 - [EdgeDetailDto](docs/EdgeDetailDto.md)
 - [EvidenceEntityDto](docs/EvidenceEntityDto.md)
+- [ExclusionRuleDto](docs/ExclusionRuleDto.md)
 - [ExpandGraphDto](docs/ExpandGraphDto.md)
 - [FinalizeIngestRunDto](docs/FinalizeIngestRunDto.md)
 - [FindingHistoryEntryDto](docs/FindingHistoryEntryDto.md)

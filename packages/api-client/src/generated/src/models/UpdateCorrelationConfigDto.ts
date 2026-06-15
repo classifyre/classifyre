@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { ExclusionRuleDto } from './ExclusionRuleDto';
+import {
+    ExclusionRuleDtoFromJSON,
+    ExclusionRuleDtoFromJSONTyped,
+    ExclusionRuleDtoToJSON,
+    ExclusionRuleDtoToJSONTyped,
+} from './ExclusionRuleDto';
+
 /**
  * 
  * @export
@@ -43,6 +51,12 @@ export interface UpdateCorrelationConfigDto {
      * @memberof UpdateCorrelationConfigDto
      */
     labelWeights?: { [key: string]: number; };
+    /**
+     * Full replacement list of exclusion rules
+     * @type {Array<ExclusionRuleDto>}
+     * @memberof UpdateCorrelationConfigDto
+     */
+    exclusions?: Array<ExclusionRuleDto>;
 }
 
 /**
@@ -66,6 +80,7 @@ export function UpdateCorrelationConfigDtoFromJSONTyped(json: any, ignoreDiscrim
         'relatedMin': json['relatedMin'] == null ? undefined : json['relatedMin'],
         'duplicateMin': json['duplicateMin'] == null ? undefined : json['duplicateMin'],
         'labelWeights': json['labelWeights'] == null ? undefined : json['labelWeights'],
+        'exclusions': json['exclusions'] == null ? undefined : ((json['exclusions'] as Array<any>).map(ExclusionRuleDtoFromJSON)),
     };
 }
 
@@ -84,6 +99,7 @@ export function UpdateCorrelationConfigDtoToJSONTyped(value?: UpdateCorrelationC
         'relatedMin': value['relatedMin'],
         'duplicateMin': value['duplicateMin'],
         'labelWeights': value['labelWeights'],
+        'exclusions': value['exclusions'] == null ? undefined : ((value['exclusions'] as Array<any>).map(ExclusionRuleDtoToJSON)),
     };
 }
 

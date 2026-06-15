@@ -15,23 +15,26 @@
 
 import * as runtime from '../runtime';
 import type {
+  AddExclusionDto,
   CaseActionRequestDto,
   CaseActionResponseDto,
   CorrelationConfigResponseDto,
-  GraphResponseDto,
+  CorrelationGraphResponseDto,
   RecomputeCorrelationResponseDto,
   UpdateCorrelationConfigDto,
   ValueOccurrencesResponseDto,
 } from '../models/index';
 import {
+    AddExclusionDtoFromJSON,
+    AddExclusionDtoToJSON,
     CaseActionRequestDtoFromJSON,
     CaseActionRequestDtoToJSON,
     CaseActionResponseDtoFromJSON,
     CaseActionResponseDtoToJSON,
     CorrelationConfigResponseDtoFromJSON,
     CorrelationConfigResponseDtoToJSON,
-    GraphResponseDtoFromJSON,
-    GraphResponseDtoToJSON,
+    CorrelationGraphResponseDtoFromJSON,
+    CorrelationGraphResponseDtoToJSON,
     RecomputeCorrelationResponseDtoFromJSON,
     RecomputeCorrelationResponseDtoToJSON,
     UpdateCorrelationConfigDtoFromJSON,
@@ -40,12 +43,21 @@ import {
     ValueOccurrencesResponseDtoToJSON,
 } from '../models/index';
 
+export interface CorrelationControllerAddExclusionRequest {
+    addExclusionDto: AddExclusionDto;
+}
+
 export interface CorrelationControllerCaseActionRequest {
     caseActionRequestDto: CaseActionRequestDto;
 }
 
 export interface CorrelationControllerGraphRequest {
     assetId?: string;
+    sourceId?: string;
+}
+
+export interface CorrelationControllerLinksGraphRequest {
+    sourceId: string;
 }
 
 export interface CorrelationControllerOccurrencesRequest {
@@ -58,6 +70,10 @@ export interface CorrelationControllerRecomputeRequest {
     id: string;
 }
 
+export interface CorrelationControllerRemoveExclusionRequest {
+    id: string;
+}
+
 export interface CorrelationControllerUpdateConfigRequest {
     updateCorrelationConfigDto: UpdateCorrelationConfigDto;
 }
@@ -66,6 +82,45 @@ export interface CorrelationControllerUpdateConfigRequest {
  * 
  */
 export class CorrelationApi extends runtime.BaseAPI {
+
+    /**
+     * Add an exclusion rule (ignore noisy values) and recompute
+     */
+    async correlationControllerAddExclusionRaw(requestParameters: CorrelationControllerAddExclusionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CorrelationConfigResponseDto>> {
+        if (requestParameters['addExclusionDto'] == null) {
+            throw new runtime.RequiredError(
+                'addExclusionDto',
+                'Required parameter "addExclusionDto" was null or undefined when calling correlationControllerAddExclusion().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/correlation/exclusions`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AddExclusionDtoToJSON(requestParameters['addExclusionDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CorrelationConfigResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Add an exclusion rule (ignore noisy values) and recompute
+     */
+    async correlationControllerAddExclusion(requestParameters: CorrelationControllerAddExclusionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CorrelationConfigResponseDto> {
+        const response = await this.correlationControllerAddExclusionRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Create a case (or add to one) from assets selected in the fingerprints graph
@@ -138,11 +193,15 @@ export class CorrelationApi extends runtime.BaseAPI {
     /**
      * Correlation (\"evidence fingerprints\") graph: assets linked through the findings they share
      */
-    async correlationControllerGraphRaw(requestParameters: CorrelationControllerGraphRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GraphResponseDto>> {
+    async correlationControllerGraphRaw(requestParameters: CorrelationControllerGraphRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CorrelationGraphResponseDto>> {
         const queryParameters: any = {};
 
         if (requestParameters['assetId'] != null) {
             queryParameters['assetId'] = requestParameters['assetId'];
+        }
+
+        if (requestParameters['sourceId'] != null) {
+            queryParameters['sourceId'] = requestParameters['sourceId'];
         }
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -157,14 +216,54 @@ export class CorrelationApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => GraphResponseDtoFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => CorrelationGraphResponseDtoFromJSON(jsonValue));
     }
 
     /**
      * Correlation (\"evidence fingerprints\") graph: assets linked through the findings they share
      */
-    async correlationControllerGraph(requestParameters: CorrelationControllerGraphRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GraphResponseDto> {
+    async correlationControllerGraph(requestParameters: CorrelationControllerGraphRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CorrelationGraphResponseDto> {
         const response = await this.correlationControllerGraphRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * A source\'s assets connected by their links (hash references)
+     */
+    async correlationControllerLinksGraphRaw(requestParameters: CorrelationControllerLinksGraphRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CorrelationGraphResponseDto>> {
+        if (requestParameters['sourceId'] == null) {
+            throw new runtime.RequiredError(
+                'sourceId',
+                'Required parameter "sourceId" was null or undefined when calling correlationControllerLinksGraph().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['sourceId'] != null) {
+            queryParameters['sourceId'] = requestParameters['sourceId'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/correlation/links-graph`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CorrelationGraphResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * A source\'s assets connected by their links (hash references)
+     */
+    async correlationControllerLinksGraph(requestParameters: CorrelationControllerLinksGraphRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CorrelationGraphResponseDto> {
+        const response = await this.correlationControllerLinksGraphRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -243,6 +342,43 @@ export class CorrelationApi extends runtime.BaseAPI {
      */
     async correlationControllerRecompute(requestParameters: CorrelationControllerRecomputeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<RecomputeCorrelationResponseDto> {
         const response = await this.correlationControllerRecomputeRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Remove an exclusion rule and recompute
+     */
+    async correlationControllerRemoveExclusionRaw(requestParameters: CorrelationControllerRemoveExclusionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CorrelationConfigResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling correlationControllerRemoveExclusion().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/correlation/exclusions/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CorrelationConfigResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Remove an exclusion rule and recompute
+     */
+    async correlationControllerRemoveExclusion(requestParameters: CorrelationControllerRemoveExclusionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CorrelationConfigResponseDto> {
+        const response = await this.correlationControllerRemoveExclusionRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

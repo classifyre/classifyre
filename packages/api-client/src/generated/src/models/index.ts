@@ -1,6 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export * from './AddEvidenceDto';
+export * from './AddExclusionDto';
 export * from './AddFindingDto';
 export * from './AddThreadEntryDto';
 export * from './AgentDecisionDto';
@@ -25,6 +26,7 @@ export * from './AssetFindingTypeCountDto';
 export * from './AssetListItemDto';
 export * from './AssetListResponseDto';
 export * from './AssetResponseDto';
+export * from './AssetSimilarityDto';
 export * from './AssistantControllerRespond200Response';
 export * from './AssistantControllerRespondRequest';
 export * from './AssistantControllerRespondRequestMessagesInner';
@@ -48,6 +50,7 @@ export * from './CliRunnerControllerUpdateRunnerStatusRequest';
 export * from './CloseCaseDto';
 export * from './CloseCaseResponseDto';
 export * from './CorrelationConfigResponseDto';
+export * from './CorrelationGraphResponseDto';
 export * from './CorrelationLabelWeightDto';
 export * from './CreateAgentMemoryDto';
 export * from './CreateAiProviderConfigDto';
@@ -70,6 +73,7 @@ export * from './DiscoveryRecentRunDto';
 export * from './DiscoveryRunSourceDto';
 export * from './EdgeDetailDto';
 export * from './EvidenceEntityDto';
+export * from './ExclusionRuleDto';
 export * from './ExpandGraphDto';
 export * from './FinalizeIngestRunDto';
 export * from './FindingHistoryEntryDto';

@@ -10,6 +10,7 @@ Name | Type
 `relatedMin` | number
 `duplicateMin` | number
 `labels` | [Array&lt;CorrelationLabelWeightDto&gt;](CorrelationLabelWeightDto.md)
+`exclusions` | [Array&lt;ExclusionRuleDto&gt;](ExclusionRuleDto.md)
 
 ## Example
 
@@ -22,6 +23,7 @@ const example = {
   "relatedMin": null,
   "duplicateMin": null,
   "labels": null,
+  "exclusions": null,
 } satisfies CorrelationConfigResponseDto
 
 console.log(example)

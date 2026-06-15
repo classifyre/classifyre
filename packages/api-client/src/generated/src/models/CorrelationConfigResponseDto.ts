@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { ExclusionRuleDto } from './ExclusionRuleDto';
+import {
+    ExclusionRuleDtoFromJSON,
+    ExclusionRuleDtoFromJSONTyped,
+    ExclusionRuleDtoToJSON,
+    ExclusionRuleDtoToJSONTyped,
+} from './ExclusionRuleDto';
 import type { CorrelationLabelWeightDto } from './CorrelationLabelWeightDto';
 import {
     CorrelationLabelWeightDtoFromJSON,
@@ -51,6 +58,12 @@ export interface CorrelationConfigResponseDto {
      * @memberof CorrelationConfigResponseDto
      */
     labels: Array<CorrelationLabelWeightDto>;
+    /**
+     * 
+     * @type {Array<ExclusionRuleDto>}
+     * @memberof CorrelationConfigResponseDto
+     */
+    exclusions: Array<ExclusionRuleDto>;
 }
 
 /**
@@ -61,6 +74,7 @@ export function instanceOfCorrelationConfigResponseDto(value: object): value is 
     if (!('relatedMin' in value) || value['relatedMin'] === undefined) return false;
     if (!('duplicateMin' in value) || value['duplicateMin'] === undefined) return false;
     if (!('labels' in value) || value['labels'] === undefined) return false;
+    if (!('exclusions' in value) || value['exclusions'] === undefined) return false;
     return true;
 }
 
@@ -78,6 +92,7 @@ export function CorrelationConfigResponseDtoFromJSONTyped(json: any, ignoreDiscr
         'relatedMin': json['relatedMin'],
         'duplicateMin': json['duplicateMin'],
         'labels': ((json['labels'] as Array<any>).map(CorrelationLabelWeightDtoFromJSON)),
+        'exclusions': ((json['exclusions'] as Array<any>).map(ExclusionRuleDtoFromJSON)),
     };
 }
 
@@ -96,6 +111,7 @@ export function CorrelationConfigResponseDtoToJSONTyped(value?: CorrelationConfi
         'relatedMin': value['relatedMin'],
         'duplicateMin': value['duplicateMin'],
         'labels': ((value['labels'] as Array<any>).map(CorrelationLabelWeightDtoToJSON)),
+        'exclusions': ((value['exclusions'] as Array<any>).map(ExclusionRuleDtoToJSON)),
     };
 }
 
