@@ -5,6 +5,8 @@ import { InquiryMatchingService } from '../../matching/inquiry-matching.service'
 import {
   MAX_CANDIDATE_INQUIRIES,
   MAX_CASE_SUMMARIES,
+  MAX_DUPLICATE_CLUSTERS,
+  MAX_DUPLICATE_PAIRS,
   MAX_FINDING_GROUPS,
   MAX_FINDINGS_PER_INQUIRY,
   MAX_SAMPLE_VALUES_PER_GROUP,
@@ -12,6 +14,7 @@ import {
 } from '../autopilot.constants';
 import type {
   CaseSummary,
+  DuplicateSummary,
   FindingGroupSummary,
   FocusedCaseDetail,
   InquirySummary,
@@ -340,6 +343,87 @@ export class AgentSearchService {
         break;
     }
     return new Set(rows.map((r) => r.id));
+  }
+
+  /**
+   * Compact summary of the duplicate/cluster results the DUPLICATES FINDER
+   * AGENT produced for this scan. Read directly from the correlation tables
+   * (no module dependency on CorrelationService → no circular import). Scope:
+   * the assets touched by the runner, narrowing to source, else instance-wide.
+   */
+  async summarizeDuplicatesForRunner(
+    sourceId: string | null,
+    runnerId: string | null,
+  ): Promise<DuplicateSummary> {
+    const assetWhere: Prisma.AssetWhereInput = runnerId
+      ? { runnerId }
+      : sourceId
+        ? { sourceId }
+        : {};
+    const assets = await this.prisma.asset.findMany({
+      where: assetWhere,
+      select: { id: true },
+      take: 5000,
+    });
+    const assetIds = assets.map((a) => a.id);
+    if (assetIds.length === 0) return { clusters: [], topPairs: [] };
+
+    // Clusters these assets belong to.
+    const members = await this.prisma.assetClusterMember.findMany({
+      where: { assetId: { in: assetIds } },
+      select: { clusterId: true },
+    });
+    const clusterIds = [...new Set(members.map((m) => m.clusterId))];
+    const clusterRows = await this.prisma.assetCluster.findMany({
+      where: { id: { in: clusterIds } },
+      orderBy: { memberCount: 'desc' },
+      take: MAX_DUPLICATE_CLUSTERS,
+    });
+
+    // Top correlation edges touching these assets.
+    const edges = await this.prisma.edge.findMany({
+      where: {
+        fromType: 'asset',
+        toType: 'asset',
+        relationType: { in: ['related', 'likely_duplicate'] },
+        OR: [{ fromId: { in: assetIds } }, { toId: { in: assetIds } }],
+      },
+      orderBy: { confidence: 'desc' },
+      take: MAX_DUPLICATE_PAIRS,
+    });
+
+    return {
+      clusters: clusterRows.map((c) => ({
+        clusterId: c.id,
+        memberCount: c.memberCount,
+        sourceCount: c.sourceCount,
+        label: c.label,
+        commonValues: Array.isArray(c.topValues)
+          ? (
+              c.topValues as Array<{
+                label: string;
+                value: string;
+                count: number;
+              }>
+            ).slice(0, 5)
+          : [],
+      })),
+      topPairs: edges.map((e) => {
+        const meta = (e.metadata ?? {}) as {
+          weighted?: number;
+          reasons?: string[];
+        };
+        return {
+          fromAssetId: e.fromId,
+          toAssetId: e.toId,
+          relationType: e.relationType,
+          matchPercent: Math.round(
+            (meta.weighted ?? Number(e.confidence)) * 100,
+          ),
+          reasons: meta.reasons ?? [],
+        };
+      }),
+    };
   }
 
   async sourceName(sourceId: string): Promise<string> {
