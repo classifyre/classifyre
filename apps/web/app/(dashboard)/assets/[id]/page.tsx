@@ -17,8 +17,13 @@ import {
   Separator,
   SourceIcon,
   Spinner,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from "@workspace/ui/components";
 import { FindingsTable } from "@/components/findings-table";
+import { FingerprintsGraph } from "@/components/fingerprints-graph";
 import { AssetMetadataCard } from "@/components/asset-metadata-card";
 import { AssetKindBadge } from "@/components/asset-kind-badge";
 import { formatAssetKind } from "@/lib/asset-kind";
@@ -273,9 +278,26 @@ export default function AssetDetailPage() {
         )}
 
       {lockedFilters && (
-        <Suspense>
-          <FindingsTable lockedFilters={lockedFilters} />
-        </Suspense>
+        <Tabs defaultValue="findings" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="findings">
+              {t("correlation.findingsTab")}
+            </TabsTrigger>
+            <TabsTrigger value="related">
+              {t("correlation.relatedTab")}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="findings">
+            <Suspense>
+              <FindingsTable lockedFilters={lockedFilters} />
+            </Suspense>
+          </TabsContent>
+          <TabsContent value="related">
+            <div className="h-[60vh]">
+              <FingerprintsGraph assetId={assetDetails.id} />
+            </div>
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );

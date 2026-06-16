@@ -564,7 +564,8 @@ export type AutopilotControllerListMemoryKindEnum = typeof AutopilotControllerLi
 export const AutopilotControllerListRunsAgentKindEnum = {
     Inquiry: 'INQUIRY',
     Case: 'CASE',
-    Dream: 'DREAM'
+    Dream: 'DREAM',
+    Duplicates: 'DUPLICATES'
 } as const;
 export type AutopilotControllerListRunsAgentKindEnum = typeof AutopilotControllerListRunsAgentKindEnum[keyof typeof AutopilotControllerListRunsAgentKindEnum];
 /**
