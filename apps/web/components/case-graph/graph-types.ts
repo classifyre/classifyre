@@ -83,6 +83,40 @@ export const MANUAL_EDGE_COLOR = "#d97706";
 export const CROSS_HYP_COLOR = "#a855f7";
 export const ACCENT = "#b7ff00";
 
+/**
+ * Heat colour for a 0..1 similarity strength: sky (weak) → amber → red (strong).
+ * Mid-tone stops chosen to read on both the light and dark graph backgrounds.
+ */
+const STRENGTH_STOPS: Array<{ p: number; c: [number, number, number] }> = [
+  { p: 0, c: [56, 189, 248] }, // sky-400
+  { p: 0.5, c: [245, 158, 11] }, // amber-500
+  { p: 1, c: [239, 68, 68] }, // red-500
+];
+
+export function strengthColor(strength: number): string {
+  const t = Math.max(0, Math.min(1, Number.isFinite(strength) ? strength : 0));
+  let lo = STRENGTH_STOPS[0]!;
+  let hi = STRENGTH_STOPS[STRENGTH_STOPS.length - 1]!;
+  for (let i = 0; i < STRENGTH_STOPS.length - 1; i++) {
+    const a = STRENGTH_STOPS[i]!;
+    const b = STRENGTH_STOPS[i + 1]!;
+    if (t >= a.p && t <= b.p) {
+      lo = a;
+      hi = b;
+      break;
+    }
+  }
+  const span = hi.p - lo.p || 1;
+  const f = (t - lo.p) / span;
+  const ch = (k: 0 | 1 | 2) => Math.round(lo.c[k] + (hi.c[k] - lo.c[k]) * f);
+  return `rgb(${ch(0)}, ${ch(1)}, ${ch(2)})`;
+}
+
+/** CSS gradient string for the strength legend (weak → strong). */
+export const STRENGTH_GRADIENT = `linear-gradient(to right, ${strengthColor(
+  0,
+)}, ${strengthColor(0.5)}, ${strengthColor(1)})`;
+
 /** Visual radius used for hit areas, collision and edge endpoint trimming. */
 export function nodeRadius(node: GraphNodeDto): number {
   switch (node.type) {

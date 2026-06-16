@@ -32,6 +32,7 @@ import type {
   AgentContext,
   CaseDecisionOutput,
   CaseSummary,
+  DuplicateSummary,
   FocusedCaseDetail,
   InquirySummary,
   RecalledMemory,
@@ -60,6 +61,7 @@ interface GatheredCaseContext {
   }>;
   /** Set on case-targeted runs: the one case this run works on, in full. */
   focusCase: FocusedCaseDetail | null;
+  duplicates: DuplicateSummary;
 }
 
 /**
@@ -100,14 +102,24 @@ export class CaseAgentService {
   }
 
   private async gatherContext(ctx: AgentContext): Promise<GatheredCaseContext> {
-    const [inquiries, openCases, closedCases, caseReadyIds, focusCase] =
-      await Promise.all([
-        this.search.listActiveInquiries(),
-        this.search.listOpenCases(),
-        this.search.listRecentlyClosedCases(),
-        this.caseReadySignals(ctx),
-        ctx.caseId ? this.search.caseDetail(ctx.caseId) : Promise.resolve(null),
-      ]);
+    const [
+      inquiries,
+      openCases,
+      closedCases,
+      caseReadyIds,
+      focusCase,
+      duplicates,
+    ] = await Promise.all([
+      this.search.listActiveInquiries(),
+      this.search.listOpenCases(),
+      this.search.listRecentlyClosedCases(),
+      this.caseReadySignals(ctx),
+      ctx.caseId ? this.search.caseDetail(ctx.caseId) : Promise.resolve(null),
+      this.search.summarizeDuplicatesForRunner(
+        ctx.sourceId,
+        ctx.manual ? null : ctx.runnerId,
+      ),
+    ]);
     if (ctx.caseId && !focusCase) {
       throw new Error(
         `Case ${ctx.caseId} no longer exists — cannot run a focused cycle.`,
@@ -136,7 +148,7 @@ export class CaseAgentService {
         ? `Focused run on case "${focusCase.title}": ${focusCase.hypotheses.length} hypothes${focusCase.hypotheses.length === 1 ? 'is' : 'es'}, ${focusCase.evidence.length} evidence item(s), ${focusCase.findings.length} finding(s), ${focusCase.edges.length} edge(s).`
         : `Reviewing ${candidates.length} candidate inquir${candidates.length === 1 ? 'y' : 'ies'} against ${openCases.length} open case(s).`,
     );
-    return { candidates, openCases, closedCases, focusCase };
+    return { candidates, openCases, closedCases, focusCase, duplicates };
   }
 
   /** SIGNAL_CASE_READY decisions recorded by this cycle's inquiry run. */
@@ -185,7 +197,7 @@ export class CaseAgentService {
   }
 
   private async decide(ctx: AgentContext): Promise<CaseDecisionOutput> {
-    const { candidates, openCases, closedCases, focusCase } =
+    const { candidates, openCases, closedCases, focusCase, duplicates } =
       stepOutput<GatheredCaseContext>(ctx, 'gather-context');
     const memories = stepOutput<RecalledMemory[]>(ctx, 'recall-memory');
 
@@ -224,6 +236,7 @@ export class CaseAgentService {
         closedCases,
         focusCase,
         memories,
+        duplicates,
         part,
       });
 
