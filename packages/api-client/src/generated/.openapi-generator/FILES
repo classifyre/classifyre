@@ -4,6 +4,7 @@ README.md
 docs/AIApi.md
 docs/AIProviderConfigsApi.md
 docs/AddEvidenceDto.md
+docs/AddExclusionDto.md
 docs/AddFindingDto.md
 docs/AddThreadEntryDto.md
 docs/AgentDecisionDto.md
@@ -28,6 +29,7 @@ docs/AssetFindingTypeCountDto.md
 docs/AssetListItemDto.md
 docs/AssetListResponseDto.md
 docs/AssetResponseDto.md
+docs/AssetSimilarityDto.md
 docs/AssetsApi.md
 docs/AssistantApi.md
 docs/AssistantControllerRespond200Response.md
@@ -41,6 +43,8 @@ docs/BulkIngestEdgesDto.md
 docs/BulkIngestEdgesResponseDto.md
 docs/BulkUpdateFindingsDto.md
 docs/BulkUpdateFindingsResponseDto.md
+docs/CaseActionRequestDto.md
+docs/CaseActionResponseDto.md
 docs/CaseActivityDto.md
 docs/CaseEvidenceDto.md
 docs/CaseFindingDto.md
@@ -52,6 +56,10 @@ docs/CasesApi.md
 docs/CliRunnerControllerUpdateRunnerStatusRequest.md
 docs/CloseCaseDto.md
 docs/CloseCaseResponseDto.md
+docs/CorrelationApi.md
+docs/CorrelationConfigResponseDto.md
+docs/CorrelationGraphResponseDto.md
+docs/CorrelationLabelWeightDto.md
 docs/CreateAgentMemoryDto.md
 docs/CreateAiProviderConfigDto.md
 docs/CreateCaseDto.md
@@ -76,6 +84,7 @@ docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
 docs/EdgeDetailDto.md
 docs/EvidenceEntityDto.md
+docs/ExclusionRuleDto.md
 docs/ExpandGraphDto.md
 docs/FinalizeIngestRunDto.md
 docs/FindingHistoryEntryDto.md
@@ -141,6 +150,7 @@ docs/PreviewResponseDto.md
 docs/PullFromInquiryDto.md
 docs/PullFromInquiryResponseDto.md
 docs/RebuildEdgesResponseDto.md
+docs/RecomputeCorrelationResponseDto.md
 docs/RegisterDiscoveredAssetsDto.md
 docs/RegisterDiscoveredAssetsResponseDto.md
 docs/RelationTypesResponseDto.md
@@ -226,6 +236,7 @@ docs/UpdateAgentMemoryDto.md
 docs/UpdateAiProviderConfigDto.md
 docs/UpdateCaseDto.md
 docs/UpdateCaseFindingNoteDto.md
+docs/UpdateCorrelationConfigDto.md
 docs/UpdateCustomDetectorDto.md
 docs/UpdateEdgeDto.md
 docs/UpdateEvidenceNoteDto.md
@@ -238,6 +249,8 @@ docs/UpdateNotificationImportanceDto.md
 docs/UpdateRunnerAssetStatusDto.md
 docs/UpdateSourceDto.md
 docs/UpdateThreadDto.md
+docs/ValueOccurrenceAssetDto.md
+docs/ValueOccurrencesResponseDto.md
 package.json
 src/apis/AIApi.ts
 src/apis/AIProviderConfigsApi.ts
@@ -245,6 +258,7 @@ src/apis/AssetsApi.ts
 src/apis/AssistantApi.ts
 src/apis/AutopilotApi.ts
 src/apis/CasesApi.ts
+src/apis/CorrelationApi.ts
 src/apis/CustomDetectorExtractionsApi.ts
 src/apis/CustomDetectorTestsApi.ts
 src/apis/CustomDetectorsApi.ts
@@ -262,6 +276,7 @@ src/apis/ThreadsApi.ts
 src/apis/index.ts
 src/index.ts
 src/models/AddEvidenceDto.ts
+src/models/AddExclusionDto.ts
 src/models/AddFindingDto.ts
 src/models/AddThreadEntryDto.ts
 src/models/AgentDecisionDto.ts
@@ -286,6 +301,7 @@ src/models/AssetFindingTypeCountDto.ts
 src/models/AssetListItemDto.ts
 src/models/AssetListResponseDto.ts
 src/models/AssetResponseDto.ts
+src/models/AssetSimilarityDto.ts
 src/models/AssistantControllerRespond200Response.ts
 src/models/AssistantControllerRespondRequest.ts
 src/models/AssistantControllerRespondRequestMessagesInner.ts
@@ -296,6 +312,8 @@ src/models/BulkIngestEdgesDto.ts
 src/models/BulkIngestEdgesResponseDto.ts
 src/models/BulkUpdateFindingsDto.ts
 src/models/BulkUpdateFindingsResponseDto.ts
+src/models/CaseActionRequestDto.ts
+src/models/CaseActionResponseDto.ts
 src/models/CaseActivityDto.ts
 src/models/CaseEvidenceDto.ts
 src/models/CaseFindingDto.ts
@@ -306,6 +324,9 @@ src/models/CaseTimelineResponseDto.ts
 src/models/CliRunnerControllerUpdateRunnerStatusRequest.ts
 src/models/CloseCaseDto.ts
 src/models/CloseCaseResponseDto.ts
+src/models/CorrelationConfigResponseDto.ts
+src/models/CorrelationGraphResponseDto.ts
+src/models/CorrelationLabelWeightDto.ts
 src/models/CreateAgentMemoryDto.ts
 src/models/CreateAiProviderConfigDto.ts
 src/models/CreateCaseDto.ts
@@ -327,6 +348,7 @@ src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
 src/models/EdgeDetailDto.ts
 src/models/EvidenceEntityDto.ts
+src/models/ExclusionRuleDto.ts
 src/models/ExpandGraphDto.ts
 src/models/FinalizeIngestRunDto.ts
 src/models/FindingHistoryEntryDto.ts
@@ -385,6 +407,7 @@ src/models/PreviewResponseDto.ts
 src/models/PullFromInquiryDto.ts
 src/models/PullFromInquiryResponseDto.ts
 src/models/RebuildEdgesResponseDto.ts
+src/models/RecomputeCorrelationResponseDto.ts
 src/models/RegisterDiscoveredAssetsDto.ts
 src/models/RegisterDiscoveredAssetsResponseDto.ts
 src/models/RelationTypesResponseDto.ts
@@ -466,6 +489,7 @@ src/models/UpdateAgentMemoryDto.ts
 src/models/UpdateAiProviderConfigDto.ts
 src/models/UpdateCaseDto.ts
 src/models/UpdateCaseFindingNoteDto.ts
+src/models/UpdateCorrelationConfigDto.ts
 src/models/UpdateCustomDetectorDto.ts
 src/models/UpdateEdgeDto.ts
 src/models/UpdateEvidenceNoteDto.ts
@@ -478,6 +502,8 @@ src/models/UpdateNotificationImportanceDto.ts
 src/models/UpdateRunnerAssetStatusDto.ts
 src/models/UpdateSourceDto.ts
 src/models/UpdateThreadDto.ts
+src/models/ValueOccurrenceAssetDto.ts
+src/models/ValueOccurrencesResponseDto.ts
 src/models/index.ts
 src/runtime.ts
 tsconfig.esm.json
