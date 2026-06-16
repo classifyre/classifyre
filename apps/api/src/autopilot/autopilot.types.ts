@@ -40,6 +40,28 @@ export interface FindingGroupSummary {
   sampleAssetIds: string[];
 }
 
+/**
+ * Compact summary of what the DUPLICATES FINDER AGENT found for this scan,
+ * fed to the inquiry/case agents so they can take same-entity / cross-source
+ * duplicate signals into account.
+ */
+export interface DuplicateSummary {
+  clusters: Array<{
+    clusterId: string;
+    memberCount: number;
+    sourceCount: number;
+    label: string | null;
+    commonValues: Array<{ label: string; value: string; count: number }>;
+  }>;
+  topPairs: Array<{
+    fromAssetId: string;
+    toAssetId: string;
+    relationType: string;
+    matchPercent: number;
+    reasons: string[];
+  }>;
+}
+
 /** Compact inquiry summary fed to the model. */
 export interface InquirySummary {
   id: string;
