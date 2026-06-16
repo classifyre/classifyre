@@ -18,6 +18,7 @@ import {
   type PathResult,
   type SimNode,
 } from "./graph-types";
+import { drawAssetIcon, drawFindingIndicator } from "./node-icons";
 import type { useForceLayout } from "./use-force-layout";
 import type { usePanZoom } from "./use-pan-zoom";
 
@@ -319,6 +320,18 @@ export function GraphCanvas({
       }
     }
 
+    // Max confidence per asset node (for colorByStrength)
+    const maxConfidence = new Map<string, number>();
+    if (colorByStrength) {
+      for (const e of edges) {
+        for (const k of [nodeKey(e.fromType, e.fromId), nodeKey(e.toType, e.toId)]) {
+          const prev = maxConfidence.get(k) ?? 0;
+          const c = Number(e.confidence ?? 0);
+          if (c > prev) maxConfidence.set(k, c);
+        }
+      }
+    }
+
     // Nodes
     for (const n of nodes) {
       const key = keyOf(n);
@@ -378,22 +391,28 @@ export function GraphCanvas({
 
       // Node shape
       if (isFinding) {
-        const severityColor = n.severity
-          ? (SEVERITY_COLORS[n.severity.toUpperCase()] ?? SEVERITY_COLORS.INFO!)
-          : SEVERITY_COLORS.INFO!;
+        const fillColor = colorByStrength
+          ? strengthColor(maxConfidence.get(key) ?? 0)
+          : n.severity
+            ? (SEVERITY_COLORS[n.severity.toUpperCase()] ?? SEVERITY_COLORS.INFO!)
+            : SEVERITY_COLORS.INFO!;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = severityColor;
+        ctx.fillStyle = fillColor;
         ctx.fill();
         ctx.strokeStyle = colors.foreground;
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        ctx.fillStyle = contrastText(severityColor);
-        ctx.font = `bold 8.5px ${colors.fontMono}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(findingCategoryCode(n), x, y);
+        ctx.fillStyle = "#ffffff";
+        if (colorByStrength) {
+          drawFindingIndicator(ctx, n, x, y, r * 1.5);
+        } else {
+          ctx.font = `bold ${Math.round(r * 0.82)}px ${colors.fontMono}`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(findingCategoryCode(n), x, y + 0.5);
+        }
       } else {
         ctx.beginPath();
         ctx.arc(x, y, r + 3, 0, Math.PI * 2);
@@ -411,11 +430,7 @@ export function GraphCanvas({
         ctx.stroke();
 
         ctx.fillStyle = colors.foreground;
-        ctx.font = `bold ${r - 4}px ${colors.fontMono}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        const initial = n.type === "sandbox" ? "S" : (n.assetType ? n.assetType.charAt(0).toUpperCase() : "A");
-        ctx.fillText(initial, x, y + 0.5);
+        drawAssetIcon(ctx, n, x, y, (r - 3) * 1.5);
       }
 
       // Hypothesis membership dots
