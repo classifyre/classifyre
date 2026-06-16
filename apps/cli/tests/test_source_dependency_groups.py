@@ -95,7 +95,6 @@ def _require_module_uv_groups() -> dict[str, set[str]]:
     return result
 
 
-
 def _ast_source_type(path: Path) -> str | None:
     """Return the `source_type = "..."` value from the first class that declares it."""
     module_ast = ast.parse(path.read_text(encoding="utf-8"))
@@ -263,4 +262,3 @@ def test_source_type_groups_values_match_actual_groups_used() -> None:
         "SOURCE_TYPE_GROUPS entries don't match the groups actually used by require_module: "
         f"{mismatches}. Keep dependency_groups.py in sync with the source files."
     )
-
