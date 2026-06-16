@@ -40,7 +40,7 @@ export function TechnicalLogViewer({
   return (
     <div
       className={cn(
-        "overflow-y-auto rounded-[4px] border-2 border-stone-700 bg-stone-900 px-3 py-2 font-mono text-[11px] leading-relaxed text-stone-200",
+        "overflow-y-auto rounded-[4px] border-2 border-stone-700 bg-stone-900 px-3 py-2 font-mono text-[11px] leading-[1.15] text-stone-200",
         maxHeight,
         className,
       )}
@@ -48,7 +48,7 @@ export function TechnicalLogViewer({
       {entries.map((l, idx) => {
         const key = l.id ?? idx;
         return (
-          <div key={key} className="py-0.5">
+          <div key={key}>
             <div className="group flex items-start gap-1">
               <span className="shrink-0 text-stone-500">
                 {l.timestamp}{" "}

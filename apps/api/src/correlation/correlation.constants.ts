@@ -48,15 +48,14 @@ export const CANDIDATE_CAP = 200;
 
 /**
  * A value shared by more than this many assets is a "hub" (e.g. a common,
- * non-discriminating token). Skipped during pairwise scoring to avoid the
- * quadratic blow-up of pairing every asset that holds it — exclude such values
- * explicitly if they matter. Clustering is unaffected (it unions duplicate
- * edges, which hubs don't produce on their own).
+ * non-discriminating token like a country code) and is excluded from the
+ * pairwise self-join entirely — not for memory (the join now runs in
+ * Postgres, not Node), but because pairing every owner of a non-discriminating
+ * value produces spurious "exact duplicate" edges between otherwise-unrelated
+ * assets. Enforced as a SQL filter, so it costs nothing in API memory and can
+ * be set much higher than the old in-memory cap.
  */
-export const FANOUT_CAP = 300;
-
-/** Most partners accumulated per asset before we stop (memory guard). */
-export const MAX_PARTNERS_PER_ASSET = 4000;
+export const FANOUT_CAP = 2000;
 
 /** Flush correlation edges to the DB in batches of this size (memory guard). */
 export const EDGE_BATCH = 2000;
