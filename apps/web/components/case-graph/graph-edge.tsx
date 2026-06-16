@@ -2,7 +2,12 @@
 
 import * as React from "react";
 import type { GraphEdgeDto } from "@workspace/api-client";
-import { ACCENT, CROSS_HYP_COLOR, MANUAL_EDGE_COLOR } from "./graph-types";
+import {
+  ACCENT,
+  CROSS_HYP_COLOR,
+  MANUAL_EDGE_COLOR,
+  strengthColor,
+} from "./graph-types";
 
 export interface GraphEdgeProps {
   edge: GraphEdgeDto;
@@ -16,6 +21,8 @@ export interface GraphEdgeProps {
   isSelected: boolean;
   isDimmed: boolean;
   isOnPath: boolean;
+  /** Colour the line by edge.confidence (0..1) as a similarity-strength heat. */
+  colorByStrength?: boolean;
   onClick: (edge: GraphEdgeDto, e: React.MouseEvent) => void;
   onContextMenu: (edge: GraphEdgeDto, e: React.MouseEvent) => void;
 }
@@ -31,6 +38,7 @@ export const GraphEdge = React.memo(function GraphEdge({
   isSelected,
   isDimmed,
   isOnPath,
+  colorByStrength,
   onClick,
   onContextMenu,
 }: GraphEdgeProps) {
@@ -48,7 +56,7 @@ export const GraphEdge = React.memo(function GraphEdge({
   const isCross = edge.crossHypothesis === true;
 
   let stroke = "var(--muted-foreground)";
-  let marker = "url(#arrow-default)";
+  let marker: string | undefined = "url(#arrow-default)";
   let dash: string | undefined;
   if (isCross) {
     stroke = CROSS_HYP_COLOR;
@@ -58,6 +66,11 @@ export const GraphEdge = React.memo(function GraphEdge({
     stroke = MANUAL_EDGE_COLOR;
     marker = "url(#arrow-manual)";
     dash = "6 4";
+  }
+  // Similarity-strength heat colour (keeps any manual/cross dash for distinction).
+  if (colorByStrength) {
+    stroke = strengthColor(Number(edge.confidence ?? 0));
+    marker = undefined; // direction is not meaningful here
   }
   if (isOnPath) {
     stroke = ACCENT;
