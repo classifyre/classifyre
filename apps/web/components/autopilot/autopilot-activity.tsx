@@ -11,7 +11,6 @@ import {
   Loader2,
   Megaphone,
   Moon,
-  Terminal,
   Workflow,
   XCircle,
 } from "lucide-react";
@@ -23,6 +22,7 @@ import {
   type AgentRunDto,
 } from "@workspace/api-client";
 import { Badge } from "@workspace/ui/components/badge";
+import { TechnicalLogViewer } from "@/components/technical-log-viewer";
 import { Button } from "@workspace/ui/components/button";
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { cn } from "@workspace/ui/lib/utils";
@@ -79,13 +79,6 @@ const OUTCOME_META: Record<string, { icon: React.ReactNode; className: string }>
     icon: <XCircle className="h-3.5 w-3.5" />,
     className: "border-red-600/40 bg-red-600/10 text-red-700 dark:text-red-400",
   },
-};
-
-const LEVEL_COLOR: Record<string, string> = {
-  DEBUG: "text-stone-400",
-  INFO: "text-emerald-400",
-  WARN: "text-amber-400",
-  ERROR: "text-red-400",
 };
 
 function actionLabel(action: string): string {
@@ -154,6 +147,20 @@ export function AutopilotActivity() {
     return () => clearInterval(t);
   }, [hasActive, selectedId, loadRuns, loadDetail]);
 
+  const shownLogs = logs.filter((l) => l.channel === channel);
+
+  const technicalEntries = React.useMemo(
+    () =>
+      shownLogs.map((l) => ({
+        id: l.id,
+        timestamp: new Date(l.createdAt).toLocaleTimeString(),
+        level: l.level,
+        message: l.message,
+        payload: l.payload,
+      })),
+    [shownLogs],
+  );
+
   if (loading) {
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
@@ -171,8 +178,6 @@ export function AutopilotActivity() {
       />
     );
   }
-
-  const shownLogs = logs.filter((l) => l.channel === channel);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
@@ -301,30 +306,10 @@ export function AutopilotActivity() {
                 No {channel.toLowerCase()} log entries for this run.
               </p>
             ) : channel === "TECHNICAL" ? (
-              <div className="max-h-[420px] overflow-y-auto rounded-[4px] border-2 border-stone-700 bg-stone-900 px-3 py-2 font-mono text-[11px] leading-relaxed text-stone-200">
-                {shownLogs.map((l) => (
-                  <div key={l.id} className="py-0.5">
-                    <span className="text-stone-500">
-                      {new Date(l.createdAt).toLocaleTimeString()}{" "}
-                    </span>
-                    <span className={LEVEL_COLOR[l.level] ?? "text-stone-300"}>
-                      [{l.level}]
-                    </span>{" "}
-                    <span className="whitespace-pre-wrap break-words">{l.message}</span>
-                    {l.payload && (
-                      <details className="ml-5 mt-0.5">
-                        <summary className="cursor-pointer text-stone-500 hover:text-stone-300">
-                          <Terminal className="mr-1 inline h-3 w-3" />
-                          payload
-                        </summary>
-                        <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-stone-950 p-2 text-[10px] text-stone-300">
-                          {JSON.stringify(l.payload, null, 2)}
-                        </pre>
-                      </details>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <TechnicalLogViewer
+                entries={technicalEntries}
+                maxHeight="max-h-[420px]"
+              />
             ) : (
               <ol className="space-y-1.5">
                 {shownLogs.map((l) => (

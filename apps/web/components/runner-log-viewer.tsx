@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RunnerLogEntryDto, RunnerLogEntryDtoLevelEnum, RunnerLogsResponseDto } from "@workspace/api-client";
 import { RunnerLogEntryDtoLevelEnum as LevelEnum } from "@workspace/api-client";
 import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
-import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import {
   Card,
@@ -37,6 +36,7 @@ import {
   Search,
   TriangleAlert,
 } from "lucide-react";
+import { TechnicalLogViewer } from "@/components/technical-log-viewer";
 import { formatLogTimestamp } from "@/lib/date";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
@@ -316,6 +316,17 @@ export function RunnerLogViewer({
     }
   }, [exportEntries, handleDownloadVisible, onDownloadAll, runnerId, t]);
 
+  const technicalEntries = useMemo(
+    () =>
+      entries.map((entry, index) => ({
+        id: `${entry.timestamp ?? ""}-${index}`,
+        timestamp: formatLogTimestamp(entry.timestamp),
+        level: entry.level,
+        message: entry.message,
+      })),
+    [entries],
+  );
+
   const showInitialLoading = loading && entries.length === 0;
 
   const liveStatus = isRunning
@@ -413,70 +424,13 @@ export function RunnerLogViewer({
         ) : entries.length === 0 ? (
           <EmptyState icon={FileText} title={t("runners.logs.noLogs")} description={t("runners.logs.noLogsHint")} />
         ) : (
-          <div className="relative overflow-hidden rounded-[4px] border bg-background">
-            {/* Header row */}
-            <div
-              className="hidden border-b bg-muted/40 px-3 py-2 md:grid md:gap-3"
-              style={{ gridTemplateColumns: "140px 84px 1fr 32px" }}
-            >
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {t("runners.logs.columns.time")}
-              </span>
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {t("runners.logs.columns.level")}
-              </span>
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {t("runners.logs.columns.message")}
-              </span>
-              <span />
-            </div>
-
-            <div className="max-h-[520px] overflow-y-auto">
-              {entries.map((entry, index) => {
-                const stableKey = `${entry.timestamp ?? ""}-${index}`;
-                return (
-                  <div key={stableKey} className="group w-full border-b px-3 py-1.5 last:border-b-0">
-                    {/* Mobile */}
-                    <div className="flex flex-col gap-1 md:hidden">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-muted-foreground">
-                          {formatLogTimestamp(entry.timestamp)}
-                        </span>
-                        <Badge variant="outline" className={cn("text-[10px] uppercase", LEVEL_CLASS[entry.level as LogLevel])}>
-                          {entry.level}
-                        </Badge>
-                      </div>
-                      <p className={cn("font-mono text-xs break-all", wrapLines ? "whitespace-pre-wrap" : "line-clamp-2")}>
-                        {entry.message}
-                      </p>
-                    </div>
-
-                    {/* Desktop */}
-                    <div
-                      className="hidden items-start gap-3 font-mono text-xs md:grid"
-                      style={{ gridTemplateColumns: "140px 84px 1fr 32px" }}
-                    >
-                      <span className="text-muted-foreground truncate">
-                        {formatLogTimestamp(entry.timestamp)}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className={cn("justify-center text-[10px] uppercase", LEVEL_CLASS[entry.level as LogLevel])}
-                      >
-                        {entry.level}
-                      </Badge>
-                      <span className={cn("break-all", wrapLines ? "whitespace-pre-wrap" : "truncate")}>
-                        {entry.message}
-                      </span>
-                      <div className="flex items-start justify-end pt-0.5">
-                        <CopyButton text={`${formatExportTimestamp(entry.timestamp)} [${entry.level}] ${entry.message}`} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <TechnicalLogViewer
+            entries={technicalEntries}
+            wrapLines={wrapLines}
+            renderActions={(entry) => (
+              <CopyButton text={`${entry.timestamp} [${entry.level}] ${entry.message}`} />
+            )}
+          />
         )}
 
         {/* Footer */}
