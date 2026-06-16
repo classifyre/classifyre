@@ -1,23 +1,14 @@
 "use client";
 
 import * as React from "react";
-import {
-  forceCollide,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  forceX,
-  forceY,
-  type Simulation,
-} from "d3-force";
 import type { GraphEdgeDto, GraphNodeDto } from "@workspace/api-client";
 import { collideRadius, keyOf, nodeKey, type SimEdge, type SimNode } from "./graph-types";
 import { seedPosition } from "./graph-utils";
 
 interface UseForceLayoutResult {
-  /** Live node map (mutated by d3 every tick). Read positions from here. */
+  /** Live node map (updated by worker on every tick). Read positions from here. */
   simNodes: Map<string, SimNode>;
-  /** Live edge list with resolved SimNode endpoints. */
+  /** Edge list mirroring the input edges. */
   simEdges: SimEdge[];
   /** Monotonic counter bumped (rAF-throttled) on every simulation tick. */
   version: number;
@@ -40,7 +31,7 @@ export function useForceLayout(
 ): UseForceLayoutResult {
   const simNodesRef = React.useRef<Map<string, SimNode>>(new Map());
   const simEdgesRef = React.useRef<SimEdge[]>([]);
-  const simRef = React.useRef<Simulation<SimNode, SimEdge> | null>(null);
+  const workerRef = React.useRef<Worker | null>(null);
   const rafRef = React.useRef(0);
   const settleCbRef = React.useRef<(() => void) | null>(null);
   const [version, setVersion] = React.useState(0);
@@ -57,6 +48,7 @@ export function useForceLayout(
     const wasEmpty = prevMap.size === 0;
     const center = { x: size.width / 2 || 400, y: size.height / 2 || 300 };
 
+    // Reconcile SimNode objects on the main thread (preserve existing positions).
     const next = new Map<string, SimNode>();
     for (const n of nodes) {
       const key = keyOf(n);
@@ -71,7 +63,6 @@ export function useForceLayout(
     }
     simNodesRef.current = next;
 
-    const simNodes = Array.from(next.values());
     const simEdges: SimEdge[] = edges
       .filter(
         (e) => next.has(nodeKey(e.fromType, e.fromId)) && next.has(nodeKey(e.toType, e.toId)),
@@ -82,81 +73,87 @@ export function useForceLayout(
         source: nodeKey(e.fromType, e.fromId),
         target: nodeKey(e.toType, e.toId),
       }));
+    simEdgesRef.current = simEdges;
 
-    const sim = simRef.current ?? forceSimulation<SimNode>();
-    simRef.current = sim;
+    // Build minimal payload for the worker (keys, initial positions, collision radii).
+    const workerNodes = Array.from(next.values()).map((sn) => ({
+      key: sn.key,
+      x: sn.x,
+      y: sn.y,
+      collideR: collideRadius(sn.data),
+    }));
+    const workerEdges = simEdges.map((e) => ({
+      id: e.id,
+      source: e.source as string,
+      target: e.target as string,
+    }));
 
-    sim
-      .nodes(simNodes)
-      .force(
-        "link",
-        forceLink<SimNode, SimEdge>(simEdges)
-          .id((d) => d.key)
-          .distance(110)
-          .strength(0.4),
-      )
-      .force("charge", forceManyBody<SimNode>().strength(-420).distanceMax(600))
-      .force(
-        "collide",
-        forceCollide<SimNode>((d) => collideRadius(d.data)).strength(0.9),
-      )
-      .force("x", forceX<SimNode>(center.x).strength(0.045))
-      .force("y", forceY<SimNode>(center.y).strength(0.055))
-      .on("tick", () => {
+    // Spawn worker. Terminate previous if this is a restructure.
+    workerRef.current?.terminate();
+    const worker = new Worker(new URL("./force-worker.ts", import.meta.url), { type: "module" });
+    workerRef.current = worker;
+    worker.onmessage = (e: MessageEvent) => {
+      const msg = e.data;
+      if (msg.type === "tick") {
+        const map = simNodesRef.current;
+        for (const p of msg.positions as Array<{
+          key: string;
+          x: number;
+          y: number;
+          fx?: number | null;
+          fy?: number | null;
+        }>) {
+          const sn = map.get(p.key);
+          if (sn) {
+            sn.x = p.x;
+            sn.y = p.y;
+            sn.fx = p.fx ?? null;
+            sn.fy = p.fy ?? null;
+          }
+        }
         cancelAnimationFrame(rafRef.current);
         rafRef.current = requestAnimationFrame(() => setVersion((v) => v + 1));
-      })
-      .on("end", () => {
+      } else if (msg.type === "settled") {
         if (settleCbRef.current) {
           const cb = settleCbRef.current;
           settleCbRef.current = null;
           cb();
         }
-      });
+      }
+    };
 
-    // forceLink resolves string ids to SimNode references in place.
-    simEdgesRef.current = simEdges;
+    worker.postMessage({ type: "init", nodes: workerNodes, edges: workerEdges, center, alpha: wasEmpty ? 1 : 0.45 });
 
-    sim.alpha(wasEmpty ? 1 : 0.45).restart();
     setVersion((v) => v + 1);
+
+    return () => {
+      worker.terminate();
+      if (workerRef.current === worker) workerRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structure, size.width, size.height]);
 
   React.useEffect(
     () => () => {
-      simRef.current?.stop();
       cancelAnimationFrame(rafRef.current);
     },
     [],
   );
 
   const dragStart = React.useCallback((key: string) => {
-    const node = simNodesRef.current.get(key);
-    if (!node) return;
-    simRef.current?.alphaTarget(0.25).restart();
-    node.fx = node.x;
-    node.fy = node.y;
+    workerRef.current?.postMessage({ type: "drag-start", key });
   }, []);
 
   const dragMove = React.useCallback((key: string, world: { x: number; y: number }) => {
-    const node = simNodesRef.current.get(key);
-    if (!node) return;
-    node.fx = world.x;
-    node.fy = world.y;
+    workerRef.current?.postMessage({ type: "drag-move", key, x: world.x, y: world.y });
   }, []);
 
   const dragEnd = React.useCallback((key: string) => {
-    // Keep fx/fy set: dragged nodes stay pinned where the analyst placed them.
-    void key;
-    simRef.current?.alphaTarget(0);
+    workerRef.current?.postMessage({ type: "drag-end", key });
   }, []);
 
   const releasePin = React.useCallback((key: string) => {
-    const node = simNodesRef.current.get(key);
-    if (!node) return;
-    node.fx = null;
-    node.fy = null;
-    simRef.current?.alpha(0.3).restart();
+    workerRef.current?.postMessage({ type: "release-pin", key });
   }, []);
 
   const isPinned = React.useCallback(
@@ -169,7 +166,7 @@ export function useForceLayout(
   );
 
   const reheat = React.useCallback(() => {
-    simRef.current?.alpha(0.5).restart();
+    workerRef.current?.postMessage({ type: "reheat" });
   }, []);
 
   const onSettle = React.useCallback((cb: () => void) => {
