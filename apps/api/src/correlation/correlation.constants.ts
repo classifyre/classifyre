@@ -46,6 +46,24 @@ export const DUPLICATE_MIN = 0.6;
 /** Cap on candidate assets scored against one asset (guards pathological hubs). */
 export const CANDIDATE_CAP = 200;
 
+/**
+ * A value shared by more than this many assets is a "hub" (e.g. a common,
+ * non-discriminating token). Skipped during pairwise scoring to avoid the
+ * quadratic blow-up of pairing every asset that holds it — exclude such values
+ * explicitly if they matter. Clustering is unaffected (it unions duplicate
+ * edges, which hubs don't produce on their own).
+ */
+export const FANOUT_CAP = 300;
+
+/** Most partners accumulated per asset before we stop (memory guard). */
+export const MAX_PARTNERS_PER_ASSET = 4000;
+
+/** Flush correlation edges to the DB in batches of this size (memory guard). */
+export const EDGE_BATCH = 2000;
+
+/** Rows fetched per page when streaming the value index / edges. */
+export const STREAM_PAGE = 50000;
+
 /** Longest normalized value we index; longer values are skipped as noise. */
 export const MAX_VALUE_LENGTH = 512;
 
