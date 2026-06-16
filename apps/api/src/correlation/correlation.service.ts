@@ -9,7 +9,6 @@ import {
   EDGE_BATCH,
   FANOUT_CAP,
   MAX_CLUSTER_TOP_VALUES,
-  MAX_PARTNERS_PER_ASSET,
   RELATED_MIN,
   STREAM_PAGE,
 } from './correlation.constants';
@@ -91,6 +90,9 @@ export interface ExclusionRule {
 /** DB-backed tuning resolved into fast lookups for a recompute pass. */
 interface ResolvedConfig {
   weightOf: (label: string) => number;
+  /** Raw label → weight overrides, for pushing the weight lookup into SQL. */
+  rawWeights: Record<string, number>;
+  defaultWeight: number;
   relatedMin: number;
   duplicateMin: number;
   /** True when a (normalized) label/value should be ignored. */
@@ -205,6 +207,8 @@ export class CorrelationService {
     const def = row?.defaultWeight ?? DEFAULT_LABEL_WEIGHT;
     return {
       weightOf: (label: string) => weights[normalizeLabel(label)] ?? def,
+      rawWeights: weights,
+      defaultWeight: def,
       relatedMin: row ? Number(row.relatedMin) : RELATED_MIN,
       duplicateMin: row ? Number(row.duplicateMin) : DUPLICATE_MIN,
       isExcluded: buildExclusionPredicate(parseExclusions(row?.exclusions)),
@@ -478,162 +482,231 @@ export class CorrelationService {
     affectedAssetIds: string[];
   }> {
     // Working set = the assets we need value-vectors for. Full recompute spans
-    // everything; an incremental run spans touched + anything sharing a value.
+    // everything (null = no filter); an incremental run spans touched plus
+    // anything sharing a value.
     const workingIds = full
-      ? touchedIds
+      ? null
       : await this.incrementalWorkingSet(touchedIds);
 
-    // Compact, index-driven value vectors (hashes + per-hash weight only — no
-    // ValueRow objects, no double-load). hashOwners is the reverse index used
-    // for candidate discovery without an O(N²) scan.
-    const assetHashes = new Map<string, string[]>();
-    const hashOwners = new Map<string, string[]>();
-    const hashLabel = new Map<string, string>();
-    const hashWeight = new Map<string, number>();
-    const assetWeightTotal = new Map<string, number>();
-    await this.streamValues(full, workingIds, (assetId, hash, label) => {
-      (
-        assetHashes.get(assetId) ?? assetHashes.set(assetId, []).get(assetId)!
-      ).push(hash);
-      (hashOwners.get(hash) ?? hashOwners.set(hash, []).get(hash)!).push(
-        assetId,
-      );
-      let w = hashWeight.get(hash);
-      if (w === undefined) {
-        w = cfg.weightOf(label);
-        hashWeight.set(hash, w);
-        hashLabel.set(hash, label);
-      }
-      assetWeightTotal.set(assetId, (assetWeightTotal.get(assetId) ?? 0) + w);
-    });
+    // One row per asset (weight total + value count) — never the
+    // per-occurrence blowup. Safe to hold in memory at any dataset size.
+    const totals = await this.loadAssetTotals(workingIds, cfg);
 
-    // Wipe stale correlation edges (all of them on a full rebuild, else only
-    // those touching the recomputed assets).
-    await this.prisma.edge.deleteMany({
-      where: full
-        ? {
-            fromType: ASSET_REL,
-            toType: ASSET_REL,
-            relationType: { in: CORRELATION_RELATION_TYPES },
-          }
-        : {
-            fromType: ASSET_REL,
-            toType: ASSET_REL,
-            relationType: { in: CORRELATION_RELATION_TYPES },
-            OR: [{ fromId: { in: touchedIds } }, { toId: { in: touchedIds } }],
-          },
-    });
+    // The pairwise overlap — formerly a hashOwners reverse index built in
+    // Node memory, which is what actually OOM'd on a full recompute — is now
+    // computed as a single INSERT ... SELECT ... GROUP BY self-join in
+    // Postgres. Its intermediate state lives in the database (work_mem / temp
+    // files on disk), not the API process's heap, so no value is excluded
+    // from scoring and nothing is lost.
+    const runId = randomUUID();
+    try {
+      await this.stagePairAggregates(runId, touchedIds, workingIds, cfg, full);
 
-    const seen = full ? null : new Set<string>();
-    let buffer: Prisma.EdgeCreateManyInput[] = [];
-    let relatedPairs = 0;
-    let duplicatePairs = 0;
-    let topMatch: CorrelationRunSummary['topMatch'] = null;
-    const affected = new Set<string>();
-    const flush = async () => {
-      if (buffer.length === 0) return;
-      await this.prisma.edge.createMany({ data: buffer, skipDuplicates: true });
-      buffer = [];
-    };
+      // Wipe stale correlation edges (all of them on a full rebuild, else only
+      // those touching the recomputed assets).
+      await this.prisma.edge.deleteMany({
+        where: full
+          ? {
+              fromType: ASSET_REL,
+              toType: ASSET_REL,
+              relationType: { in: CORRELATION_RELATION_TYPES },
+            }
+          : {
+              fromType: ASSET_REL,
+              toType: ASSET_REL,
+              relationType: { in: CORRELATION_RELATION_TYPES },
+              OR: [
+                { fromId: { in: touchedIds } },
+                { toId: { in: touchedIds } },
+              ],
+            },
+      });
 
-    for (const aId of touchedIds) {
-      const aHashes = assetHashes.get(aId);
-      if (!aHashes || aHashes.length === 0) continue;
-      const totalA = assetWeightTotal.get(aId) ?? 0;
-
-      // One pass over A's (non-hub) values accumulates per-partner overlap via
-      // the reverse index — no full scan, no partner hash-sets.
-      const acc = new Map<
-        string,
-        {
-          shared: number;
-          weightedShared: number;
-          byLabel: Record<string, number>;
-        }
-      >();
-      for (const h of aHashes) {
-        const owners = hashOwners.get(h);
-        if (!owners || owners.length > FANOUT_CAP) continue; // skip hubs
-        const w = hashWeight.get(h)!;
-        const label = hashLabel.get(h)!;
-        for (const p of owners) {
-          if (p === aId) continue;
-          let e = acc.get(p);
-          if (!e) {
-            if (acc.size >= MAX_PARTNERS_PER_ASSET) continue;
-            e = { shared: 0, weightedShared: 0, byLabel: {} };
-            acc.set(p, e);
-          }
-          e.shared++;
-          e.weightedShared += w;
-          e.byLabel[label] = (e.byLabel[label] ?? 0) + 1;
-        }
-      }
-
-      const aCount = aHashes.length;
-      for (const [pId, e] of acc) {
-        const lo = aId < pId ? aId : pId;
-        const hi = aId < pId ? pId : aId;
-        if (full) {
-          if (aId !== lo) continue; // each unordered pair once (smaller id)
-        } else {
-          const key = `${lo}|${hi}`;
-          if (seen!.has(key)) continue;
-          seen!.add(key);
-        }
-
-        const totalP = assetWeightTotal.get(pId) ?? 0;
-        const denom = totalA + totalP;
-        const weighted = denom === 0 ? 0 : (2 * e.weightedShared) / denom;
-        const pCount = assetHashes.get(pId)?.length ?? 0;
-        const union = aCount + pCount - e.shared;
-        const jaccard = union === 0 ? 0 : e.shared / union;
-        const exact =
-          e.shared > 0 && e.shared === aCount && e.shared === pCount;
-        if (weighted < cfg.relatedMin && !exact) continue;
-
-        const isDuplicate = weighted >= cfg.duplicateMin || exact;
-        const reasons = buildReasons(e.byLabel, cfg.weightOf);
-        buffer.push({
-          fromType: ASSET_REL,
-          fromId: lo,
-          toType: ASSET_REL,
-          toId: hi,
-          relationType: isDuplicate ? REL_DUPLICATE : REL_RELATED,
-          confidence: roundConfidence(weighted),
-          origin: 'INFERRED',
-          metadata: {
-            weighted: round2(weighted),
-            jaccard: round2(jaccard),
-            sharedCount: e.shared,
-            sharedByLabel: e.byLabel,
-            exact,
-            reasons,
-          },
+      let buffer: Prisma.EdgeCreateManyInput[] = [];
+      let relatedPairs = 0;
+      let duplicatePairs = 0;
+      let topMatch: CorrelationRunSummary['topMatch'] = null;
+      const affected = new Set<string>();
+      const flush = async () => {
+        if (buffer.length === 0) return;
+        await this.prisma.edge.createMany({
+          data: buffer,
+          skipDuplicates: true,
         });
-        affected.add(lo);
-        affected.add(hi);
-        if (isDuplicate) duplicatePairs++;
-        else relatedPairs++;
-        if (!topMatch || weighted > topMatch.weighted) {
-          topMatch = {
-            fromAssetId: lo,
-            toAssetId: hi,
-            weighted: round2(weighted),
-            reasons,
-          };
-        }
-        if (buffer.length >= EDGE_BATCH) await flush();
-      }
-    }
-    await flush();
+        buffer = [];
+      };
 
-    return {
-      relatedPairs,
-      duplicatePairs,
-      topMatch,
-      affectedAssetIds: Array.from(affected),
-    };
+      // Stream the staged pairs back page by page (keyset on id) — bounded
+      // memory regardless of how many pairs the recompute produced.
+      let cursor = -1n;
+      for (;;) {
+        const rows = await this.prisma.correlationPairStaging.findMany({
+          where: { runId, id: { gt: cursor } },
+          orderBy: { id: 'asc' },
+          take: STREAM_PAGE,
+        });
+        if (rows.length === 0) break;
+
+        for (const r of rows) {
+          const a = totals.get(r.aId);
+          const b = totals.get(r.bId);
+          const totalA = a?.weight ?? 0;
+          const totalB = b?.weight ?? 0;
+          const countA = a?.count ?? 0;
+          const countB = b?.count ?? 0;
+          const weightedShared = Number(r.weightedShared);
+          const sharedCount = r.sharedCount;
+
+          const denom = totalA + totalB;
+          const weighted = denom === 0 ? 0 : (2 * weightedShared) / denom;
+          const union = countA + countB - sharedCount;
+          const jaccard = union === 0 ? 0 : sharedCount / union;
+          const exact =
+            sharedCount > 0 && sharedCount === countA && sharedCount === countB;
+          if (weighted < cfg.relatedMin && !exact) continue;
+
+          const isDuplicate = weighted >= cfg.duplicateMin || exact;
+          const byLabel = r.sharedByLabel as Record<string, number>;
+          const reasons = buildReasons(byLabel, cfg.weightOf);
+          buffer.push({
+            fromType: ASSET_REL,
+            fromId: r.aId,
+            toType: ASSET_REL,
+            toId: r.bId,
+            relationType: isDuplicate ? REL_DUPLICATE : REL_RELATED,
+            confidence: roundConfidence(weighted),
+            origin: 'INFERRED',
+            metadata: {
+              weighted: round2(weighted),
+              jaccard: round2(jaccard),
+              sharedCount,
+              sharedByLabel: byLabel,
+              exact,
+              reasons,
+            },
+          });
+          affected.add(r.aId);
+          affected.add(r.bId);
+          if (isDuplicate) duplicatePairs++;
+          else relatedPairs++;
+          if (!topMatch || weighted > topMatch.weighted) {
+            topMatch = {
+              fromAssetId: r.aId,
+              toAssetId: r.bId,
+              weighted: round2(weighted),
+              reasons,
+            };
+          }
+          if (buffer.length >= EDGE_BATCH) await flush();
+        }
+
+        cursor = rows[rows.length - 1].id;
+        if (rows.length < STREAM_PAGE) break;
+      }
+      await flush();
+
+      return {
+        relatedPairs,
+        duplicatePairs,
+        topMatch,
+        affectedAssetIds: Array.from(affected),
+      };
+    } finally {
+      // Scratch rows for this run are no longer needed either way.
+      await this.prisma.correlationPairStaging.deleteMany({ where: { runId } });
+    }
+  }
+
+  /** Per-asset weight total + value count, scoped to `assetIds` (null = all). */
+  private async loadAssetTotals(
+    assetIds: string[] | null,
+    cfg: ResolvedConfig,
+  ): Promise<Map<string, { weight: number; count: number }>> {
+    const weightsJson = JSON.stringify(cfg.rawWeights);
+    const scope = assetIds
+      ? Prisma.sql`WHERE asset_id = ANY(${assetIds})`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<
+      Array<{ asset_id: string; total_weight: string; value_count: bigint }>
+    >(Prisma.sql`
+      SELECT asset_id,
+             SUM(COALESCE((${weightsJson}::jsonb ->> label)::numeric, ${cfg.defaultWeight})) AS total_weight,
+             COUNT(*) AS value_count
+      FROM asset_correlation_values
+      ${scope}
+      GROUP BY asset_id
+    `);
+    const map = new Map<string, { weight: number; count: number }>();
+    for (const r of rows) {
+      map.set(r.asset_id, {
+        weight: Number(r.total_weight),
+        count: Number(r.value_count),
+      });
+    }
+    return map;
+  }
+
+  /**
+   * Compute pairwise overlap (shared count, weighted-shared sum, per-label
+   * breakdown) for every asset pair in the working set as a single
+   * INSERT ... SELECT ... GROUP BY, staged under `runId`. This is the
+   * self-join that used to be a Node-side reverse index — running it as one
+   * SQL statement lets Postgres spill any oversized intermediate state to
+   * disk instead of the API process's heap.
+   */
+  private async stagePairAggregates(
+    runId: string,
+    touchedIds: string[],
+    workingIds: string[] | null,
+    cfg: ResolvedConfig,
+    full: boolean,
+  ): Promise<void> {
+    const weightsJson = JSON.stringify(cfg.rawWeights);
+    const scope = workingIds
+      ? Prisma.sql`WHERE v.asset_id = ANY(${workingIds})`
+      : Prisma.empty;
+    // Every pair needs at least one touched member; on a full recompute
+    // touchedIds is every asset, so the join already satisfies this and the
+    // filter is skipped to avoid evaluating it per row.
+    const touchFilter = full
+      ? Prisma.empty
+      : Prisma.sql`WHERE a.asset_id = ANY(${touchedIds}) OR b.asset_id = ANY(${touchedIds})`;
+
+    await this.prisma.$executeRaw(Prisma.sql`
+      WITH raw AS (
+        SELECT v.asset_id, v.value_hash, v.label,
+               COALESCE((${weightsJson}::jsonb ->> v.label)::numeric, ${cfg.defaultWeight}) AS weight
+        FROM asset_correlation_values v
+        ${scope}
+      ),
+      -- Values shared by more than FANOUT_CAP assets are non-discriminating
+      -- (e.g. a generic country code) and are excluded from the join: pairing
+      -- every owner of such a value produces spurious "exact duplicate" edges
+      -- between otherwise-unrelated assets. This does NOT touch asset weight
+      -- totals (loadAssetTotals) — only which *shared* values count as
+      -- pairwise evidence.
+      hash_counts AS (
+        SELECT value_hash, COUNT(*) AS owners FROM raw GROUP BY value_hash
+      ),
+      av AS (
+        SELECT raw.* FROM raw
+        JOIN hash_counts hc ON hc.value_hash = raw.value_hash
+        WHERE hc.owners <= ${FANOUT_CAP}
+      ),
+      pair_label AS (
+        SELECT a.asset_id AS a_id, b.asset_id AS b_id, a.label AS label,
+               COUNT(*) AS cnt, SUM(a.weight) AS wsum
+        FROM av a
+        JOIN av b ON a.value_hash = b.value_hash AND a.asset_id < b.asset_id
+        ${touchFilter}
+        GROUP BY a.asset_id, b.asset_id, a.label
+      )
+      INSERT INTO correlation_pair_staging
+        (run_id, a_id, b_id, shared_count, weighted_shared, shared_by_label)
+      SELECT ${runId}, a_id, b_id, SUM(cnt)::int, SUM(wsum), jsonb_object_agg(label, cnt)
+      FROM pair_label
+      GROUP BY a_id, b_id
+    `);
   }
 
   /** Touched assets plus every asset that shares ≥1 value with them. */
@@ -656,41 +729,6 @@ export class CorrelationService {
       }
     }
     return Array.from(working);
-  }
-
-  /**
-   * Stream (assetId, valueHash, label) for the working set without ever holding
-   * the whole table in one query result. Full recompute paginates the table by
-   * id cursor; incremental fetches the bounded working set in chunks.
-   */
-  private async streamValues(
-    full: boolean,
-    workingIds: string[],
-    cb: (assetId: string, hash: string, label: string) => void,
-  ): Promise<void> {
-    if (!full) {
-      for (const ids of chunk(workingIds, 1000)) {
-        const rows = await this.prisma.assetCorrelationValue.findMany({
-          where: { assetId: { in: ids } },
-          select: { assetId: true, valueHash: true, label: true },
-        });
-        for (const r of rows) cb(r.assetId, r.valueHash, r.label);
-      }
-      return;
-    }
-    let cursor: string | undefined;
-    for (;;) {
-      const rows = await this.prisma.assetCorrelationValue.findMany({
-        select: { id: true, assetId: true, valueHash: true, label: true },
-        orderBy: { id: 'asc' },
-        take: STREAM_PAGE,
-        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-      });
-      if (rows.length === 0) break;
-      for (const r of rows) cb(r.assetId, r.valueHash, r.label);
-      if (rows.length < STREAM_PAGE) break;
-      cursor = rows[rows.length - 1].id;
-    }
   }
 
   /** Rebuild every cluster from scratch (full recompute): union-find over all
