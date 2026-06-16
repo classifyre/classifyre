@@ -38,3 +38,6 @@ export const MAX_FINDINGS_PER_INQUIRY = 25;
 export const MAX_CASE_CLUSTERS_PER_CYCLE = 5;
 export const MAX_GLOSSARY_ENTRIES = 20;
 export const MAX_RECALLED_MEMORIES = 30;
+// Duplicate/cluster context handed to the inquiry/case agents per cycle.
+export const MAX_DUPLICATE_CLUSTERS = 15;
+export const MAX_DUPLICATE_PAIRS = 20;

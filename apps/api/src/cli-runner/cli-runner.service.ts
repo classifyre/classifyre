@@ -13,10 +13,7 @@ import { PrismaService } from '../prisma.service';
 import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { INQUIRY_MATCH_QUEUE } from '../matching/matching.constants';
-import {
-  AUTOPILOT_QUEUE,
-  AUTOPILOT_START_AFTER_SECONDS,
-} from '../autopilot/autopilot.constants';
+import { CORRELATION_QUEUE } from '../correlation/correlation.constants';
 import {
   AssetType,
   Prisma,
@@ -111,19 +108,18 @@ export class CliRunnerService implements OnApplicationBootstrap {
         { sourceId, runnerId },
         { singletonKey: sourceId },
       );
-      // Autopilot cycle for the same scan — deliberately delayed so inquiry
-      // matching lands first; singletonKey debounces rapid rescans.
+      // Correlation (DUPLICATES FINDER AGENT) for the same scan — runs the
+      // deterministic duplicate detection and then hands off to the autopilot
+      // cycle, so inquiry/case agents can consider the duplicate/cluster
+      // results. singletonKey debounces rapid rescans.
       await boss.send(
-        AUTOPILOT_QUEUE,
-        { sourceId, runnerId, cycleKey: `scan:${sourceId}:${runnerId}` },
+        CORRELATION_QUEUE,
+        { sourceId, runnerId },
         {
-          singletonKey: `autopilot:${sourceId}`,
-          startAfter: AUTOPILOT_START_AFTER_SECONDS,
+          singletonKey: `correlation:${sourceId}`,
           retryLimit: 2,
-          retryDelay: 120,
+          retryDelay: 60,
           retryBackoff: true,
-          // Cycles may legitimately take a long time (slow providers, 429
-          // backoff) — don't let pg-boss expire and redeliver mid-run.
           expireInSeconds: 3 * 3600,
         },
       );

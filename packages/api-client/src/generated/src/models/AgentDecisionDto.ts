@@ -92,6 +92,8 @@ export const AgentDecisionDtoActionEnum = {
     ChangeStatus: 'CHANGE_STATUS',
     LinkInquiry: 'LINK_INQUIRY',
     ConsolidateMemory: 'CONSOLIDATE_MEMORY',
+    LinkDuplicate: 'LINK_DUPLICATE',
+    UpdateCluster: 'UPDATE_CLUSTER',
     NoAction: 'NO_ACTION'
 } as const;
 export type AgentDecisionDtoActionEnum = typeof AgentDecisionDtoActionEnum[keyof typeof AgentDecisionDtoActionEnum];
