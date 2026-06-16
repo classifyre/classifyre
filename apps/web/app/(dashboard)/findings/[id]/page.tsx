@@ -58,6 +58,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { FINDING_SEVERITY_COLOR_BY_LEVEL } from "@workspace/ui/lib/finding-severity";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { MatchedContentBlock } from "@/components/matched-content-block";
+import { WhereElseFound } from "@/components/where-else-found";
 import { FindingExtractionCard } from "@/components/finding-extraction-card";
 import { FindingMetadataCard } from "@/components/finding-metadata-card";
 import { useTranslation } from "@/hooks/use-translation";
@@ -414,6 +415,15 @@ export default function FindingDetailPage() {
         contextBefore={finding.contextBefore}
         contextAfter={finding.contextAfter}
       />
+
+      {/* ── Where else this value appears (correlation reverse index) ── */}
+      {finding.findingType && finding.matchedContent && (
+        <WhereElseFound
+          label={finding.findingType}
+          value={finding.matchedContent}
+          currentAssetId={finding.asset?.id || finding.assetId}
+        />
+      )}
 
       {/* ── Extracted data (CUSTOM detector only) ── */}
       {finding.detectorType === "CUSTOM" && (
