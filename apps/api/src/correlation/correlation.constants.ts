@@ -70,12 +70,12 @@ export const MAX_VALUE_LENGTH = 512;
 export const MAX_CLUSTER_TOP_VALUES = 12;
 
 /**
- * Initial weight multiplier for a phonetic-only match (sounds alike but
- * normalizes differently, e.g. "smyth" ↔ "smith"). Applied in SQL so the
- * staging row already carries a conservative estimate; the Node streaming
- * loop then refines it to the actual Jaro-Winkler score.
+ * Maximum number of assets allowed in a single phonetic group
+ * (a "label + phonetic_hash" bucket). Groups larger than this are skipped:
+ * common phonetic codes (e.g. "JN" shared by all John/Jon/Jan documents) are
+ * non-discriminating and would produce O(N²) pair comparisons.
  */
-export const PHONETIC_DISCOUNT = 0.8;
+export const PHONETIC_FANOUT_CAP = 50;
 
 /**
  * Minimum Jaro-Winkler score for a phonetic match to count as evidence.
@@ -83,6 +83,12 @@ export const PHONETIC_DISCOUNT = 0.8;
  * (e.g. "john" ↔ "jane" both map to "JN") and should not contribute weight.
  */
 export const PHONETIC_MIN_JW = 0.75;
+
+/** Max findings fetched per DB round-trip when building a value index. */
+export const FINDINGS_PAGE = 1000;
+
+/** Max rows per createMany call inside an asset's value rebuild transaction. */
+export const VALUE_UPSERT_BATCH = 500;
 
 /**
  * Labels for which phonetic matching is meaningful. Structured identifiers
