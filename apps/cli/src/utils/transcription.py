@@ -185,7 +185,9 @@ def _split_audio_chunks(
         )
 
         def _drain(frames: object) -> Generator[bytes, None, None]:
-            result = frames if isinstance(frames, list) else ([frames] if frames is not None else [])
+            result = (
+                frames if isinstance(frames, list) else ([frames] if frames is not None else [])
+            )
             for out_frame in result:
                 current.extend(bytes(out_frame.planes[0]))
                 while len(current) >= bytes_per_chunk:
@@ -283,6 +285,7 @@ def iter_transcription_pages(
                 file_name or mime_type,
                 exc,
             )
+            raise
 
 
 def transcribe_media(
@@ -299,9 +302,18 @@ def transcribe_media(
     if not file_bytes:
         return "", None
 
-    pages = list(
-        iter_transcription_pages(file_bytes, mime_type=mime_type, file_name=file_name)
-    )
+    model, model_error = _get_whisper_model()
+    if model_error:
+        return "", model_error
+    if model is None:
+        return "", "Whisper model not initialized"
+
+    try:
+        pages = list(iter_transcription_pages(file_bytes, mime_type=mime_type, file_name=file_name))
+    except Exception as exc:
+        logger.warning("Transcription failed for %s: %s", file_name or mime_type, exc)
+        return "", f"Transcription failed: {exc}"
+
     text = "\n".join(pages)
     if text:
         logger.info(
