@@ -8,14 +8,15 @@ import {
   DUPLICATE_MIN,
   EDGE_BATCH,
   FANOUT_CAP,
-  FINDINGS_PAGE,
   MAX_CLUSTER_TOP_VALUES,
   PHONETIC_FANOUT_CAP,
   PHONETIC_MIN_JW,
   RELATED_MIN,
-  STREAM_PAGE,
-  VALUE_UPSERT_BATCH,
 } from './correlation.constants';
+import {
+  type CorrelationBatchSizes,
+  computeCorrelationBatchSizes,
+} from './batch-sizing';
 import {
   hashSet,
   jaroWinkler,
@@ -181,8 +182,17 @@ function yieldToGC(): Promise<void> {
 @Injectable()
 export class CorrelationService {
   private readonly logger = new Logger(CorrelationService.name);
+  private readonly batches: CorrelationBatchSizes;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {
+    this.batches = computeCorrelationBatchSizes();
+    this.logger.log(
+      `Batch sizing: memory=${this.batches.memoryMb} MB (${this.batches.memorySource}), ` +
+        `findingsPage=${this.batches.findingsPage}, ` +
+        `valueUpsertBatch=${this.batches.valueUpsertBatch}, ` +
+        `streamPage=${this.batches.streamPage}`,
+    );
+  }
 
   // ── Recompute entry points ────────────────────────────────────────────────
 
@@ -241,7 +251,7 @@ export class CorrelationService {
           `Fingerprinted ${processed}/${total} assets (${valuesIndexed} values).`,
           { processed, total, valuesIndexed },
         );
-      cursor = rows[rows.length - 1].id;
+      cursor = rows.at(-1)!.id;
       if (rows.length < PAGE) break;
     }
 
@@ -424,7 +434,7 @@ export class CorrelationService {
     //    assets so long scans don't accumulate unreachable objects in the heap.
     let valuesIndexed = 0;
     for (let i = 0; i < touchedIds.length; i++) {
-      valuesIndexed += await this.rebuildAssetValues(touchedIds[i], cfg);
+      valuesIndexed += await this.rebuildAssetValues(touchedIds[i]!, cfg);
       await yieldToGC(); // after every asset so GC can reclaim large finding arrays
       if (i > 0 && i % 50 === 0 && onProgress)
         await onProgress(
@@ -495,7 +505,13 @@ export class CorrelationService {
     >();
     let idCursor: string | null = null;
     for (;;) {
-      const batch = await this.prisma.finding.findMany({
+      const batch: Array<{
+        id: string;
+        findingType: string;
+        matchedContent: string;
+        detectorType: DetectorType;
+        customDetectorKey: string | null;
+      }> = await this.prisma.finding.findMany({
         where: { assetId, ...(idCursor ? { id: { gt: idCursor } } : {}) },
         select: {
           id: true,
@@ -505,7 +521,7 @@ export class CorrelationService {
           customDetectorKey: true,
         },
         orderBy: { id: 'asc' },
-        take: FINDINGS_PAGE,
+        take: this.batches.findingsPage,
       });
       if (!batch.length) break;
       for (const f of batch) {
@@ -523,8 +539,9 @@ export class CorrelationService {
           phoneticHash: phoneticFingerprint(label, normalized),
         });
       }
-      if (batch.length < FINDINGS_PAGE) break;
-      idCursor = batch[batch.length - 1].id;
+      if (batch.length < this.batches.findingsPage) break;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      idCursor = batch.at(-1)!.id;
     }
 
     const componentHashes: Record<string, string[]> = {};
@@ -539,13 +556,13 @@ export class CorrelationService {
     const rowArray = Array.from(rows.entries());
 
     // Interactive transaction: delete stale values then insert new ones in
-    // chunks of VALUE_UPSERT_BATCH to avoid sending one massive createMany
+    // chunks of this.batches.valueUpsertBatch to avoid sending one massive createMany
     // payload to Postgres.
     await this.prisma.$transaction(async (tx) => {
       await tx.assetCorrelationValue.deleteMany({ where: { assetId } });
-      for (let i = 0; i < rowArray.length; i += VALUE_UPSERT_BATCH) {
+      for (let i = 0; i < rowArray.length; i += this.batches.valueUpsertBatch) {
         await tx.assetCorrelationValue.createMany({
-          data: rowArray.slice(i, i + VALUE_UPSERT_BATCH).map(([hash, r]) => ({
+          data: rowArray.slice(i, i + this.batches.valueUpsertBatch).map(([hash, r]) => ({
             assetId,
             sourceId: asset.sourceId,
             label: r.label,
@@ -651,7 +668,7 @@ export class CorrelationService {
         const rows = await this.prisma.correlationPairStaging.findMany({
           where: { runId, id: { gt: cursor } },
           orderBy: { id: 'asc' },
-          take: STREAM_PAGE,
+          take: this.batches.streamPage,
         });
         if (rows.length === 0) break;
 
@@ -713,8 +730,8 @@ export class CorrelationService {
           if (buffer.length >= EDGE_BATCH) await flush();
         }
 
-        cursor = rows[rows.length - 1].id;
-        if (rows.length < STREAM_PAGE) break;
+        cursor = rows.at(-1)!.id;
+        if (rows.length < this.batches.streamPage) break;
       }
       await flush();
 
@@ -987,8 +1004,8 @@ export class CorrelationService {
 
       for (let i = 0; i < assetIds.length; i++) {
         for (let j = i + 1; j < assetIds.length; j++) {
-          const aId = assetIds[i];
-          const bId = assetIds[j];
+          const aId = assetIds[i]!;
+          const bId = assetIds[j]!;
 
           // Incremental: only score pairs where at least one side is touched.
           if (!full && !touchedSet.has(aId) && !touchedSet.has(bId)) continue;
@@ -1123,13 +1140,13 @@ export class CorrelationService {
         },
         select: { id: true, fromId: true, toId: true },
         orderBy: { id: 'asc' },
-        take: STREAM_PAGE,
+        take: this.batches.streamPage,
         ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       });
       if (rows.length === 0) break;
       for (const e of rows) uf.union(e.fromId, e.toId);
-      if (rows.length < STREAM_PAGE) break;
-      cursor = rows[rows.length - 1].id;
+      if (rows.length < this.batches.streamPage) break;
+      cursor = rows.at(-1)!.id;
     }
 
     const components = new Map<string, string[]>();
