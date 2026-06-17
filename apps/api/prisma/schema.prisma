@@ -825,18 +825,13 @@ model CorrelationConfig {
 // (work_mem / on-disk temp files), never in the API process's heap. Rows are
 // scoped by run_id and deleted once that run's edges have been written.
 model CorrelationPairStaging {
-  id            BigInt @id @default(autoincrement())
-  runId         String @map("run_id")
-  aId           String @map("a_id")
-  bId           String @map("b_id")
-  sharedCount   Int    @map("shared_count")
+  id            BigInt  @id @default(autoincrement())
+  runId         String  @map("run_id")
+  aId           String  @map("a_id")
+  bId           String  @map("b_id")
+  sharedCount   Int     @map("shared_count")
   weightedShared Decimal @map("weighted_shared") @db.Decimal(12, 4)
-  sharedByLabel Json   @map("shared_by_label") @db.JsonB
-  // Phonetic-only matched value pairs, keyed by label:
-  // { "person": [{ av: "john smith", bv: "jon smyth", w: 2 }, …] }
-  // Used by the Node streaming loop to replace the initial PHONETIC_DISCOUNT
-  // with an actual Jaro-Winkler score — no extra DB round-trip required.
-  phoneticPairs Json? @map("phonetic_pairs") @db.JsonB
+  sharedByLabel Json    @map("shared_by_label") @db.JsonB
 
   @@index([runId, id])
   @@map("correlation_pair_staging")
