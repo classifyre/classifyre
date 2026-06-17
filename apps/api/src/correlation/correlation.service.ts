@@ -154,6 +154,17 @@ export interface ValueOccurrenceDto {
   }>;
 }
 
+/** Progress callback threaded into long-running recompute passes. */
+type ProgressFn = (
+  msg: string,
+  data?: Record<string, unknown>,
+) => Promise<void>;
+
+/** Yield to the event loop so V8's GC can reclaim objects between batches. */
+function yieldToGC(): Promise<void> {
+  return new Promise<void>((resolve) => setImmediate(resolve));
+}
+
 /**
  * Deterministic asset-correlation engine ("evidence fingerprints"). Derives
  * normalized, correlatable tokens from findings, maintains a reverse index
@@ -173,12 +184,17 @@ export class CorrelationService {
   async recomputeForRunner(
     sourceId: string,
     runnerId: string,
+    onProgress?: ProgressFn,
   ): Promise<CorrelationRunSummary> {
     const touched = await this.prisma.asset.findMany({
       where: { runnerId },
       select: { id: true },
     });
-    return this.recompute(touched.map((a) => a.id));
+    if (onProgress)
+      await onProgress(`Found ${touched.length} asset(s) to fingerprint.`, {
+        total: touched.length,
+      });
+    return this.recompute(touched.map((a) => a.id), false, onProgress);
   }
 
   /** On-demand correlation for a single asset (and its neighbourhood). */
@@ -186,13 +202,63 @@ export class CorrelationService {
     return this.recompute([assetId]);
   }
 
-  /** Recompute correlation for every asset (e.g. after a config change). */
-  async recomputeAll(): Promise<CorrelationRunSummary> {
-    const rows = await this.prisma.asset.findMany({ select: { id: true } });
-    return this.recompute(
-      rows.map((r) => r.id),
+  /**
+   * Recompute correlation for every asset (e.g. after a config change).
+   * Asset IDs are fetched in pages so the Node heap never holds them all at
+   * once. Fingerprint rebuild is also paged with GC yields between pages.
+   */
+  async recomputeAll(onProgress?: ProgressFn): Promise<CorrelationRunSummary> {
+    const cfg = await this.loadConfig();
+    const total = await this.prisma.asset.count();
+    if (onProgress)
+      await onProgress(`Full recompute: ${total} total asset(s).`, { total });
+
+    let valuesIndexed = 0;
+    let processed = 0;
+    const PAGE = 200;
+    let cursor: string | undefined;
+    for (;;) {
+      const rows = await this.prisma.asset.findMany({
+        select: { id: true },
+        orderBy: { id: 'asc' },
+        take: PAGE,
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      });
+      if (rows.length === 0) break;
+      for (const r of rows)
+        valuesIndexed += await this.rebuildAssetValues(r.id, cfg);
+      processed += rows.length;
+      await yieldToGC();
+      if (onProgress)
+        await onProgress(
+          `Fingerprinted ${processed}/${total} assets (${valuesIndexed} values).`,
+          { processed, total, valuesIndexed },
+        );
+      cursor = rows[rows.length - 1].id;
+      if (rows.length < PAGE) break;
+    }
+
+    if (onProgress) await onProgress('Scoring all pairs…');
+    // full=true: workingIds=null, touchFilter=empty — touchedIds is unused in SQL.
+    const { relatedPairs, duplicatePairs, topMatch } = await this.scoreAndLink(
+      [],
+      cfg,
       true,
     );
+    if (onProgress)
+      await onProgress(
+        `Pairs scored: ${relatedPairs} related, ${duplicatePairs} duplicate. Rebuilding clusters…`,
+        { relatedPairs, duplicatePairs },
+      );
+    const clustersTouched = await this.rebuildAllClusters(cfg);
+    return {
+      assetsProcessed: processed,
+      valuesIndexed,
+      relatedPairs,
+      duplicatePairs,
+      clustersTouched,
+      topMatch,
+    };
   }
 
   // ── Tuning config (DB-backed, dynamic labels) ───────────────────────────────
@@ -331,6 +397,7 @@ export class CorrelationService {
   private async recompute(
     touchedIds: string[],
     full = false,
+    onProgress?: ProgressFn,
   ): Promise<CorrelationRunSummary> {
     const empty: CorrelationRunSummary = {
       assetsProcessed: 0,
@@ -346,16 +413,37 @@ export class CorrelationService {
     const cfg = await this.loadConfig();
 
     // 1. Rebuild fingerprints (reverse-index rows + signature) for each asset,
-    //    skipping any values matched by exclusion rules.
+    //    skipping any values matched by exclusion rules. Yield to GC every 50
+    //    assets so long scans don't accumulate unreachable objects in the heap.
     let valuesIndexed = 0;
-    for (const assetId of touchedIds) {
-      valuesIndexed += await this.rebuildAssetValues(assetId, cfg);
+    for (let i = 0; i < touchedIds.length; i++) {
+      valuesIndexed += await this.rebuildAssetValues(touchedIds[i], cfg);
+      if (i > 0 && i % 50 === 0) {
+        await yieldToGC();
+        if (onProgress)
+          await onProgress(
+            `Fingerprinted ${i + 1}/${touchedIds.length} assets (${valuesIndexed} values so far)…`,
+            { processed: i + 1, total: touchedIds.length, valuesIndexed },
+          );
+      }
     }
+
+    if (onProgress)
+      await onProgress('Scoring pairs…', {
+        processed: touchedIds.length,
+        valuesIndexed,
+      });
 
     // 2. Score touched assets against candidates and (re)link them. Index-driven
     //    + batched so it stays bounded in memory on large datasets.
     const { relatedPairs, duplicatePairs, topMatch, affectedAssetIds } =
       await this.scoreAndLink(touchedIds, cfg, full);
+
+    if (onProgress)
+      await onProgress(
+        `Pairs scored: ${relatedPairs} related, ${duplicatePairs} duplicate. Updating clusters…`,
+        { relatedPairs, duplicatePairs },
+      );
 
     // 3. Clusters: a full recompute rebuilds them wholesale; an incremental run
     //    reconciles only the affected components.
