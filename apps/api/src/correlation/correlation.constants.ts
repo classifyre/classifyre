@@ -61,7 +61,7 @@ export const FANOUT_CAP = 2000;
 export const EDGE_BATCH = 2000;
 
 /** Rows fetched per page when streaming the value index / edges. */
-export const STREAM_PAGE = 50000;
+export const STREAM_PAGE = 500;
 
 /** Longest normalized value we index; longer values are skipped as noise. */
 export const MAX_VALUE_LENGTH = 512;
