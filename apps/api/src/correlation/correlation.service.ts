@@ -9,13 +9,17 @@ import {
   EDGE_BATCH,
   FANOUT_CAP,
   MAX_CLUSTER_TOP_VALUES,
+  PHONETIC_DISCOUNT,
+  PHONETIC_MIN_JW,
   RELATED_MIN,
   STREAM_PAGE,
 } from './correlation.constants';
 import {
   hashSet,
+  jaroWinkler,
   normalizeLabel,
   normalizeValue,
+  phoneticFingerprint,
   valueHash,
   weightForLabel,
 } from './value-normalizer';
@@ -154,6 +158,17 @@ export interface ValueOccurrenceDto {
   }>;
 }
 
+/** Progress callback threaded into long-running recompute passes. */
+type ProgressFn = (
+  msg: string,
+  data?: Record<string, unknown>,
+) => Promise<void>;
+
+/** Yield to the event loop so V8's GC can reclaim objects between batches. */
+function yieldToGC(): Promise<void> {
+  return new Promise<void>((resolve) => setImmediate(resolve));
+}
+
 /**
  * Deterministic asset-correlation engine ("evidence fingerprints"). Derives
  * normalized, correlatable tokens from findings, maintains a reverse index
@@ -173,12 +188,17 @@ export class CorrelationService {
   async recomputeForRunner(
     sourceId: string,
     runnerId: string,
+    onProgress?: ProgressFn,
   ): Promise<CorrelationRunSummary> {
     const touched = await this.prisma.asset.findMany({
       where: { runnerId },
       select: { id: true },
     });
-    return this.recompute(touched.map((a) => a.id));
+    if (onProgress)
+      await onProgress(`Found ${touched.length} asset(s) to fingerprint.`, {
+        total: touched.length,
+      });
+    return this.recompute(touched.map((a) => a.id), false, onProgress);
   }
 
   /** On-demand correlation for a single asset (and its neighbourhood). */
@@ -186,13 +206,63 @@ export class CorrelationService {
     return this.recompute([assetId]);
   }
 
-  /** Recompute correlation for every asset (e.g. after a config change). */
-  async recomputeAll(): Promise<CorrelationRunSummary> {
-    const rows = await this.prisma.asset.findMany({ select: { id: true } });
-    return this.recompute(
-      rows.map((r) => r.id),
+  /**
+   * Recompute correlation for every asset (e.g. after a config change).
+   * Asset IDs are fetched in pages so the Node heap never holds them all at
+   * once. Fingerprint rebuild is also paged with GC yields between pages.
+   */
+  async recomputeAll(onProgress?: ProgressFn): Promise<CorrelationRunSummary> {
+    const cfg = await this.loadConfig();
+    const total = await this.prisma.asset.count();
+    if (onProgress)
+      await onProgress(`Full recompute: ${total} total asset(s).`, { total });
+
+    let valuesIndexed = 0;
+    let processed = 0;
+    const PAGE = 200;
+    let cursor: string | undefined;
+    for (;;) {
+      const rows = await this.prisma.asset.findMany({
+        select: { id: true },
+        orderBy: { id: 'asc' },
+        take: PAGE,
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      });
+      if (rows.length === 0) break;
+      for (const r of rows)
+        valuesIndexed += await this.rebuildAssetValues(r.id, cfg);
+      processed += rows.length;
+      await yieldToGC();
+      if (onProgress)
+        await onProgress(
+          `Fingerprinted ${processed}/${total} assets (${valuesIndexed} values).`,
+          { processed, total, valuesIndexed },
+        );
+      cursor = rows[rows.length - 1].id;
+      if (rows.length < PAGE) break;
+    }
+
+    if (onProgress) await onProgress('Scoring all pairs…');
+    // full=true: workingIds=null, touchFilter=empty — touchedIds is unused in SQL.
+    const { relatedPairs, duplicatePairs, topMatch } = await this.scoreAndLink(
+      [],
+      cfg,
       true,
     );
+    if (onProgress)
+      await onProgress(
+        `Pairs scored: ${relatedPairs} related, ${duplicatePairs} duplicate. Rebuilding clusters…`,
+        { relatedPairs, duplicatePairs },
+      );
+    const clustersTouched = await this.rebuildAllClusters(cfg);
+    return {
+      assetsProcessed: processed,
+      valuesIndexed,
+      relatedPairs,
+      duplicatePairs,
+      clustersTouched,
+      topMatch,
+    };
   }
 
   // ── Tuning config (DB-backed, dynamic labels) ───────────────────────────────
@@ -331,6 +401,7 @@ export class CorrelationService {
   private async recompute(
     touchedIds: string[],
     full = false,
+    onProgress?: ProgressFn,
   ): Promise<CorrelationRunSummary> {
     const empty: CorrelationRunSummary = {
       assetsProcessed: 0,
@@ -346,16 +417,37 @@ export class CorrelationService {
     const cfg = await this.loadConfig();
 
     // 1. Rebuild fingerprints (reverse-index rows + signature) for each asset,
-    //    skipping any values matched by exclusion rules.
+    //    skipping any values matched by exclusion rules. Yield to GC every 50
+    //    assets so long scans don't accumulate unreachable objects in the heap.
     let valuesIndexed = 0;
-    for (const assetId of touchedIds) {
-      valuesIndexed += await this.rebuildAssetValues(assetId, cfg);
+    for (let i = 0; i < touchedIds.length; i++) {
+      valuesIndexed += await this.rebuildAssetValues(touchedIds[i], cfg);
+      if (i > 0 && i % 50 === 0) {
+        await yieldToGC();
+        if (onProgress)
+          await onProgress(
+            `Fingerprinted ${i + 1}/${touchedIds.length} assets (${valuesIndexed} values so far)…`,
+            { processed: i + 1, total: touchedIds.length, valuesIndexed },
+          );
+      }
     }
+
+    if (onProgress)
+      await onProgress('Scoring pairs…', {
+        processed: touchedIds.length,
+        valuesIndexed,
+      });
 
     // 2. Score touched assets against candidates and (re)link them. Index-driven
     //    + batched so it stays bounded in memory on large datasets.
     const { relatedPairs, duplicatePairs, topMatch, affectedAssetIds } =
       await this.scoreAndLink(touchedIds, cfg, full);
+
+    if (onProgress)
+      await onProgress(
+        `Pairs scored: ${relatedPairs} related, ${duplicatePairs} duplicate. Updating clusters…`,
+        { relatedPairs, duplicatePairs },
+      );
 
     // 3. Clusters: a full recompute rebuilds them wholesale; an incremental run
     //    reconciles only the affected components.
@@ -404,6 +496,7 @@ export class CorrelationService {
         detectorType: DetectorType;
         customDetectorKey: string | null;
         normalizedValue: string;
+        phoneticHash: string | null;
       }
     >();
     for (const f of findings) {
@@ -419,6 +512,7 @@ export class CorrelationService {
         detectorType: f.detectorType,
         customDetectorKey: f.customDetectorKey ?? null,
         normalizedValue: normalized,
+        phoneticHash: phoneticFingerprint(label, normalized),
       });
     }
 
@@ -445,6 +539,7 @@ export class CorrelationService {
                 customDetectorKey: r.customDetectorKey,
                 normalizedValue: r.normalizedValue,
                 valueHash: hash,
+                phoneticHash: r.phoneticHash,
               })),
             }),
           ]
@@ -550,19 +645,48 @@ export class CorrelationService {
         for (const r of rows) {
           const a = totals.get(r.aId);
           const b = totals.get(r.bId);
-          const totalA = a?.weight ?? 0;
-          const totalB = b?.weight ?? 0;
-          const countA = a?.count ?? 0;
-          const countB = b?.count ?? 0;
-          const weightedShared = Number(r.weightedShared);
           const sharedCount = r.sharedCount;
 
-          const denom = totalA + totalB;
+          // Use fanout-filtered totals so numerator and denominator use the
+          // same population (exact + phonetic non-fanout values only).
+          const nfWeightA = a?.nfWeight ?? 0;
+          const nfWeightB = b?.nfWeight ?? 0;
+          const nfCountA = a?.nfCount ?? 0;
+          const nfCountB = b?.nfCount ?? 0;
+
+          // Refine phonetic-only matches: the SQL staged them at
+          // weight × PHONETIC_DISCOUNT. Replace that with weight × JW(aVal, bVal)
+          // so the final Dice score reflects actual string similarity, not a
+          // fixed conservative estimate. Pairs below PHONETIC_MIN_JW contribute
+          // zero weight (accidental phonetic collision, e.g. "john" ↔ "jane").
+          let weightedShared = Number(r.weightedShared);
+          const phoneticPairs = r.phoneticPairs as Record<
+            string,
+            Array<{ av: string; bv: string; w: number }>
+          > | null;
+          if (phoneticPairs) {
+            for (const pairs of Object.values(phoneticPairs)) {
+              for (const pp of pairs) {
+                const jw = jaroWinkler(pp.av, pp.bv);
+                // The SQL already added weight × PHONETIC_DISCOUNT; replace
+                // it with weight × max(jw, 0) when jw ≥ threshold, else 0.
+                const replacement =
+                  jw >= PHONETIC_MIN_JW ? pp.w * jw : 0;
+                weightedShared += replacement - pp.w * PHONETIC_DISCOUNT;
+              }
+            }
+            // Clamp to non-negative (shouldn't go negative, but guard it).
+            if (weightedShared < 0) weightedShared = 0;
+          }
+
+          const denom = nfWeightA + nfWeightB;
           const weighted = denom === 0 ? 0 : (2 * weightedShared) / denom;
-          const union = countA + countB - sharedCount;
+          const union = nfCountA + nfCountB - sharedCount;
           const jaccard = union === 0 ? 0 : sharedCount / union;
           const exact =
-            sharedCount > 0 && sharedCount === countA && sharedCount === countB;
+            sharedCount > 0 &&
+            sharedCount === nfCountA &&
+            sharedCount === nfCountB;
           if (weighted < cfg.relatedMin && !exact) continue;
 
           const isDuplicate = weighted >= cfg.duplicateMin || exact;
@@ -583,6 +707,7 @@ export class CorrelationService {
               sharedByLabel: byLabel,
               exact,
               reasons,
+              ...(phoneticPairs ? { phoneticMatches: phoneticPairs } : {}),
             },
           });
           affected.add(r.aId);
@@ -617,30 +742,73 @@ export class CorrelationService {
     }
   }
 
-  /** Per-asset weight total + value count, scoped to `assetIds` (null = all). */
+  /**
+   * Per-asset totals scoped to `assetIds` (null = all). Returns both the
+   * all-values totals AND fanout-filtered totals so the scoring step can use
+   * consistent populations for numerator and denominator.
+   *
+   * The fanout filter mirrors the one in stagePairAggregates: values shared by
+   * more than FANOUT_CAP assets within the same scope are excluded from
+   * sharedCount/weightedShared in the staging table, so they must also be
+   * excluded from the denominator (and the `exact` check) to avoid inflating
+   * the denominator and deflating similarity scores.
+   */
   private async loadAssetTotals(
     assetIds: string[] | null,
     cfg: ResolvedConfig,
-  ): Promise<Map<string, { weight: number; count: number }>> {
+  ): Promise<
+    Map<
+      string,
+      { weight: number; count: number; nfWeight: number; nfCount: number }
+    >
+  > {
     const weightsJson = JSON.stringify(cfg.rawWeights);
-    const scope = assetIds
+    // Two separate scope fragments are needed — one for the CTE, one for the
+    // outer join — because Prisma parameterises each ${assetIds} independently.
+    const scopeCte = assetIds
       ? Prisma.sql`WHERE asset_id = ANY(${assetIds})`
       : Prisma.empty;
+    const scopeMain = assetIds
+      ? Prisma.sql`WHERE v.asset_id = ANY(${assetIds})`
+      : Prisma.empty;
+
     const rows = await this.prisma.$queryRaw<
-      Array<{ asset_id: string; total_weight: string; value_count: bigint }>
+      Array<{
+        asset_id: string;
+        total_weight: string;
+        value_count: bigint;
+        nf_weight: string;
+        nf_count: bigint;
+      }>
     >(Prisma.sql`
-      SELECT asset_id,
-             SUM(COALESCE((${weightsJson}::jsonb ->> label)::numeric, ${cfg.defaultWeight})) AS total_weight,
-             COUNT(*) AS value_count
-      FROM asset_correlation_values
-      ${scope}
-      GROUP BY asset_id
+      WITH hash_counts AS (
+        SELECT value_hash, COUNT(*) AS owners
+        FROM asset_correlation_values
+        ${scopeCte}
+        GROUP BY value_hash
+      )
+      SELECT v.asset_id,
+             SUM(COALESCE((${weightsJson}::jsonb ->> v.label)::numeric, ${cfg.defaultWeight})) AS total_weight,
+             COUNT(*) AS value_count,
+             SUM(COALESCE((${weightsJson}::jsonb ->> v.label)::numeric, ${cfg.defaultWeight}))
+               FILTER (WHERE hc.owners <= ${FANOUT_CAP}) AS nf_weight,
+             COUNT(*) FILTER (WHERE hc.owners <= ${FANOUT_CAP}) AS nf_count
+      FROM asset_correlation_values v
+      JOIN hash_counts hc ON hc.value_hash = v.value_hash
+      ${scopeMain}
+      GROUP BY v.asset_id
     `);
-    const map = new Map<string, { weight: number; count: number }>();
+
+    const map = new Map<
+      string,
+      { weight: number; count: number; nfWeight: number; nfCount: number }
+    >();
     for (const r of rows) {
       map.set(r.asset_id, {
         weight: Number(r.total_weight),
         count: Number(r.value_count),
+        nfWeight: Number(r.nf_weight ?? 0),
+        nfCount: Number(r.nf_count ?? 0),
       });
     }
     return map;
@@ -649,10 +817,19 @@ export class CorrelationService {
   /**
    * Compute pairwise overlap (shared count, weighted-shared sum, per-label
    * breakdown) for every asset pair in the working set as a single
-   * INSERT ... SELECT ... GROUP BY, staged under `runId`. This is the
-   * self-join that used to be a Node-side reverse index — running it as one
-   * SQL statement lets Postgres spill any oversized intermediate state to
-   * disk instead of the API process's heap.
+   * INSERT … SELECT … GROUP BY, staged under `runId`. Runs entirely in
+   * Postgres so heavy intermediate state spills to disk rather than the API
+   * process heap.
+   *
+   * Two blocking keys are used:
+   *  • exact match   — `a.value_hash = b.value_hash`
+   *  • phonetic match — `a.phonetic_hash = b.phonetic_hash` (non-null, non-exact)
+   *
+   * The two branches are mutually exclusive (`value_hash ≠ b.value_hash` in
+   * the phonetic branch) so no pair is double-counted. Phonetic-only matches
+   * receive an initial `weight × PHONETIC_DISCOUNT` contribution; the Node
+   * streaming loop later refines this with the actual Jaro-Winkler score
+   * using the `phonetic_pairs` JSONB stored alongside each staging row.
    */
   private async stagePairAggregates(
     runId: string,
@@ -665,26 +842,22 @@ export class CorrelationService {
     const scope = workingIds
       ? Prisma.sql`WHERE v.asset_id = ANY(${workingIds})`
       : Prisma.empty;
-    // Every pair needs at least one touched member; on a full recompute
-    // touchedIds is every asset, so the join already satisfies this and the
-    // filter is skipped to avoid evaluating it per row.
     const touchFilter = full
       ? Prisma.empty
       : Prisma.sql`WHERE a.asset_id = ANY(${touchedIds}) OR b.asset_id = ANY(${touchedIds})`;
 
     await this.prisma.$executeRaw(Prisma.sql`
       WITH raw AS (
-        SELECT v.asset_id, v.value_hash, v.label,
+        SELECT v.asset_id, v.value_hash, v.phonetic_hash, v.label,
+               v.normalized_value,
                COALESCE((${weightsJson}::jsonb ->> v.label)::numeric, ${cfg.defaultWeight}) AS weight
         FROM asset_correlation_values v
         ${scope}
       ),
-      -- Values shared by more than FANOUT_CAP assets are non-discriminating
-      -- (e.g. a generic country code) and are excluded from the join: pairing
-      -- every owner of such a value produces spurious "exact duplicate" edges
-      -- between otherwise-unrelated assets. This does NOT touch asset weight
-      -- totals (loadAssetTotals) — only which *shared* values count as
-      -- pairwise evidence.
+      -- Hub values (shared by > FANOUT_CAP assets) are excluded from the
+      -- join — they're non-discriminating and produce spurious "exact
+      -- duplicate" edges. Asset weight totals (loadAssetTotals) use the same
+      -- filter so numerator and denominator stay consistent.
       hash_counts AS (
         SELECT value_hash, COUNT(*) AS owners FROM raw GROUP BY value_hash
       ),
@@ -694,16 +867,56 @@ export class CorrelationService {
         WHERE hc.owners <= ${FANOUT_CAP}
       ),
       pair_label AS (
-        SELECT a.asset_id AS a_id, b.asset_id AS b_id, a.label AS label,
-               COUNT(*) AS cnt, SUM(a.weight) AS wsum
+        SELECT
+          a.asset_id   AS a_id,
+          b.asset_id   AS b_id,
+          a.label      AS label,
+          COUNT(*)     AS cnt,
+          -- Exact match: full weight. Phonetic-only: PHONETIC_DISCOUNT × weight
+          -- (Node refines this to the actual Jaro-Winkler score per pair).
+          SUM(CASE
+            WHEN a.value_hash = b.value_hash THEN a.weight
+            ELSE a.weight * ${PHONETIC_DISCOUNT}
+          END)         AS wsum,
+          -- Collect phonetic-only match values for Jaro-Winkler refinement.
+          -- NULL for pairs that are exclusively exact-matched.
+          jsonb_agg(
+            jsonb_build_object(
+              'av', a.normalized_value,
+              'bv', b.normalized_value,
+              'w',  a.weight
+            )
+          ) FILTER (WHERE a.value_hash != b.value_hash) AS phonetic_vals
         FROM av a
-        JOIN av b ON a.value_hash = b.value_hash AND a.asset_id < b.asset_id
+        JOIN av b ON (
+          -- Branch 1: exact hash match.
+          a.value_hash = b.value_hash
+          -- Branch 2: phonetic match only (mutually exclusive with branch 1).
+          OR (
+            a.phonetic_hash IS NOT NULL
+            AND a.phonetic_hash = b.phonetic_hash
+            AND a.value_hash  != b.value_hash
+          )
+        ) AND a.asset_id < b.asset_id
         ${touchFilter}
         GROUP BY a.asset_id, b.asset_id, a.label
       )
       INSERT INTO correlation_pair_staging
-        (run_id, a_id, b_id, shared_count, weighted_shared, shared_by_label)
-      SELECT ${runId}, a_id, b_id, SUM(cnt)::int, SUM(wsum), jsonb_object_agg(label, cnt)
+        (run_id, a_id, b_id, shared_count, weighted_shared, shared_by_label, phonetic_pairs)
+      SELECT
+        ${runId},
+        a_id,
+        b_id,
+        SUM(cnt)::int,
+        SUM(wsum),
+        jsonb_object_agg(label, cnt),
+        -- Merge per-label phonetic arrays into a single { label: [...] } object.
+        -- NULL when no phonetic-only matches exist for this pair.
+        CASE WHEN bool_or(phonetic_vals IS NOT NULL)
+          THEN jsonb_object_agg(label, phonetic_vals)
+               FILTER (WHERE phonetic_vals IS NOT NULL)
+          ELSE NULL
+        END
       FROM pair_label
       GROUP BY a_id, b_id
     `);
