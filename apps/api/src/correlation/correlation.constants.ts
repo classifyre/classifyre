@@ -60,9 +60,6 @@ export const FANOUT_CAP = 2000;
 /** Flush correlation edges to the DB in batches of this size (memory guard). */
 export const EDGE_BATCH = 2000;
 
-/** Rows fetched per page when streaming the value index / edges. */
-export const STREAM_PAGE = 500;
-
 /** Longest normalized value we index; longer values are skipped as noise. */
 export const MAX_VALUE_LENGTH = 512;
 
@@ -84,11 +81,6 @@ export const PHONETIC_FANOUT_CAP = 50;
  */
 export const PHONETIC_MIN_JW = 0.75;
 
-/** Max findings fetched per DB round-trip when building a value index. */
-export const FINDINGS_PAGE = 1000;
-
-/** Max rows per createMany call inside an asset's value rebuild transaction. */
-export const VALUE_UPSERT_BATCH = 500;
 
 /**
  * Labels for which phonetic matching is meaningful. Structured identifiers
