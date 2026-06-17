@@ -60,9 +60,6 @@ export const FANOUT_CAP = 2000;
 /** Flush correlation edges to the DB in batches of this size (memory guard). */
 export const EDGE_BATCH = 2000;
 
-/** Rows fetched per page when streaming the value index / edges. */
-export const STREAM_PAGE = 500;
-
 /** Longest normalized value we index; longer values are skipped as noise. */
 export const MAX_VALUE_LENGTH = 512;
 
@@ -70,12 +67,12 @@ export const MAX_VALUE_LENGTH = 512;
 export const MAX_CLUSTER_TOP_VALUES = 12;
 
 /**
- * Initial weight multiplier for a phonetic-only match (sounds alike but
- * normalizes differently, e.g. "smyth" ↔ "smith"). Applied in SQL so the
- * staging row already carries a conservative estimate; the Node streaming
- * loop then refines it to the actual Jaro-Winkler score.
+ * Maximum number of assets allowed in a single phonetic group
+ * (a "label + phonetic_hash" bucket). Groups larger than this are skipped:
+ * common phonetic codes (e.g. "JN" shared by all John/Jon/Jan documents) are
+ * non-discriminating and would produce O(N²) pair comparisons.
  */
-export const PHONETIC_DISCOUNT = 0.8;
+export const PHONETIC_FANOUT_CAP = 50;
 
 /**
  * Minimum Jaro-Winkler score for a phonetic match to count as evidence.
@@ -83,6 +80,7 @@ export const PHONETIC_DISCOUNT = 0.8;
  * (e.g. "john" ↔ "jane" both map to "JN") and should not contribute weight.
  */
 export const PHONETIC_MIN_JW = 0.75;
+
 
 /**
  * Labels for which phonetic matching is meaningful. Structured identifiers

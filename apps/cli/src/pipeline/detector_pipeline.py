@@ -109,7 +109,10 @@ class DetectorPipeline:
 
         scan_started = datetime.now(UTC)
         ocr_enabled = self.source.ocr_enabled()
-        text_content_type = self._text_content_type_for_asset(asset.asset_type, ocr_enabled)
+        transcription_enabled = self.source.transcription_enabled()
+        text_content_type = self._text_content_type_for_asset(
+            asset.asset_type, ocr_enabled, transcription_enabled
+        )
         link_content = self._build_links_payload(asset.links)
 
         text_detectors = []
@@ -727,6 +730,7 @@ class DetectorPipeline:
         self,
         asset_type: OutputAssetType,
         ocr_enabled: bool,
+        transcription_enabled: bool = False,
     ) -> str | None:
         mapping = {
             OutputAssetType.TXT: "text/plain",
@@ -736,6 +740,8 @@ class DetectorPipeline:
         if asset_type in mapping:
             return mapping[asset_type]
         if ocr_enabled and asset_type in {OutputAssetType.IMAGE, OutputAssetType.BINARY}:
+            return "text/plain"
+        if transcription_enabled and asset_type in {OutputAssetType.AUDIO, OutputAssetType.VIDEO}:
             return "text/plain"
         return None
 
