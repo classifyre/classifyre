@@ -61,10 +61,47 @@ export const FANOUT_CAP = 2000;
 export const EDGE_BATCH = 2000;
 
 /** Rows fetched per page when streaming the value index / edges. */
-export const STREAM_PAGE = 50000;
+export const STREAM_PAGE = 500;
 
 /** Longest normalized value we index; longer values are skipped as noise. */
 export const MAX_VALUE_LENGTH = 512;
 
 /** How many common values to precompute into AssetCluster.topValues for the UI. */
 export const MAX_CLUSTER_TOP_VALUES = 12;
+
+/**
+ * Initial weight multiplier for a phonetic-only match (sounds alike but
+ * normalizes differently, e.g. "smyth" ↔ "smith"). Applied in SQL so the
+ * staging row already carries a conservative estimate; the Node streaming
+ * loop then refines it to the actual Jaro-Winkler score.
+ */
+export const PHONETIC_DISCOUNT = 0.8;
+
+/**
+ * Minimum Jaro-Winkler score for a phonetic match to count as evidence.
+ * Below this threshold the pair probably share a phonetic code by accident
+ * (e.g. "john" ↔ "jane" both map to "JN") and should not contribute weight.
+ */
+export const PHONETIC_MIN_JW = 0.75;
+
+/**
+ * Labels for which phonetic matching is meaningful. Structured identifiers
+ * (email, phone, SSN, IBAN, URLs, IPs …) are excluded: their normalised form
+ * is already canonical and phonetics would produce false positives.
+ * Custom/unknown labels are considered phonetic-eligible by default.
+ */
+export const NON_PHONETIC_LABELS = new Set([
+  'email',
+  'phone',
+  'url',
+  'domain',
+  'ip',
+  'credit_card',
+  'iban',
+  'ssn',
+  'passport',
+  'national_id',
+  'api_key',
+  'secret',
+  'country',
+]);
