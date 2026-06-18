@@ -340,6 +340,10 @@ api:
       # to hf.co, which significantly increases download rate limits and avoids
       # the "unauthenticated requests" warning from the huggingface-hub library.
       #
+      # When this value is set, the Hugging Face token field in the web UI
+      # Settings page becomes read-only and disabled — the instance-level token
+      # always takes priority over any user-configured token.
+      #
       # Create the Secret manually (or via your preferred tool — SealedSecrets,
       # External Secrets, SOPS, etc.) in the same namespace as the CLI jobs:
       #

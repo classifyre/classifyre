@@ -181,6 +181,20 @@
       "aiBadge": "KI",
       "aiBadgeTooltip": "Vom Ermittlungs-Autopilot ausgeführt",
       "saveGuidance": "Leitlinien speichern"
+    },
+    "huggingFace": {
+      "heading": "Hugging Face-Token",
+      "desc": "Legen Sie einen Hugging Face-Token fest, um Modell-Downloads zu authentifizieren. Der Token wird verschlüsselt gespeichert und an CLI-Jobs übergeben.",
+      "instanceManaged": "Ein instanzweites HF_TOKEN ist über ein Kubernetes-Secret konfiguriert. Benutzerkonfigurierte Tokens werden nicht verwendet, wenn ein Instanz-Token gesetzt ist.",
+      "instanceActive": "Instanzweites HF_TOKEN ist aktiv. Die Benutzer-Token-Konfiguration ist deaktiviert.",
+      "tokenConfigured": "Token konfiguriert",
+      "remove": "Entfernen",
+      "updateToken": "Token aktualisieren",
+      "tokenPlaceholder": "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "savedToast": "Hugging Face-Token gespeichert",
+      "removedToast": "Hugging Face-Token entfernt",
+      "saveFailedToast": "Hugging Face-Token konnte nicht gespeichert werden",
+      "removeFailedToast": "Hugging Face-Token konnte nicht entfernt werden"
     }
   },
   "sources": {
