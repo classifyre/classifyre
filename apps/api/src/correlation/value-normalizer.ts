@@ -3,7 +3,9 @@ import {
   DEFAULT_LABEL_WEIGHT,
   LABEL_WEIGHTS,
   MAX_VALUE_LENGTH,
+  NON_PHONETIC_LABELS,
 } from './correlation.constants';
+import { jaroWinkler, metaphoneCode, tokenize } from './fuzzy';
 
 /**
  * Label-specific normalization is the *only* place the correlation engine knows
@@ -71,3 +73,51 @@ export function hashSet(hashes: Iterable<string>): string {
   const sorted = Array.from(new Set(hashes)).sort();
   return sha256(sorted.join('|'));
 }
+
+/**
+ * True when phonetic matching makes sense for `label`. Structured identifiers
+ * (email, phone, SSN, …) are excluded; person names, addresses, and all
+ * custom/unknown labels are eligible.
+ */
+export function isPhoneticEligible(label: string): boolean {
+  return !NON_PHONETIC_LABELS.has(normalizeLabel(label));
+}
+
+/**
+ * Compute a phonetic fingerprint for a text value:
+ *  1. Tokenize into words (AggressiveTokenizer)
+ *  2. Map each token through DoubleMetaphone → primary code
+ *  3. Sort codes (order-independent: "John Smith" ≡ "Smith John")
+ *  4. SHA-256 of joined codes
+ *
+ * Returns null when the label is not phonetic-eligible or no valid codes
+ * could be derived (e.g. a purely numeric value).
+ *
+ * Same-sounding names share a phoneticHash even with different spellings:
+ *   "John Smith"  → JN|SM0  → hash H
+ *   "Jon Smyth"   → JN|SM0  → hash H  ← same candidate ✓
+ *   "Smith, John" → SM0|JN  (sorted to JN|SM0) → hash H ✓
+ */
+export function phoneticFingerprint(
+  label: string,
+  normalizedValue: string,
+): string | null {
+  if (!isPhoneticEligible(label)) return null;
+  const tokens = tokenize(normalizedValue);
+  if (tokens.length === 0) return null;
+
+  const codes = tokens
+    .map((t) => metaphoneCode(t))
+    .filter((c): c is string => c !== null)
+    .sort();
+
+  if (codes.length === 0) return null;
+  return sha256(codes.join('|'));
+}
+
+/**
+ * Jaro-Winkler similarity in [0, 1] between two normalised strings.
+ * Used after phonetic blocking to score the quality of a fuzzy match.
+ * Re-exported here so callers only need one import from this module.
+ */
+export { jaroWinkler };
