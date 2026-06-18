@@ -89,14 +89,27 @@ def _get_whisper_model() -> tuple[object, str | None]:
                 detail="Transcription requires the faster-whisper optional dependency.",
             )
             cfg = get_whisper_config()
+
+            import os
+
+            explicit_model = os.environ.get("CLASSIFYRE_WHISPER_MODEL", "").strip()
+            if explicit_model:
+                model_name = cfg.model
+                model_source = "env"
+            else:
+                available_mb = _whisper_available_mb()
+                model_name = select_whisper_model(available_mb)
+                model_source = f"auto ({available_mb} MB available)"
+
             _whisper_state.model = whisper_module.WhisperModel(
-                cfg.model,
+                model_name,
                 device=cfg.device,
                 compute_type=cfg.compute_type,
             )
             logger.info(
-                "Loaded faster-whisper model %s (device=%s, compute_type=%s)",
-                cfg.model,
+                "Loaded faster-whisper model %s [%s] (device=%s, compute_type=%s)",
+                model_name,
+                model_source,
                 cfg.device,
                 cfg.compute_type,
             )
@@ -151,6 +164,51 @@ def _pcm_to_wav(pcm_bytes: bytes, sample_rate: int) -> bytes:
 
 _AUDIO_CHUNK_SECONDS = 600  # 10-minute chunks → ~38 MB decoded audio per chunk
 _TARGET_SAMPLE_RATE = 16_000
+
+# ---------------------------------------------------------------------------
+# Memory-aware model selection
+# ---------------------------------------------------------------------------
+
+# Budget to reserve for the detector worker process (presidio + spaCy) and
+# OS / Python overhead, before the remainder is available to the Whisper model.
+_DETECTOR_WORKER_RESERVE_MB = 1536  # ~1 GB presidio/spaCy + 512 MB headroom
+_OS_RESERVE_MB = 256
+
+# (model_name, min_available_mb) ordered largest → smallest.
+# min_available_mb accounts for beam-search working memory on top of the model
+# weights: tiny≈75 MB, base≈150 MB, small≈500 MB, medium≈1.5 GB.
+_WHISPER_MODEL_TIERS: tuple[tuple[str, int], ...] = (
+    ("medium", 2560),  # needs ≥ 2.5 GB available
+    ("small", 1000),   # needs ≥ 1 GB available
+    ("base", 512),     # needs ≥ 512 MB available
+    ("tiny", 0),       # always fits
+)
+
+
+def select_whisper_model(available_mb: int) -> str:
+    """Return the largest Whisper model that fits in *available_mb* of RAM.
+
+    Mirrors the logic of ``compute_pool_workers`` in the detector worker pool:
+    query the cgroup-aware memory budget, subtract reserved headroom, then pick
+    the best model tier that fits.  Callers pass *available_mb* so the function
+    is unit-testable without mocking cgroup files.
+
+    Example: a 4 GB pod with one detector worker has
+    ``4096 - 1536 - 256 = 2304 MB`` available → auto-selects "small" instead
+    of the default "medium", keeping peak RSS safely under the pod limit.
+    """
+    for model, threshold in _WHISPER_MODEL_TIERS:
+        if available_mb >= threshold:
+            return model
+    return "tiny"
+
+
+def _whisper_available_mb() -> int:
+    """Return MB available to the Whisper model after reserving headroom."""
+    from .resources import get_effective_memory_mb
+
+    total = get_effective_memory_mb()
+    return max(0, total - _DETECTOR_WORKER_RESERVE_MB - _OS_RESERVE_MB)
 
 
 def _split_audio_chunks(

@@ -32,6 +32,16 @@ class ParsedContentProvider:
         if saw_text:
             return
 
+        # If fetch_content_pages already ran the full extraction pipeline for
+        # this asset (tracked via _content_pages_processed), skip the fallback
+        # iter_asset_pages call.  Without this, an all-silence audio file would
+        # trigger a redundant second transcription pass.
+        pages_processed: set[str] | None = getattr(
+            self._source, "_content_pages_processed", None
+        )
+        if isinstance(pages_processed, set) and asset_id in pages_processed:
+            return
+
         result = await self._source.fetch_content_bytes(asset_id)
         if result is None:
             return
