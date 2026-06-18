@@ -9,8 +9,8 @@ The Settings page controls instance-wide preferences and integrations. It is
 organised into three tabs:
 
 | Tab | What it controls |
-|---|---|
-| **General** | Instance locale (language, timezone, time format), AI assistant toggle and default model |
+|---|---|---|
+| **General** | Instance locale (language, timezone, time format), AI assistant toggle and default model, Hugging Face token |
 | **AI Providers** | API credentials for LLM providers used by the AI assistant and AI-powered custom detectors |
 | **MCP Server** | MCP endpoint configuration, bearer tokens, and client setup guides |
 
@@ -45,6 +45,20 @@ The AI assistant toggle enables or disables AI-powered features across the
 entire instance. When enabled, you must select a **default AI provider** and
 model that the assistant uses for all AI interactions. This default provider
 is configured separately on the AI Providers tab.
+
+### Hugging Face token
+
+A Hugging Face token authenticates model downloads from the Hugging Face Hub.
+It is required for **audio transcription** and **Hugging Face custom detectors**
+— without it, downloads fall back to unauthenticated requests with lower rate
+limits and slower speeds.
+
+The token can be provided in two ways: **instance-level** (via the Helm chart
+on Kubernetes deployments) or **user-configured** (via the Settings UI). When
+an instance-level token is set, the UI field is disabled and user tokens are
+ignored.
+
+See [Instance Settings](/settings/instance-settings) for full details.
 
 ---
 

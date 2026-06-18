@@ -181,6 +181,20 @@
       "aiBadge": "AI",
       "aiBadgeTooltip": "Done by Investigation Autopilot",
       "saveGuidance": "Save guidance"
+    },
+    "huggingFace": {
+      "heading": "Hugging Face token",
+      "desc": "Set a Hugging Face token to authenticate model downloads. The token is encrypted at rest and passed to CLI jobs.",
+      "instanceManaged": "An instance-level HF_TOKEN is configured via Kubernetes Secret. User-configured tokens are not used when an instance token is set.",
+      "instanceActive": "Instance-level HF_TOKEN is active. User token configuration is disabled.",
+      "tokenConfigured": "Token configured",
+      "remove": "Remove",
+      "updateToken": "Update token",
+      "tokenPlaceholder": "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "savedToast": "Hugging Face token saved",
+      "removedToast": "Hugging Face token removed",
+      "saveFailedToast": "Failed to save Hugging Face token",
+      "removeFailedToast": "Failed to remove Hugging Face token"
     }
   },
   "sources": {

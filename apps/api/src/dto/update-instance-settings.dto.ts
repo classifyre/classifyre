@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  MinLength,
 } from 'class-validator';
 import {
   INSTANCE_LANGUAGE_VALUES,
@@ -110,4 +111,16 @@ export class UpdateInstanceSettingsDto {
   @IsString()
   @MaxLength(4000)
   autopilotCaseGuidance?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Hugging Face token to set. Pass a token value to store (encrypted at rest). ' +
+      'Pass null or an empty string to clear the stored token. ' +
+      'Ignored when an instance-level HF_TOKEN is configured.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  hfToken?: string | null;
 }
