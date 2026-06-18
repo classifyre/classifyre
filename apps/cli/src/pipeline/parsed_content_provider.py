@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncGenerator
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
 from ..sources.base import BaseSource
+
+logger = logging.getLogger(__name__)
 
 
 class ParsedContentProvider:
@@ -36,17 +39,26 @@ class ParsedContentProvider:
         # this asset (tracked via _content_pages_processed), skip the fallback
         # iter_asset_pages call.  Without this, an all-silence audio file would
         # trigger a redundant second transcription pass.
-        pages_processed: set[str] | None = getattr(
-            self._source, "_content_pages_processed", None
-        )
+        pages_processed: set[str] | None = getattr(self._source, "_content_pages_processed", None)
         if isinstance(pages_processed, set) and asset_id in pages_processed:
+            logger.info(
+                "fetch_text_pages(%s): source already processed, skipping fallback",
+                asset_id,
+            )
             return
 
         result = await self._source.fetch_content_bytes(asset_id)
         if result is None:
+            logger.info("fetch_text_pages(%s): fetch_content_bytes returned None", asset_id)
             return
 
         raw_bytes, mime = result
+        logger.info(
+            "fetch_text_pages(%s): fallback iter_asset_pages path (%s, %d bytes)",
+            asset_id,
+            mime,
+            len(raw_bytes),
+        )
         pages: list[str] = await asyncio.to_thread(
             list,
             self._source.iter_asset_pages(raw_bytes, mime),

@@ -179,9 +179,9 @@ _OS_RESERVE_MB = 256
 # weights: tiny≈75 MB, base≈150 MB, small≈500 MB, medium≈1.5 GB.
 _WHISPER_MODEL_TIERS: tuple[tuple[str, int], ...] = (
     ("medium", 2560),  # needs ≥ 2.5 GB available
-    ("small", 1000),   # needs ≥ 1 GB available
-    ("base", 512),     # needs ≥ 512 MB available
-    ("tiny", 0),       # always fits
+    ("small", 1000),  # needs ≥ 1 GB available
+    ("base", 512),  # needs ≥ 512 MB available
+    ("tiny", 0),  # always fits
 )
 
 

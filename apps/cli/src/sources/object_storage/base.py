@@ -634,29 +634,68 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         raw_bytes = self._bytes_cache.get(asset_id)
         mime = self._mime_cache.get(asset_id, "")
 
+        logger.info(
+            "fetch_content_pages(%s): raw_bytes=%s mime=%s processed=%s",
+            asset_id,
+            f"{len(raw_bytes)} bytes" if raw_bytes is not None else "MISS",
+            mime or "MISS",
+            asset_id in self._content_pages_processed,
+        )
+
         if raw_bytes is not None:
             sampling = self.config.sampling
             batch_size = int(sampling.rows_per_page or 100)
             include_col_names = bool(
                 sampling.include_column_names if sampling.include_column_names is not None else True
             )
-            # Run the (potentially blocking) file parsing in a thread so pyarrow /
-            # pdfplumber can't freeze the event loop during large file iteration.
-            pages: list[str] = await asyncio.to_thread(
-                list,
-                self.iter_asset_pages(
-                    raw_bytes,
-                    mime,
-                    batch_size,
-                    include_col_names,
-                    file_name=self._file_name_for_asset_id(asset_id),
-                ),
+            file_name = self._file_name_for_asset_id(asset_id)
+
+            # Stream pages from a thread instead of materializing via list().
+            # For transcription this lets detectors start working on the first
+            # chunk while later chunks are still being transcribed.
+            loop = asyncio.get_running_loop()
+            queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+            exc_info: list[BaseException | None] = [None]
+
+            page_count: int = 0
+
+            def _produce() -> None:
+                nonlocal page_count
+                try:
+                    for page in self.iter_asset_pages(
+                        raw_bytes,
+                        mime,
+                        batch_size,
+                        include_col_names,
+                        file_name=file_name,
+                    ):
+                        loop.call_soon_threadsafe(queue.put_nowait, page)
+                        page_count += 1
+                except BaseException as exc:
+                    exc_info[0] = exc
+                finally:
+                    loop.call_soon_threadsafe(queue.put_nowait, None)
+
+            task = loop.run_in_executor(None, _produce)
+
+            while True:
+                page = await queue.get()
+                if page is None:
+                    break
+                yield "", page
+
+            await task
+            if exc_info[0] is not None:
+                raise exc_info[0]  # type: ignore[misc]
+
+            logger.info(
+                "fetch_content_pages(%s): streamed %d page(s) from %s",
+                asset_id,
+                page_count,
+                file_name,
             )
-            for batch_text in pages:
-                yield "", batch_text
-            # Mark as processed so ParsedContentProvider skips its fallback
-            # iter_asset_pages call even when no pages were produced (e.g. an
-            # all-silence audio file that yields no transcript text).
+
             self._content_pages_processed.add(asset_id)
             return
 
