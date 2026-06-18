@@ -135,6 +135,11 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         # Keyed by both asset_hash and external_url for O(1) lookup from either.
         self._bytes_cache: dict[str, bytes] = {}
         self._mime_cache: dict[str, str] = {}
+        # asset_ids for which fetch_content_pages ran the full bytes path
+        # (even if it produced no text, e.g. all-silence audio).  Checked by
+        # ParsedContentProvider to skip its fallback iter_asset_pages path,
+        # which would otherwise re-run an expensive transcription a second time.
+        self._content_pages_processed: set[str] = set()
         # Child IMAGE assets queued while transforming the current object.
         self._pending_child_assets: list[SingleAssetScanResults] = []
 
@@ -549,6 +554,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._object_ref_by_hash = {}
         self._bytes_cache = {}
         self._mime_cache = {}
+        self._content_pages_processed = set()
         self._pending_child_assets = []
 
         refs = self._list_objects()
@@ -648,6 +654,10 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             )
             for batch_text in pages:
                 yield "", batch_text
+            # Mark as processed so ParsedContentProvider skips its fallback
+            # iter_asset_pages call even when no pages were produced (e.g. an
+            # all-silence audio file that yields no transcript text).
+            self._content_pages_processed.add(asset_id)
             return
 
         result = await self.fetch_content(asset_id)
