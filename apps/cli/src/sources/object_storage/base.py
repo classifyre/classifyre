@@ -307,6 +307,15 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
         return OutputAssetType.OTHER
 
+    @staticmethod
+    def _asset_kind_for_asset_type(asset_type: OutputAssetType) -> str:
+        mapping: dict[OutputAssetType, str] = {
+            OutputAssetType.IMAGE: "image",
+            OutputAssetType.AUDIO: "audio",
+            OutputAssetType.VIDEO: "video",
+        }
+        return mapping.get(asset_type, "file")
+
     def _ensure_file_processing_dependencies(self) -> None:
         if self._file_processing_deps_checked:
             return
@@ -451,7 +460,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             created_at=ref.last_modified,
             updated_at=ref.last_modified,
             runner_id=self.runner_id,
-            **self.metadata_fields("file", asset_metadata),
+            **self.metadata_fields(self._asset_kind_for_asset_type(asset_type), asset_metadata),
         )
         self._hash_to_uri[asset_hash] = external_url
         self._object_ref_by_hash[asset_hash] = ref
