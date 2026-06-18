@@ -297,13 +297,23 @@ class DetectorPipeline:
                 page_num=page_num,
             )
             elapsed = int((time.monotonic() - t0) * 1000)
+            snippet = page_content[:120].replace("\n", "\\n") if page_content else ""
             logger.info(
-                "  %s page %d done: %d findings (%dms)",
+                "  %s page %d: %d findings in %dms — snippet: %s",
                 asset.name,
                 page_num,
                 len(page_findings),
                 elapsed,
+                snippet,
             )
+            if page_findings:
+                for f in page_findings[:5]:
+                    logger.info(
+                        "    finding: type=%s detector=%s matched=%.100s",
+                        f.finding_type,
+                        f.detector_type,
+                        f.matched_content[:100].replace("\n", " "),
+                    )
             return page_findings, page_types, page_errors, page_content, page_num
 
         def _collect_done() -> None:
@@ -404,13 +414,23 @@ class DetectorPipeline:
                 page_num=page_num,
             )
             elapsed = int((time.monotonic() - t0) * 1000)
+            snippet = page_content[:120].replace("\n", "\\n") if page_content else ""
             logger.info(
-                "  %s page %d done: %d findings (%dms)",
+                "  %s page %d: %d findings in %dms — snippet: %s",
                 asset.name,
                 page_num,
                 len(page_findings),
                 elapsed,
+                snippet,
             )
+            if page_findings:
+                for f in page_findings[:5]:
+                    logger.info(
+                        "    finding: type=%s detector=%s matched=%.100s",
+                        f.finding_type,
+                        f.detector_type,
+                        f.matched_content[:100].replace("\n", " "),
+                    )
             return page_findings, page_types, page_errors, page_content, page_num
 
         async def _collect_done_and_flush(min_findings: int = 1) -> None:
@@ -491,6 +511,12 @@ class DetectorPipeline:
                 continue
             candidate_ids.append(value)
 
+        logger.info(
+            "_iter_text_content_pages(%s): trying candidates %s",
+            asset.name,
+            candidate_ids,
+        )
+
         for candidate_id in candidate_ids:
             saw_candidate_content = False
             async for text_content in self.content_provider.fetch_text_pages(candidate_id):
@@ -501,6 +527,16 @@ class DetectorPipeline:
 
             if saw_candidate_content:
                 return
+
+            # If fetch_content_pages ran the full bytes-path extraction (even
+            # yielding 0 text, e.g. silent audio), the source already did the
+            # expensive work.  Don't re-process with another candidate ID for
+            # the same asset.
+            source = getattr(self.content_provider, "_source", None)
+            if source is not None:
+                processed: set[str] = getattr(source, "_content_pages_processed", set())
+                if candidate_id in processed:
+                    return
 
     async def _run_binary_detectors_for_asset(
         self,
