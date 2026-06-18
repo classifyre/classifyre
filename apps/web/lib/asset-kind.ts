@@ -7,6 +7,7 @@ import {
   Link2,
   Mail,
   MessageSquare,
+  Music,
   Notebook,
   Paperclip,
   Table,
@@ -37,6 +38,7 @@ const assetKindIconMap: Record<string, LucideIcon> = {
   label: Hash,
   item: File,
   video: Video,
+  audio: Music,
 };
 
 export function getAssetKindIcon(kind?: string | null): LucideIcon {
