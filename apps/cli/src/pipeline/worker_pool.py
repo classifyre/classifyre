@@ -21,6 +21,9 @@ from concurrent.futures import ProcessPoolExecutor
 from typing import Any
 
 from ..models.generated_single_asset_scan_results import DetectionResult
+from ..utils.resources import get_effective_cpu_count, get_effective_memory_mb
+
+__all__ = ["get_effective_cpu_count", "get_effective_memory_mb"]
 
 logger = logging.getLogger(__name__)
 
@@ -128,63 +131,6 @@ _IO_BOUND_DETECTORS = frozenset({"broken_links"})
 
 def is_io_bound_detector(detector_name: str) -> bool:
     return detector_name in _IO_BOUND_DETECTORS
-
-
-def get_effective_cpu_count() -> int:
-    """Return the number of usable CPUs, respecting cgroup limits (K8s/Docker).
-
-    ``os.cpu_count()`` returns the *host* CPU count, which can be much larger
-    than what the container is allowed to use.  This function reads the cgroup
-    v2 ``cpu.max`` (or v1 ``cpu.cfs_quota_us``/``cpu.cfs_period_us``) to
-    determine the actual allocation.
-    """
-    try:
-        data = open("/sys/fs/cgroup/cpu.max").read().strip()
-        quota_str, period_str = data.split()
-        if quota_str != "max":
-            cpus = int(quota_str) / int(period_str)
-            if cpus >= 0.5:
-                return max(1, int(cpus))
-    except (FileNotFoundError, OSError, ValueError):
-        pass
-
-    try:
-        quota = int(open("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read().strip())
-        period = int(open("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read().strip())
-        if quota > 0 and period > 0:
-            cpus = quota / period
-            if cpus >= 0.5:
-                return max(1, int(cpus))
-    except (FileNotFoundError, OSError, ValueError):
-        pass
-
-    return os.cpu_count() or 4
-
-
-def get_effective_memory_mb() -> int:
-    """Return usable memory in MB, respecting cgroup limits."""
-    try:
-        mem_bytes = int(open("/sys/fs/cgroup/memory.max").read().strip())
-        if mem_bytes < 2**50:
-            return max(256, mem_bytes // (1024 * 1024))
-    except (FileNotFoundError, OSError, ValueError):
-        pass
-
-    try:
-        mem_bytes = int(open("/sys/fs/cgroup/memory/memory.limit_in_bytes").read().strip())
-        if mem_bytes < 2**50:
-            return max(256, mem_bytes // (1024 * 1024))
-    except (FileNotFoundError, OSError, ValueError):
-        pass
-
-    try:
-        for line in open("/proc/meminfo"):
-            if line.startswith("MemTotal:"):
-                return max(256, int(line.split()[1]) // 1024)
-    except (FileNotFoundError, OSError, ValueError):
-        pass
-
-    return 4096
 
 
 def compute_pool_workers(override: int | None = None) -> int:

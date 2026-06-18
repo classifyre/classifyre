@@ -730,6 +730,11 @@ model AssetCorrelationValue {
   normalizedValue   String       @map("normalized_value") @db.Text
   // sha256(label + ':' + normalizedValue) — the reverse-index key.
   valueHash         String       @map("value_hash") @db.VarChar(64)
+  // sha256 of sorted DoubleMetaphone codes for each token in the value.
+  // Non-null only for text-like labels (person, name, address, …) where
+  // phonetic similarity is meaningful. Used as a second blocking key so
+  // "John Smith" and "Jon Smyth" end up as correlation candidates.
+  phoneticHash      String?      @map("phonetic_hash") @db.VarChar(64)
   createdAt         DateTime     @default(now()) @map("created_at")
 
   asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
@@ -738,6 +743,7 @@ model AssetCorrelationValue {
   @@index([valueHash])
   @@index([assetId])
   @@index([sourceId])
+  @@index([label, phoneticHash])
   @@map("asset_correlation_values")
 }
 
@@ -811,6 +817,24 @@ model CorrelationConfig {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("correlation_config")
+}
+
+// Scratch space for a recompute pass: the pairwise overlap aggregation
+// (GROUP BY over the asset_correlation_values self-join) runs as a single
+// INSERT ... SELECT so the heavy intermediate state lives in Postgres
+// (work_mem / on-disk temp files), never in the API process's heap. Rows are
+// scoped by run_id and deleted once that run's edges have been written.
+model CorrelationPairStaging {
+  id            BigInt  @id @default(autoincrement())
+  runId         String  @map("run_id")
+  aId           String  @map("a_id")
+  bId           String  @map("b_id")
+  sharedCount   Int     @map("shared_count")
+  weightedShared Decimal @map("weighted_shared") @db.Decimal(12, 4)
+  sharedByLabel Json    @map("shared_by_label") @db.JsonB
+
+  @@index([runId, id])
+  @@map("correlation_pair_staging")
 }
 
 enum InquiryStatus {

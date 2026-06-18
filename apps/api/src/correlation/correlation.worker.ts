@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import type { Job } from 'pg-boss';
+import { AgentKind, AgentRunStatus } from '@prisma/client';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { PrismaService } from '../prisma.service';
 import {
@@ -33,12 +34,38 @@ export class CorrelationWorker implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
+    await this.recoverStaleRuns();
+
     const boss = await this.pgBoss.getBossAsync();
     await boss.createQueue(CORRELATION_QUEUE);
     await boss.work(CORRELATION_QUEUE, { localConcurrency: 1 }, (jobs: Job[]) =>
       this.handle(jobs),
     );
     this.logger.log(`Registered worker for queue ${CORRELATION_QUEUE}`);
+  }
+
+  /**
+   * Mark any DUPLICATES runs that were still RUNNING when the pod died as
+   * FAILED so they don't stay stuck in "running" status indefinitely. Runs
+   * once at startup before the queue worker is registered.
+   */
+  private async recoverStaleRuns(): Promise<void> {
+    const result = await this.prisma.agentRun.updateMany({
+      where: {
+        agentKind: AgentKind.DUPLICATES,
+        status: AgentRunStatus.RUNNING,
+      },
+      data: {
+        status: AgentRunStatus.FAILED,
+        error: 'Pod restarted while run was in progress (OOM or SIGKILL).',
+        finishedAt: new Date(),
+      },
+    });
+    if (result.count > 0) {
+      this.logger.warn(
+        `Recovered ${result.count} stale DUPLICATES run(s) → FAILED (pod restarted).`,
+      );
+    }
   }
 
   private async handle(jobs: Job[]): Promise<void> {

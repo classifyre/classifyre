@@ -135,6 +135,11 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         # Keyed by both asset_hash and external_url for O(1) lookup from either.
         self._bytes_cache: dict[str, bytes] = {}
         self._mime_cache: dict[str, str] = {}
+        # asset_ids for which fetch_content_pages ran the full bytes path
+        # (even if it produced no text, e.g. all-silence audio).  Checked by
+        # ParsedContentProvider to skip its fallback iter_asset_pages path,
+        # which would otherwise re-run an expensive transcription a second time.
+        self._content_pages_processed: set[str] = set()
         # Child IMAGE assets queued while transforming the current object.
         self._pending_child_assets: list[SingleAssetScanResults] = []
 
@@ -302,6 +307,15 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
         return OutputAssetType.OTHER
 
+    @staticmethod
+    def _asset_kind_for_asset_type(asset_type: OutputAssetType) -> str:
+        mapping: dict[OutputAssetType, str] = {
+            OutputAssetType.IMAGE: "image",
+            OutputAssetType.AUDIO: "audio",
+            OutputAssetType.VIDEO: "video",
+        }
+        return mapping.get(asset_type, "file")
+
     def _ensure_file_processing_dependencies(self) -> None:
         if self._file_processing_deps_checked:
             return
@@ -446,7 +460,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             created_at=ref.last_modified,
             updated_at=ref.last_modified,
             runner_id=self.runner_id,
-            **self.metadata_fields("file", asset_metadata),
+            **self.metadata_fields(self._asset_kind_for_asset_type(asset_type), asset_metadata),
         )
         self._hash_to_uri[asset_hash] = external_url
         self._object_ref_by_hash[asset_hash] = ref
@@ -549,6 +563,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._object_ref_by_hash = {}
         self._bytes_cache = {}
         self._mime_cache = {}
+        self._content_pages_processed = set()
         self._pending_child_assets = []
 
         refs = self._list_objects()
@@ -628,26 +643,69 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         raw_bytes = self._bytes_cache.get(asset_id)
         mime = self._mime_cache.get(asset_id, "")
 
+        logger.info(
+            "fetch_content_pages(%s): raw_bytes=%s mime=%s processed=%s",
+            asset_id,
+            f"{len(raw_bytes)} bytes" if raw_bytes is not None else "MISS",
+            mime or "MISS",
+            asset_id in self._content_pages_processed,
+        )
+
         if raw_bytes is not None:
             sampling = self.config.sampling
             batch_size = int(sampling.rows_per_page or 100)
             include_col_names = bool(
                 sampling.include_column_names if sampling.include_column_names is not None else True
             )
-            # Run the (potentially blocking) file parsing in a thread so pyarrow /
-            # pdfplumber can't freeze the event loop during large file iteration.
-            pages: list[str] = await asyncio.to_thread(
-                list,
-                self.iter_asset_pages(
-                    raw_bytes,
-                    mime,
-                    batch_size,
-                    include_col_names,
-                    file_name=self._file_name_for_asset_id(asset_id),
-                ),
+            file_name = self._file_name_for_asset_id(asset_id)
+
+            # Stream pages from a thread instead of materializing via list().
+            # For transcription this lets detectors start working on the first
+            # chunk while later chunks are still being transcribed.
+            loop = asyncio.get_running_loop()
+            queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+            exc_info: list[BaseException | None] = [None]
+
+            page_count: int = 0
+
+            def _produce() -> None:
+                nonlocal page_count
+                try:
+                    for page in self.iter_asset_pages(
+                        raw_bytes,
+                        mime,
+                        batch_size,
+                        include_col_names,
+                        file_name=file_name,
+                    ):
+                        loop.call_soon_threadsafe(queue.put_nowait, page)
+                        page_count += 1
+                except BaseException as exc:
+                    exc_info[0] = exc
+                finally:
+                    loop.call_soon_threadsafe(queue.put_nowait, None)
+
+            task = loop.run_in_executor(None, _produce)
+
+            while True:
+                page = await queue.get()
+                if page is None:
+                    break
+                yield "", page
+
+            await task
+            if exc_info[0] is not None:
+                raise exc_info[0]  # type: ignore[misc]
+
+            logger.info(
+                "fetch_content_pages(%s): streamed %d page(s) from %s",
+                asset_id,
+                page_count,
+                file_name,
             )
-            for batch_text in pages:
-                yield "", batch_text
+
+            self._content_pages_processed.add(asset_id)
             return
 
         result = await self.fetch_content(asset_id)
