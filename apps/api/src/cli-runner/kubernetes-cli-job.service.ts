@@ -51,9 +51,7 @@ export class KubernetesCliJobService {
   private readonly runningJobsByRunnerId = new Map<string, JobRef>();
   private cachedTemplate: V1Job | null = null;
 
-  constructor(
-    private readonly instanceSettings: InstanceSettingsService,
-  ) {}
+  constructor(private readonly instanceSettings: InstanceSettingsService) {}
 
   isEnabled(): boolean {
     return this.enabled;
