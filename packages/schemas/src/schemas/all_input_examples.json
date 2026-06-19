@@ -2668,5 +2668,139 @@
         }
       }
     }
+  ],
+  "MICROSOFT_365": [
+    {
+      "name": "SharePoint document scan with client secret",
+      "description": "Scan all SharePoint sites and document libraries for PII and secrets using app registration with client secret",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "15 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MICROSOFT_365",
+        "required": {
+          "auth_mode": "CLIENT_SECRET",
+          "tenant_id": "00000000-0000-0000-0000-000000000000",
+          "client_id": "11111111-1111-1111-1111-111111111111"
+        },
+        "masked": {
+          "client_secret": "your-client-secret"
+        },
+        "optional": {
+          "scope": {
+            "ecosystems": [
+              "sharepoint_sites"
+            ]
+          },
+          "extraction": {
+            "include_site_metadata": true,
+            "include_drive_metadata": true
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST"
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Multi-ecosystem certificate auth scan",
+      "description": "Scan SharePoint, OneDrive, and Teams files using certificate authentication with path and extension filtering",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekly",
+        "cron": "30 2 * * 0",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MICROSOFT_365",
+        "required": {
+          "auth_mode": "CERTIFICATE",
+          "tenant_id": "00000000-0000-0000-0000-000000000000",
+          "client_id": "22222222-2222-2222-2222-222222222222"
+        },
+        "masked": {
+          "certificate_pem": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+        },
+        "optional": {
+          "scope": {
+            "ecosystems": [
+              "sharepoint_sites",
+              "onedrive",
+              "teams_files"
+            ],
+            "path_prefix": "/Documents",
+            "include_extensions": [
+              ".pdf",
+              ".docx",
+              ".xlsx",
+              ".pptx"
+            ]
+          },
+          "connection": {
+            "page_size": 500,
+            "max_retries": 5
+          }
+        },
+        "sampling": {
+          "strategy": "ALL",
+          "enable_ocr": true
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Azure-hosted managed identity scan",
+      "description": "Scan SharePoint and OneDrive from an Azure VM or container using managed identity — no secrets required",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "45 7 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MICROSOFT_365",
+        "required": {
+          "auth_mode": "MANAGED_IDENTITY"
+        },
+        "masked": {},
+        "optional": {
+          "scope": {
+            "ecosystems": [
+              "sharepoint_sites",
+              "onedrive"
+            ],
+            "exclude_extensions": [
+              ".mp4",
+              ".mov",
+              ".avi",
+              ".wmv"
+            ],
+            "max_object_bytes": 52428800
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 25
+        }
+      }
+    }
   ]
 }

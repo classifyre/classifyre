@@ -52,6 +52,7 @@ class AssetType(StrEnum):
     OPENSEARCH = 'OPENSEARCH'
     MEILISEARCH = 'MEILISEARCH'
     LOCAL_FOLDER = 'LOCAL_FOLDER'
+    MICROSOFT_365 = 'MICROSOFT_365'
 
 
 class DetectorType(StrEnum):
@@ -357,6 +358,7 @@ class Type(StrEnum):
     OPENSEARCH = 'OPENSEARCH'
     MEILISEARCH = 'MEILISEARCH'
     LOCAL_FOLDER = 'LOCAL_FOLDER'
+    MICROSOFT_365 = 'MICROSOFT_365'
 
 
 class YouTubeRequired(BaseModel):
@@ -2947,6 +2949,7 @@ class Type20(StrEnum):
     OPENSEARCH = 'OPENSEARCH'
     MEILISEARCH = 'MEILISEARCH'
     LOCAL_FOLDER = 'LOCAL_FOLDER'
+    MICROSOFT_365 = 'MICROSOFT_365'
 
 
 class ConfluenceInput(CoreInput):
@@ -3687,6 +3690,188 @@ class IcebergOptionalScope(BaseModel):
     )
 
 
+class Microsoft365Ecosystem(StrEnum):
+    """
+    Microsoft 365 ecosystem to scan
+    """
+
+    sharepoint_sites = 'sharepoint_sites'
+    onedrive = 'onedrive'
+    teams_files = 'teams_files'
+
+
+class Microsoft365RequiredClientSecret(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['CLIENT_SECRET']
+    tenant_id: str = Field(..., description='Azure AD tenant ID (directory ID)')
+    client_id: str = Field(..., description='Azure AD application (client) ID')
+
+
+class Microsoft365RequiredCertificate(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['CERTIFICATE']
+    tenant_id: str = Field(..., description='Azure AD tenant ID (directory ID)')
+    client_id: str = Field(..., description='Azure AD application (client) ID')
+
+
+class Microsoft365RequiredManagedIdentity(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['MANAGED_IDENTITY']
+    client_id: str | None = Field(
+        None,
+        description='User-assigned managed identity client ID (omit for system-assigned)',
+    )
+
+
+class Microsoft365MaskedClientSecret(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    client_secret: str = Field(..., description='Azure AD application client secret')
+
+
+class Microsoft365MaskedCertificate(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    certificate_pem: str = Field(
+        ..., description='PEM-encoded certificate (private key + cert chain)'
+    )
+    certificate_password: str | None = Field(
+        None, description='Passphrase for encrypted PEM private key (optional)'
+    )
+
+
+class Microsoft365MaskedManagedIdentity(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class Microsoft365OptionalScope(BaseModel):
+    """
+    Ecosystem selection and content filtering.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ecosystems: list[Microsoft365Ecosystem] | None = Field(
+        ['sharepoint_sites'],
+        description='Microsoft 365 ecosystems to scan (select one or more)',
+    )
+    site_filter: list[str] | None = Field(
+        None,
+        description='SharePoint site hostnames or paths to include (empty = all accessible)',
+    )
+    drive_filter: list[str] | None = Field(
+        None, description='Drive names or IDs to include (empty = all)'
+    )
+    path_prefix: str | None = Field(
+        None,
+        description='Only scan items under this folder path (e.g. /Documents/Legal)',
+    )
+    include_extensions: list[str] | None = Field(
+        None, description='Only include files with these extensions (e.g. .pdf, .docx)'
+    )
+    exclude_extensions: list[str] | None = Field(
+        None, description='Skip files with these extensions'
+    )
+    max_object_bytes: int | None = Field(
+        104857600,
+        description='Skip files larger than this many bytes (default 100 MB)',
+        ge=0,
+    )
+
+
+class Microsoft365OptionalConnection(BaseModel):
+    """
+    Network and throttle controls for Graph API requests.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_timeout_seconds: int | None = Field(
+        30, description='Socket timeout for Graph API operations', ge=5, le=300
+    )
+    max_retries: int | None = Field(
+        3,
+        description='Maximum retries on transient errors and 429 throttling',
+        ge=0,
+        le=10,
+    )
+    rate_limit_delay_seconds: float | None = Field(
+        1.0,
+        description='Base delay between requests when throttled (exponential backoff applied)',
+        ge=0.0,
+    )
+    page_size: int | None = Field(
+        200, description='Items per page for Graph API list requests', ge=1, le=999
+    )
+
+
+class Microsoft365OptionalExtraction(BaseModel):
+    """
+    Controls which structural assets to emit beyond files.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_permissions: bool | None = Field(
+        False,
+        description='Include file/site permission metadata (requires Sites.FullControl.All)',
+    )
+    include_site_metadata: bool | None = Field(
+        True, description='Emit site-level assets with metadata'
+    )
+    include_drive_metadata: bool | None = Field(
+        True, description='Emit drive-level assets with metadata'
+    )
+
+
+class Microsoft365Optional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    scope: Microsoft365OptionalScope | None = None
+    connection: Microsoft365OptionalConnection | None = None
+    extraction: Microsoft365OptionalExtraction | None = None
+
+
+class Microsoft365Input(CoreInput):
+    type: Literal['MICROSOFT_365'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: (
+        Microsoft365RequiredClientSecret
+        | Microsoft365RequiredCertificate
+        | Microsoft365RequiredManagedIdentity
+    ) = Field(..., title='Microsoft365Required')
+    masked: (
+        Microsoft365MaskedClientSecret
+        | Microsoft365MaskedCertificate
+        | Microsoft365MaskedManagedIdentity
+    ) = Field(..., title='Microsoft365Masked')
+    optional: Microsoft365Optional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
 class YouTubeInput(CoreInput):
     type: Literal['YOUTUBE'] | None = Field(
         None, description='Type of the asset or source'
@@ -3789,6 +3974,7 @@ class SourceInput(
         | ElasticsearchInput
         | OpenSearchInput
         | MeilisearchInput
+        | Microsoft365Input
     ]
 ):
     root: (
@@ -3822,6 +4008,7 @@ class SourceInput(
         | ElasticsearchInput
         | OpenSearchInput
         | MeilisearchInput
+        | Microsoft365Input
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

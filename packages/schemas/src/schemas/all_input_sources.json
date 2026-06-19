@@ -92,6 +92,9 @@
     },
     {
       "$ref": "#/definitions/MeilisearchInput"
+    },
+    {
+      "$ref": "#/definitions/Microsoft365Input"
     }
   ],
   "x-asset-metadata": {
@@ -1744,6 +1747,132 @@
             "doc_count"
           ]
         }
+      },
+      "MICROSOFT_365": {
+        "file": {
+          "use": [
+            "file",
+            "image",
+            "document",
+            "spreadsheet",
+            "text",
+            "json"
+          ],
+          "properties": {
+            "site_name": {
+              "type": "string",
+              "description": "SharePoint site display name"
+            },
+            "drive_name": {
+              "type": "string",
+              "description": "Drive display name"
+            },
+            "item_path": {
+              "type": "string",
+              "description": "Full path within the drive"
+            },
+            "ecosystem": {
+              "type": "string",
+              "description": "Source ecosystem (sharepoint_sites, onedrive, teams_files)"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible URL for the item"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Graph API eTag for the item"
+            },
+            "created_by": {
+              "type": "string",
+              "description": "User who created the file"
+            },
+            "modified_by": {
+              "type": "string",
+              "description": "User who last modified the file"
+            }
+          },
+          "required": [
+            "drive_name",
+            "item_path",
+            "ecosystem"
+          ]
+        },
+        "image": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent file asset"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location of the embedded image within the parent"
+            }
+          },
+          "required": [
+            "source_hash",
+            "location"
+          ]
+        },
+        "site": {
+          "properties": {
+            "site_id": {
+              "type": "string",
+              "description": "Graph API site ID"
+            },
+            "site_url": {
+              "type": "string",
+              "description": "Site URL"
+            },
+            "site_name": {
+              "type": "string",
+              "description": "Site display name"
+            },
+            "drive_count": {
+              "type": "integer",
+              "description": "Number of document libraries"
+            }
+          },
+          "required": [
+            "site_id",
+            "site_name"
+          ]
+        },
+        "drive": {
+          "properties": {
+            "drive_id": {
+              "type": "string",
+              "description": "Graph API drive ID"
+            },
+            "drive_name": {
+              "type": "string",
+              "description": "Drive display name"
+            },
+            "drive_type": {
+              "type": "string",
+              "description": "Drive type (documentLibrary, personal, etc.)"
+            },
+            "site_name": {
+              "type": "string",
+              "description": "Parent site display name"
+            },
+            "quota_total": {
+              "type": "integer",
+              "description": "Total storage quota in bytes"
+            },
+            "quota_used": {
+              "type": "integer",
+              "description": "Used storage in bytes"
+            }
+          },
+          "required": [
+            "drive_id",
+            "drive_name"
+          ]
+        }
       }
     }
   },
@@ -1780,7 +1909,8 @@
         "ELASTICSEARCH",
         "OPENSEARCH",
         "MEILISEARCH",
-        "LOCAL_FOLDER"
+        "LOCAL_FOLDER",
+        "MICROSOFT_365"
       ],
       "description": "Type of the asset or source"
     },
@@ -7639,6 +7769,318 @@
         }
       },
       "additionalProperties": false
+    },
+    "Microsoft365Ecosystem": {
+      "type": "string",
+      "enum": [
+        "sharepoint_sites",
+        "onedrive",
+        "teams_files"
+      ],
+      "description": "Microsoft 365 ecosystem to scan"
+    },
+    "Microsoft365RequiredClientSecret": {
+      "title": "Microsoft365RequiredClientSecret",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "CLIENT_SECRET"
+        },
+        "tenant_id": {
+          "type": "string",
+          "description": "Azure AD tenant ID (directory ID)"
+        },
+        "client_id": {
+          "type": "string",
+          "description": "Azure AD application (client) ID"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "tenant_id",
+        "client_id"
+      ],
+      "additionalProperties": false
+    },
+    "Microsoft365RequiredCertificate": {
+      "title": "Microsoft365RequiredCertificate",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "CERTIFICATE"
+        },
+        "tenant_id": {
+          "type": "string",
+          "description": "Azure AD tenant ID (directory ID)"
+        },
+        "client_id": {
+          "type": "string",
+          "description": "Azure AD application (client) ID"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "tenant_id",
+        "client_id"
+      ],
+      "additionalProperties": false
+    },
+    "Microsoft365RequiredManagedIdentity": {
+      "title": "Microsoft365RequiredManagedIdentity",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "MANAGED_IDENTITY"
+        },
+        "client_id": {
+          "type": "string",
+          "description": "User-assigned managed identity client ID (omit for system-assigned)"
+        }
+      },
+      "required": [
+        "auth_mode"
+      ],
+      "additionalProperties": false
+    },
+    "Microsoft365Required": {
+      "title": "Microsoft365Required",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/Microsoft365RequiredClientSecret"
+        },
+        {
+          "$ref": "#/definitions/Microsoft365RequiredCertificate"
+        },
+        {
+          "$ref": "#/definitions/Microsoft365RequiredManagedIdentity"
+        }
+      ]
+    },
+    "Microsoft365MaskedClientSecret": {
+      "title": "Microsoft365MaskedClientSecret",
+      "type": "object",
+      "properties": {
+        "client_secret": {
+          "type": "string",
+          "description": "Azure AD application client secret"
+        }
+      },
+      "required": [
+        "client_secret"
+      ],
+      "additionalProperties": false
+    },
+    "Microsoft365MaskedCertificate": {
+      "title": "Microsoft365MaskedCertificate",
+      "type": "object",
+      "properties": {
+        "certificate_pem": {
+          "type": "string",
+          "description": "PEM-encoded certificate (private key + cert chain)"
+        },
+        "certificate_password": {
+          "type": "string",
+          "description": "Passphrase for encrypted PEM private key (optional)"
+        }
+      },
+      "required": [
+        "certificate_pem"
+      ],
+      "additionalProperties": false
+    },
+    "Microsoft365MaskedManagedIdentity": {
+      "title": "Microsoft365MaskedManagedIdentity",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "Microsoft365Masked": {
+      "title": "Microsoft365Masked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/Microsoft365MaskedClientSecret"
+        },
+        {
+          "$ref": "#/definitions/Microsoft365MaskedCertificate"
+        },
+        {
+          "$ref": "#/definitions/Microsoft365MaskedManagedIdentity"
+        }
+      ]
+    },
+    "Microsoft365OptionalScope": {
+      "title": "Microsoft365OptionalScope",
+      "type": "object",
+      "description": "Ecosystem selection and content filtering.",
+      "properties": {
+        "ecosystems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Microsoft365Ecosystem"
+          },
+          "default": [
+            "sharepoint_sites"
+          ],
+          "description": "Microsoft 365 ecosystems to scan (select one or more)"
+        },
+        "site_filter": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "SharePoint site hostnames or paths to include (empty = all accessible)"
+        },
+        "drive_filter": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Drive names or IDs to include (empty = all)"
+        },
+        "path_prefix": {
+          "type": "string",
+          "description": "Only scan items under this folder path (e.g. /Documents/Legal)"
+        },
+        "include_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only include files with these extensions (e.g. .pdf, .docx)"
+        },
+        "exclude_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip files with these extensions"
+        },
+        "max_object_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 104857600,
+          "description": "Skip files larger than this many bytes (default 100 MB)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Microsoft365OptionalConnection": {
+      "title": "Microsoft365OptionalConnection",
+      "type": "object",
+      "description": "Network and throttle controls for Graph API requests.",
+      "properties": {
+        "request_timeout_seconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 300,
+          "default": 30,
+          "description": "Socket timeout for Graph API operations"
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3,
+          "description": "Maximum retries on transient errors and 429 throttling"
+        },
+        "rate_limit_delay_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1.0,
+          "description": "Base delay between requests when throttled (exponential backoff applied)"
+        },
+        "page_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999,
+          "default": 200,
+          "description": "Items per page for Graph API list requests"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Microsoft365OptionalExtraction": {
+      "title": "Microsoft365OptionalExtraction",
+      "type": "object",
+      "description": "Controls which structural assets to emit beyond files.",
+      "properties": {
+        "include_permissions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include file/site permission metadata (requires Sites.FullControl.All)"
+        },
+        "include_site_metadata": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit site-level assets with metadata"
+        },
+        "include_drive_metadata": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit drive-level assets with metadata"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Microsoft365Optional": {
+      "title": "Microsoft365Optional",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/definitions/Microsoft365OptionalScope"
+        },
+        "connection": {
+          "$ref": "#/definitions/Microsoft365OptionalConnection"
+        },
+        "extraction": {
+          "$ref": "#/definitions/Microsoft365OptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Microsoft365Input": {
+      "title": "Microsoft365Input",
+      "label": "Microsoft 365",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "MICROSOFT_365"
+            },
+            "required": {
+              "$ref": "#/definitions/Microsoft365Required"
+            },
+            "masked": {
+              "$ref": "#/definitions/Microsoft365Masked"
+            },
+            "optional": {
+              "$ref": "#/definitions/Microsoft365Optional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
     }
   }
 }

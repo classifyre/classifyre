@@ -197,6 +197,10 @@ azure-blob-storage = [
     "azure-storage-blob>=12.29.0,<13.0.0",
     "azure-identity>=1.25.3,<2.0.0",
 ]
+microsoft-graph = [
+    "msgraph-sdk>=1.0.0,<2.0.0",
+    "azure-identity>=1.25.3,<2.0.0",
+]
 google-cloud-storage = [
     "google-cloud-storage>=3.10.1,<4.0.0",
 ]

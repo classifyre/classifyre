@@ -8438,7 +8438,8 @@
               "ELASTICSEARCH",
               "OPENSEARCH",
               "MEILISEARCH",
-              "LOCAL_FOLDER"
+              "LOCAL_FOLDER",
+              "MICROSOFT_365"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -8630,7 +8631,8 @@
               "ELASTICSEARCH",
               "OPENSEARCH",
               "MEILISEARCH",
-              "LOCAL_FOLDER"
+              "LOCAL_FOLDER",
+              "MICROSOFT_365"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
