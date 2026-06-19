@@ -11,6 +11,8 @@ import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { RunnerLogStorageService } from './runner-log-storage.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
 import { AiProviderConfigService } from '../ai-provider-config.service';
+import { InstanceSettingsService } from '../instance-settings.service';
+import { DemoModeService } from '../demo-mode.service';
 import { ExportModule } from '../export/export.module';
 
 @Module({
@@ -23,6 +25,8 @@ import { ExportModule } from '../export/export.module';
     MaskedConfigCryptoService,
     CustomDetectorsService,
     AiProviderConfigService,
+    InstanceSettingsService,
+    DemoModeService,
     RunnerLogStorageService,
   ],
   controllers: [CliRunnerController, SearchRunnersController],

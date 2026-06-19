@@ -1,7 +1,7 @@
 ---
 sidebarTitle: Instance Settings
 title: Instance Settings
-description: Language, timezone, and time format configuration — auto-detection and fixed overrides.
+description: Language, timezone, time format, and Hugging Face token configuration.
 ---
 
 # Instance Settings
@@ -67,3 +67,82 @@ Controls whether times are displayed in 12-hour or 24-hour format.
 | `Automatic` | Detected from the user's browser preferences. Typically 12-hour for US browsers, 24-hour for most others. | depends on browser |
 | `12-hour` | Fixed 12-hour display. | `08:45 PM` |
 | `24-hour` | Fixed 24-hour display. | `20:45` |
+
+---
+
+## Hugging Face token
+
+A Hugging Face token authenticates requests to the Hugging Face Hub
+([huggingface.co](https://huggingface.co)). It is used internally by the
+platform when downloading models — specifically for **audio transcription**
+and **Hugging Face custom detectors**.
+
+Without a token, model downloads are unauthenticated, which results in
+**lower rate limits and slower download speeds**. With a token, downloads
+are authenticated, giving you higher rate limits and faster speeds —
+especially important when processing audio files or running many custom
+detectors.
+
+### Where tokens are used
+
+| Feature | Why it needs the token |
+|---|---|
+| **Audio transcription** | Downloads Whisper or other speech-to-text models from Hugging Face Hub to transcribe audio and video assets. |
+| **Custom detectors** | Downloads the model specified in the detector configuration (text classification, image classification, feature extraction, object detection). |
+
+### Where to get a token
+
+1. Sign up or log in at [huggingface.co](https://huggingface.co)
+2. Go to **Settings → Access Tokens**
+3. Click **Create new token**
+4. Choose **Read** role (writing is not needed)
+5. Copy the token — it looks like `hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+
+### How the token is configured
+
+There are two ways to provide a Hugging Face token:
+
+#### Instance-level (Helm chart)
+
+When deploying with Kubernetes, the operator sets a token via the Helm chart:
+
+```yaml
+api:
+  cliJobs:
+    huggingFace:
+      existingSecret: hf-token
+      existingKey: token
+```
+
+The token value lives in a Kubernetes Secret and is injected into every
+CLI job pod. This is the recommended approach for production deployments.
+
+#### User-configured (Settings UI)
+
+If no instance-level token is configured in the Helm chart, any user can
+set their own Hugging Face token on the **General** tab of the Settings page.
+The token is encrypted at rest and cannot be viewed after saving.
+
+**Important:** When an instance-level token is configured in the Helm chart,
+the UI field is disabled and user-configured tokens are ignored. The
+instance-level token always takes priority.
+
+### How it works
+
+The token travels from where it is configured to the CLI job that downloads
+the model:
+
+```
+Instance-level (K8s Secret) ──► CLI job environment (HF_TOKEN)
+                                        │
+User-configured (Settings UI) ──► API decrypts ──► CLI job environment
+                                        │
+                              huggingface_hub library reads HF_TOKEN
+                                        │
+                              Authenticated model download
+```
+
+In both cases the token reaches the `huggingface_hub` Python library inside
+the CLI job as the `HF_TOKEN` environment variable. The library
+automatically picks it up — no code changes are needed when adding or
+removing a token.
