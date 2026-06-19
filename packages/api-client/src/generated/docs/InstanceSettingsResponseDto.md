@@ -19,6 +19,8 @@ Name | Type
 `autopilotCaseEnabled` | boolean
 `autopilotCaseGuidance` | string
 `demoMode` | boolean
+`hfTokenSet` | boolean
+`hfTokenInstanceSet` | boolean
 `createdAt` | Date
 `updatedAt` | Date
 
@@ -42,6 +44,8 @@ const example = {
   "autopilotCaseEnabled": false,
   "autopilotCaseGuidance": null,
   "demoMode": false,
+  "hfTokenSet": false,
+  "hfTokenInstanceSet": false,
   "createdAt": null,
   "updatedAt": null,
 } satisfies InstanceSettingsResponseDto
