@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@workspace/ui/components/button";
-import { AppIcon } from "@/components/app-icon";
+import { Globe } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +34,7 @@ export function LanguageSwitcher() {
           size="icon"
           className="relative rounded-[4px] border-2 border-transparent hover:border-border"
         >
-          <AppIcon name="language" size={20} />
+          <Globe className="h-5 w-5" />
           <span className="sr-only">{t("common.language")}</span>
         </Button>
       </DropdownMenuTrigger>
