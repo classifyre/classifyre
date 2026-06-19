@@ -4,6 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 
 const getWebSocketUrl = () => {
+  if (
+    typeof window !== "undefined" &&
+    (window as any).__CLASSIFYRE_DESKTOP__?.apiBaseUrl
+  ) {
+    return (window as any).__CLASSIFYRE_DESKTOP__.apiBaseUrl as string;
+  }
+
   if (process.env.NEXT_PUBLIC_WS_URL) {
     return process.env.NEXT_PUBLIC_WS_URL;
   }

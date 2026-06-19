@@ -52,6 +52,15 @@
       "cache": false,
       "dependsOn": ["build"]
     },
+    "desktop#dev": {
+      "dependsOn": ["prisma:generate"],
+      "cache": false,
+      "persistent": true
+    },
+    "desktop#make": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
     "docker:build": {
       "cache": false
     },

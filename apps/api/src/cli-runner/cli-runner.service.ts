@@ -1206,6 +1206,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
     switch (environment) {
       case 'development':
+      case 'desktop':
         return resolveCliPath(configuredPath || defaultDevelopmentCliPath);
       case 'docker':
         return resolveCliPath(configuredPath || defaultDockerCliPath);

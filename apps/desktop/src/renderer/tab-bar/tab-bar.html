@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tabs</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+      font-size: 12px;
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+
+    body {
+      background: #0a0a0a;
+      color: #f5f5f5;
+      display: flex;
+      align-items: stretch;
+      border-bottom: 2px solid #b7ff00;
+    }
+
+    .drag-region {
+      width: 78px;
+      flex-shrink: 0;
+    }
+
+    .tabs {
+      display: flex;
+      align-items: stretch;
+      flex: 1;
+      overflow-x: auto;
+      overflow-y: hidden;
+      gap: 0;
+      -webkit-app-region: no-drag;
+    }
+
+    .tabs::-webkit-scrollbar { display: none; }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 14px;
+      height: 100%;
+      cursor: pointer;
+      white-space: nowrap;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      font-size: 11px;
+      color: #7c7c7c;
+      border-right: 1px solid #1a1a1a;
+      transition: color 0.1s, background 0.1s;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .tab:hover {
+      color: #f5f5f5;
+      background: #1a1a1a;
+    }
+
+    .tab.active {
+      color: #b7ff00;
+      background: #121212;
+    }
+
+    .tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #b7ff00;
+    }
+
+    .tab-close {
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 2px;
+      font-size: 14px;
+      line-height: 1;
+      color: #7c7c7c;
+      cursor: pointer;
+    }
+
+    .tab-close:hover {
+      background: #ff2b2b;
+      color: #fff;
+    }
+
+    .tab-add {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      flex-shrink: 0;
+      cursor: pointer;
+      color: #7c7c7c;
+      font-size: 18px;
+      font-weight: 400;
+      -webkit-app-region: no-drag;
+      transition: color 0.1s;
+    }
+
+    .tab-add:hover {
+      color: #b7ff00;
+    }
+
+    .right-spacer {
+      flex-shrink: 0;
+      width: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="drag-region"></div>
+  <div class="tabs" id="tabs"></div>
+  <div class="tab-add" id="add-tab" title="New workspace">+</div>
+  <div class="right-spacer"></div>
+
+  <script>
+    const { electronAPI } = window;
+    const tabsEl = document.getElementById('tabs');
+    const addBtn = document.getElementById('add-tab');
+
+    function render(data) {
+      const { tabs, showingSelector } = data;
+      tabsEl.innerHTML = tabs.map(t => `
+        <div class="tab ${t.active ? 'active' : ''}" data-id="${t.id}">
+          <span class="tab-label">${escapeHtml(t.name)}</span>
+          <span class="tab-close" data-close="${t.id}">&times;</span>
+        </div>
+      `).join('');
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    tabsEl.addEventListener('click', (e) => {
+      const closeBtn = e.target.closest('[data-close]');
+      if (closeBtn) {
+        e.stopPropagation();
+        electronAPI.closeTab(closeBtn.dataset.close);
+        return;
+      }
+      const tab = e.target.closest('.tab');
+      if (tab) {
+        electronAPI.switchTab(tab.dataset.id);
+      }
+    });
+
+    addBtn.addEventListener('click', () => {
+      electronAPI.showSelector();
+    });
+
+    // Listen for tab updates from main process
+    if (window.electronAPI && window.electronAPI.onTabsUpdate) {
+      window.electronAPI.onTabsUpdate((data) => render(data));
+    }
+  </script>
+</body>
+</html>
