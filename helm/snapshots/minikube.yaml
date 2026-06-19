@@ -61,7 +61,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 type: Opaque
 stringData:
-  CLASSIFYRE_MASKED_CONFIG_KEY: "OyXe2wxoXVp4I3u2n7eN1bCfYqjTfcFM"
+  CLASSIFYRE_MASKED_CONFIG_KEY: "change-me-in-production-to-a-random-64-char-key"
 ---
 # Source: classifyre-core/templates/database-secrets.yaml
 apiVersion: v1
