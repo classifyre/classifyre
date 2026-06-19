@@ -40,7 +40,10 @@ function readCgroupMemoryMb(): { mb: number; source: string } {
     const meminfo = readFileSync('/proc/meminfo', 'utf8');
     const m = /MemTotal:\s+(\d+)\s+kB/.exec(meminfo);
     if (m?.[1]) {
-      return { mb: Math.max(256, Math.floor(parseInt(m[1], 10) / 1024)), source: 'proc-meminfo' };
+      return {
+        mb: Math.max(256, Math.floor(parseInt(m[1], 10) / 1024)),
+        source: 'proc-meminfo',
+      };
     }
   } catch {
     /* not available */
