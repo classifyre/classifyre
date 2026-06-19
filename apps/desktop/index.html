@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Classifyre — Workspaces</title>
+  <link rel="stylesheet" href="src/renderer/namespace-selector/styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <img src="src/renderer/namespace-selector/clasifyre_icon.png" alt="Classifyre" />
+      </div>
+      <h1>Classifyre</h1>
+      <p class="subtitle">Select a workspace or create a new one</p>
+    </header>
+
+    <div id="namespace-list" class="namespace-list">
+      <div class="loading">Loading workspaces…</div>
+    </div>
+
+    <div class="create-section">
+      <input
+        type="text"
+        id="new-name"
+        placeholder="New workspace name"
+        maxlength="64"
+        autocomplete="off"
+      />
+      <button id="create-btn" class="btn btn-primary">Create</button>
+    </div>
+  </div>
+
+  <script type="module" src="src/renderer/namespace-selector/renderer.ts"></script>
+</body>
+</html>
