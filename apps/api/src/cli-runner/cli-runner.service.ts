@@ -2896,6 +2896,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
       sortOrder: page.sortOrder,
     });
 
+    // NOTE: the `include` here triggers Prisma's PgTransaction bug (CLASSIFYRE-9)
+    // that dispatches join children concurrently on a single pg client. Upstream
+    // fix in prisma/prisma#29468, expected in Prisma 7.9.0.
     const [items, total] = await this.prisma.$transaction([
       this.prisma.runner.findMany({
         where,

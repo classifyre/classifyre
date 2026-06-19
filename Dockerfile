@@ -148,7 +148,8 @@ WORKDIR /app/api
 USER 10001
 EXPOSE 8000
 ENV NODE_ENV=production \
-    PORT=8000
+    PORT=8000 \
+    NODE_OPTIONS="--no-deprecation"
 CMD ["node", "dist/src/main.js"]
 
 # ── cli-final: Python CLI ─────────────────────────────────────────────────────
@@ -370,6 +371,7 @@ exec env \
   PORT="${API_PORT:-8000}" \
   DATABASE_URL="${DATABASE_URL}" \
   CLASSIFYRE_MASKED_CONFIG_KEY="${CLASSIFYRE_MASKED_CONFIG_KEY}" \
+  NODE_OPTIONS="--no-deprecation" \
   node /app/api/dist/src/main.js
 SH
 chmod +x /etc/s6-overlay/s6-rc.d/api/run

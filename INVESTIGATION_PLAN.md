@@ -283,19 +283,22 @@ Before marking CLASSIFYRE-9 as done:
       children via `Promise.all` on a single pg client
 - [x] **One explicit `Promise.all` inside transaction** identified and fixed
       (`cli-runner.service.ts:1756`)
-- [ ] **Sequential count queries** produce correct results (order-independent)
-- [ ] **No new ESLint or TypeScript errors** from the change
-- [ ] **Existing tests pass** (unit + e2e)
+- [x] **Sequential count queries** produce correct results (order-independent)
+- [x] **No new ESLint or TypeScript errors** from the change
+- [ ] **Existing tests pass** (unit + e2e) — pending CI run
 - [ ] **No deprecation warning in API logs** when running through a full
-      runner lifecycle (start, process assets, complete)
-- [ ] **Prisma upgrade tracked** — either completed or a ticket/comment exists
-      for when 7.9.0 drops
-- [ ] **`NODE_OPTIONS=--no-deprecation`** (if used) is documented as temporary
-- [ ] **Security**: No changes to authentication, authorization, or data access
-- [ ] **Performance**: Sequential `count` queries add ~1-2ms latency per
+      runner lifecycle (start, process assets, complete) — pending manual verification
+- [x] **Prisma upgrade tracked** — Prisma 7.9.0 not yet released (latest stable is
+      7.8.0). Upgrade tracked in INVESTIGATION_PLAN.md. When 7.9.0 ships: update
+      `@prisma/adapter-pg` and `@prisma/client` to `^7.9.0`, run `bun install && bun prisma:generate`,
+      then revert all `NODE_OPTIONS=--no-deprecation` additions.
+- [x] **`NODE_OPTIONS=--no-deprecation`** added to Dockerfile api-final and runtime
+      stages. Documented here as temporary — revert when Prisma 7.9.0 is deployed.
+- [x] **Security**: No changes to authentication, authorization, or data access
+- [x] **Performance**: Sequential `count` queries add ~1-2ms latency per
       runner completion (negligible for a non-hot path)
-- [ ] **Error handling**: The transaction callback's error path is unchanged
+- [x] **Error handling**: The transaction callback's error path is unchanged
       (line 1793+ error handling still works)
-- [ ] **Logging**: No new log messages added or removed
-- [ ] **Confirms `pg-stream.service.ts` is clean**: No concurrent queries on
-      a single client
+- [x] **Logging**: No new log messages added or removed
+- [x] **Confirms `pg-stream.service.ts` is clean**: No concurrent queries on
+      a single client. Safety comment added.
