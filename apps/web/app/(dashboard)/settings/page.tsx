@@ -25,6 +25,7 @@ import {
   Languages,
   Loader2,
   Server,
+  Settings,
   SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -35,7 +36,7 @@ import { AiAssistantSettingsCard } from "@/components/ai-assistant-settings-card
 import { AutopilotSettingsCard } from "@/components/autopilot-settings-card";
 import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
-import { AppIcon } from "@/components/app-icon";
+
 import { useTranslation } from "@/hooks/use-translation";
 
 type SettingsDraft = {
@@ -169,7 +170,7 @@ export default function SettingsPage() {
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
-            <AppIcon name="settings" active size={28} />
+            <Settings className="size-7" />
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
               {t("settings.title")}
             </h1>

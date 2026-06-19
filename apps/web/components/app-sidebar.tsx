@@ -19,25 +19,37 @@ import {
 } from "@workspace/ui/components/sidebar";
 import { useTranslation } from "@/hooks/use-translation";
 import { VersionSidebarNotifier } from "./version-update-notifier";
-import { AppIcon, type IconName } from "./app-icon";
+import {
+  LayoutDashboard,
+  SearchCheck,
+  FileText,
+  Database,
+  FlaskConical,
+  Search,
+  Fingerprint,
+  ScanSearch,
+  Terminal,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { t } = useTranslation();
 
-  const mainNavigation: { title: string; href: string; iconName: IconName }[] = [
-    { title: t("nav.overview"), href: "/discovery", iconName: "people" },
-    { title: t("nav.findings"), href: "/findings", iconName: "finger-print" },
-    { title: t("nav.assets"), href: "/assets", iconName: "docs" },
-    { title: t("nav.sources"), href: "/sources", iconName: "binders" },
-    { title: t("nav.detectors"), href: "/detectors", iconName: "single-probe" },
-    { title: t("nav.investigations"), href: "/investigations", iconName: "dna" },
-    { title: t("nav.fingerprints"), href: "/fingerprints", iconName: "feet" },
+  const mainNavigation: { title: string; href: string; icon: LucideIcon }[] = [
+    { title: t("nav.overview"), href: "/discovery", icon: LayoutDashboard },
+    { title: t("nav.findings"), href: "/findings", icon: SearchCheck },
+    { title: t("nav.assets"), href: "/assets", icon: FileText },
+    { title: t("nav.sources"), href: "/sources", icon: Database },
+    { title: t("nav.detectors"), href: "/detectors", icon: FlaskConical },
+    { title: t("nav.investigations"), href: "/investigations", icon: Search },
+    { title: t("nav.fingerprints"), href: "/fingerprints", icon: Fingerprint },
   ];
 
-  const operationsNavigation: { title: string; href: string; iconName: IconName }[] = [
-    { title: t("nav.scans"), href: "/scans", iconName: "check-list" },
-    { title: t("nav.sandbox"), href: "/sandbox", iconName: "probe" },
+  const operationsNavigation: { title: string; href: string; icon: LucideIcon }[] = [
+    { title: t("nav.scans"), href: "/scans", icon: ScanSearch },
+    { title: t("nav.sandbox"), href: "/sandbox", icon: Terminal },
   ];
 
   return (
@@ -85,7 +97,7 @@ export function AppSidebar() {
                       tooltip={item.title}
                     >
                       <Link href={item.href}>
-                        <AppIcon name={item.iconName} active={isActive} size={20} />
+                        <item.icon className="size-5" />
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -111,7 +123,7 @@ export function AppSidebar() {
                       tooltip={item.title}
                     >
                       <Link href={item.href}>
-                        <AppIcon name={item.iconName} active={isActive} size={20} />
+                        <item.icon className="size-5" />
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -127,7 +139,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip={t("nav.settings")}>
               <Link href="/settings">
-                <AppIcon name="settings" size={24} />
+                <Settings className="size-6" />
                 <span>{t("nav.settings")}</span>
               </Link>
             </SidebarMenuButton>

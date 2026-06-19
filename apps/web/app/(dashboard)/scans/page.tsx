@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as echarts from "echarts";
-import { Activity, Loader2, Play } from "lucide-react";
+import { Activity, Loader2, Play, ScanSearch } from "lucide-react";
 import {
   api,
   type SearchRunnersChartsResponseDto,
@@ -26,7 +26,7 @@ import {
 import { ScanWizard } from "@/components/scan-wizard";
 import { EChartBox } from "@/components/echart-box";
 import { RunnersTable } from "@/components/runners-table";
-import { AppIcon } from "@/components/app-icon";
+
 import { useTranslation } from "@/hooks/use-translation";
 
 type StatusPanelKey = "TOTAL" | SearchRunnersStatus;
@@ -325,7 +325,7 @@ export default function ScansPage() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <AppIcon name="check-list" active size={28} />
+            <ScanSearch className="size-7" />
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
               {t("scans.title")}
             </h1>

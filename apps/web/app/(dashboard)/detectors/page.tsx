@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { FlaskConical, Plus } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { CustomDetectorsTable } from "@/components/custom-detectors-table";
-import { AppIcon } from "@/components/app-icon";
+
 import { useTranslation } from "@/hooks/use-translation";
 
 export default function CustomDetectorsPage() {
@@ -15,7 +15,7 @@ export default function CustomDetectorsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-3">
-            <AppIcon name="single-probe" active size={28} />
+            <FlaskConical className="size-7" />
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
               {t("detectors.title")}
             </h1>
