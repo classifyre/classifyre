@@ -400,6 +400,10 @@ export class FindingsService {
     const limit = Number.isFinite(rawLimit) ? Math.max(1, rawLimit) : 50;
     const where = await this.buildSearchFindingsWhere(filters);
 
+    // NOTE: the nested `select` (asset, source relations) in searchFindingSelect
+    // triggers Prisma's PgTransaction bug (CLASSIFYRE-9) — join children are
+    // dispatched concurrently on a single pg client. Upstream fix in PR#29468,
+    // expected in Prisma 7.9.0.
     const [findings, total] = await this.prisma.$transaction([
       this.prisma.finding.findMany({
         where,

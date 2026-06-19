@@ -84,6 +84,8 @@ export class PgStreamService implements OnModuleDestroy {
       }
     });
 
+    // Single query per client — must not add concurrent client.query() calls
+    // here or the pg@9 deprecation warning (CLASSIFYRE-9) will fire.
     const queryStream = client.query(
       new QueryStream(sql, params, { highWaterMark: 1024 }),
     );

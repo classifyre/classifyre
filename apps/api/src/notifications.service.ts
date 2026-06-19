@@ -102,6 +102,10 @@ export class NotificationsService {
         ? parseInt(query.take, 10)
         : (query.take ?? 50);
 
+    // NOTE: the `include` here triggers Prisma's PgTransaction bug (CLASSIFYRE-9)
+    // that dispatches join children concurrently on a single pg client. The
+    // upstream fix (prisma/prisma#29468) will ship in 7.9.0. Once upgraded,
+    // remove the NODE_OPTIONS=--no-deprecation workaround in Dockerfile.
     const [notifications, total, unreadCount] = await this.prisma.$transaction([
       this.prisma.notification.findMany({
         where,

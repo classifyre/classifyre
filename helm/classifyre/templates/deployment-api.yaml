@@ -176,6 +176,11 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            # TEMPORARY: suppress pg@9 deprecation flooding logs in production
+            # until Prisma 7.9.0 ships the PgTransaction mutex fix (PR#29468).
+            # Remove this env var once @prisma/adapter-pg is upgraded to ^7.9.0.
+            - name: NODE_OPTIONS
+              value: "--no-deprecation"
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
