@@ -85,6 +85,12 @@ export interface UpdateInstanceSettingsDto {
      * @memberof UpdateInstanceSettingsDto
      */
     autopilotCaseGuidance?: string | null;
+    /**
+     * Hugging Face token to set. Pass a token value to store (encrypted at rest). Pass null or an empty string to clear the stored token. Ignored when an instance-level HF_TOKEN is configured.
+     * @type {string}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    hfToken?: string | null;
 }
 
 
@@ -137,6 +143,7 @@ export function UpdateInstanceSettingsDtoFromJSONTyped(json: any, ignoreDiscrimi
         'autopilotInquirySearchable': json['autopilotInquirySearchable'] == null ? undefined : json['autopilotInquirySearchable'],
         'autopilotCaseEnabled': json['autopilotCaseEnabled'] == null ? undefined : json['autopilotCaseEnabled'],
         'autopilotCaseGuidance': json['autopilotCaseGuidance'] == null ? undefined : json['autopilotCaseGuidance'],
+        'hfToken': json['hfToken'] == null ? undefined : json['hfToken'],
     };
 }
 
@@ -162,6 +169,7 @@ export function UpdateInstanceSettingsDtoToJSONTyped(value?: UpdateInstanceSetti
         'autopilotInquirySearchable': value['autopilotInquirySearchable'],
         'autopilotCaseEnabled': value['autopilotCaseEnabled'],
         'autopilotCaseGuidance': value['autopilotCaseGuidance'],
+        'hfToken': value['hfToken'],
     };
 }
 

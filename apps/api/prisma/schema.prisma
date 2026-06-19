@@ -390,6 +390,8 @@ model InstanceSettings {
   timeFormat InstanceTimeFormat @default(AUTOMATIC) @map("time_format")
   aiProviderConfigId String?  @map("ai_provider_config_id")
 
+  hfTokenEnc String? @map("hf_token_enc")
+
   // Investigation autopilot — instance-wide defaults. Per-entity aiMode on
   // Inquiry/Case overrides these when not INHERIT.
   autopilotInquiryEnabled    Boolean @default(false) @map("autopilot_inquiry_enabled")

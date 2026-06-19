@@ -333,6 +333,30 @@ api:
         drop:
           - ALL
 
+    huggingFace:
+      # -- Name of an existing Kubernetes Secret containing the Hugging Face
+      # authentication token (HF_TOKEN). When set, the token is injected into
+      # every CLI job pod via a secretKeyRef env var. This authenticates requests
+      # to hf.co, which significantly increases download rate limits and avoids
+      # the "unauthenticated requests" warning from the huggingface-hub library.
+      #
+      # When this value is set, the Hugging Face token field in the web UI
+      # Settings page becomes read-only and disabled — the instance-level token
+      # always takes priority over any user-configured token.
+      #
+      # Create the Secret manually (or via your preferred tool — SealedSecrets,
+      # External Secrets, SOPS, etc.) in the same namespace as the CLI jobs:
+      #
+      #   kubectl create secret generic hf-token \
+      #     --from-literal=token=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      #
+      # The chart does NOT create or manage this Secret — you must create it
+      # yourself. This keeps the token out of Helm state and lets you rotate
+      # it independently of Helm releases.
+      existingSecret: ""
+      # -- Key inside existingSecret that holds the HF_TOKEN value.
+      existingKey: token
+
     # -- Additional environment variables for CLI jobs (list of EnvVar objects; supports secretKeyRef etc.).
     extraEnv: []
     # -- Extra volume mounts for CLI job containers.
