@@ -81,7 +81,6 @@ export const PHONETIC_FANOUT_CAP = 50;
  */
 export const PHONETIC_MIN_JW = 0.75;
 
-
 /**
  * Labels for which phonetic matching is meaningful. Structured identifiers
  * (email, phone, SSN, IBAN, URLs, IPs …) are excluded: their normalised form

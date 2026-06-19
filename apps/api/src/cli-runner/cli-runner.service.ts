@@ -1753,12 +1753,12 @@ export class CliRunnerService implements OnApplicationBootstrap {
           },
         });
 
-        const [errorCount, totalCount] = await Promise.all([
-          tx.runnerAsset.count({
-            where: { runnerId, status: RunnerAssetStatus.ERROR },
-          }),
-          tx.runnerAsset.count({ where: { runnerId } }),
-        ]);
+        const errorCount = await tx.runnerAsset.count({
+          where: { runnerId, status: RunnerAssetStatus.ERROR },
+        });
+        const totalCount = await tx.runnerAsset.count({
+          where: { runnerId },
+        });
 
         const hasErrors = errorCount > 0;
         const status = hasErrors
