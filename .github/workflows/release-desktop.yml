@@ -33,9 +33,7 @@ jobs:
           - os: macos-latest
             arch: arm64
             artifact: dmg-arm64
-          - os: macos-13
-            arch: x64
-            artifact: dmg-x64
+          # TODO: add x64 DMG via cross-compile or universal build
           # TODO: re-enable Windows once Squirrel maker issue is resolved
           # - os: windows-latest
           #   arch: x64
