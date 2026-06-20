@@ -374,12 +374,12 @@ name = "black"
 version = "26.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click" },
-    { name = "mypy-extensions" },
-    { name = "packaging" },
-    { name = "pathspec" },
-    { name = "platformdirs" },
-    { name = "pytokens" },
+    { name = "click", marker = "sys_platform != 'emscripten'" },
+    { name = "mypy-extensions", marker = "sys_platform != 'emscripten'" },
+    { name = "packaging", marker = "sys_platform != 'emscripten'" },
+    { name = "pathspec", marker = "sys_platform != 'emscripten'" },
+    { name = "platformdirs", marker = "sys_platform != 'emscripten'" },
+    { name = "pytokens", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c0/37/5628dd55bf2b34257fc7603f0fe97c40e3aaf24265f416a9c85c95ca1436/black-26.5.1.tar.gz", hash = "sha256:dd321f668053961824bcc1be1cc1df748b2d7e4fa28086b08331e577b0100a73", size = 679439, upload-time = "2026-05-18T16:53:36.107Z" }
 wheels = [
@@ -661,7 +661,8 @@ azure-blob-storage = [
     { name = "azure-storage-blob" },
 ]
 classification = [
-    { name = "transformers" },
+    { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "transformers", version = "5.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
 content = [
     { name = "nudenet" },
@@ -670,7 +671,8 @@ content = [
     { name = "sentencepiece" },
     { name = "torch", version = "2.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.12.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
-    { name = "transformers" },
+    { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "transformers", version = "5.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
 custom = [
     { name = "datasets" },
@@ -684,7 +686,8 @@ custom = [
     { name = "torch", version = "2.12.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "torchvision", version = "0.27.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torchvision", version = "0.27.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
-    { name = "transformers" },
+    { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "transformers", version = "5.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
 databricks = [
     { name = "databricks-sql-connector" },
@@ -723,7 +726,8 @@ detectors = [
     { name = "torch", version = "2.12.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "torchvision", version = "0.27.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torchvision", version = "0.27.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
-    { name = "transformers" },
+    { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "transformers", version = "5.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
     { name = "yara-python" },
 ]
 dev = [
@@ -772,8 +776,7 @@ neo4j = [
 ]
 ocr = [
     { name = "chardet" },
-    { name = "docling", version = "2.99.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
-    { name = "docling", version = "2.104.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
+    { name = "docling" },
     { name = "filetype" },
     { name = "openpyxl" },
     { name = "pdfplumber" },
@@ -806,7 +809,8 @@ quality = [
     { name = "textstat" },
     { name = "torch", version = "2.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.12.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
-    { name = "transformers" },
+    { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "transformers", version = "5.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
 regex = [
     { name = "google-re2" },
@@ -829,7 +833,8 @@ threat-ml = [
     { name = "sentencepiece" },
     { name = "torch", version = "2.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.12.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
-    { name = "transformers" },
+    { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "transformers", version = "5.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
 transcription = [
     { name = "faster-whisper" },
@@ -1327,46 +1332,10 @@ wheels = [
 
 [[package]]
 name = "docling"
-version = "2.99.0"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.15' and sys_platform == 'darwin'",
-    "python_full_version == '3.14.*' and sys_platform == 'darwin'",
-    "python_full_version == '3.13.*' and sys_platform == 'darwin'",
-    "python_full_version < '3.13' and sys_platform == 'darwin'",
-]
-dependencies = [
-    { name = "docling-slim", version = "2.99.0", source = { registry = "https://pypi.org/simple" }, extra = ["standard"], marker = "sys_platform == 'darwin'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/61/73/f6a0d6ada626281c1914dfb2de30c6e0067b1f8e3993e77eabb05fb08bf6/docling-2.99.0.tar.gz", hash = "sha256:306ea071d935f3852f75c873fe1b8663da580d2c359b8de162da52a6151c4c91", size = 8755, upload-time = "2026-06-08T15:14:20.677Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/05/cc/cd8bea43057e64ec7755a18e009270500263f513e058649b909e83e2c0a7/docling-2.99.0-py3-none-any.whl", hash = "sha256:a78d4fd34e4ca495cd50003288b4de4a9b040dbff59f8ca5624aa8fa37d43728", size = 4798, upload-time = "2026-06-08T15:14:19.25Z" },
-]
-
-[[package]]
-name = "docling"
 version = "2.104.0"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.15' and sys_platform == 'linux'",
-    "python_full_version == '3.14.*' and sys_platform == 'linux'",
-    "python_full_version == '3.13.*' and sys_platform == 'linux'",
-    "python_full_version < '3.13' and sys_platform == 'linux'",
-    "python_full_version >= '3.15' and sys_platform == 'win32'",
-    "python_full_version >= '3.15' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.15' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
-    "python_full_version == '3.14.*' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.14.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
-    "python_full_version == '3.13.*' and sys_platform == 'win32'",
-    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
-    "python_full_version < '3.13' and sys_platform == 'win32'",
-    "python_full_version < '3.13' and sys_platform == 'emscripten'",
-    "python_full_version < '3.13' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
-]
 dependencies = [
-    { name = "docling-slim", version = "2.104.0", source = { registry = "https://pypi.org/simple" }, extra = ["standard"], marker = "sys_platform != 'darwin'" },
+    { name = "docling-slim", extra = ["standard"] },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a6/a1/5f02d87de3d9886270ffe3a0526a358d91d04a84bfbf088d438bbcae964e/docling-2.104.0.tar.gz", hash = "sha256:042636aac519f6f4f92f929f655db6b191c6558bd10f998cdf396a664048ada7", size = 8839, upload-time = "2026-06-19T04:53:29.661Z" }
 wheels = [
@@ -1375,79 +1344,22 @@ wheels = [
 
 [[package]]
 name = "docling-core"
-version = "2.78.0"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.15' and sys_platform == 'darwin'",
-    "python_full_version == '3.14.*' and sys_platform == 'darwin'",
-    "python_full_version == '3.13.*' and sys_platform == 'darwin'",
-    "python_full_version < '3.13' and sys_platform == 'darwin'",
-]
-dependencies = [
-    { name = "defusedxml", marker = "sys_platform == 'darwin'" },
-    { name = "jsonref", marker = "sys_platform == 'darwin'" },
-    { name = "jsonschema", marker = "sys_platform == 'darwin'" },
-    { name = "latex2mathml", marker = "sys_platform == 'darwin'" },
-    { name = "pandas", marker = "sys_platform == 'darwin'" },
-    { name = "pillow", marker = "sys_platform == 'darwin'" },
-    { name = "pydantic", marker = "sys_platform == 'darwin'" },
-    { name = "pydantic-settings", marker = "sys_platform == 'darwin'" },
-    { name = "pyyaml", marker = "sys_platform == 'darwin'" },
-    { name = "tabulate", marker = "sys_platform == 'darwin'" },
-    { name = "typer", version = "0.21.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
-    { name = "typing-extensions", marker = "sys_platform == 'darwin'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/38/7f/11acfcbf29975d1abb198b4019d2f479eecd2b285845635fb08f3a6bab87/docling_core-2.78.0.tar.gz", hash = "sha256:d8b795bbd9c29b84f85dbe5ef273d968fead350c96589620d0eae01b0bb0c825", size = 333287, upload-time = "2026-05-29T15:55:29.499Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/de/7911f2750dd65b145e4971b090a3f5c30a56b243f4589d00543c5399b141/docling_core-2.78.0-py3-none-any.whl", hash = "sha256:69c0d67e87e4d3aec1509a758691a27e8ba0496f61a85ba705cc48a5b21ffe86", size = 285552, upload-time = "2026-05-29T15:55:27.936Z" },
-]
-
-[package.optional-dependencies]
-chunking = [
-    { name = "semchunk", marker = "sys_platform == 'darwin'" },
-    { name = "transformers", marker = "sys_platform == 'darwin'" },
-    { name = "tree-sitter", marker = "sys_platform == 'darwin'" },
-    { name = "tree-sitter-c", marker = "sys_platform == 'darwin'" },
-    { name = "tree-sitter-javascript", marker = "sys_platform == 'darwin'" },
-    { name = "tree-sitter-python", marker = "sys_platform == 'darwin'" },
-    { name = "tree-sitter-typescript", marker = "sys_platform == 'darwin'" },
-]
-
-[[package]]
-name = "docling-core"
 version = "2.83.1"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.15' and sys_platform == 'linux'",
-    "python_full_version == '3.14.*' and sys_platform == 'linux'",
-    "python_full_version == '3.13.*' and sys_platform == 'linux'",
-    "python_full_version < '3.13' and sys_platform == 'linux'",
-    "python_full_version >= '3.15' and sys_platform == 'win32'",
-    "python_full_version >= '3.15' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.15' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
-    "python_full_version == '3.14.*' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.14.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
-    "python_full_version == '3.13.*' and sys_platform == 'win32'",
-    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
-    "python_full_version < '3.13' and sys_platform == 'win32'",
-    "python_full_version < '3.13' and sys_platform == 'emscripten'",
-    "python_full_version < '3.13' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
-]
 dependencies = [
-    { name = "defusedxml", marker = "sys_platform != 'darwin'" },
-    { name = "jsonref", marker = "sys_platform != 'darwin'" },
-    { name = "jsonschema", marker = "sys_platform != 'darwin'" },
-    { name = "latex2mathml", marker = "sys_platform != 'darwin'" },
-    { name = "pandas", marker = "sys_platform != 'darwin'" },
-    { name = "pillow", marker = "sys_platform != 'darwin'" },
-    { name = "pydantic", marker = "sys_platform != 'darwin'" },
-    { name = "pydantic-settings", marker = "sys_platform != 'darwin'" },
-    { name = "pyyaml", marker = "sys_platform != 'darwin'" },
-    { name = "tabulate", marker = "sys_platform != 'darwin'" },
+    { name = "defusedxml" },
+    { name = "jsonref" },
+    { name = "jsonschema" },
+    { name = "latex2mathml" },
+    { name = "pandas" },
+    { name = "pillow" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pyyaml" },
+    { name = "tabulate" },
+    { name = "typer", version = "0.21.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
     { name = "typer", version = "0.24.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
-    { name = "typing-extensions", marker = "sys_platform != 'darwin'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4f/04/0f62e8092dfeccf7d287b7898d8dcf793417e96f6976b41f5359bf143ebe/docling_core-2.83.1.tar.gz", hash = "sha256:e09ce91d18522bb161b45ca79b9bd2c94f0b38ca744a1f8605f3e1d9bff26902", size = 317894, upload-time = "2026-06-19T05:45:49.651Z" }
 wheels = [
@@ -1456,13 +1368,14 @@ wheels = [
 
 [package.optional-dependencies]
 chunking = [
-    { name = "semchunk", marker = "sys_platform != 'darwin'" },
-    { name = "transformers", marker = "sys_platform != 'darwin'" },
-    { name = "tree-sitter", marker = "sys_platform != 'darwin'" },
-    { name = "tree-sitter-c", marker = "sys_platform != 'darwin'" },
-    { name = "tree-sitter-javascript", marker = "sys_platform != 'darwin'" },
-    { name = "tree-sitter-python", marker = "sys_platform != 'darwin'" },
-    { name = "tree-sitter-typescript", marker = "sys_platform != 'darwin'" },
+    { name = "semchunk" },
+    { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "transformers", version = "5.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
+    { name = "tree-sitter" },
+    { name = "tree-sitter-c" },
+    { name = "tree-sitter-javascript" },
+    { name = "tree-sitter-python" },
+    { name = "tree-sitter-typescript" },
 ]
 
 [[package]]
@@ -1477,7 +1390,7 @@ resolution-markers = [
 ]
 dependencies = [
     { name = "accelerate", marker = "sys_platform == 'darwin'" },
-    { name = "docling-core", version = "2.78.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "docling-core", marker = "sys_platform == 'darwin'" },
     { name = "huggingface-hub", marker = "sys_platform == 'darwin'" },
     { name = "jsonlines", marker = "sys_platform == 'darwin'" },
     { name = "numpy", marker = "sys_platform == 'darwin'" },
@@ -1488,7 +1401,7 @@ dependencies = [
     { name = "torch", version = "2.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
     { name = "torchvision", version = "0.27.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
     { name = "tqdm", marker = "sys_platform == 'darwin'" },
-    { name = "transformers", marker = "sys_platform == 'darwin'" },
+    { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c1/25/84166f5751d7837612138966669019a4ef67c09bf6d3ef8d3cc1aa0e6268/docling_ibm_models-3.13.2.tar.gz", hash = "sha256:195e02dd119df34d2ce5f76ac614da82825851013e4898db7b0468cdf8740a3d", size = 98655, upload-time = "2026-04-23T11:04:23.517Z" }
 wheels = [
@@ -1519,7 +1432,7 @@ resolution-markers = [
 ]
 dependencies = [
     { name = "accelerate", marker = "sys_platform != 'darwin'" },
-    { name = "docling-core", version = "2.83.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
+    { name = "docling-core", marker = "sys_platform != 'darwin'" },
     { name = "huggingface-hub", marker = "sys_platform != 'darwin'" },
     { name = "jsonlines", marker = "sys_platform != 'darwin'" },
     { name = "numpy", marker = "sys_platform != 'darwin'" },
@@ -1532,7 +1445,7 @@ dependencies = [
     { name = "torchvision", version = "0.27.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin' and sys_platform != 'linux'" },
     { name = "torchvision", version = "0.27.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "tqdm", marker = "sys_platform != 'darwin'" },
-    { name = "transformers", marker = "sys_platform != 'darwin'" },
+    { name = "transformers", version = "5.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/37/2b/c0ad433da1210672d6e8e774f1ba601824e0d23153e8cd963521dcf1c28c/docling_ibm_models-3.13.3.tar.gz", hash = "sha256:8c8b55e80b3d20fc74d85ca49a4d064578ef75b9f7251eec42fc9df6af426218", size = 98768, upload-time = "2026-06-04T08:23:08.088Z" }
 wheels = [
@@ -1544,8 +1457,7 @@ name = "docling-parse"
 version = "6.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "docling-core", version = "2.78.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
-    { name = "docling-core", version = "2.83.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
+    { name = "docling-core" },
     { name = "pillow" },
     { name = "pydantic" },
     { name = "pywin32", marker = "sys_platform == 'win32'" },
@@ -1569,91 +1481,17 @@ wheels = [
 
 [[package]]
 name = "docling-slim"
-version = "2.99.0"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.15' and sys_platform == 'darwin'",
-    "python_full_version == '3.14.*' and sys_platform == 'darwin'",
-    "python_full_version == '3.13.*' and sys_platform == 'darwin'",
-    "python_full_version < '3.13' and sys_platform == 'darwin'",
-]
-dependencies = [
-    { name = "certifi", marker = "sys_platform == 'darwin'" },
-    { name = "docling-core", version = "2.78.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
-    { name = "filetype", marker = "sys_platform == 'darwin'" },
-    { name = "pluggy", marker = "sys_platform == 'darwin'" },
-    { name = "pydantic", marker = "sys_platform == 'darwin'" },
-    { name = "pydantic-settings", marker = "sys_platform == 'darwin'" },
-    { name = "requests", marker = "sys_platform == 'darwin'" },
-    { name = "tqdm", marker = "sys_platform == 'darwin'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a3/10/42e81debe1b7db6ae6dbbcd41f90f2aaa59501a1089fe9f304821783c409/docling_slim-2.99.0.tar.gz", hash = "sha256:b05150cda69e4c24c85aa32d2e329f21188dd4304547928eab32d8bb8b645bba", size = 410480, upload-time = "2026-06-08T15:12:53.706Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1c/d8/caa986a093c89238cc4019e10885677ffe4ee7aeb46a807626ac18654dfb/docling_slim-2.99.0-py3-none-any.whl", hash = "sha256:f67e31ca3cc39c5b19df3cfcb8fbe7bcc5ef29ffff320bbafca56e3b9ce40f24", size = 530895, upload-time = "2026-06-08T15:12:51.487Z" },
-]
-
-[package.optional-dependencies]
-standard = [
-    { name = "accelerate", marker = "sys_platform == 'darwin'" },
-    { name = "beautifulsoup4", marker = "sys_platform == 'darwin'" },
-    { name = "defusedxml", marker = "sys_platform == 'darwin'" },
-    { name = "docling-core", version = "2.78.0", source = { registry = "https://pypi.org/simple" }, extra = ["chunking"], marker = "sys_platform == 'darwin'" },
-    { name = "docling-ibm-models", version = "3.13.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
-    { name = "docling-parse", marker = "sys_platform == 'darwin'" },
-    { name = "httpx", marker = "sys_platform == 'darwin'" },
-    { name = "huggingface-hub", marker = "sys_platform == 'darwin'" },
-    { name = "lxml", marker = "sys_platform == 'darwin'" },
-    { name = "mail-parser", marker = "sys_platform == 'darwin'" },
-    { name = "marko", marker = "sys_platform == 'darwin'" },
-    { name = "numpy", marker = "sys_platform == 'darwin'" },
-    { name = "openpyxl", marker = "sys_platform == 'darwin'" },
-    { name = "pillow", marker = "sys_platform == 'darwin'" },
-    { name = "polyfactory", marker = "sys_platform == 'darwin'" },
-    { name = "pylatexenc", marker = "sys_platform == 'darwin'" },
-    { name = "pypdfium2", marker = "sys_platform == 'darwin'" },
-    { name = "python-docx", marker = "sys_platform == 'darwin'" },
-    { name = "python-pptx", marker = "sys_platform == 'darwin'" },
-    { name = "rapidocr", marker = "sys_platform == 'darwin'" },
-    { name = "rich", marker = "sys_platform == 'darwin'" },
-    { name = "rtree", marker = "sys_platform == 'darwin'" },
-    { name = "scipy", marker = "sys_platform == 'darwin'" },
-    { name = "torch", version = "2.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
-    { name = "torchvision", version = "0.27.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
-    { name = "typer", version = "0.21.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
-    { name = "websockets", marker = "sys_platform == 'darwin'" },
-]
-
-[[package]]
-name = "docling-slim"
 version = "2.104.0"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.15' and sys_platform == 'linux'",
-    "python_full_version == '3.14.*' and sys_platform == 'linux'",
-    "python_full_version == '3.13.*' and sys_platform == 'linux'",
-    "python_full_version < '3.13' and sys_platform == 'linux'",
-    "python_full_version >= '3.15' and sys_platform == 'win32'",
-    "python_full_version >= '3.15' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.15' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
-    "python_full_version == '3.14.*' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.14.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
-    "python_full_version == '3.13.*' and sys_platform == 'win32'",
-    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.13.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
-    "python_full_version < '3.13' and sys_platform == 'win32'",
-    "python_full_version < '3.13' and sys_platform == 'emscripten'",
-    "python_full_version < '3.13' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
-]
 dependencies = [
-    { name = "certifi", marker = "sys_platform != 'darwin'" },
-    { name = "docling-core", version = "2.83.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
-    { name = "filetype", marker = "sys_platform != 'darwin'" },
-    { name = "pluggy", marker = "sys_platform != 'darwin'" },
-    { name = "pydantic", marker = "sys_platform != 'darwin'" },
-    { name = "pydantic-settings", marker = "sys_platform != 'darwin'" },
-    { name = "requests", marker = "sys_platform != 'darwin'" },
-    { name = "tqdm", marker = "sys_platform != 'darwin'" },
+    { name = "certifi" },
+    { name = "docling-core" },
+    { name = "filetype" },
+    { name = "pluggy" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "requests" },
+    { name = "tqdm" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/aa/75/217803d56063d559c7565c59f3dc27c898eeec857cd4ba890c4a3c8681a7/docling_slim-2.104.0.tar.gz", hash = "sha256:a426ba5802fe0b6102da9a8f19079036dcf4eac33791a8967df9887bb7449b53", size = 442998, upload-time = "2026-06-19T04:52:06.9Z" }
 wheels = [
@@ -1662,36 +1500,38 @@ wheels = [
 
 [package.optional-dependencies]
 standard = [
-    { name = "accelerate", marker = "sys_platform != 'darwin'" },
-    { name = "beautifulsoup4", marker = "sys_platform != 'darwin'" },
-    { name = "defusedxml", marker = "sys_platform != 'darwin'" },
-    { name = "docling-core", version = "2.83.1", source = { registry = "https://pypi.org/simple" }, extra = ["chunking"], marker = "sys_platform != 'darwin'" },
+    { name = "accelerate" },
+    { name = "beautifulsoup4" },
+    { name = "defusedxml" },
+    { name = "docling-core", extra = ["chunking"] },
+    { name = "docling-ibm-models", version = "3.13.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
     { name = "docling-ibm-models", version = "3.13.3", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
-    { name = "docling-parse", marker = "sys_platform != 'darwin'" },
-    { name = "httpx", marker = "sys_platform != 'darwin'" },
-    { name = "huggingface-hub", marker = "sys_platform != 'darwin'" },
-    { name = "lxml", marker = "sys_platform != 'darwin'" },
-    { name = "mail-parser", marker = "sys_platform != 'darwin'" },
-    { name = "marko", marker = "sys_platform != 'darwin'" },
-    { name = "numpy", marker = "sys_platform != 'darwin'" },
-    { name = "openpyxl", marker = "sys_platform != 'darwin'" },
-    { name = "pillow", marker = "sys_platform != 'darwin'" },
-    { name = "polyfactory", marker = "sys_platform != 'darwin'" },
-    { name = "pylatexenc", marker = "sys_platform != 'darwin'" },
-    { name = "pypdfium2", marker = "sys_platform != 'darwin'" },
-    { name = "python-docx", marker = "sys_platform != 'darwin'" },
-    { name = "python-dotenv", marker = "sys_platform != 'darwin'" },
-    { name = "python-pptx", marker = "sys_platform != 'darwin'" },
-    { name = "rapidocr", marker = "sys_platform != 'darwin'" },
-    { name = "rich", marker = "sys_platform != 'darwin'" },
-    { name = "rtree", marker = "sys_platform != 'darwin'" },
-    { name = "scipy", marker = "sys_platform != 'darwin'" },
-    { name = "torch", version = "2.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin' and sys_platform != 'linux'" },
+    { name = "docling-parse" },
+    { name = "httpx" },
+    { name = "huggingface-hub" },
+    { name = "lxml" },
+    { name = "mail-parser" },
+    { name = "marko" },
+    { name = "numpy" },
+    { name = "openpyxl" },
+    { name = "pillow" },
+    { name = "polyfactory" },
+    { name = "pylatexenc" },
+    { name = "pypdfium2" },
+    { name = "python-docx" },
+    { name = "python-dotenv" },
+    { name = "python-pptx" },
+    { name = "rapidocr" },
+    { name = "rich" },
+    { name = "rtree" },
+    { name = "scipy" },
+    { name = "torch", version = "2.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.12.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
-    { name = "torchvision", version = "0.27.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin' and sys_platform != 'linux'" },
+    { name = "torchvision", version = "0.27.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torchvision", version = "0.27.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+    { name = "typer", version = "0.21.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
     { name = "typer", version = "0.24.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
-    { name = "websockets", marker = "sys_platform != 'darwin'" },
+    { name = "websockets" },
 ]
 
 [[package]]
@@ -1982,7 +1822,8 @@ dependencies = [
     { name = "torch", version = "2.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.12.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "tqdm" },
-    { name = "transformers" },
+    { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "transformers", version = "5.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/2b/6d/677d50855311e4a1286204c5ef2ef5672d01688246a303bde5326311bdad/gliner-0.2.24.tar.gz", hash = "sha256:191a37d1b3d297927c37ae890ce904e9d4e9d3f4c8e19715e77a9876e5f8a575", size = 160568, upload-time = "2025-11-26T18:20:32.867Z" }
 wheels = [
@@ -3527,7 +3368,8 @@ dependencies = [
     { name = "torch", version = "2.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.12.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "tqdm" },
-    { name = "transformers" },
+    { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "transformers", version = "5.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/86/cf/037f1e3d5186496c05513a6754639e2dab3038a05f384284d49a9bd06a2d/peft-0.19.1.tar.gz", hash = "sha256:0d97542fe96dcdaa20d3b81c06f26f988618f416a73544ab23c3618ccb674a40", size = 763738, upload-time = "2026-04-16T15:46:45.105Z" }
 wheels = [
@@ -4966,7 +4808,8 @@ dependencies = [
     { name = "torch", version = "2.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.12.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "tqdm" },
-    { name = "transformers" },
+    { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "transformers", version = "5.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f9/56/d2cb00765a6b15c994a7fccf20f9032f16e8193ca49147cb5155166ad744/sentence_transformers-5.6.0.tar.gz", hash = "sha256:0e7164d051e416c1853ade7c274ff52af3f9da0f4be7f0b83d734c27699e1057", size = 453194, upload-time = "2026-06-16T14:01:56.42Z" }
@@ -5039,7 +4882,8 @@ dependencies = [
     { name = "packaging" },
     { name = "scikit-learn" },
     { name = "sentence-transformers", extra = ["train"] },
-    { name = "transformers" },
+    { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "transformers", version = "5.12.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ac/f5/5dbca5ff076524daccf6a63062f8903d97c0c56c4a631f17730ae5723b1f/setfit-1.1.3.tar.gz", hash = "sha256:db54a7b6e86118343275cc70c39749f71e10aa226fef510543bcd7c8b00b9f19", size = 84459, upload-time = "2025-08-05T13:22:38.727Z" }
 wheels = [
@@ -5714,18 +5558,61 @@ wheels = [
 
 [[package]]
 name = "transformers"
+version = "5.8.1"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.15' and sys_platform == 'darwin'",
+    "python_full_version == '3.14.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.13.*' and sys_platform == 'darwin'",
+    "python_full_version < '3.13' and sys_platform == 'darwin'",
+]
+dependencies = [
+    { name = "huggingface-hub", marker = "sys_platform == 'darwin'" },
+    { name = "numpy", marker = "sys_platform == 'darwin'" },
+    { name = "packaging", marker = "sys_platform == 'darwin'" },
+    { name = "pyyaml", marker = "sys_platform == 'darwin'" },
+    { name = "regex", marker = "sys_platform == 'darwin'" },
+    { name = "safetensors", marker = "sys_platform == 'darwin'" },
+    { name = "tokenizers", marker = "sys_platform == 'darwin'" },
+    { name = "tqdm", marker = "sys_platform == 'darwin'" },
+    { name = "typer", version = "0.21.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e7/e6/4134ea2fbea322cddc7ffc94a0d8ee47fe32ce8e876b320cd37d88edfc4d/transformers-5.8.1.tar.gz", hash = "sha256:4dd5b6de4105725104d84fd6abd74b305f4debfc251b38c648ee5dd087cf543b", size = 8532019, upload-time = "2026-05-13T03:21:57.234Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fc/b1/8be7e7ef0b5200491312201918b6125ef9c9df9dd0f0240ccef9ac824e6b/transformers-5.8.1-py3-none-any.whl", hash = "sha256:5340fb95962162cdfdae5cc91d7f8fedd92ed75216c1154c5e1f590fcf56dd0e", size = 10632882, upload-time = "2026-05-13T03:21:52.876Z" },
+]
+
+[[package]]
+name = "transformers"
 version = "5.12.1"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.15' and sys_platform == 'linux'",
+    "python_full_version == '3.14.*' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and sys_platform == 'linux'",
+    "python_full_version >= '3.15' and sys_platform == 'win32'",
+    "python_full_version >= '3.15' and sys_platform == 'emscripten'",
+    "python_full_version >= '3.15' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
+    "python_full_version == '3.14.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
+    "python_full_version == '3.13.*' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
+    "python_full_version < '3.13' and sys_platform == 'win32'",
+    "python_full_version < '3.13' and sys_platform == 'emscripten'",
+    "python_full_version < '3.13' and sys_platform != 'darwin' and sys_platform != 'emscripten' and sys_platform != 'linux' and sys_platform != 'win32'",
+]
 dependencies = [
-    { name = "huggingface-hub" },
-    { name = "numpy" },
-    { name = "packaging" },
-    { name = "pyyaml" },
-    { name = "regex" },
-    { name = "safetensors" },
-    { name = "tokenizers" },
-    { name = "tqdm" },
-    { name = "typer", version = "0.21.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "huggingface-hub", marker = "sys_platform != 'darwin'" },
+    { name = "numpy", marker = "sys_platform != 'darwin'" },
+    { name = "packaging", marker = "sys_platform != 'darwin'" },
+    { name = "pyyaml", marker = "sys_platform != 'darwin'" },
+    { name = "regex", marker = "sys_platform != 'darwin'" },
+    { name = "safetensors", marker = "sys_platform != 'darwin'" },
+    { name = "tokenizers", marker = "sys_platform != 'darwin'" },
+    { name = "tqdm", marker = "sys_platform != 'darwin'" },
     { name = "typer", version = "0.24.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/aa/7c/8240f612819718100a9346dc28dea6a11370c3ca9c8c6eabadd3dea4ef29/transformers-5.12.1.tar.gz", hash = "sha256:679ee731c8225347889ad4fb3b2c926a62e9da3b7d284e9d12c791da7272466b", size = 8924054, upload-time = "2026-06-15T17:27:50.604Z" }
