@@ -107,15 +107,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Ad-hoc codesign macOS app
+      - name: Ad-hoc codesign macOS app and rebuild ZIP
         if: runner.os == 'macOS'
         shell: bash
         run: |
           APP=$(find apps/desktop/out -name '*.app' -type d | head -1)
-          if [ -n "$APP" ]; then
-            echo "Signing $APP"
-            codesign --deep --force --sign - "$APP"
-            codesign --verify --deep "$APP" && echo "Signature valid" || echo "::warning::Signature verification failed"
+          if [ -z "$APP" ]; then
+            echo "::error::No .app bundle found"
+            exit 1
+          fi
+
+          echo "Signing $APP"
+          codesign --deep --force --sign - "$APP"
+          codesign --verify --deep "$APP"
+
+          # Rebuild the ZIP with the signed app
+          APP_DIR=$(dirname "$APP")
+          ZIP=$(find apps/desktop/out -name '*.zip' | head -1)
+          if [ -n "$ZIP" ]; then
+            echo "Rebuilding $ZIP with signed app"
+            rm "$ZIP"
+            cd "$APP_DIR"
+            zip -r -y "$OLDPWD/$ZIP" "$(basename "$APP")"
+            cd "$OLDPWD"
           fi
 
       - name: Find artifacts
