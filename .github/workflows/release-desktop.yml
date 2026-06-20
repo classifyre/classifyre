@@ -149,7 +149,6 @@ jobs:
         with:
           name: desktop-${{ matrix.artifact }}
           path: |
-            apps/desktop/out/**/*.dmg
             apps/desktop/out/**/*.exe
             apps/desktop/out/**/*.deb
             apps/desktop/out/**/*.zip
@@ -178,7 +177,6 @@ jobs:
         with:
           tag_name: ${{ inputs.tag }}
           files: |
-            artifacts/**/*.dmg
             artifacts/**/*.exe
             artifacts/**/*.deb
             artifacts/**/*.zip
