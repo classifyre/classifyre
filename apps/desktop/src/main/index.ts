@@ -6,6 +6,17 @@ import { ProcessManager } from './process-manager.js';
 import { NamespaceRuntime } from './namespace-runtime.js';
 import { registerIpcHandlers } from './ipc-handlers.js';
 import { registerAppProtocol } from './protocol-handler.js';
+import { AutoUpdater } from './auto-updater.js';
+
+// embedded-postgres registers an async-exit-hook that calls done() on process
+// exit, but Electron's quit path doesn't always provide the callback. Suppress
+// the resulting unhandled rejection so it doesn't crash the app on quit.
+process.on('unhandledRejection', (reason) => {
+  if (reason instanceof TypeError && (reason as TypeError).message === 'done is not a function') {
+    return;
+  }
+  console.error('Unhandled rejection:', reason);
+});
 
 const isDev = !app.isPackaged;
 
@@ -14,6 +25,7 @@ let pg: PostgresManager;
 let namespaceManager: NamespaceManager;
 let processManager: ProcessManager;
 let runtime: NamespaceRuntime;
+let updater: AutoUpdater;
 
 function getPreloadPath(): string {
   return path.join(__dirname, 'preload.js');
@@ -45,7 +57,9 @@ function createMainWindow(): BrowserWindow {
   });
   win.contentView.addChildView(tabBarView);
 
-  const tabBarHtml = path.join(__dirname, '../../src/renderer/tab-bar/tab-bar.html');
+  const tabBarHtml = isDev
+    ? path.join(__dirname, '../../src/renderer/tab-bar/tab-bar.html')
+    : path.join(__dirname, 'tab-bar/tab-bar.html');
   void tabBarView.webContents.loadFile(tabBarHtml);
 
   // --- Selector view (namespace picker, fills content area) ---
@@ -75,6 +89,9 @@ function createMainWindow(): BrowserWindow {
   runtime.setSelectorView(selectorView);
   runtime.showSelector();
 
+  updater.setTabBarView(tabBarView);
+  void updater.init().then(() => updater.checkForUpdates());
+
   return win;
 }
 
@@ -100,7 +117,8 @@ app.on('ready', async () => {
     getPreloadPath(),
   );
 
-  registerIpcHandlers(runtime, namespaceManager);
+  updater = new AutoUpdater();
+  registerIpcHandlers(runtime, namespaceManager, updater);
 
   try {
     await pg.start();
@@ -137,9 +155,15 @@ app.on('activate', () => {
   }
 });
 
-app.on('before-quit', () => {
+let isQuitting = false;
+app.on('before-quit', (e) => {
+  if (isQuitting) return;
+  e.preventDefault();
+  isQuitting = true;
+
   Promise.resolve()
     .then(() => runtime?.closeAll())
     .then(() => pg?.stop())
-    .catch((err) => console.error('Shutdown error:', err));
+    .catch((err) => console.error('Shutdown error:', err))
+    .finally(() => app.quit());
 });

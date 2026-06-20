@@ -6,7 +6,9 @@ import { randomUUID } from 'crypto';
 export interface Namespace {
   id: string;
   name: string;
+  type: 'local' | 'remote';
   schemaName: string;
+  remoteUrl?: string;
   createdAt: string;
   lastOpenedAt: string;
 }
@@ -24,7 +26,11 @@ export class NamespaceManager {
   private load(): void {
     try {
       const data = fs.readFileSync(this.filePath, 'utf-8');
-      this.namespaces = JSON.parse(data) as Namespace[];
+      const parsed = JSON.parse(data) as Namespace[];
+      this.namespaces = parsed.map((ns) => ({
+        ...ns,
+        type: ns.type || 'local',
+      }));
     } catch {
       this.namespaces = [];
     }
@@ -46,8 +52,9 @@ export class NamespaceManager {
     return [...this.namespaces];
   }
 
-  create(name: string): Namespace {
+  create(name: string, remoteUrl?: string): Namespace {
     const id = randomUUID();
+    const isRemote = !!remoteUrl;
     const slug = this.slugify(name) || id.slice(0, 8);
 
     const existing = this.namespaces.map((n) => n.schemaName);
@@ -60,7 +67,9 @@ export class NamespaceManager {
     const ns: Namespace = {
       id,
       name,
+      type: isRemote ? 'remote' : 'local',
       schemaName,
+      ...(isRemote ? { remoteUrl } : {}),
       createdAt: new Date().toISOString(),
       lastOpenedAt: new Date().toISOString(),
     };

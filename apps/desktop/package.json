@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/desktop",
-  "version": "0.4.25-SNAPSHOT",
+  "version": "0.4.25",
   "private": true,
   "description": "Classifyre Desktop — Electron app with embedded PostgreSQL",
   "main": ".vite/build/index.js",
@@ -15,6 +15,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "electron-updater": "^6.3.0",
     "embedded-postgres": "18.4.0-beta.17",
     "get-port": "^7.1.0",
     "tree-kill": "^1.2.2"

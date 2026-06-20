@@ -68,12 +68,13 @@ export class PostgresManager {
 
   async createSchema(schemaName: string): Promise<void> {
     if (!this.pg) throw new Error('PostgreSQL not started');
+    if (!/^[a-z0-9_]+$/.test(schemaName)) {
+      throw new Error(`Invalid schema name: ${schemaName}`);
+    }
 
-    // getPgClient connects to the database matching the configured user
     const client = this.pg.getPgClient();
     await client.connect();
     try {
-      // Switch to classifyre database and create schema
       await client.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
     } finally {
       await client.end();

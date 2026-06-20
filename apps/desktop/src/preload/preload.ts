@@ -21,8 +21,8 @@ if (apiPort) {
 contextBridge.exposeInMainWorld('electronAPI', {
   // Namespace operations
   listNamespaces: () => ipcRenderer.invoke('namespace:list'),
-  createNamespace: (name: string) =>
-    ipcRenderer.invoke('namespace:create', name),
+  createNamespace: (name: string, remoteUrl?: string) =>
+    ipcRenderer.invoke('namespace:create', name, remoteUrl),
   deleteNamespace: (id: string) =>
     ipcRenderer.invoke('namespace:delete', id),
   openNamespace: (id: string) =>
@@ -36,8 +36,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   switchTab: (id: string) => ipcRenderer.invoke('tab:switch', id),
   showSelector: () => ipcRenderer.invoke('tab:show-selector'),
   closeTab: (id: string) => ipcRenderer.invoke('tab:close', id),
+  getTabState: () => ipcRenderer.invoke('tab:get-state'),
   onTabsUpdate: (cb: (data: unknown) => void) => {
     ipcRenderer.on('tabs:update', (_event, data) => cb(data));
+  },
+
+  // Update operations
+  checkForUpdate: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateStatus: (cb: (data: unknown) => void) => {
+    ipcRenderer.on('update:status', (_event, data) => cb(data));
   },
 
   // Runtime info

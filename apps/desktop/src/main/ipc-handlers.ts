@@ -1,17 +1,19 @@
 import { ipcMain, app } from 'electron';
 import { NamespaceRuntime } from './namespace-runtime.js';
 import { NamespaceManager } from './namespace-manager.js';
+import { AutoUpdater } from './auto-updater.js';
 
 export function registerIpcHandlers(
   runtime: NamespaceRuntime,
   namespaceManager: NamespaceManager,
+  updater: AutoUpdater,
 ): void {
   ipcMain.handle('namespace:list', () => {
     return namespaceManager.list();
   });
 
-  ipcMain.handle('namespace:create', (_event, name: string) => {
-    return namespaceManager.create(name);
+  ipcMain.handle('namespace:create', (_event, name: string, remoteUrl?: string) => {
+    return namespaceManager.create(name, remoteUrl);
   });
 
   ipcMain.handle('namespace:delete', async (_event, id: string) => {
@@ -40,14 +42,33 @@ export function registerIpcHandlers(
   });
 
   ipcMain.handle('tab:show-selector', () => {
+    console.log('[IPC] tab:show-selector called');
     runtime.showSelector();
+    console.log('[IPC] tab:show-selector done, active tab:', runtime.getActiveTabId());
   });
 
   ipcMain.handle('tab:close', async (_event, id: string) => {
     await runtime.close(id);
   });
 
-  ipcMain.handle('runtime:api-port', (_event) => {
+  ipcMain.handle('tab:get-state', () => {
+    return runtime.getTabState();
+  });
+
+  // Update operations
+  ipcMain.handle('update:check', async () => {
+    await updater.checkForUpdates();
+  });
+
+  ipcMain.handle('update:download', async () => {
+    await updater.downloadUpdate();
+  });
+
+  ipcMain.handle('update:install', () => {
+    updater.quitAndInstall();
+  });
+
+  ipcMain.handle('runtime:api-port', () => {
     return null;
   });
 

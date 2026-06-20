@@ -7,25 +7,40 @@ import os from 'os';
 import treeKill from 'tree-kill';
 
 function getShellPath(): string {
-  try {
-    const raw = execFileSync('/bin/zsh', ['-lc', 'echo $PATH'], {
-      encoding: 'utf-8',
-      timeout: 5000,
-    }).trim();
-    if (raw) return raw;
-  } catch { /* fall through */ }
+  const shells = ['/bin/zsh', '/bin/bash'];
+  for (const shell of shells) {
+    try {
+      if (!fs.existsSync(shell)) continue;
+      const raw = execFileSync(shell, ['-lc', 'echo $PATH'], {
+        encoding: 'utf-8',
+        timeout: 5000,
+      }).trim();
+      if (raw) return raw;
+    } catch { /* fall through */ }
+  }
 
   const home = os.homedir();
   const extras = [
     `${home}/.bun/bin`,
     `${home}/.local/bin`,
-    `${home}/.nvm/versions/node/v22.22.3/bin`,
+    '/opt/homebrew/bin',
     '/usr/local/bin',
     '/usr/bin',
     '/bin',
     '/usr/sbin',
     '/sbin',
   ];
+
+  const nvmDir = path.join(home, '.nvm/versions/node');
+  if (fs.existsSync(nvmDir)) {
+    try {
+      const versions = fs.readdirSync(nvmDir).filter((v) => v.startsWith('v')).sort().reverse();
+      if (versions[0]) {
+        extras.unshift(path.join(nvmDir, versions[0], 'bin'));
+      }
+    } catch { /* ignore */ }
+  }
+
   return extras.join(':');
 }
 
@@ -91,7 +106,7 @@ export class ProcessManager {
     databaseUrl: string,
   ): Promise<void> {
     if (this.processes.has(namespaceId)) {
-      throw new Error(`API already running for namespace ${namespaceId}`);
+      return;
     }
 
     const entryPath = this.getApiEntryPath();
@@ -114,15 +129,15 @@ export class ProcessManager {
     });
 
     child.stdout?.on('data', (data: Buffer) => {
-      console.log(`[API:${namespaceId}] ${data.toString().trim()}`);
+      process.stderr.write(`[API:${namespaceId}] ${data.toString().trim()}\n`);
     });
 
     child.stderr?.on('data', (data: Buffer) => {
-      console.error(`[API:${namespaceId}] ${data.toString().trim()}`);
+      process.stderr.write(`[API:${namespaceId}] ${data.toString().trim()}\n`);
     });
 
     child.on('exit', (code) => {
-      console.log(`[API:${namespaceId}] exited with code ${code}`);
+      process.stderr.write(`[API:${namespaceId}] exited with code ${code}\n`);
       this.processes.delete(namespaceId);
     });
 
