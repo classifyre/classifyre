@@ -1,8 +1,12 @@
 name: Release Desktop
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.4.25)'
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
@@ -45,6 +49,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -119,7 +125,6 @@ jobs:
     name: Upload to GitHub Release
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event.inputs.tag != ''
 
     steps:
       - name: Download all artifacts
@@ -132,19 +137,10 @@ jobs:
       - name: List downloaded artifacts
         run: find artifacts -type f | head -30
 
-      - name: Determine tag
-        id: tag
-        run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ inputs.tag }}
           files: |
             artifacts/**/*.dmg
             artifacts/**/*.exe

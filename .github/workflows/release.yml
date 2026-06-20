@@ -226,6 +226,7 @@ jobs:
             package.json \
             apps/api/package.json \
             apps/blog/package.json \
+            apps/desktop/package.json \
             apps/docs/package.json \
             apps/web/package.json \
             apps/cli/package.json \
@@ -407,6 +408,7 @@ jobs:
             package.json \
             apps/api/package.json \
             apps/blog/package.json \
+            apps/desktop/package.json \
             apps/docs/package.json \
             apps/web/package.json \
             apps/cli/package.json \
@@ -487,3 +489,15 @@ jobs:
           kubectl -n "${HELM_NAMESPACE}" rollout status deployment/${HELM_RELEASE_NAME}-web --timeout=300s
           kubectl -n "${HELM_NAMESPACE}" get deploy,pods,svc
           helm status "${HELM_RELEASE_NAME}" -n "${HELM_NAMESPACE}"
+
+    outputs:
+      tag: ${{ steps.versions.outputs.tag }}
+
+  # ── 10. Desktop builds (runs in parallel on macOS/Windows/Linux) ─────
+  desktop:
+    name: Desktop Builds
+    needs: release
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+    secrets: inherit
