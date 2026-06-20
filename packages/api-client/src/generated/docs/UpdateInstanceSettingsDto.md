@@ -17,6 +17,7 @@ Name | Type
 `autopilotInquirySearchable` | string
 `autopilotCaseEnabled` | boolean
 `autopilotCaseGuidance` | string
+`hfToken` | string
 
 ## Example
 
@@ -36,6 +37,7 @@ const example = {
   "autopilotInquirySearchable": null,
   "autopilotCaseEnabled": false,
   "autopilotCaseGuidance": null,
+  "hfToken": null,
 } satisfies UpdateInstanceSettingsDto
 
 console.log(example)

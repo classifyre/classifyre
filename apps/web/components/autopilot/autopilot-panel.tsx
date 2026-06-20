@@ -4,6 +4,7 @@ import * as React from "react";
 import { Activity, Bot, Brain, Play } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
+import { useTranslation } from "@/hooks/use-translation";
 import { AutopilotActivity } from "./autopilot-activity";
 import { AutopilotMemory } from "./autopilot-memory";
 import { RunAutopilotDialog } from "./run-autopilot-dialog";
@@ -14,6 +15,7 @@ import { RunAutopilotDialog } from "./run-autopilot-dialog";
  * memory) and a steer-and-run trigger.
  */
 export function AutopilotPanel() {
+  const { t } = useTranslation();
   const [view, setView] = React.useState<"activity" | "memory">("activity");
   const [runOpen, setRunOpen] = React.useState(false);
   // Remount activity after a manual trigger so it picks the new cycle up fast.
@@ -28,8 +30,8 @@ export function AutopilotPanel() {
         <div className="flex rounded-[4px] border-2 border-border p-0.5">
           {(
             [
-              { value: "activity", label: "Activity", icon: <Activity className="h-3 w-3" /> },
-              { value: "memory", label: "Memory", icon: <Brain className="h-3 w-3" /> },
+              { value: "activity", label: t("investigations.autopilot.toggleActivity"), icon: <Activity className="h-3 w-3" /> },
+              { value: "memory", label: t("investigations.autopilot.toggleMemory"), icon: <Brain className="h-3 w-3" /> },
             ] as const
           ).map((v) => (
             <button
@@ -48,7 +50,7 @@ export function AutopilotPanel() {
           ))}
         </div>
         <Button size="sm" className="ml-auto" onClick={() => setRunOpen(true)}>
-          <Play className="h-3.5 w-3.5" /> Run autopilot
+          <Play className="h-3.5 w-3.5" /> {t("investigations.autopilot.runAutopilot")}
         </Button>
       </div>
 

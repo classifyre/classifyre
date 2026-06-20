@@ -317,6 +317,44 @@
             "source_hash",
             "location"
           ]
+        },
+        "audio": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key"
+          ]
+        },
+        "video": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key"
+          ]
         }
       },
       "AZURE_BLOB_STORAGE": {
@@ -366,6 +404,44 @@
             "source_hash",
             "location"
           ]
+        },
+        "audio": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key"
+          ]
+        },
+        "video": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key"
+          ]
         }
       },
       "GOOGLE_CLOUD_STORAGE": {
@@ -414,6 +490,44 @@
           "required": [
             "source_hash",
             "location"
+          ]
+        },
+        "audio": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key"
+          ]
+        },
+        "video": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key"
           ]
         }
       },

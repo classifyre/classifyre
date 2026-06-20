@@ -21,6 +21,18 @@
             "cleanupPolicy": {
               "type": "string",
               "enum": ["none", "failed", "always"]
+            },
+            "huggingFace": {
+              "type": "object",
+              "properties": {
+                "existingSecret": {
+                  "type": "string"
+                },
+                "existingKey": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
             }
           }
         },

@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, SearchCheck } from "lucide-react";
 import {
   api,
   SearchFindingsFiltersInputDtoSeverityEnum,
@@ -31,7 +31,7 @@ import {
 import { FindingsTrendChart } from "@/components/findings-trend-chart";
 import { FindingsTable } from "@/components/findings-table";
 import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
-import { AppIcon } from "@/components/app-icon";
+
 import { useTranslation } from "@/hooks/use-translation";
 
 type SeverityValue =
@@ -222,7 +222,7 @@ function FindingsPageContent() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
-          <AppIcon name="finger-print" active size={28} />
+          <SearchCheck className="size-7" />
           <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
             {t("findings.title")}
           </h1>

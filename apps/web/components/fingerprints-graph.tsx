@@ -984,11 +984,13 @@ export function FingerprintsGraph({
         onOpenChange={setTuneOpen}
         onSaved={() => void waitForRecompute(Date.now())}
       />
-      <FingerprintsCaseDialog
-        open={caseOpen}
-        onOpenChange={setCaseOpen}
-        assetIds={targetAssetIds}
-      />
+      {caseOpen && (
+        <FingerprintsCaseDialog
+          open={caseOpen}
+          onOpenChange={setCaseOpen}
+          assetIds={targetAssetIds}
+        />
+      )}
     </div>
   );
 }

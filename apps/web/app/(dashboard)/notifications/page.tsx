@@ -43,17 +43,16 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import {
   ArrowUpRight,
+  Bell,
   CheckCheck,
   Clock3,
   Loader2,
-  LucideIcon,
   Search,
   Star,
   StarOff,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
-import { AppIcon, type IconName } from "@/components/app-icon";
 import { formatRelative, formatShortUTC } from "@/lib/date";
 import { useNotificationsWebSocket } from "@/hooks/use-notifications-websocket";
 import { useTranslation } from "@/hooks/use-translation";
@@ -66,14 +65,6 @@ type ListNotificationsRequest = NonNullable<
 type MarkAllReadDto = Parameters<
   typeof api.notifications.notificationsControllerMarkAllRead
 >[0]["markAllReadDto"];
-
-const BellCardIcon: ComponentType<{ className?: string }> = ({ className }) => (
-  <AppIcon name="bell" size={14} className={className} />
-);
-
-const BellEmptyIcon = (({ className }: { className?: string }) => (
-  <AppIcon name="bell" size={48} className={className} />
-)) as LucideIcon;
 
 const ALL = "ALL" as const;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
@@ -367,7 +358,7 @@ export default function NotificationsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
-          <AppIcon name="bell" active size={28} />
+          <Bell className="size-7" />
           <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
             {t("notifications.title")}
           </h1>
@@ -381,7 +372,7 @@ export default function NotificationsPage() {
         <QuickFilterCard
           label={t("notifications.total")}
           value={total}
-          icon={BellCardIcon}
+            icon={Bell}
           active={activeQuickFilter === "TOTAL"}
           onClick={() => handleQuickFilterClick("TOTAL")}
         />
@@ -538,7 +529,7 @@ export default function NotificationsPage() {
           </div>
         ) : visibleNotifications.length === 0 ? (
           <EmptyState
-          icon={BellEmptyIcon}
+          icon={Bell}
             title={t("notifications.noNotifications")}
             description={t("notifications.noNotificationsHint")}
             className="min-h-[320px]"

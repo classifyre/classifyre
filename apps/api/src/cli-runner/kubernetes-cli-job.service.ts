@@ -11,6 +11,7 @@ import type {
   V1Pod,
   V1PodList,
 } from '@kubernetes/client-node';
+import { InstanceSettingsService } from '../instance-settings.service';
 
 type KubernetesModule = typeof import('@kubernetes/client-node');
 
@@ -50,7 +51,7 @@ export class KubernetesCliJobService {
   private readonly runningJobsByRunnerId = new Map<string, JobRef>();
   private cachedTemplate: V1Job | null = null;
 
-  constructor() {}
+  constructor(private readonly instanceSettings: InstanceSettingsService) {}
 
   isEnabled(): boolean {
     return this.enabled;
@@ -233,7 +234,7 @@ export class KubernetesCliJobService {
     }
 
     const template = await this.loadTemplate();
-    const job = this.buildJobFromTemplate(template, params);
+    const job = await this.buildJobFromTemplate(template, params);
     const namespace = job.metadata?.namespace || this.namespace;
     const jobName = job.metadata?.name;
 
@@ -393,7 +394,7 @@ export class KubernetesCliJobService {
     };
   }
 
-  private buildJobFromTemplate(
+  private async buildJobFromTemplate(
     template: V1Job,
     params: {
       sourceId: string;
@@ -405,7 +406,7 @@ export class KubernetesCliJobService {
       sandboxFileExt?: string;
       sandboxDetectorsB64?: string;
     },
-  ): V1Job {
+  ): Promise<V1Job> {
     const job = JSON.parse(JSON.stringify(template)) as V1Job;
     const jobAny = job as any;
     const nameSuffix = crypto
@@ -509,6 +510,16 @@ export class KubernetesCliJobService {
 
     if (process.env.UV_CACHE_DIR) {
       this.setEnvValue(envMap, 'UV_CACHE_DIR', process.env.UV_CACHE_DIR);
+    }
+
+    // If the job template does NOT carry an instance-level HF_TOKEN (provided via
+    // the Helm chart's huggingFace.existingSecret), inject the user-configured
+    // token from the database (encrypted at rest, decrypted here).
+    if (!envMap.has('HF_TOKEN')) {
+      const userToken = await this.instanceSettings.getUserHfToken();
+      if (userToken) {
+        this.setEnvValue(envMap, 'HF_TOKEN', userToken);
+      }
     }
 
     container.env = Array.from(envMap.values());
