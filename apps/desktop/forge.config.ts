@@ -18,6 +18,8 @@ const extraResource = allResources
 const config: ForgeConfig = {
   buildIdentifier: 'classifyre',
   packagerConfig: {
+    name: 'Classifyre',
+    executableName: 'classifyre',
     appBundleId: 'com.classifyre.desktop',
     icon: path.resolve(__dirname, 'build/icon'),
     asar: true,
