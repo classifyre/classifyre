@@ -4,31 +4,36 @@ import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const allResources = ['api', 'web', 'cli', 'prisma'];
+const extraResource = allResources
+  .map((name) => path.resolve(__dirname, 'resources', name))
+  .filter((abs) => fs.existsSync(abs));
 
 const config: ForgeConfig = {
   buildIdentifier: 'classifyre',
   packagerConfig: {
     appBundleId: 'com.classifyre.desktop',
-    icon: './build/icon',
+    icon: path.resolve(__dirname, 'build/icon'),
     asar: true,
-    extraResource: [
-      './resources/api',
-      './resources/web',
-      './resources/cli',
-      './resources/prisma',
-    ],
+    ...(extraResource.length > 0 ? { extraResource } : {}),
   },
   makers: [
     new MakerDMG({
-      icon: './build/icon.icns',
+      icon: path.resolve(__dirname, 'build/icon.icns'),
     }),
     new MakerSquirrel({
       name: 'Classifyre',
-      setupIcon: './build/icon.ico',
+      setupIcon: path.resolve(__dirname, 'build/icon.ico'),
     }),
     new MakerDeb({
       options: {
-        icon: './build/icon.png',
+        icon: path.resolve(__dirname, 'build/icon.png'),
       },
     }),
   ],

@@ -30,6 +30,7 @@ coverage
 
 # Build Outputs
 .next/
+.vite/
 out/
 build
 dist
