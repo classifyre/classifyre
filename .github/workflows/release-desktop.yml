@@ -116,22 +116,25 @@ jobs:
         id: artifacts
         shell: bash
         run: |
-          OUTDIR="apps/desktop/out/make"
+          OUTDIR="apps/desktop/out"
           echo "Files in make output:"
           find "$OUTDIR" -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.deb' -o -name '*.rpm' -o -name '*.zip' -o -name '*.nupkg' \) | tee /tmp/artifacts.txt
-          echo "artifact_dir=$OUTDIR" >> "$GITHUB_OUTPUT"
+          if [ ! -s /tmp/artifacts.txt ]; then
+            echo "::error::No desktop artifacts found"
+            exit 1
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.artifact }}
           path: |
-            apps/desktop/out/make/**/*.dmg
-            apps/desktop/out/make/**/*.exe
-            apps/desktop/out/make/**/*.deb
-            apps/desktop/out/make/**/*.zip
-            apps/desktop/out/make/**/*.nupkg
-          if-no-files-found: warn
+            apps/desktop/out/**/*.dmg
+            apps/desktop/out/**/*.exe
+            apps/desktop/out/**/*.deb
+            apps/desktop/out/**/*.zip
+            apps/desktop/out/**/*.nupkg
+          if-no-files-found: error
 
   upload-release:
     name: Upload to GitHub Release
