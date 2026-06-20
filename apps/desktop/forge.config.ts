@@ -6,20 +6,31 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 
 const config: ForgeConfig = {
+  buildIdentifier: 'classifyre',
   packagerConfig: {
+    appBundleId: 'com.classifyre.desktop',
+    icon: './build/icon',
     asar: true,
     extraResource: [
       './resources/api',
       './resources/web',
       './resources/cli',
-      './resources/venv',
       './resources/prisma',
     ],
   },
   makers: [
-    new MakerDMG({}),
-    new MakerSquirrel({}),
-    new MakerDeb({}),
+    new MakerDMG({
+      icon: './build/icon.icns',
+    }),
+    new MakerSquirrel({
+      name: 'Classifyre',
+      setupIcon: './build/icon.ico',
+    }),
+    new MakerDeb({
+      options: {
+        icon: './build/icon.png',
+      },
+    }),
   ],
   plugins: [
     new AutoUnpackNativesPlugin({}),

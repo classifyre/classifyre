@@ -8,7 +8,7 @@ interface Namespace {
 
 interface ElectronAPI {
   listNamespaces(): Promise<Namespace[]>;
-  createNamespace(name: string): Promise<Namespace>;
+  createNamespace(name: string, remoteUrl?: string): Promise<Namespace>;
   deleteNamespace(id: string): Promise<void>;
   openNamespace(id: string): Promise<{ apiPort: number; namespaceId: string }>;
   isNamespaceOpen(id: string): Promise<boolean>;
@@ -19,6 +19,8 @@ const api = (window as unknown as { electronAPI: ElectronAPI }).electronAPI;
 const listEl = document.getElementById('namespace-list')!;
 const nameInput = document.getElementById('new-name') as HTMLInputElement;
 const createBtn = document.getElementById('create-btn')!;
+const remoteUrlInput = document.getElementById('remote-url') as HTMLInputElement;
+const connectBtn = document.getElementById('connect-btn')!;
 
 async function render(): Promise<void> {
   const namespaces = await api.listNamespaces();
@@ -39,19 +41,23 @@ async function render(): Promise<void> {
   listEl.innerHTML = namespaces
     .map((ns) => {
       const isOpen = openMap.get(ns.id) ?? false;
+      const isRemote = (ns as any).type === 'remote';
       const date = new Date(ns.lastOpenedAt).toLocaleDateString();
+      const typeBadge = isRemote
+        ? '<span class="type-badge remote">remote</span>'
+        : '<span class="type-badge local">local</span>';
       return `
         <div class="namespace-item" data-id="${ns.id}">
           <div class="namespace-info">
             <div class="namespace-name">
               <span class="status-dot ${isOpen ? '' : 'closed'}"></span>
-              ${escapeHtml(ns.name)}
+              ${escapeHtml(ns.name)} ${typeBadge}
             </div>
-            <div class="namespace-meta">Last opened ${date}</div>
+            <div class="namespace-meta">${isRemote ? escapeHtml((ns as any).remoteUrl || '') : `Last opened ${date}`}</div>
           </div>
           <div class="namespace-actions">
             <button class="btn btn-open" data-action="open" data-id="${ns.id}">
-              ${isOpen ? 'Focus' : 'Open'}
+              ${isOpen ? 'Focus' : isRemote ? 'Connect' : 'Open'}
             </button>
             <button class="btn btn-danger" data-action="delete" data-id="${ns.id}">Delete</button>
           </div>
@@ -67,6 +73,40 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
+const LOADING_STEPS = [
+  'Starting database…',
+  'Creating schema…',
+  'Running migrations…',
+  'Starting API server…',
+  'Waiting for API…',
+  'Loading interface…',
+];
+
+function showLoading(item: HTMLElement): void {
+  const actionsEl = item.querySelector('.namespace-actions');
+  if (!actionsEl) return;
+
+  actionsEl.innerHTML = `<div class="loading-indicator"><span class="loading-step">${LOADING_STEPS[0]}</span></div>`;
+
+  let step = 0;
+  const interval = setInterval(() => {
+    step++;
+    if (step >= LOADING_STEPS.length) {
+      clearInterval(interval);
+      return;
+    }
+    const stepEl = item.querySelector('.loading-step');
+    if (stepEl) stepEl.textContent = LOADING_STEPS[step]!;
+  }, 3000);
+
+  item.dataset['loadingInterval'] = String(interval);
+}
+
+function clearLoading(item: HTMLElement): void {
+  const interval = item.dataset['loadingInterval'];
+  if (interval) clearInterval(Number(interval));
+}
+
 listEl.addEventListener('click', async (e) => {
   const target = e.target as HTMLElement;
   const btn = target.closest('[data-action]') as HTMLElement | null;
@@ -78,10 +118,14 @@ listEl.addEventListener('click', async (e) => {
 
   if (action === 'open') {
     const item = btn.closest('.namespace-item') as HTMLElement | null;
-    if (item) item.classList.add('opening');
+    if (item) {
+      item.classList.add('opening');
+      showLoading(item);
+    }
     try {
       await api.openNamespace(id);
     } finally {
+      if (item) clearLoading(item);
       await render();
     }
   }
@@ -113,6 +157,39 @@ nameInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     createBtn.click();
   }
+});
+
+connectBtn.addEventListener('click', async () => {
+  const url = remoteUrlInput.value.trim();
+  if (!url) return;
+
+  try {
+    new URL(url);
+  } catch {
+    remoteUrlInput.style.borderColor = '#ff2b2b';
+    return;
+  }
+
+  connectBtn.setAttribute('disabled', '');
+  try {
+    const hostname = new URL(url).hostname;
+    const name = hostname.replace(/^(www|demo|app)\./, '').split('.')[0] || hostname;
+    await api.createNamespace(name, url);
+    remoteUrlInput.value = '';
+    await render();
+  } finally {
+    connectBtn.removeAttribute('disabled');
+  }
+});
+
+remoteUrlInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    connectBtn.click();
+  }
+});
+
+remoteUrlInput.addEventListener('input', () => {
+  remoteUrlInput.style.borderColor = '';
 });
 
 void render();
