@@ -1,5 +1,6 @@
 {
-  "name": "@classifyre/desktop",
+  "name": "classifyre-desktop",
+  "productName": "Classifyre",
   "version": "0.4.25",
   "private": true,
   "description": "Classifyre Desktop — Electron app with embedded PostgreSQL",
