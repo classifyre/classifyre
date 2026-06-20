@@ -2032,7 +2032,9 @@ class CoreInput(BaseModel):
 
 
 class SlackInput(CoreInput):
-    type: Literal['SLACK'] = Field('SLACK', description='Type of the asset or source')
+    type: Literal['SLACK'] | None = Field(
+        None, description='Type of the asset or source'
+    )
     required: SlackRequired
     masked: SlackMaskedBotToken | SlackMaskedUserToken | SlackMaskedToken = Field(
         ..., title='SlackMasked'
@@ -2050,7 +2052,9 @@ class SlackInput(CoreInput):
 
 
 class EmailInput(CoreInput):
-    type: Literal['EMAIL'] = Field('EMAIL', description='Type of the asset or source')
+    type: Literal['EMAIL'] | None = Field(
+        None, description='Type of the asset or source'
+    )
     required: EmailRequired
     masked: EmailMasked
     optional: EmailOptional | None = None
@@ -2066,8 +2070,8 @@ class EmailInput(CoreInput):
 
 
 class S3CompatibleStorageInput(CoreInput):
-    type: Literal['S3_COMPATIBLE_STORAGE'] = Field(
-        'S3_COMPATIBLE_STORAGE', description='Type of the asset or source'
+    type: Literal['S3_COMPATIBLE_STORAGE'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: S3CompatibleStorageRequired
     masked: S3CompatibleStorageMasked | None = None
@@ -2084,8 +2088,8 @@ class S3CompatibleStorageInput(CoreInput):
 
 
 class AzureBlobStorageInput(CoreInput):
-    type: Literal['AZURE_BLOB_STORAGE'] = Field(
-        'AZURE_BLOB_STORAGE', description='Type of the asset or source'
+    type: Literal['AZURE_BLOB_STORAGE'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: AzureBlobStorageRequired
     masked: AzureBlobStorageMasked | None = None
@@ -2102,8 +2106,8 @@ class AzureBlobStorageInput(CoreInput):
 
 
 class GoogleCloudStorageInput(CoreInput):
-    type: Literal['GOOGLE_CLOUD_STORAGE'] = Field(
-        'GOOGLE_CLOUD_STORAGE', description='Type of the asset or source'
+    type: Literal['GOOGLE_CLOUD_STORAGE'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: GoogleCloudStorageRequired
     masked: GoogleCloudStorageMasked | None = None
@@ -2120,8 +2124,8 @@ class GoogleCloudStorageInput(CoreInput):
 
 
 class WordPressInput(CoreInput):
-    type: Literal['WORDPRESS'] = Field(
-        'WORDPRESS', description='Type of the asset or source'
+    type: Literal['WORDPRESS'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: WordPressRequired
     masked: WordPressMasked
@@ -2138,8 +2142,8 @@ class WordPressInput(CoreInput):
 
 
 class PostgreSQLInput(CoreInput):
-    type: Literal['POSTGRESQL'] = Field(
-        'POSTGRESQL', description='Type of the asset or source'
+    type: Literal['POSTGRESQL'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: PostgreSQLRequired
     masked: PostgreSQLMasked
@@ -2156,7 +2160,9 @@ class PostgreSQLInput(CoreInput):
 
 
 class MySQLInput(CoreInput):
-    type: Literal['MYSQL'] = Field('MYSQL', description='Type of the asset or source')
+    type: Literal['MYSQL'] | None = Field(
+        None, description='Type of the asset or source'
+    )
     required: MySQLRequired
     masked: MySQLMasked
     optional: MySQLOptional | None = None
@@ -2172,7 +2178,9 @@ class MySQLInput(CoreInput):
 
 
 class MSSQLInput(CoreInput):
-    type: Literal['MSSQL'] = Field('MSSQL', description='Type of the asset or source')
+    type: Literal['MSSQL'] | None = Field(
+        None, description='Type of the asset or source'
+    )
     required: MSSQLRequired
     masked: MSSQLMasked
     optional: MSSQLOptional | None = None
@@ -2188,7 +2196,9 @@ class MSSQLInput(CoreInput):
 
 
 class OracleInput(CoreInput):
-    type: Literal['ORACLE'] = Field('ORACLE', description='Type of the asset or source')
+    type: Literal['ORACLE'] | None = Field(
+        None, description='Type of the asset or source'
+    )
     required: OracleRequired
     masked: OracleMasked
     optional: OracleOptional | None = None
@@ -2204,7 +2214,9 @@ class OracleInput(CoreInput):
 
 
 class HiveInput(CoreInput):
-    type: Literal['HIVE'] = Field('HIVE', description='Type of the asset or source')
+    type: Literal['HIVE'] | None = Field(
+        None, description='Type of the asset or source'
+    )
     required: HiveRequired
     masked: HiveMasked
     optional: HiveOptional | None = None
@@ -2220,8 +2232,8 @@ class HiveInput(CoreInput):
 
 
 class DatabricksInput(CoreInput):
-    type: Literal['DATABRICKS'] = Field(
-        'DATABRICKS', description='Type of the asset or source'
+    type: Literal['DATABRICKS'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: PersonalAccessToken | ServicePrincipalOAuthM2M | AzureServicePrincipal = (
         Field(..., title='DatabricksRequired')
@@ -2242,8 +2254,8 @@ class DatabricksInput(CoreInput):
 
 
 class SnowflakeInput(CoreInput):
-    type: Literal['SNOWFLAKE'] = Field(
-        'SNOWFLAKE', description='Type of the asset or source'
+    type: Literal['SNOWFLAKE'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: (
         SnowflakeRequiredDefaultAuthenticator
@@ -2270,8 +2282,8 @@ class SnowflakeInput(CoreInput):
 
 
 class MongoDBInput(CoreInput):
-    type: Literal['MONGODB'] = Field(
-        'MONGODB', description='Type of the asset or source'
+    type: Literal['MONGODB'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: MongoDBRequiredAtlas | MongoDBRequiredOnPrem = Field(
         ..., title='MongoDBRequired'
@@ -2398,7 +2410,9 @@ class Neo4jOptional(BaseModel):
 
 
 class Neo4jInput(CoreInput):
-    type: Literal['NEO4J'] = Field('NEO4J', description='Type of the asset or source')
+    type: Literal['NEO4J'] | None = Field(
+        None, description='Type of the asset or source'
+    )
     required: Neo4jRequired
     masked: Neo4jMaskedUsernamePassword | Neo4jMaskedNone = Field(
         ..., title='Neo4jMasked'
@@ -2416,8 +2430,8 @@ class Neo4jInput(CoreInput):
 
 
 class PowerBIInput(CoreInput):
-    type: Literal['POWERBI'] = Field(
-        'POWERBI', description='Type of the asset or source'
+    type: Literal['POWERBI'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: PowerBIRequiredServicePrincipal | PowerBIRequiredAccessToken = Field(
         ..., title='PowerBIRequired'
@@ -2438,8 +2452,8 @@ class PowerBIInput(CoreInput):
 
 
 class TableauInput(CoreInput):
-    type: Literal['TABLEAU'] = Field(
-        'TABLEAU', description='Type of the asset or source'
+    type: Literal['TABLEAU'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: TableauRequiredUsernamePassword | TableauRequiredPersonalAccessToken = (
         Field(..., title='TableauRequired')
@@ -2838,8 +2852,8 @@ class Type19(StrEnum):
 
 
 class ConfluenceInput(CoreInput):
-    type: Literal['CONFLUENCE'] = Field(
-        'CONFLUENCE', description='Type of the asset or source'
+    type: Literal['CONFLUENCE'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: ConfluenceRequired
     masked: ConfluenceMasked
@@ -2856,7 +2870,9 @@ class ConfluenceInput(CoreInput):
 
 
 class JiraInput(CoreInput):
-    type: Literal['JIRA'] = Field('JIRA', description='Type of the asset or source')
+    type: Literal['JIRA'] | None = Field(
+        None, description='Type of the asset or source'
+    )
     required: JiraRequired
     masked: JiraMasked
     optional: JiraOptional | None = None
@@ -2872,8 +2888,8 @@ class JiraInput(CoreInput):
 
 
 class ServiceDeskInput(CoreInput):
-    type: Literal['SERVICEDESK'] = Field(
-        'SERVICEDESK', description='Type of the asset or source'
+    type: Literal['SERVICEDESK'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: ServiceDeskRequired
     masked: ServiceDeskMasked
@@ -2924,7 +2940,9 @@ class SQLiteOptional(BaseModel):
 
 
 class SQLiteInput(CoreInput):
-    type: Literal['SQLITE'] = Field('SQLITE', description='Type of the asset or source')
+    type: Literal['SQLITE'] | None = Field(
+        None, description='Type of the asset or source'
+    )
     required: SQLiteRequired
     masked: dict[str, Any] | None = Field(
         None,
@@ -3057,7 +3075,9 @@ class NotionOptional(BaseModel):
 
 
 class NotionInput(CoreInput):
-    type: Literal['NOTION'] = Field('NOTION', description='Type of the asset or source')
+    type: Literal['NOTION'] | None = Field(
+        None, description='Type of the asset or source'
+    )
     required: NotionRequired
     masked: NotionMasked
     optional: NotionOptional | None = None
@@ -3073,8 +3093,8 @@ class NotionInput(CoreInput):
 
 
 class YouTubeInput(CoreInput):
-    type: Literal['YOUTUBE'] = Field(
-        'YOUTUBE', description='Type of the asset or source'
+    type: Literal['YOUTUBE'] | None = Field(
+        None, description='Type of the asset or source'
     )
     required: YouTubeRequired
     masked: YouTubeMasked | None = None

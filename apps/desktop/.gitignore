@@ -1,0 +1,5 @@
+out/
+resources/
+.vite/
+# Keep icon files needed for packaging
+!build/icon.*

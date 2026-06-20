@@ -1,8 +1,12 @@
 name: Release Desktop
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.4.25)'
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
@@ -27,17 +31,11 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            arch: arm64
-            artifact: dmg-arm64
-          - os: macos-13
-            arch: x64
-            artifact: dmg-x64
+            artifact: mac
           - os: windows-latest
-            arch: x64
-            artifact: exe
+            artifact: win
           - os: ubuntu-latest
-            arch: x64
-            artifact: deb
+            artifact: linux
 
     name: Build (${{ matrix.artifact }})
     runs-on: ${{ matrix.os }}
@@ -45,6 +43,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set desktop version from tag
+        shell: bash
+        run: |
+          TAG="${{ inputs.tag }}"
+          VERSION="${TAG#v}"
+          cd apps/desktop
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+            pkg.version = '${VERSION}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          echo "Set desktop version to $VERSION"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -69,6 +81,7 @@ jobs:
         run: bun run --cwd apps/api build
 
       - name: Build web (static export)
+        shell: bash
         run: bash apps/desktop/scripts/desktop-web-build.sh
 
       - name: Stage resources
@@ -94,32 +107,59 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Ad-hoc codesign macOS app and rebuild ZIP
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          APP=$(find apps/desktop/out -name '*.app' -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::No .app bundle found"
+            exit 1
+          fi
+
+          echo "Signing $APP"
+          codesign --deep --force --sign - "$APP"
+          codesign --verify --deep "$APP"
+
+          # Rebuild the ZIP with the signed app
+          APP_DIR=$(dirname "$APP")
+          ZIP=$(find apps/desktop/out -name '*.zip' | head -1)
+          if [ -n "$ZIP" ]; then
+            echo "Rebuilding $ZIP with signed app"
+            rm "$ZIP"
+            cd "$APP_DIR"
+            zip -r -y "$OLDPWD/$ZIP" "$(basename "$APP")"
+            cd "$OLDPWD"
+          fi
+
       - name: Find artifacts
         id: artifacts
         shell: bash
         run: |
-          OUTDIR="apps/desktop/out/make"
+          OUTDIR="apps/desktop/out"
           echo "Files in make output:"
           find "$OUTDIR" -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.deb' -o -name '*.rpm' -o -name '*.zip' -o -name '*.nupkg' \) | tee /tmp/artifacts.txt
-          echo "artifact_dir=$OUTDIR" >> "$GITHUB_OUTPUT"
+          if [ ! -s /tmp/artifacts.txt ]; then
+            echo "::error::No desktop artifacts found"
+            exit 1
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.artifact }}
           path: |
-            apps/desktop/out/make/**/*.dmg
-            apps/desktop/out/make/**/*.exe
-            apps/desktop/out/make/**/*.deb
-            apps/desktop/out/make/**/*.zip
-            apps/desktop/out/make/**/*.nupkg
-          if-no-files-found: warn
+            apps/desktop/out/**/*.exe
+            apps/desktop/out/**/*.deb
+            apps/desktop/out/**/*.zip
+            apps/desktop/out/**/*.nupkg
+          if-no-files-found: error
 
   upload-release:
     name: Upload to GitHub Release
     needs: build
+    if: always() && !cancelled() && needs.build.result != 'cancelled'
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event.inputs.tag != ''
 
     steps:
       - name: Download all artifacts
@@ -132,21 +172,11 @@ jobs:
       - name: List downloaded artifacts
         run: find artifacts -type f | head -30
 
-      - name: Determine tag
-        id: tag
-        run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ inputs.tag }}
           files: |
-            artifacts/**/*.dmg
             artifacts/**/*.exe
             artifacts/**/*.deb
             artifacts/**/*.zip
