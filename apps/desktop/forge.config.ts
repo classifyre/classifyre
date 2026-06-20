@@ -23,7 +23,6 @@ const config: ForgeConfig = {
     appBundleId: 'com.classifyre.desktop',
     icon: path.resolve(__dirname, 'build/icon'),
     asar: true,
-    osxSign: {},
     ...(extraResource.length > 0 ? { extraResource } : {}),
   },
   makers: [
