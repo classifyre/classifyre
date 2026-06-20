@@ -98,6 +98,18 @@ export interface InstanceSettingsResponseDto {
      */
     demoMode: boolean;
     /**
+     * Read-only. Whether a user-configured Hugging Face token is stored (encrypted at rest).
+     * @type {boolean}
+     * @memberof InstanceSettingsResponseDto
+     */
+    hfTokenSet: boolean;
+    /**
+     * Read-only. Whether an instance-level HF_TOKEN is configured via Kubernetes Secret. When true, the instance token takes priority over any user-configured token.
+     * @type {boolean}
+     * @memberof InstanceSettingsResponseDto
+     */
+    hfTokenInstanceSet: boolean;
+    /**
      * 
      * @type {Date}
      * @memberof InstanceSettingsResponseDto
@@ -150,6 +162,8 @@ export function instanceOfInstanceSettingsResponseDto(value: object): value is I
     if (!('autopilotCaseEnabled' in value) || value['autopilotCaseEnabled'] === undefined) return false;
     if (!('autopilotCaseGuidance' in value) || value['autopilotCaseGuidance'] === undefined) return false;
     if (!('demoMode' in value) || value['demoMode'] === undefined) return false;
+    if (!('hfTokenSet' in value) || value['hfTokenSet'] === undefined) return false;
+    if (!('hfTokenInstanceSet' in value) || value['hfTokenInstanceSet'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     return true;
@@ -178,6 +192,8 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'autopilotCaseEnabled': json['autopilotCaseEnabled'],
         'autopilotCaseGuidance': json['autopilotCaseGuidance'],
         'demoMode': json['demoMode'],
+        'hfTokenSet': json['hfTokenSet'],
+        'hfTokenInstanceSet': json['hfTokenInstanceSet'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
     };
@@ -207,6 +223,8 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
         'autopilotCaseEnabled': value['autopilotCaseEnabled'],
         'autopilotCaseGuidance': value['autopilotCaseGuidance'],
         'demoMode': value['demoMode'],
+        'hfTokenSet': value['hfTokenSet'],
+        'hfTokenInstanceSet': value['hfTokenInstanceSet'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
     };

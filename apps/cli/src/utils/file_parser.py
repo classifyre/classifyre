@@ -690,6 +690,18 @@ def iter_file_pages(
         yield from _iter_parquet_pages(file_bytes, batch_size, include_column_names)
     elif normalized in ("text/csv", "text/tab-separated-values"):
         yield from _iter_csv_pages(file_bytes, include_column_names)
+    elif normalized.startswith(("audio/", "video/")) and enable_transcription:
+        # Stream transcript pages directly from the chunked transcription pipeline
+        # so the detector receives text as each ~10-min audio chunk completes
+        # instead of waiting for the full file and buffering the entire transcript.
+        from .transcription import iter_transcription_pages
+
+        yield from iter_transcription_pages(
+            file_bytes,
+            mime_type=normalized,
+            file_name=file_name,
+            segments_per_page=batch_size,
+        )
     else:
         text, error = extract_text(
             file_bytes,

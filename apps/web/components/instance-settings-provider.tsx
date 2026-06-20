@@ -67,6 +67,8 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   autopilotInquirySearchable: null,
   autopilotCaseEnabled: false,
   autopilotCaseGuidance: null,
+  hfTokenSet: false,
+  hfTokenInstanceSet: false,
   createdAt: new Date(0),
   updatedAt: new Date(0),
 };

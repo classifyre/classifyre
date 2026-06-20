@@ -11,7 +11,6 @@ import {
   Loader2,
   Megaphone,
   Moon,
-  Terminal,
   Workflow,
   XCircle,
 } from "lucide-react";
@@ -23,27 +22,14 @@ import {
   type AgentRunDto,
 } from "@workspace/api-client";
 import { Badge } from "@workspace/ui/components/badge";
+import { TechnicalLogViewer } from "@/components/technical-log-viewer";
 import { Button } from "@workspace/ui/components/button";
 import { EmptyState } from "@workspace/ui/components/empty-state";
+import { useTranslation } from "@/hooks/use-translation";
 import { cn } from "@workspace/ui/lib/utils";
 import { formatRelative } from "@/lib/date";
 
 const POLL_MS = 5000;
-
-function agentKindLabel(kind: string): string {
-  switch (kind) {
-    case "INQUIRY":
-      return "Inquiry agent";
-    case "CASE":
-      return "Case agent";
-    case "DREAM":
-      return "Dream agent";
-    case "DUPLICATES":
-      return "Duplicates finder";
-    default:
-      return kind;
-  }
-}
 
 function AgentKindIcon({
   kind,
@@ -58,40 +44,6 @@ function AgentKindIcon({
   return <Workflow className={className} />;
 }
 
-const STATUS_META: Record<string, { dot: string; label: string }> = {
-  PENDING: { dot: "bg-stone-400", label: "Pending" },
-  RUNNING: { dot: "bg-amber-500 animate-pulse", label: "Running" },
-  COMPLETED: { dot: "bg-green-600", label: "Completed" },
-  FAILED: { dot: "bg-red-600", label: "Failed" },
-  SKIPPED: { dot: "bg-stone-300", label: "Skipped" },
-};
-
-const OUTCOME_META: Record<string, { icon: React.ReactNode; className: string }> = {
-  APPLIED: {
-    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
-    className: "border-green-600/40 bg-green-600/10 text-green-700 dark:text-green-400",
-  },
-  SKIPPED_OBSERVE_ONLY: {
-    icon: <CircleDashed className="h-3.5 w-3.5" />,
-    className: "border-border bg-muted/40 text-muted-foreground",
-  },
-  FAILED: {
-    icon: <XCircle className="h-3.5 w-3.5" />,
-    className: "border-red-600/40 bg-red-600/10 text-red-700 dark:text-red-400",
-  },
-};
-
-const LEVEL_COLOR: Record<string, string> = {
-  DEBUG: "text-stone-400",
-  INFO: "text-emerald-400",
-  WARN: "text-amber-400",
-  ERROR: "text-red-400",
-};
-
-function actionLabel(action: string): string {
-  return action.replaceAll("_", " ").toLowerCase();
-}
-
 /**
  * Flight-recorder view of autopilot cycles: a rail of runs on the left, the
  * selected run's decision feed + execution log on the right. The log has two
@@ -99,6 +51,7 @@ function actionLabel(action: string): string {
  * raw model output incl. schema-failure responses).
  */
 export function AutopilotActivity() {
+  const { t } = useTranslation();
   const [runs, setRuns] = React.useState<AgentRunDto[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
@@ -144,6 +97,49 @@ export function AutopilotActivity() {
   }, [selectedId, loadDetail]);
 
   // Live-follow while anything is in flight.
+  const STATUS_META: Record<string, { dot: string; label: string }> = React.useMemo(
+    () => ({
+      PENDING: {
+        dot: "bg-amber-500",
+        label: t("investigations.autopilot.activity.statusPending"),
+      },
+      RUNNING: {
+        dot: "bg-emerald-500 animate-pulse",
+        label: t("investigations.autopilot.activity.statusRunning"),
+      },
+      COMPLETED: {
+        dot: "bg-emerald-500",
+        label: t("investigations.autopilot.activity.statusCompleted"),
+      },
+      FAILED: {
+        dot: "bg-red-500",
+        label: t("investigations.autopilot.activity.statusFailed"),
+      },
+      SKIPPED: {
+        dot: "bg-stone-400",
+        label: t("investigations.autopilot.activity.statusSkipped"),
+      },
+      CANCELLED: {
+        dot: "bg-stone-400",
+        label: t("investigations.autopilot.activity.statusCancelled"),
+      },
+    }),
+    [t],
+  );
+
+  const agentKindLabel = React.useCallback(
+    (kind: string) => {
+      switch (kind) {
+        case "INQUIRY": return t("investigations.autopilot.activity.agentInquiry");
+        case "CASE": return t("investigations.autopilot.activity.agentCase");
+        case "DREAM": return t("investigations.autopilot.activity.agentDream");
+        case "DUPLICATES": return t("investigations.autopilot.activity.agentDuplicates");
+        default: return kind;
+      }
+    },
+    [t],
+  );
+
   const hasActive = runs.some((r) => r.status === "RUNNING" || r.status === "PENDING");
   React.useEffect(() => {
     if (!hasActive) return;
@@ -154,10 +150,24 @@ export function AutopilotActivity() {
     return () => clearInterval(t);
   }, [hasActive, selectedId, loadRuns, loadDetail]);
 
+  const shownLogs = logs.filter((l) => l.channel === channel);
+
+  const technicalEntries = React.useMemo(
+    () =>
+      shownLogs.map((l) => ({
+        id: l.id,
+        timestamp: new Date(l.createdAt).toLocaleTimeString(),
+        level: l.level,
+        message: l.message,
+        payload: l.payload,
+      })),
+    [shownLogs],
+  );
+
   if (loading) {
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading autopilot activity…
+        <Loader2 className="h-4 w-4 animate-spin" />{t("investigations.autopilot.activity.loading")}
       </div>
     );
   }
@@ -166,13 +176,11 @@ export function AutopilotActivity() {
     return (
       <EmptyState
         icon={Bot}
-        title="No autopilot cycles yet"
-        description="Cycles appear here after a scan finishes with autopilot enabled, or when you run the autopilot manually."
+        title={t("investigations.autopilot.activity.emptyTitle")}
+        description={t("investigations.autopilot.activity.emptyDesc")}
       />
     );
   }
-
-  const shownLogs = logs.filter((l) => l.channel === channel);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
@@ -206,7 +214,7 @@ export function AutopilotActivity() {
                       variant="outline"
                       className="ml-auto border-[#d97706]/50 px-1 text-[9px] uppercase tracking-wider text-[#d97706]"
                     >
-                      steered
+                      {t("investigations.autopilot.activity.labelSteered")}
                     </Badge>
                   )}
                 </div>
@@ -214,8 +222,7 @@ export function AutopilotActivity() {
                   {run.summary ?? run.error ?? STATUS_META[run.status]?.label}
                 </p>
                 <p className="mt-1 font-mono text-[10px] tabular-nums text-muted-foreground/70">
-                  {formatRelative(run.createdAt)} · {run.decisionCount} decision
-                  {run.decisionCount === 1 ? "" : "s"}
+                  {formatRelative(run.createdAt)} · {t("investigations.autopilot.activity.decisionCount", { count: run.decisionCount })}
                 </p>
               </button>
             </li>
@@ -241,9 +248,9 @@ export function AutopilotActivity() {
                 {STATUS_META[detail.status]?.label ?? detail.status}
               </Badge>
               <span className="ml-auto font-mono text-[11px] text-muted-foreground">
-                {detail.trigger === "manual" ? "manual run" : "after scan"} ·{" "}
+                {detail.trigger === "manual" ? t("investigations.autopilot.activity.labelManualRun") : t("investigations.autopilot.activity.labelAfterScan")} ·{" "}
                 {formatRelative(detail.createdAt)}
-                {detail.attempts > 1 ? ` · attempt ${detail.attempts}` : ""}
+                {detail.attempts > 1 ? ` · ${t("investigations.autopilot.activity.labelAttempt", { count: detail.attempts })}` : ""}
               </span>
             </div>
             {detail.instruction && (
@@ -264,7 +271,7 @@ export function AutopilotActivity() {
           {detail.decisions.length > 0 && (
             <section className="space-y-2">
               <h3 className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                Decisions
+                {t("investigations.autopilot.activity.decisions")}
               </h3>
               {detail.decisions.map((d) => (
                 <DecisionCard key={d.id} decision={d} />
@@ -276,7 +283,7 @@ export function AutopilotActivity() {
           <section className="space-y-2">
             <div className="flex items-center gap-2">
               <h3 className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                Execution log
+                {t("investigations.autopilot.activity.executionLog")}
               </h3>
               <div className="ml-auto flex rounded-[4px] border-2 border-border p-0.5">
                 {(["BUSINESS", "TECHNICAL"] as const).map((c) => (
@@ -290,7 +297,7 @@ export function AutopilotActivity() {
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    {c === "BUSINESS" ? "Business" : "Technical"}
+                    {c === "BUSINESS" ? t("investigations.autopilot.activity.logBusiness") : t("investigations.autopilot.activity.logTechnical")}
                   </button>
                 ))}
               </div>
@@ -298,33 +305,13 @@ export function AutopilotActivity() {
 
             {shownLogs.length === 0 ? (
               <p className="rounded-[4px] border border-dashed border-border px-4 py-4 text-center text-xs text-muted-foreground">
-                No {channel.toLowerCase()} log entries for this run.
+                {t("investigations.autopilot.activity.noLogEntries", { channel: channel.toLowerCase() })}
               </p>
             ) : channel === "TECHNICAL" ? (
-              <div className="max-h-[420px] overflow-y-auto rounded-[4px] border-2 border-stone-700 bg-stone-900 px-3 py-2 font-mono text-[11px] leading-relaxed text-stone-200">
-                {shownLogs.map((l) => (
-                  <div key={l.id} className="py-0.5">
-                    <span className="text-stone-500">
-                      {new Date(l.createdAt).toLocaleTimeString()}{" "}
-                    </span>
-                    <span className={LEVEL_COLOR[l.level] ?? "text-stone-300"}>
-                      [{l.level}]
-                    </span>{" "}
-                    <span className="whitespace-pre-wrap break-words">{l.message}</span>
-                    {l.payload && (
-                      <details className="ml-5 mt-0.5">
-                        <summary className="cursor-pointer text-stone-500 hover:text-stone-300">
-                          <Terminal className="mr-1 inline h-3 w-3" />
-                          payload
-                        </summary>
-                        <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-stone-950 p-2 text-[10px] text-stone-300">
-                          {JSON.stringify(l.payload, null, 2)}
-                        </pre>
-                      </details>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <TechnicalLogViewer
+                entries={technicalEntries}
+                maxHeight="max-h-[420px]"
+              />
             ) : (
               <ol className="space-y-1.5">
                 {shownLogs.map((l) => (
@@ -356,7 +343,7 @@ export function AutopilotActivity() {
         </div>
       ) : (
         <div className="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
-          <ChevronRight className="h-4 w-4" /> Select a cycle to inspect it.
+          <ChevronRight className="h-4 w-4" />{t("investigations.autopilot.activity.selectCycle")}
         </div>
       )}
     </div>
@@ -364,6 +351,59 @@ export function AutopilotActivity() {
 }
 
 function DecisionCard({ decision }: { decision: AgentDecisionDto }) {
+  const { t } = useTranslation();
+
+  const OUTCOME_META: Record<string, { className: string; icon: React.ReactNode; label: string }> = React.useMemo(
+    () => ({
+      APPLIED: {
+        className: "border-emerald-600/50 text-emerald-600",
+        icon: <CheckCircle2 className="h-3 w-3" />,
+        label: t("investigations.autopilot.activity.outcomeApplied"),
+      },
+      SKIPPED_OBSERVE_ONLY: {
+        className: "border-stone-400/50 text-stone-500",
+        icon: <CircleDashed className="h-3 w-3" />,
+        label: t("investigations.autopilot.activity.outcomeSkippedObserveOnly"),
+      },
+      FAILED: {
+        className: "border-red-600/50 text-red-600",
+        icon: <XCircle className="h-3 w-3" />,
+        label: t("investigations.autopilot.activity.outcomeFailed"),
+      },
+    }),
+    [t],
+  );
+
+  const actionLabel = React.useCallback(
+    (action: string): string => {
+      const labels: Record<string, string> = {
+        CREATE_INQUIRY: t("investigations.autopilot.activity.actions.CREATE_INQUIRY"),
+        UPDATE_INQUIRY: t("investigations.autopilot.activity.actions.UPDATE_INQUIRY"),
+        ENRICH_INQUIRY_MATCHERS: t("investigations.autopilot.activity.actions.ENRICH_INQUIRY_MATCHERS"),
+        SIGNAL_CASE_READY: t("investigations.autopilot.activity.actions.SIGNAL_CASE_READY"),
+        CREATE_CASE: t("investigations.autopilot.activity.actions.CREATE_CASE"),
+        UPDATE_CASE: t("investigations.autopilot.activity.actions.UPDATE_CASE"),
+        ADD_HYPOTHESIS: t("investigations.autopilot.activity.actions.ADD_HYPOTHESIS"),
+        UPDATE_HYPOTHESIS: t("investigations.autopilot.activity.actions.UPDATE_HYPOTHESIS"),
+        ADD_EVIDENCE: t("investigations.autopilot.activity.actions.ADD_EVIDENCE"),
+        ATTACH_FINDINGS: t("investigations.autopilot.activity.actions.ATTACH_FINDINGS"),
+        ADD_NOTE: t("investigations.autopilot.activity.actions.ADD_NOTE"),
+        ADD_THREAD_ENTRY: t("investigations.autopilot.activity.actions.ADD_THREAD_ENTRY"),
+        CREATE_EDGE: t("investigations.autopilot.activity.actions.CREATE_EDGE"),
+        REMOVE_EDGE: t("investigations.autopilot.activity.actions.REMOVE_EDGE"),
+        LINK_SUPPORT: t("investigations.autopilot.activity.actions.LINK_SUPPORT"),
+        CHANGE_STATUS: t("investigations.autopilot.activity.actions.CHANGE_STATUS"),
+        LINK_INQUIRY: t("investigations.autopilot.activity.actions.LINK_INQUIRY"),
+        CONSOLIDATE_MEMORY: t("investigations.autopilot.activity.actions.CONSOLIDATE_MEMORY"),
+        LINK_DUPLICATE: t("investigations.autopilot.activity.actions.LINK_DUPLICATE"),
+        UPDATE_CLUSTER: t("investigations.autopilot.activity.actions.UPDATE_CLUSTER"),
+        NO_ACTION: t("investigations.autopilot.activity.actions.NO_ACTION"),
+      };
+      return labels[action] ?? action.charAt(0).toUpperCase() + action.slice(1).toLowerCase().replace(/_/g, " ");
+    },
+    [t],
+  );
+
   const meta = OUTCOME_META[decision.outcome] ?? OUTCOME_META.APPLIED!;
   return (
     <div className="rounded-[4px] border-2 border-border bg-card px-3 py-2.5 shadow-[0_1px_3px_rgba(28,25,23,0.04)]">
@@ -375,7 +415,7 @@ function DecisionCard({ decision }: { decision: AgentDecisionDto }) {
           )}
         >
           {meta.icon}
-          {decision.outcome === "SKIPPED_OBSERVE_ONLY" ? "observe only" : decision.outcome.toLowerCase()}
+          {meta.label}
         </span>
         <span className="text-sm font-medium capitalize">{actionLabel(decision.action)}</span>
         {decision.entityType && (
@@ -389,7 +429,7 @@ function DecisionCard({ decision }: { decision: AgentDecisionDto }) {
       {decision.payload && Object.keys(decision.payload).length > 0 && (
         <details className="mt-1.5">
           <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground">
-            payload
+            {t("investigations.autopilot.activity.payload")}
           </summary>
           <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/40 p-2 font-mono text-[10px]">
             {JSON.stringify(decision.payload, null, 2)}
@@ -401,9 +441,10 @@ function DecisionCard({ decision }: { decision: AgentDecisionDto }) {
 }
 
 export function AutopilotRefreshButton({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
   return (
     <Button variant="outline" size="sm" onClick={onClick}>
-      Refresh
+      {t("investigations.autopilot.activity.labelRefresh")}
     </Button>
   );
 }

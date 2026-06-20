@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, Loader2 } from "lucide-react";
+import { Activity, FileText, Loader2 } from "lucide-react";
 import * as echarts from "echarts";
 import {
   api,
@@ -19,7 +19,7 @@ import {
 } from "@workspace/ui/components";
 import { AssetsTable } from "@/components/assets-table";
 import { EChartBox } from "@/components/echart-box";
-import { AppIcon } from "@/components/app-icon";
+
 import { useTranslation } from "@/hooks/use-translation";
 
 type AssetStatusFilter =
@@ -354,7 +354,7 @@ export default function AssetsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <AppIcon name="docs" active size={28} />
+        <FileText className="size-7" />
         <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
           {t("assets.title")}
         </h1>

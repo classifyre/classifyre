@@ -278,5 +278,5 @@ jobs:
     with:
       environment: classifyre-develop
       image_tag: develop
-      demo_mode: 'true'
+      demo_mode: 'false'
     secrets: inherit

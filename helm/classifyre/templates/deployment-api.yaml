@@ -195,6 +195,10 @@ spec:
               value: {{ .Values.api.cliJobs.cleanupPolicy | quote }}
             - name: K8S_CLI_JOB_WORKDIR
               value: {{ .Values.api.cliJobs.workDir | quote }}
+            {{- if .Values.api.cliJobs.huggingFace.existingSecret }}
+            - name: HF_TOKEN_INSTANCE_SET
+              value: "1"
+            {{- end }}
             {{- end }}
             {{- /* ── S3 / object-storage configuration ─────────────────── */}}
             - name: S3_CONFIGURED

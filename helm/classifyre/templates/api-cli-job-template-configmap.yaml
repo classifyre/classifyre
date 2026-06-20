@@ -79,6 +79,17 @@ data:
                     "name": "HF_HOME",
                     "value": "{{ if .Values.api.cliJobs.uvCache.enabled }}{{ .Values.api.cliJobs.uvCache.mountPath }}/hf{{ else }}/tmp/uv-cache/hf{{ end }}"
                   }
+                  {{- if .Values.api.cliJobs.huggingFace.existingSecret }},
+                  {
+                    "name": "HF_TOKEN",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "name": "{{ .Values.api.cliJobs.huggingFace.existingSecret }}",
+                        "key": "{{ .Values.api.cliJobs.huggingFace.existingKey }}"
+                      }
+                    }
+                  }
+                  {{- end }}
                   {{- if .Values.telemetry.enabled }},
                   {
                     "name": "OTEL_EXPORTER_OTLP_ENDPOINT",

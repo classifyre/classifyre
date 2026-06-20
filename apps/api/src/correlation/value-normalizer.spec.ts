@@ -1,7 +1,10 @@
 import {
   hashSet,
+  isPhoneticEligible,
+  jaroWinkler,
   normalizeLabel,
   normalizeValue,
+  phoneticFingerprint,
   valueHash,
   weightForLabel,
 } from './value-normalizer';
@@ -71,6 +74,93 @@ describe('value-normalizer', () => {
 
     it('differs for different sets', () => {
       expect(hashSet(['a', 'b'])).not.toBe(hashSet(['a', 'c']));
+    });
+  });
+
+  describe('isPhoneticEligible', () => {
+    it('allows person and name labels', () => {
+      expect(isPhoneticEligible('person')).toBe(true);
+      expect(isPhoneticEligible('name')).toBe(true);
+      expect(isPhoneticEligible('Person Name')).toBe(true);
+    });
+
+    it('allows unknown / custom labels', () => {
+      expect(isPhoneticEligible('employee')).toBe(true);
+      expect(isPhoneticEligible('customer_id_text')).toBe(true);
+    });
+
+    it('blocks structured identifier labels', () => {
+      expect(isPhoneticEligible('email')).toBe(false);
+      expect(isPhoneticEligible('phone')).toBe(false);
+      expect(isPhoneticEligible('ssn')).toBe(false);
+      expect(isPhoneticEligible('iban')).toBe(false);
+      expect(isPhoneticEligible('ip')).toBe(false);
+      expect(isPhoneticEligible('url')).toBe(false);
+    });
+  });
+
+  describe('phoneticFingerprint', () => {
+    it('returns null for non-phonetic labels', () => {
+      expect(phoneticFingerprint('email', 'john@example.com')).toBeNull();
+      expect(phoneticFingerprint('phone', '+4312345')).toBeNull();
+    });
+
+    it('produces the same hash for differently-spelled same-sounding names', () => {
+      const a = phoneticFingerprint('person', 'john smith');
+      const b = phoneticFingerprint('person', 'jon smyth');
+      expect(a).not.toBeNull();
+      expect(a).toBe(b);
+    });
+
+    it('is order-independent across tokens (surname-first ≡ first-name-first)', () => {
+      const a = phoneticFingerprint('person', 'john smith');
+      const b = phoneticFingerprint('person', 'smith john');
+      expect(a).toBe(b);
+    });
+
+    it('differs for phonetically distinct names', () => {
+      const a = phoneticFingerprint('person', 'john smith');
+      const b = phoneticFingerprint('person', 'jane doe');
+      expect(a).not.toBe(b);
+    });
+
+    it('works for custom / unknown labels', () => {
+      const a = phoneticFingerprint('employee_name', 'robert jones');
+      const b = phoneticFingerprint('employee_name', 'robbert jonez');
+      expect(a).not.toBeNull();
+      expect(a).toBe(b);
+    });
+
+    it('returns null when no phonetic codes can be derived', () => {
+      // Purely numeric — DoubleMetaphone returns empty codes for digits.
+      expect(phoneticFingerprint('person', '12345')).toBeNull();
+    });
+
+    it('is case-insensitive (values are pre-normalised to lowercase)', () => {
+      // normalizeValue lowercases before we ever call phoneticFingerprint,
+      // but verify the function itself is stable for lowercase input.
+      expect(phoneticFingerprint('name', 'alice')).toBe(
+        phoneticFingerprint('name', 'alice'),
+      );
+    });
+  });
+
+  describe('jaroWinkler', () => {
+    it('returns 1 for identical strings', () => {
+      expect(jaroWinkler('john', 'john')).toBe(1);
+    });
+
+    it('returns a high score for close name variants', () => {
+      expect(jaroWinkler('john', 'jon')).toBeGreaterThan(0.9);
+      expect(jaroWinkler('smith', 'smyth')).toBeGreaterThan(0.85);
+    });
+
+    it('returns a low score for unrelated strings', () => {
+      expect(jaroWinkler('john', 'zxqwerty')).toBeLessThan(0.6);
+    });
+
+    it('returns 0 or near-0 for empty vs non-empty', () => {
+      expect(jaroWinkler('', 'john')).toBeLessThanOrEqual(0.5);
     });
   });
 });

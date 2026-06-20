@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import {AppSidebar} from "./app-sidebar";
-import {SidebarInset, SidebarProvider, useSidebar,} from "@workspace/ui/components/sidebar";
+import {SidebarInset, SidebarProvider, SidebarTrigger,} from "@workspace/ui/components/sidebar";
 import {Separator} from "@workspace/ui/components/separator";
 import {
     Breadcrumb,
@@ -14,8 +14,7 @@ import {
 } from "@workspace/ui/components/breadcrumb";
 import {NotificationCenter} from "./notification-center";
 import {Button} from "@workspace/ui/components/button";
-import {AppIcon} from "@/components/app-icon";
-import {Eye} from "lucide-react";
+import {Eye, Settings} from "lucide-react";
 import {usePathname} from "next/navigation";
 import Link from "next/link";
 import {api} from "@workspace/api-client";
@@ -82,21 +81,6 @@ const ServerConfigContext = React.createContext<ServerConfig>(DEFAULT_SERVER_CON
 
 export function useServerConfig(): ServerConfig {
     return React.useContext(ServerConfigContext);
-}
-
-function SidebarToggleButton() {
-    const {toggleSidebar} = useSidebar();
-    return (
-        <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleSidebar}
-            className="-ml-1 size-7"
-        >
-            <AppIcon name="sidebar" size={20}/>
-            <span className="sr-only">Toggle Sidebar</span>
-        </Button>
-    );
 }
 
 export function DashboardLayout({
@@ -280,7 +264,7 @@ export function DashboardLayout({
                 <SidebarInset className="min-w-0 overflow-x-clip">
                     <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
                         <div className="flex min-w-0 items-center gap-2">
-                            <SidebarToggleButton/>
+                            <SidebarTrigger className="-ml-1 size-7" />
                             <Separator orientation="vertical" className="mr-2 h-4"/>
                             <Breadcrumb className="min-w-0">
                                 <BreadcrumbList>
@@ -379,7 +363,7 @@ export function DashboardLayout({
                                 className="relative rounded-[4px] border-2 border-transparent hover:border-border"
                             >
                                 <Link href="/settings">
-                                    <AppIcon name="settings" size={20}/>
+                                    <Settings className="h-5 w-5" />
                                     <span className="sr-only">Settings</span>
                                 </Link>
                             </Button>
