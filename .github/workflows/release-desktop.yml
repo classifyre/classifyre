@@ -107,6 +107,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Ad-hoc codesign macOS app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          APP=$(find apps/desktop/out -name '*.app' -type d | head -1)
+          if [ -n "$APP" ]; then
+            echo "Signing $APP"
+            codesign --deep --force --sign - "$APP"
+            codesign --verify --deep "$APP" && echo "Signature valid" || echo "::warning::Signature verification failed"
+          fi
+
       - name: Find artifacts
         id: artifacts
         shell: bash
