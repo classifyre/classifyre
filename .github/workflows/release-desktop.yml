@@ -31,16 +31,11 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            arch: arm64
-            artifact: dmg-arm64
-          # TODO: add x64 DMG via cross-compile or universal build
-          # TODO: re-enable Windows once Squirrel maker issue is resolved
-          # - os: windows-latest
-          #   arch: x64
-          #   artifact: exe
+            artifact: mac
+          - os: windows-latest
+            artifact: win
           - os: ubuntu-latest
-            arch: x64
-            artifact: deb
+            artifact: linux
 
     name: Build (${{ matrix.artifact }})
     runs-on: ${{ matrix.os }}
@@ -86,6 +81,7 @@ jobs:
         run: bun run --cwd apps/api build
 
       - name: Build web (static export)
+        shell: bash
         run: bash apps/desktop/scripts/desktop-web-build.sh
 
       - name: Stage resources
@@ -138,6 +134,7 @@ jobs:
   upload-release:
     name: Upload to GitHub Release
     needs: build
+    if: always() && !cancelled() && needs.build.result != 'cancelled'
     runs-on: ubuntu-latest
 
     steps:
