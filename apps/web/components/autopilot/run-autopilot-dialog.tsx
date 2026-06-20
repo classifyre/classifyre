@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Bot, Loader2, Play } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/use-translation";
 import { api, TriggerAutopilotDtoAgentKindEnum } from "@workspace/api-client";
 import {
   Button,
@@ -22,11 +23,6 @@ import {
 
 const ALL_SOURCES = "__all__";
 const BOTH_AGENTS = "__both__";
-
-const CASE_PLACEHOLDER =
-  "e.g. Connect the findings that share the same credential value with edges, build the evidence path from the HR export to the public wiki page, and update the exfiltration hypothesis with whatever supports or contradicts it…";
-const GENERAL_PLACEHOLDER =
-  "e.g. Create an inquiry for exposed database credentials if any exist, and check whether the PII findings in Confluence justify a case…";
 
 /**
  * Steer-and-run dialog: queue a manual autopilot cycle over EXISTING data
@@ -55,6 +51,7 @@ export function RunAutopilotDialog({
   caseTitle?: string;
   onTriggered?: (cycleKey: string) => void;
 }) {
+  const { t } = useTranslation();
   const caseMode = Boolean(caseId);
   const [instruction, setInstruction] = React.useState("");
   const [sourceId, setSourceId] = React.useState(defaultSourceId ?? ALL_SOURCES);
@@ -94,14 +91,14 @@ export function RunAutopilotDialog({
       });
       toast.success(
         caseMode
-          ? "AI is working on this case — results appear here when done"
-          : "Autopilot cycle queued — watch it in Activity",
+          ? t("investigations.autopilot.runDialog.toastCaseQueued")
+          : t("investigations.autopilot.runDialog.toastQueued"),
       );
       onOpenChange(false);
       setInstruction("");
       onTriggered?.(res.cycleKey);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to queue the autopilot");
+      toast.error(err instanceof Error ? err.message : t("investigations.autopilot.runDialog.toastError"));
     } finally {
       setSubmitting(false);
     }
@@ -113,22 +110,15 @@ export function RunAutopilotDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bot className="h-4 w-4 text-[#d97706]" />
-            {caseMode ? "Run AI on this case" : "Run autopilot now"}
+            {caseMode ? t("investigations.autopilot.runDialog.titleCase") : t("investigations.autopilot.runDialog.titleGeneral")}
           </DialogTitle>
           <DialogDescription>
             {caseMode ? (
               <>
-                The case agent works on{" "}
-                <span className="font-medium text-foreground">{caseTitle ?? "this case"}</span>{" "}
-                with its full detail: it can connect or disconnect edges, build evidence
-                paths, and create or update hypotheses with supporting evidence. Describe
-                what you want in plain language — the AI resolves the targets itself.
+                {t("investigations.autopilot.runDialog.descCase", { title: caseTitle ?? "this case" })}
               </>
             ) : (
-              <>
-                Reviews all existing open findings — not just new ones — and manages
-                inquiries and cases. Items set to “Observe only” are never touched.
-              </>
+              t("investigations.autopilot.runDialog.descGeneral")
             )}
           </DialogDescription>
         </DialogHeader>
@@ -136,20 +126,20 @@ export function RunAutopilotDialog({
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs font-mono uppercase tracking-[0.12em]">
-              {caseMode ? "What should it do on this case?" : "What should it pay attention to?"}
+              {caseMode ? t("investigations.autopilot.runDialog.instructionLabelCase") : t("investigations.autopilot.runDialog.instructionLabelGeneral")}
             </Label>
             <Textarea
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
               rows={4}
               maxLength={4000}
-              placeholder={caseMode ? CASE_PLACEHOLDER : GENERAL_PLACEHOLDER}
+              placeholder={caseMode ? t("investigations.autopilot.runDialog.placeholderCase") : t("investigations.autopilot.runDialog.placeholderGeneral")}
               className="rounded-[4px] border-2 border-border text-sm"
             />
             <p className="text-[11px] text-muted-foreground">
               {caseMode
-                ? "Optional — without an instruction the agent does whatever most advances the investigation."
-                : "Optional — without an instruction the agents do a general review."}
+                ? t("investigations.autopilot.runDialog.instructionOptionalCase")
+                : t("investigations.autopilot.runDialog.instructionOptionalGeneral")}
             </p>
           </div>
 
@@ -157,33 +147,33 @@ export function RunAutopilotDialog({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-mono uppercase tracking-[0.12em]">
-                  Agent
+                  {t("investigations.autopilot.runDialog.agentLabel")}
                 </Label>
                 <Select value={agent} onValueChange={setAgent}>
                   <SelectTrigger className="h-9 rounded-[4px] border-2 border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={BOTH_AGENTS}>Both agents</SelectItem>
+                    <SelectItem value={BOTH_AGENTS}>{t("investigations.autopilot.runDialog.agentBoth")}</SelectItem>
                     <SelectItem value={TriggerAutopilotDtoAgentKindEnum.Inquiry}>
-                      Inquiry agent only
+                      {t("investigations.autopilot.runDialog.agentInquiryOnly")}
                     </SelectItem>
                     <SelectItem value={TriggerAutopilotDtoAgentKindEnum.Case}>
-                      Case agent only
+                      {t("investigations.autopilot.runDialog.agentCaseOnly")}
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-mono uppercase tracking-[0.12em]">
-                  Scope
+                  {t("investigations.autopilot.runDialog.scopeLabel")}
                 </Label>
                 <Select value={sourceId} onValueChange={setSourceId}>
                   <SelectTrigger className="h-9 rounded-[4px] border-2 border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={ALL_SOURCES}>All sources</SelectItem>
+                    <SelectItem value={ALL_SOURCES}>{t("investigations.autopilot.runDialog.scopeAllSources")}</SelectItem>
                     {sources.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
                         {s.name}
@@ -197,7 +187,7 @@ export function RunAutopilotDialog({
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("investigations.autopilot.runDialog.cancel")}
             </Button>
             <Button onClick={() => void run()} disabled={submitting}>
               {submitting ? (
@@ -205,7 +195,7 @@ export function RunAutopilotDialog({
               ) : (
                 <Play className="h-3.5 w-3.5" />
               )}
-              {caseMode ? "Run on case" : "Queue cycle"}
+              {caseMode ? t("investigations.autopilot.runDialog.submitCase") : t("investigations.autopilot.runDialog.submitGeneral")}
             </Button>
           </div>
         </div>
