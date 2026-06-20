@@ -4,6 +4,7 @@ import { InstanceLanguage, InstanceTimeFormat } from '@prisma/client';
 import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaService } from './prisma.service';
 import { DemoModeService } from './demo-mode.service';
+import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 
 describe('InstanceSettingsService', () => {
   let service: InstanceSettingsService;
@@ -20,6 +21,7 @@ describe('InstanceSettingsService', () => {
       providers: [
         InstanceSettingsService,
         DemoModeService,
+        MaskedConfigCryptoService,
         {
           provide: PrismaService,
           useValue: mockPrismaService,

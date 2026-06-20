@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Bot, ChevronDown, ChevronUp, Loader2, Square, X } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/use-translation";
 import { api, type AgentLogDto, type AgentRunDto } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -35,6 +36,7 @@ export function CaseAutopilotStatus({
   const [logs, setLogs] = React.useState<AgentLogDto[]>([]);
   const [dismissedId, setDismissedId] = React.useState<string | null>(null);
   const [cancelling, setCancelling] = React.useState(false);
+  const { t } = useTranslation();
   const wasActive = React.useRef(false);
 
   const check = React.useCallback(async () => {
@@ -64,15 +66,15 @@ export function CaseAutopilotStatus({
         setLiveLine(null);
         toast.success(
           latest.status === "COMPLETED"
-            ? "AI finished working on this case"
-            : `AI run ${latest.status.toLowerCase()}`,
+            ? t("investigations.autopilot.caseStatus.finished")
+            : t("investigations.autopilot.caseStatus.failed", { status: latest.status.toLowerCase() }),
         );
         onFinished?.();
       }
     } catch {
       /* polling must never break the page */
     }
-  }, [caseId, onFinished]);
+  }, [caseId, onFinished, t]);
 
   // Immediate check on mount and whenever the operator queues a run.
   React.useEffect(() => {
@@ -108,10 +110,10 @@ export function CaseAutopilotStatus({
     setCancelling(true);
     try {
       await api.autopilot.autopilotControllerCancelRun({ id: run.id });
-      toast.success("Stop requested — the AI halts before its next step");
+      toast.success(t("investigations.autopilot.caseStatus.stoppedToast"));
       void check();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to stop the run");
+      toast.error(err instanceof Error ? err.message : t("investigations.autopilot.caseStatus.stopError"));
     } finally {
       setCancelling(false);
     }
@@ -137,7 +139,7 @@ export function CaseAutopilotStatus({
             <p className="min-w-0 text-sm">
               <Bot className="mr-1.5 inline h-4 w-4 text-[color:var(--color-amber-600,#d97706)]" />
               <span className="font-medium">
-                AI {run.status === "COMPLETED" ? "finished" : run.status.toLowerCase()}
+                {run.status === "COMPLETED" ? t("investigations.autopilot.caseStatus.finished") : t("investigations.autopilot.caseStatus.failed", { status: run.status.toLowerCase() })}
               </span>
               {run.summary && (
                 <span className="text-muted-foreground"> — {run.summary}</span>
@@ -153,13 +155,13 @@ export function CaseAutopilotStatus({
                 ) : (
                   <ChevronDown className="h-3.5 w-3.5" />
                 )}
-                Log
+                {t("investigations.autopilot.caseStatus.log")}
               </Button>
               <Button
                 size="icon"
                 variant="ghost"
                 className="h-7 w-7 text-muted-foreground"
-                aria-label="Dismiss"
+                aria-label={t("investigations.autopilot.caseStatus.dismiss")}
                 onClick={() => setDismissedId(run.id)}
               >
                 <X className="h-3.5 w-3.5" />
@@ -183,11 +185,11 @@ export function CaseAutopilotStatus({
                 <Bot className="h-4 w-4 text-[color:var(--color-amber-600,#d97706)]" />
                 <span className="absolute -right-1 -top-1 h-2 w-2 animate-ping rounded-full bg-[color:var(--color-amber-600,#d97706)]/75" />
               </span>
-              AI autopilot is working on this case…
+              {t("investigations.autopilot.caseStatus.working")}
             </p>
             <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
               <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
-              <span className="truncate">{liveLine ?? "Starting up…"}</span>
+              <span className="truncate">{liveLine ?? t("investigations.autopilot.caseStatus.startingUp")}</span>
             </p>
           </div>
           <Button
@@ -202,7 +204,7 @@ export function CaseAutopilotStatus({
             ) : (
               <Square className="h-3.5 w-3.5" />
             )}
-            Stop
+            {t("investigations.autopilot.caseStatus.stop")}
           </Button>
         </div>
       </CardContent>
@@ -211,8 +213,9 @@ export function CaseAutopilotStatus({
 }
 
 function RunLog({ logs }: { logs: AgentLogDto[] }) {
+  const { t } = useTranslation();
   if (logs.length === 0) {
-    return <p className="text-muted-foreground text-xs">No log entries.</p>;
+    return <p className="text-muted-foreground text-xs">{t("investigations.autopilot.caseStatus.noLogEntries")}</p>;
   }
   return (
     <ol className="max-h-64 space-y-1 overflow-y-auto border-t-2 border-border pt-2">

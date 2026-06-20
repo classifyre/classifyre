@@ -880,12 +880,12 @@ function getServerApiBaseUrl(): string {
 }
 
 function getBaseUrl(): string {
-  // Check if we're in a browser environment
   if (typeof window !== "undefined") {
+    const desktop = (window as any).__CLASSIFYRE_DESKTOP__;
+    if (desktop?.apiBaseUrl) return desktop.apiBaseUrl as string;
     return process.env.NEXT_PUBLIC_API_URL || "/api";
   }
 
-  // Server-side: use direct API URL
   return getServerApiBaseUrl();
 }
 

@@ -96,6 +96,21 @@ export class InstanceSettingsResponseDto {
   })
   demoMode: boolean;
 
+  @ApiProperty({
+    description:
+      'Read-only. Whether a user-configured Hugging Face token is stored (encrypted at rest).',
+    example: false,
+  })
+  hfTokenSet: boolean;
+
+  @ApiProperty({
+    description:
+      'Read-only. Whether an instance-level HF_TOKEN is configured via Kubernetes Secret. ' +
+      'When true, the instance token takes priority over any user-configured token.',
+    example: false,
+  })
+  hfTokenInstanceSet: boolean;
+
   @ApiProperty()
   createdAt: Date;
 
