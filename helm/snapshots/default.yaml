@@ -6,7 +6,7 @@ metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: api
@@ -25,7 +25,7 @@ metadata:
   name: classifyre-web
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: web
@@ -44,7 +44,7 @@ metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
@@ -56,7 +56,7 @@ metadata:
   name: classifyre-api-secrets
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 type: Opaque
@@ -70,7 +70,7 @@ metadata:
   name: classifyre-db
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 type: Opaque
@@ -84,7 +84,7 @@ metadata:
   name: classifyre-api-cli-job-template
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 data:
@@ -118,9 +118,9 @@ data:
             "containers": [
               {
                 "name": "cli",
-                "image": "classifyre/cli:0.3.1",
+                "image": "classifyre/cli:0.4.19-SNAPSHOT",
                 "imagePullPolicy": "IfNotPresent",
-                "resources": {"limits":{"cpu":"2","memory":"4Gi"},"requests":{"cpu":"500m","memory":"1Gi"}},
+                "resources": {"limits":{"cpu":"2","ephemeral-storage":"20Gi","memory":"4Gi"},"requests":{"cpu":"500m","ephemeral-storage":"6Gi","memory":"1Gi"}},
                 "securityContext": {"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":false},
                 "env": [
                   {
@@ -129,11 +129,19 @@ data:
                   },
                   {
                     "name": "CLASSIFYRE_OUTPUT_REST_URL",
-                    "value": "http://classifyre-api:8000"
+                    "value": "http://classifyre-api.od-product-sw-team-1-c.svc.cluster.local:8000"
                   },
                   {
                     "name": "CLASSIFYRE_OUTPUT_BATCH_SIZE",
                     "value": "20"
+                  },
+                  {
+                    "name": "CLASSIFYRE_OUTPUT_REST_TIMEOUT_SEC",
+                    "value": "120"
+                  },
+                  {
+                    "name": "CLASSIFYRE_DETECTOR_FLUSH_BATCH_SIZE",
+                    "value": "5"
                   },
                   {
                     "name": "HOME",
@@ -178,12 +186,9 @@ data:
                   {
                     "name": "uv-cache",
                     "mountPath": "/cache/uv"
-                  },
-                  {
-                    "name": "runner-logs",
-                    "mountPath": "/var/lib/classifyre/runner-logs"
                   }
-                ]
+                ],
+                "workingDir": "/app/apps/cli"
               }
             ],
             "volumes": [
@@ -191,12 +196,6 @@ data:
                 "name": "uv-cache",
                 "persistentVolumeClaim": {
                   "claimName": "classifyre-cli-uv-cache"
-                }
-              },
-              {
-                "name": "runner-logs",
-                "persistentVolumeClaim": {
-                  "claimName": "classifyre-runner-logs"
                 }
               }
             ]
@@ -212,7 +211,7 @@ metadata:
   name: classifyre-instance-id
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: telemetry
@@ -220,7 +219,7 @@ metadata:
     # Preserve this ConfigMap across `helm upgrade` so the instance ID stays stable.
     "helm.sh/resource-policy": keep
 data:
-  instance-id: "cdf84746-3126-429d-a27a-1e70eb9ed3fe"
+  instance-id: "4da142e8-0428-4c47-ac5b-b84d6b265975"
 ---
 # Source: classifyre-core/templates/api-cli-cache-pvc.yaml
 apiVersion: v1
@@ -229,7 +228,7 @@ metadata:
   name: classifyre-cli-uv-cache
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 spec:
@@ -237,18 +236,19 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 20Gi
+      storage: 10Gi
 ---
-# Source: classifyre-core/templates/api-cli-cache-pvc.yaml
+# Source: classifyre-core/templates/postgres-embedded.yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: classifyre-runner-logs
+  name: classifyre-postgres-data
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: postgres
 spec:
   accessModes:
     - ReadWriteOnce
@@ -263,7 +263,7 @@ metadata:
   name: classifyre-api-job-manager
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 rules:
@@ -284,7 +284,7 @@ metadata:
   name: classifyre-api-job-manager
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 subjects:
@@ -295,6 +295,29 @@ roleRef:
   kind: Role
   name: classifyre-api-job-manager
 ---
+# Source: classifyre-core/templates/postgres-embedded.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: classifyre-postgres
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: classifyre
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/component: postgres
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: pg
+      protocol: TCP
+---
 # Source: classifyre-core/templates/service-api.yaml
 apiVersion: v1
 kind: Service
@@ -302,7 +325,7 @@ metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: api
@@ -325,7 +348,7 @@ metadata:
   name: classifyre-web
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: web
@@ -348,7 +371,7 @@ metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: api
@@ -366,7 +389,7 @@ spec:
         app.kubernetes.io/instance: classifyre
         app.kubernetes.io/component: api
       annotations:
-        checksum/cli-job-template: ac8ea9592fca2bf1476fba382886045cca247d34f513502c80b65c7d581d9a40
+        checksum/cli-job-template: 2ae547265e9fe21a2d3e6f30c8b1651d44a8e33b2ad0ea98ffa92ff4a7b3c0fe
     spec:
       serviceAccountName: classifyre-api
       automountServiceAccountToken: true
@@ -379,7 +402,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: prisma-migrate
-          image: classifyre/api:0.3.1
+          image: classifyre/api:0.4.19-SNAPSHOT
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -401,13 +424,13 @@ spec:
               npx prisma migrate deploy --schema /app/api/prisma/schema.prisma
           env:
             - name: DB_HOST
-              value: ""
+              value: "classifyre-postgres"
             - name: DB_PORT
               value: "5432"
             - name: DB_NAME
               value: "classifyre"
             - name: DB_USER
-              value: "classifyre"
+              value: "postgres"
             - name: DB_SSLMODE
               value: "disable"
             - name: DB_PASSWORD
@@ -422,7 +445,7 @@ spec:
                   key: CLASSIFYRE_MASKED_CONFIG_KEY
       containers:
         - name: api
-          image: classifyre/api:0.3.1
+          image: classifyre/api:0.4.19-SNAPSHOT
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
@@ -443,13 +466,13 @@ spec:
               protocol: TCP
           env:
             - name: DB_HOST
-              value: ""
+              value: "classifyre-postgres"
             - name: DB_PORT
               value: "5432"
             - name: DB_NAME
               value: "classifyre"
             - name: DB_USER
-              value: "classifyre"
+              value: "postgres"
             - name: DB_SSLMODE
               value: "disable"
             - name: DB_PASSWORD
@@ -462,10 +485,16 @@ spec:
                 secretKeyRef:
                   name: classifyre-api-secrets
                   key: CLASSIFYRE_MASKED_CONFIG_KEY
+            - name: SANDBOX_TEMP_DIR
+              value: "/var/lib/classifyre/sandbox-tmp"
             - name: DEMO_MODE
               value: "false"
             - name: ENVIRONMENT
               value: "kubernetes"
+            - name: MAX_CONCURRENT_RUNNERS
+              value: "3"
+            - name: MAX_RUNNERS_PER_SOURCE
+              value: "5"
             - name: NODE_ENV
               value: "production"
             - name: PORT
@@ -481,7 +510,7 @@ spec:
             - name: K8S_JOBS_ENABLED
               value: "1"
             - name: K8S_JOBS_NAMESPACE
-              value: "default"
+              value: "od-product-sw-team-1-c"
             - name: K8S_CLI_JOB_TEMPLATE_PATH
               value: /etc/classifyre/cli-job-template/job-template.json
             - name: K8S_CLI_JOB_WAIT_TIMEOUT_SECONDS
@@ -492,6 +521,8 @@ spec:
               value: "always"
             - name: K8S_CLI_JOB_WORKDIR
               value: "/app/apps/cli"
+            - name: S3_CONFIGURED
+              value: "false"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "https://otel.classifyre.com"
             - name: OTEL_EXPORTER_OTLP_PROTOCOL
@@ -505,11 +536,11 @@ spec:
                   key: instance-id
                   optional: true
           volumeMounts:
+            - name: sandbox-temp
+              mountPath: "/var/lib/classifyre/sandbox-tmp"
             - name: cli-job-template
               mountPath: /etc/classifyre/cli-job-template
               readOnly: true
-            - name: runner-logs
-              mountPath: "/var/lib/classifyre/runner-logs"
           resources:
             limits:
               cpu: "1"
@@ -554,12 +585,12 @@ spec:
                 - -c
                 - sleep 5
       volumes:
+        - name: sandbox-temp
+          emptyDir:
+            sizeLimit: "2Gi"
         - name: cli-job-template
           configMap:
             name: classifyre-api-cli-job-template
-        - name: runner-logs
-          persistentVolumeClaim:
-            claimName: classifyre-runner-logs
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -588,7 +619,7 @@ metadata:
   name: classifyre-web
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: web
@@ -616,7 +647,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: classifyre/web:0.3.1
+          image: classifyre/web:0.4.19-SNAPSHOT
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
@@ -632,6 +663,10 @@ spec:
           env:
             - name: API_URL
               value: "http://classifyre-api:8000"
+            - name: S3_CONFIGURED
+              value: "false"
+            - name: DEMO_MODE
+              value: "false"
             - name: HOSTNAME
               value: "0.0.0.0"
             - name: NEXT_PUBLIC_API_URL
@@ -695,6 +730,12 @@ spec:
                 - /bin/sh
                 - -c
                 - sleep 5
+          volumeMounts:
+            - name: next-cache
+              mountPath: /app/apps/web/.next/cache
+      volumes:
+        - name: next-cache
+          emptyDir: {}
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -716,6 +757,98 @@ spec:
               app.kubernetes.io/instance: classifyre
               app.kubernetes.io/component: web
 ---
+# Source: classifyre-core/templates/postgres-embedded.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: classifyre-postgres
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: classifyre
+      app.kubernetes.io/instance: classifyre
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: classifyre
+        app.kubernetes.io/instance: classifyre
+        app.kubernetes.io/component: postgres
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 999
+        runAsGroup: 999
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:18
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: pg
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_DB
+              value: "classifyre"
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: classifyre-db
+                  key: password
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p 5432
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p 5432
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: classifyre-postgres-data
+---
 # Source: classifyre-core/templates/hpa-api.yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -723,7 +856,7 @@ metadata:
   name: classifyre-api
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: api
@@ -755,7 +888,7 @@ metadata:
   name: classifyre-web
   labels:
     app.kubernetes.io/name: classifyre
-    helm.sh/chart: classifyre-core-0.3.1
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: web
@@ -779,3 +912,67 @@ spec:
         target:
           type: Utilization
           averageUtilization: 75
+---
+# Source: classifyre-core/templates/api-cli-cache-prune-cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: classifyre-cli-uv-cache-prune
+  labels:
+    app.kubernetes.io/name: classifyre
+    helm.sh/chart: classifyre-core-0.4.19-SNAPSHOT
+    app.kubernetes.io/instance: classifyre
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: cli-cache-prune
+spec:
+  schedule: "0 2 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          volumes:
+            - name: uv-cache
+              persistentVolumeClaim:
+                claimName: classifyre-cli-uv-cache
+          containers:
+            - name: prune
+              image: classifyre/cli:0.4.19-SNAPSHOT
+              imagePullPolicy: IfNotPresent
+              command:
+                - sh
+                - -c
+                - |
+                  echo "Cache size before prune:" && du -sh /cache/uv
+                  UV_CACHE_DIR=/cache/uv uv cache prune
+                  echo "Cache size after prune:" && du -sh /cache/uv
+              env:
+                - name: UV_CACHE_DIR
+                  value: "/cache/uv"
+              volumeMounts:
+                - name: uv-cache
+                  mountPath: /cache/uv
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: false
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi

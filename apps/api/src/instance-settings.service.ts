@@ -1,17 +1,23 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { DemoModeService } from './demo-mode.service';
+import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import type { InstanceSettings, Prisma } from '@prisma/client';
 import { InstanceSettingsResponseDto } from './dto/instance-settings-response.dto';
 import { UpdateInstanceSettingsDto } from './dto/update-instance-settings.dto';
 
 const INSTANCE_SETTINGS_ID = 1;
 
+const isInstanceTokenSet =
+  process.env.HF_TOKEN_INSTANCE_SET === '1' ||
+  process.env.HF_TOKEN_INSTANCE_SET === 'true';
+
 @Injectable()
 export class InstanceSettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly demoMode: DemoModeService,
+    private readonly crypto: MaskedConfigCryptoService,
   ) {}
 
   private toResponse(settings: InstanceSettings): InstanceSettingsResponseDto {
@@ -28,6 +34,8 @@ export class InstanceSettingsService {
       autopilotInquirySearchable: settings.autopilotInquirySearchable,
       autopilotCaseEnabled: settings.autopilotCaseEnabled,
       autopilotCaseGuidance: settings.autopilotCaseGuidance,
+      hfTokenSet: !!settings.hfTokenEnc,
+      hfTokenInstanceSet: isInstanceTokenSet,
       demoMode: this.demoMode.isDemoMode,
       createdAt: settings.createdAt,
       updatedAt: settings.updatedAt,
@@ -130,6 +138,14 @@ export class InstanceSettingsService {
           }
         : {}),
       ...(aiProviderConfigUpdate ?? {}),
+      ...(updateDto.hfToken !== undefined
+        ? {
+            hfTokenEnc:
+              updateDto.hfToken && updateDto.hfToken.length > 0
+                ? this.crypto.encryptString(updateDto.hfToken)
+                : null,
+          }
+        : {}),
     };
 
     const settings = await this.prisma.instanceSettings.update({
@@ -138,6 +154,18 @@ export class InstanceSettingsService {
     });
 
     return this.toResponse(settings);
+  }
+
+  /** Returns the decrypted user-configured HF token, or null if not set. */
+  async getUserHfToken(): Promise<string | null> {
+    if (isInstanceTokenSet) {
+      return null;
+    }
+    const settings = await this.ensureSingleton();
+    if (!settings.hfTokenEnc) {
+      return null;
+    }
+    return this.crypto.decryptString(settings.hfTokenEnc);
   }
 }
 

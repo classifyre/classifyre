@@ -7,7 +7,7 @@ import { StatsCard } from "@workspace/ui/components";
 import { Button } from "@workspace/ui/components/button";
 import type { SearchSourcesResponseDto } from "@workspace/api-client";
 import { SourcesTable } from "../../../components/sources-table";
-import { AppIcon } from "@/components/app-icon";
+
 import { useTranslation } from "@/hooks/use-translation";
 
 export default function SourcesPage() {
@@ -23,7 +23,7 @@ export default function SourcesPage() {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <AppIcon name="binders" active size={28} />
+            <Database className="size-7" />
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
               {t("sources.title")}
             </h1>

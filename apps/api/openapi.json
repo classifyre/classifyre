@@ -11163,6 +11163,16 @@
             "description": "Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.",
             "example": false
           },
+          "hfTokenSet": {
+            "type": "boolean",
+            "description": "Read-only. Whether a user-configured Hugging Face token is stored (encrypted at rest).",
+            "example": false
+          },
+          "hfTokenInstanceSet": {
+            "type": "boolean",
+            "description": "Read-only. Whether an instance-level HF_TOKEN is configured via Kubernetes Secret. When true, the instance token takes priority over any user-configured token.",
+            "example": false
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -11172,23 +11182,25 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "aiEnabled",
-          "mcpEnabled",
-          "language",
-          "timezone",
-          "timeFormat",
-          "aiProviderConfigId",
-          "autopilotInquiryEnabled",
-          "autopilotInquiryDesired",
-          "autopilotInquirySearchable",
-          "autopilotCaseEnabled",
-          "autopilotCaseGuidance",
-          "demoMode",
-          "createdAt",
-          "updatedAt"
-        ]
+          "required": [
+            "id",
+            "aiEnabled",
+            "mcpEnabled",
+            "language",
+            "timezone",
+            "timeFormat",
+            "aiProviderConfigId",
+            "autopilotInquiryEnabled",
+            "autopilotInquiryDesired",
+            "autopilotInquirySearchable",
+            "autopilotCaseEnabled",
+            "autopilotCaseGuidance",
+            "demoMode",
+            "hfTokenSet",
+            "hfTokenInstanceSet",
+            "createdAt",
+            "updatedAt"
+          ]
       },
       "UpdateInstanceSettingsDto": {
         "type": "object",
@@ -11254,6 +11266,11 @@
           "autopilotCaseGuidance": {
             "type": "string",
             "description": "Operator guidance for the case agent.",
+            "nullable": true
+          },
+          "hfToken": {
+            "type": "string",
+            "description": "Hugging Face token to set. Pass a token value to store (encrypted at rest). Pass null or an empty string to clear the stored token. Ignored when an instance-level HF_TOKEN is configured.",
             "nullable": true
           }
         }
