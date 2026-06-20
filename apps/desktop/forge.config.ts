@@ -19,7 +19,7 @@ const config: ForgeConfig = {
   buildIdentifier: 'classifyre',
   packagerConfig: {
     name: 'Classifyre',
-    executableName: 'classifyre',
+    executableName: 'classifyre-desktop',
     appBundleId: 'com.classifyre.desktop',
     icon: path.resolve(__dirname, 'build/icon'),
     asar: true,
