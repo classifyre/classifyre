@@ -210,7 +210,11 @@ export class CorrelationService {
       await onProgress(`Found ${touched.length} asset(s) to fingerprint.`, {
         total: touched.length,
       });
-    return this.recompute(touched.map((a) => a.id), false, onProgress);
+    return this.recompute(
+      touched.map((a) => a.id),
+      false,
+      onProgress,
+    );
   }
 
   /** On-demand correlation for a single asset (and its neighbourhood). */
@@ -434,7 +438,7 @@ export class CorrelationService {
     //    assets so long scans don't accumulate unreachable objects in the heap.
     let valuesIndexed = 0;
     for (let i = 0; i < touchedIds.length; i++) {
-      valuesIndexed += await this.rebuildAssetValues(touchedIds[i]!, cfg);
+      valuesIndexed += await this.rebuildAssetValues(touchedIds[i], cfg);
       await yieldToGC(); // after every asset so GC can reclaim large finding arrays
       if (i > 0 && i % 50 === 0 && onProgress)
         await onProgress(
@@ -540,7 +544,7 @@ export class CorrelationService {
         });
       }
       if (batch.length < this.batches.findingsPage) break;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+
       idCursor = batch.at(-1)!.id;
     }
 
@@ -562,16 +566,18 @@ export class CorrelationService {
       await tx.assetCorrelationValue.deleteMany({ where: { assetId } });
       for (let i = 0; i < rowArray.length; i += this.batches.valueUpsertBatch) {
         await tx.assetCorrelationValue.createMany({
-          data: rowArray.slice(i, i + this.batches.valueUpsertBatch).map(([hash, r]) => ({
-            assetId,
-            sourceId: asset.sourceId,
-            label: r.label,
-            detectorType: r.detectorType,
-            customDetectorKey: r.customDetectorKey,
-            normalizedValue: r.normalizedValue,
-            valueHash: hash,
-            phoneticHash: r.phoneticHash,
-          })),
+          data: rowArray
+            .slice(i, i + this.batches.valueUpsertBatch)
+            .map(([hash, r]) => ({
+              assetId,
+              sourceId: asset.sourceId,
+              label: r.label,
+              detectorType: r.detectorType,
+              customDetectorKey: r.customDetectorKey,
+              normalizedValue: r.normalizedValue,
+              valueHash: hash,
+              phoneticHash: r.phoneticHash,
+            })),
         });
       }
       await tx.assetSignature.upsert({
@@ -747,7 +753,10 @@ export class CorrelationService {
       for (const id of ph.affectedAssetIds) affected.add(id);
       relatedPairs += ph.relatedPairs;
       duplicatePairs += ph.duplicatePairs;
-      if (ph.topMatch && (!topMatch || ph.topMatch.weighted > topMatch.weighted))
+      if (
+        ph.topMatch &&
+        (!topMatch || ph.topMatch.weighted > topMatch.weighted)
+      )
         topMatch = ph.topMatch;
 
       return {
@@ -975,7 +984,10 @@ export class CorrelationService {
       >();
       for (const m of members) {
         const arr = byAsset.get(m.assetId) ?? [];
-        arr.push({ normalizedValue: m.normalizedValue, valueHash: m.valueHash });
+        arr.push({
+          normalizedValue: m.normalizedValue,
+          valueHash: m.valueHash,
+        });
         byAsset.set(m.assetId, arr);
       }
       const assetIds = Array.from(byAsset.keys());
@@ -1004,8 +1016,8 @@ export class CorrelationService {
 
       for (let i = 0; i < assetIds.length; i++) {
         for (let j = i + 1; j < assetIds.length; j++) {
-          const aId = assetIds[i]!;
-          const bId = assetIds[j]!;
+          const aId = assetIds[i];
+          const bId = assetIds[j];
 
           // Incremental: only score pairs where at least one side is touched.
           if (!full && !touchedSet.has(aId) && !touchedSet.has(bId)) continue;
@@ -1015,7 +1027,10 @@ export class CorrelationService {
           const bH = hashByAsset.get(bId) ?? new Set<string>();
           let exactOverlap = false;
           for (const h of aH) {
-            if (bH.has(h)) { exactOverlap = true; break; }
+            if (bH.has(h)) {
+              exactOverlap = true;
+              break;
+            }
           }
           if (exactOverlap) continue;
 
@@ -1075,7 +1090,12 @@ export class CorrelationService {
           if (isDuplicate) duplicatePairs++;
           else relatedPairs++;
           if (!topMatch || weighted > topMatch.weighted)
-            topMatch = { fromAssetId: aId, toAssetId: bId, weighted: round2(weighted), reasons };
+            topMatch = {
+              fromAssetId: aId,
+              toAssetId: bId,
+              weighted: round2(weighted),
+              reasons,
+            };
           if (buffer.length >= EDGE_BATCH) await flush();
         }
       }
@@ -1084,7 +1104,12 @@ export class CorrelationService {
     }
 
     await flush();
-    return { relatedPairs, duplicatePairs, topMatch, affectedAssetIds: Array.from(affected) };
+    return {
+      relatedPairs,
+      duplicatePairs,
+      topMatch,
+      affectedAssetIds: Array.from(affected),
+    };
   }
 
   /** Load and cache per-asset totals for assets outside the precomputed set. */
@@ -1095,9 +1120,19 @@ export class CorrelationService {
       string,
       { weight: number; count: number; nfWeight: number; nfCount: number }
     >,
-  ): Promise<{ weight: number; count: number; nfWeight: number; nfCount: number }> {
+  ): Promise<{
+    weight: number;
+    count: number;
+    nfWeight: number;
+    nfCount: number;
+  }> {
     const m = await this.loadAssetTotals([assetId], cfg);
-    const data = m.get(assetId) ?? { weight: 0, count: 0, nfWeight: 0, nfCount: 0 };
+    const data = m.get(assetId) ?? {
+      weight: 0,
+      count: 0,
+      nfWeight: 0,
+      nfCount: 0,
+    };
     cache.set(assetId, data);
     return data;
   }

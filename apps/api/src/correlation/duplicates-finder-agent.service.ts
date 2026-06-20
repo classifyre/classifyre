@@ -127,8 +127,8 @@ export class DuplicatesFinderAgentService {
         run.id,
         'Correlation tuning changed — recomputing all fingerprints under the new weights/thresholds.',
       );
-      const summary = await this.correlation.recomputeAll(
-        (msg, data) => this.log.technical(run.id, msg, data),
+      const summary = await this.correlation.recomputeAll((msg, data) =>
+        this.log.technical(run.id, msg, data),
       );
       await this.log.technical(run.id, 'Full recompute finished.', {
         ...summary,
