@@ -6,6 +6,13 @@ import type { RunnerDto, RunnerLogEntryDto } from "@workspace/api-client";
 import { parseRunnerSocketPayload } from "@/lib/runner-ws-merge";
 
 const getWebSocketUrl = () => {
+  if (
+    typeof window !== "undefined" &&
+    (window as any).__CLASSIFYRE_DESKTOP__?.apiBaseUrl
+  ) {
+    return (window as any).__CLASSIFYRE_DESKTOP__.apiBaseUrl as string;
+  }
+
   if (process.env.NEXT_PUBLIC_WS_URL) {
     return process.env.NEXT_PUBLIC_WS_URL;
   }
