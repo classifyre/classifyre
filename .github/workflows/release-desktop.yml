@@ -1,0 +1,154 @@
+name: Release Desktop
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.4.25)'
+        required: true
+        type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-desktop
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            arch: arm64
+            artifact: dmg-arm64
+          - os: macos-13
+            arch: x64
+            artifact: dmg-x64
+          - os: windows-latest
+            arch: x64
+            artifact: exe
+          - os: ubuntu-latest
+            arch: x64
+            artifact: deb
+
+    name: Build (${{ matrix.artifact }})
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run postinstall (dylib symlinks)
+        run: node apps/desktop/scripts/postinstall.js
+
+      - name: Generate Prisma client
+        run: bun run --cwd apps/api prisma:generate
+
+      - name: Build API
+        run: bun run --cwd apps/api build
+
+      - name: Build web (static export)
+        run: bash apps/desktop/scripts/desktop-web-build.sh
+
+      - name: Stage resources
+        shell: bash
+        run: |
+          RESOURCES="apps/desktop/resources"
+          mkdir -p "$RESOURCES"/{api,web,cli,prisma}
+
+          cp -r apps/api/dist "$RESOURCES/api/dist"
+          cp apps/api/package.json "$RESOURCES/api/package.json"
+          cp -r apps/api/prisma "$RESOURCES/prisma"
+
+          if [ -d apps/web/out ]; then
+            cp -r apps/web/out/* "$RESOURCES/web/"
+          fi
+
+          cp -r apps/cli/src "$RESOURCES/cli/src"
+          cp apps/cli/pyproject.toml "$RESOURCES/cli/pyproject.toml"
+          [ -f apps/cli/uv.lock ] && cp apps/cli/uv.lock "$RESOURCES/cli/uv.lock" || true
+
+      - name: Build Electron (${{ matrix.artifact }})
+        run: bun run --cwd apps/desktop make
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Find artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          OUTDIR="apps/desktop/out/make"
+          echo "Files in make output:"
+          find "$OUTDIR" -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.deb' -o -name '*.rpm' -o -name '*.zip' -o -name '*.nupkg' \) | tee /tmp/artifacts.txt
+          echo "artifact_dir=$OUTDIR" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.artifact }}
+          path: |
+            apps/desktop/out/make/**/*.dmg
+            apps/desktop/out/make/**/*.exe
+            apps/desktop/out/make/**/*.deb
+            apps/desktop/out/make/**/*.zip
+            apps/desktop/out/make/**/*.nupkg
+          if-no-files-found: warn
+
+  upload-release:
+    name: Upload to GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event.inputs.tag != ''
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: desktop-*
+          merge-multiple: false
+
+      - name: List downloaded artifacts
+        run: find artifacts -type f | head -30
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.exe
+            artifacts/**/*.deb
+            artifacts/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1206,6 +1206,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
     switch (environment) {
       case 'development':
+      case 'desktop':
         return resolveCliPath(configuredPath || defaultDevelopmentCliPath);
       case 'docker':
         return resolveCliPath(configuredPath || defaultDockerCliPath);
@@ -1304,6 +1305,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
     if (environment === 'docker') {
       return 'http://127.0.0.1:8000';
+    }
+    if (environment === 'desktop') {
+      const port = process.env.PORT || '8000';
+      return `http://127.0.0.1:${port}`;
     }
     if (environment === 'development') {
       return 'http://localhost:8000';
