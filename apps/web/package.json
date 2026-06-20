@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/web",
-  "version": "0.4.25",
+  "version": "0.4.26",
   "type": "module",
   "private": true,
   "scripts": {

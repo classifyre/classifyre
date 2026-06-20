@@ -2,37 +2,47 @@
 set -euo pipefail
 
 # Build Next.js in static export mode for Electron desktop.
-# Temporarily excludes server-side proxy routes that are incompatible with
-# output: 'export' (they use runtime: "nodejs" + dynamic: "force-dynamic").
+# Temporarily excludes routes incompatible with output: 'export':
+# - Server-side proxy routes (runtime: "nodejs" + dynamic: "force-dynamic")
+# - Dynamic [param] routes without generateStaticParams()
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MONOREPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 WEB_DIR="$MONOREPO_ROOT/apps/web"
 
-PROXY_ROUTES=(
-  "app/api/[...path]/route.ts"
-  "app/classifyre-usr/[...path]/route.ts"
-)
+BACKED_UP_FILES=()
+
+backup_file() {
+  local src="$1"
+  if [ -f "$src" ]; then
+    mv "$src" "$src.desktop-bak"
+    BACKED_UP_FILES+=("$src")
+    echo "[desktop-web-build]   excluded: ${src#$WEB_DIR/}"
+  fi
+}
 
 cleanup() {
-  echo "[desktop-web-build] Restoring proxy routes…"
-  for route in "${PROXY_ROUTES[@]}"; do
-    local bak="$WEB_DIR/$route.desktop-bak"
-    if [ -f "$bak" ]; then
-      mv "$bak" "$WEB_DIR/$route"
+  echo "[desktop-web-build] Restoring excluded files…"
+  for src in "${BACKED_UP_FILES[@]}"; do
+    if [ -f "$src.desktop-bak" ]; then
+      mv "$src.desktop-bak" "$src"
     fi
   done
 }
 
 trap cleanup EXIT
 
-echo "[desktop-web-build] Temporarily excluding proxy routes…"
-for route in "${PROXY_ROUTES[@]}"; do
-  src="$WEB_DIR/$route"
-  if [ -f "$src" ]; then
-    mv "$src" "$src.desktop-bak"
-  fi
-done
+echo "[desktop-web-build] Excluding incompatible routes…"
+
+# Proxy routes
+backup_file "$WEB_DIR/app/api/[...path]/route.ts"
+backup_file "$WEB_DIR/app/classifyre-usr/[...path]/route.ts"
+
+# Dynamic [param] routes that lack generateStaticParams — find all page/layout
+# files anywhere under a [param] directory and exclude them.
+while IFS= read -r -d '' file; do
+  backup_file "$file"
+done < <(find "$WEB_DIR/app" -path '*\[*\]*' \( -name 'page.tsx' -o -name 'page.ts' -o -name 'page.jsx' -o -name 'page.js' -o -name 'layout.tsx' -o -name 'layout.ts' \) -print0)
 
 echo "[desktop-web-build] Building Next.js with DESKTOP_BUILD=true…"
 cd "$WEB_DIR"

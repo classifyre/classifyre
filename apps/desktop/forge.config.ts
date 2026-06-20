@@ -1,7 +1,6 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
-import { MakerDMG } from '@electron-forge/maker-dmg';
-import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerDeb } from '@electron-forge/maker-deb';
+import { MakerZIP } from '@electron-forge/maker-zip';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import path from 'path';
@@ -18,19 +17,15 @@ const extraResource = allResources
 const config: ForgeConfig = {
   buildIdentifier: 'classifyre',
   packagerConfig: {
+    name: 'Classifyre',
+    executableName: 'classifyre-desktop',
     appBundleId: 'com.classifyre.desktop',
     icon: path.resolve(__dirname, 'build/icon'),
     asar: true,
     ...(extraResource.length > 0 ? { extraResource } : {}),
   },
   makers: [
-    new MakerDMG({
-      icon: path.resolve(__dirname, 'build/icon.icns'),
-    }),
-    new MakerSquirrel({
-      name: 'Classifyre',
-      setupIcon: path.resolve(__dirname, 'build/icon.ico'),
-    }),
+    new MakerZIP({}, ['darwin', 'win32']),
     new MakerDeb({
       options: {
         icon: path.resolve(__dirname, 'build/icon.png'),

@@ -1,6 +1,6 @@
 {
   "name": "classifyre",
-  "version": "0.4.25",
+  "version": "0.4.26",
   "private": true,
   "scripts": {
     "build": "turbo build --filter=!@workspace/devops",
@@ -34,7 +34,7 @@
     "ops:helm:snapshot": "turbo run helm:snpshot --filter=@workspace/devops",
     "ops:helm:snapshot:check": "turbo run helm:snpshot:check --filter=@workspace/devops",
     "ops:helm:test": "turbo run helm:test --filter=@workspace/devops",
-    "desktop:dev": "turbo dev --filter=@classifyre/desktop",
+    "desktop:dev": "turbo dev --filter=classifyre-desktop",
     "desktop:make": "cd apps/desktop && bun run make",
     "test:all": "bun run test && bun run test:e2e",
     "prepare": "husky"
