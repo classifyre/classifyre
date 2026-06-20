@@ -9,6 +9,7 @@ const packageJsonPaths = [
   "package.json",
   "apps/api/package.json",
   "apps/blog/package.json",
+  "apps/desktop/package.json",
   "apps/docs/package.json",
   "apps/web/package.json",
   "apps/cli/package.json",
