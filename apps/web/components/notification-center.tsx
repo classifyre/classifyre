@@ -207,33 +207,32 @@ export function NotificationCenter() {
         align="end"
         className="flex h-[min(70vh,560px)] w-[min(420px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[6px] border-2 border-border bg-card p-0 shadow-[6px_6px_0_var(--color-border)]"
       >
-        <div className="shrink-0 flex items-center justify-between gap-2 border-b-2 border-border bg-foreground px-4 py-3 text-primary-foreground">
-          <div>
+        <div className="shrink-0 border-b-2 border-border bg-foreground px-4 py-3 text-primary-foreground">
+          <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-primary-foreground/70">
-              Signal Feed
+              {t("notifications.signalFeed")}
             </p>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.08em]">
-              {t("notifications.title")}
-            </h3>
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <Badge className="rounded-[3px] border border-primary-foreground bg-accent px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.12em] text-accent-foreground">
+                  {unreadCount} {t("notifications.unread")}
+                </Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 rounded-[4px] border border-primary-foreground/40 px-2 text-[10px] font-mono uppercase tracking-[0.12em] hover:bg-primary-foreground/10"
+                onClick={() => void handleMarkAllAsRead()}
+                disabled={unreadCount === 0}
+              >
+                <CheckCheck className="mr-1 h-3.5 w-3.5" />
+                {t("notifications.markAll")}
+              </Button>
+            </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            {unreadCount > 0 && (
-              <Badge className="rounded-[3px] border border-primary-foreground bg-accent px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.12em] text-accent-foreground">
-                {unreadCount} {t("notifications.unread")}
-              </Badge>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 rounded-[4px] border border-primary-foreground/40 px-2 text-[10px] font-mono uppercase tracking-[0.12em] hover:bg-primary-foreground/10"
-              onClick={() => void handleMarkAllAsRead()}
-              disabled={unreadCount === 0}
-            >
-              <CheckCheck className="mr-1 h-3.5 w-3.5" />
-              {t("notifications.markAll")}
-            </Button>
-          </div>
+          <h3 className="mt-1 text-sm font-semibold uppercase tracking-[0.08em]">
+            {t("notifications.title")}
+          </h3>
         </div>
 
         <ScrollArea className="min-h-0 flex-1">

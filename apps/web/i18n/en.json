@@ -1343,6 +1343,7 @@
     "perPage": "{{count}} / page",
     "syncing": "Syncing…",
     "signal": "Signal",
+    "signalFeed": "Signal Feed",
     "message": "Message",
     "context": "Context",
     "detected": "Detected",

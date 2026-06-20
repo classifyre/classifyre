@@ -1343,6 +1343,7 @@
     "perPage": "{{count}} / Seite",
     "syncing": "Wird synchronisiert…",
     "signal": "Signal",
+    "signalFeed": "Signal-Feed",
     "message": "Nachricht",
     "context": "Kontext",
     "detected": "Erkannt",
