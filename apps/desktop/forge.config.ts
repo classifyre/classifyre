@@ -1,5 +1,4 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
-import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { VitePlugin } from '@electron-forge/plugin-vite';
@@ -27,9 +26,6 @@ const config: ForgeConfig = {
   },
   makers: [
     new MakerZIP({}, ['darwin', 'win32']),
-    new MakerDMG({
-      icon: path.resolve(__dirname, 'build/icon.icns'),
-    }),
     new MakerDeb({
       options: {
         icon: path.resolve(__dirname, 'build/icon.png'),
