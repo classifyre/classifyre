@@ -8,8 +8,11 @@ import { AgentKind, AgentRunStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { AgentAuditService } from './audit/agent-audit.service';
+import { SystemBriefService } from './harness/system-brief.service';
 import { AUTOPILOT_QUEUE } from './autopilot.constants';
 import {
+  AgentActivityItemDto,
+  AgentActivityListResponseDto,
   AgentDecisionDto,
   AgentLogDto,
   AgentLogListResponseDto,
@@ -18,7 +21,10 @@ import {
   AgentRunDetailDto,
   AgentRunDto,
   AgentRunListResponseDto,
+  AgentSystemBriefDto,
+  AutopilotStatsDto,
   CreateAgentMemoryDto,
+  QueryAgentActivityDto,
   QueryAgentLogsDto,
   QueryAgentMemoryDto,
   QueryAgentRunsDto,
@@ -38,6 +44,7 @@ export class AutopilotService {
     private readonly prisma: PrismaService,
     private readonly pgBoss: PgBossService,
     private readonly audit: AgentAuditService,
+    private readonly brief: SystemBriefService,
   ) {}
 
   // ── Manual trigger ──────────────────────────────────────────────────────────
@@ -228,8 +235,14 @@ export class AutopilotService {
       select: { id: true },
     });
     if (!run) throw new NotFoundException(`Agent run ${runId} not found`);
+    const where: Prisma.AgentLogWhereInput = { runId };
+    if (query.channel) where.channel = query.channel;
+    if (query.level) where.level = query.level;
+    if (query.search?.trim()) {
+      where.message = { contains: query.search.trim(), mode: 'insensitive' };
+    }
     const rows = await this.prisma.agentLog.findMany({
-      where: { runId, ...(query.channel ? { channel: query.channel } : {}) },
+      where,
       orderBy: { createdAt: 'asc' },
       take: 1000,
     });
@@ -342,6 +355,18 @@ export class AutopilotService {
     if (query.agentKind) where.agentKind = query.agentKind;
     if (query.status) where.status = query.status;
     if (query.caseId) where.caseId = query.caseId;
+    if (query.sourceId) where.sourceId = query.sourceId;
+    if (query.trigger) where.trigger = query.trigger;
+    if (query.search?.trim()) {
+      const term = query.search.trim();
+      where.OR = [
+        { summary: { contains: term, mode: 'insensitive' } },
+        { instruction: { contains: term, mode: 'insensitive' } },
+        { error: { contains: term, mode: 'insensitive' } },
+      ];
+    }
+    const createdAt = dateRange(query.since, query.until);
+    if (createdAt) where.createdAt = createdAt;
 
     const [rows, total] = await Promise.all([
       this.prisma.agentRun.findMany({
@@ -359,6 +384,131 @@ export class AutopilotService {
       total,
       skip,
       limit,
+    };
+  }
+
+  /**
+   * Cross-run activity feed — the business timeline. Every AgentDecision joined
+   * with its run's kind/status, server-side filtered and paginated. This is the
+   * primary "observe what the autopilot is doing" surface.
+   */
+  async listActivity(
+    query: QueryAgentActivityDto,
+  ): Promise<AgentActivityListResponseDto> {
+    const skip = Math.max(0, Number(query.skip ?? 0) || 0);
+    const limit = Math.min(Math.max(1, Number(query.limit ?? 50) || 50), 200);
+
+    const where: Prisma.AgentDecisionWhereInput = {};
+    if (query.action) where.action = query.action;
+    if (query.outcome) where.outcome = query.outcome;
+    if (query.entityType) where.entityType = query.entityType;
+    if (query.search?.trim()) {
+      where.rationale = { contains: query.search.trim(), mode: 'insensitive' };
+    }
+    const createdAt = dateRange(query.since, query.until);
+    if (createdAt) where.createdAt = createdAt;
+    if (query.agentKind) where.run = { agentKind: query.agentKind };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.agentDecision.findMany({
+        where,
+        include: { run: { select: { agentKind: true, status: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.agentDecision.count({ where }),
+    ]);
+
+    return {
+      items: rows.map(
+        (d): AgentActivityItemDto => ({
+          id: d.id,
+          runId: d.runId,
+          agentKind: d.run.agentKind,
+          runStatus: d.run.status,
+          action: d.action,
+          outcome: d.outcome,
+          entityType: d.entityType,
+          entityId: d.entityId,
+          rationale: d.rationale,
+          payload: (d.payload ?? null) as Record<string, unknown> | null,
+          createdAt: d.createdAt,
+        }),
+      ),
+      total,
+      skip,
+      limit,
+    };
+  }
+
+  /** The living system brief — what the autopilot understands about the system. */
+  async getSystemBrief(): Promise<AgentSystemBriefDto> {
+    const b = await this.brief.get();
+    const row = await this.prisma.agentSystemBrief.findUnique({
+      where: { id: 1 },
+      select: { updatedAt: true },
+    });
+    return {
+      content: b.content,
+      facts: b.facts,
+      version: b.version,
+      updatedBy: b.updatedBy,
+      updatedAt: row?.updatedAt ?? null,
+    };
+  }
+
+  /** Mission-control counters for the observability header. */
+  async getStats(): Promise<AutopilotStatsDto> {
+    const since24h = new Date(Date.now() - 24 * 3600 * 1000);
+    const [
+      totalRuns,
+      runsLast24h,
+      activeRuns,
+      decisionsApplied,
+      decisionsSkipped,
+      decisionsFailed,
+      memoryCount,
+      brief,
+      lastRun,
+      byKind,
+    ] = await Promise.all([
+      this.prisma.agentRun.count(),
+      this.prisma.agentRun.count({ where: { createdAt: { gte: since24h } } }),
+      this.prisma.agentRun.count({
+        where: { status: { in: ['RUNNING', 'PENDING'] } },
+      }),
+      this.prisma.agentDecision.count({ where: { outcome: 'APPLIED' } }),
+      this.prisma.agentDecision.count({
+        where: { outcome: 'SKIPPED_OBSERVE_ONLY' },
+      }),
+      this.prisma.agentDecision.count({ where: { outcome: 'FAILED' } }),
+      this.prisma.agentMemory.count(),
+      this.prisma.agentSystemBrief.findUnique({
+        where: { id: 1 },
+        select: { version: true },
+      }),
+      this.prisma.agentRun.findFirst({
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+      }),
+      this.prisma.agentRun.groupBy({ by: ['agentKind'], _count: true }),
+    ]);
+
+    const runsByKind: Record<string, number> = {};
+    for (const g of byKind) runsByKind[String(g.agentKind)] = g._count;
+
+    return {
+      totalRuns,
+      runsLast24h,
+      activeRuns,
+      decisionsApplied,
+      decisionsSkipped,
+      decisionsFailed,
+      memoryCount,
+      briefVersion: brief?.version ?? 0,
+      lastActivityAt: lastRun?.createdAt ?? null,
+      runsByKind,
     };
   }
 
@@ -411,4 +561,21 @@ export class AutopilotService {
       createdAt: d.createdAt,
     };
   }
+}
+
+/** Build a Prisma DateTime filter from optional ISO bounds (ignores invalid). */
+function dateRange(
+  since?: string,
+  until?: string,
+): Prisma.DateTimeFilter | undefined {
+  const filter: Prisma.DateTimeFilter = {};
+  if (since) {
+    const d = new Date(since);
+    if (!Number.isNaN(d.getTime())) filter.gte = d;
+  }
+  if (until) {
+    const d = new Date(until);
+    if (!Number.isNaN(d.getTime())) filter.lte = d;
+  }
+  return Object.keys(filter).length > 0 ? filter : undefined;
 }

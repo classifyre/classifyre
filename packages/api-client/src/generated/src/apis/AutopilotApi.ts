@@ -15,18 +15,23 @@
 
 import * as runtime from '../runtime';
 import type {
+  AgentActivityListResponseDto,
   AgentLogListResponseDto,
   AgentMemoryDto,
   AgentMemoryListResponseDto,
   AgentRunDetailDto,
   AgentRunDto,
   AgentRunListResponseDto,
+  AgentSystemBriefDto,
+  AutopilotStatsDto,
   CreateAgentMemoryDto,
   TriggerAutopilotDto,
   TriggerAutopilotResponseDto,
   UpdateAgentMemoryDto,
 } from '../models/index';
 import {
+    AgentActivityListResponseDtoFromJSON,
+    AgentActivityListResponseDtoToJSON,
     AgentLogListResponseDtoFromJSON,
     AgentLogListResponseDtoToJSON,
     AgentMemoryDtoFromJSON,
@@ -39,6 +44,10 @@ import {
     AgentRunDtoToJSON,
     AgentRunListResponseDtoFromJSON,
     AgentRunListResponseDtoToJSON,
+    AgentSystemBriefDtoFromJSON,
+    AgentSystemBriefDtoToJSON,
+    AutopilotStatsDtoFromJSON,
+    AutopilotStatsDtoToJSON,
     CreateAgentMemoryDtoFromJSON,
     CreateAgentMemoryDtoToJSON,
     TriggerAutopilotDtoFromJSON,
@@ -65,9 +74,23 @@ export interface AutopilotControllerGetRunRequest {
     id: string;
 }
 
+export interface AutopilotControllerListActivityRequest {
+    agentKind?: AutopilotControllerListActivityAgentKindEnum;
+    action?: AutopilotControllerListActivityActionEnum;
+    outcome?: AutopilotControllerListActivityOutcomeEnum;
+    entityType?: string;
+    search?: string;
+    since?: string;
+    until?: string;
+    skip?: number;
+    limit?: number;
+}
+
 export interface AutopilotControllerListLogsRequest {
     id: string;
     channel?: AutopilotControllerListLogsChannelEnum;
+    level?: AutopilotControllerListLogsLevelEnum;
+    search?: string;
 }
 
 export interface AutopilotControllerListMemoryRequest {
@@ -80,7 +103,12 @@ export interface AutopilotControllerListMemoryRequest {
 export interface AutopilotControllerListRunsRequest {
     agentKind?: AutopilotControllerListRunsAgentKindEnum;
     caseId?: string;
+    sourceId?: string;
     status?: AutopilotControllerListRunsStatusEnum;
+    trigger?: string;
+    search?: string;
+    since?: string;
+    until?: string;
     skip?: number;
     limit?: number;
 }
@@ -253,6 +281,129 @@ export class AutopilotApi extends runtime.BaseAPI {
     }
 
     /**
+     * Mission-control counters (runs, decisions, memory, brief version)
+     */
+    async autopilotControllerGetStatsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AutopilotStatsDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/stats`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AutopilotStatsDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Mission-control counters (runs, decisions, memory, brief version)
+     */
+    async autopilotControllerGetStats(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AutopilotStatsDto> {
+        const response = await this.autopilotControllerGetStatsRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * The living system brief the autopilot maintains and injects
+     */
+    async autopilotControllerGetSystemBriefRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentSystemBriefDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/system-brief`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AgentSystemBriefDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * The living system brief the autopilot maintains and injects
+     */
+    async autopilotControllerGetSystemBrief(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentSystemBriefDto> {
+        const response = await this.autopilotControllerGetSystemBriefRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time
+     */
+    async autopilotControllerListActivityRaw(requestParameters: AutopilotControllerListActivityRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentActivityListResponseDto>> {
+        const queryParameters: any = {};
+
+        if (requestParameters['agentKind'] != null) {
+            queryParameters['agentKind'] = requestParameters['agentKind'];
+        }
+
+        if (requestParameters['action'] != null) {
+            queryParameters['action'] = requestParameters['action'];
+        }
+
+        if (requestParameters['outcome'] != null) {
+            queryParameters['outcome'] = requestParameters['outcome'];
+        }
+
+        if (requestParameters['entityType'] != null) {
+            queryParameters['entityType'] = requestParameters['entityType'];
+        }
+
+        if (requestParameters['search'] != null) {
+            queryParameters['search'] = requestParameters['search'];
+        }
+
+        if (requestParameters['since'] != null) {
+            queryParameters['since'] = requestParameters['since'];
+        }
+
+        if (requestParameters['until'] != null) {
+            queryParameters['until'] = requestParameters['until'];
+        }
+
+        if (requestParameters['skip'] != null) {
+            queryParameters['skip'] = requestParameters['skip'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/activity`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AgentActivityListResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time
+     */
+    async autopilotControllerListActivity(requestParameters: AutopilotControllerListActivityRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentActivityListResponseDto> {
+        const response = await this.autopilotControllerListActivityRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output)
      */
     async autopilotControllerListLogsRaw(requestParameters: AutopilotControllerListLogsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentLogListResponseDto>> {
@@ -267,6 +418,14 @@ export class AutopilotApi extends runtime.BaseAPI {
 
         if (requestParameters['channel'] != null) {
             queryParameters['channel'] = requestParameters['channel'];
+        }
+
+        if (requestParameters['level'] != null) {
+            queryParameters['level'] = requestParameters['level'];
+        }
+
+        if (requestParameters['search'] != null) {
+            queryParameters['search'] = requestParameters['search'];
         }
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -352,8 +511,28 @@ export class AutopilotApi extends runtime.BaseAPI {
             queryParameters['caseId'] = requestParameters['caseId'];
         }
 
+        if (requestParameters['sourceId'] != null) {
+            queryParameters['sourceId'] = requestParameters['sourceId'];
+        }
+
         if (requestParameters['status'] != null) {
             queryParameters['status'] = requestParameters['status'];
+        }
+
+        if (requestParameters['trigger'] != null) {
+            queryParameters['trigger'] = requestParameters['trigger'];
+        }
+
+        if (requestParameters['search'] != null) {
+            queryParameters['search'] = requestParameters['search'];
+        }
+
+        if (requestParameters['since'] != null) {
+            queryParameters['since'] = requestParameters['since'];
+        }
+
+        if (requestParameters['until'] != null) {
+            queryParameters['until'] = requestParameters['until'];
         }
 
         if (requestParameters['skip'] != null) {
@@ -544,6 +723,62 @@ export class AutopilotApi extends runtime.BaseAPI {
 /**
  * @export
  */
+export const AutopilotControllerListActivityAgentKindEnum = {
+    Inquiry: 'INQUIRY',
+    Case: 'CASE',
+    Dream: 'DREAM',
+    Duplicates: 'DUPLICATES',
+    Config: 'CONFIG',
+    DetectorAuthor: 'DETECTOR_AUTHOR'
+} as const;
+export type AutopilotControllerListActivityAgentKindEnum = typeof AutopilotControllerListActivityAgentKindEnum[keyof typeof AutopilotControllerListActivityAgentKindEnum];
+/**
+ * @export
+ */
+export const AutopilotControllerListActivityActionEnum = {
+    CreateInquiry: 'CREATE_INQUIRY',
+    UpdateInquiry: 'UPDATE_INQUIRY',
+    EnrichInquiryMatchers: 'ENRICH_INQUIRY_MATCHERS',
+    SignalCaseReady: 'SIGNAL_CASE_READY',
+    CreateCase: 'CREATE_CASE',
+    UpdateCase: 'UPDATE_CASE',
+    AddHypothesis: 'ADD_HYPOTHESIS',
+    UpdateHypothesis: 'UPDATE_HYPOTHESIS',
+    AddEvidence: 'ADD_EVIDENCE',
+    AttachFindings: 'ATTACH_FINDINGS',
+    AddNote: 'ADD_NOTE',
+    AddThreadEntry: 'ADD_THREAD_ENTRY',
+    CreateEdge: 'CREATE_EDGE',
+    RemoveEdge: 'REMOVE_EDGE',
+    LinkSupport: 'LINK_SUPPORT',
+    ChangeStatus: 'CHANGE_STATUS',
+    LinkInquiry: 'LINK_INQUIRY',
+    ConsolidateMemory: 'CONSOLIDATE_MEMORY',
+    LinkDuplicate: 'LINK_DUPLICATE',
+    UpdateCluster: 'UPDATE_CLUSTER',
+    ToolCall: 'TOOL_CALL',
+    TuneSource: 'TUNE_SOURCE',
+    CreateDetector: 'CREATE_DETECTOR',
+    TrainDetector: 'TRAIN_DETECTOR',
+    TriggerScan: 'TRIGGER_SCAN',
+    UpdateSystemBrief: 'UPDATE_SYSTEM_BRIEF',
+    RecomputeCorrelation: 'RECOMPUTE_CORRELATION',
+    TuneCorrelation: 'TUNE_CORRELATION',
+    NoAction: 'NO_ACTION'
+} as const;
+export type AutopilotControllerListActivityActionEnum = typeof AutopilotControllerListActivityActionEnum[keyof typeof AutopilotControllerListActivityActionEnum];
+/**
+ * @export
+ */
+export const AutopilotControllerListActivityOutcomeEnum = {
+    Applied: 'APPLIED',
+    SkippedObserveOnly: 'SKIPPED_OBSERVE_ONLY',
+    Failed: 'FAILED'
+} as const;
+export type AutopilotControllerListActivityOutcomeEnum = typeof AutopilotControllerListActivityOutcomeEnum[keyof typeof AutopilotControllerListActivityOutcomeEnum];
+/**
+ * @export
+ */
 export const AutopilotControllerListLogsChannelEnum = {
     Technical: 'TECHNICAL',
     Business: 'BUSINESS'
@@ -552,10 +787,24 @@ export type AutopilotControllerListLogsChannelEnum = typeof AutopilotControllerL
 /**
  * @export
  */
+export const AutopilotControllerListLogsLevelEnum = {
+    Debug: 'DEBUG',
+    Info: 'INFO',
+    Warn: 'WARN',
+    Error: 'ERROR'
+} as const;
+export type AutopilotControllerListLogsLevelEnum = typeof AutopilotControllerListLogsLevelEnum[keyof typeof AutopilotControllerListLogsLevelEnum];
+/**
+ * @export
+ */
 export const AutopilotControllerListMemoryKindEnum = {
     Glossary: 'GLOSSARY',
     DecisionPrecedent: 'DECISION_PRECEDENT',
-    TopicInquiryMap: 'TOPIC_INQUIRY_MAP'
+    TopicInquiryMap: 'TOPIC_INQUIRY_MAP',
+    EntityMap: 'ENTITY_MAP',
+    SourceProfile: 'SOURCE_PROFILE',
+    DetectorInsight: 'DETECTOR_INSIGHT',
+    OperatorDirective: 'OPERATOR_DIRECTIVE'
 } as const;
 export type AutopilotControllerListMemoryKindEnum = typeof AutopilotControllerListMemoryKindEnum[keyof typeof AutopilotControllerListMemoryKindEnum];
 /**
@@ -565,7 +814,9 @@ export const AutopilotControllerListRunsAgentKindEnum = {
     Inquiry: 'INQUIRY',
     Case: 'CASE',
     Dream: 'DREAM',
-    Duplicates: 'DUPLICATES'
+    Duplicates: 'DUPLICATES',
+    Config: 'CONFIG',
+    DetectorAuthor: 'DETECTOR_AUTHOR'
 } as const;
 export type AutopilotControllerListRunsAgentKindEnum = typeof AutopilotControllerListRunsAgentKindEnum[keyof typeof AutopilotControllerListRunsAgentKindEnum];
 /**

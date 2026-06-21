@@ -17,6 +17,11 @@ Name | Type
 `autopilotInquirySearchable` | string
 `autopilotCaseEnabled` | boolean
 `autopilotCaseGuidance` | string
+`autopilotConfigEnabled` | boolean
+`autopilotConfigGuidance` | string
+`autopilotDetectorEnabled` | boolean
+`autopilotDetectorGuidance` | string
+`autopilotMcpEnabled` | boolean
 `hfToken` | string
 
 ## Example
@@ -37,6 +42,11 @@ const example = {
   "autopilotInquirySearchable": null,
   "autopilotCaseEnabled": false,
   "autopilotCaseGuidance": null,
+  "autopilotConfigEnabled": false,
+  "autopilotConfigGuidance": null,
+  "autopilotDetectorEnabled": false,
+  "autopilotDetectorGuidance": null,
+  "autopilotMcpEnabled": false,
   "hfToken": null,
 } satisfies UpdateInstanceSettingsDto
 

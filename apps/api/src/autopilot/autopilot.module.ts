@@ -4,6 +4,7 @@ import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { AiProviderConfigService } from '../ai-provider-config.service';
 import { AiClientService } from '../ai';
 import { MatchingModule } from '../matching/matching.module';
+import { CorrelationModule } from '../correlation/correlation.module';
 import { InquiriesService } from '../inquiries.service';
 import { CasesService } from '../cases.service';
 import { CaseThreadsService } from '../case-threads.service';
@@ -14,9 +15,18 @@ import { AgentSearchService } from './search/agent-search.service';
 import { AgentAuditService } from './audit/agent-audit.service';
 import { AgentLoggerService } from './audit/agent-logger.service';
 import { DecisionApplierService } from './decision-applier.service';
-import { InquiryAgentService } from './inquiry-agent.service';
-import { CaseAgentService } from './case-agent.service';
-import { DreamAgentService } from './dream-agent.service';
+import { ValidationService } from '../validation.service';
+import { CustomDetectorsService } from '../custom-detectors.service';
+import { ObserveToolset } from './tools/observe/observe.toolset';
+import { InvestigationToolset } from './tools/investigation/investigation.toolset';
+import { KnowledgeToolset } from './tools/knowledge/knowledge.toolset';
+import { ConfigToolset } from './tools/config/config.toolset';
+import { DetectorToolset } from './tools/detector/detector.toolset';
+import { FingerprintsToolset } from './tools/fingerprints/fingerprints.toolset';
+import { ToolRegistry } from './tools/tool-registry.service';
+import { ToolDispatcherService } from './tools/tool-dispatcher.service';
+import { HarnessService } from './harness/harness.service';
+import { SystemBriefService } from './harness/system-brief.service';
 import { AutopilotWorker } from './autopilot.worker';
 import { AutopilotService } from './autopilot.service';
 import { AutopilotController } from './autopilot.controller';
@@ -28,7 +38,7 @@ import { AutopilotController } from './autopilot.controller';
  * full audit trail (AgentRun / AgentDecision) and DB-backed memory.
  */
 @Module({
-  imports: [MatchingModule],
+  imports: [MatchingModule, CorrelationModule],
   controllers: [AutopilotController],
   providers: [
     PrismaService,
@@ -45,9 +55,18 @@ import { AutopilotController } from './autopilot.controller';
     AgentAuditService,
     AgentLoggerService,
     DecisionApplierService,
-    InquiryAgentService,
-    CaseAgentService,
-    DreamAgentService,
+    ValidationService,
+    CustomDetectorsService,
+    ObserveToolset,
+    InvestigationToolset,
+    KnowledgeToolset,
+    ConfigToolset,
+    DetectorToolset,
+    FingerprintsToolset,
+    ToolRegistry,
+    ToolDispatcherService,
+    SystemBriefService,
+    HarnessService,
     AutopilotWorker,
     AutopilotService,
   ],
