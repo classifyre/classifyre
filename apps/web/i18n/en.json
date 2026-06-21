@@ -21,7 +21,8 @@
     "scans": "Scans",
     "sandbox": "Sandbox",
     "operations": "Operations",
-    "settings": "Settings"
+    "settings": "Settings",
+    "harness": "Harness AI"
   },
   "common": {
     "duration": {
@@ -2035,7 +2036,8 @@
           "LINK_DUPLICATE": "Link duplicate",
           "UPDATE_CLUSTER": "Update cluster",
           "NO_ACTION": "No action"
-        }
+        },
+        "loadMore": "Load {{count}} more"
       },
       "runDialog": {
         "titleGeneral": "Run autopilot now",
@@ -2372,5 +2374,178 @@
     "legendHint": "Assets are connected by their link references (hash → asset).",
     "legendAsset": "Asset in this source",
     "legendExternal": "Linked asset in another source"
+  },
+  "harness": {
+    "title": "Harness AI Autopilot",
+    "subtitle": "Autonomous control plane",
+    "description": "A tool-using AI harness that observes your system and acts on it — managing investigations, tuning sources & detectors, correlating fingerprints, and learning as it goes.",
+    "steer": "Run / Steer",
+    "refresh": "Refresh",
+    "loading": "Loading the harness…",
+    "stats": {
+      "active": "Active",
+      "runs24h": "Runs · 24h",
+      "totalRuns": "Total runs",
+      "applied": "Applied",
+      "skipped": "Observe-only",
+      "failed": "Failed",
+      "memory": "Memories",
+      "brief": "Brief v",
+      "lastActivity": "Last activity",
+      "never": "never",
+      "idle": "Idle"
+    },
+    "nav": {
+      "activity": "Activity",
+      "runs": "Runs",
+      "tools": "Tools",
+      "memory": "Memory",
+      "brief": "System Brief",
+      "config": "Configuration"
+    },
+    "activity": {
+      "title": "Activity timeline",
+      "desc": "Every decision the harness made or skipped — the business narrative, queried server-side.",
+      "search": "Search rationale…",
+      "all": "All",
+      "kind": "Mission",
+      "action": "Action",
+      "outcome": "Outcome",
+      "entity": "Entity",
+      "empty": "No activity yet",
+      "emptyDesc": "Once the harness runs, its decisions appear here. Filter by mission, action, outcome or text.",
+      "loadMore": "Load more",
+      "results": "{{count}} of {{total}}",
+      "openRun": "Open run",
+      "payload": "Payload",
+      "clearFilters": "Clear filters"
+    },
+    "tools": {
+      "title": "Capability map",
+      "desc": "The tools the harness can call and the missions that wield them. New tools (including external MCP servers) register here automatically.",
+      "registry": "Tool registry",
+      "missions": "Missions",
+      "read": "read",
+      "mutate": "mutate",
+      "domain": "domain",
+      "toolCount": "{{count}} tools",
+      "allowedTools": "{{count}} tools",
+      "maxIterations": "max {{count}} steps",
+      "reactTitle": "How the harness thinks",
+      "reactStep1": "Observe — calls read tools to gather the slice of state it needs.",
+      "reactStep2": "Reason — proposes the next action with a short rationale.",
+      "reactStep3": "Act — a mutating tool runs through the gate (validated, OBSERVE_ONLY-checked, audited).",
+      "reactStep4": "Repeat — the result feeds back until the goal is met or the step budget is reached.",
+      "none": "No tools registered."
+    },
+    "brief": {
+      "title": "System brief",
+      "desc": "The living understanding the harness maintains and injects into every run — refreshed nightly.",
+      "version": "Version {{n}}",
+      "updatedBy": "Updated by {{who}}",
+      "never": "Not generated yet",
+      "facts": "Snapshot",
+      "narrative": "Narrative",
+      "empty": "No system brief yet",
+      "emptyDesc": "The dream cycle writes the system brief. Trigger one from Run / Steer, or wait for the nightly run.",
+      "edit": "Edit",
+      "create": "Write brief",
+      "save": "Save brief",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "saved": "System brief saved",
+      "placeholder": "Describe the system: sources, detectors, what's been tried, known gaps…"
+    },
+    "config": {
+      "title": "Harness configuration",
+      "desc": "Enable each autonomous capability and steer it with free-text guidance. All actions stay audited; per-entity observe-only still applies.",
+      "requiresAi": "Enable AI and select a default provider in Settings → AI before the harness can act.",
+      "enable": "Enabled",
+      "guidance": "Guidance",
+      "save": "Save guidance",
+      "saved": "Guidance saved",
+      "enabledToast": "Setting updated",
+      "master": "Capabilities",
+      "agents": {
+        "inquiry": {
+          "name": "Inquiry agent",
+          "desc": "Creates and enriches inquiries from new findings."
+        },
+        "case": {
+          "name": "Case agent",
+          "desc": "Builds and advances investigation cases, hypotheses and evidence."
+        },
+        "config": {
+          "name": "Config-tuning agent",
+          "desc": "Tunes detectors, sampling and resources on sources — never the base connection."
+        },
+        "detector": {
+          "name": "Detector-authoring agent",
+          "desc": "Creates and trains custom detectors when coverage is missing."
+        },
+        "mcp": {
+          "name": "External MCP tools",
+          "desc": "Let the harness call tools from connected external MCP servers."
+        }
+      }
+    },
+    "kinds": {
+      "INQUIRY": "Inquiry",
+      "CASE": "Case",
+      "CONFIG": "Config",
+      "DETECTOR_AUTHOR": "Detector",
+      "DREAM": "Dream",
+      "DUPLICATES": "Duplicates"
+    },
+    "outcomes": {
+      "APPLIED": "Applied",
+      "SKIPPED_OBSERVE_ONLY": "Observe-only",
+      "FAILED": "Failed"
+    },
+    "pointer": {
+      "title": "Investigation Autopilot moved",
+      "desc": "Autopilot is now the Harness AI control plane — configure and observe it from its own workspace.",
+      "cta": "Open Harness AI"
+    },
+    "mcp": {
+      "title": "External MCP servers",
+      "desc": "Connect external Model Context Protocol servers and choose which missions may use their tools. Untrusted servers are observe-only.",
+      "add": "Add server",
+      "none": "No MCP servers",
+      "noneDesc": "Connect an external MCP server to extend the harness with third-party tools.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "test": "Test",
+      "refresh": "Refresh all",
+      "refreshed": "Reconnected MCP servers",
+      "connected": "Connected",
+      "neverConnected": "Not connected",
+      "tools": "{{count}} tools",
+      "transport": "Transport",
+      "http": "HTTP",
+      "stdio": "stdio",
+      "url": "Server URL",
+      "command": "Command",
+      "args": "Arguments (one per line)",
+      "headers": "Auth headers (key: value per line)",
+      "name": "Name",
+      "enabled": "Enabled",
+      "trusted": "Trusted",
+      "trustedDesc": "Trusted servers may run mutating tools; untrusted ones are observe-only.",
+      "agents": "Missions allowed",
+      "agentsAll": "All missions",
+      "allowlist": "Tool allowlist (optional, one per line)",
+      "save": "Save",
+      "cancel": "Cancel",
+      "created": "MCP server added",
+      "updated": "MCP server updated",
+      "deleted": "MCP server removed",
+      "testing": "Testing…",
+      "testOk": "Connected — {{count}} tools",
+      "testFail": "Connection failed",
+      "confirmDelete": "Remove this MCP server?",
+      "editTitle": "Edit MCP server",
+      "addTitle": "Add MCP server"
+    }
   }
 }
