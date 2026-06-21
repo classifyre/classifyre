@@ -30,6 +30,7 @@ import {
   ScanSearch,
   Terminal,
   Settings,
+  Bot,
   type LucideIcon,
 } from "lucide-react";
 
@@ -137,7 +138,25 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip={t("nav.settings")}>
+            <SidebarMenuButton
+              asChild
+              isActive={
+                pathname === "/harness" || pathname.startsWith("/harness/")
+              }
+              tooltip={t("nav.harness")}
+            >
+              <Link href="/harness">
+                <Bot className="size-6 text-[#d97706]" />
+                <span>{t("nav.harness")}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname === "/settings" || pathname.startsWith("/settings/")}
+              tooltip={t("nav.settings")}
+            >
               <Link href="/settings">
                 <Settings className="size-6" />
                 <span>{t("nav.settings")}</span>

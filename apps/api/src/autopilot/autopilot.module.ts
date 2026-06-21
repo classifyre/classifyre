@@ -27,6 +27,9 @@ import { ToolRegistry } from './tools/tool-registry.service';
 import { ToolDispatcherService } from './tools/tool-dispatcher.service';
 import { HarnessService } from './harness/harness.service';
 import { SystemBriefService } from './harness/system-brief.service';
+import { McpClientService } from './mcp-client/mcp-client.service';
+import { McpServersService } from './mcp-client/mcp-servers.service';
+import { McpServersController } from './mcp-client/mcp-servers.controller';
 import { AutopilotWorker } from './autopilot.worker';
 import { AutopilotService } from './autopilot.service';
 import { AutopilotController } from './autopilot.controller';
@@ -39,7 +42,7 @@ import { AutopilotController } from './autopilot.controller';
  */
 @Module({
   imports: [MatchingModule, CorrelationModule],
-  controllers: [AutopilotController],
+  controllers: [AutopilotController, McpServersController],
   providers: [
     PrismaService,
     MaskedConfigCryptoService,
@@ -66,6 +69,8 @@ import { AutopilotController } from './autopilot.controller';
     ToolRegistry,
     ToolDispatcherService,
     SystemBriefService,
+    McpClientService,
+    McpServersService,
     HarnessService,
     AutopilotWorker,
     AutopilotService,

@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -23,6 +24,8 @@ import {
   AgentSystemBriefDto,
   AutopilotStatsDto,
   CreateAgentMemoryDto,
+  HarnessToolsResponseDto,
+  UpdateSystemBriefDto,
   QueryAgentActivityDto,
   QueryAgentLogsDto,
   QueryAgentMemoryDto,
@@ -82,6 +85,16 @@ export class AutopilotController {
     return this.autopilot.listActivity(query);
   }
 
+  @Get('tools')
+  @ApiOperation({
+    summary:
+      'The harness capability map — every registered tool (read/mutate, domain) and the missions that use them',
+  })
+  @ApiResponse({ status: 200, type: HarnessToolsResponseDto })
+  getTools(): HarnessToolsResponseDto {
+    return this.autopilot.getTools();
+  }
+
   @Get('system-brief')
   @ApiOperation({
     summary: 'The living system brief the autopilot maintains and injects',
@@ -89,6 +102,15 @@ export class AutopilotController {
   @ApiResponse({ status: 200, type: AgentSystemBriefDto })
   getSystemBrief(): Promise<AgentSystemBriefDto> {
     return this.autopilot.getSystemBrief();
+  }
+
+  @Put('system-brief')
+  @ApiOperation({ summary: 'Create or rewrite the system-brief narrative' })
+  @ApiResponse({ status: 200, type: AgentSystemBriefDto })
+  updateSystemBrief(
+    @Body() dto: UpdateSystemBriefDto,
+  ): Promise<AgentSystemBriefDto> {
+    return this.autopilot.updateSystemBrief(dto.content);
   }
 
   @Get('runs')

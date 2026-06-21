@@ -10,6 +10,7 @@ All URIs are relative to *http://localhost*
 | [**autopilotControllerGetRun**](AutopilotApi.md#autopilotcontrollergetrun) | **GET** /autopilot/runs/{id} | Get one autopilot run with all decisions and rationales |
 | [**autopilotControllerGetStats**](AutopilotApi.md#autopilotcontrollergetstats) | **GET** /autopilot/stats | Mission-control counters (runs, decisions, memory, brief version) |
 | [**autopilotControllerGetSystemBrief**](AutopilotApi.md#autopilotcontrollergetsystembrief) | **GET** /autopilot/system-brief | The living system brief the autopilot maintains and injects |
+| [**autopilotControllerGetTools**](AutopilotApi.md#autopilotcontrollergettools) | **GET** /autopilot/tools | The harness capability map — every registered tool (read/mutate, domain) and the missions that use them |
 | [**autopilotControllerListActivity**](AutopilotApi.md#autopilotcontrollerlistactivity) | **GET** /autopilot/activity | Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time |
 | [**autopilotControllerListLogs**](AutopilotApi.md#autopilotcontrollerlistlogs) | **GET** /autopilot/runs/{id}/logs | Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output) |
 | [**autopilotControllerListMemory**](AutopilotApi.md#autopilotcontrollerlistmemory) | **GET** /autopilot/memory | List the agent memory (glossary, precedents, topic map) |
@@ -18,6 +19,13 @@ All URIs are relative to *http://localhost*
 | [**autopilotControllerTrigger**](AutopilotApi.md#autopilotcontrollertrigger) | **POST** /autopilot/trigger | Manually trigger an autopilot cycle over existing data, with an optional steering instruction |
 | [**autopilotControllerTriggerDream**](AutopilotApi.md#autopilotcontrollertriggerdream) | **POST** /autopilot/dream | Trigger a dream cycle now (memory consolidation — dedupe, prune noise, distill notes) |
 | [**autopilotControllerUpdateMemory**](AutopilotApi.md#autopilotcontrollerupdatememory) | **PATCH** /autopilot/memory/{id} | Edit a memory entry (content, tags, weight) |
+| [**autopilotControllerUpdateSystemBrief**](AutopilotApi.md#autopilotcontrollerupdatesystembrief) | **PUT** /autopilot/system-brief | Create or rewrite the system-brief narrative |
+| [**mcpServersControllerCreate**](AutopilotApi.md#mcpserverscontrollercreate) | **POST** /autopilot/mcp-servers | Add an external MCP server |
+| [**mcpServersControllerList**](AutopilotApi.md#mcpserverscontrollerlist) | **GET** /autopilot/mcp-servers | List configured external MCP servers |
+| [**mcpServersControllerRefresh**](AutopilotApi.md#mcpserverscontrollerrefresh) | **POST** /autopilot/mcp-servers/refresh | Reconnect all enabled servers and rediscover tools |
+| [**mcpServersControllerRemove**](AutopilotApi.md#mcpserverscontrollerremove) | **DELETE** /autopilot/mcp-servers/{id} | Remove an MCP server |
+| [**mcpServersControllerTest**](AutopilotApi.md#mcpserverscontrollertest) | **POST** /autopilot/mcp-servers/{id}/test | Probe a server: connect and list its tools |
+| [**mcpServersControllerUpdate**](AutopilotApi.md#mcpserverscontrollerupdate) | **PATCH** /autopilot/mcp-servers/{id} | Update an MCP server |
 
 
 
@@ -376,6 +384,63 @@ This endpoint does not need any parameter.
 ### Return type
 
 [**AgentSystemBriefDto**](AgentSystemBriefDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## autopilotControllerGetTools
+
+> HarnessToolsResponseDto autopilotControllerGetTools()
+
+The harness capability map — every registered tool (read/mutate, domain) and the missions that use them
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { AutopilotControllerGetToolsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  try {
+    const data = await api.autopilotControllerGetTools();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**HarnessToolsResponseDto**](HarnessToolsResponseDto.md)
 
 ### Authorization
 
@@ -960,6 +1025,448 @@ example().catch(console.error);
 ### Return type
 
 [**AgentMemoryDto**](AgentMemoryDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## autopilotControllerUpdateSystemBrief
+
+> AgentSystemBriefDto autopilotControllerUpdateSystemBrief(updateSystemBriefDto)
+
+Create or rewrite the system-brief narrative
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { AutopilotControllerUpdateSystemBriefRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // UpdateSystemBriefDto
+    updateSystemBriefDto: ...,
+  } satisfies AutopilotControllerUpdateSystemBriefRequest;
+
+  try {
+    const data = await api.autopilotControllerUpdateSystemBrief(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **updateSystemBriefDto** | [UpdateSystemBriefDto](UpdateSystemBriefDto.md) |  | |
+
+### Return type
+
+[**AgentSystemBriefDto**](AgentSystemBriefDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## mcpServersControllerCreate
+
+> McpServerResponseDto mcpServersControllerCreate(createMcpServerDto)
+
+Add an external MCP server
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { McpServersControllerCreateRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // CreateMcpServerDto
+    createMcpServerDto: ...,
+  } satisfies McpServersControllerCreateRequest;
+
+  try {
+    const data = await api.mcpServersControllerCreate(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **createMcpServerDto** | [CreateMcpServerDto](CreateMcpServerDto.md) |  | |
+
+### Return type
+
+[**McpServerResponseDto**](McpServerResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## mcpServersControllerList
+
+> Array&lt;McpServerResponseDto&gt; mcpServersControllerList()
+
+List configured external MCP servers
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { McpServersControllerListRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  try {
+    const data = await api.mcpServersControllerList();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Array&lt;McpServerResponseDto&gt;**](McpServerResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## mcpServersControllerRefresh
+
+> Array&lt;McpServerResponseDto&gt; mcpServersControllerRefresh()
+
+Reconnect all enabled servers and rediscover tools
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { McpServersControllerRefreshRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  try {
+    const data = await api.mcpServersControllerRefresh();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Array&lt;McpServerResponseDto&gt;**](McpServerResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## mcpServersControllerRemove
+
+> mcpServersControllerRemove(id)
+
+Remove an MCP server
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { McpServersControllerRemoveRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies McpServersControllerRemoveRequest;
+
+  try {
+    const data = await api.mcpServersControllerRemove(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## mcpServersControllerTest
+
+> McpServerTestResultDto mcpServersControllerTest(id)
+
+Probe a server: connect and list its tools
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { McpServersControllerTestRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies McpServersControllerTestRequest;
+
+  try {
+    const data = await api.mcpServersControllerTest(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**McpServerTestResultDto**](McpServerTestResultDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## mcpServersControllerUpdate
+
+> McpServerResponseDto mcpServersControllerUpdate(id, updateMcpServerDto)
+
+Update an MCP server
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { McpServersControllerUpdateRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // UpdateMcpServerDto
+    updateMcpServerDto: ...,
+  } satisfies McpServersControllerUpdateRequest;
+
+  try {
+    const data = await api.mcpServersControllerUpdate(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **updateMcpServerDto** | [UpdateMcpServerDto](UpdateMcpServerDto.md) |  | |
+
+### Return type
+
+[**McpServerResponseDto**](McpServerResponseDto.md)
 
 ### Authorization
 

@@ -67,7 +67,7 @@ telemetry:
   otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318"
 
 objectStorage:
-  enabled: true
+  enabled: false
   bucket: classifyredemologs
   sandboxBucket: classifyredemosandbox
   endpoint: "https://s3.us-west-002.backblazeb2.com"

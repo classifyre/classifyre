@@ -7196,6 +7196,28 @@
         ]
       }
     },
+    "/autopilot/tools": {
+      "get": {
+        "operationId": "AutopilotController_getTools",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HarnessToolsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The harness capability map — every registered tool (read/mutate, domain) and the missions that use them",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
     "/autopilot/system-brief": {
       "get": {
         "operationId": "AutopilotController_getSystemBrief",
@@ -7213,6 +7235,36 @@
           }
         },
         "summary": "The living system brief the autopilot maintains and injects",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "put": {
+        "operationId": "AutopilotController_updateSystemBrief",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSystemBriefDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSystemBriefDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create or rewrite the system-brief narrative",
         "tags": [
           "autopilot"
         ]
@@ -7660,6 +7712,180 @@
           }
         },
         "summary": "Delete a memory entry the agent learned",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/mcp-servers": {
+      "get": {
+        "operationId": "McpServersController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/McpServerResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List configured external MCP servers",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "post": {
+        "operationId": "McpServersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMcpServerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add an external MCP server",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/mcp-servers/refresh": {
+      "post": {
+        "operationId": "McpServersController_refresh",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/McpServerResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reconnect all enabled servers and rediscover tools",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/mcp-servers/{id}/test": {
+      "post": {
+        "operationId": "McpServersController_test",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerTestResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Probe a server: connect and list its tools",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/mcp-servers/{id}": {
+      "patch": {
+        "operationId": "McpServersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMcpServerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update an MCP server",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "delete": {
+        "operationId": "McpServersController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Remove an MCP server",
         "tags": [
           "autopilot"
         ]
@@ -15445,9 +15671,11 @@
             "type": "string",
             "enum": [
               "INQUIRY",
-              "CASE"
+              "CASE",
+              "CONFIG",
+              "DETECTOR_AUTHOR"
             ],
-            "description": "Run only one agent. Omit to run both (inquiry then case). Implied CASE when caseId is set."
+            "description": "Run only one mission. Omit to run the full investigation cycle (inquiry then case). Implied CASE when caseId is set. Use POST /autopilot/dream for memory consolidation."
           },
           "caseId": {
             "type": "string",
@@ -15662,6 +15890,89 @@
           "limit"
         ]
       },
+      "HarnessToolDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Namespaced tool name, e.g. \"config.tune_source\""
+          },
+          "description": {
+            "type": "string"
+          },
+          "sideEffect": {
+            "type": "string",
+            "description": "read | mutate"
+          },
+          "domain": {
+            "type": "string",
+            "nullable": true,
+            "description": "Domain gated for OBSERVE_ONLY (inquiry/case/source/…)"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "sideEffect"
+        ]
+      },
+      "HarnessMissionDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE",
+              "DREAM",
+              "DUPLICATES",
+              "CONFIG",
+              "DETECTOR_AUTHOR"
+            ]
+          },
+          "goal": {
+            "type": "string",
+            "description": "The goal/system-prompt that frames the mission"
+          },
+          "allowedTools": {
+            "description": "Tool names this mission may call",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "maxIterations": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "goal",
+          "allowedTools",
+          "maxIterations"
+        ]
+      },
+      "HarnessToolsResponseDto": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HarnessToolDto"
+            }
+          },
+          "missions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HarnessMissionDto"
+            }
+          }
+        },
+        "required": [
+          "tools",
+          "missions"
+        ]
+      },
       "AgentSystemBriefDto": {
         "type": "object",
         "properties": {
@@ -15690,6 +16001,18 @@
           "content",
           "facts",
           "version"
+        ]
+      },
+      "UpdateSystemBriefDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Full replacement narrative for the system brief"
+          }
+        },
+        "required": [
+          "content"
         ]
       },
       "AgentRunDto": {
@@ -16177,6 +16500,250 @@
           "weight": {
             "type": "number",
             "description": "Set the reinforcement weight directly"
+          }
+        }
+      },
+      "McpServerResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string",
+            "nullable": true
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasHeaders": {
+            "type": "boolean",
+            "description": "Whether auth headers are stored (values hidden)"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "trusted": {
+            "type": "boolean"
+          },
+          "agentKinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "toolAllowlist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "discoveredTools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastConnectedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "transport",
+          "args",
+          "hasHeaders",
+          "enabled",
+          "trusted",
+          "agentKinds",
+          "toolAllowlist",
+          "discoveredTools",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateMcpServerDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "description": "Stable slug; generated from name if omitted"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "stdio",
+              "http"
+            ]
+          },
+          "command": {
+            "type": "string",
+            "description": "stdio: executable"
+          },
+          "args": {
+            "description": "stdio: arguments",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string",
+            "description": "http: server URL"
+          },
+          "headers": {
+            "type": "object",
+            "description": "http: auth headers (stored encrypted, never returned)"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "trusted": {
+            "type": "boolean",
+            "default": false,
+            "description": "Trusted servers may run mutating tools; untrusted are observe-only"
+          },
+          "agentKinds": {
+            "type": "array",
+            "description": "Missions allowed to use these tools. Empty = all missions.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "INQUIRY",
+                "CASE",
+                "DREAM",
+                "DUPLICATES",
+                "CONFIG",
+                "DETECTOR_AUTHOR"
+              ]
+            }
+          },
+          "toolAllowlist": {
+            "description": "Discovered tool names to expose. Empty = all.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "transport"
+        ]
+      },
+      "McpServerTestResultDto": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "ok",
+          "tools"
+        ]
+      },
+      "UpdateMcpServerDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "stdio",
+              "http"
+            ]
+          },
+          "command": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string"
+          },
+          "headers": {
+            "type": "object",
+            "nullable": true,
+            "description": "Replace auth headers; pass null/empty to clear"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "trusted": {
+            "type": "boolean"
+          },
+          "agentKinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "INQUIRY",
+                "CASE",
+                "DREAM",
+                "DUPLICATES",
+                "CONFIG",
+                "DETECTOR_AUTHOR"
+              ]
+            }
+          },
+          "toolAllowlist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

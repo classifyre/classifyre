@@ -53,6 +53,16 @@ export class ToolRegistry {
     this.add(tool);
   }
 
+  /** Remove a runtime-registered tool (e.g. on MCP server refresh/disconnect). */
+  unregister(name: string): void {
+    this.tools.delete(name);
+  }
+
+  /** All registered tool names (used to scope MCP tools per mission). */
+  names(): string[] {
+    return [...this.tools.keys()];
+  }
+
   private add(tool: Tool): void {
     if (this.tools.has(tool.name)) {
       this.logger.warn(`Tool "${tool.name}" already registered — overwriting.`);

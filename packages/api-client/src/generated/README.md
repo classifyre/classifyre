@@ -78,6 +78,7 @@ All URIs are relative to *http://localhost*
 *AutopilotApi* | [**autopilotControllerGetRun**](docs/AutopilotApi.md#autopilotcontrollergetrun) | **GET** /autopilot/runs/{id} | Get one autopilot run with all decisions and rationales
 *AutopilotApi* | [**autopilotControllerGetStats**](docs/AutopilotApi.md#autopilotcontrollergetstats) | **GET** /autopilot/stats | Mission-control counters (runs, decisions, memory, brief version)
 *AutopilotApi* | [**autopilotControllerGetSystemBrief**](docs/AutopilotApi.md#autopilotcontrollergetsystembrief) | **GET** /autopilot/system-brief | The living system brief the autopilot maintains and injects
+*AutopilotApi* | [**autopilotControllerGetTools**](docs/AutopilotApi.md#autopilotcontrollergettools) | **GET** /autopilot/tools | The harness capability map — every registered tool (read/mutate, domain) and the missions that use them
 *AutopilotApi* | [**autopilotControllerListActivity**](docs/AutopilotApi.md#autopilotcontrollerlistactivity) | **GET** /autopilot/activity | Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time
 *AutopilotApi* | [**autopilotControllerListLogs**](docs/AutopilotApi.md#autopilotcontrollerlistlogs) | **GET** /autopilot/runs/{id}/logs | Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output)
 *AutopilotApi* | [**autopilotControllerListMemory**](docs/AutopilotApi.md#autopilotcontrollerlistmemory) | **GET** /autopilot/memory | List the agent memory (glossary, precedents, topic map)
@@ -86,6 +87,13 @@ All URIs are relative to *http://localhost*
 *AutopilotApi* | [**autopilotControllerTrigger**](docs/AutopilotApi.md#autopilotcontrollertrigger) | **POST** /autopilot/trigger | Manually trigger an autopilot cycle over existing data, with an optional steering instruction
 *AutopilotApi* | [**autopilotControllerTriggerDream**](docs/AutopilotApi.md#autopilotcontrollertriggerdream) | **POST** /autopilot/dream | Trigger a dream cycle now (memory consolidation — dedupe, prune noise, distill notes)
 *AutopilotApi* | [**autopilotControllerUpdateMemory**](docs/AutopilotApi.md#autopilotcontrollerupdatememory) | **PATCH** /autopilot/memory/{id} | Edit a memory entry (content, tags, weight)
+*AutopilotApi* | [**autopilotControllerUpdateSystemBrief**](docs/AutopilotApi.md#autopilotcontrollerupdatesystembrief) | **PUT** /autopilot/system-brief | Create or rewrite the system-brief narrative
+*AutopilotApi* | [**mcpServersControllerCreate**](docs/AutopilotApi.md#mcpserverscontrollercreate) | **POST** /autopilot/mcp-servers | Add an external MCP server
+*AutopilotApi* | [**mcpServersControllerList**](docs/AutopilotApi.md#mcpserverscontrollerlist) | **GET** /autopilot/mcp-servers | List configured external MCP servers
+*AutopilotApi* | [**mcpServersControllerRefresh**](docs/AutopilotApi.md#mcpserverscontrollerrefresh) | **POST** /autopilot/mcp-servers/refresh | Reconnect all enabled servers and rediscover tools
+*AutopilotApi* | [**mcpServersControllerRemove**](docs/AutopilotApi.md#mcpserverscontrollerremove) | **DELETE** /autopilot/mcp-servers/{id} | Remove an MCP server
+*AutopilotApi* | [**mcpServersControllerTest**](docs/AutopilotApi.md#mcpserverscontrollertest) | **POST** /autopilot/mcp-servers/{id}/test | Probe a server: connect and list its tools
+*AutopilotApi* | [**mcpServersControllerUpdate**](docs/AutopilotApi.md#mcpserverscontrollerupdate) | **PATCH** /autopilot/mcp-servers/{id} | Update an MCP server
 *CasesApi* | [**caseTimelineControllerGetTimeline**](docs/CasesApi.md#casetimelinecontrollergettimeline) | **GET** /cases/{caseId}/timeline | Paginated unified case activity feed (newest first)
 *CasesApi* | [**casesControllerAddEvidence**](docs/CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence
 *CasesApi* | [**casesControllerAddFinding**](docs/CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of evidence
@@ -293,6 +301,7 @@ All URIs are relative to *http://localhost*
 - [CreateHypothesisDto](docs/CreateHypothesisDto.md)
 - [CreateInquiryDto](docs/CreateInquiryDto.md)
 - [CreateManualEdgeDto](docs/CreateManualEdgeDto.md)
+- [CreateMcpServerDto](docs/CreateMcpServerDto.md)
 - [CreateMcpTokenDto](docs/CreateMcpTokenDto.md)
 - [CreateSourceDto](docs/CreateSourceDto.md)
 - [CreateThreadDto](docs/CreateThreadDto.md)
@@ -324,6 +333,9 @@ All URIs are relative to *http://localhost*
 - [GraphEdgeDto](docs/GraphEdgeDto.md)
 - [GraphNodeDto](docs/GraphNodeDto.md)
 - [GraphResponseDto](docs/GraphResponseDto.md)
+- [HarnessMissionDto](docs/HarnessMissionDto.md)
+- [HarnessToolDto](docs/HarnessToolDto.md)
+- [HarnessToolsResponseDto](docs/HarnessToolsResponseDto.md)
 - [HealthControllerGetHealth200Response](docs/HealthControllerGetHealth200Response.md)
 - [HypothesisResponseDto](docs/HypothesisResponseDto.md)
 - [HypothesisSupportLinkDto](docs/HypothesisSupportLinkDto.md)
@@ -349,6 +361,8 @@ All URIs are relative to *http://localhost*
 - [McpCapabilityGroupDto](docs/McpCapabilityGroupDto.md)
 - [McpOverviewResponseDto](docs/McpOverviewResponseDto.md)
 - [McpPromptSummaryDto](docs/McpPromptSummaryDto.md)
+- [McpServerResponseDto](docs/McpServerResponseDto.md)
+- [McpServerTestResultDto](docs/McpServerTestResultDto.md)
 - [McpTokenCreatedResponseDto](docs/McpTokenCreatedResponseDto.md)
 - [McpTokenResponseDto](docs/McpTokenResponseDto.md)
 - [NotificationListResponseDto](docs/NotificationListResponseDto.md)
@@ -454,10 +468,12 @@ All URIs are relative to *http://localhost*
 - [UpdateHypothesisDto](docs/UpdateHypothesisDto.md)
 - [UpdateInquiryDto](docs/UpdateInquiryDto.md)
 - [UpdateInstanceSettingsDto](docs/UpdateInstanceSettingsDto.md)
+- [UpdateMcpServerDto](docs/UpdateMcpServerDto.md)
 - [UpdateMcpTokenDto](docs/UpdateMcpTokenDto.md)
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)
 - [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)
+- [UpdateSystemBriefDto](docs/UpdateSystemBriefDto.md)
 - [UpdateThreadDto](docs/UpdateThreadDto.md)
 - [ValueOccurrenceAssetDto](docs/ValueOccurrenceAssetDto.md)
 - [ValueOccurrencesResponseDto](docs/ValueOccurrencesResponseDto.md)

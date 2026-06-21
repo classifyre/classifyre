@@ -1222,6 +1222,35 @@ enum AgentMemoryKind {
   OPERATOR_DIRECTIVE
 }
 
+// An external MCP server the harness can connect to and call tools from.
+// Credentials (headers) are encrypted at rest. agentKinds scopes which missions
+// may use the server's tools (empty = all). Untrusted servers expose their tools
+// observe-only (the dispatcher refuses to run their mutating handlers).
+model McpServerConfig {
+  id              String    @id @default(uuid())
+  name            String
+  slug            String    @unique
+  transport       String // "stdio" | "http"
+  command         String?
+  args            String[]  @default([])
+  url             String?
+  headersEnc      String?   @map("headers_enc")
+  enabled         Boolean   @default(false)
+  trusted         Boolean   @default(false)
+  // Mission kinds allowed to use these tools (AgentKind strings). Empty = all.
+  agentKinds      String[]  @default([]) @map("agent_kinds")
+  // Discovered tool names to expose. Empty = all discovered.
+  toolAllowlist   String[]  @default([]) @map("tool_allowlist")
+  // Last connection result for the UI.
+  discoveredTools String[]  @default([]) @map("discovered_tools")
+  lastError       String?   @map("last_error") @db.Text
+  lastConnectedAt DateTime? @map("last_connected_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("mcp_server_configs")
+}
+
 // Living, always-injected summary of the whole system the autopilot maintains:
 // source/detector counts, finding landscape, what's been tried, known gaps.
 // Singleton (id = 1), like InstanceSettings. The narrative is model-authored;
