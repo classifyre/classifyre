@@ -1,9 +1,4 @@
-import type {
-  AgentKind,
-  AgentRun,
-  DetectorType,
-  InstanceSettings,
-} from '@prisma/client';
+import type { AgentRun, DetectorType, InstanceSettings } from '@prisma/client';
 
 /** Payload of an AUTOPILOT_QUEUE job. */
 export interface AutopilotJob {
@@ -23,7 +18,7 @@ export interface AutopilotJob {
    * this agent and treat the job as explicit operator intent (instance
    * enable-flags are bypassed).
    */
-  agentKind?: 'INQUIRY' | 'CASE' | 'DREAM';
+  agentKind?: 'INQUIRY' | 'CASE' | 'DREAM' | 'CONFIG' | 'DETECTOR_AUTHOR';
   /** Focus the case agent on one case (full case detail in context). */
   caseId?: string;
 }
@@ -169,7 +164,7 @@ export interface AgentStep {
   execute(ctx: AgentContext): Promise<unknown>;
 }
 
-// ── LLM decision shapes (mirror schemas/*.schema.ts) ─────────────────────────
+// ── Tool input shapes ────────────────────────────────────────────────────────
 
 export interface InquiryMatcherProposal {
   title?: string;
@@ -183,29 +178,18 @@ export interface InquiryMatcherProposal {
   findingValueRegex?: string[];
 }
 
-export interface InquiryDecision {
-  action:
-    | 'CREATE_INQUIRY'
-    | 'UPDATE_INQUIRY'
-    | 'ENRICH_INQUIRY_MATCHERS'
-    | 'SIGNAL_CASE_READY'
-    | 'NO_ACTION';
-  rationale: string;
-  inquiryId?: string;
-  inquiry?: InquiryMatcherProposal;
-  duplicateOfInquiryId?: string;
-}
-
 export interface MemoryWrite {
-  kind: 'GLOSSARY' | 'DECISION_PRECEDENT' | 'TOPIC_INQUIRY_MAP';
+  kind:
+    | 'GLOSSARY'
+    | 'DECISION_PRECEDENT'
+    | 'TOPIC_INQUIRY_MAP'
+    | 'ENTITY_MAP'
+    | 'SOURCE_PROFILE'
+    | 'DETECTOR_INSIGHT'
+    | 'OPERATOR_DIRECTIVE';
   key: string;
   content: string;
   tags?: string[];
-}
-
-export interface InquiryDecisionOutput {
-  decisions: InquiryDecision[];
-  memoryWrites: MemoryWrite[];
 }
 
 export type CaseOperation = {
@@ -253,24 +237,3 @@ export type CaseOperation = {
   /** LINK_INQUIRY */
   inquiryIds?: string[];
 };
-
-export interface CaseDecision {
-  action: 'CREATE_CASE' | 'UPDATE_CASE' | 'NO_ACTION';
-  rationale: string;
-  caseId?: string;
-  title?: string;
-  description?: string;
-  severity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
-  operations?: CaseOperation[];
-}
-
-export interface CaseDecisionOutput {
-  decisions: CaseDecision[];
-  memoryWrites: MemoryWrite[];
-}
-
-export interface AgentRunResult {
-  agentKind: AgentKind;
-  runId: string;
-  status: string;
-}

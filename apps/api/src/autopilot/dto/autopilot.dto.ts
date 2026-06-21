@@ -31,10 +31,46 @@ export class QueryAgentRunsDto {
   @MaxLength(64)
   caseId?: string;
 
+  @ApiPropertyOptional({ description: 'Only runs for this source' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  sourceId?: string;
+
   @ApiPropertyOptional({ enum: AgentRunStatus })
   @IsOptional()
   @IsEnum(AgentRunStatus)
   status?: AgentRunStatus;
+
+  @ApiPropertyOptional({
+    description: 'Trigger origin: scan_completed | manual | schedule',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  trigger?: string;
+
+  @ApiPropertyOptional({
+    description: 'Substring search over summary, instruction and error',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
+
+  @ApiPropertyOptional({
+    description: 'Only runs created at/after this ISO time',
+  })
+  @IsOptional()
+  @IsString()
+  since?: string;
+
+  @ApiPropertyOptional({
+    description: 'Only runs created at/before this ISO time',
+  })
+  @IsOptional()
+  @IsString()
+  until?: string;
 
   @ApiPropertyOptional({ default: 0 })
   @IsOptional()
@@ -49,6 +85,112 @@ export class QueryAgentRunsDto {
   @IsInt()
   @Min(1)
   limit?: number = 50;
+}
+
+// ── Activity feed (cross-run decision timeline, server-side filterable) ─────────
+
+export class QueryAgentActivityDto {
+  @ApiPropertyOptional({ enum: AgentKind })
+  @IsOptional()
+  @IsEnum(AgentKind)
+  agentKind?: AgentKind;
+
+  @ApiPropertyOptional({ enum: AgentDecisionAction })
+  @IsOptional()
+  @IsEnum(AgentDecisionAction)
+  action?: AgentDecisionAction;
+
+  @ApiPropertyOptional({ enum: AgentDecisionOutcome })
+  @IsOptional()
+  @IsEnum(AgentDecisionOutcome)
+  outcome?: AgentDecisionOutcome;
+
+  @ApiPropertyOptional({
+    description: 'inquiry | case | source | detector | memory | system | asset',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  entityType?: string;
+
+  @ApiPropertyOptional({ description: 'Substring search over the rationale' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'ISO time lower bound' })
+  @IsOptional()
+  @IsString()
+  since?: string;
+
+  @ApiPropertyOptional({ description: 'ISO time upper bound' })
+  @IsOptional()
+  @IsString()
+  until?: string;
+
+  @ApiPropertyOptional({ default: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number = 0;
+
+  @ApiPropertyOptional({ default: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number = 50;
+}
+
+export class AgentActivityItemDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  runId!: string;
+
+  @ApiProperty({ enum: AgentKind })
+  agentKind!: AgentKind;
+
+  @ApiProperty({ enum: AgentRunStatus })
+  runStatus!: AgentRunStatus;
+
+  @ApiProperty({ enum: AgentDecisionAction })
+  action!: AgentDecisionAction;
+
+  @ApiProperty({ enum: AgentDecisionOutcome })
+  outcome!: AgentDecisionOutcome;
+
+  @ApiPropertyOptional({ nullable: true })
+  entityType!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  entityId!: string | null;
+
+  @ApiProperty()
+  rationale!: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  payload!: Record<string, unknown> | null;
+
+  @ApiProperty()
+  createdAt!: Date;
+}
+
+export class AgentActivityListResponseDto {
+  @ApiProperty({ type: [AgentActivityItemDto] })
+  items!: AgentActivityItemDto[];
+
+  @ApiProperty()
+  total!: number;
+
+  @ApiProperty()
+  skip!: number;
+
+  @ApiProperty()
+  limit!: number;
 }
 
 export class AgentDecisionDto {
@@ -163,6 +305,17 @@ export class QueryAgentLogsDto {
   @IsOptional()
   @IsEnum(AgentLogChannel)
   channel?: AgentLogChannel;
+
+  @ApiPropertyOptional({ enum: AgentLogLevel })
+  @IsOptional()
+  @IsEnum(AgentLogLevel)
+  level?: AgentLogLevel;
+
+  @ApiPropertyOptional({ description: 'Substring search over the message' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
 }
 
 export class AgentLogDto {
@@ -214,9 +367,14 @@ export class TriggerAutopilotDto {
   sourceId?: string;
 
   @ApiPropertyOptional({
-    enum: [AgentKind.INQUIRY, AgentKind.CASE],
+    enum: [
+      AgentKind.INQUIRY,
+      AgentKind.CASE,
+      AgentKind.CONFIG,
+      AgentKind.DETECTOR_AUTHOR,
+    ],
     description:
-      'Run only one agent. Omit to run both (inquiry then case). Implied CASE when caseId is set.',
+      'Run only one mission. Omit to run the full investigation cycle (inquiry then case). Implied CASE when caseId is set. Use POST /autopilot/dream for memory consolidation.',
   })
   @IsOptional()
   @IsEnum(AgentKind)
@@ -360,4 +518,126 @@ export class UpdateAgentMemoryDto {
   @IsInt()
   @Min(0)
   weight?: number;
+}
+
+// ── System brief ───────────────────────────────────────────────────────────────
+
+export class AgentSystemBriefDto {
+  @ApiProperty({ description: 'Model-authored narrative of the whole system' })
+  content!: string;
+
+  @ApiProperty({
+    description:
+      'Structured snapshot (source/detector counts, finding landscape, …)',
+  })
+  facts!: Record<string, unknown>;
+
+  @ApiProperty()
+  version!: number;
+
+  @ApiPropertyOptional({ nullable: true })
+  updatedBy!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  updatedAt!: Date | null;
+}
+
+// ── Tool registry & missions (capability map) ──────────────────────────────────
+
+export class HarnessToolDto {
+  @ApiProperty({
+    description: 'Namespaced tool name, e.g. "config.tune_source"',
+  })
+  name!: string;
+
+  @ApiProperty()
+  description!: string;
+
+  @ApiProperty({ description: 'read | mutate' })
+  sideEffect!: string;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Domain gated for OBSERVE_ONLY (inquiry/case/source/…)',
+  })
+  domain!: string | null;
+}
+
+export class HarnessMissionDto {
+  @ApiProperty({ enum: AgentKind })
+  kind!: AgentKind;
+
+  @ApiProperty({
+    description: 'The goal/system-prompt that frames the mission',
+  })
+  goal!: string;
+
+  @ApiProperty({
+    type: [String],
+    description: 'Tool names this mission may call',
+  })
+  allowedTools!: string[];
+
+  @ApiProperty()
+  maxIterations!: number;
+}
+
+export class HarnessToolsResponseDto {
+  @ApiProperty({ type: [HarnessToolDto] })
+  tools!: HarnessToolDto[];
+
+  @ApiProperty({ type: [HarnessMissionDto] })
+  missions!: HarnessMissionDto[];
+}
+
+export class UpdateSystemBriefDto {
+  @ApiProperty({
+    description: 'Full replacement narrative for the system brief',
+  })
+  @IsString()
+  @MaxLength(20000)
+  content!: string;
+}
+
+// ── Observability stats (mission-control header) ───────────────────────────────
+
+export class AutopilotStatsDto {
+  @ApiProperty({ description: 'Total agent runs ever recorded' })
+  totalRuns!: number;
+
+  @ApiProperty({ description: 'Runs created in the last 24h' })
+  runsLast24h!: number;
+
+  @ApiProperty({ description: 'Runs currently RUNNING or PENDING' })
+  activeRuns!: number;
+
+  @ApiProperty({ description: 'Decisions APPLIED (mutations made)' })
+  decisionsApplied!: number;
+
+  @ApiProperty({ description: 'Decisions SKIPPED due to observe-only' })
+  decisionsSkipped!: number;
+
+  @ApiProperty({ description: 'Decisions FAILED' })
+  decisionsFailed!: number;
+
+  @ApiProperty({
+    description: 'Long-lived memory entries the agent has learned',
+  })
+  memoryCount!: number;
+
+  @ApiProperty({ description: 'Current system brief version (0 = none yet)' })
+  briefVersion!: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'When the autopilot last did anything',
+  })
+  lastActivityAt!: Date | null;
+
+  @ApiProperty({
+    description: 'Run counts grouped by agent kind',
+    type: 'object',
+    additionalProperties: { type: 'number' },
+  })
+  runsByKind!: Record<string, number>;
 }

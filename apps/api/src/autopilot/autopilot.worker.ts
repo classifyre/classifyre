@@ -8,9 +8,7 @@ import { INQUIRY_MATCH_QUEUE } from '../matching/matching.constants';
 import { AgentAuditService } from './audit/agent-audit.service';
 import { AgentLoggerService } from './audit/agent-logger.service';
 import { AgentSearchService } from './search/agent-search.service';
-import { InquiryAgentService } from './inquiry-agent.service';
-import { CaseAgentService } from './case-agent.service';
-import { DreamAgentService, DreamSummary } from './dream-agent.service';
+import { HarnessService } from './harness/harness.service';
 import { AgentRunCancelledError } from './agent-runtime';
 import type { ApplySummary } from './decision-applier.service';
 import {
@@ -55,9 +53,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
     private readonly audit: AgentAuditService,
     private readonly log: AgentLoggerService,
     private readonly search: AgentSearchService,
-    private readonly inquiryAgent: InquiryAgentService,
-    private readonly caseAgent: CaseAgentService,
-    private readonly dreamAgent: DreamAgentService,
+    private readonly harness: HarnessService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -229,6 +225,30 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         'Case autopilot disabled in settings; observing only.',
       );
     }
+
+    // Config-tuning agent — opt-in, off by default. Runs after the
+    // investigation agents (it reacts to the finding landscape they observed).
+    // Skipped silently when disabled (no SKIPPED-run noise on every scan).
+    const configEnabled = cycle.only
+      ? cycle.only === AgentKind.CONFIG
+      : settings.autopilotConfigEnabled;
+    if (configEnabled) {
+      await this.runAgent(AgentKind.CONFIG, settings, cycle, sourceName);
+    }
+
+    // Detector-authoring agent — opt-in, off by default. Runs last so it can
+    // react to what the config agent left unaddressed.
+    const detectorEnabled = cycle.only
+      ? cycle.only === AgentKind.DETECTOR_AUTHOR
+      : settings.autopilotDetectorEnabled;
+    if (detectorEnabled) {
+      await this.runAgent(
+        AgentKind.DETECTOR_AUTHOR,
+        settings,
+        cycle,
+        sourceName,
+      );
+    }
   }
 
   private async runAgent(
@@ -253,7 +273,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         ? `Dream cycle started: consolidating agent memory (${cycle.trigger}).`
         : cycle.manual
           ? `Manual ${agentKind.toLowerCase()} review started for ${sourceName}${cycle.instruction ? ' with operator instruction.' : '.'}`
-          : `${agentKind === AgentKind.INQUIRY ? 'Inquiry' : 'Case'} cycle started after a scan of ${sourceName}.`,
+          : `${agentKind.charAt(0)}${agentKind.slice(1).toLowerCase()} cycle started after a scan of ${sourceName}.`,
       cycle.instruction ? { instruction: cycle.instruction } : undefined,
     );
 
@@ -265,6 +285,8 @@ export class AutopilotWorker implements OnApplicationBootstrap {
             ...settings,
             autopilotInquiryEnabled: true,
             autopilotCaseEnabled: true,
+            autopilotConfigEnabled: true,
+            autopilotDetectorEnabled: true,
           }
         : settings;
 
@@ -279,15 +301,8 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       caseId: agentKind === AgentKind.CASE ? (cycle.caseId ?? null) : null,
       state: {},
     };
-    const agent =
-      agentKind === AgentKind.INQUIRY
-        ? this.inquiryAgent
-        : agentKind === AgentKind.CASE
-          ? this.caseAgent
-          : this.dreamAgent;
-
     try {
-      const summary = await agent.execute(ctx);
+      const summary = await this.harness.execute(ctx);
       await this.audit.complete(run.id, formatSummary(summary));
       await this.log.business(
         run.id,
@@ -361,10 +376,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
   }
 }
 
-function formatSummary(s: ApplySummary | DreamSummary): string {
-  if ('journal' in s) {
-    return `${s.deleted} memory deletion(s), ${s.rewritten} rewrite(s), ${s.created} new note(s), ${s.failed} failed. ${s.journal}`;
-  }
+function formatSummary(s: ApplySummary): string {
   const parts = [
     `${s.applied} applied`,
     `${s.skippedObserveOnly} observe-only`,

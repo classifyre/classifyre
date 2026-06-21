@@ -31,13 +31,15 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            artifact: mac
+            platform: mac-arm64
           - os: windows-latest
-            artifact: win
+            platform: win-x64
           - os: ubuntu-latest
-            artifact: linux
+            platform: linux-amd64
+          - os: ubuntu-24.04-arm
+            platform: linux-arm64
 
-    name: Build (${{ matrix.artifact }})
+    name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -102,12 +104,12 @@ jobs:
           cp apps/cli/pyproject.toml "$RESOURCES/cli/pyproject.toml"
           [ -f apps/cli/uv.lock ] && cp apps/cli/uv.lock "$RESOURCES/cli/uv.lock" || true
 
-      - name: Build Electron (${{ matrix.artifact }})
-        run: bun run --cwd apps/desktop make
+      - name: Package Electron app
+        run: bun run --cwd apps/desktop build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Ad-hoc codesign macOS app and rebuild ZIP
+      - name: Ad-hoc codesign macOS app
         if: runner.os == 'macOS'
         shell: bash
         run: |
@@ -116,21 +118,15 @@ jobs:
             echo "::error::No .app bundle found"
             exit 1
           fi
-
           echo "Signing $APP"
           codesign --deep --force --sign - "$APP"
           codesign --verify --deep "$APP"
+          echo "Signature valid"
 
-          # Rebuild the ZIP with the signed app
-          APP_DIR=$(dirname "$APP")
-          ZIP=$(find apps/desktop/out -name '*.zip' | head -1)
-          if [ -n "$ZIP" ]; then
-            echo "Rebuilding $ZIP with signed app"
-            rm "$ZIP"
-            cd "$APP_DIR"
-            zip -r -y "$OLDPWD/$ZIP" "$(basename "$APP")"
-            cd "$OLDPWD"
-          fi
+      - name: Create distributables
+        run: bun run --cwd apps/desktop make --skip-package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Find artifacts
         id: artifacts
@@ -138,7 +134,7 @@ jobs:
         run: |
           OUTDIR="apps/desktop/out"
           echo "Files in make output:"
-          find "$OUTDIR" -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.deb' -o -name '*.rpm' -o -name '*.zip' -o -name '*.nupkg' \) | tee /tmp/artifacts.txt
+          find "$OUTDIR" -type f \( -name '*.dmg' -o -name '*.deb' -o -name '*.zip' -o -name '*.nupkg' \) | tee /tmp/artifacts.txt
           if [ ! -s /tmp/artifacts.txt ]; then
             echo "::error::No desktop artifacts found"
             exit 1
@@ -147,9 +143,9 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ matrix.artifact }}
+          name: desktop-${{ matrix.platform }}
           path: |
-            apps/desktop/out/**/*.exe
+            apps/desktop/out/**/*.dmg
             apps/desktop/out/**/*.deb
             apps/desktop/out/**/*.zip
             apps/desktop/out/**/*.nupkg
@@ -177,7 +173,7 @@ jobs:
         with:
           tag_name: ${{ inputs.tag }}
           files: |
-            artifacts/**/*.exe
+            artifacts/**/*.dmg
             artifacts/**/*.deb
             artifacts/**/*.zip
         env:

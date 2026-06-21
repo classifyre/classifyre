@@ -7,10 +7,12 @@ import {
   ChevronRight,
   CircleDashed,
   Copy,
+  FlaskConical,
   FolderSearch,
   Loader2,
   Megaphone,
   Moon,
+  SlidersHorizontal,
   Workflow,
   XCircle,
 } from "lucide-react";
@@ -30,6 +32,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { formatRelative } from "@/lib/date";
 
 const POLL_MS = 5000;
+const RUNS_PAGE = 15;
 
 function AgentKindIcon({
   kind,
@@ -41,7 +44,17 @@ function AgentKindIcon({
   if (kind === "INQUIRY") return <FolderSearch className={className} />;
   if (kind === "DREAM") return <Moon className={className} />;
   if (kind === "DUPLICATES") return <Copy className={className} />;
+  if (kind === "CONFIG") return <SlidersHorizontal className={className} />;
+  if (kind === "DETECTOR_AUTHOR") return <FlaskConical className={className} />;
   return <Workflow className={className} />;
+}
+
+function humanizeKind(kind: string): string {
+  return kind
+    .toLowerCase()
+    .split("_")
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(" ");
 }
 
 /**
@@ -50,26 +63,40 @@ function AgentKindIcon({
  * channels — Business (analyst narrative) and Technical (mechanics, prompts,
  * raw model output incl. schema-failure responses).
  */
-export function AutopilotActivity() {
+export function AutopilotActivity({
+  focusRunId,
+}: {
+  /** When provided, pre-selects this run on mount (deep-link from activity). */
+  focusRunId?: string;
+} = {}) {
   const { t } = useTranslation();
   const [runs, setRuns] = React.useState<AgentRunDto[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [limit, setLimit] = React.useState(RUNS_PAGE);
   const [loading, setLoading] = React.useState(true);
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [selectedId, setSelectedId] = React.useState<string | null>(
+    focusRunId ?? null,
+  );
+
+  React.useEffect(() => {
+    if (focusRunId) setSelectedId(focusRunId);
+  }, [focusRunId]);
   const [detail, setDetail] = React.useState<AgentRunDetailDto | null>(null);
   const [logs, setLogs] = React.useState<AgentLogDto[]>([]);
   const [channel, setChannel] = React.useState<"BUSINESS" | "TECHNICAL">("BUSINESS");
 
   const loadRuns = React.useCallback(async () => {
     try {
-      const res = await api.autopilot.autopilotControllerListRuns({ limit: 50 });
+      const res = await api.autopilot.autopilotControllerListRuns({ limit });
       setRuns(res.items);
+      setTotal(res.total);
       setSelectedId((current) => current ?? res.items[0]?.id ?? null);
     } catch {
       // transient — next poll retries
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [limit]);
 
   const loadDetail = React.useCallback(async (id: string) => {
     try {
@@ -134,7 +161,7 @@ export function AutopilotActivity() {
         case "CASE": return t("investigations.autopilot.activity.agentCase");
         case "DREAM": return t("investigations.autopilot.activity.agentDream");
         case "DUPLICATES": return t("investigations.autopilot.activity.agentDuplicates");
-        default: return kind;
+        default: return humanizeKind(kind);
       }
     },
     [t],
@@ -228,6 +255,20 @@ export function AutopilotActivity() {
             </li>
           );
         })}
+        {runs.length < total && (
+          <li>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => setLimit((l) => l + RUNS_PAGE)}
+            >
+              {t("investigations.autopilot.activity.loadMore", {
+                count: total - runs.length,
+              })}
+            </Button>
+          </li>
+        )}
       </ol>
 
       {/* ── Run detail ── */}
