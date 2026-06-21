@@ -26,15 +26,9 @@ import type { DuplicatesFinderAgentService } from '../../correlation/duplicates-
 describe('ToolRegistry', () => {
   // list() does not touch deps; safe to pass empty stubs.
   const registry = new ToolRegistry(
-    new ObserveToolset(
-      {} as AgentSearchService,
-      {} as AgentMemoryService,
-    ),
+    new ObserveToolset({} as AgentSearchService, {} as AgentMemoryService),
     new InvestigationToolset({} as DecisionApplierService),
-    new KnowledgeToolset(
-      {} as AgentMemoryService,
-      {} as SystemBriefService,
-    ),
+    new KnowledgeToolset({} as AgentMemoryService, {} as SystemBriefService),
     new ConfigToolset(
       {} as PrismaService,
       {} as ValidationService,

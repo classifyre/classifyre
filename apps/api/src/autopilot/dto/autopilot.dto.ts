@@ -58,12 +58,16 @@ export class QueryAgentRunsDto {
   @MaxLength(200)
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Only runs created at/after this ISO time' })
+  @ApiPropertyOptional({
+    description: 'Only runs created at/after this ISO time',
+  })
   @IsOptional()
   @IsString()
   since?: string;
 
-  @ApiPropertyOptional({ description: 'Only runs created at/before this ISO time' })
+  @ApiPropertyOptional({
+    description: 'Only runs created at/before this ISO time',
+  })
   @IsOptional()
   @IsString()
   until?: string;
@@ -541,7 +545,9 @@ export class AgentSystemBriefDto {
 // ── Tool registry & missions (capability map) ──────────────────────────────────
 
 export class HarnessToolDto {
-  @ApiProperty({ description: 'Namespaced tool name, e.g. "config.tune_source"' })
+  @ApiProperty({
+    description: 'Namespaced tool name, e.g. "config.tune_source"',
+  })
   name!: string;
 
   @ApiProperty()
@@ -561,10 +567,15 @@ export class HarnessMissionDto {
   @ApiProperty({ enum: AgentKind })
   kind!: AgentKind;
 
-  @ApiProperty({ description: 'The goal/system-prompt that frames the mission' })
+  @ApiProperty({
+    description: 'The goal/system-prompt that frames the mission',
+  })
   goal!: string;
 
-  @ApiProperty({ type: [String], description: 'Tool names this mission may call' })
+  @ApiProperty({
+    type: [String],
+    description: 'Tool names this mission may call',
+  })
   allowedTools!: string[];
 
   @ApiProperty()
@@ -580,7 +591,9 @@ export class HarnessToolsResponseDto {
 }
 
 export class UpdateSystemBriefDto {
-  @ApiProperty({ description: 'Full replacement narrative for the system brief' })
+  @ApiProperty({
+    description: 'Full replacement narrative for the system brief',
+  })
   @IsString()
   @MaxLength(20000)
   content!: string;
@@ -607,7 +620,9 @@ export class AutopilotStatsDto {
   @ApiProperty({ description: 'Decisions FAILED' })
   decisionsFailed!: number;
 
-  @ApiProperty({ description: 'Long-lived memory entries the agent has learned' })
+  @ApiProperty({
+    description: 'Long-lived memory entries the agent has learned',
+  })
   memoryCount!: number;
 
   @ApiProperty({ description: 'Current system brief version (0 = none yet)' })

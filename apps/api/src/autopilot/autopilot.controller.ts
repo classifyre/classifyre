@@ -66,7 +66,8 @@ export class AutopilotController {
 
   @Get('stats')
   @ApiOperation({
-    summary: 'Mission-control counters (runs, decisions, memory, brief version)',
+    summary:
+      'Mission-control counters (runs, decisions, memory, brief version)',
   })
   @ApiResponse({ status: 200, type: AutopilotStatsDto })
   getStats(): Promise<AutopilotStatsDto> {

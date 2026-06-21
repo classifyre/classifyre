@@ -47,10 +47,11 @@ export class KnowledgeToolset {
         },
         sideEffect: 'mutate',
         domain: 'memory',
-        resolveGate: async () => ({
-          mode: AiManagementMode.MANAGED,
-          entityType: 'memory',
-        }),
+        resolveGate: () =>
+          Promise.resolve({
+            mode: AiManagementMode.MANAGED,
+            entityType: 'memory',
+          }),
         handler: async (input) => {
           const write: MemoryWrite = {
             kind: input.kind as MemoryWrite['kind'],
@@ -86,10 +87,11 @@ export class KnowledgeToolset {
         },
         sideEffect: 'mutate',
         domain: 'memory',
-        resolveGate: async () => ({
-          mode: AiManagementMode.MANAGED,
-          entityType: 'memory',
-        }),
+        resolveGate: () =>
+          Promise.resolve({
+            mode: AiManagementMode.MANAGED,
+            entityType: 'memory',
+          }),
         handler: async (input) => {
           const deleted = await this.memory.deleteById(String(input.id));
           return { deleted };
@@ -111,10 +113,11 @@ export class KnowledgeToolset {
         },
         sideEffect: 'mutate',
         domain: 'memory',
-        resolveGate: async () => ({
-          mode: AiManagementMode.MANAGED,
-          entityType: 'memory',
-        }),
+        resolveGate: () =>
+          Promise.resolve({
+            mode: AiManagementMode.MANAGED,
+            entityType: 'memory',
+          }),
         handler: async (input) => {
           const rewritten = await this.memory.rewriteById(
             String(input.id),
@@ -128,7 +131,11 @@ export class KnowledgeToolset {
         name: 'system_brief.get',
         description:
           'Read the current system brief (holistic summary of sources, detectors, finding landscape, what has been tried and known gaps).',
-        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
         sideEffect: 'read',
         handler: async () => this.brief.get(),
       },
@@ -145,11 +152,12 @@ export class KnowledgeToolset {
         sideEffect: 'mutate',
         domain: 'system',
         decisionAction: AgentDecisionAction.UPDATE_SYSTEM_BRIEF,
-        resolveGate: async () => ({
-          mode: AiManagementMode.MANAGED,
-          entityType: 'system',
-        }),
-        handler: async (input) =>
+        resolveGate: () =>
+          Promise.resolve({
+            mode: AiManagementMode.MANAGED,
+            entityType: 'system',
+          }),
+        handler: (input) =>
           this.brief.update({ content: String(input.content) }, AI_ACTOR),
       },
     ];

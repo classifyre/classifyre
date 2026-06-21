@@ -22,7 +22,8 @@ export class DetectorToolset {
     input: Record<string, unknown>,
     tc: ToolContext,
   ): Promise<ToolGate> => {
-    const detectorId = String(input.detectorId ?? '');
+    const detectorId =
+      typeof input.detectorId === 'string' ? input.detectorId : '';
     const mode = await this.applier.detectorGate(
       detectorId,
       tc.ctx.settings.autopilotDetectorEnabled,
@@ -36,7 +37,11 @@ export class DetectorToolset {
         name: 'detectors.list',
         description:
           'List custom detectors with id, key, name, pipeline type and active flag.',
-        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
         sideEffect: 'read',
         handler: async () => {
           const rows = await this.detectors.list({ includeInactive: false });
@@ -71,13 +76,14 @@ export class DetectorToolset {
         sideEffect: 'mutate',
         domain: 'detector',
         decisionAction: AgentDecisionAction.CREATE_DETECTOR,
-        resolveGate: async (_input, tc) => ({
-          mode: this.applier.effectiveMode(
-            AiManagementMode.INHERIT,
-            tc.ctx.settings.autopilotDetectorEnabled,
-          ),
-          entityType: 'detector',
-        }),
+        resolveGate: (_input, tc) =>
+          Promise.resolve({
+            mode: this.applier.effectiveMode(
+              AiManagementMode.INHERIT,
+              tc.ctx.settings.autopilotDetectorEnabled,
+            ),
+            entityType: 'detector',
+          }),
         handler: async (input) => {
           const created = await this.detectors.create({
             name: String(input.name),

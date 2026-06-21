@@ -37,7 +37,7 @@ export class ConfigToolset {
     input: Record<string, unknown>,
     tc: ToolContext,
   ): Promise<ToolGate> => {
-    const sourceId = String(input.sourceId ?? '');
+    const sourceId = typeof input.sourceId === 'string' ? input.sourceId : '';
     const mode = await this.applier.sourceGate(
       sourceId,
       tc.ctx.settings.autopilotConfigEnabled,
@@ -51,7 +51,11 @@ export class ConfigToolset {
         name: 'sources.list',
         description:
           'List sources with id, name, type, autopilot mode and last run status.',
-        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
         sideEffect: 'read',
         handler: async () => {
           const rows = await this.prisma.source.findMany({
@@ -92,7 +96,13 @@ export class ConfigToolset {
         handler: async (input) => {
           const source = await this.prisma.source.findUnique({
             where: { id: String(input.sourceId) },
-            select: { id: true, name: true, type: true, aiMode: true, config: true },
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              aiMode: true,
+              config: true,
+            },
           });
           if (!source) throw new Error('Unknown sourceId');
           const decrypted = this.masked.decryptMaskedConfig(

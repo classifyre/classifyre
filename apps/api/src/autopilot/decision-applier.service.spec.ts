@@ -89,7 +89,10 @@ describe('DecisionApplierService', () => {
 
   describe('createInquiryCore', () => {
     it('creates with the AI actor', async () => {
-      mockInquiries.create.mockResolvedValue({ id: 'q1', title: 'Leaked keys' });
+      mockInquiries.create.mockResolvedValue({
+        id: 'q1',
+        title: 'Leaked keys',
+      });
       const res = await service.createInquiryCore({
         title: 'Leaked keys',
         findingTypes: ['aws-access-key'],

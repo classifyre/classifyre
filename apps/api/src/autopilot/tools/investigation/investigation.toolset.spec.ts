@@ -10,8 +10,8 @@ describe('InvestigationToolset', () => {
     expect(tools.length).toBeGreaterThan(0);
     for (const tool of tools) {
       if (tool.sideEffect === 'mutate') {
-        expect(tool.resolveGate).toBeDefined();
-        expect(tool.domain).toBeTruthy();
+        expect('resolveGate' in tool).toBe(true);
+        expect('domain' in tool).toBe(true);
       }
     }
   });

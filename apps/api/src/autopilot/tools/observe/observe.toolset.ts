@@ -139,7 +139,7 @@ export class ObserveToolset {
         },
         sideEffect: 'read',
         handler: async (input) => {
-          const terms = String(input.query ?? '')
+          const terms = (typeof input.query === 'string' ? input.query : '')
             .split(/\s+/)
             .filter(Boolean);
           const [glossary, related] = await Promise.all([

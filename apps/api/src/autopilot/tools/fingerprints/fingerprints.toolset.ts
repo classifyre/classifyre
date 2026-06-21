@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { AgentDecisionAction, AiManagementMode, Severity } from '@prisma/client';
+import {
+  AgentDecisionAction,
+  AiManagementMode,
+  Severity,
+} from '@prisma/client';
 import { PrismaService } from '../../../prisma.service';
 import { CorrelationService } from '../../../correlation/correlation.service';
 import { DuplicatesFinderAgentService } from '../../../correlation/duplicates-finder-agent.service';
 import { DecisionApplierService } from '../../decision-applier.service';
-import type { Tool, ToolContext, ToolGate } from '../tool.types';
+import type { Tool, ToolGate } from '../tool.types';
 
 const RELATION_TYPES = ['related', 'likely_duplicate'];
 
@@ -119,10 +123,11 @@ export class FingerprintsToolset {
         domain: 'source',
         decisionAction: AgentDecisionAction.RECOMPUTE_CORRELATION,
         // Internal, idempotent recompute — always allowed while a cycle runs.
-        resolveGate: async (): Promise<ToolGate> => ({
-          mode: AiManagementMode.MANAGED,
-          entityType: 'source',
-        }),
+        resolveGate: () =>
+          Promise.resolve({
+            mode: AiManagementMode.MANAGED,
+            entityType: 'source',
+          }),
         handler: async (input) =>
           this.correlation.recomputeForAsset(String(input.assetId)),
       },
@@ -150,7 +155,8 @@ export class FingerprintsToolset {
         domain: 'case',
         decisionAction: AgentDecisionAction.CREATE_CASE,
         resolveGate: async (input, tc): Promise<ToolGate> => {
-          const caseId = input.caseId ? String(input.caseId) : undefined;
+          const caseId =
+            typeof input.caseId === 'string' ? input.caseId : undefined;
           const mode = caseId
             ? await this.applier.caseGate(
                 caseId,
@@ -169,7 +175,8 @@ export class FingerprintsToolset {
             title: (input.title as string | undefined) ?? null,
             description: (input.description as string | undefined) ?? null,
             severity: (input.severity as Severity | undefined) ?? null,
-            attachFindings: (input.attachFindings as boolean | undefined) ?? false,
+            attachFindings:
+              (input.attachFindings as boolean | undefined) ?? false,
           }),
       },
       {
@@ -192,13 +199,14 @@ export class FingerprintsToolset {
         sideEffect: 'mutate',
         domain: 'system',
         decisionAction: AgentDecisionAction.TUNE_CORRELATION,
-        resolveGate: async (_input, tc): Promise<ToolGate> => ({
-          mode: this.applier.effectiveMode(
-            AiManagementMode.INHERIT,
-            tc.ctx.settings.autopilotConfigEnabled,
-          ),
-          entityType: 'system',
-        }),
+        resolveGate: (_input, tc) =>
+          Promise.resolve({
+            mode: this.applier.effectiveMode(
+              AiManagementMode.INHERIT,
+              tc.ctx.settings.autopilotConfigEnabled,
+            ),
+            entityType: 'system',
+          }),
         handler: async (input) =>
           this.correlation.saveConfig({
             defaultWeight: input.defaultWeight as number | undefined,
