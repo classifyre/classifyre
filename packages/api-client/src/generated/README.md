@@ -76,6 +76,9 @@ All URIs are relative to *http://localhost*
 *AutopilotApi* | [**autopilotControllerCreateMemory**](docs/AutopilotApi.md#autopilotcontrollercreatememory) | **POST** /autopilot/memory | Add (or overwrite) a memory entry to steer the agent
 *AutopilotApi* | [**autopilotControllerDeleteMemory**](docs/AutopilotApi.md#autopilotcontrollerdeletememory) | **DELETE** /autopilot/memory/{id} | Delete a memory entry the agent learned
 *AutopilotApi* | [**autopilotControllerGetRun**](docs/AutopilotApi.md#autopilotcontrollergetrun) | **GET** /autopilot/runs/{id} | Get one autopilot run with all decisions and rationales
+*AutopilotApi* | [**autopilotControllerGetStats**](docs/AutopilotApi.md#autopilotcontrollergetstats) | **GET** /autopilot/stats | Mission-control counters (runs, decisions, memory, brief version)
+*AutopilotApi* | [**autopilotControllerGetSystemBrief**](docs/AutopilotApi.md#autopilotcontrollergetsystembrief) | **GET** /autopilot/system-brief | The living system brief the autopilot maintains and injects
+*AutopilotApi* | [**autopilotControllerListActivity**](docs/AutopilotApi.md#autopilotcontrollerlistactivity) | **GET** /autopilot/activity | Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time
 *AutopilotApi* | [**autopilotControllerListLogs**](docs/AutopilotApi.md#autopilotcontrollerlistlogs) | **GET** /autopilot/runs/{id}/logs | Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output)
 *AutopilotApi* | [**autopilotControllerListMemory**](docs/AutopilotApi.md#autopilotcontrollerlistmemory) | **GET** /autopilot/memory | List the agent memory (glossary, precedents, topic map)
 *AutopilotApi* | [**autopilotControllerListRuns**](docs/AutopilotApi.md#autopilotcontrollerlistruns) | **GET** /autopilot/runs | List autopilot agent runs (newest first)
@@ -229,6 +232,8 @@ All URIs are relative to *http://localhost*
 - [AddExclusionDto](docs/AddExclusionDto.md)
 - [AddFindingDto](docs/AddFindingDto.md)
 - [AddThreadEntryDto](docs/AddThreadEntryDto.md)
+- [AgentActivityItemDto](docs/AgentActivityItemDto.md)
+- [AgentActivityListResponseDto](docs/AgentActivityListResponseDto.md)
 - [AgentDecisionDto](docs/AgentDecisionDto.md)
 - [AgentLogDto](docs/AgentLogDto.md)
 - [AgentLogListResponseDto](docs/AgentLogListResponseDto.md)
@@ -237,6 +242,7 @@ All URIs are relative to *http://localhost*
 - [AgentRunDetailDto](docs/AgentRunDetailDto.md)
 - [AgentRunDto](docs/AgentRunDto.md)
 - [AgentRunListResponseDto](docs/AgentRunListResponseDto.md)
+- [AgentSystemBriefDto](docs/AgentSystemBriefDto.md)
 - [AiCompleteRequestDto](docs/AiCompleteRequestDto.md)
 - [AiCompleteResponseDto](docs/AiCompleteResponseDto.md)
 - [AiMessageDto](docs/AiMessageDto.md)
@@ -257,6 +263,7 @@ All URIs are relative to *http://localhost*
 - [AssistantControllerRespondRequestMessagesInner](docs/AssistantControllerRespondRequestMessagesInner.md)
 - [AttachFindingsDto](docs/AttachFindingsDto.md)
 - [AttachFindingsResponseDto](docs/AttachFindingsResponseDto.md)
+- [AutopilotStatsDto](docs/AutopilotStatsDto.md)
 - [BulkIngestAssetsDto](docs/BulkIngestAssetsDto.md)
 - [BulkIngestEdgesDto](docs/BulkIngestEdgesDto.md)
 - [BulkIngestEdgesResponseDto](docs/BulkIngestEdgesResponseDto.md)

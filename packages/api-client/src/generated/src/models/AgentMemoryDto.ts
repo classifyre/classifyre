@@ -88,7 +88,11 @@ export interface AgentMemoryDto {
 export const AgentMemoryDtoKindEnum = {
     Glossary: 'GLOSSARY',
     DecisionPrecedent: 'DECISION_PRECEDENT',
-    TopicInquiryMap: 'TOPIC_INQUIRY_MAP'
+    TopicInquiryMap: 'TOPIC_INQUIRY_MAP',
+    EntityMap: 'ENTITY_MAP',
+    SourceProfile: 'SOURCE_PROFILE',
+    DetectorInsight: 'DETECTOR_INSIGHT',
+    OperatorDirective: 'OPERATOR_DIRECTIVE'
 } as const;
 export type AgentMemoryDtoKindEnum = typeof AgentMemoryDtoKindEnum[keyof typeof AgentMemoryDtoKindEnum];
 

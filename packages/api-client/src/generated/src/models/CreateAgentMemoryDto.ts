@@ -52,7 +52,11 @@ export interface CreateAgentMemoryDto {
 export const CreateAgentMemoryDtoKindEnum = {
     Glossary: 'GLOSSARY',
     DecisionPrecedent: 'DECISION_PRECEDENT',
-    TopicInquiryMap: 'TOPIC_INQUIRY_MAP'
+    TopicInquiryMap: 'TOPIC_INQUIRY_MAP',
+    EntityMap: 'ENTITY_MAP',
+    SourceProfile: 'SOURCE_PROFILE',
+    DetectorInsight: 'DETECTOR_INSIGHT',
+    OperatorDirective: 'OPERATOR_DIRECTIVE'
 } as const;
 export type CreateAgentMemoryDtoKindEnum = typeof CreateAgentMemoryDtoKindEnum[keyof typeof CreateAgentMemoryDtoKindEnum];
 

@@ -34,6 +34,11 @@ export class InstanceSettingsService {
       autopilotInquirySearchable: settings.autopilotInquirySearchable,
       autopilotCaseEnabled: settings.autopilotCaseEnabled,
       autopilotCaseGuidance: settings.autopilotCaseGuidance,
+      autopilotConfigEnabled: settings.autopilotConfigEnabled,
+      autopilotConfigGuidance: settings.autopilotConfigGuidance,
+      autopilotDetectorEnabled: settings.autopilotDetectorEnabled,
+      autopilotDetectorGuidance: settings.autopilotDetectorGuidance,
+      autopilotMcpEnabled: settings.autopilotMcpEnabled,
       hfTokenSet: !!settings.hfTokenEnc,
       hfTokenInstanceSet: isInstanceTokenSet,
       demoMode: this.demoMode.isDemoMode,
@@ -136,6 +141,29 @@ export class InstanceSettingsService {
         ? {
             autopilotCaseGuidance: emptyToNull(updateDto.autopilotCaseGuidance),
           }
+        : {}),
+      ...(updateDto.autopilotConfigEnabled !== undefined
+        ? { autopilotConfigEnabled: updateDto.autopilotConfigEnabled }
+        : {}),
+      ...(updateDto.autopilotConfigGuidance !== undefined
+        ? {
+            autopilotConfigGuidance: emptyToNull(
+              updateDto.autopilotConfigGuidance,
+            ),
+          }
+        : {}),
+      ...(updateDto.autopilotDetectorEnabled !== undefined
+        ? { autopilotDetectorEnabled: updateDto.autopilotDetectorEnabled }
+        : {}),
+      ...(updateDto.autopilotDetectorGuidance !== undefined
+        ? {
+            autopilotDetectorGuidance: emptyToNull(
+              updateDto.autopilotDetectorGuidance,
+            ),
+          }
+        : {}),
+      ...(updateDto.autopilotMcpEnabled !== undefined
+        ? { autopilotMcpEnabled: updateDto.autopilotMcpEnabled }
         : {}),
       ...(aiProviderConfigUpdate ?? {}),
       ...(updateDto.hfToken !== undefined

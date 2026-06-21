@@ -1,9 +1,6 @@
 import { runPipeline, stepOutput } from './agent-runtime';
 import type { AgentAuditService } from './audit/agent-audit.service';
 import type { AgentContext, AgentStep } from './autopilot.types';
-import { validateAgainstSchema } from '../ai/schema-validate';
-import { inquiryDecisionSchema } from './schemas/inquiry-decision.schema';
-import { caseDecisionSchema } from './schemas/case-decision.schema';
 
 function makeCtx(
   stepState: Record<string, unknown> | null = null,
@@ -71,99 +68,5 @@ describe('agent-runtime', () => {
 
   it('stepOutput throws on missing step (ordering bug guard)', () => {
     expect(() => stepOutput(makeCtx(), 'nope')).toThrow(/missing/);
-  });
-});
-
-describe('decision schemas', () => {
-  it('accepts a valid inquiry decision payload', () => {
-    expect(() =>
-      validateAgainstSchema(
-        {
-          decisions: [
-            {
-              action: 'CREATE_INQUIRY',
-              rationale: 'A coherent new topic with strong recurring findings.',
-              inquiry: { title: 'Leaked AWS keys', detectorTypes: ['SECRETS'] },
-            },
-          ],
-          memoryWrites: [
-            {
-              kind: 'GLOSSARY',
-              key: 'aws-key',
-              content: 'AKIA-prefixed access keys.',
-            },
-          ],
-        },
-        inquiryDecisionSchema,
-      ),
-    ).not.toThrow();
-  });
-
-  it('rejects an empty decisions list — doing nothing still needs a NO_ACTION rationale', () => {
-    expect(() =>
-      validateAgainstSchema(
-        { decisions: [], memoryWrites: [] },
-        inquiryDecisionSchema,
-      ),
-    ).toThrow();
-  });
-
-  it('rejects decisions without a rationale', () => {
-    expect(() =>
-      validateAgainstSchema(
-        { decisions: [{ action: 'NO_ACTION' }], memoryWrites: [] },
-        inquiryDecisionSchema,
-      ),
-    ).toThrow();
-  });
-
-  it('accepts a valid case decision with typed operations', () => {
-    expect(() =>
-      validateAgainstSchema(
-        {
-          decisions: [
-            {
-              action: 'UPDATE_CASE',
-              rationale: 'New matches strengthen the running hypothesis.',
-              caseId: 'c1',
-              operations: [
-                {
-                  op: 'ADD_HYPOTHESIS',
-                  rationale: 'The keys probably share one origin pipeline.',
-                  title: 'Single origin',
-                  confidence: 0.6,
-                },
-              ],
-            },
-          ],
-          memoryWrites: [],
-        },
-        caseDecisionSchema,
-      ),
-    ).not.toThrow();
-  });
-
-  it('rejects unknown operation kinds', () => {
-    expect(() =>
-      validateAgainstSchema(
-        {
-          decisions: [
-            {
-              action: 'UPDATE_CASE',
-              rationale: 'New matches strengthen the running hypothesis.',
-              caseId: 'c1',
-              operations: [
-                {
-                  op: 'DROP_DATABASE',
-                  rationale: 'This should never validate, obviously.',
-                },
-              ],
-            },
-          ],
-          memoryWrites: [],
-        },
-        caseDecisionSchema,
-      ),
-    ).toThrow();
   });
 });

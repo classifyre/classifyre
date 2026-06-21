@@ -7,6 +7,8 @@ docs/AddEvidenceDto.md
 docs/AddExclusionDto.md
 docs/AddFindingDto.md
 docs/AddThreadEntryDto.md
+docs/AgentActivityItemDto.md
+docs/AgentActivityListResponseDto.md
 docs/AgentDecisionDto.md
 docs/AgentLogDto.md
 docs/AgentLogListResponseDto.md
@@ -15,6 +17,7 @@ docs/AgentMemoryListResponseDto.md
 docs/AgentRunDetailDto.md
 docs/AgentRunDto.md
 docs/AgentRunListResponseDto.md
+docs/AgentSystemBriefDto.md
 docs/AiCompleteRequestDto.md
 docs/AiCompleteResponseDto.md
 docs/AiMessageDto.md
@@ -38,6 +41,7 @@ docs/AssistantControllerRespondRequestMessagesInner.md
 docs/AttachFindingsDto.md
 docs/AttachFindingsResponseDto.md
 docs/AutopilotApi.md
+docs/AutopilotStatsDto.md
 docs/BulkIngestAssetsDto.md
 docs/BulkIngestEdgesDto.md
 docs/BulkIngestEdgesResponseDto.md
@@ -279,6 +283,8 @@ src/models/AddEvidenceDto.ts
 src/models/AddExclusionDto.ts
 src/models/AddFindingDto.ts
 src/models/AddThreadEntryDto.ts
+src/models/AgentActivityItemDto.ts
+src/models/AgentActivityListResponseDto.ts
 src/models/AgentDecisionDto.ts
 src/models/AgentLogDto.ts
 src/models/AgentLogListResponseDto.ts
@@ -287,6 +293,7 @@ src/models/AgentMemoryListResponseDto.ts
 src/models/AgentRunDetailDto.ts
 src/models/AgentRunDto.ts
 src/models/AgentRunListResponseDto.ts
+src/models/AgentSystemBriefDto.ts
 src/models/AiCompleteRequestDto.ts
 src/models/AiCompleteResponseDto.ts
 src/models/AiMessageDto.ts
@@ -307,6 +314,7 @@ src/models/AssistantControllerRespondRequest.ts
 src/models/AssistantControllerRespondRequestMessagesInner.ts
 src/models/AttachFindingsDto.ts
 src/models/AttachFindingsResponseDto.ts
+src/models/AutopilotStatsDto.ts
 src/models/BulkIngestAssetsDto.ts
 src/models/BulkIngestEdgesDto.ts
 src/models/BulkIngestEdgesResponseDto.ts
