@@ -7029,6 +7029,247 @@
         ]
       }
     },
+    "/autopilot/stats": {
+      "get": {
+        "operationId": "AutopilotController_getStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutopilotStatsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Mission-control counters (runs, decisions, memory, brief version)",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/activity": {
+      "get": {
+        "operationId": "AutopilotController_listActivity",
+        "parameters": [
+          {
+            "name": "agentKind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INQUIRY",
+                "CASE",
+                "DREAM",
+                "DUPLICATES",
+                "CONFIG",
+                "DETECTOR_AUTHOR"
+              ]
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CREATE_INQUIRY",
+                "UPDATE_INQUIRY",
+                "ENRICH_INQUIRY_MATCHERS",
+                "SIGNAL_CASE_READY",
+                "CREATE_CASE",
+                "UPDATE_CASE",
+                "ADD_HYPOTHESIS",
+                "UPDATE_HYPOTHESIS",
+                "ADD_EVIDENCE",
+                "ATTACH_FINDINGS",
+                "ADD_NOTE",
+                "ADD_THREAD_ENTRY",
+                "CREATE_EDGE",
+                "REMOVE_EDGE",
+                "LINK_SUPPORT",
+                "CHANGE_STATUS",
+                "LINK_INQUIRY",
+                "CONSOLIDATE_MEMORY",
+                "LINK_DUPLICATE",
+                "UPDATE_CLUSTER",
+                "TOOL_CALL",
+                "TUNE_SOURCE",
+                "CREATE_DETECTOR",
+                "TRAIN_DETECTOR",
+                "TRIGGER_SCAN",
+                "UPDATE_SYSTEM_BRIEF",
+                "RECOMPUTE_CORRELATION",
+                "TUNE_CORRELATION",
+                "NO_ACTION"
+              ]
+            }
+          },
+          {
+            "name": "outcome",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "APPLIED",
+                "SKIPPED_OBSERVE_ONLY",
+                "FAILED"
+              ]
+            }
+          },
+          {
+            "name": "entityType",
+            "required": false,
+            "in": "query",
+            "description": "inquiry | case | source | detector | memory | system | asset",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Substring search over the rationale",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "required": false,
+            "in": "query",
+            "description": "ISO time lower bound",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "required": false,
+            "in": "query",
+            "description": "ISO time upper bound",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentActivityListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/tools": {
+      "get": {
+        "operationId": "AutopilotController_getTools",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HarnessToolsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The harness capability map — every registered tool (read/mutate, domain) and the missions that use them",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/system-brief": {
+      "get": {
+        "operationId": "AutopilotController_getSystemBrief",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSystemBriefDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The living system brief the autopilot maintains and injects",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "put": {
+        "operationId": "AutopilotController_updateSystemBrief",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSystemBriefDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSystemBriefDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create or rewrite the system-brief narrative",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
     "/autopilot/runs": {
       "get": {
         "operationId": "AutopilotController_listRuns",
@@ -7043,7 +7284,9 @@
                 "INQUIRY",
                 "CASE",
                 "DREAM",
-                "DUPLICATES"
+                "DUPLICATES",
+                "CONFIG",
+                "DETECTOR_AUTHOR"
               ]
             }
           },
@@ -7052,6 +7295,15 @@
             "required": false,
             "in": "query",
             "description": "Only runs focused on this case",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceId",
+            "required": false,
+            "in": "query",
+            "description": "Only runs for this source",
             "schema": {
               "type": "string"
             }
@@ -7070,6 +7322,42 @@
                 "SKIPPED",
                 "CANCELLED"
               ]
+            }
+          },
+          {
+            "name": "trigger",
+            "required": false,
+            "in": "query",
+            "description": "Trigger origin: scan_completed | manual | schedule",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Substring search over summary, instruction and error",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "required": false,
+            "in": "query",
+            "description": "Only runs created at/after this ISO time",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "required": false,
+            "in": "query",
+            "description": "Only runs created at/before this ISO time",
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -7226,6 +7514,29 @@
                 "BUSINESS"
               ]
             }
+          },
+          {
+            "name": "level",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DEBUG",
+                "INFO",
+                "WARN",
+                "ERROR"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Substring search over the message",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -7259,7 +7570,11 @@
               "enum": [
                 "GLOSSARY",
                 "DECISION_PRECEDENT",
-                "TOPIC_INQUIRY_MAP"
+                "TOPIC_INQUIRY_MAP",
+                "ENTITY_MAP",
+                "SOURCE_PROFILE",
+                "DETECTOR_INSIGHT",
+                "OPERATOR_DIRECTIVE"
               ]
             }
           },
@@ -7397,6 +7712,180 @@
           }
         },
         "summary": "Delete a memory entry the agent learned",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/mcp-servers": {
+      "get": {
+        "operationId": "McpServersController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/McpServerResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List configured external MCP servers",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "post": {
+        "operationId": "McpServersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMcpServerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add an external MCP server",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/mcp-servers/refresh": {
+      "post": {
+        "operationId": "McpServersController_refresh",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/McpServerResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reconnect all enabled servers and rediscover tools",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/mcp-servers/{id}/test": {
+      "post": {
+        "operationId": "McpServersController_test",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerTestResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Probe a server: connect and list its tools",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/mcp-servers/{id}": {
+      "patch": {
+        "operationId": "McpServersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMcpServerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update an MCP server",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "delete": {
+        "operationId": "McpServersController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Remove an MCP server",
         "tags": [
           "autopilot"
         ]
@@ -11158,6 +11647,31 @@
             "description": "Operator guidance for the case agent.",
             "nullable": true
           },
+          "autopilotConfigEnabled": {
+            "type": "boolean",
+            "description": "When true, the config-tuning agent may change editable source config.",
+            "example": false
+          },
+          "autopilotConfigGuidance": {
+            "type": "string",
+            "description": "Operator guidance for the config-tuning agent.",
+            "nullable": true
+          },
+          "autopilotDetectorEnabled": {
+            "type": "boolean",
+            "description": "When true, the detector-authoring agent may create/train detectors.",
+            "example": false
+          },
+          "autopilotDetectorGuidance": {
+            "type": "string",
+            "description": "Operator guidance for the detector-authoring agent.",
+            "nullable": true
+          },
+          "autopilotMcpEnabled": {
+            "type": "boolean",
+            "description": "When true, the harness may call tools from connected external MCP servers.",
+            "example": false
+          },
           "demoMode": {
             "type": "boolean",
             "description": "Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.",
@@ -11182,25 +11696,30 @@
             "type": "string"
           }
         },
-          "required": [
-            "id",
-            "aiEnabled",
-            "mcpEnabled",
-            "language",
-            "timezone",
-            "timeFormat",
-            "aiProviderConfigId",
-            "autopilotInquiryEnabled",
-            "autopilotInquiryDesired",
-            "autopilotInquirySearchable",
-            "autopilotCaseEnabled",
-            "autopilotCaseGuidance",
-            "demoMode",
-            "hfTokenSet",
-            "hfTokenInstanceSet",
-            "createdAt",
-            "updatedAt"
-          ]
+        "required": [
+          "id",
+          "aiEnabled",
+          "mcpEnabled",
+          "language",
+          "timezone",
+          "timeFormat",
+          "aiProviderConfigId",
+          "autopilotInquiryEnabled",
+          "autopilotInquiryDesired",
+          "autopilotInquirySearchable",
+          "autopilotCaseEnabled",
+          "autopilotCaseGuidance",
+          "autopilotConfigEnabled",
+          "autopilotConfigGuidance",
+          "autopilotDetectorEnabled",
+          "autopilotDetectorGuidance",
+          "autopilotMcpEnabled",
+          "demoMode",
+          "hfTokenSet",
+          "hfTokenInstanceSet",
+          "createdAt",
+          "updatedAt"
+        ]
       },
       "UpdateInstanceSettingsDto": {
         "type": "object",
@@ -11267,6 +11786,31 @@
             "type": "string",
             "description": "Operator guidance for the case agent.",
             "nullable": true
+          },
+          "autopilotConfigEnabled": {
+            "type": "boolean",
+            "description": "When true, the config-tuning agent may change editable source config (detectors, sampling, optional, resources) — never the base connection.",
+            "example": false
+          },
+          "autopilotConfigGuidance": {
+            "type": "string",
+            "description": "Operator guidance for the config-tuning agent.",
+            "nullable": true
+          },
+          "autopilotDetectorEnabled": {
+            "type": "boolean",
+            "description": "When true, the detector-authoring agent may create and train custom detectors.",
+            "example": false
+          },
+          "autopilotDetectorGuidance": {
+            "type": "string",
+            "description": "Operator guidance for the detector-authoring agent.",
+            "nullable": true
+          },
+          "autopilotMcpEnabled": {
+            "type": "boolean",
+            "description": "When true, the harness may call tools from connected external MCP servers.",
+            "example": false
           },
           "hfToken": {
             "type": "string",
@@ -15127,9 +15671,11 @@
             "type": "string",
             "enum": [
               "INQUIRY",
-              "CASE"
+              "CASE",
+              "CONFIG",
+              "DETECTOR_AUTHOR"
             ],
-            "description": "Run only one agent. Omit to run both (inquiry then case). Implied CASE when caseId is set."
+            "description": "Run only one mission. Omit to run the full investigation cycle (inquiry then case). Implied CASE when caseId is set. Use POST /autopilot/dream for memory consolidation."
           },
           "caseId": {
             "type": "string",
@@ -15153,6 +15699,322 @@
           "enqueued"
         ]
       },
+      "AutopilotStatsDto": {
+        "type": "object",
+        "properties": {
+          "totalRuns": {
+            "type": "number",
+            "description": "Total agent runs ever recorded"
+          },
+          "runsLast24h": {
+            "type": "number",
+            "description": "Runs created in the last 24h"
+          },
+          "activeRuns": {
+            "type": "number",
+            "description": "Runs currently RUNNING or PENDING"
+          },
+          "decisionsApplied": {
+            "type": "number",
+            "description": "Decisions APPLIED (mutations made)"
+          },
+          "decisionsSkipped": {
+            "type": "number",
+            "description": "Decisions SKIPPED due to observe-only"
+          },
+          "decisionsFailed": {
+            "type": "number",
+            "description": "Decisions FAILED"
+          },
+          "memoryCount": {
+            "type": "number",
+            "description": "Long-lived memory entries the agent has learned"
+          },
+          "briefVersion": {
+            "type": "number",
+            "description": "Current system brief version (0 = none yet)"
+          },
+          "lastActivityAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When the autopilot last did anything"
+          },
+          "runsByKind": {
+            "type": "object",
+            "description": "Run counts grouped by agent kind",
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "totalRuns",
+          "runsLast24h",
+          "activeRuns",
+          "decisionsApplied",
+          "decisionsSkipped",
+          "decisionsFailed",
+          "memoryCount",
+          "briefVersion",
+          "runsByKind"
+        ]
+      },
+      "AgentActivityItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "agentKind": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE",
+              "DREAM",
+              "DUPLICATES",
+              "CONFIG",
+              "DETECTOR_AUTHOR"
+            ]
+          },
+          "runStatus": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "SKIPPED",
+              "CANCELLED"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "CREATE_INQUIRY",
+              "UPDATE_INQUIRY",
+              "ENRICH_INQUIRY_MATCHERS",
+              "SIGNAL_CASE_READY",
+              "CREATE_CASE",
+              "UPDATE_CASE",
+              "ADD_HYPOTHESIS",
+              "UPDATE_HYPOTHESIS",
+              "ADD_EVIDENCE",
+              "ATTACH_FINDINGS",
+              "ADD_NOTE",
+              "ADD_THREAD_ENTRY",
+              "CREATE_EDGE",
+              "REMOVE_EDGE",
+              "LINK_SUPPORT",
+              "CHANGE_STATUS",
+              "LINK_INQUIRY",
+              "CONSOLIDATE_MEMORY",
+              "LINK_DUPLICATE",
+              "UPDATE_CLUSTER",
+              "TOOL_CALL",
+              "TUNE_SOURCE",
+              "CREATE_DETECTOR",
+              "TRAIN_DETECTOR",
+              "TRIGGER_SCAN",
+              "UPDATE_SYSTEM_BRIEF",
+              "RECOMPUTE_CORRELATION",
+              "TUNE_CORRELATION",
+              "NO_ACTION"
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "APPLIED",
+              "SKIPPED_OBSERVE_ONLY",
+              "FAILED"
+            ]
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "runId",
+          "agentKind",
+          "runStatus",
+          "action",
+          "outcome",
+          "rationale",
+          "createdAt"
+        ]
+      },
+      "AgentActivityListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentActivityItemDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "skip": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ]
+      },
+      "HarnessToolDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Namespaced tool name, e.g. \"config.tune_source\""
+          },
+          "description": {
+            "type": "string"
+          },
+          "sideEffect": {
+            "type": "string",
+            "description": "read | mutate"
+          },
+          "domain": {
+            "type": "string",
+            "nullable": true,
+            "description": "Domain gated for OBSERVE_ONLY (inquiry/case/source/…)"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "sideEffect"
+        ]
+      },
+      "HarnessMissionDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE",
+              "DREAM",
+              "DUPLICATES",
+              "CONFIG",
+              "DETECTOR_AUTHOR"
+            ]
+          },
+          "goal": {
+            "type": "string",
+            "description": "The goal/system-prompt that frames the mission"
+          },
+          "allowedTools": {
+            "description": "Tool names this mission may call",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "maxIterations": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "kind",
+          "goal",
+          "allowedTools",
+          "maxIterations"
+        ]
+      },
+      "HarnessToolsResponseDto": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HarnessToolDto"
+            }
+          },
+          "missions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HarnessMissionDto"
+            }
+          }
+        },
+        "required": [
+          "tools",
+          "missions"
+        ]
+      },
+      "AgentSystemBriefDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Model-authored narrative of the whole system"
+          },
+          "facts": {
+            "type": "object",
+            "description": "Structured snapshot (source/detector counts, finding landscape, …)"
+          },
+          "version": {
+            "type": "number"
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "content",
+          "facts",
+          "version"
+        ]
+      },
+      "UpdateSystemBriefDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Full replacement narrative for the system brief"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
       "AgentRunDto": {
         "type": "object",
         "properties": {
@@ -15165,7 +16027,9 @@
               "INQUIRY",
               "CASE",
               "DREAM",
-              "DUPLICATES"
+              "DUPLICATES",
+              "CONFIG",
+              "DETECTOR_AUTHOR"
             ]
           },
           "status": {
@@ -15295,6 +16159,14 @@
               "CONSOLIDATE_MEMORY",
               "LINK_DUPLICATE",
               "UPDATE_CLUSTER",
+              "TOOL_CALL",
+              "TUNE_SOURCE",
+              "CREATE_DETECTOR",
+              "TRAIN_DETECTOR",
+              "TRIGGER_SCAN",
+              "UPDATE_SYSTEM_BRIEF",
+              "RECOMPUTE_CORRELATION",
+              "TUNE_CORRELATION",
               "NO_ACTION"
             ]
           },
@@ -15349,7 +16221,9 @@
               "INQUIRY",
               "CASE",
               "DREAM",
-              "DUPLICATES"
+              "DUPLICATES",
+              "CONFIG",
+              "DETECTOR_AUTHOR"
             ]
           },
           "status": {
@@ -15499,7 +16373,11 @@
             "enum": [
               "GLOSSARY",
               "DECISION_PRECEDENT",
-              "TOPIC_INQUIRY_MAP"
+              "TOPIC_INQUIRY_MAP",
+              "ENTITY_MAP",
+              "SOURCE_PROFILE",
+              "DETECTOR_INSIGHT",
+              "OPERATOR_DIRECTIVE"
             ]
           },
           "key": {
@@ -15580,7 +16458,11 @@
             "enum": [
               "GLOSSARY",
               "DECISION_PRECEDENT",
-              "TOPIC_INQUIRY_MAP"
+              "TOPIC_INQUIRY_MAP",
+              "ENTITY_MAP",
+              "SOURCE_PROFILE",
+              "DETECTOR_INSIGHT",
+              "OPERATOR_DIRECTIVE"
             ]
           },
           "key": {
@@ -15618,6 +16500,250 @@
           "weight": {
             "type": "number",
             "description": "Set the reinforcement weight directly"
+          }
+        }
+      },
+      "McpServerResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string",
+            "nullable": true
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasHeaders": {
+            "type": "boolean",
+            "description": "Whether auth headers are stored (values hidden)"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "trusted": {
+            "type": "boolean"
+          },
+          "agentKinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "toolAllowlist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "discoveredTools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastConnectedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "transport",
+          "args",
+          "hasHeaders",
+          "enabled",
+          "trusted",
+          "agentKinds",
+          "toolAllowlist",
+          "discoveredTools",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateMcpServerDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "description": "Stable slug; generated from name if omitted"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "stdio",
+              "http"
+            ]
+          },
+          "command": {
+            "type": "string",
+            "description": "stdio: executable"
+          },
+          "args": {
+            "description": "stdio: arguments",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string",
+            "description": "http: server URL"
+          },
+          "headers": {
+            "type": "object",
+            "description": "http: auth headers (stored encrypted, never returned)"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "trusted": {
+            "type": "boolean",
+            "default": false,
+            "description": "Trusted servers may run mutating tools; untrusted are observe-only"
+          },
+          "agentKinds": {
+            "type": "array",
+            "description": "Missions allowed to use these tools. Empty = all missions.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "INQUIRY",
+                "CASE",
+                "DREAM",
+                "DUPLICATES",
+                "CONFIG",
+                "DETECTOR_AUTHOR"
+              ]
+            }
+          },
+          "toolAllowlist": {
+            "description": "Discovered tool names to expose. Empty = all.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "transport"
+        ]
+      },
+      "McpServerTestResultDto": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "ok",
+          "tools"
+        ]
+      },
+      "UpdateMcpServerDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "stdio",
+              "http"
+            ]
+          },
+          "command": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string"
+          },
+          "headers": {
+            "type": "object",
+            "nullable": true,
+            "description": "Replace auth headers; pass null/empty to clear"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "trusted": {
+            "type": "boolean"
+          },
+          "agentKinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "INQUIRY",
+                "CASE",
+                "DREAM",
+                "DUPLICATES",
+                "CONFIG",
+                "DETECTOR_AUTHOR"
+              ]
+            }
+          },
+          "toolAllowlist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

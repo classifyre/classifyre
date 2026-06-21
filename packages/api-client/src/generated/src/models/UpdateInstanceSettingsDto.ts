@@ -86,6 +86,36 @@ export interface UpdateInstanceSettingsDto {
      */
     autopilotCaseGuidance?: string | null;
     /**
+     * When true, the config-tuning agent may change editable source config (detectors, sampling, optional, resources) — never the base connection.
+     * @type {boolean}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    autopilotConfigEnabled?: boolean;
+    /**
+     * Operator guidance for the config-tuning agent.
+     * @type {string}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    autopilotConfigGuidance?: string | null;
+    /**
+     * When true, the detector-authoring agent may create and train custom detectors.
+     * @type {boolean}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    autopilotDetectorEnabled?: boolean;
+    /**
+     * Operator guidance for the detector-authoring agent.
+     * @type {string}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    autopilotDetectorGuidance?: string | null;
+    /**
+     * When true, the harness may call tools from connected external MCP servers.
+     * @type {boolean}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    autopilotMcpEnabled?: boolean;
+    /**
      * Hugging Face token to set. Pass a token value to store (encrypted at rest). Pass null or an empty string to clear the stored token. Ignored when an instance-level HF_TOKEN is configured.
      * @type {string}
      * @memberof UpdateInstanceSettingsDto
@@ -143,6 +173,11 @@ export function UpdateInstanceSettingsDtoFromJSONTyped(json: any, ignoreDiscrimi
         'autopilotInquirySearchable': json['autopilotInquirySearchable'] == null ? undefined : json['autopilotInquirySearchable'],
         'autopilotCaseEnabled': json['autopilotCaseEnabled'] == null ? undefined : json['autopilotCaseEnabled'],
         'autopilotCaseGuidance': json['autopilotCaseGuidance'] == null ? undefined : json['autopilotCaseGuidance'],
+        'autopilotConfigEnabled': json['autopilotConfigEnabled'] == null ? undefined : json['autopilotConfigEnabled'],
+        'autopilotConfigGuidance': json['autopilotConfigGuidance'] == null ? undefined : json['autopilotConfigGuidance'],
+        'autopilotDetectorEnabled': json['autopilotDetectorEnabled'] == null ? undefined : json['autopilotDetectorEnabled'],
+        'autopilotDetectorGuidance': json['autopilotDetectorGuidance'] == null ? undefined : json['autopilotDetectorGuidance'],
+        'autopilotMcpEnabled': json['autopilotMcpEnabled'] == null ? undefined : json['autopilotMcpEnabled'],
         'hfToken': json['hfToken'] == null ? undefined : json['hfToken'],
     };
 }
@@ -169,6 +204,11 @@ export function UpdateInstanceSettingsDtoToJSONTyped(value?: UpdateInstanceSetti
         'autopilotInquirySearchable': value['autopilotInquirySearchable'],
         'autopilotCaseEnabled': value['autopilotCaseEnabled'],
         'autopilotCaseGuidance': value['autopilotCaseGuidance'],
+        'autopilotConfigEnabled': value['autopilotConfigEnabled'],
+        'autopilotConfigGuidance': value['autopilotConfigGuidance'],
+        'autopilotDetectorEnabled': value['autopilotDetectorEnabled'],
+        'autopilotDetectorGuidance': value['autopilotDetectorGuidance'],
+        'autopilotMcpEnabled': value['autopilotMcpEnabled'],
         'hfToken': value['hfToken'],
     };
 }

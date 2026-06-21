@@ -114,6 +114,51 @@ export class UpdateInstanceSettingsDto {
 
   @ApiPropertyOptional({
     description:
+      'When true, the config-tuning agent may change editable source config (detectors, sampling, optional, resources) — never the base connection.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  autopilotConfigEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Operator guidance for the config-tuning agent.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  autopilotConfigGuidance?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'When true, the detector-authoring agent may create and train custom detectors.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  autopilotDetectorEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Operator guidance for the detector-authoring agent.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  autopilotDetectorGuidance?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'When true, the harness may call tools from connected external MCP servers.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  autopilotMcpEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
       'Hugging Face token to set. Pass a token value to store (encrypted at rest). ' +
       'Pass null or an empty string to clear the stored token. ' +
       'Ignored when an instance-level HF_TOKEN is configured.',

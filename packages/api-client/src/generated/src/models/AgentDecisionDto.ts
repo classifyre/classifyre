@@ -94,6 +94,14 @@ export const AgentDecisionDtoActionEnum = {
     ConsolidateMemory: 'CONSOLIDATE_MEMORY',
     LinkDuplicate: 'LINK_DUPLICATE',
     UpdateCluster: 'UPDATE_CLUSTER',
+    ToolCall: 'TOOL_CALL',
+    TuneSource: 'TUNE_SOURCE',
+    CreateDetector: 'CREATE_DETECTOR',
+    TrainDetector: 'TRAIN_DETECTOR',
+    TriggerScan: 'TRIGGER_SCAN',
+    UpdateSystemBrief: 'UPDATE_SYSTEM_BRIEF',
+    RecomputeCorrelation: 'RECOMPUTE_CORRELATION',
+    TuneCorrelation: 'TUNE_CORRELATION',
     NoAction: 'NO_ACTION'
 } as const;
 export type AgentDecisionDtoActionEnum = typeof AgentDecisionDtoActionEnum[keyof typeof AgentDecisionDtoActionEnum];

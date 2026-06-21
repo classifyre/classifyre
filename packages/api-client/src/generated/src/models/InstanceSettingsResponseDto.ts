@@ -92,6 +92,36 @@ export interface InstanceSettingsResponseDto {
      */
     autopilotCaseGuidance: string | null;
     /**
+     * When true, the config-tuning agent may change editable source config.
+     * @type {boolean}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autopilotConfigEnabled: boolean;
+    /**
+     * Operator guidance for the config-tuning agent.
+     * @type {string}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autopilotConfigGuidance: string | null;
+    /**
+     * When true, the detector-authoring agent may create/train detectors.
+     * @type {boolean}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autopilotDetectorEnabled: boolean;
+    /**
+     * Operator guidance for the detector-authoring agent.
+     * @type {string}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autopilotDetectorGuidance: string | null;
+    /**
+     * When true, the harness may call tools from connected external MCP servers.
+     * @type {boolean}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autopilotMcpEnabled: boolean;
+    /**
      * Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.
      * @type {boolean}
      * @memberof InstanceSettingsResponseDto
@@ -161,6 +191,11 @@ export function instanceOfInstanceSettingsResponseDto(value: object): value is I
     if (!('autopilotInquirySearchable' in value) || value['autopilotInquirySearchable'] === undefined) return false;
     if (!('autopilotCaseEnabled' in value) || value['autopilotCaseEnabled'] === undefined) return false;
     if (!('autopilotCaseGuidance' in value) || value['autopilotCaseGuidance'] === undefined) return false;
+    if (!('autopilotConfigEnabled' in value) || value['autopilotConfigEnabled'] === undefined) return false;
+    if (!('autopilotConfigGuidance' in value) || value['autopilotConfigGuidance'] === undefined) return false;
+    if (!('autopilotDetectorEnabled' in value) || value['autopilotDetectorEnabled'] === undefined) return false;
+    if (!('autopilotDetectorGuidance' in value) || value['autopilotDetectorGuidance'] === undefined) return false;
+    if (!('autopilotMcpEnabled' in value) || value['autopilotMcpEnabled'] === undefined) return false;
     if (!('demoMode' in value) || value['demoMode'] === undefined) return false;
     if (!('hfTokenSet' in value) || value['hfTokenSet'] === undefined) return false;
     if (!('hfTokenInstanceSet' in value) || value['hfTokenInstanceSet'] === undefined) return false;
@@ -191,6 +226,11 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'autopilotInquirySearchable': json['autopilotInquirySearchable'],
         'autopilotCaseEnabled': json['autopilotCaseEnabled'],
         'autopilotCaseGuidance': json['autopilotCaseGuidance'],
+        'autopilotConfigEnabled': json['autopilotConfigEnabled'],
+        'autopilotConfigGuidance': json['autopilotConfigGuidance'],
+        'autopilotDetectorEnabled': json['autopilotDetectorEnabled'],
+        'autopilotDetectorGuidance': json['autopilotDetectorGuidance'],
+        'autopilotMcpEnabled': json['autopilotMcpEnabled'],
         'demoMode': json['demoMode'],
         'hfTokenSet': json['hfTokenSet'],
         'hfTokenInstanceSet': json['hfTokenInstanceSet'],
@@ -222,6 +262,11 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
         'autopilotInquirySearchable': value['autopilotInquirySearchable'],
         'autopilotCaseEnabled': value['autopilotCaseEnabled'],
         'autopilotCaseGuidance': value['autopilotCaseGuidance'],
+        'autopilotConfigEnabled': value['autopilotConfigEnabled'],
+        'autopilotConfigGuidance': value['autopilotConfigGuidance'],
+        'autopilotDetectorEnabled': value['autopilotDetectorEnabled'],
+        'autopilotDetectorGuidance': value['autopilotDetectorGuidance'],
+        'autopilotMcpEnabled': value['autopilotMcpEnabled'],
         'demoMode': value['demoMode'],
         'hfTokenSet': value['hfTokenSet'],
         'hfTokenInstanceSet': value['hfTokenInstanceSet'],
