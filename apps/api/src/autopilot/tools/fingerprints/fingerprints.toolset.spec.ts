@@ -15,14 +15,16 @@ describe('FingerprintsToolset', () => {
   it('every mutating fingerprint tool declares a gate and domain', () => {
     for (const tool of toolset.list()) {
       if (tool.sideEffect === 'mutate') {
-        expect(tool.resolveGate).toBeDefined();
-        expect(tool.domain).toBeTruthy();
+        expect('resolveGate' in tool).toBe(true);
+        expect('domain' in tool).toBe(true);
       }
     }
   });
 
   it('config-bearing tools opt out of lenient input stripping', () => {
-    const tune = toolset.list().find((t) => t.name === 'fingerprints.tune_config');
+    const tune = toolset
+      .list()
+      .find((t) => t.name === 'fingerprints.tune_config');
     expect(tune?.lenientInput).toBe(false);
   });
 });

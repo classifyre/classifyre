@@ -127,8 +127,7 @@ export async function runAgentLoop(
 
     const observations: unknown[] = [];
     for (const [i, call] of calls.entries()) {
-      const tool =
-        allowed.includes(call.tool) && deps.registry.get(call.tool);
+      const tool = allowed.includes(call.tool) && deps.registry.get(call.tool);
       if (!tool) {
         observations.push({
           tool: call.tool,
@@ -194,7 +193,13 @@ function loadProgress(
     messages: [
       {
         role: 'system',
-        content: buildSystemPrompt(ctx, mission, registry, systemBrief, allowed),
+        content: buildSystemPrompt(
+          ctx,
+          mission,
+          registry,
+          systemBrief,
+          allowed,
+        ),
       },
       { role: 'user', content: buildUserPrompt(ctx, mission) },
     ],
@@ -251,7 +256,10 @@ function pushCreated(
   if (result && typeof result === 'object' && 'id' in result) {
     const r = result as { id?: unknown; title?: unknown };
     if (typeof r.id === 'string')
-      into.push({ id: r.id, title: String(r.title ?? r.id) });
+      into.push({
+        id: r.id,
+        title: typeof r.title === 'string' ? r.title : r.id,
+      });
   }
 }
 
@@ -298,6 +306,7 @@ function repairTurn(value: unknown): unknown {
   if (!value || typeof value !== 'object') return { thought: String(value) };
   const v = value as Record<string, unknown>;
   if (v.toolCalls && !Array.isArray(v.toolCalls)) v.toolCalls = [v.toolCalls];
-  if (typeof v.thought !== 'string') v.thought = v.thought ? String(v.thought) : '';
+  if (typeof v.thought !== 'string')
+    v.thought = v.thought ? JSON.stringify(v.thought) : '';
   return v;
 }

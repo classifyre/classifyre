@@ -19,7 +19,9 @@ export class CreateMcpServerDto {
   @MaxLength(120)
   name!: string;
 
-  @ApiPropertyOptional({ description: 'Stable slug; generated from name if omitted' })
+  @ApiPropertyOptional({
+    description: 'Stable slug; generated from name if omitted',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(64)
@@ -61,7 +63,8 @@ export class CreateMcpServerDto {
 
   @ApiPropertyOptional({
     default: false,
-    description: 'Trusted servers may run mutating tools; untrusted are observe-only',
+    description:
+      'Trusted servers may run mutating tools; untrusted are observe-only',
   })
   @IsOptional()
   @IsBoolean()
@@ -156,7 +159,9 @@ export class McpServerResponseDto {
   @ApiPropertyOptional({ nullable: true }) command!: string | null;
   @ApiProperty({ type: [String] }) args!: string[];
   @ApiPropertyOptional({ nullable: true }) url!: string | null;
-  @ApiProperty({ description: 'Whether auth headers are stored (values hidden)' })
+  @ApiProperty({
+    description: 'Whether auth headers are stored (values hidden)',
+  })
   hasHeaders!: boolean;
   @ApiProperty() enabled!: boolean;
   @ApiProperty() trusted!: boolean;

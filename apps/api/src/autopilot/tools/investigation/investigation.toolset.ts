@@ -39,7 +39,7 @@ export class InvestigationToolset {
     input: Record<string, unknown>,
     tc: ToolContext,
   ): Promise<ToolGate> => {
-    const caseId = String(input.caseId ?? '');
+    const caseId = typeof input.caseId === 'string' ? input.caseId : '';
     const mode = await this.applier.caseGate(
       caseId,
       tc.ctx.settings.autopilotCaseEnabled,
@@ -95,13 +95,14 @@ export class InvestigationToolset {
         sideEffect: 'mutate',
         domain: 'inquiry',
         decisionAction: AgentDecisionAction.CREATE_INQUIRY,
-        resolveGate: async (_input, tc) => ({
-          mode: this.applier.effectiveMode(
-            AiManagementMode.INHERIT,
-            tc.ctx.settings.autopilotInquiryEnabled,
-          ),
-          entityType: 'inquiry',
-        }),
+        resolveGate: (_input, tc) =>
+          Promise.resolve({
+            mode: this.applier.effectiveMode(
+              AiManagementMode.INHERIT,
+              tc.ctx.settings.autopilotInquiryEnabled,
+            ),
+            entityType: 'inquiry',
+          }),
         handler: async (input) => this.applier.createInquiryCore(input),
       },
       {
@@ -119,16 +120,16 @@ export class InvestigationToolset {
         decisionAction: AgentDecisionAction.UPDATE_INQUIRY,
         resolveGate: async (input, tc) => ({
           mode: await this.applier.inquiryGate(
-            String(input.inquiryId ?? ''),
+            typeof input.inquiryId === 'string' ? input.inquiryId : '',
             tc.ctx.settings.autopilotInquiryEnabled,
           ),
           entityType: 'inquiry',
-          entityId: String(input.inquiryId ?? ''),
+          entityId: typeof input.inquiryId === 'string' ? input.inquiryId : '',
         }),
         handler: async (input) => {
           const { inquiryId, ...proposal } = input;
           await this.applier.updateInquiryCore(
-            String(inquiryId),
+            typeof inquiryId === 'string' ? inquiryId : '',
             proposal,
             false,
           );
@@ -150,11 +151,11 @@ export class InvestigationToolset {
         decisionAction: AgentDecisionAction.ENRICH_INQUIRY_MATCHERS,
         resolveGate: async (input, tc) => ({
           mode: await this.applier.inquiryGate(
-            String(input.inquiryId ?? ''),
+            typeof input.inquiryId === 'string' ? input.inquiryId : '',
             tc.ctx.settings.autopilotInquiryEnabled,
           ),
           entityType: 'inquiry',
-          entityId: String(input.inquiryId ?? ''),
+          entityId: typeof input.inquiryId === 'string' ? input.inquiryId : '',
         }),
         handler: async (input) => {
           const { inquiryId, ...proposal } = input;
@@ -184,13 +185,14 @@ export class InvestigationToolset {
         sideEffect: 'mutate',
         domain: 'case',
         decisionAction: AgentDecisionAction.CREATE_CASE,
-        resolveGate: async (_input, tc) => ({
-          mode: this.applier.effectiveMode(
-            AiManagementMode.INHERIT,
-            tc.ctx.settings.autopilotCaseEnabled,
-          ),
-          entityType: 'case',
-        }),
+        resolveGate: (_input, tc) =>
+          Promise.resolve({
+            mode: this.applier.effectiveMode(
+              AiManagementMode.INHERIT,
+              tc.ctx.settings.autopilotCaseEnabled,
+            ),
+            entityType: 'case',
+          }),
         handler: async (input) =>
           this.applier.createCaseCore({
             title: String(input.title),

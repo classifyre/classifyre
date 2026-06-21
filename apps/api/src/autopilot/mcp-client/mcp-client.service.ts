@@ -171,13 +171,13 @@ export class McpClientService
   ): Promise<unknown> {
     const client = this.clients.get(serverId);
     if (!client) {
-      throw new Error('MCP server is not connected — refresh the harness tools.');
+      throw new Error(
+        'MCP server is not connected — refresh the harness tools.',
+      );
     }
-    return client.callTool(
-      { name, arguments: args },
-      undefined,
-      { timeout: CALL_TIMEOUT_MS },
-    );
+    return client.callTool({ name, arguments: args }, undefined, {
+      timeout: CALL_TIMEOUT_MS,
+    });
   }
 
   private decodeHeaders(headersEnc: string | null): Record<string, string> {

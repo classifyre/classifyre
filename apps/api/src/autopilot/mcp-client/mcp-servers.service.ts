@@ -62,7 +62,9 @@ export class McpServersService {
         e instanceof Prisma.PrismaClientKnownRequestError &&
         e.code === 'P2002'
       ) {
-        throw new ConflictException(`MCP server slug "${slug}" already exists.`);
+        throw new ConflictException(
+          `MCP server slug "${slug}" already exists.`,
+        );
       }
       throw e;
     }

@@ -40,9 +40,7 @@ export class HarnessService {
   async execute(ctx: AgentContext, mission?: Mission): Promise<ApplySummary> {
     const resolved = mission ?? missionFor(ctx.run.agentKind);
     if (!resolved) {
-      throw new Error(
-        `No harness mission for agent kind ${ctx.run.agentKind}`,
-      );
+      throw new Error(`No harness mission for agent kind ${ctx.run.agentKind}`);
     }
 
     const briefText = this.brief.render(await this.brief.get());

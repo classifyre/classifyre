@@ -29,7 +29,13 @@ export class SystemBriefService {
       where: { id: BRIEF_ID },
     });
     if (!row) {
-      return { id: BRIEF_ID, content: '', facts: {}, version: 0, updatedBy: null };
+      return {
+        id: BRIEF_ID,
+        content: '',
+        facts: {},
+        version: 0,
+        updatedBy: null,
+      };
     }
     return {
       id: row.id,

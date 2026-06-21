@@ -40,7 +40,9 @@ export class McpServersController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reconnect all enabled servers and rediscover tools' })
+  @ApiOperation({
+    summary: 'Reconnect all enabled servers and rediscover tools',
+  })
   @ApiResponse({ status: 200, type: [McpServerResponseDto] })
   refresh(): Promise<McpServerResponseDto[]> {
     return this.servers.refresh();

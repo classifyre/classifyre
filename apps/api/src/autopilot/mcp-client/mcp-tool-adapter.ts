@@ -1,5 +1,4 @@
 import { AiManagementMode } from '@prisma/client';
-import type { JsonSchema } from '../../ai';
 import type { Tool, ToolContext } from '../tools/tool.types';
 
 export interface RemoteTool {
@@ -25,23 +24,22 @@ export function adaptMcpTool(opts: {
     description:
       opts.remote.description?.trim() ||
       `External MCP tool "${opts.remote.name}" from server "${opts.slug}".`,
-    inputSchema:
-      (opts.remote.inputSchema as JsonSchema | undefined) ?? {
-        type: 'object',
-        additionalProperties: true,
-      },
+    inputSchema: opts.remote.inputSchema ?? {
+      type: 'object',
+      additionalProperties: true,
+    },
     // Preserve the remote tool's arbitrary argument shape verbatim.
     lenientInput: false,
     sideEffect: 'mutate',
     domain: null,
-    resolveGate: async (_input, tc: ToolContext) => ({
-      mode:
-        tc.ctx.settings.autopilotMcpEnabled && opts.trusted
-          ? AiManagementMode.MANAGED
-          : AiManagementMode.OBSERVE_ONLY,
-      entityType: 'system',
-    }),
-    handler: async (input) =>
-      opts.call(opts.remote.name, input as Record<string, unknown>),
+    resolveGate: (_input, tc: ToolContext) =>
+      Promise.resolve({
+        mode:
+          tc.ctx.settings.autopilotMcpEnabled && opts.trusted
+            ? AiManagementMode.MANAGED
+            : AiManagementMode.OBSERVE_ONLY,
+        entityType: 'system',
+      }),
+    handler: async (input) => opts.call(opts.remote.name, input),
   };
 }
