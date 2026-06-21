@@ -7,7 +7,6 @@ import { Button } from "@workspace/ui/components/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { CasesTable } from "@/components/cases-table";
 import { InquiriesTable } from "@/components/inquiries-table";
-import { AutopilotPanel } from "@/components/autopilot/autopilot-panel";
 import { useTranslation } from "@/hooks/use-translation";
 
 export default function InvestigationsPage() {
@@ -23,8 +22,7 @@ function InvestigationsPageInner() {
   const searchParams = useSearchParams();
   const { t } = useTranslation();
   const tabParam = searchParams.get("tab");
-  const defaultTab =
-    tabParam === "inquiries" || tabParam === "autopilot" ? tabParam : "cases";
+  const defaultTab = tabParam === "inquiries" ? tabParam : "cases";
 
   return (
     <div className="space-y-6">
@@ -54,7 +52,6 @@ function InvestigationsPageInner() {
         <TabsList>
           <TabsTrigger value="cases">{t("investigations.page.tabCases")}</TabsTrigger>
           <TabsTrigger value="inquiries">{t("investigations.page.tabInquiries")}</TabsTrigger>
-          <TabsTrigger value="autopilot">{t("investigations.page.tabAutopilot")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="cases">
@@ -63,10 +60,6 @@ function InvestigationsPageInner() {
 
         <TabsContent value="inquiries">
           <InquiriesTable />
-        </TabsContent>
-
-        <TabsContent value="autopilot">
-          <AutopilotPanel />
         </TabsContent>
       </Tabs>
     </div>

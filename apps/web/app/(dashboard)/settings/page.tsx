@@ -33,7 +33,7 @@ import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { McpSettingsCard } from "@/components/mcp-settings-card";
 import { AiProvidersCard } from "@/components/ai-providers-card";
 import { AiAssistantSettingsCard } from "@/components/ai-assistant-settings-card";
-import { AutopilotSettingsCard } from "@/components/autopilot-settings-card";
+import { HarnessPointerCard } from "@/components/harness/harness-pointer-card";
 import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
 
@@ -359,7 +359,7 @@ export default function SettingsPage() {
 
           <AiAssistantSettingsCard />
 
-          <AutopilotSettingsCard />
+          <HarnessPointerCard />
 
           <HuggingFaceSettingsCard />
         </TabsContent>

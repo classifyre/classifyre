@@ -24,6 +24,10 @@ model Source {
   scheduleCron        String?        @map("schedule_cron")
   scheduleTimezone    String?        @default("UTC") @map("schedule_timezone")
   scheduleNextAt      DateTime?      @map("schedule_next_at")
+  // Per-source autopilot management mode; overrides the instance config flag
+  // unless INHERIT. OBSERVE_ONLY blocks the config-tuning agent from changing
+  // this source's config.
+  aiMode              AiManagementMode @default(INHERIT) @map("ai_mode")
   assets          Asset[]
   findings        Finding[]
   customDetectorFeedback CustomDetectorFeedback[]
@@ -197,6 +201,9 @@ model CustomDetector {
   pipelineSchema      Json                        @map("pipeline_schema") @db.JsonB
   isActive            Boolean                     @default(true) @map("is_active")
   version             Int                         @default(1)
+  // Per-detector autopilot management mode (overrides the instance detector
+  // flag unless INHERIT). OBSERVE_ONLY blocks the detector-authoring agent.
+  aiMode              AiManagementMode            @default(INHERIT) @map("ai_mode")
   lastTrainedAt       DateTime?                   @map("last_trained_at")
   lastTrainingSummary Json?                       @map("last_training_summary") @db.JsonB
   aiProviderConfigId  String?                     @map("ai_provider_config_id")
@@ -399,6 +406,15 @@ model InstanceSettings {
   autopilotInquirySearchable String? @db.Text @map("autopilot_inquiry_searchable")
   autopilotCaseEnabled       Boolean @default(false) @map("autopilot_case_enabled")
   autopilotCaseGuidance      String? @db.Text @map("autopilot_case_guidance")
+  // Config-tuning agent: may change editable source config (detectors,
+  // sampling, optional, resources) — never base connection. Opt-in.
+  autopilotConfigEnabled     Boolean @default(false) @map("autopilot_config_enabled")
+  autopilotConfigGuidance    String? @db.Text @map("autopilot_config_guidance")
+  // Detector-authoring agent: may create/train custom detectors. Opt-in.
+  autopilotDetectorEnabled   Boolean @default(false) @map("autopilot_detector_enabled")
+  autopilotDetectorGuidance  String? @db.Text @map("autopilot_detector_guidance")
+  // Allow the harness to call tools from connected external MCP servers. Opt-in.
+  autopilotMcpEnabled        Boolean @default(false) @map("autopilot_mcp_enabled")
 
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
@@ -1122,6 +1138,11 @@ enum AgentKind {
   // the inquiry/case agents, and records its work in the autopilot log so the
   // results are visible and the AI agents can take them into account.
   DUPLICATES
+  // Config-tuning agent: investigates sources by changing editable config
+  // (detectors, sampling, optional, resources) — never base connection.
+  CONFIG
+  // Detector-authoring agent: creates/trains custom detectors when needed.
+  DETECTOR_AUTHOR
 }
 
 enum AgentRunStatus {
@@ -1160,6 +1181,22 @@ enum AgentDecisionAction {
   LINK_DUPLICATE
   // Duplicates finder: an identity cluster was created/grown/merged.
   UPDATE_CLUSTER
+  // Harness: a generic tool was invoked by the agent loop (read or mutate).
+  TOOL_CALL
+  // Config-tuning agent: a source's editable config was changed.
+  TUNE_SOURCE
+  // Detector-authoring agent: a custom detector was created.
+  CREATE_DETECTOR
+  // Detector-authoring agent: a custom detector was trained.
+  TRAIN_DETECTOR
+  // Config-tuning agent: a source scan was triggered.
+  TRIGGER_SCAN
+  // Harness: the living system brief was updated.
+  UPDATE_SYSTEM_BRIEF
+  // Fingerprints: recomputed asset correlation/similarity on demand.
+  RECOMPUTE_CORRELATION
+  // Fingerprints: tuned correlation config (weights/exclusions/thresholds).
+  TUNE_CORRELATION
   NO_ACTION
 }
 
@@ -1172,7 +1209,62 @@ enum AgentDecisionOutcome {
 enum AgentMemoryKind {
   GLOSSARY
   DECISION_PRECEDENT
+  // Legacy: topic→inquiry mapping. ENTITY_MAP generalizes it (topic→any entity).
   TOPIC_INQUIRY_MAP
+  // Topic → any entity (inquiry/case/source/detector) mapping for dedupe.
+  ENTITY_MAP
+  // Per-source learned facts: typical finding mix, false-positive patterns,
+  // detector/sampling settings that worked well.
+  SOURCE_PROFILE
+  // What a detector catches/misses and tuning lessons.
+  DETECTOR_INSIGHT
+  // Sacred operator corrections/opt-outs — never pruned by the dream agent.
+  OPERATOR_DIRECTIVE
+}
+
+// An external MCP server the harness can connect to and call tools from.
+// Credentials (headers) are encrypted at rest. agentKinds scopes which missions
+// may use the server's tools (empty = all). Untrusted servers expose their tools
+// observe-only (the dispatcher refuses to run their mutating handlers).
+model McpServerConfig {
+  id              String    @id @default(uuid())
+  name            String
+  slug            String    @unique
+  transport       String // "stdio" | "http"
+  command         String?
+  args            String[]  @default([])
+  url             String?
+  headersEnc      String?   @map("headers_enc")
+  enabled         Boolean   @default(false)
+  trusted         Boolean   @default(false)
+  // Mission kinds allowed to use these tools (AgentKind strings). Empty = all.
+  agentKinds      String[]  @default([]) @map("agent_kinds")
+  // Discovered tool names to expose. Empty = all discovered.
+  toolAllowlist   String[]  @default([]) @map("tool_allowlist")
+  // Last connection result for the UI.
+  discoveredTools String[]  @default([]) @map("discovered_tools")
+  lastError       String?   @map("last_error") @db.Text
+  lastConnectedAt DateTime? @map("last_connected_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("mcp_server_configs")
+}
+
+// Living, always-injected summary of the whole system the autopilot maintains:
+// source/detector counts, finding landscape, what's been tried, known gaps.
+// Singleton (id = 1), like InstanceSettings. The narrative is model-authored;
+// `facts` holds structured aggregates refreshed from the search service.
+model AgentSystemBrief {
+  id        Int      @id @default(1)
+  content   String   @default("") @db.Text
+  facts     Json     @default("{}") @db.JsonB
+  version   Int      @default(1)
+  updatedBy String?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("agent_system_brief")
 }
 
 // One autonomous agent cycle (triggered by a scan completion). currentStep +

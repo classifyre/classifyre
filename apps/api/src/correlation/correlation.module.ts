@@ -34,6 +34,6 @@ import { CorrelationController } from './correlation.controller';
     DuplicatesFinderAgentService,
     CorrelationWorker,
   ],
-  exports: [CorrelationService],
+  exports: [CorrelationService, DuplicatesFinderAgentService],
 })
 export class CorrelationModule {}

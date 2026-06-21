@@ -8,18 +8,25 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AutopilotService } from './autopilot.service';
 import {
+  AgentActivityListResponseDto,
   AgentLogListResponseDto,
   AgentMemoryDto,
   AgentMemoryListResponseDto,
   AgentRunDetailDto,
   AgentRunDto,
   AgentRunListResponseDto,
+  AgentSystemBriefDto,
+  AutopilotStatsDto,
   CreateAgentMemoryDto,
+  HarnessToolsResponseDto,
+  UpdateSystemBriefDto,
+  QueryAgentActivityDto,
   QueryAgentLogsDto,
   QueryAgentMemoryDto,
   QueryAgentRunsDto,
@@ -55,6 +62,56 @@ export class AutopilotController {
   @ApiResponse({ status: 202, type: TriggerAutopilotResponseDto })
   triggerDream(): Promise<TriggerAutopilotResponseDto> {
     return this.autopilot.triggerDream();
+  }
+
+  @Get('stats')
+  @ApiOperation({
+    summary:
+      'Mission-control counters (runs, decisions, memory, brief version)',
+  })
+  @ApiResponse({ status: 200, type: AutopilotStatsDto })
+  getStats(): Promise<AutopilotStatsDto> {
+    return this.autopilot.getStats();
+  }
+
+  @Get('activity')
+  @ApiOperation({
+    summary:
+      'Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time',
+  })
+  @ApiResponse({ status: 200, type: AgentActivityListResponseDto })
+  listActivity(
+    @Query() query: QueryAgentActivityDto,
+  ): Promise<AgentActivityListResponseDto> {
+    return this.autopilot.listActivity(query);
+  }
+
+  @Get('tools')
+  @ApiOperation({
+    summary:
+      'The harness capability map — every registered tool (read/mutate, domain) and the missions that use them',
+  })
+  @ApiResponse({ status: 200, type: HarnessToolsResponseDto })
+  getTools(): HarnessToolsResponseDto {
+    return this.autopilot.getTools();
+  }
+
+  @Get('system-brief')
+  @ApiOperation({
+    summary: 'The living system brief the autopilot maintains and injects',
+  })
+  @ApiResponse({ status: 200, type: AgentSystemBriefDto })
+  getSystemBrief(): Promise<AgentSystemBriefDto> {
+    return this.autopilot.getSystemBrief();
+  }
+
+  @Put('system-brief')
+  @ApiOperation({ summary: 'Create or rewrite the system-brief narrative' })
+  @ApiResponse({ status: 200, type: AgentSystemBriefDto })
+  updateSystemBrief(
+    @Body() dto: UpdateSystemBriefDto,
+  ): Promise<AgentSystemBriefDto> {
+    return this.autopilot.updateSystemBrief(dto.content);
   }
 
   @Get('runs')

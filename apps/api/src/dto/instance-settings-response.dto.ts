@@ -91,6 +91,39 @@ export class InstanceSettingsResponseDto {
 
   @ApiProperty({
     description:
+      'When true, the config-tuning agent may change editable source config.',
+    example: false,
+  })
+  autopilotConfigEnabled: boolean;
+
+  @ApiProperty({
+    description: 'Operator guidance for the config-tuning agent.',
+    nullable: true,
+  })
+  autopilotConfigGuidance: string | null;
+
+  @ApiProperty({
+    description:
+      'When true, the detector-authoring agent may create/train detectors.',
+    example: false,
+  })
+  autopilotDetectorEnabled: boolean;
+
+  @ApiProperty({
+    description: 'Operator guidance for the detector-authoring agent.',
+    nullable: true,
+  })
+  autopilotDetectorGuidance: string | null;
+
+  @ApiProperty({
+    description:
+      'When true, the harness may call tools from connected external MCP servers.',
+    example: false,
+  })
+  autopilotMcpEnabled: boolean;
+
+  @ApiProperty({
+    description:
       'Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.',
     example: false,
   })

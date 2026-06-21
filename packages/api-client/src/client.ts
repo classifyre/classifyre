@@ -53,6 +53,18 @@ export type {
   UpdateAgentMemoryDto,
   TriggerAutopilotDto,
   TriggerAutopilotResponseDto,
+  AgentActivityItemDto,
+  AgentActivityListResponseDto,
+  AgentSystemBriefDto,
+  AutopilotStatsDto,
+  HarnessToolDto,
+  HarnessMissionDto,
+  HarnessToolsResponseDto,
+  UpdateSystemBriefDto,
+  McpServerResponseDto,
+  CreateMcpServerDto,
+  UpdateMcpServerDto,
+  McpServerTestResultDto,
 } from "./generated/src/models";
 
 // Investigation (cases / inquiries / graph / hypotheses) model types
@@ -139,6 +151,15 @@ export {
 } from "./generated/src/apis/SandboxApi";
 
 export { TriggerAutopilotDtoAgentKindEnum } from "./generated/src/models/TriggerAutopilotDto";
+export {
+  AutopilotControllerListActivityAgentKindEnum,
+  AutopilotControllerListActivityActionEnum,
+  AutopilotControllerListActivityOutcomeEnum,
+} from "./generated/src/apis/AutopilotApi";
+export {
+  CreateMcpServerDtoTransportEnum,
+  CreateMcpServerDtoAgentKindsEnum,
+} from "./generated/src/models/CreateMcpServerDto";
 
 // Re-export types from generated models
 export type {
