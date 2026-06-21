@@ -90,10 +90,17 @@ export async function runAgentLoop(
   ctx: AgentContext,
   mission: Mission,
   deps: AgentLoopDeps,
-  opts: { systemBrief?: string } = {},
+  opts: { systemBrief?: string; allowedTools?: string[] } = {},
 ): Promise<AgentLoopResult> {
   const runId = ctx.run.id;
-  const progress = loadProgress(ctx, mission, deps.registry, opts.systemBrief);
+  const allowed = opts.allowedTools ?? mission.allowedTools;
+  const progress = loadProgress(
+    ctx,
+    mission,
+    deps.registry,
+    opts.systemBrief,
+    allowed,
+  );
 
   while (!progress.done && progress.iteration < mission.maxIterations) {
     if (await deps.audit.isCancelled(runId)) {
@@ -121,8 +128,7 @@ export async function runAgentLoop(
     const observations: unknown[] = [];
     for (const [i, call] of calls.entries()) {
       const tool =
-        mission.allowedTools.includes(call.tool) &&
-        deps.registry.get(call.tool);
+        allowed.includes(call.tool) && deps.registry.get(call.tool);
       if (!tool) {
         observations.push({
           tool: call.tool,
@@ -179,7 +185,8 @@ function loadProgress(
   ctx: AgentContext,
   mission: Mission,
   registry: ToolRegistry,
-  systemBrief?: string,
+  systemBrief: string | undefined,
+  allowed: string[],
 ): LoopProgress {
   const existing = ctx.state[PROGRESS_KEY] as LoopProgress | undefined;
   if (existing && Array.isArray(existing.messages)) return existing;
@@ -187,7 +194,7 @@ function loadProgress(
     messages: [
       {
         role: 'system',
-        content: buildSystemPrompt(ctx, mission, registry, systemBrief),
+        content: buildSystemPrompt(ctx, mission, registry, systemBrief, allowed),
       },
       { role: 'user', content: buildUserPrompt(ctx, mission) },
     ],
@@ -252,7 +259,8 @@ function buildSystemPrompt(
   ctx: AgentContext,
   mission: Mission,
   registry: ToolRegistry,
-  systemBrief?: string,
+  systemBrief: string | undefined,
+  allowed: string[],
 ): string {
   const guidance = ctx.instruction
     ? `\n\nOperator instruction for this run:\n${ctx.instruction}`
@@ -263,7 +271,7 @@ function buildSystemPrompt(
     brief,
     guidance,
     '\n## Tools you may call',
-    registry.catalog(mission.allowedTools),
+    registry.catalog(allowed),
     '\n## How to respond',
     'Each turn, return JSON: {"thought": "...", "toolCalls": [{"tool": "name", "input": {...}, "rationale": "why"}]}.',
     'Call read tools to gather what you need before mutating. When you are done, return {"thought":"...","finish":{"summary":"what you did"}} with an empty or omitted toolCalls.',

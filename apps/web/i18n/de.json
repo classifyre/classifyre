@@ -21,7 +21,8 @@
     "scans": "Scans",
     "sandbox": "Sandbox",
     "operations": "Operationen",
-    "settings": "Einstellungen"
+    "settings": "Einstellungen",
+    "harness": "Harness AI"
   },
   "common": {
     "duration": {
@@ -2035,7 +2036,8 @@
           "LINK_DUPLICATE": "Duplikat verknüpfen",
           "UPDATE_CLUSTER": "Cluster aktualisieren",
           "NO_ACTION": "Keine Aktion"
-        }
+        },
+        "loadMore": "{{count}} weitere laden"
       },
       "runDialog": {
         "titleGeneral": "Autopilot jetzt starten",
@@ -2372,5 +2374,178 @@
     "legendHint": "Assets sind über ihre Verknüpfungen verbunden (Hash → Asset).",
     "legendAsset": "Asset in dieser Quelle",
     "legendExternal": "Verknüpftes Asset in anderer Quelle"
+  },
+  "harness": {
+    "title": "Harness-KI-Autopilot",
+    "subtitle": "Autonome Steuerungsebene",
+    "description": "Eine werkzeugnutzende KI-Harness, die Ihr System beobachtet und darauf reagiert — Untersuchungen verwalten, Quellen & Detektoren abstimmen, Fingerprints korrelieren und dabei lernen.",
+    "steer": "Ausführen / Steuern",
+    "refresh": "Aktualisieren",
+    "loading": "Harness wird geladen…",
+    "stats": {
+      "active": "Aktiv",
+      "runs24h": "Läufe · 24h",
+      "totalRuns": "Läufe gesamt",
+      "applied": "Angewendet",
+      "skipped": "Nur Beobachtung",
+      "failed": "Fehlgeschlagen",
+      "memory": "Erinnerungen",
+      "brief": "Briefing v",
+      "lastActivity": "Letzte Aktivität",
+      "never": "nie",
+      "idle": "Inaktiv"
+    },
+    "nav": {
+      "activity": "Aktivität",
+      "runs": "Läufe",
+      "tools": "Werkzeuge",
+      "memory": "Gedächtnis",
+      "brief": "System-Briefing",
+      "config": "Konfiguration"
+    },
+    "activity": {
+      "title": "Activity timeline",
+      "desc": "Every decision the harness made or skipped — the business narrative, queried server-side.",
+      "search": "Search rationale…",
+      "all": "All",
+      "kind": "Mission",
+      "action": "Action",
+      "outcome": "Outcome",
+      "entity": "Entity",
+      "empty": "No activity yet",
+      "emptyDesc": "Once the harness runs, its decisions appear here. Filter by mission, action, outcome or text.",
+      "loadMore": "Load more",
+      "results": "{{count}} of {{total}}",
+      "openRun": "Open run",
+      "payload": "Payload",
+      "clearFilters": "Clear filters"
+    },
+    "tools": {
+      "title": "Capability map",
+      "desc": "The tools the harness can call and the missions that wield them. New tools (including external MCP servers) register here automatically.",
+      "registry": "Tool registry",
+      "missions": "Missions",
+      "read": "read",
+      "mutate": "mutate",
+      "domain": "domain",
+      "toolCount": "{{count}} tools",
+      "allowedTools": "{{count}} tools",
+      "maxIterations": "max {{count}} steps",
+      "reactTitle": "How the harness thinks",
+      "reactStep1": "Observe — calls read tools to gather the slice of state it needs.",
+      "reactStep2": "Reason — proposes the next action with a short rationale.",
+      "reactStep3": "Act — a mutating tool runs through the gate (validated, OBSERVE_ONLY-checked, audited).",
+      "reactStep4": "Repeat — the result feeds back until the goal is met or the step budget is reached.",
+      "none": "No tools registered."
+    },
+    "brief": {
+      "title": "System brief",
+      "desc": "The living understanding the harness maintains and injects into every run — refreshed nightly.",
+      "version": "Version {{n}}",
+      "updatedBy": "Updated by {{who}}",
+      "never": "Not generated yet",
+      "facts": "Snapshot",
+      "narrative": "Narrative",
+      "empty": "No system brief yet",
+      "emptyDesc": "The dream cycle writes the system brief. Trigger one from Run / Steer, or wait for the nightly run.",
+      "edit": "Bearbeiten",
+      "create": "Briefing schreiben",
+      "save": "Briefing speichern",
+      "cancel": "Abbrechen",
+      "saving": "Speichern…",
+      "saved": "System-Briefing gespeichert",
+      "placeholder": "Beschreiben Sie das System: Quellen, Detektoren, was versucht wurde, bekannte Lücken…"
+    },
+    "config": {
+      "title": "Harness-Konfiguration",
+      "desc": "Enable each autonomous capability and steer it with free-text guidance. All actions stay audited; per-entity observe-only still applies.",
+      "requiresAi": "Enable AI and select a default provider in Settings → AI before the harness can act.",
+      "enable": "Enabled",
+      "guidance": "Guidance",
+      "save": "Save guidance",
+      "saved": "Guidance saved",
+      "enabledToast": "Setting updated",
+      "master": "Capabilities",
+      "agents": {
+        "inquiry": {
+          "name": "Anfrage-Agent",
+          "desc": "Erstellt und erweitert Anfragen aus neuen Funden."
+        },
+        "case": {
+          "name": "Fall-Agent",
+          "desc": "Baut und treibt Untersuchungsfälle, Hypothesen und Belege voran."
+        },
+        "config": {
+          "name": "Konfigurations-Agent",
+          "desc": "Stimmt Detektoren, Sampling und Ressourcen ab — nie die Basisverbindung."
+        },
+        "detector": {
+          "name": "Detektor-Agent",
+          "desc": "Erstellt und trainiert eigene Detektoren bei fehlender Abdeckung."
+        },
+        "mcp": {
+          "name": "Externe MCP-Werkzeuge",
+          "desc": "Erlaubt der Harness, Werkzeuge verbundener externer MCP-Server zu nutzen."
+        }
+      }
+    },
+    "kinds": {
+      "INQUIRY": "Inquiry",
+      "CASE": "Case",
+      "CONFIG": "Config",
+      "DETECTOR_AUTHOR": "Detector",
+      "DREAM": "Dream",
+      "DUPLICATES": "Duplicates"
+    },
+    "outcomes": {
+      "APPLIED": "Applied",
+      "SKIPPED_OBSERVE_ONLY": "Observe-only",
+      "FAILED": "Failed"
+    },
+    "pointer": {
+      "title": "Untersuchungs-Autopilot verschoben",
+      "desc": "Der Autopilot ist jetzt die Harness-KI-Steuerungsebene — konfigurieren und beobachten Sie ihn in seinem eigenen Bereich.",
+      "cta": "Harness-KI öffnen"
+    },
+    "mcp": {
+      "title": "Externe MCP-Server",
+      "desc": "Verbinden Sie externe Model-Context-Protocol-Server und wählen Sie, welche Missionen ihre Werkzeuge nutzen dürfen. Nicht vertrauenswürdige Server sind nur Beobachtung.",
+      "add": "Server hinzufügen",
+      "none": "Keine MCP-Server",
+      "noneDesc": "Connect an external MCP server to extend the harness with third-party tools.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "test": "Test",
+      "refresh": "Alle aktualisieren",
+      "refreshed": "Reconnected MCP servers",
+      "connected": "Connected",
+      "neverConnected": "Not connected",
+      "tools": "{{count}} tools",
+      "transport": "Transport",
+      "http": "HTTP",
+      "stdio": "stdio",
+      "url": "Server URL",
+      "command": "Command",
+      "args": "Arguments (one per line)",
+      "headers": "Auth headers (key: value per line)",
+      "name": "Name",
+      "enabled": "Aktiviert",
+      "trusted": "Vertrauenswürdig",
+      "trustedDesc": "Trusted servers may run mutating tools; untrusted ones are observe-only.",
+      "agents": "Erlaubte Missionen",
+      "agentsAll": "Alle Missionen",
+      "allowlist": "Tool allowlist (optional, one per line)",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "created": "MCP server added",
+      "updated": "MCP server updated",
+      "deleted": "MCP server removed",
+      "testing": "Testing…",
+      "testOk": "Connected — {{count}} tools",
+      "testFail": "Connection failed",
+      "confirmDelete": "Remove this MCP server?",
+      "editTitle": "MCP-Server bearbeiten",
+      "addTitle": "MCP-Server hinzufügen"
+    }
   }
 }

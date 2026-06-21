@@ -73,6 +73,7 @@ docs/CreateFindingDto.md
 docs/CreateHypothesisDto.md
 docs/CreateInquiryDto.md
 docs/CreateManualEdgeDto.md
+docs/CreateMcpServerDto.md
 docs/CreateMcpTokenDto.md
 docs/CreateSourceDto.md
 docs/CreateThreadDto.md
@@ -109,6 +110,9 @@ docs/GraphApi.md
 docs/GraphEdgeDto.md
 docs/GraphNodeDto.md
 docs/GraphResponseDto.md
+docs/HarnessMissionDto.md
+docs/HarnessToolDto.md
+docs/HarnessToolsResponseDto.md
 docs/HealthApi.md
 docs/HealthControllerGetHealth200Response.md
 docs/HypothesesApi.md
@@ -138,6 +142,8 @@ docs/MatchOptionsResponseDto.md
 docs/McpCapabilityGroupDto.md
 docs/McpOverviewResponseDto.md
 docs/McpPromptSummaryDto.md
+docs/McpServerResponseDto.md
+docs/McpServerTestResultDto.md
 docs/McpTokenCreatedResponseDto.md
 docs/McpTokenResponseDto.md
 docs/NotificationListResponseDto.md
@@ -248,10 +254,12 @@ docs/UpdateFindingDto.md
 docs/UpdateHypothesisDto.md
 docs/UpdateInquiryDto.md
 docs/UpdateInstanceSettingsDto.md
+docs/UpdateMcpServerDto.md
 docs/UpdateMcpTokenDto.md
 docs/UpdateNotificationImportanceDto.md
 docs/UpdateRunnerAssetStatusDto.md
 docs/UpdateSourceDto.md
+docs/UpdateSystemBriefDto.md
 docs/UpdateThreadDto.md
 docs/ValueOccurrenceAssetDto.md
 docs/ValueOccurrencesResponseDto.md
@@ -344,6 +352,7 @@ src/models/CreateFindingDto.ts
 src/models/CreateHypothesisDto.ts
 src/models/CreateInquiryDto.ts
 src/models/CreateManualEdgeDto.ts
+src/models/CreateMcpServerDto.ts
 src/models/CreateMcpTokenDto.ts
 src/models/CreateSourceDto.ts
 src/models/CreateThreadDto.ts
@@ -375,6 +384,9 @@ src/models/FindingsDiscoveryTotalsDto.ts
 src/models/GraphEdgeDto.ts
 src/models/GraphNodeDto.ts
 src/models/GraphResponseDto.ts
+src/models/HarnessMissionDto.ts
+src/models/HarnessToolDto.ts
+src/models/HarnessToolsResponseDto.ts
 src/models/HealthControllerGetHealth200Response.ts
 src/models/HypothesisResponseDto.ts
 src/models/HypothesisSupportLinkDto.ts
@@ -400,6 +412,8 @@ src/models/MatchOptionsResponseDto.ts
 src/models/McpCapabilityGroupDto.ts
 src/models/McpOverviewResponseDto.ts
 src/models/McpPromptSummaryDto.ts
+src/models/McpServerResponseDto.ts
+src/models/McpServerTestResultDto.ts
 src/models/McpTokenCreatedResponseDto.ts
 src/models/McpTokenResponseDto.ts
 src/models/NotificationListResponseDto.ts
@@ -505,10 +519,12 @@ src/models/UpdateFindingDto.ts
 src/models/UpdateHypothesisDto.ts
 src/models/UpdateInquiryDto.ts
 src/models/UpdateInstanceSettingsDto.ts
+src/models/UpdateMcpServerDto.ts
 src/models/UpdateMcpTokenDto.ts
 src/models/UpdateNotificationImportanceDto.ts
 src/models/UpdateRunnerAssetStatusDto.ts
 src/models/UpdateSourceDto.ts
+src/models/UpdateSystemBriefDto.ts
 src/models/UpdateThreadDto.ts
 src/models/ValueOccurrenceAssetDto.ts
 src/models/ValueOccurrencesResponseDto.ts

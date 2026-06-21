@@ -32,7 +32,7 @@ export interface TriggerAutopilotDto {
      */
     sourceId?: string;
     /**
-     * Run only one agent. Omit to run both (inquiry then case). Implied CASE when caseId is set.
+     * Run only one mission. Omit to run the full investigation cycle (inquiry then case). Implied CASE when caseId is set. Use POST /autopilot/dream for memory consolidation.
      * @type {string}
      * @memberof TriggerAutopilotDto
      */
@@ -51,7 +51,9 @@ export interface TriggerAutopilotDto {
  */
 export const TriggerAutopilotDtoAgentKindEnum = {
     Inquiry: 'INQUIRY',
-    Case: 'CASE'
+    Case: 'CASE',
+    Config: 'CONFIG',
+    DetectorAuthor: 'DETECTOR_AUTHOR'
 } as const;
 export type TriggerAutopilotDtoAgentKindEnum = typeof TriggerAutopilotDtoAgentKindEnum[keyof typeof TriggerAutopilotDtoAgentKindEnum];
 

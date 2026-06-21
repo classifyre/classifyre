@@ -23,6 +23,7 @@ import {
 
 const ALL_SOURCES = "__all__";
 const BOTH_AGENTS = "__both__";
+const DREAM_AGENT = "__dream__";
 
 /**
  * Steer-and-run dialog: queue a manual autopilot cycle over EXISTING data
@@ -78,6 +79,14 @@ export function RunAutopilotDialog({
   const run = async () => {
     try {
       setSubmitting(true);
+      if (!caseMode && agent === DREAM_AGENT) {
+        const dream = await api.autopilot.autopilotControllerTriggerDream();
+        toast.success(t("investigations.autopilot.runDialog.toastQueued"));
+        onOpenChange(false);
+        setInstruction("");
+        onTriggered?.(dream.cycleKey);
+        return;
+      }
       const res = await api.autopilot.autopilotControllerTrigger({
         triggerAutopilotDto: {
           instruction: instruction.trim() || undefined,
@@ -160,6 +169,17 @@ export function RunAutopilotDialog({
                     </SelectItem>
                     <SelectItem value={TriggerAutopilotDtoAgentKindEnum.Case}>
                       {t("investigations.autopilot.runDialog.agentCaseOnly")}
+                    </SelectItem>
+                    <SelectItem value={TriggerAutopilotDtoAgentKindEnum.Config}>
+                      {t("harness.kinds.CONFIG")}
+                    </SelectItem>
+                    <SelectItem
+                      value={TriggerAutopilotDtoAgentKindEnum.DetectorAuthor}
+                    >
+                      {t("harness.kinds.DETECTOR_AUTHOR")}
+                    </SelectItem>
+                    <SelectItem value={DREAM_AGENT}>
+                      {t("harness.kinds.DREAM")}
                     </SelectItem>
                   </SelectContent>
                 </Select>

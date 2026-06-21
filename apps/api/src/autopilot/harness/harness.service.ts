@@ -10,6 +10,7 @@ import type { AgentContext } from '../autopilot.types';
 import { runAgentLoop, type AgentLoopResult } from './agent-loop';
 import { missionFor, type Mission } from './missions';
 import { SystemBriefService } from './system-brief.service';
+import { McpClientService } from '../mcp-client/mcp-client.service';
 
 /**
  * Executes a mission via the resumable agent loop. The loop runs inside a
@@ -28,6 +29,7 @@ export class HarnessService {
     private readonly audit: AgentAuditService,
     private readonly log: AgentLoggerService,
     private readonly brief: SystemBriefService,
+    private readonly mcp: McpClientService,
   ) {}
 
   /** True when the given AgentKind has a harness mission. */
@@ -44,6 +46,11 @@ export class HarnessService {
     }
 
     const briefText = this.brief.render(await this.brief.get());
+    // Mission tools + any external MCP tools scoped to this mission kind.
+    const allowedTools = [
+      ...resolved.allowedTools,
+      ...this.mcp.toolNamesForKind(resolved.kind),
+    ];
 
     await runPipeline(
       ctx,
@@ -61,7 +68,7 @@ export class HarnessService {
                 audit: this.audit,
                 log: this.log,
               },
-              { systemBrief: briefText },
+              { systemBrief: briefText, allowedTools },
             ),
         },
       ],

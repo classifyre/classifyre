@@ -9,11 +9,20 @@ import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { AgentAuditService } from './audit/agent-audit.service';
 import { SystemBriefService } from './harness/system-brief.service';
+import { ToolRegistry } from './tools/tool-registry.service';
+import {
+  INQUIRY_MISSION,
+  CASE_MISSION,
+  CONFIG_MISSION,
+  DETECTOR_AUTHOR_MISSION,
+  DREAM_MISSION,
+} from './harness/missions';
 import { AUTOPILOT_QUEUE } from './autopilot.constants';
 import {
   AgentActivityItemDto,
   AgentActivityListResponseDto,
   AgentDecisionDto,
+  HarnessToolsResponseDto,
   AgentLogDto,
   AgentLogListResponseDto,
   AgentMemoryDto,
@@ -45,7 +54,33 @@ export class AutopilotService {
     private readonly pgBoss: PgBossService,
     private readonly audit: AgentAuditService,
     private readonly brief: SystemBriefService,
+    private readonly tools: ToolRegistry,
   ) {}
+
+  /** The capability map: every registered tool + the missions that wield them. */
+  getTools(): HarnessToolsResponseDto {
+    const missions = [
+      INQUIRY_MISSION,
+      CASE_MISSION,
+      CONFIG_MISSION,
+      DETECTOR_AUTHOR_MISSION,
+      DREAM_MISSION,
+    ];
+    return {
+      tools: this.tools.list().map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        sideEffect: tool.sideEffect,
+        domain: tool.domain ?? null,
+      })),
+      missions: missions.map((m) => ({
+        kind: m.kind,
+        goal: m.goal,
+        allowedTools: m.allowedTools,
+        maxIterations: m.maxIterations,
+      })),
+    };
+  }
 
   // ── Manual trigger ──────────────────────────────────────────────────────────
 
@@ -440,6 +475,12 @@ export class AutopilotService {
       skip,
       limit,
     };
+  }
+
+  /** Operator-authored create/update of the system-brief narrative. */
+  async updateSystemBrief(content: string): Promise<AgentSystemBriefDto> {
+    await this.brief.update({ content }, 'operator');
+    return this.getSystemBrief();
   }
 
   /** The living system brief — what the autopilot understands about the system. */

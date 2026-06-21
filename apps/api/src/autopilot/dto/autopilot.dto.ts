@@ -363,9 +363,14 @@ export class TriggerAutopilotDto {
   sourceId?: string;
 
   @ApiPropertyOptional({
-    enum: [AgentKind.INQUIRY, AgentKind.CASE],
+    enum: [
+      AgentKind.INQUIRY,
+      AgentKind.CASE,
+      AgentKind.CONFIG,
+      AgentKind.DETECTOR_AUTHOR,
+    ],
     description:
-      'Run only one agent. Omit to run both (inquiry then case). Implied CASE when caseId is set.',
+      'Run only one mission. Omit to run the full investigation cycle (inquiry then case). Implied CASE when caseId is set. Use POST /autopilot/dream for memory consolidation.',
   })
   @IsOptional()
   @IsEnum(AgentKind)
@@ -531,6 +536,54 @@ export class AgentSystemBriefDto {
 
   @ApiPropertyOptional({ nullable: true })
   updatedAt!: Date | null;
+}
+
+// ── Tool registry & missions (capability map) ──────────────────────────────────
+
+export class HarnessToolDto {
+  @ApiProperty({ description: 'Namespaced tool name, e.g. "config.tune_source"' })
+  name!: string;
+
+  @ApiProperty()
+  description!: string;
+
+  @ApiProperty({ description: 'read | mutate' })
+  sideEffect!: string;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Domain gated for OBSERVE_ONLY (inquiry/case/source/…)',
+  })
+  domain!: string | null;
+}
+
+export class HarnessMissionDto {
+  @ApiProperty({ enum: AgentKind })
+  kind!: AgentKind;
+
+  @ApiProperty({ description: 'The goal/system-prompt that frames the mission' })
+  goal!: string;
+
+  @ApiProperty({ type: [String], description: 'Tool names this mission may call' })
+  allowedTools!: string[];
+
+  @ApiProperty()
+  maxIterations!: number;
+}
+
+export class HarnessToolsResponseDto {
+  @ApiProperty({ type: [HarnessToolDto] })
+  tools!: HarnessToolDto[];
+
+  @ApiProperty({ type: [HarnessMissionDto] })
+  missions!: HarnessMissionDto[];
+}
+
+export class UpdateSystemBriefDto {
+  @ApiProperty({ description: 'Full replacement narrative for the system brief' })
+  @IsString()
+  @MaxLength(20000)
+  content!: string;
 }
 
 // ── Observability stats (mission-control header) ───────────────────────────────

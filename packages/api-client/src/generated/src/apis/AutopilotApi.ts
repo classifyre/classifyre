@@ -25,9 +25,15 @@ import type {
   AgentSystemBriefDto,
   AutopilotStatsDto,
   CreateAgentMemoryDto,
+  CreateMcpServerDto,
+  HarnessToolsResponseDto,
+  McpServerResponseDto,
+  McpServerTestResultDto,
   TriggerAutopilotDto,
   TriggerAutopilotResponseDto,
   UpdateAgentMemoryDto,
+  UpdateMcpServerDto,
+  UpdateSystemBriefDto,
 } from '../models/index';
 import {
     AgentActivityListResponseDtoFromJSON,
@@ -50,12 +56,24 @@ import {
     AutopilotStatsDtoToJSON,
     CreateAgentMemoryDtoFromJSON,
     CreateAgentMemoryDtoToJSON,
+    CreateMcpServerDtoFromJSON,
+    CreateMcpServerDtoToJSON,
+    HarnessToolsResponseDtoFromJSON,
+    HarnessToolsResponseDtoToJSON,
+    McpServerResponseDtoFromJSON,
+    McpServerResponseDtoToJSON,
+    McpServerTestResultDtoFromJSON,
+    McpServerTestResultDtoToJSON,
     TriggerAutopilotDtoFromJSON,
     TriggerAutopilotDtoToJSON,
     TriggerAutopilotResponseDtoFromJSON,
     TriggerAutopilotResponseDtoToJSON,
     UpdateAgentMemoryDtoFromJSON,
     UpdateAgentMemoryDtoToJSON,
+    UpdateMcpServerDtoFromJSON,
+    UpdateMcpServerDtoToJSON,
+    UpdateSystemBriefDtoFromJSON,
+    UpdateSystemBriefDtoToJSON,
 } from '../models/index';
 
 export interface AutopilotControllerCancelRunRequest {
@@ -124,6 +142,27 @@ export interface AutopilotControllerTriggerRequest {
 export interface AutopilotControllerUpdateMemoryRequest {
     id: string;
     updateAgentMemoryDto: UpdateAgentMemoryDto;
+}
+
+export interface AutopilotControllerUpdateSystemBriefRequest {
+    updateSystemBriefDto: UpdateSystemBriefDto;
+}
+
+export interface McpServersControllerCreateRequest {
+    createMcpServerDto: CreateMcpServerDto;
+}
+
+export interface McpServersControllerRemoveRequest {
+    id: string;
+}
+
+export interface McpServersControllerTestRequest {
+    id: string;
+}
+
+export interface McpServersControllerUpdateRequest {
+    id: string;
+    updateMcpServerDto: UpdateMcpServerDto;
 }
 
 /**
@@ -335,6 +374,35 @@ export class AutopilotApi extends runtime.BaseAPI {
      */
     async autopilotControllerGetSystemBrief(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentSystemBriefDto> {
         const response = await this.autopilotControllerGetSystemBriefRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * The harness capability map — every registered tool (read/mutate, domain) and the missions that use them
+     */
+    async autopilotControllerGetToolsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HarnessToolsResponseDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/tools`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => HarnessToolsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * The harness capability map — every registered tool (read/mutate, domain) and the missions that use them
+     */
+    async autopilotControllerGetTools(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HarnessToolsResponseDto> {
+        const response = await this.autopilotControllerGetToolsRaw(initOverrides);
         return await response.value();
     }
 
@@ -715,6 +783,262 @@ export class AutopilotApi extends runtime.BaseAPI {
      */
     async autopilotControllerUpdateMemory(requestParameters: AutopilotControllerUpdateMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentMemoryDto> {
         const response = await this.autopilotControllerUpdateMemoryRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Create or rewrite the system-brief narrative
+     */
+    async autopilotControllerUpdateSystemBriefRaw(requestParameters: AutopilotControllerUpdateSystemBriefRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentSystemBriefDto>> {
+        if (requestParameters['updateSystemBriefDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateSystemBriefDto',
+                'Required parameter "updateSystemBriefDto" was null or undefined when calling autopilotControllerUpdateSystemBrief().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/system-brief`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateSystemBriefDtoToJSON(requestParameters['updateSystemBriefDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AgentSystemBriefDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Create or rewrite the system-brief narrative
+     */
+    async autopilotControllerUpdateSystemBrief(requestParameters: AutopilotControllerUpdateSystemBriefRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentSystemBriefDto> {
+        const response = await this.autopilotControllerUpdateSystemBriefRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Add an external MCP server
+     */
+    async mcpServersControllerCreateRaw(requestParameters: McpServersControllerCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<McpServerResponseDto>> {
+        if (requestParameters['createMcpServerDto'] == null) {
+            throw new runtime.RequiredError(
+                'createMcpServerDto',
+                'Required parameter "createMcpServerDto" was null or undefined when calling mcpServersControllerCreate().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/mcp-servers`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateMcpServerDtoToJSON(requestParameters['createMcpServerDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => McpServerResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Add an external MCP server
+     */
+    async mcpServersControllerCreate(requestParameters: McpServersControllerCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<McpServerResponseDto> {
+        const response = await this.mcpServersControllerCreateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * List configured external MCP servers
+     */
+    async mcpServersControllerListRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<McpServerResponseDto>>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/mcp-servers`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(McpServerResponseDtoFromJSON));
+    }
+
+    /**
+     * List configured external MCP servers
+     */
+    async mcpServersControllerList(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<McpServerResponseDto>> {
+        const response = await this.mcpServersControllerListRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Reconnect all enabled servers and rediscover tools
+     */
+    async mcpServersControllerRefreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<McpServerResponseDto>>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/mcp-servers/refresh`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(McpServerResponseDtoFromJSON));
+    }
+
+    /**
+     * Reconnect all enabled servers and rediscover tools
+     */
+    async mcpServersControllerRefresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<McpServerResponseDto>> {
+        const response = await this.mcpServersControllerRefreshRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Remove an MCP server
+     */
+    async mcpServersControllerRemoveRaw(requestParameters: McpServersControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling mcpServersControllerRemove().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/mcp-servers/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Remove an MCP server
+     */
+    async mcpServersControllerRemove(requestParameters: McpServersControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.mcpServersControllerRemoveRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Probe a server: connect and list its tools
+     */
+    async mcpServersControllerTestRaw(requestParameters: McpServersControllerTestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<McpServerTestResultDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling mcpServersControllerTest().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/mcp-servers/{id}/test`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => McpServerTestResultDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Probe a server: connect and list its tools
+     */
+    async mcpServersControllerTest(requestParameters: McpServersControllerTestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<McpServerTestResultDto> {
+        const response = await this.mcpServersControllerTestRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Update an MCP server
+     */
+    async mcpServersControllerUpdateRaw(requestParameters: McpServersControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<McpServerResponseDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling mcpServersControllerUpdate().'
+            );
+        }
+
+        if (requestParameters['updateMcpServerDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateMcpServerDto',
+                'Required parameter "updateMcpServerDto" was null or undefined when calling mcpServersControllerUpdate().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/mcp-servers/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateMcpServerDtoToJSON(requestParameters['updateMcpServerDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => McpServerResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Update an MCP server
+     */
+    async mcpServersControllerUpdate(requestParameters: McpServersControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<McpServerResponseDto> {
+        const response = await this.mcpServersControllerUpdateRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
