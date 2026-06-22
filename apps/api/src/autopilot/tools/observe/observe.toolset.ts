@@ -151,6 +151,10 @@ export class ObserveToolset {
               [
                 AgentMemoryKind.TOPIC_INQUIRY_MAP,
                 AgentMemoryKind.DECISION_PRECEDENT,
+                AgentMemoryKind.ENTITY_MAP,
+                AgentMemoryKind.SOURCE_PROFILE,
+                AgentMemoryKind.DETECTOR_INSIGHT,
+                AgentMemoryKind.OPERATOR_DIRECTIVE,
               ],
               terms,
             ),

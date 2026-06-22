@@ -163,7 +163,6 @@ describe('DecisionApplierService', () => {
       await expect(
         service.applyCaseOperationCore('c1', {
           op: 'ADD_EVIDENCE',
-          rationale: '',
           assetId: 'ghost',
         }),
       ).rejects.toThrow(/Unknown assetId/);
@@ -175,7 +174,6 @@ describe('DecisionApplierService', () => {
       mockCases.attachFindings.mockResolvedValue({ attached: 1 });
       await service.applyCaseOperationCore('c1', {
         op: 'ATTACH_FINDINGS',
-        rationale: '',
         findingIds: ['f1'],
       });
       expect(mockCases.attachFindings).toHaveBeenCalledWith('c1', {

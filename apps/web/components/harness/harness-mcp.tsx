@@ -288,13 +288,14 @@ export function HarnessMcp() {
                     )}
                     {t("harness.mcp.test")}
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(s)}>
+                  <Button variant="ghost" size="sm" onClick={() => openEdit(s)} aria-label={t("harness.mcp.editTitle")}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => void remove(s.id)}
+                    aria-label={t("harness.mcp.confirmDelete")}
                   >
                     <Trash2 className="h-3.5 w-3.5 text-red-600" />
                   </Button>

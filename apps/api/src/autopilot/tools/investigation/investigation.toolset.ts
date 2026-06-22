@@ -240,7 +240,7 @@ export class InvestigationToolset {
         ['title'],
         (input) => ({
           op: 'ADD_HYPOTHESIS',
-          rationale: '',
+
           title: input.title as string,
           statement: input.statement as string | undefined,
           hypothesisStatus: input.hypothesisStatus as never,
@@ -260,7 +260,7 @@ export class InvestigationToolset {
         ['threadId'],
         (input) => ({
           op: 'UPDATE_HYPOTHESIS',
-          rationale: '',
+
           threadId: input.threadId as string,
           title: input.title as string | undefined,
           hypothesisStatus: input.hypothesisStatus as never,
@@ -275,7 +275,7 @@ export class InvestigationToolset {
         ['assetId'],
         (input) => ({
           op: 'ADD_EVIDENCE',
-          rationale: '',
+
           assetId: input.assetId as string,
           note: input.note as string | undefined,
         }),
@@ -288,7 +288,7 @@ export class InvestigationToolset {
         ['findingIds'],
         (input) => ({
           op: 'ATTACH_FINDINGS',
-          rationale: '',
+
           findingIds: input.findingIds as string[],
         }),
       ),
@@ -300,7 +300,7 @@ export class InvestigationToolset {
         ['body'],
         (input) => ({
           op: 'ADD_NOTE',
-          rationale: '',
+
           body: input.body as string,
         }),
       ),
@@ -312,7 +312,7 @@ export class InvestigationToolset {
         ['threadId', 'body'],
         (input) => ({
           op: 'ADD_THREAD_ENTRY',
-          rationale: '',
+
           threadId: input.threadId as string,
           body: input.body as string,
         }),
@@ -332,7 +332,7 @@ export class InvestigationToolset {
         ['fromType', 'fromId', 'toType', 'toId', 'relationType'],
         (input) => ({
           op: 'CREATE_EDGE',
-          rationale: '',
+
           fromType: input.fromType as string,
           fromId: input.fromId as string,
           toType: input.toType as string,
@@ -349,7 +349,7 @@ export class InvestigationToolset {
         ['edgeId'],
         (input) => ({
           op: 'REMOVE_EDGE',
-          rationale: '',
+
           edgeId: input.edgeId as string,
         }),
       ),
@@ -367,7 +367,7 @@ export class InvestigationToolset {
         ['threadId', 'targetType', 'targetId'],
         (input) => ({
           op: 'LINK_SUPPORT',
-          rationale: '',
+
           threadId: input.threadId as string,
           targetType: input.targetType as never,
           targetId: input.targetId as string,
@@ -386,7 +386,7 @@ export class InvestigationToolset {
         [],
         (input) => ({
           op: 'CHANGE_STATUS',
-          rationale: '',
+
           caseStatus: input.caseStatus as never,
           severity: input.severity as never,
         }),
@@ -399,7 +399,7 @@ export class InvestigationToolset {
         ['inquiryIds'],
         (input) => ({
           op: 'LINK_INQUIRY',
-          rationale: '',
+
           inquiryIds: input.inquiryIds as string[],
         }),
       ),
