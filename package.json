@@ -40,7 +40,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@openapitools/openapi-generator-cli": "^2.34.0",
+    "@openapitools/openapi-generator-cli": "^2.39.0",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "husky": "^9.1.7",

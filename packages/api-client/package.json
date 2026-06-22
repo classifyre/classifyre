@@ -22,7 +22,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@openapitools/openapi-generator-cli": "2.34.0",
+    "@openapitools/openapi-generator-cli": "2.39.0",
     "@types/node": "^25.5.2",
     "typescript": "^5.9.3"
   }
