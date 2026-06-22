@@ -8,6 +8,7 @@ import { ToolDispatcherService } from '../tools/tool-dispatcher.service';
 import { ToolRegistry } from '../tools/tool-registry.service';
 import type { AgentContext } from '../autopilot.types';
 import type { Mission } from './missions';
+import { AgentKind } from '@prisma/client';
 
 const logger = new Logger('AgentLoop');
 
@@ -273,10 +274,12 @@ function buildSystemPrompt(
   const guidance = ctx.instruction
     ? `\n\nOperator instruction for this run:\n${ctx.instruction}`
     : '';
+  const standing = standingGuidance(ctx, mission);
   const brief = systemBrief?.trim() ? `\n${systemBrief.trim()}\n` : '';
   return [
     mission.goal,
     brief,
+    standing,
     guidance,
     '\n## Tools you may call',
     registry.catalog(allowed),
@@ -299,6 +302,36 @@ function buildUserPrompt(ctx: AgentContext, mission: Mission): string {
     `Scope: ${scope}. ${mode}`,
     'Begin by observing the relevant state, then take the minimal correct actions.',
   ].join('\n');
+}
+
+/** Operator-configured standing guidance for the given mission kind. */
+function standingGuidance(ctx: AgentContext, mission: Mission): string {
+  const s = ctx.settings;
+  const parts: string[] = [];
+  switch (mission.kind) {
+    case AgentKind.INQUIRY:
+      if (s.autopilotInquiryDesired?.trim())
+        parts.push(`What to investigate:\n${s.autopilotInquiryDesired.trim()}`);
+      if (s.autopilotInquirySearchable?.trim())
+        parts.push(
+          `What is searchable:\n${s.autopilotInquirySearchable.trim()}`,
+        );
+      break;
+    case AgentKind.CASE:
+      if (s.autopilotCaseGuidance?.trim())
+        parts.push(s.autopilotCaseGuidance.trim());
+      break;
+    case AgentKind.CONFIG:
+      if (s.autopilotConfigGuidance?.trim())
+        parts.push(s.autopilotConfigGuidance.trim());
+      break;
+    case AgentKind.DETECTOR_AUTHOR:
+      if (s.autopilotDetectorGuidance?.trim())
+        parts.push(s.autopilotDetectorGuidance.trim());
+      break;
+  }
+  if (parts.length === 0) return '';
+  return `\n## Operator guidance\n${parts.join('\n\n')}`;
 }
 
 /** Tolerate common shape drift in the model's turn output. */

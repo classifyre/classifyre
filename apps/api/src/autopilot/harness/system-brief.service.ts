@@ -90,10 +90,6 @@ export class SystemBriefService {
     updatedBy: string,
   ): Promise<SystemBrief> {
     const facts = input.facts ?? (await this.computeFacts());
-    const existing = await this.prisma.agentSystemBrief.findUnique({
-      where: { id: BRIEF_ID },
-      select: { version: true },
-    });
     const row = await this.prisma.agentSystemBrief.upsert({
       where: { id: BRIEF_ID },
       create: {
@@ -106,7 +102,7 @@ export class SystemBriefService {
       update: {
         ...(input.content !== undefined ? { content: input.content } : {}),
         facts: facts as Prisma.InputJsonValue,
-        version: (existing?.version ?? 0) + 1,
+        version: { increment: 1 },
         updatedBy,
       },
     });

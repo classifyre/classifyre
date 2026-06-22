@@ -205,7 +205,6 @@ export type CaseOperation = {
     | 'LINK_SUPPORT'
     | 'CHANGE_STATUS'
     | 'LINK_INQUIRY';
-  rationale: string;
   /** ADD_HYPOTHESIS / UPDATE_HYPOTHESIS */
   threadId?: string;
   title?: string;

@@ -151,15 +151,20 @@ export class McpClientService
       { name: 'classifyre-harness', version: '1.0.0' },
       { capabilities: {} },
     );
-    const transport =
-      server.transport === 'stdio'
-        ? new StdioClientTransport({
-            command: server.command ?? '',
-            args: server.args,
-          })
-        : new StreamableHTTPClientTransport(new URL(server.url ?? ''), {
-            requestInit: { headers: this.decodeHeaders(server.headersEnc) },
-          });
+    let transport;
+    if (server.transport === 'stdio') {
+      if (!server.command)
+        throw new Error('stdio MCP server has no command configured');
+      transport = new StdioClientTransport({
+        command: server.command,
+        args: server.args,
+      });
+    } else {
+      if (!server.url) throw new Error('HTTP MCP server has no URL configured');
+      transport = new StreamableHTTPClientTransport(new URL(server.url), {
+        requestInit: { headers: this.decodeHeaders(server.headersEnc) },
+      });
+    }
     await client.connect(transport, { timeout: CONNECT_TIMEOUT_MS });
     return client;
   }
@@ -186,7 +191,10 @@ export class McpClientService
       const json = this.crypto.decryptString(headersEnc);
       const parsed = JSON.parse(json) as Record<string, string>;
       return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch {
+    } catch (error) {
+      this.logger.warn(
+        `Failed to decrypt MCP server headers — connecting without auth: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return {};
     }
   }

@@ -55,7 +55,7 @@ export class McpServersService {
           toolAllowlist: dto.toolAllowlist ?? [],
         },
       });
-      await this.mcp.refresh();
+      await this.mcp.refresh().catch(() => undefined);
       return this.map(row);
     } catch (e) {
       if (
@@ -94,14 +94,14 @@ export class McpServersService {
           : {}),
       },
     });
-    await this.mcp.refresh();
+    await this.mcp.refresh().catch(() => undefined);
     return this.map(row);
   }
 
   async remove(id: string): Promise<void> {
     await this.requireExists(id);
     await this.prisma.mcpServerConfig.delete({ where: { id } });
-    await this.mcp.refresh();
+    await this.mcp.refresh().catch(() => undefined);
   }
 
   /** Reconnect all enabled servers and rediscover their tools. */
@@ -116,10 +116,12 @@ export class McpServersService {
       where: { id },
     });
     if (!server) throw new NotFoundException(`MCP server ${id} not found`);
+    let client: Awaited<ReturnType<typeof this.mcp.connect>> | undefined;
     try {
-      const client = await this.mcp.connect(server);
+      client = await this.mcp.connect(server);
       const listed = await client.listTools();
       await client.close().catch(() => undefined);
+      client = undefined;
       const tools = (listed.tools ?? []).map((tool) => tool.name);
       await this.prisma.mcpServerConfig.update({
         where: { id },
@@ -127,6 +129,7 @@ export class McpServersService {
       });
       return { ok: true, tools, error: null };
     } catch (e) {
+      await client?.close().catch(() => undefined);
       const error = e instanceof Error ? e.message : String(e);
       await this.prisma.mcpServerConfig
         .update({ where: { id }, data: { lastError: error } })

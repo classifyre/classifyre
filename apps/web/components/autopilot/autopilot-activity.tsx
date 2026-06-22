@@ -170,11 +170,11 @@ export function AutopilotActivity({
   const hasActive = runs.some((r) => r.status === "RUNNING" || r.status === "PENDING");
   React.useEffect(() => {
     if (!hasActive) return;
-    const t = setInterval(() => {
+    const pollId = setInterval(() => {
       void loadRuns();
       if (selectedId) void loadDetail(selectedId);
     }, POLL_MS);
-    return () => clearInterval(t);
+    return () => clearInterval(pollId);
   }, [hasActive, selectedId, loadRuns, loadDetail]);
 
   const shownLogs = logs.filter((l) => l.channel === channel);
