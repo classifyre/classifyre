@@ -28,6 +28,7 @@ import { FingerprintsToolset } from './tools/fingerprints/fingerprints.toolset';
 import { ToolRegistry } from './tools/tool-registry.service';
 import { ToolDispatcherService } from './tools/tool-dispatcher.service';
 import { HarnessService } from './harness/harness.service';
+import { AgentConfigService } from './harness/agent-config.service';
 import { SystemBriefService } from './harness/system-brief.service';
 import { McpClientService } from './mcp-client/mcp-client.service';
 import { McpServersService } from './mcp-client/mcp-servers.service';
@@ -74,6 +75,7 @@ import { AutopilotController } from './autopilot.controller';
     SystemBriefService,
     McpClientService,
     McpServersService,
+    AgentConfigService,
     HarnessService,
     AutopilotWorker,
     AutopilotService,

@@ -98,6 +98,8 @@ export const AgentDecisionDtoActionEnum = {
     TuneSource: 'TUNE_SOURCE',
     CreateDetector: 'CREATE_DETECTOR',
     TrainDetector: 'TRAIN_DETECTOR',
+    UpdateDetector: 'UPDATE_DETECTOR',
+    DeleteDetector: 'DELETE_DETECTOR',
     TriggerScan: 'TRIGGER_SCAN',
     UpdateSystemBrief: 'UPDATE_SYSTEM_BRIEF',
     RecomputeCorrelation: 'RECOMPUTE_CORRELATION',

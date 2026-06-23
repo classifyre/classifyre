@@ -43,6 +43,12 @@ export interface HarnessToolDto {
      * @memberof HarnessToolDto
      */
     domain?: string | null;
+    /**
+     * Origin of the tool: "builtin" (native toolset) or "mcp" (external server)
+     * @type {string}
+     * @memberof HarnessToolDto
+     */
+    source: string;
 }
 
 /**
@@ -52,6 +58,7 @@ export function instanceOfHarnessToolDto(value: object): value is HarnessToolDto
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('description' in value) || value['description'] === undefined) return false;
     if (!('sideEffect' in value) || value['sideEffect'] === undefined) return false;
+    if (!('source' in value) || value['source'] === undefined) return false;
     return true;
 }
 
@@ -69,6 +76,7 @@ export function HarnessToolDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'description': json['description'],
         'sideEffect': json['sideEffect'],
         'domain': json['domain'] == null ? undefined : json['domain'],
+        'source': json['source'],
     };
 }
 
@@ -87,6 +95,7 @@ export function HarnessToolDtoToJSONTyped(value?: HarnessToolDto | null, ignoreD
         'description': value['description'],
         'sideEffect': value['sideEffect'],
         'domain': value['domain'],
+        'source': value['source'],
     };
 }
 

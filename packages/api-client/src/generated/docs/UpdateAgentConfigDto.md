@@ -1,30 +1,28 @@
 
-# HarnessToolDto
+# UpdateAgentConfigDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`name` | string
-`description` | string
-`sideEffect` | string
-`domain` | string
-`source` | string
+`enabled` | boolean
+`goal` | string
+`maxIterations` | number
+`toolNames` | Array&lt;string&gt;
 
 ## Example
 
 ```typescript
-import type { HarnessToolDto } from '@workspace/api-client'
+import type { UpdateAgentConfigDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "name": null,
-  "description": null,
-  "sideEffect": null,
-  "domain": null,
-  "source": null,
-} satisfies HarnessToolDto
+  "enabled": null,
+  "goal": null,
+  "maxIterations": null,
+  "toolNames": null,
+} satisfies UpdateAgentConfigDto
 
 console.log(example)
 
@@ -33,7 +31,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as HarnessToolDto
+const exampleParsed = JSON.parse(exampleJSON) as UpdateAgentConfigDto
 console.log(exampleParsed)
 ```
 

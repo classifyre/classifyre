@@ -13,8 +13,11 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AutopilotService } from './autopilot.service';
+import { AgentKind } from '@prisma/client';
 import {
   AgentActivityListResponseDto,
+  AgentConfigDto,
+  AgentConfigListResponseDto,
   AgentLogListResponseDto,
   AgentMemoryDto,
   AgentMemoryListResponseDto,
@@ -25,6 +28,7 @@ import {
   AutopilotStatsDto,
   CreateAgentMemoryDto,
   HarnessToolsResponseDto,
+  UpdateAgentConfigDto,
   UpdateSystemBriefDto,
   QueryAgentActivityDto,
   QueryAgentLogsDto,
@@ -92,8 +96,31 @@ export class AutopilotController {
       'The harness capability map — every registered tool (read/mutate, domain) and the missions that use them',
   })
   @ApiResponse({ status: 200, type: HarnessToolsResponseDto })
-  getTools(): HarnessToolsResponseDto {
+  getTools(): Promise<HarnessToolsResponseDto> {
     return this.autopilot.getTools();
+  }
+
+  @Get('agents')
+  @ApiOperation({
+    summary:
+      'Per-agent configuration: enable flag, goal, iteration budget and assigned built-in/MCP tools',
+  })
+  @ApiResponse({ status: 200, type: AgentConfigListResponseDto })
+  getAgents(): Promise<AgentConfigListResponseDto> {
+    return this.autopilot.getAgents();
+  }
+
+  @Patch('agents/:kind')
+  @ApiOperation({
+    summary:
+      'Retune one agent — toggle it, edit its goal/iterations, or reassign its built-in tools',
+  })
+  @ApiResponse({ status: 200, type: AgentConfigDto })
+  updateAgent(
+    @Param('kind') kind: AgentKind,
+    @Body() dto: UpdateAgentConfigDto,
+  ): Promise<AgentConfigDto> {
+    return this.autopilot.updateAgent(kind, dto);
   }
 
   @Get('system-brief')
