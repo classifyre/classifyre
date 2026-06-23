@@ -27,8 +27,8 @@ interface CycleInput {
   trigger: string;
   manual: boolean;
   instruction: string | null;
-  /** Rerun of one specific agent — execute only it, bypassing enable-flags. */
-  only?: AgentKind | null;
+  /** Run exactly these pipeline agents (in canonical order), bypassing enable-flags. */
+  only?: AgentKind[] | null;
   /** Case-focused run: the case agent works on exactly this case. */
   caseId?: string | null;
 }
@@ -86,18 +86,26 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       const runnerId =
         typeof data?.runnerId === 'string' ? data.runnerId : null;
       const manual = data?.manual === true;
-      const only =
-        data?.agentKind && data.agentKind in AgentKind ? data.agentKind : null;
-      if (data?.dream === true || only === AgentKind.DREAM) {
+      const instruction =
+        typeof data?.instruction === 'string' && data.instruction.trim()
+          ? data.instruction.trim()
+          : null;
+      if (data?.dream === true) {
         await this.runDreamCycle({
           cycleKey:
             typeof data?.cycleKey === 'string' && data.cycleKey
               ? data.cycleKey
               : `dream:${new Date().toISOString().slice(0, 10)}`,
-          trigger: manual || only ? 'manual' : 'schedule',
+          trigger: manual ? 'manual' : 'schedule',
+          instruction,
         });
         continue;
       }
+      // Run exactly the requested pipeline agents (in canonical order).
+      const requested = (
+        Array.isArray(data?.agentKinds) ? data.agentKinds : []
+      ).filter((k) => typeof k === 'string' && k in AgentKind);
+      const only: AgentKind[] | null = requested.length > 0 ? requested : null;
       if (!sourceId && !manual && !only) continue;
       await this.runCycle({
         sourceId,
@@ -105,10 +113,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         manual,
         only,
         caseId: typeof data?.caseId === 'string' ? data.caseId : null,
-        instruction:
-          typeof data?.instruction === 'string' && data.instruction.trim()
-            ? data.instruction.trim()
-            : null,
+        instruction,
         cycleKey:
           typeof data?.cycleKey === 'string' && data.cycleKey
             ? data.cycleKey
@@ -122,6 +127,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
   private async runDreamCycle(input: {
     cycleKey: string;
     trigger: string;
+    instruction?: string | null;
   }): Promise<void> {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: INSTANCE_SETTINGS_ID },
@@ -139,7 +145,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         cycleKey: input.cycleKey,
         trigger: input.trigger,
         manual: input.trigger === 'manual',
-        instruction: null,
+        instruction: input.instruction ?? null,
       },
       'agent memory',
     );
@@ -195,13 +201,14 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       ? await this.search.sourceName(cycle.sourceId)
       : 'all sources';
 
-    // A rerun of one specific agent ("only") is explicit operator intent:
-    // run exactly that agent and skip the other without a SKIPPED record.
+    // An explicit agent set ("only") is operator intent: run exactly those
+    // pipeline agents (in canonical order) and skip the rest without a SKIPPED
+    // record.
     const inquiryEnabled = cycle.only
-      ? cycle.only === AgentKind.INQUIRY
+      ? cycle.only.includes(AgentKind.INQUIRY)
       : cycle.manual || settings.autopilotInquiryEnabled;
     const caseEnabled = cycle.only
-      ? cycle.only === AgentKind.CASE
+      ? cycle.only.includes(AgentKind.CASE)
       : cycle.manual || settings.autopilotCaseEnabled;
 
     if (inquiryEnabled) {
@@ -230,7 +237,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
     // investigation agents (it reacts to the finding landscape they observed).
     // Skipped silently when disabled (no SKIPPED-run noise on every scan).
     const configEnabled = cycle.only
-      ? cycle.only === AgentKind.CONFIG
+      ? cycle.only.includes(AgentKind.CONFIG)
       : settings.autopilotConfigEnabled;
     if (configEnabled) {
       await this.runAgent(AgentKind.CONFIG, settings, cycle, sourceName);
@@ -239,7 +246,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
     // Detector-authoring agent — opt-in, off by default. Runs last so it can
     // react to what the config agent left unaddressed.
     const detectorEnabled = cycle.only
-      ? cycle.only === AgentKind.DETECTOR_AUTHOR
+      ? cycle.only.includes(AgentKind.DETECTOR_AUTHOR)
       : settings.autopilotDetectorEnabled;
     if (detectorEnabled) {
       await this.runAgent(

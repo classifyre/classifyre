@@ -2061,7 +2061,38 @@
         "submitCase": "Auf Fall ausführen",
         "toastQueued": "Autopilot-Zyklus eingereiht — beobachten Sie ihn in der Aktivität",
         "toastCaseQueued": "KI arbeitet an diesem Fall — Ergebnisse erscheinen hier, wenn fertig",
-        "toastError": "Autopilot konnte nicht eingereiht werden"
+        "toastError": "Autopilot konnte nicht eingereiht werden",
+        "pipelineGroup": "Pipeline — läuft als Kette",
+        "globalGroup": "Wartung",
+        "fullPipeline": "Alle auswählen",
+        "clearAll": "Alle abwählen",
+        "duplicatesHint": "Die Fingerprint-Konsolidierung ist deterministisch — die Anweisung oben gilt dafür nicht.",
+        "agents": {
+          "inquiry": {
+            "label": "Anfrage",
+            "desc": "Prüft offene Funde und hält gespeicherte Monitore (Anfragen) aktuell."
+          },
+          "case": {
+            "label": "Fall",
+            "desc": "Erstellt und erweitert Ermittlungsfälle aus Anfragen mit neuen Treffern."
+          },
+          "config": {
+            "label": "Konfiguration",
+            "desc": "Stimmt Detektoren, Sampling und Ressourcen je Quelle ab, um mehr zu finden oder Rauschen zu senken."
+          },
+          "detector": {
+            "label": "Detektor",
+            "desc": "Erstellt und testet benutzerdefinierte Detektoren, wenn vorhandene Funde verpassen."
+          },
+          "dream": {
+            "label": "Traum",
+            "desc": "Konsolidiert den Agentenspeicher und aktualisiert das System-Briefing — steuerbar über die Anweisung oben."
+          },
+          "duplicates": {
+            "label": "Duplikate",
+            "desc": "Berechnet Asset-Fingerprints und Identitätscluster über alle Quellen neu."
+          }
+        }
       },
       "caseStatus": {
         "working": "KI-Autopilot arbeitet an diesem Fall…",
