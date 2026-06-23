@@ -15667,15 +15667,20 @@
             "type": "string",
             "description": "Limit the review to one source. Omit to review all sources."
           },
-          "agentKind": {
-            "type": "string",
-            "enum": [
-              "INQUIRY",
-              "CASE",
-              "CONFIG",
-              "DETECTOR_AUTHOR"
-            ],
-            "description": "Run only one mission. Omit to run the full investigation cycle (inquiry then case). Implied CASE when caseId is set. Use POST /autopilot/dream for memory consolidation."
+          "agentKinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "INQUIRY",
+                "CASE",
+                "DREAM",
+                "DUPLICATES",
+                "CONFIG",
+                "DETECTOR_AUTHOR"
+              ]
+            },
+            "description": "Which agents to run. Pipeline agents (INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR) run in canonical order as one chained cycle; DREAM (memory consolidation, steered by instruction) and DUPLICATES (fingerprint consolidation, deterministic — instruction ignored) run as their own jobs. Omit to run the full pipeline. Forced to [CASE] when caseId is set."
           },
           "caseId": {
             "type": "string",

@@ -18,6 +18,16 @@ import {
   DREAM_MISSION,
 } from './harness/missions';
 import { AUTOPILOT_QUEUE } from './autopilot.constants';
+import { CORRELATION_QUEUE } from '../correlation/correlation.constants';
+import type { AutopilotJob } from './autopilot.types';
+
+/** Agents that run in canonical order as one chained cycle on the autopilot queue. */
+const PIPELINE_KINDS = [
+  AgentKind.INQUIRY,
+  AgentKind.CASE,
+  AgentKind.CONFIG,
+  AgentKind.DETECTOR_AUTHOR,
+] as const;
 import {
   AgentActivityItemDto,
   AgentActivityListResponseDto,
@@ -118,42 +128,77 @@ export class AutopilotService {
       if (!found) {
         throw new BadRequestException(`Case ${dto.caseId} does not exist`);
       }
-      if (dto.agentKind && dto.agentKind !== AgentKind.CASE) {
+      if (
+        dto.agentKinds?.length &&
+        dto.agentKinds.some((k) => k !== AgentKind.CASE)
+      ) {
         throw new BadRequestException(
-          'A case-focused run targets the CASE agent — omit agentKind or set it to CASE.',
+          'A case-focused run targets the CASE agent — omit agentKinds or set it to [CASE].',
         );
       }
     }
-    if (dto.agentKind === AgentKind.DREAM) {
-      throw new BadRequestException(
-        'Use POST /autopilot/dream to trigger a dream cycle.',
+
+    // Resolve which agents to run. A case-focused run implies the case agent;
+    // omitting agentKinds means the full pipeline.
+    const requested: readonly AgentKind[] = dto.caseId
+      ? [AgentKind.CASE]
+      : (dto.agentKinds ?? PIPELINE_KINDS);
+
+    const pipeline = requested.filter((k) =>
+      (PIPELINE_KINDS as readonly AgentKind[]).includes(k),
+    );
+    const wantsDream = requested.includes(AgentKind.DREAM);
+    const wantsDuplicates = requested.includes(AgentKind.DUPLICATES);
+
+    const instruction = dto.instruction?.trim() || undefined;
+    // One shared cycle identity groups every job enqueued by this trigger.
+    const cycleKey = `manual:${randomUUID()}`;
+    const boss = await this.pgBoss.getBossAsync();
+    const sendOpts = {
+      retryLimit: 2,
+      retryDelay: 90,
+      retryBackoff: true,
+      expireInSeconds: 3 * 3600,
+    } as const;
+
+    // Pipeline agents run in canonical order as one chained cycle.
+    if (pipeline.length > 0) {
+      await boss.send(
+        AUTOPILOT_QUEUE,
+        {
+          manual: true,
+          cycleKey,
+          instruction,
+          sourceId: dto.sourceId || undefined,
+          agentKinds: pipeline as AutopilotJob['agentKinds'],
+          caseId: dto.caseId || undefined,
+        },
+        sendOpts,
       );
     }
 
-    // Focusing on a case implies the case agent only.
-    const agentKind = dto.caseId ? AgentKind.CASE : dto.agentKind;
+    // DREAM (memory consolidation) — steerable via the operator instruction.
+    if (wantsDream) {
+      await boss.send(
+        AUTOPILOT_QUEUE,
+        { dream: true, manual: true, cycleKey, instruction },
+        sendOpts,
+      );
+    }
 
-    const cycleKey = `manual:${randomUUID()}`;
-    const boss = await this.pgBoss.getBossAsync();
-    await boss.send(
-      AUTOPILOT_QUEUE,
-      {
-        manual: true,
-        cycleKey,
-        instruction: dto.instruction?.trim() || undefined,
-        sourceId: dto.sourceId || undefined,
-        agentKind: agentKind ?? undefined,
-        caseId: dto.caseId || undefined,
-      },
-      // Spaced retries so provider rate limits (429) get room to clear;
-      // resumed deliveries skip already-completed steps via stepState.
-      {
-        retryLimit: 2,
-        retryDelay: 90,
-        retryBackoff: true,
-        expireInSeconds: 3 * 3600,
-      },
-    );
+    // DUPLICATES (fingerprint consolidation) — deterministic global recompute on
+    // the correlation queue; the instruction does not apply.
+    if (wantsDuplicates) {
+      await boss.send(
+        CORRELATION_QUEUE,
+        { recomputeAll: true, manual: true },
+        {
+          singletonKey: 'correlation:recompute-all',
+          expireInSeconds: 6 * 3600,
+        },
+      );
+    }
+
     return { cycleKey, enqueued: true };
   }
 
@@ -241,7 +286,10 @@ export class AutopilotService {
       AUTOPILOT_QUEUE,
       {
         cycleKey: run.cycleKey,
-        agentKind: run.agentKind,
+        agentKinds:
+          run.agentKind === AgentKind.DREAM
+            ? undefined
+            : ([run.agentKind] as AutopilotJob['agentKinds']),
         dream: run.agentKind === AgentKind.DREAM || undefined,
         manual: run.trigger === 'manual' || undefined,
         instruction: run.instruction ?? undefined,

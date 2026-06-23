@@ -17,6 +17,8 @@ import { AgentLoggerService } from './audit/agent-logger.service';
 import { DecisionApplierService } from './decision-applier.service';
 import { ValidationService } from '../validation.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
+import { CustomDetectorTestsService } from '../custom-detector-tests.service';
+import { CliRunnerModule } from '../cli-runner/cli-runner.module';
 import { ObserveToolset } from './tools/observe/observe.toolset';
 import { InvestigationToolset } from './tools/investigation/investigation.toolset';
 import { KnowledgeToolset } from './tools/knowledge/knowledge.toolset';
@@ -41,7 +43,7 @@ import { AutopilotController } from './autopilot.controller';
  * full audit trail (AgentRun / AgentDecision) and DB-backed memory.
  */
 @Module({
-  imports: [MatchingModule, CorrelationModule],
+  imports: [MatchingModule, CorrelationModule, CliRunnerModule],
   controllers: [AutopilotController, McpServersController],
   providers: [
     PrismaService,
@@ -60,6 +62,7 @@ import { AutopilotController } from './autopilot.controller';
     DecisionApplierService,
     ValidationService,
     CustomDetectorsService,
+    CustomDetectorTestsService,
     ObserveToolset,
     InvestigationToolset,
     KnowledgeToolset,

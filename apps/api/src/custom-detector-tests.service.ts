@@ -130,6 +130,22 @@ export class CustomDetectorTestsService {
     };
   }
 
+  /**
+   * Evaluate a detector pipeline against ad-hoc sample text (no saved scenario).
+   * Used by the detector-authoring agent to verify that a saved detector — or a
+   * draft pipeline schema before it is ever created — actually fires.
+   */
+  async evaluateSample(
+    detector: {
+      key: string;
+      name: string;
+      pipelineSchema: Record<string, unknown>;
+    },
+    sampleText: string,
+  ): Promise<Record<string, unknown>> {
+    return this.evaluateViaCli(detector, sampleText);
+  }
+
   // ── Internals ─────────────────────────────────────────────────────────────
 
   private async runOneScenario(
@@ -192,66 +208,6 @@ export class CustomDetectorTestsService {
 
       return result;
     }
-  }
-
-  // RULESET: evaluate in-process — fast, deterministic, no CLI needed
-  private evaluateRuleset(
-    config: Record<string, unknown>,
-    inputText: string,
-  ): Record<string, unknown> {
-    const ruleset = (config.ruleset ?? {}) as Record<string, unknown>;
-    const regexRules = Array.isArray(ruleset.regex_rules)
-      ? (ruleset.regex_rules as Array<Record<string, unknown>>)
-      : [];
-    const keywordRules = Array.isArray(ruleset.keyword_rules)
-      ? (ruleset.keyword_rules as Array<Record<string, unknown>>)
-      : [];
-
-    const firedRules: Array<{ id: string; name: string; type: string }> = [];
-
-    for (const rule of regexRules) {
-      const id = (rule.id as string | undefined) ?? '';
-      const name = (rule.name as string | undefined) ?? '';
-      const pattern = (rule.pattern as string | undefined) ?? '';
-      const flags = (rule.flags as string | undefined) ?? '';
-
-      try {
-        const regex = new RegExp(pattern, flags);
-        if (regex.test(inputText)) {
-          firedRules.push({ id, name, type: 'regex' });
-        }
-      } catch {
-        // invalid regex — skip
-      }
-    }
-
-    for (const rule of keywordRules) {
-      const id = (rule.id as string | undefined) ?? '';
-      const name = (rule.name as string | undefined) ?? '';
-      const caseSensitive = Boolean(rule.case_sensitive ?? false);
-      const keywords = Array.isArray(rule.keywords)
-        ? (rule.keywords as string[])
-        : [];
-
-      const flags = caseSensitive ? '' : 'i';
-      const hit = keywords.some((kw) => {
-        try {
-          return new RegExp(`\\b${escapeRegex(kw)}\\b`, flags).test(inputText);
-        } catch {
-          return false;
-        }
-      });
-
-      if (hit) {
-        firedRules.push({ id, name, type: 'keyword' });
-      }
-    }
-
-    return {
-      matched: firedRules.length > 0,
-      firedRules,
-      totalRules: regexRules.length + keywordRules.length,
-    };
   }
 
   private async evaluateViaCli(
@@ -537,10 +493,6 @@ export class CustomDetectorTestsService {
 }
 
 // ── Pure helpers (no side effects) ───────────────────────────────────────────
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 function shellEscape(s: string): string {
   return `'${s.replace(/'/g, "'\\''")}'`;

@@ -42,6 +42,13 @@ function humanize(value: string): string {
     .join(" ");
 }
 
+/** Pull the failure reason a tool dispatcher stored on a FAILED decision. */
+function extractError(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const err = (payload as Record<string, unknown>).error;
+  return typeof err === "string" && err.trim() ? err : null;
+}
+
 const OUTCOME_META: Record<
   string,
   { icon: React.ReactNode; className: string }
@@ -262,6 +269,8 @@ function ActivityRow({
 }) {
   const { t } = useTranslation();
   const meta = OUTCOME_META[item.outcome] ?? OUTCOME_META.APPLIED!;
+  const errorText =
+    item.outcome === "FAILED" ? extractError(item.payload) : null;
   return (
     <li className="relative pl-9">
       <span className="absolute left-2 top-3 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-border bg-card">
@@ -293,6 +302,11 @@ function ActivityRow({
           </span>
         </div>
         <p className="mt-1.5 text-sm text-muted-foreground">{item.rationale}</p>
+        {errorText && (
+          <p className="mt-1 whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-red-600">
+            {errorText}
+          </p>
+        )}
         <div className="mt-1.5 flex items-center gap-3">
           {onOpenRun && (
             <button
