@@ -32,11 +32,11 @@ export interface TriggerAutopilotDto {
      */
     sourceId?: string;
     /**
-     * Run only one mission. Omit to run the full investigation cycle (inquiry then case). Implied CASE when caseId is set. Use POST /autopilot/dream for memory consolidation.
-     * @type {string}
+     * Which agents to run. Pipeline agents (INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR) run in canonical order as one chained cycle; DREAM (memory consolidation, steered by instruction) and DUPLICATES (fingerprint consolidation, deterministic — instruction ignored) run as their own jobs. Omit to run the full pipeline. Forced to [CASE] when caseId is set.
+     * @type {Array<string>}
      * @memberof TriggerAutopilotDto
      */
-    agentKind?: TriggerAutopilotDtoAgentKindEnum;
+    agentKinds?: Array<TriggerAutopilotDtoAgentKindsEnum>;
     /**
      * Focus the case agent on ONE case: it receives the full case detail (hypotheses, evidence, findings, edges) and can connect/disconnect edges, build evidence paths and create/update hypotheses with supporting evidence — steered by the instruction.
      * @type {string}
@@ -49,13 +49,15 @@ export interface TriggerAutopilotDto {
 /**
  * @export
  */
-export const TriggerAutopilotDtoAgentKindEnum = {
+export const TriggerAutopilotDtoAgentKindsEnum = {
     Inquiry: 'INQUIRY',
     Case: 'CASE',
+    Dream: 'DREAM',
+    Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR'
 } as const;
-export type TriggerAutopilotDtoAgentKindEnum = typeof TriggerAutopilotDtoAgentKindEnum[keyof typeof TriggerAutopilotDtoAgentKindEnum];
+export type TriggerAutopilotDtoAgentKindsEnum = typeof TriggerAutopilotDtoAgentKindsEnum[keyof typeof TriggerAutopilotDtoAgentKindsEnum];
 
 
 /**
@@ -77,7 +79,7 @@ export function TriggerAutopilotDtoFromJSONTyped(json: any, ignoreDiscriminator:
         
         'instruction': json['instruction'] == null ? undefined : json['instruction'],
         'sourceId': json['sourceId'] == null ? undefined : json['sourceId'],
-        'agentKind': json['agentKind'] == null ? undefined : json['agentKind'],
+        'agentKinds': json['agentKinds'] == null ? undefined : json['agentKinds'],
         'caseId': json['caseId'] == null ? undefined : json['caseId'],
     };
 }
@@ -95,7 +97,7 @@ export function TriggerAutopilotDtoToJSONTyped(value?: TriggerAutopilotDto | nul
         
         'instruction': value['instruction'],
         'sourceId': value['sourceId'],
-        'agentKind': value['agentKind'],
+        'agentKinds': value['agentKinds'],
         'caseId': value['caseId'],
     };
 }

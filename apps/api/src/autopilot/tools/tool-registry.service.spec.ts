@@ -20,6 +20,7 @@ import type { PrismaService } from '../../prisma.service';
 import type { ValidationService } from '../../validation.service';
 import type { MaskedConfigCryptoService } from '../../masked-config-crypto.service';
 import type { CustomDetectorsService } from '../../custom-detectors.service';
+import type { CustomDetectorTestsService } from '../../custom-detector-tests.service';
 import type { CorrelationService } from '../../correlation/correlation.service';
 import type { DuplicatesFinderAgentService } from '../../correlation/duplicates-finder-agent.service';
 
@@ -37,6 +38,7 @@ describe('ToolRegistry', () => {
     ),
     new DetectorToolset(
       {} as CustomDetectorsService,
+      {} as CustomDetectorTestsService,
       {} as DecisionApplierService,
     ),
     new FingerprintsToolset(
