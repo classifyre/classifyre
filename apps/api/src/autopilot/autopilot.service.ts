@@ -10,13 +10,8 @@ import { PgBossService } from '../scheduler/pg-boss.service';
 import { AgentAuditService } from './audit/agent-audit.service';
 import { SystemBriefService } from './harness/system-brief.service';
 import { ToolRegistry } from './tools/tool-registry.service';
-import {
-  INQUIRY_MISSION,
-  CASE_MISSION,
-  CONFIG_MISSION,
-  DETECTOR_AUTHOR_MISSION,
-  DREAM_MISSION,
-} from './harness/missions';
+import { AgentConfigService } from './harness/agent-config.service';
+import { McpClientService } from './mcp-client/mcp-client.service';
 import { AUTOPILOT_QUEUE } from './autopilot.constants';
 import { CORRELATION_QUEUE } from '../correlation/correlation.constants';
 import type { AutopilotJob } from './autopilot.types';
@@ -31,8 +26,11 @@ const PIPELINE_KINDS = [
 import {
   AgentActivityItemDto,
   AgentActivityListResponseDto,
+  AgentConfigDto,
+  AgentConfigListResponseDto,
   AgentDecisionDto,
   HarnessToolsResponseDto,
+  UpdateAgentConfigDto,
   AgentLogDto,
   AgentLogListResponseDto,
   AgentMemoryDto,
@@ -65,31 +63,50 @@ export class AutopilotService {
     private readonly audit: AgentAuditService,
     private readonly brief: SystemBriefService,
     private readonly tools: ToolRegistry,
+    private readonly agentConfig: AgentConfigService,
+    private readonly mcp: McpClientService,
   ) {}
 
   /** The capability map: every registered tool + the missions that wield them. */
-  getTools(): HarnessToolsResponseDto {
-    const missions = [
-      INQUIRY_MISSION,
-      CASE_MISSION,
-      CONFIG_MISSION,
-      DETECTOR_AUTHOR_MISSION,
-      DREAM_MISSION,
-    ];
+  async getTools(): Promise<HarnessToolsResponseDto> {
+    const agents = await this.agentConfig.list();
     return {
       tools: this.tools.list().map((tool) => ({
         name: tool.name,
         description: tool.description,
         sideEffect: tool.sideEffect,
         domain: tool.domain ?? null,
+        source: tool.name.startsWith('mcp.') ? 'mcp' : 'builtin',
       })),
-      missions: missions.map((m) => ({
-        kind: m.kind,
-        goal: m.goal,
-        allowedTools: m.allowedTools,
-        maxIterations: m.maxIterations,
+      missions: agents.map((a) => ({
+        kind: a.kind,
+        goal: a.goal,
+        allowedTools: a.toolNames,
+        maxIterations: a.maxIterations,
       })),
     };
+  }
+
+  // ── Per-agent configuration ───────────────────────────────────────────────────
+
+  /** Every agent with its effective + default config and scoped MCP tools. */
+  async getAgents(): Promise<AgentConfigListResponseDto> {
+    const summaries = await this.agentConfig.list();
+    return {
+      agents: summaries.map((a) => ({
+        ...a,
+        mcpToolNames: this.mcp.toolNamesForKind(a.kind),
+      })),
+    };
+  }
+
+  /** Update one agent's enable flag / goal / iterations / assigned tools. */
+  async updateAgent(
+    kind: AgentKind,
+    dto: UpdateAgentConfigDto,
+  ): Promise<AgentConfigDto> {
+    const summary = await this.agentConfig.update(kind, dto);
+    return { ...summary, mcpToolNames: this.mcp.toolNamesForKind(kind) };
   }
 
   // ── Manual trigger ──────────────────────────────────────────────────────────

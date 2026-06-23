@@ -10,6 +10,7 @@ Name | Type
 `description` | string
 `sideEffect` | string
 `domain` | string
+`source` | string
 
 ## Example
 
@@ -22,6 +23,7 @@ const example = {
   "description": null,
   "sideEffect": null,
   "domain": null,
+  "source": null,
 } satisfies HarnessToolDto
 
 console.log(example)

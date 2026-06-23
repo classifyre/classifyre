@@ -8,6 +8,7 @@ import {
   Brain,
   Play,
   SlidersHorizontal,
+  Users,
   Workflow,
   Wrench,
   type LucideIcon,
@@ -21,11 +22,19 @@ import { AutopilotActivity } from "@/components/autopilot/autopilot-activity";
 import { AutopilotMemory } from "@/components/autopilot/autopilot-memory";
 import { RunAutopilotDialog } from "@/components/autopilot/run-autopilot-dialog";
 import { HarnessActivity } from "./harness-activity";
+import { HarnessAgents } from "./harness-agents";
 import { HarnessTools } from "./harness-tools";
 import { HarnessBrief } from "./harness-brief";
 import { HarnessConfig } from "./harness-config";
 
-type View = "activity" | "runs" | "tools" | "memory" | "brief" | "config";
+type View =
+  | "activity"
+  | "runs"
+  | "agents"
+  | "tools"
+  | "memory"
+  | "brief"
+  | "config";
 
 const POLL_MS = 8000;
 
@@ -68,6 +77,7 @@ export function HarnessShell() {
   const tabs: { value: View; label: string; icon: LucideIcon }[] = [
     { value: "activity", label: t("harness.nav.activity"), icon: Activity },
     { value: "runs", label: t("harness.nav.runs"), icon: Workflow },
+    { value: "agents", label: t("harness.nav.agents"), icon: Users },
     { value: "tools", label: t("harness.nav.tools"), icon: Wrench },
     { value: "memory", label: t("harness.nav.memory"), icon: Brain },
     { value: "brief", label: t("harness.nav.brief"), icon: BookOpen },
@@ -131,6 +141,7 @@ export function HarnessShell() {
         {view === "runs" && (
           <AutopilotActivity key={`runs-${epoch}`} focusRunId={focusRunId} />
         )}
+        {view === "agents" && <HarnessAgents />}
         {view === "tools" && <HarnessTools />}
         {view === "memory" && <AutopilotMemory />}
         {view === "brief" && <HarnessBrief key={`brief-${epoch}`} />}

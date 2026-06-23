@@ -75,6 +75,7 @@ All URIs are relative to *http://localhost*
 *AutopilotApi* | [**autopilotControllerCancelRun**](docs/AutopilotApi.md#autopilotcontrollercancelrun) | **POST** /autopilot/runs/{id}/cancel | Stop a pending/running agent run (it aborts before its next step)
 *AutopilotApi* | [**autopilotControllerCreateMemory**](docs/AutopilotApi.md#autopilotcontrollercreatememory) | **POST** /autopilot/memory | Add (or overwrite) a memory entry to steer the agent
 *AutopilotApi* | [**autopilotControllerDeleteMemory**](docs/AutopilotApi.md#autopilotcontrollerdeletememory) | **DELETE** /autopilot/memory/{id} | Delete a memory entry the agent learned
+*AutopilotApi* | [**autopilotControllerGetAgents**](docs/AutopilotApi.md#autopilotcontrollergetagents) | **GET** /autopilot/agents | Per-agent configuration: enable flag, goal, iteration budget and assigned built-in/MCP tools
 *AutopilotApi* | [**autopilotControllerGetRun**](docs/AutopilotApi.md#autopilotcontrollergetrun) | **GET** /autopilot/runs/{id} | Get one autopilot run with all decisions and rationales
 *AutopilotApi* | [**autopilotControllerGetStats**](docs/AutopilotApi.md#autopilotcontrollergetstats) | **GET** /autopilot/stats | Mission-control counters (runs, decisions, memory, brief version)
 *AutopilotApi* | [**autopilotControllerGetSystemBrief**](docs/AutopilotApi.md#autopilotcontrollergetsystembrief) | **GET** /autopilot/system-brief | The living system brief the autopilot maintains and injects
@@ -86,6 +87,7 @@ All URIs are relative to *http://localhost*
 *AutopilotApi* | [**autopilotControllerRerunRun**](docs/AutopilotApi.md#autopilotcontrollerrerunrun) | **POST** /autopilot/runs/{id}/rerun | Re-execute one specific agent run from scratch under its original cycle identity
 *AutopilotApi* | [**autopilotControllerTrigger**](docs/AutopilotApi.md#autopilotcontrollertrigger) | **POST** /autopilot/trigger | Manually trigger an autopilot cycle over existing data, with an optional steering instruction
 *AutopilotApi* | [**autopilotControllerTriggerDream**](docs/AutopilotApi.md#autopilotcontrollertriggerdream) | **POST** /autopilot/dream | Trigger a dream cycle now (memory consolidation — dedupe, prune noise, distill notes)
+*AutopilotApi* | [**autopilotControllerUpdateAgent**](docs/AutopilotApi.md#autopilotcontrollerupdateagent) | **PATCH** /autopilot/agents/{kind} | Retune one agent — toggle it, edit its goal/iterations, or reassign its built-in tools
 *AutopilotApi* | [**autopilotControllerUpdateMemory**](docs/AutopilotApi.md#autopilotcontrollerupdatememory) | **PATCH** /autopilot/memory/{id} | Edit a memory entry (content, tags, weight)
 *AutopilotApi* | [**autopilotControllerUpdateSystemBrief**](docs/AutopilotApi.md#autopilotcontrollerupdatesystembrief) | **PUT** /autopilot/system-brief | Create or rewrite the system-brief narrative
 *AutopilotApi* | [**mcpServersControllerCreate**](docs/AutopilotApi.md#mcpserverscontrollercreate) | **POST** /autopilot/mcp-servers | Add an external MCP server
@@ -242,6 +244,8 @@ All URIs are relative to *http://localhost*
 - [AddThreadEntryDto](docs/AddThreadEntryDto.md)
 - [AgentActivityItemDto](docs/AgentActivityItemDto.md)
 - [AgentActivityListResponseDto](docs/AgentActivityListResponseDto.md)
+- [AgentConfigDto](docs/AgentConfigDto.md)
+- [AgentConfigListResponseDto](docs/AgentConfigListResponseDto.md)
 - [AgentDecisionDto](docs/AgentDecisionDto.md)
 - [AgentLogDto](docs/AgentLogDto.md)
 - [AgentLogListResponseDto](docs/AgentLogListResponseDto.md)
@@ -456,6 +460,7 @@ All URIs are relative to *http://localhost*
 - [TrainingExamplesStatsDtoByLabelValue](docs/TrainingExamplesStatsDtoByLabelValue.md)
 - [TriggerAutopilotDto](docs/TriggerAutopilotDto.md)
 - [TriggerAutopilotResponseDto](docs/TriggerAutopilotResponseDto.md)
+- [UpdateAgentConfigDto](docs/UpdateAgentConfigDto.md)
 - [UpdateAgentMemoryDto](docs/UpdateAgentMemoryDto.md)
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
 - [UpdateCaseDto](docs/UpdateCaseDto.md)

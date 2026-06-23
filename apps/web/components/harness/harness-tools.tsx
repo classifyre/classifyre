@@ -5,7 +5,7 @@ import { api, type HarnessToolDto } from "@workspace/api-client";
 import { Badge } from "@workspace/ui/components";
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { cn } from "@workspace/ui/lib/utils";
-import { Eye, Loader2, Pencil, Wrench } from "lucide-react";
+import { Eye, Loader2, Pencil, Plug, Wrench } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 
 /**
@@ -105,7 +105,15 @@ function ToolRow({ tool }: { tool: HarnessToolDto }) {
         {mutate ? t("harness.tools.mutate") : t("harness.tools.read")}
       </span>
       <div className="min-w-0">
-        <p className="font-mono text-xs">{tool.name}</p>
+        <p className="flex items-center gap-1.5 font-mono text-xs">
+          {tool.name}
+          {tool.source === "mcp" && (
+            <span className="inline-flex items-center gap-0.5 rounded-[3px] border border-stone-400/40 px-1 font-mono text-[9px] uppercase tracking-wide text-stone-500">
+              <Plug className="h-2 w-2" />
+              {t("harness.tools.mcpBadge")}
+            </span>
+          )}
+        </p>
         <p className="text-[11px] leading-snug text-muted-foreground">
           {tool.description}
         </p>

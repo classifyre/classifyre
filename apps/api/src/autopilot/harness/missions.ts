@@ -193,20 +193,21 @@ export const DREAM_MISSION: Mission = {
   maxIterations: 16,
 };
 
-/** Resolve the mission for an AgentKind, or null when it has no harness mission. */
+/**
+ * Factory defaults for every AgentKind that has a harness mission, in canonical
+ * order. These are the single source of truth for an agent's default goal,
+ * tools and iteration budget; per-agent overrides (AgentConfig rows) merge on
+ * top of these (see AgentConfigService).
+ */
+export const DEFAULT_MISSIONS: readonly Mission[] = [
+  INQUIRY_MISSION,
+  CASE_MISSION,
+  CONFIG_MISSION,
+  DETECTOR_AUTHOR_MISSION,
+  DREAM_MISSION,
+];
+
+/** Resolve the factory mission for an AgentKind, or null when it has none. */
 export function missionFor(kind: AgentKind): Mission | null {
-  switch (kind) {
-    case AgentKind.INQUIRY:
-      return INQUIRY_MISSION;
-    case AgentKind.CASE:
-      return CASE_MISSION;
-    case AgentKind.CONFIG:
-      return CONFIG_MISSION;
-    case AgentKind.DETECTOR_AUTHOR:
-      return DETECTOR_AUTHOR_MISSION;
-    case AgentKind.DREAM:
-      return DREAM_MISSION;
-    default:
-      return null;
-  }
+  return DEFAULT_MISSIONS.find((m) => m.kind === kind) ?? null;
 }

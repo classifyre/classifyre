@@ -7,6 +7,7 @@ All URIs are relative to *http://localhost*
 | [**autopilotControllerCancelRun**](AutopilotApi.md#autopilotcontrollercancelrun) | **POST** /autopilot/runs/{id}/cancel | Stop a pending/running agent run (it aborts before its next step) |
 | [**autopilotControllerCreateMemory**](AutopilotApi.md#autopilotcontrollercreatememory) | **POST** /autopilot/memory | Add (or overwrite) a memory entry to steer the agent |
 | [**autopilotControllerDeleteMemory**](AutopilotApi.md#autopilotcontrollerdeletememory) | **DELETE** /autopilot/memory/{id} | Delete a memory entry the agent learned |
+| [**autopilotControllerGetAgents**](AutopilotApi.md#autopilotcontrollergetagents) | **GET** /autopilot/agents | Per-agent configuration: enable flag, goal, iteration budget and assigned built-in/MCP tools |
 | [**autopilotControllerGetRun**](AutopilotApi.md#autopilotcontrollergetrun) | **GET** /autopilot/runs/{id} | Get one autopilot run with all decisions and rationales |
 | [**autopilotControllerGetStats**](AutopilotApi.md#autopilotcontrollergetstats) | **GET** /autopilot/stats | Mission-control counters (runs, decisions, memory, brief version) |
 | [**autopilotControllerGetSystemBrief**](AutopilotApi.md#autopilotcontrollergetsystembrief) | **GET** /autopilot/system-brief | The living system brief the autopilot maintains and injects |
@@ -18,6 +19,7 @@ All URIs are relative to *http://localhost*
 | [**autopilotControllerRerunRun**](AutopilotApi.md#autopilotcontrollerrerunrun) | **POST** /autopilot/runs/{id}/rerun | Re-execute one specific agent run from scratch under its original cycle identity |
 | [**autopilotControllerTrigger**](AutopilotApi.md#autopilotcontrollertrigger) | **POST** /autopilot/trigger | Manually trigger an autopilot cycle over existing data, with an optional steering instruction |
 | [**autopilotControllerTriggerDream**](AutopilotApi.md#autopilotcontrollertriggerdream) | **POST** /autopilot/dream | Trigger a dream cycle now (memory consolidation — dedupe, prune noise, distill notes) |
+| [**autopilotControllerUpdateAgent**](AutopilotApi.md#autopilotcontrollerupdateagent) | **PATCH** /autopilot/agents/{kind} | Retune one agent — toggle it, edit its goal/iterations, or reassign its built-in tools |
 | [**autopilotControllerUpdateMemory**](AutopilotApi.md#autopilotcontrollerupdatememory) | **PATCH** /autopilot/memory/{id} | Edit a memory entry (content, tags, weight) |
 | [**autopilotControllerUpdateSystemBrief**](AutopilotApi.md#autopilotcontrollerupdatesystembrief) | **PUT** /autopilot/system-brief | Create or rewrite the system-brief narrative |
 | [**mcpServersControllerCreate**](AutopilotApi.md#mcpserverscontrollercreate) | **POST** /autopilot/mcp-servers | Add an external MCP server |
@@ -220,6 +222,63 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## autopilotControllerGetAgents
+
+> AgentConfigListResponseDto autopilotControllerGetAgents()
+
+Per-agent configuration: enable flag, goal, iteration budget and assigned built-in/MCP tools
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { AutopilotControllerGetAgentsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  try {
+    const data = await api.autopilotControllerGetAgents();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**AgentConfigListResponseDto**](AgentConfigListResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -482,7 +541,7 @@ async function example() {
   const body = {
     // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' (optional)
     agentKind: agentKind_example,
-    // 'CREATE_INQUIRY' | 'UPDATE_INQUIRY' | 'ENRICH_INQUIRY_MATCHERS' | 'SIGNAL_CASE_READY' | 'CREATE_CASE' | 'UPDATE_CASE' | 'ADD_HYPOTHESIS' | 'UPDATE_HYPOTHESIS' | 'ADD_EVIDENCE' | 'ATTACH_FINDINGS' | 'ADD_NOTE' | 'ADD_THREAD_ENTRY' | 'CREATE_EDGE' | 'REMOVE_EDGE' | 'LINK_SUPPORT' | 'CHANGE_STATUS' | 'LINK_INQUIRY' | 'CONSOLIDATE_MEMORY' | 'LINK_DUPLICATE' | 'UPDATE_CLUSTER' | 'TOOL_CALL' | 'TUNE_SOURCE' | 'CREATE_DETECTOR' | 'TRAIN_DETECTOR' | 'TRIGGER_SCAN' | 'UPDATE_SYSTEM_BRIEF' | 'RECOMPUTE_CORRELATION' | 'TUNE_CORRELATION' | 'NO_ACTION' (optional)
+    // 'CREATE_INQUIRY' | 'UPDATE_INQUIRY' | 'ENRICH_INQUIRY_MATCHERS' | 'SIGNAL_CASE_READY' | 'CREATE_CASE' | 'UPDATE_CASE' | 'ADD_HYPOTHESIS' | 'UPDATE_HYPOTHESIS' | 'ADD_EVIDENCE' | 'ATTACH_FINDINGS' | 'ADD_NOTE' | 'ADD_THREAD_ENTRY' | 'CREATE_EDGE' | 'REMOVE_EDGE' | 'LINK_SUPPORT' | 'CHANGE_STATUS' | 'LINK_INQUIRY' | 'CONSOLIDATE_MEMORY' | 'LINK_DUPLICATE' | 'UPDATE_CLUSTER' | 'TOOL_CALL' | 'TUNE_SOURCE' | 'CREATE_DETECTOR' | 'TRAIN_DETECTOR' | 'UPDATE_DETECTOR' | 'DELETE_DETECTOR' | 'TRIGGER_SCAN' | 'UPDATE_SYSTEM_BRIEF' | 'RECOMPUTE_CORRELATION' | 'TUNE_CORRELATION' | 'NO_ACTION' (optional)
     action: action_example,
     // 'APPLIED' | 'SKIPPED_OBSERVE_ONLY' | 'FAILED' (optional)
     outcome: outcome_example,
@@ -518,7 +577,7 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR] |
-| **action** | `CREATE_INQUIRY`, `UPDATE_INQUIRY`, `ENRICH_INQUIRY_MATCHERS`, `SIGNAL_CASE_READY`, `CREATE_CASE`, `UPDATE_CASE`, `ADD_HYPOTHESIS`, `UPDATE_HYPOTHESIS`, `ADD_EVIDENCE`, `ATTACH_FINDINGS`, `ADD_NOTE`, `ADD_THREAD_ENTRY`, `CREATE_EDGE`, `REMOVE_EDGE`, `LINK_SUPPORT`, `CHANGE_STATUS`, `LINK_INQUIRY`, `CONSOLIDATE_MEMORY`, `LINK_DUPLICATE`, `UPDATE_CLUSTER`, `TOOL_CALL`, `TUNE_SOURCE`, `CREATE_DETECTOR`, `TRAIN_DETECTOR`, `TRIGGER_SCAN`, `UPDATE_SYSTEM_BRIEF`, `RECOMPUTE_CORRELATION`, `TUNE_CORRELATION`, `NO_ACTION` |  | [Optional] [Defaults to `undefined`] [Enum: CREATE_INQUIRY, UPDATE_INQUIRY, ENRICH_INQUIRY_MATCHERS, SIGNAL_CASE_READY, CREATE_CASE, UPDATE_CASE, ADD_HYPOTHESIS, UPDATE_HYPOTHESIS, ADD_EVIDENCE, ATTACH_FINDINGS, ADD_NOTE, ADD_THREAD_ENTRY, CREATE_EDGE, REMOVE_EDGE, LINK_SUPPORT, CHANGE_STATUS, LINK_INQUIRY, CONSOLIDATE_MEMORY, LINK_DUPLICATE, UPDATE_CLUSTER, TOOL_CALL, TUNE_SOURCE, CREATE_DETECTOR, TRAIN_DETECTOR, TRIGGER_SCAN, UPDATE_SYSTEM_BRIEF, RECOMPUTE_CORRELATION, TUNE_CORRELATION, NO_ACTION] |
+| **action** | `CREATE_INQUIRY`, `UPDATE_INQUIRY`, `ENRICH_INQUIRY_MATCHERS`, `SIGNAL_CASE_READY`, `CREATE_CASE`, `UPDATE_CASE`, `ADD_HYPOTHESIS`, `UPDATE_HYPOTHESIS`, `ADD_EVIDENCE`, `ATTACH_FINDINGS`, `ADD_NOTE`, `ADD_THREAD_ENTRY`, `CREATE_EDGE`, `REMOVE_EDGE`, `LINK_SUPPORT`, `CHANGE_STATUS`, `LINK_INQUIRY`, `CONSOLIDATE_MEMORY`, `LINK_DUPLICATE`, `UPDATE_CLUSTER`, `TOOL_CALL`, `TUNE_SOURCE`, `CREATE_DETECTOR`, `TRAIN_DETECTOR`, `UPDATE_DETECTOR`, `DELETE_DETECTOR`, `TRIGGER_SCAN`, `UPDATE_SYSTEM_BRIEF`, `RECOMPUTE_CORRELATION`, `TUNE_CORRELATION`, `NO_ACTION` |  | [Optional] [Defaults to `undefined`] [Enum: CREATE_INQUIRY, UPDATE_INQUIRY, ENRICH_INQUIRY_MATCHERS, SIGNAL_CASE_READY, CREATE_CASE, UPDATE_CASE, ADD_HYPOTHESIS, UPDATE_HYPOTHESIS, ADD_EVIDENCE, ATTACH_FINDINGS, ADD_NOTE, ADD_THREAD_ENTRY, CREATE_EDGE, REMOVE_EDGE, LINK_SUPPORT, CHANGE_STATUS, LINK_INQUIRY, CONSOLIDATE_MEMORY, LINK_DUPLICATE, UPDATE_CLUSTER, TOOL_CALL, TUNE_SOURCE, CREATE_DETECTOR, TRAIN_DETECTOR, UPDATE_DETECTOR, DELETE_DETECTOR, TRIGGER_SCAN, UPDATE_SYSTEM_BRIEF, RECOMPUTE_CORRELATION, TUNE_CORRELATION, NO_ACTION] |
 | **outcome** | `APPLIED`, `SKIPPED_OBSERVE_ONLY`, `FAILED` |  | [Optional] [Defaults to `undefined`] [Enum: APPLIED, SKIPPED_OBSERVE_ONLY, FAILED] |
 | **entityType** | `string` | inquiry | case | source | detector | memory | system | asset | [Optional] [Defaults to `undefined`] |
 | **search** | `string` | Substring search over the rationale | [Optional] [Defaults to `undefined`] |
@@ -972,6 +1031,74 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **202** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## autopilotControllerUpdateAgent
+
+> AgentConfigDto autopilotControllerUpdateAgent(kind, updateAgentConfigDto)
+
+Retune one agent — toggle it, edit its goal/iterations, or reassign its built-in tools
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { AutopilotControllerUpdateAgentRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR'
+    kind: kind_example,
+    // UpdateAgentConfigDto
+    updateAgentConfigDto: ...,
+  } satisfies AutopilotControllerUpdateAgentRequest;
+
+  try {
+    const data = await api.autopilotControllerUpdateAgent(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **kind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR` |  | [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR] |
+| **updateAgentConfigDto** | [UpdateAgentConfigDto](UpdateAgentConfigDto.md) |  | |
+
+### Return type
+
+[**AgentConfigDto**](AgentConfigDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
