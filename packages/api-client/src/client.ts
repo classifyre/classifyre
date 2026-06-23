@@ -150,7 +150,7 @@ export {
   SandboxControllerListRunsStatusEnum,
 } from "./generated/src/apis/SandboxApi";
 
-export { TriggerAutopilotDtoAgentKindEnum } from "./generated/src/models/TriggerAutopilotDto";
+export { TriggerAutopilotDtoAgentKindsEnum } from "./generated/src/models/TriggerAutopilotDto";
 export {
   AutopilotControllerListActivityAgentKindEnum,
   AutopilotControllerListActivityActionEnum,

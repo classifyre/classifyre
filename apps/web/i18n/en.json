@@ -2061,7 +2061,38 @@
         "submitCase": "Run on case",
         "toastQueued": "Autopilot cycle queued — watch it in Activity",
         "toastCaseQueued": "AI is working on this case — results appear here when done",
-        "toastError": "Failed to queue the autopilot"
+        "toastError": "Failed to queue the autopilot",
+        "pipelineGroup": "Pipeline — runs as a chain",
+        "globalGroup": "Maintenance",
+        "fullPipeline": "Select all",
+        "clearAll": "Clear all",
+        "duplicatesHint": "Fingerprint consolidation is deterministic — the instruction above does not apply to it.",
+        "agents": {
+          "inquiry": {
+            "label": "Inquiry",
+            "desc": "Reviews open findings and keeps saved monitors (inquiries) healthy."
+          },
+          "case": {
+            "label": "Case",
+            "desc": "Builds and enriches investigation cases from inquiries with new matches."
+          },
+          "config": {
+            "label": "Config",
+            "desc": "Tunes each source's detectors, sampling and resources to catch more or cut noise."
+          },
+          "detector": {
+            "label": "Detector",
+            "desc": "Authors and tests custom detectors when existing ones miss findings."
+          },
+          "dream": {
+            "label": "Dream",
+            "desc": "Consolidates agent memory and refreshes the system brief — steer it with the instruction above."
+          },
+          "duplicates": {
+            "label": "Duplicates",
+            "desc": "Recomputes asset fingerprints and identity clusters across all sources."
+          }
+        }
       },
       "caseStatus": {
         "working": "AI autopilot is working on this case…",

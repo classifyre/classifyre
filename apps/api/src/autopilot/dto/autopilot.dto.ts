@@ -367,18 +367,15 @@ export class TriggerAutopilotDto {
   sourceId?: string;
 
   @ApiPropertyOptional({
-    enum: [
-      AgentKind.INQUIRY,
-      AgentKind.CASE,
-      AgentKind.CONFIG,
-      AgentKind.DETECTOR_AUTHOR,
-    ],
+    enum: AgentKind,
+    isArray: true,
     description:
-      'Run only one mission. Omit to run the full investigation cycle (inquiry then case). Implied CASE when caseId is set. Use POST /autopilot/dream for memory consolidation.',
+      'Which agents to run. Pipeline agents (INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR) run in canonical order as one chained cycle; DREAM (memory consolidation, steered by instruction) and DUPLICATES (fingerprint consolidation, deterministic — instruction ignored) run as their own jobs. Omit to run the full pipeline. Forced to [CASE] when caseId is set.',
   })
   @IsOptional()
-  @IsEnum(AgentKind)
-  agentKind?: AgentKind;
+  @IsArray()
+  @IsEnum(AgentKind, { each: true })
+  agentKinds?: AgentKind[];
 
   @ApiPropertyOptional({
     description:

@@ -14,11 +14,12 @@ export interface AutopilotJob {
   /** Scheduled "dreaming" cycle: memory consolidation, no inquiry/case work. */
   dream?: boolean;
   /**
-   * Rerun of one specific run, or a manual trigger of one agent: execute only
-   * this agent and treat the job as explicit operator intent (instance
-   * enable-flags are bypassed).
+   * Manual trigger of a specific set of pipeline agents (or a single-agent
+   * rerun): execute exactly these, in canonical order, as one chained cycle and
+   * treat the job as explicit operator intent (instance enable-flags bypassed).
+   * DREAM is carried via `dream`; DUPLICATES runs on the correlation queue.
    */
-  agentKind?: 'INQUIRY' | 'CASE' | 'DREAM' | 'CONFIG' | 'DETECTOR_AUTHOR';
+  agentKinds?: Array<'INQUIRY' | 'CASE' | 'CONFIG' | 'DETECTOR_AUTHOR'>;
   /** Focus the case agent on one case (full case detail in context). */
   caseId?: string;
 }

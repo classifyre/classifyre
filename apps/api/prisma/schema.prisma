@@ -1189,6 +1189,10 @@ enum AgentDecisionAction {
   CREATE_DETECTOR
   // Detector-authoring agent: a custom detector was trained.
   TRAIN_DETECTOR
+  // Detector-authoring agent: a custom detector was updated (config/active flag).
+  UPDATE_DETECTOR
+  // Detector-authoring agent: a custom detector was deleted.
+  DELETE_DETECTOR
   // Config-tuning agent: a source scan was triggered.
   TRIGGER_SCAN
   // Harness: the living system brief was updated.
