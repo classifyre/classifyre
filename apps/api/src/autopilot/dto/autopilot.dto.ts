@@ -2,10 +2,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -558,6 +560,12 @@ export class HarnessToolDto {
     description: 'Domain gated for OBSERVE_ONLY (inquiry/case/source/…)',
   })
   domain!: string | null;
+
+  @ApiProperty({
+    description:
+      'Origin of the tool: "builtin" (native toolset) or "mcp" (external server)',
+  })
+  source!: 'builtin' | 'mcp';
 }
 
 export class HarnessMissionDto {
@@ -585,6 +593,94 @@ export class HarnessToolsResponseDto {
 
   @ApiProperty({ type: [HarnessMissionDto] })
   missions!: HarnessMissionDto[];
+}
+
+// ── Per-agent configuration (the Agents management surface) ────────────────────
+
+export class AgentConfigDto {
+  @ApiProperty({ enum: AgentKind })
+  kind!: AgentKind;
+
+  @ApiProperty({ description: 'Whether the agent runs on scan cycles' })
+  enabled!: boolean;
+
+  @ApiProperty({
+    description: 'False when the agent has no enable toggle (DREAM)',
+  })
+  enableable!: boolean;
+
+  @ApiProperty({ description: 'Effective goal / system prompt' })
+  goal!: string;
+
+  @ApiProperty({ description: 'Factory-default goal (for reset)' })
+  defaultGoal!: string;
+
+  @ApiProperty()
+  maxIterations!: number;
+
+  @ApiProperty()
+  defaultMaxIterations!: number;
+
+  @ApiProperty({ type: [String], description: 'Assigned built-in tool names' })
+  toolNames!: string[];
+
+  @ApiProperty({ type: [String], description: 'Factory-default tool names' })
+  defaultToolNames!: string[];
+
+  @ApiProperty({
+    type: [String],
+    description: 'MCP tools this agent receives via server scoping (read-only)',
+  })
+  mcpToolNames!: string[];
+
+  @ApiProperty({
+    description: 'True when config differs from factory defaults',
+  })
+  customized!: boolean;
+}
+
+export class AgentConfigListResponseDto {
+  @ApiProperty({ type: [AgentConfigDto] })
+  agents!: AgentConfigDto[];
+}
+
+export class UpdateAgentConfigDto {
+  @ApiPropertyOptional({
+    description: 'Enable/disable the agent on scan cycles',
+  })
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Goal override; empty/null resets to factory default',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  goal?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Iteration budget override (1–50); null resets to default',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  maxIterations?: number | null;
+
+  @ApiPropertyOptional({
+    type: [String],
+    nullable: true,
+    description:
+      'Assigned built-in tool names; null resets to the factory toolset',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  toolNames?: string[] | null;
 }
 
 export class UpdateSystemBriefDto {

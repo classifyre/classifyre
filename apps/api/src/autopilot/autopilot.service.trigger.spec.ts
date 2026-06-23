@@ -7,6 +7,8 @@ import type { PgBossService } from '../scheduler/pg-boss.service';
 import type { AgentAuditService } from './audit/agent-audit.service';
 import type { SystemBriefService } from './harness/system-brief.service';
 import type { ToolRegistry } from './tools/tool-registry.service';
+import type { AgentConfigService } from './harness/agent-config.service';
+import type { McpClientService } from './mcp-client/mcp-client.service';
 
 describe('AutopilotService.trigger — agent selection & chaining', () => {
   const send = jest.fn();
@@ -27,6 +29,8 @@ describe('AutopilotService.trigger — agent selection & chaining', () => {
     {} as AgentAuditService,
     {} as SystemBriefService,
     {} as ToolRegistry,
+    {} as AgentConfigService,
+    {} as McpClientService,
   );
 
   beforeEach(() => jest.clearAllMocks());
