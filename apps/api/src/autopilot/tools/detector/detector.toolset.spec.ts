@@ -62,7 +62,10 @@ describe('DetectorToolset', () => {
         name: 'X',
         pipelineSchema: { type: 'GLINER2' },
       });
-      mockTests.evaluateSample.mockResolvedValue({ matched: false, findings: [] });
+      mockTests.evaluateSample.mockResolvedValue({
+        matched: false,
+        findings: [],
+      });
       await test().handler({ detectorId: 'd1', sampleText: 'hi' }, tc);
       expect(mockDetectors.getById).toHaveBeenCalledWith('d1');
       expect(mockTests.evaluateSample).toHaveBeenCalledWith(
@@ -72,9 +75,9 @@ describe('DetectorToolset', () => {
     });
 
     it('throws when neither detectorId nor pipelineSchema is given', async () => {
-      await expect(
-        test().handler({ sampleText: 'hi' }, tc),
-      ).rejects.toThrow(/detectorId or pipelineSchema/);
+      await expect(test().handler({ sampleText: 'hi' }, tc)).rejects.toThrow(
+        /detectorId or pipelineSchema/,
+      );
     });
 
     it('is a read tool (never gated)', () => {
@@ -97,7 +100,9 @@ describe('DetectorToolset', () => {
       );
       expect(mockDetectors.update).toHaveBeenCalledWith(
         'd1',
-        expect.objectContaining({ pipelineSchema: { type: 'REGEX', patterns: {} } }),
+        expect.objectContaining({
+          pipelineSchema: { type: 'REGEX', patterns: {} },
+        }),
       );
       expect(tool.decisionAction).toBe(AgentDecisionAction.UPDATE_DETECTOR);
       expect(tool.sideEffect).toBe('mutate');
@@ -136,7 +141,10 @@ describe('DetectorToolset', () => {
       mockDetectors.listExamples.mockReturnValue([
         { name: 'Ex', description: 'd', pipelineSchema: { type: 'REGEX' } },
       ]);
-      const out = (await byName('detector.examples').handler({}, tc)) as unknown[];
+      const out = (await byName('detector.examples').handler(
+        {},
+        tc,
+      )) as unknown[];
       expect(out).toHaveLength(1);
       expect(mockDetectors.listExamples).toHaveBeenCalled();
     });
