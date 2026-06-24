@@ -7102,6 +7102,8 @@
                 "TUNE_SOURCE",
                 "CREATE_DETECTOR",
                 "TRAIN_DETECTOR",
+                "UPDATE_DETECTOR",
+                "DELETE_DETECTOR",
                 "TRIGGER_SCAN",
                 "UPDATE_SYSTEM_BRIEF",
                 "RECOMPUTE_CORRELATION",
@@ -7213,6 +7215,77 @@
           }
         },
         "summary": "The harness capability map — every registered tool (read/mutate, domain) and the missions that use them",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/agents": {
+      "get": {
+        "operationId": "AutopilotController_getAgents",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Per-agent configuration: enable flag, goal, iteration budget and assigned built-in/MCP tools",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/agents/{kind}": {
+      "patch": {
+        "operationId": "AutopilotController_updateAgent",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INQUIRY",
+                "CASE",
+                "DREAM",
+                "DUPLICATES",
+                "CONFIG",
+                "DETECTOR_AUTHOR"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConfigDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Retune one agent — toggle it, edit its goal/iterations, or reassign its built-in tools",
         "tags": [
           "autopilot"
         ]
@@ -15669,6 +15742,7 @@
           },
           "agentKinds": {
             "type": "array",
+            "description": "Which agents to run. Pipeline agents (INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR) run in canonical order as one chained cycle; DREAM (memory consolidation, steered by instruction) and DUPLICATES (fingerprint consolidation, deterministic — instruction ignored) run as their own jobs. Omit to run the full pipeline. Forced to [CASE] when caseId is set.",
             "items": {
               "type": "string",
               "enum": [
@@ -15679,8 +15753,7 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR"
               ]
-            },
-            "description": "Which agents to run. Pipeline agents (INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR) run in canonical order as one chained cycle; DREAM (memory consolidation, steered by instruction) and DUPLICATES (fingerprint consolidation, deterministic — instruction ignored) run as their own jobs. Omit to run the full pipeline. Forced to [CASE] when caseId is set."
+            }
           },
           "caseId": {
             "type": "string",
@@ -15823,6 +15896,8 @@
               "TUNE_SOURCE",
               "CREATE_DETECTOR",
               "TRAIN_DETECTOR",
+              "UPDATE_DETECTOR",
+              "DELETE_DETECTOR",
               "TRIGGER_SCAN",
               "UPDATE_SYSTEM_BRIEF",
               "RECOMPUTE_CORRELATION",
@@ -15913,12 +15988,17 @@
             "type": "string",
             "nullable": true,
             "description": "Domain gated for OBSERVE_ONLY (inquiry/case/source/…)"
+          },
+          "source": {
+            "type": "string",
+            "description": "Origin of the tool: \"builtin\" (native toolset) or \"mcp\" (external server)"
           }
         },
         "required": [
           "name",
           "description",
-          "sideEffect"
+          "sideEffect",
+          "source"
         ]
       },
       "HarnessMissionDto": {
@@ -15977,6 +16057,123 @@
           "tools",
           "missions"
         ]
+      },
+      "AgentConfigDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE",
+              "DREAM",
+              "DUPLICATES",
+              "CONFIG",
+              "DETECTOR_AUTHOR"
+            ]
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the agent runs on scan cycles"
+          },
+          "enableable": {
+            "type": "boolean",
+            "description": "False when the agent has no enable toggle (DREAM)"
+          },
+          "goal": {
+            "type": "string",
+            "description": "Effective goal / system prompt"
+          },
+          "defaultGoal": {
+            "type": "string",
+            "description": "Factory-default goal (for reset)"
+          },
+          "maxIterations": {
+            "type": "number"
+          },
+          "defaultMaxIterations": {
+            "type": "number"
+          },
+          "toolNames": {
+            "description": "Assigned built-in tool names",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaultToolNames": {
+            "description": "Factory-default tool names",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mcpToolNames": {
+            "description": "MCP tools this agent receives via server scoping (read-only)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "customized": {
+            "type": "boolean",
+            "description": "True when config differs from factory defaults"
+          }
+        },
+        "required": [
+          "kind",
+          "enabled",
+          "enableable",
+          "goal",
+          "defaultGoal",
+          "maxIterations",
+          "defaultMaxIterations",
+          "toolNames",
+          "defaultToolNames",
+          "mcpToolNames",
+          "customized"
+        ]
+      },
+      "AgentConfigListResponseDto": {
+        "type": "object",
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentConfigDto"
+            }
+          }
+        },
+        "required": [
+          "agents"
+        ]
+      },
+      "UpdateAgentConfigDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable/disable the agent on scan cycles"
+          },
+          "goal": {
+            "type": "string",
+            "nullable": true,
+            "description": "Goal override; empty/null resets to factory default"
+          },
+          "maxIterations": {
+            "type": "number",
+            "nullable": true,
+            "description": "Iteration budget override (1–50); null resets to default"
+          },
+          "toolNames": {
+            "nullable": true,
+            "description": "Assigned built-in tool names; null resets to the factory toolset",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       },
       "AgentSystemBriefDto": {
         "type": "object",
@@ -16168,6 +16365,8 @@
               "TUNE_SOURCE",
               "CREATE_DETECTOR",
               "TRAIN_DETECTOR",
+              "UPDATE_DETECTOR",
+              "DELETE_DETECTOR",
               "TRIGGER_SCAN",
               "UPDATE_SYSTEM_BRIEF",
               "RECOMPUTE_CORRELATION",

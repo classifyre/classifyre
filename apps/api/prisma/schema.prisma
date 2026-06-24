@@ -1255,6 +1255,28 @@ model McpServerConfig {
   @@map("mcp_server_configs")
 }
 
+// Per-agent harness configuration. One optional row per AgentKind that has a
+// factory mission (see harness/missions.ts). Absent columns fall back to the
+// hardcoded factory default, so an absent row means "fully default". The
+// operator edits these via the Harness → Agents UI to retune an agent's goal,
+// iteration budget and assigned built-in tools without a code change.
+model AgentConfig {
+  kind          AgentKind @id
+  // Override for the mission goal (system prompt). null = factory default.
+  goal          String?   @db.Text
+  // Override for the iteration budget. null = factory default.
+  maxIterations Int?      @map("max_iterations")
+  // Assigned built-in tool names (used only when toolsOverride is true).
+  toolNames     String[]  @default([]) @map("tool_names")
+  // false = follow the factory toolset; true = use toolNames verbatim. Lets an
+  // empty assignment ("no tools") differ from "never customised".
+  toolsOverride Boolean   @default(false) @map("tools_override")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("agent_configs")
+}
+
 // Living, always-injected summary of the whole system the autopilot maintains:
 // source/detector counts, finding landscape, what's been tried, known gaps.
 // Singleton (id = 1), like InstanceSettings. The narrative is model-authored;
