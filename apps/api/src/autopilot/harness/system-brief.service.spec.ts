@@ -43,7 +43,6 @@ describe('SystemBriefService', () => {
         [AgentMemoryKind.ENTITY_MAP]: [
           { kind: 'ENTITY_MAP', key: 'leaks', content: 'maps to inquiry 1', weight: 2 },
         ],
-        [AgentMemoryKind.TOPIC_INQUIRY_MAP]: [],
         [AgentMemoryKind.DETECTOR_INSIGHT]: [
           {
             kind: 'DETECTOR_INSIGHT',

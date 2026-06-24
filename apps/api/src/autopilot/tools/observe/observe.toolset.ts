@@ -29,13 +29,18 @@ export class ObserveToolset {
       {
         name: 'findings.search',
         description:
-          'List open findings in scope, grouped by detector + finding type with bounded samples. Defaults to the current run/source scope.',
+          'List open findings in scope, grouped by detector + finding type with bounded samples. Defaults to the current run/source scope. Pass customDetectorKey to isolate the findings one custom detector produced (use it to verify a detector you authored).',
         inputSchema: {
           type: 'object',
           properties: {
             sourceId: {
               type: 'string',
               description: 'Optional source id; defaults to the run scope.',
+            },
+            customDetectorKey: {
+              type: 'string',
+              description:
+                'Optional: only findings from this custom detector key.',
             },
           },
           additionalProperties: false,
@@ -47,6 +52,7 @@ export class ObserveToolset {
           return this.search.summarizeNewFindings(
             sourceId,
             tc.ctx.manual ? null : tc.ctx.runnerId,
+            (input.customDetectorKey as string | undefined) ?? null,
           );
         },
       },
@@ -196,10 +202,7 @@ export class ObserveToolset {
               MAX_GLOSSARY_ENTRIES,
             ),
             this.memory.recall(
-              [
-                AgentMemoryKind.TOPIC_INQUIRY_MAP,
-                AgentMemoryKind.DECISION_PRECEDENT,
-              ],
+              [AgentMemoryKind.ENTITY_MAP, AgentMemoryKind.DECISION_PRECEDENT],
               terms,
             ),
           ]);

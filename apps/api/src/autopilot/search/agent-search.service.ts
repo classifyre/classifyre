@@ -47,12 +47,16 @@ export class AgentSearchService {
   async summarizeNewFindings(
     sourceId: string | null,
     runnerId: string | null,
+    customDetectorKey?: string | null,
   ): Promise<FindingGroupSummary[]> {
     const where: Prisma.FindingWhereInput = runnerId
       ? { runnerId, status: 'OPEN' }
       : sourceId
         ? { sourceId, status: 'OPEN' }
         : { status: 'OPEN' };
+    // Optional precision filter: isolate the findings a single custom detector
+    // produced, so the agent can verify a detector it just authored.
+    if (customDetectorKey) where.customDetectorKey = customDetectorKey;
 
     const rows = await this.prisma.finding.findMany({
       where,

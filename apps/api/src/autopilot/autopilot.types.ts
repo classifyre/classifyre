@@ -213,7 +213,6 @@ export interface MemoryWrite {
   kind:
     | 'GLOSSARY'
     | 'DECISION_PRECEDENT'
-    | 'TOPIC_INQUIRY_MAP'
     | 'ENTITY_MAP'
     | 'SOURCE_PROFILE'
     | 'DETECTOR_INSIGHT'

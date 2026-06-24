@@ -97,15 +97,11 @@ export class SystemBriefService {
    * server-composed coverage, glossary, topics, gaps and setup sections.
    */
   async compose(): Promise<ComposedBrief> {
-    const [brief, glossary, entityMaps, topicMaps, detectorInsights, precedents] =
+    const [brief, glossary, entityMaps, detectorInsights, precedents] =
       await Promise.all([
         this.get(),
         this.memory.topByWeight(AgentMemoryKind.GLOSSARY, MAX_GLOSSARY_ENTRIES),
         this.memory.topByWeight(AgentMemoryKind.ENTITY_MAP, MAX_TOPIC_ENTRIES),
-        this.memory.topByWeight(
-          AgentMemoryKind.TOPIC_INQUIRY_MAP,
-          MAX_TOPIC_ENTRIES,
-        ),
         this.memory.topByWeight(
           AgentMemoryKind.DETECTOR_INSIGHT,
           MAX_GAP_ENTRIES,
@@ -124,7 +120,7 @@ export class SystemBriefService {
       overview: brief.content.trim(),
       facts,
       glossary: glossary.map(toEntry),
-      topics: [...entityMaps, ...topicMaps].map(toEntry).slice(0, MAX_TOPIC_ENTRIES),
+      topics: entityMaps.map(toEntry).slice(0, MAX_TOPIC_ENTRIES),
       gaps: [...detectorInsights, ...precedents]
         .map(toEntry)
         .slice(0, MAX_GAP_ENTRIES),

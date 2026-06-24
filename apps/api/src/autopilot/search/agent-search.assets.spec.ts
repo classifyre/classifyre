@@ -8,7 +8,7 @@ describe('AgentSearchService — asset observation (cold start)', () => {
 
   const mockPrisma = {
     asset: { findMany: jest.fn() },
-    finding: { count: jest.fn() },
+    finding: { count: jest.fn(), findMany: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -84,6 +84,28 @@ describe('AgentSearchService — asset observation (cold start)', () => {
       mockPrisma.finding.count.mockResolvedValue(0);
       const profile = await service.assetMetadataProfile(null, null);
       expect(profile.scope).toBe('instance');
+    });
+  });
+
+  describe('summarizeNewFindings', () => {
+    it('applies the optional customDetectorKey filter to the query', async () => {
+      mockPrisma.finding.findMany.mockResolvedValue([]);
+      await service.summarizeNewFindings('s1', null, 'my-detector');
+      expect(mockPrisma.finding.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            sourceId: 's1',
+            customDetectorKey: 'my-detector',
+          }),
+        }),
+      );
+    });
+
+    it('omits the filter when no customDetectorKey is given', async () => {
+      mockPrisma.finding.findMany.mockResolvedValue([]);
+      await service.summarizeNewFindings('s1', null);
+      const where = mockPrisma.finding.findMany.mock.calls[0]![0].where;
+      expect(where.customDetectorKey).toBeUndefined();
     });
   });
 });
