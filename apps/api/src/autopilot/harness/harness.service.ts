@@ -9,6 +9,7 @@ import type { ApplySummary } from '../decision-applier.service';
 import type { AgentContext } from '../autopilot.types';
 import { runAgentLoop, type AgentLoopResult } from './agent-loop';
 import { missionFor, type Mission } from './missions';
+import { AgentConfigService } from './agent-config.service';
 import { SystemBriefService } from './system-brief.service';
 import { McpClientService } from '../mcp-client/mcp-client.service';
 
@@ -30,6 +31,7 @@ export class HarnessService {
     private readonly log: AgentLoggerService,
     private readonly brief: SystemBriefService,
     private readonly mcp: McpClientService,
+    private readonly agentConfig: AgentConfigService,
   ) {}
 
   /** True when the given AgentKind has a harness mission. */
@@ -38,7 +40,8 @@ export class HarnessService {
   }
 
   async execute(ctx: AgentContext, mission?: Mission): Promise<ApplySummary> {
-    const resolved = mission ?? missionFor(ctx.run.agentKind);
+    const resolved =
+      mission ?? (await this.agentConfig.resolveMission(ctx.run.agentKind));
     if (!resolved) {
       throw new Error(`No harness mission for agent kind ${ctx.run.agentKind}`);
     }

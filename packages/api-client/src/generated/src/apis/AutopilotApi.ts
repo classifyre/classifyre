@@ -16,6 +16,8 @@
 import * as runtime from '../runtime';
 import type {
   AgentActivityListResponseDto,
+  AgentConfigDto,
+  AgentConfigListResponseDto,
   AgentLogListResponseDto,
   AgentMemoryDto,
   AgentMemoryListResponseDto,
@@ -31,6 +33,7 @@ import type {
   McpServerTestResultDto,
   TriggerAutopilotDto,
   TriggerAutopilotResponseDto,
+  UpdateAgentConfigDto,
   UpdateAgentMemoryDto,
   UpdateMcpServerDto,
   UpdateSystemBriefDto,
@@ -38,6 +41,10 @@ import type {
 import {
     AgentActivityListResponseDtoFromJSON,
     AgentActivityListResponseDtoToJSON,
+    AgentConfigDtoFromJSON,
+    AgentConfigDtoToJSON,
+    AgentConfigListResponseDtoFromJSON,
+    AgentConfigListResponseDtoToJSON,
     AgentLogListResponseDtoFromJSON,
     AgentLogListResponseDtoToJSON,
     AgentMemoryDtoFromJSON,
@@ -68,6 +75,8 @@ import {
     TriggerAutopilotDtoToJSON,
     TriggerAutopilotResponseDtoFromJSON,
     TriggerAutopilotResponseDtoToJSON,
+    UpdateAgentConfigDtoFromJSON,
+    UpdateAgentConfigDtoToJSON,
     UpdateAgentMemoryDtoFromJSON,
     UpdateAgentMemoryDtoToJSON,
     UpdateMcpServerDtoFromJSON,
@@ -137,6 +146,11 @@ export interface AutopilotControllerRerunRunRequest {
 
 export interface AutopilotControllerTriggerRequest {
     triggerAutopilotDto: TriggerAutopilotDto;
+}
+
+export interface AutopilotControllerUpdateAgentRequest {
+    kind: AutopilotControllerUpdateAgentKindEnum;
+    updateAgentConfigDto: UpdateAgentConfigDto;
 }
 
 export interface AutopilotControllerUpdateMemoryRequest {
@@ -280,6 +294,35 @@ export class AutopilotApi extends runtime.BaseAPI {
      */
     async autopilotControllerDeleteMemory(requestParameters: AutopilotControllerDeleteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.autopilotControllerDeleteMemoryRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Per-agent configuration: enable flag, goal, iteration budget and assigned built-in/MCP tools
+     */
+    async autopilotControllerGetAgentsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentConfigListResponseDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/agents`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AgentConfigListResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Per-agent configuration: enable flag, goal, iteration budget and assigned built-in/MCP tools
+     */
+    async autopilotControllerGetAgents(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentConfigListResponseDto> {
+        const response = await this.autopilotControllerGetAgentsRaw(initOverrides);
+        return await response.value();
     }
 
     /**
@@ -740,6 +783,53 @@ export class AutopilotApi extends runtime.BaseAPI {
     }
 
     /**
+     * Retune one agent — toggle it, edit its goal/iterations, or reassign its built-in tools
+     */
+    async autopilotControllerUpdateAgentRaw(requestParameters: AutopilotControllerUpdateAgentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentConfigDto>> {
+        if (requestParameters['kind'] == null) {
+            throw new runtime.RequiredError(
+                'kind',
+                'Required parameter "kind" was null or undefined when calling autopilotControllerUpdateAgent().'
+            );
+        }
+
+        if (requestParameters['updateAgentConfigDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateAgentConfigDto',
+                'Required parameter "updateAgentConfigDto" was null or undefined when calling autopilotControllerUpdateAgent().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/autopilot/agents/{kind}`;
+        urlPath = urlPath.replace(`{${"kind"}}`, encodeURIComponent(String(requestParameters['kind'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateAgentConfigDtoToJSON(requestParameters['updateAgentConfigDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AgentConfigDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Retune one agent — toggle it, edit its goal/iterations, or reassign its built-in tools
+     */
+    async autopilotControllerUpdateAgent(requestParameters: AutopilotControllerUpdateAgentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentConfigDto> {
+        const response = await this.autopilotControllerUpdateAgentRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Edit a memory entry (content, tags, weight)
      */
     async autopilotControllerUpdateMemoryRaw(requestParameters: AutopilotControllerUpdateMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentMemoryDto>> {
@@ -1084,6 +1174,8 @@ export const AutopilotControllerListActivityActionEnum = {
     TuneSource: 'TUNE_SOURCE',
     CreateDetector: 'CREATE_DETECTOR',
     TrainDetector: 'TRAIN_DETECTOR',
+    UpdateDetector: 'UPDATE_DETECTOR',
+    DeleteDetector: 'DELETE_DETECTOR',
     TriggerScan: 'TRIGGER_SCAN',
     UpdateSystemBrief: 'UPDATE_SYSTEM_BRIEF',
     RecomputeCorrelation: 'RECOMPUTE_CORRELATION',
@@ -1155,3 +1247,15 @@ export const AutopilotControllerListRunsStatusEnum = {
     Cancelled: 'CANCELLED'
 } as const;
 export type AutopilotControllerListRunsStatusEnum = typeof AutopilotControllerListRunsStatusEnum[keyof typeof AutopilotControllerListRunsStatusEnum];
+/**
+ * @export
+ */
+export const AutopilotControllerUpdateAgentKindEnum = {
+    Inquiry: 'INQUIRY',
+    Case: 'CASE',
+    Dream: 'DREAM',
+    Duplicates: 'DUPLICATES',
+    Config: 'CONFIG',
+    DetectorAuthor: 'DETECTOR_AUTHOR'
+} as const;
+export type AutopilotControllerUpdateAgentKindEnum = typeof AutopilotControllerUpdateAgentKindEnum[keyof typeof AutopilotControllerUpdateAgentKindEnum];

@@ -9,6 +9,8 @@ docs/AddFindingDto.md
 docs/AddThreadEntryDto.md
 docs/AgentActivityItemDto.md
 docs/AgentActivityListResponseDto.md
+docs/AgentConfigDto.md
+docs/AgentConfigListResponseDto.md
 docs/AgentDecisionDto.md
 docs/AgentLogDto.md
 docs/AgentLogListResponseDto.md
@@ -242,6 +244,7 @@ docs/TrainingExamplesStatsDto.md
 docs/TrainingExamplesStatsDtoByLabelValue.md
 docs/TriggerAutopilotDto.md
 docs/TriggerAutopilotResponseDto.md
+docs/UpdateAgentConfigDto.md
 docs/UpdateAgentMemoryDto.md
 docs/UpdateAiProviderConfigDto.md
 docs/UpdateCaseDto.md
@@ -293,6 +296,8 @@ src/models/AddFindingDto.ts
 src/models/AddThreadEntryDto.ts
 src/models/AgentActivityItemDto.ts
 src/models/AgentActivityListResponseDto.ts
+src/models/AgentConfigDto.ts
+src/models/AgentConfigListResponseDto.ts
 src/models/AgentDecisionDto.ts
 src/models/AgentLogDto.ts
 src/models/AgentLogListResponseDto.ts
@@ -507,6 +512,7 @@ src/models/TrainingExamplesStatsDto.ts
 src/models/TrainingExamplesStatsDtoByLabelValue.ts
 src/models/TriggerAutopilotDto.ts
 src/models/TriggerAutopilotResponseDto.ts
+src/models/UpdateAgentConfigDto.ts
 src/models/UpdateAgentMemoryDto.ts
 src/models/UpdateAiProviderConfigDto.ts
 src/models/UpdateCaseDto.ts
