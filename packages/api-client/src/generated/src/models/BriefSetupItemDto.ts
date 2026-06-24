@@ -14,7 +14,7 @@
 
 import { mapValues } from '../runtime';
 /**
- *
+ * 
  * @export
  * @interface BriefSetupItemDto
  */
@@ -26,13 +26,13 @@ export interface BriefSetupItemDto {
      */
     status: BriefSetupItemDtoStatusEnum;
     /**
-     *
+     * 
      * @type {string}
      * @memberof BriefSetupItemDto
      */
     label: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof BriefSetupItemDto
      */
@@ -70,7 +70,7 @@ export function BriefSetupItemDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         return json;
     }
     return {
-
+        
         'status': json['status'],
         'label': json['label'],
         'detail': json['detail'],
@@ -87,7 +87,7 @@ export function BriefSetupItemDtoToJSONTyped(value?: BriefSetupItemDto | null, i
     }
 
     return {
-
+        
         'status': value['status'],
         'label': value['label'],
         'detail': value['detail'],

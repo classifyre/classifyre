@@ -14,25 +14,25 @@
 
 import { mapValues } from '../runtime';
 /**
- *
+ * 
  * @export
  * @interface BriefMemoryEntryDto
  */
 export interface BriefMemoryEntryDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof BriefMemoryEntryDto
      */
     key: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof BriefMemoryEntryDto
      */
     content: string;
     /**
-     *
+     * 
      * @type {number}
      * @memberof BriefMemoryEntryDto
      */
@@ -58,7 +58,7 @@ export function BriefMemoryEntryDtoFromJSONTyped(json: any, ignoreDiscriminator:
         return json;
     }
     return {
-
+        
         'key': json['key'],
         'content': json['content'],
         'weight': json['weight'],
@@ -75,7 +75,7 @@ export function BriefMemoryEntryDtoToJSONTyped(value?: BriefMemoryEntryDto | nul
     }
 
     return {
-
+        
         'key': value['key'],
         'content': value['content'],
         'weight': value['weight'],

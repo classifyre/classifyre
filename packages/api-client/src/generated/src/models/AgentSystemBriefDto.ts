@@ -29,7 +29,7 @@ import {
 } from './BriefSetupItemDto';
 
 /**
- *
+ * 
  * @export
  * @interface AgentSystemBriefDto
  */
@@ -71,19 +71,19 @@ export interface AgentSystemBriefDto {
      */
     setup: Array<BriefSetupItemDto>;
     /**
-     *
+     * 
      * @type {number}
      * @memberof AgentSystemBriefDto
      */
     version: number;
     /**
-     *
+     * 
      * @type {string}
      * @memberof AgentSystemBriefDto
      */
     updatedBy?: string | null;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof AgentSystemBriefDto
      */
@@ -113,7 +113,7 @@ export function AgentSystemBriefDtoFromJSONTyped(json: any, ignoreDiscriminator:
         return json;
     }
     return {
-
+        
         'content': json['content'],
         'facts': json['facts'],
         'glossary': ((json['glossary'] as Array<any>).map(BriefMemoryEntryDtoFromJSON)),
@@ -136,7 +136,7 @@ export function AgentSystemBriefDtoToJSONTyped(value?: AgentSystemBriefDto | nul
     }
 
     return {
-
+        
         'content': value['content'],
         'facts': value['facts'],
         'glossary': ((value['glossary'] as Array<any>).map(BriefMemoryEntryDtoToJSON)),
