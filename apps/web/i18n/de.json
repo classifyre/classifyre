@@ -2621,5 +2621,21 @@
       "editTitle": "MCP-Server bearbeiten",
       "addTitle": "MCP-Server hinzufügen"
     }
+  },
+  "aiHealth": {
+    "fix": "Beheben",
+    "fixInSettings": "In Einstellungen beheben",
+    "disabled": {
+      "title": "KI ist deaktiviert",
+      "desc": "Aktivieren Sie KI in den Einstellungen, um Assistent und Autopilot zu nutzen."
+    },
+    "not_configured": {
+      "title": "KI nicht konfiguriert",
+      "desc": "Fügen Sie einen KI-Anbieter hinzu und legen Sie ihn als Standard fest, um Assistent und Autopilot zu aktivieren."
+    },
+    "error": {
+      "title": "KI-Anbieter-Problem",
+      "desc": "Der Standard-KI-Anbieter hat eine Verbindungs-/Structured-Output-Prüfung nicht bestanden. Öffnen Sie die Einstellungen, um ihn erneut zu testen oder zu beheben."
+    }
   }
 }

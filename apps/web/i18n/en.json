@@ -2621,5 +2621,21 @@
       "editTitle": "Edit MCP server",
       "addTitle": "Add MCP server"
     }
+  },
+  "aiHealth": {
+    "fix": "Fix",
+    "fixInSettings": "Fix in settings",
+    "disabled": {
+      "title": "AI is turned off",
+      "desc": "Enable AI in Settings to use the assistant and autopilot."
+    },
+    "not_configured": {
+      "title": "AI not configured",
+      "desc": "Add an AI provider and set it as the default to enable the assistant and autopilot."
+    },
+    "error": {
+      "title": "AI provider problem",
+      "desc": "The default AI provider failed a connection / structured-output check. Open Settings to re-test or fix it."
+    }
   }
 }
