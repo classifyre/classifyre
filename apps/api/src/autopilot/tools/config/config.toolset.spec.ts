@@ -128,20 +128,32 @@ describe('ConfigToolset — sources.rescan', () => {
     mockPrisma.runner.findUnique.mockResolvedValue({ triggerType: 'MANUAL' });
     mockCliRunner.startRun.mockResolvedValue({ id: 'run-new' });
 
-    const res = (await rescan.handler({ sourceId: 's1' }, ctxWith('run-1'))) as {
+    const res = (await rescan.handler(
+      { sourceId: 's1' },
+      ctxWith('run-1'),
+    )) as {
       ok?: boolean;
       runnerId?: string;
     };
 
-    expect(mockCliRunner.startRun).toHaveBeenCalledWith('s1', 'AUTOPILOT', expect.any(String));
+    expect(mockCliRunner.startRun).toHaveBeenCalledWith(
+      's1',
+      'AUTOPILOT',
+      expect.any(String),
+    );
     expect(res.ok).toBe(true);
     expect(res.runnerId).toBe('run-new');
   });
 
   it('suppresses the rescan when the current cycle is itself a verification run', async () => {
-    mockPrisma.runner.findUnique.mockResolvedValue({ triggerType: 'AUTOPILOT' });
+    mockPrisma.runner.findUnique.mockResolvedValue({
+      triggerType: 'AUTOPILOT',
+    });
 
-    const res = (await rescan.handler({ sourceId: 's1' }, ctxWith('run-ai'))) as {
+    const res = (await rescan.handler(
+      { sourceId: 's1' },
+      ctxWith('run-ai'),
+    )) as {
       skipped?: string;
     };
 
@@ -151,9 +163,14 @@ describe('ConfigToolset — sources.rescan', () => {
 
   it('returns a graceful skip when a scan is already running', async () => {
     mockPrisma.runner.findUnique.mockResolvedValue({ triggerType: 'MANUAL' });
-    mockCliRunner.startRun.mockRejectedValue(new Error('scan already in progress'));
+    mockCliRunner.startRun.mockRejectedValue(
+      new Error('scan already in progress'),
+    );
 
-    const res = (await rescan.handler({ sourceId: 's1' }, ctxWith('run-1'))) as {
+    const res = (await rescan.handler(
+      { sourceId: 's1' },
+      ctxWith('run-1'),
+    )) as {
       skipped?: string;
     };
 

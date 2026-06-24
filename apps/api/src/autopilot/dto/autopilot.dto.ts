@@ -567,7 +567,8 @@ export class AgentSystemBriefDto {
 
   @ApiProperty({
     type: [BriefMemoryEntryDto],
-    description: 'Topic → entity/inquiry maps, composed from memory (read-only).',
+    description:
+      'Topic → entity/inquiry maps, composed from memory (read-only).',
   })
   topics!: BriefMemoryEntryDto[];
 

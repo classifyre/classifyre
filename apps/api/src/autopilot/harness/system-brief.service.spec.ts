@@ -41,7 +41,12 @@ describe('SystemBriefService', () => {
           { kind: 'GLOSSARY', key: 'pii', content: 'personal data', weight: 3 },
         ],
         [AgentMemoryKind.ENTITY_MAP]: [
-          { kind: 'ENTITY_MAP', key: 'leaks', content: 'maps to inquiry 1', weight: 2 },
+          {
+            kind: 'ENTITY_MAP',
+            key: 'leaks',
+            content: 'maps to inquiry 1',
+            weight: 2,
+          },
         ],
         [AgentMemoryKind.DETECTOR_INSIGHT]: [
           {
@@ -97,7 +102,11 @@ describe('SystemBriefService', () => {
       topics: [{ key: 'leaks', content: 'maps to inquiry 1', weight: 2 }],
       gaps: [{ key: 'detector-author:iban', content: 'abandoned', weight: 1 }],
       setup: [
-        { status: 'ok', label: 'AI provider configured', detail: '1 provider.' },
+        {
+          status: 'ok',
+          label: 'AI provider configured',
+          detail: '1 provider.',
+        },
       ],
       version: 4,
       updatedBy: 'ai-autopilot',

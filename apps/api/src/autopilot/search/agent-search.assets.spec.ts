@@ -63,8 +63,16 @@ describe('AgentSearchService — asset observation (cold start)', () => {
   describe('assetMetadataProfile', () => {
     it('aggregates asset/source kinds and flags hasFindings=false on cold start', async () => {
       mockPrisma.asset.findMany.mockResolvedValue([
-        { assetType: 'table', sourceType: 'POSTGRES', metadata: { column_names: [] } },
-        { assetType: 'table', sourceType: 'POSTGRES', metadata: { row_count: 5 } },
+        {
+          assetType: 'table',
+          sourceType: 'POSTGRES',
+          metadata: { column_names: [] },
+        },
+        {
+          assetType: 'table',
+          sourceType: 'POSTGRES',
+          metadata: { row_count: 5 },
+        },
         { assetType: 'file', sourceType: 'S3', metadata: null },
       ]);
       mockPrisma.finding.count.mockResolvedValue(0);
@@ -74,9 +82,9 @@ describe('AgentSearchService — asset observation (cold start)', () => {
       expect(profile.totalAssets).toBe(3);
       expect(profile.hasFindings).toBe(false);
       expect(profile.assetTypes[0]).toEqual({ type: 'table', count: 2 });
-      expect(
-        profile.commonMetadataKeys.map((k) => k.type),
-      ).toEqual(expect.arrayContaining(['column_names', 'row_count']));
+      expect(profile.commonMetadataKeys.map((k) => k.type)).toEqual(
+        expect.arrayContaining(['column_names', 'row_count']),
+      );
     });
 
     it('reports instance scope when neither source nor runner is given', async () => {

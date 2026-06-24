@@ -160,7 +160,10 @@ export class SystemBriefService {
       sections.push(heading('Topics'), bullets(brief.topics));
     }
     if (brief.gaps.length > 0) {
-      sections.push(heading("What's been tried / known gaps"), bullets(brief.gaps));
+      sections.push(
+        heading("What's been tried / known gaps"),
+        bullets(brief.gaps),
+      );
     }
     if (brief.setup.length > 0) {
       sections.push(

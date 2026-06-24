@@ -140,7 +140,9 @@ export class AgentSearchService {
     });
     return rows.map((a) => {
       const meta =
-        a.metadata && typeof a.metadata === 'object' && !Array.isArray(a.metadata)
+        a.metadata &&
+        typeof a.metadata === 'object' &&
+        !Array.isArray(a.metadata)
           ? (a.metadata as Record<string, unknown>)
           : {};
       const keys = Object.keys(meta);
@@ -190,11 +192,7 @@ export class AgentSearchService {
         take: ASSET_PROFILE_SCAN_LIMIT,
       }),
       this.prisma.finding.count({
-        where: runnerId
-          ? { runnerId }
-          : sourceId
-            ? { sourceId }
-            : {},
+        where: runnerId ? { runnerId } : sourceId ? { sourceId } : {},
       }),
     ]);
 
@@ -204,8 +202,12 @@ export class AgentSearchService {
     for (const a of rows) {
       bump(assetTypes, a.assetType);
       bump(sourceTypes, String(a.sourceType));
-      if (a.metadata && typeof a.metadata === 'object' && !Array.isArray(a.metadata)) {
-        for (const key of Object.keys(a.metadata as Record<string, unknown>)) {
+      if (
+        a.metadata &&
+        typeof a.metadata === 'object' &&
+        !Array.isArray(a.metadata)
+      ) {
+        for (const key of Object.keys(a.metadata)) {
           bump(metadataKeys, key);
         }
       }
@@ -588,9 +590,22 @@ function previewValue(value: unknown): string {
       .slice(0, 5)
       .map((v) => (typeof v === 'object' ? '{…}' : String(v)))
       .join(', ');
-    return truncate(`[${head}${value.length > 5 ? ', …' : ''}]`,
-      MAX_ASSET_METADATA_PREVIEW_LENGTH);
+    return truncate(
+      `[${head}${value.length > 5 ? ', …' : ''}]`,
+      MAX_ASSET_METADATA_PREVIEW_LENGTH,
+    );
   }
   if (typeof value === 'object') return '{…}';
-  return truncate(String(value), MAX_ASSET_METADATA_PREVIEW_LENGTH);
+  if (typeof value === 'string') {
+    return truncate(value, MAX_ASSET_METADATA_PREVIEW_LENGTH);
+  }
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    return truncate(String(value), MAX_ASSET_METADATA_PREVIEW_LENGTH);
+  }
+  // symbol / function — no useful preview.
+  return '';
 }
