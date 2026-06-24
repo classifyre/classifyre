@@ -2517,7 +2517,18 @@
       "cancel": "Cancel",
       "saving": "Saving…",
       "saved": "System brief saved",
-      "placeholder": "Describe the system: sources, detectors, what's been tried, known gaps…"
+      "placeholder": "Describe the system: sources, detectors, what's been tried, known gaps…",
+      "overview": "Overview",
+      "overviewEmpty": "No overview yet",
+      "overviewDesc": "A short, durable framing the harness keeps. Everything below is composed automatically.",
+      "coverage": "Coverage",
+      "glossary": "Glossary",
+      "topics": "Topics",
+      "gaps": "What's been tried / known gaps",
+      "setup": "Setup & next steps",
+      "composed": "Composed automatically",
+      "emptySection": "Nothing recorded yet",
+      "weight": "×{{n}}"
     },
     "config": {
       "title": "Harness configuration",

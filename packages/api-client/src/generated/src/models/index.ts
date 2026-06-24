@@ -23,6 +23,8 @@ export * from './AiMessageDto';
 export * from './AiProviderConfigResponseDto';
 export * from './AiProviderConfigTestResultDto';
 export * from './AssetFindingDetectorCountDto';
+export * from './BriefMemoryEntryDto';
+export * from './BriefSetupItemDto';
 export * from './AssetFindingSeverityCountDto';
 export * from './AssetFindingStatusCountDto';
 export * from './AssetFindingSummaryDto';

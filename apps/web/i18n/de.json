@@ -2517,7 +2517,18 @@
       "cancel": "Abbrechen",
       "saving": "Speichern…",
       "saved": "System-Briefing gespeichert",
-      "placeholder": "Beschreiben Sie das System: Quellen, Detektoren, was versucht wurde, bekannte Lücken…"
+      "placeholder": "Beschreiben Sie das System: Quellen, Detektoren, was versucht wurde, bekannte Lücken…",
+      "overview": "Übersicht",
+      "overviewEmpty": "Noch keine Übersicht",
+      "overviewDesc": "Eine kurze, dauerhafte Einordnung, die der Harness pflegt. Alles Weitere wird automatisch zusammengestellt.",
+      "coverage": "Abdeckung",
+      "glossary": "Glossar",
+      "topics": "Themen",
+      "gaps": "Versucht / bekannte Lücken",
+      "setup": "Einrichtung & nächste Schritte",
+      "composed": "Automatisch zusammengestellt",
+      "emptySection": "Noch nichts erfasst",
+      "weight": "×{{n}}"
     },
     "config": {
       "title": "Harness-Konfiguration",

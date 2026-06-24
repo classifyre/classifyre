@@ -51,6 +51,54 @@ export class ObserveToolset {
         },
       },
       {
+        name: 'assets.profile',
+        description:
+          'Aggregate shape of the ingested assets in scope: asset/source kinds, the most common metadata fields, and whether any finding exists yet. Use this to bootstrap detection on a source that has produced no findings (cold start).',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            sourceId: {
+              type: 'string',
+              description: 'Optional source id; defaults to the run scope.',
+            },
+          },
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: async (input, tc) => {
+          const sourceId =
+            (input.sourceId as string | undefined) ?? tc.ctx.sourceId;
+          return this.search.assetMetadataProfile(
+            sourceId,
+            tc.ctx.manual ? null : tc.ctx.runnerId,
+          );
+        },
+      },
+      {
+        name: 'assets.sample',
+        description:
+          'Bounded, redacted sample of raw assets in scope — name, kind and a preview of each asset’s metadata fields. The concrete material to hypothesise a detector from when there are no findings to learn from.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            sourceId: {
+              type: 'string',
+              description: 'Optional source id; defaults to the run scope.',
+            },
+          },
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: async (input, tc) => {
+          const sourceId =
+            (input.sourceId as string | undefined) ?? tc.ctx.sourceId;
+          return this.search.sampleAssets(
+            sourceId,
+            tc.ctx.manual ? null : tc.ctx.runnerId,
+          );
+        },
+      },
+      {
         name: 'inquiries.list',
         description:
           'List all ACTIVE inquiries as compact summaries (matchers, counts, linked cases) for dedupe/enrichment.',

@@ -521,8 +521,36 @@ export class UpdateAgentMemoryDto {
 
 // ── System brief ───────────────────────────────────────────────────────────────
 
+export class BriefMemoryEntryDto {
+  @ApiProperty()
+  key!: string;
+
+  @ApiProperty()
+  content!: string;
+
+  @ApiProperty()
+  weight!: number;
+}
+
+export class BriefSetupItemDto {
+  @ApiProperty({
+    enum: ['ok', 'todo', 'info'],
+    description: 'ok = satisfied, todo = action recommended, info = neutral',
+  })
+  status!: 'ok' | 'todo' | 'info';
+
+  @ApiProperty()
+  label!: string;
+
+  @ApiProperty()
+  detail!: string;
+}
+
 export class AgentSystemBriefDto {
-  @ApiProperty({ description: 'Model-authored narrative of the whole system' })
+  @ApiProperty({
+    description:
+      'Model-authored overview narrative (the only free-form, editable slot).',
+  })
   content!: string;
 
   @ApiProperty({
@@ -530,6 +558,31 @@ export class AgentSystemBriefDto {
       'Structured snapshot (source/detector counts, finding landscape, …)',
   })
   facts!: Record<string, unknown>;
+
+  @ApiProperty({
+    type: [BriefMemoryEntryDto],
+    description: 'Glossary terms, composed from agent memory (read-only).',
+  })
+  glossary!: BriefMemoryEntryDto[];
+
+  @ApiProperty({
+    type: [BriefMemoryEntryDto],
+    description: 'Topic → entity/inquiry maps, composed from memory (read-only).',
+  })
+  topics!: BriefMemoryEntryDto[];
+
+  @ApiProperty({
+    type: [BriefMemoryEntryDto],
+    description:
+      "What's been tried / known gaps (detector insights, precedents).",
+  })
+  gaps!: BriefMemoryEntryDto[];
+
+  @ApiProperty({
+    type: [BriefSetupItemDto],
+    description: 'Server-derived setup checklist for standing up the instance.',
+  })
+  setup!: BriefSetupItemDto[];
 
   @ApiProperty()
   version!: number;

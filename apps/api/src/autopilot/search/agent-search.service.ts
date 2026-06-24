@@ -3,6 +3,12 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { InquiryMatchingService } from '../../matching/inquiry-matching.service';
 import {
+  ASSET_PROFILE_SCAN_LIMIT,
+  MAX_ASSET_METADATA_KEY_BUCKETS,
+  MAX_ASSET_METADATA_PREVIEW_KEYS,
+  MAX_ASSET_METADATA_PREVIEW_LENGTH,
+  MAX_ASSET_SAMPLES,
+  MAX_ASSET_TYPE_BUCKETS,
   MAX_CANDIDATE_INQUIRIES,
   MAX_CASE_SUMMARIES,
   MAX_DUPLICATE_CLUSTERS,
@@ -13,6 +19,8 @@ import {
   MAX_SAMPLE_VALUE_LENGTH,
 } from '../autopilot.constants';
 import type {
+  AssetMetadataProfile,
+  AssetSampleSummary,
   CaseSummary,
   DuplicateSummary,
   FindingGroupSummary,
@@ -96,6 +104,120 @@ export class AgentSearchService {
     return [...groups.values()]
       .sort((a, b) => b.count - a.count)
       .slice(0, MAX_FINDING_GROUPS);
+  }
+
+  /**
+   * Bounded, redacted sample of the raw assets in scope — name, kind and a
+   * preview of their metadata. The cold-start signal: when a source has been
+   * ingested but no detectors fired, this is the only material the harness has
+   * to hypothesise what to detect. Scope narrows runner → source → instance.
+   */
+  async sampleAssets(
+    sourceId: string | null,
+    runnerId: string | null,
+  ): Promise<AssetSampleSummary[]> {
+    const where: Prisma.AssetWhereInput = runnerId
+      ? { runnerId }
+      : sourceId
+        ? { sourceId }
+        : {};
+    const rows = await this.prisma.asset.findMany({
+      where,
+      select: {
+        id: true,
+        assetType: true,
+        sourceType: true,
+        name: true,
+        externalUrl: true,
+        metadata: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: MAX_ASSET_SAMPLES,
+    });
+    return rows.map((a) => {
+      const meta =
+        a.metadata && typeof a.metadata === 'object' && !Array.isArray(a.metadata)
+          ? (a.metadata as Record<string, unknown>)
+          : {};
+      const keys = Object.keys(meta);
+      const preview: Record<string, string> = {};
+      for (const key of keys.slice(0, MAX_ASSET_METADATA_PREVIEW_KEYS)) {
+        preview[key] = previewValue(meta[key]);
+      }
+      return {
+        id: a.id,
+        assetType: a.assetType,
+        sourceType: String(a.sourceType),
+        name: truncate(a.name, MAX_SAMPLE_VALUE_LENGTH),
+        url: a.externalUrl
+          ? truncate(a.externalUrl, MAX_SAMPLE_VALUE_LENGTH)
+          : null,
+        metadataKeys: keys,
+        metadataPreview: preview,
+      };
+    });
+  }
+
+  /**
+   * Aggregate metadata profile of the assets in scope: asset/source kinds and
+   * the most common metadata fields, plus whether any finding exists yet. The
+   * CONFIG and DETECTOR_AUTHOR missions read this to bootstrap detection on a
+   * source that has produced no findings.
+   */
+  async assetMetadataProfile(
+    sourceId: string | null,
+    runnerId: string | null,
+  ): Promise<AssetMetadataProfile> {
+    const where: Prisma.AssetWhereInput = runnerId
+      ? { runnerId }
+      : sourceId
+        ? { sourceId }
+        : {};
+    const scope: AssetMetadataProfile['scope'] = runnerId
+      ? 'runner'
+      : sourceId
+        ? 'source'
+        : 'instance';
+
+    const [rows, findingCount] = await Promise.all([
+      this.prisma.asset.findMany({
+        where,
+        select: { assetType: true, sourceType: true, metadata: true },
+        take: ASSET_PROFILE_SCAN_LIMIT,
+      }),
+      this.prisma.finding.count({
+        where: runnerId
+          ? { runnerId }
+          : sourceId
+            ? { sourceId }
+            : {},
+      }),
+    ]);
+
+    const assetTypes = new Map<string, number>();
+    const sourceTypes = new Map<string, number>();
+    const metadataKeys = new Map<string, number>();
+    for (const a of rows) {
+      bump(assetTypes, a.assetType);
+      bump(sourceTypes, String(a.sourceType));
+      if (a.metadata && typeof a.metadata === 'object' && !Array.isArray(a.metadata)) {
+        for (const key of Object.keys(a.metadata as Record<string, unknown>)) {
+          bump(metadataKeys, key);
+        }
+      }
+    }
+
+    return {
+      scope,
+      totalAssets: rows.length,
+      hasFindings: findingCount > 0,
+      assetTypes: topBuckets(assetTypes, MAX_ASSET_TYPE_BUCKETS),
+      sourceTypes: topBuckets(sourceTypes, MAX_ASSET_TYPE_BUCKETS),
+      commonMetadataKeys: topBuckets(
+        metadataKeys,
+        MAX_ASSET_METADATA_KEY_BUCKETS,
+      ),
+    };
   }
 
   /** All ACTIVE inquiries (capped) as compact summaries for dedupe/enrichment. */
@@ -437,4 +559,34 @@ export class AgentSearchService {
 
 function truncate(value: string, max: number): string {
   return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
+function bump(map: Map<string, number>, key: string): void {
+  map.set(key, (map.get(key) ?? 0) + 1);
+}
+
+/** Highest-count entries of a tally, descending, capped. */
+function topBuckets(
+  map: Map<string, number>,
+  limit: number,
+): Array<{ type: string; count: number }> {
+  return [...map.entries()]
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
+/** Compact, redacted preview of a metadata value (structure, not full content). */
+function previewValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (Array.isArray(value)) {
+    const head = value
+      .slice(0, 5)
+      .map((v) => (typeof v === 'object' ? '{…}' : String(v)))
+      .join(', ');
+    return truncate(`[${head}${value.length > 5 ? ', …' : ''}]`,
+      MAX_ASSET_METADATA_PREVIEW_LENGTH);
+  }
+  if (typeof value === 'object') return '{…}';
+  return truncate(String(value), MAX_ASSET_METADATA_PREVIEW_LENGTH);
 }

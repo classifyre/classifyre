@@ -29,6 +29,13 @@ const OBSERVE_TOOLS = [
 /** Learning tools available to every mission. */
 const KNOWLEDGE_TOOLS = ['memory.write'];
 
+/**
+ * Raw-asset observation. The cold-start signal: when a source has produced no
+ * findings, these expose the ingested assets' kinds and metadata shape so a
+ * mission can reason about what to detect from the data itself.
+ */
+const ASSET_OBSERVE_TOOLS = ['assets.profile', 'assets.sample'];
+
 const INVESTIGATION_INQUIRY_TOOLS = [
   'inquiries.create',
   'inquiries.update',
@@ -106,9 +113,15 @@ export const CONFIG_MISSION: Mission = {
     'noise. You may ONLY change those editable keys — never the base connection. Every change is',
     'schema-validated for you; if a change is rejected, read the error and try a valid one.',
     'Make the smallest correct change and explain why.',
+    '\nCOLD START: if a source has ingested assets but produced NO findings, it likely has no',
+    'detectors enabled. Call assets.profile (and assets.sample for detail) to see the asset kinds',
+    'and metadata shape, then enable the baseline detectors that fit that data (e.g. SECRETS/PII for',
+    'text, CODE_SECURITY for code). Getting a detector-less source to produce its first findings is',
+    'as valuable as retuning a noisy one.',
   ].join('\n'),
   allowedTools: [
     'findings.search',
+    ...ASSET_OBSERVE_TOOLS,
     'sources.list',
     'sources.get_config',
     'memory.search',
@@ -129,13 +142,17 @@ export const DETECTOR_AUTHOR_MISSION: Mission = {
     DOMAIN_PRIMER,
     '\nYour mission: when existing detectors miss an important class of finding, author ONE new',
     'custom detector — as a tested, documented hypothesis. Work this bounded loop and then finish:',
-    '\n1. RECALL: memory.search for DETECTOR_INSIGHT entries (keys prefixed "detector-author:") and',
+    '\n0. SURVEY: call assets.profile. If the source has assets but hasFindings is false (cold start),',
+    'you have NO findings to learn from — call assets.sample and hypothesise a detector directly from',
+    'the asset kinds and metadata shape (e.g. column names, mime types, fields present). Otherwise',
+    'proceed from the missed findings as below.',
+    '1. RECALL: memory.search for DETECTOR_INSIGHT entries (keys prefixed "detector-author:") and',
     'detectors.list. Never re-attempt a concept a prior run abandoned, and never duplicate a detector',
     'that already exists.',
-    '2. HYPOTHESISE: from findings.search, pick one missed finding class and the simplest pipeline that',
-    'fits — REGEX for fixed patterns, GLINER2 for entities/categories, a HuggingFace classification',
-    'pipeline, or a pure-LLM detector for nuanced judgement (LLM needs an aiProviderConfigId; never',
-    'include provider_runtime).',
+    '2. HYPOTHESISE: from findings.search (or, on cold start, from assets.profile/assets.sample), pick',
+    'one missed finding class and the simplest pipeline that fits — REGEX for fixed patterns, GLINER2',
+    'for entities/categories, a HuggingFace classification pipeline, or a pure-LLM detector for nuanced',
+    'judgement (LLM needs an aiProviderConfigId; never include provider_runtime).',
     '3. SHAPE: call detector.examples and follow the required fields for that type exactly.',
     '4. DRY-RUN: call detector.test with a DRAFT pipelineSchema plus representative sampleText AND a',
     'counter-example. Only proceed once it matches what it should and not what it should not.',
@@ -151,6 +168,7 @@ export const DETECTOR_AUTHOR_MISSION: Mission = {
   ].join('\n'),
   allowedTools: [
     'findings.search',
+    ...ASSET_OBSERVE_TOOLS,
     'detectors.list',
     'detector.examples',
     'sources.list',
@@ -177,8 +195,10 @@ export const DREAM_MISSION: Mission = {
     'Call memory.list, then delete noise/stale/duplicate entries (memory.delete), rewrite verbose',
     'entries into crisp lessons (memory.rewrite), and record durable new lessons (memory.write).',
     'NEVER delete OPERATOR_DIRECTIVE entries or operator-deletion precedents; keep entity maps that',
-    'still point to live inquiries/cases. Finish by rewriting the system brief narrative',
-    '(system_brief.update) to reflect the current state, what has been tried, and known gaps.',
+    'still point to live inquiries/cases. Finish by writing a SHORT, stable system-brief overview',
+    '(system_brief.update): 2–4 sentences on what this instance is for and its current investigative',
+    'posture. Do NOT restate coverage counts, glossary, topics or gaps — those sections are composed',
+    'automatically from facts and memory; the overview is only the durable framing around them.',
   ].join('\n'),
   allowedTools: [
     'memory.list',
