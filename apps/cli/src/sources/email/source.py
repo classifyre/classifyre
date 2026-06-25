@@ -195,6 +195,11 @@ class EmailSource(BaseSource):
         total = 0
 
         try:
+            if strategy == SamplingStrategy.AUTOMATIC:
+                async for batch in self._extract_automatic(mod, criteria):
+                    yield batch
+                return
+
             for folder in self.folders:
                 if self._aborted or (limit is not None and total >= limit):
                     break
@@ -235,6 +240,63 @@ class EmailSource(BaseSource):
                 yield pending
         finally:
             logger.info("Extracted %s email messages", total)
+
+    async def _extract_automatic(
+        self, mod: Any, criteria: Any
+    ) -> AsyncGenerator[list[SingleAssetScanResults], None]:
+        """AUTOMATIC sampling: page through each folder's messages by UID.
+
+        Listing UIDs is cheap (no body fetch); we window the UID list (newest
+        first) so each run ingests the next ``rows_per_page`` slice per folder
+        and wraps around once the folder has been fully covered.
+        """
+        pending: list[SingleAssetScanResults] = []
+        total = 0
+        for folder in self.folders:
+            if self._aborted:
+                break
+            try:
+                self._mailbox.folder.set(folder)
+            except Exception as e:
+                logger.warning("Skipping folder %s: %s", folder, e)
+                continue
+
+            try:
+                uid_ints = sorted((int(u) for u in self._mailbox.uids(criteria)), reverse=True)
+            except Exception as e:
+                logger.warning("Could not list UIDs for folder %s: %s", folder, e)
+                continue
+            if not uid_ints:
+                continue
+
+            window = self.automatic_window([str(u) for u in uid_ints], key=f"folder:{folder}")
+            if not window:
+                continue
+
+            for msg in self._mailbox.fetch(
+                mod.AND(uid=",".join(window)),
+                mark_seen=False,
+                bulk=self.BATCH_SIZE,
+            ):
+                if self._aborted:
+                    break
+                try:
+                    assets = self._message_to_assets(msg, folder)
+                except Exception as e:
+                    logger.error(
+                        "Failed to transform message uid=%s: %s", getattr(msg, "uid", "?"), e
+                    )
+                    continue
+                for asset in assets:
+                    pending.append(asset)
+                    while len(pending) >= self.BATCH_SIZE:
+                        yield pending[: self.BATCH_SIZE]
+                        pending = pending[self.BATCH_SIZE :]
+                total += 1
+
+        if pending:
+            yield pending
+        logger.info("Extracted %s email messages (AUTOMATIC)", total)
 
     def _message_to_assets(self, msg: Any, folder: str) -> list[SingleAssetScanResults]:
         message_id = self._message_id(msg, folder)

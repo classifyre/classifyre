@@ -13,7 +13,9 @@ import logging
 import threading
 from abc import abstractmethod
 from collections.abc import AsyncGenerator
+from copy import deepcopy
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from ..models.generated_input import SamplingConfig, SamplingStrategy
@@ -112,6 +114,11 @@ class BaseTabularSource(BaseSource):
         self._pk_columns_cache: dict[tuple[str, ...], list[str]] = {}
         self._columns_meta_cache: dict[tuple[str, ...], list[str]] = {}
         self._column_types_cache: dict[tuple[str, ...], dict[str, str]] = {}
+        # AUTOMATIC sampling: serialise cursor mutation across the concurrent
+        # per-table content tasks, and advance each table's cursor at most once
+        # per run (fetch_content and fetch_content_pages may both touch a table).
+        self._automatic_lock = threading.Lock()
+        self._automatic_advanced: set[str] = set()
 
     def _get_cached_connection(self, database: str | None = None) -> Any:
         """Return a cached DBAPI connection, creating one if needed."""
@@ -566,11 +573,127 @@ class BaseTabularSource(BaseSource):
     def _cursor_fetchmany(cursor: Any, size: int) -> list[tuple[Any, ...]]:
         return list(cursor.fetchmany(size))
 
-    def _fetch_sample_rows(
+    # ── AUTOMATIC incremental sampling ───────────────────────────────────
+    #
+    # The asset is the table; AUTOMATIC pages through each table's rows across
+    # runs. We remember, per table, the position reached last run (the last
+    # primary-key values for keyset pagination, or a row OFFSET when the table
+    # has no primary key) and fetch the next ``rows_per_page`` slice. When a
+    # table is exhausted its cursor is reset so the next run wraps around and
+    # re-ingests from the start (data is not stale).
+
+    @staticmethod
+    def _json_safe_value(value: Any) -> Any:
+        """Coerce a primary-key cell into a JSON-serialisable form for the cursor."""
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, (bytes, bytearray, memoryview)):
+            return None
+        return str(value)
+
+    def _automatic_supports_keyset(self) -> bool:
+        """Whether AUTOMATIC may use keyset pagination (primary-key ``WHERE … > ?``).
+
+        Dialects that build inline, parameter-less queries (Snowflake, Databricks)
+        override this to ``False`` and fall back to OFFSET paging through their own
+        ``_fetch_one_page``.
+        """
+        return True
+
+    def _saved_table_cursor(self, key: str) -> dict[str, Any]:
+        tables = self._sampling_cursor.get("tables")
+        if isinstance(tables, dict):
+            state = tables.get(key)
+            if isinstance(state, dict):
+                return state
+        return {}
+
+    def _record_table_cursor(self, key: str, state: dict[str, Any] | None) -> None:
+        with self._automatic_lock:
+            if key in self._automatic_advanced:
+                return
+            nxt = self._next_sampling_cursor
+            if not isinstance(nxt, dict):
+                # Seed from the incoming cursor so untouched tables are preserved.
+                nxt = deepcopy(self._sampling_cursor)
+            tables = nxt.get("tables")
+            if not isinstance(tables, dict):
+                tables = {}
+            if state is None:
+                tables.pop(key, None)
+            else:
+                tables[key] = state
+            nxt["tables"] = tables
+            self._next_sampling_cursor = nxt
+            self._automatic_advanced.add(key)
+
+    def _automatic_fetch(
         self, table_ref: TableRef
     ) -> tuple[list[tuple[Any, ...]], list[str]] | None:
         columns = self._available_columns(table_ref)
+        if not columns:
+            return None
+
+        key = table_ref.raw_id
+        saved = self._saved_table_cursor(key)
+        rows_per_page = int(self._sampling().rows_per_page or 100)
+        quoted_columns = ", ".join(self._quote_identifier(c) for c in columns)
+        base_query = f"SELECT {quoted_columns} FROM {self._table_select_fqn(table_ref)}"
+
+        pk_columns = self._get_primary_key_columns(table_ref)
+        pk_indices = [columns.index(c) for c in pk_columns if c in columns]
+        use_keyset = (
+            bool(pk_columns)
+            and len(pk_indices) == len(pk_columns)
+            and self._automatic_supports_keyset()
+        )
+
+        conn = self._get_cached_connection(table_ref.database)
+
+        if use_keyset:
+            saved_pk = saved.get("pk")
+            last_pk_values = saved_pk if isinstance(saved_pk, list) and saved_pk else None
+            pk_order = ", ".join(self._quote_identifier(c) for c in pk_columns)
+            rows, column_names = self._fetch_page_keyset(
+                conn, base_query, rows_per_page, pk_columns, pk_order, last_pk_values
+            )
+            if not rows or len(rows) < rows_per_page:
+                next_state: dict[str, Any] | None = None  # exhausted → wrap next run
+            else:
+                last_row = rows[-1]
+                next_state = {
+                    "pk": [self._json_safe_value(last_row[pk_indices[j]]) for j in range(len(pk_columns))]
+                }
+                if any(v is None for v in next_state["pk"]):
+                    # Non-serialisable PK (e.g. binary) — fall back to a restart
+                    # rather than persisting an unusable cursor.
+                    next_state = None
+        else:
+            offset = int(saved.get("offset") or 0)
+            rows, column_names = self._fetch_one_page(table_ref, base_query, rows_per_page, offset)
+            if not rows or len(rows) < rows_per_page:
+                next_state = None
+            else:
+                next_state = {"offset": offset + len(rows)}
+
+        self._record_table_cursor(key, next_state)
+
+        if not column_names:
+            return None
+        return rows, column_names
+
+    def _fetch_sample_rows(
+        self, table_ref: TableRef
+    ) -> tuple[list[tuple[Any, ...]], list[str]] | None:
         sampling = self._sampling()
+        if sampling.strategy == SamplingStrategy.AUTOMATIC:
+            return self._automatic_fetch(table_ref)
+
+        columns = self._available_columns(table_ref)
         query, params = self._build_sampling_query(table_ref, columns)
 
         if sampling.strategy == SamplingStrategy.ALL:

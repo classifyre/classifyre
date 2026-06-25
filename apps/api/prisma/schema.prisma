@@ -24,6 +24,10 @@ model Source {
   scheduleCron        String?        @map("schedule_cron")
   scheduleTimezone    String?        @default("UTC") @map("schedule_timezone")
   scheduleNextAt      DateTime?      @map("schedule_next_at")
+  // Opaque, source-defined cursor for AUTOMATIC sampling. Persisted at the end
+  // of each run and injected into the next run so extraction picks up where it
+  // left off (incremental ingestion). The API never interprets its contents.
+  samplingCursor      Json?          @map("sampling_cursor") @db.JsonB
   // Per-source autopilot management mode; overrides the instance config flag
   // unless INHERIT. OBSERVE_ONLY blocks the config-tuning agent from changing
   // this source's config.

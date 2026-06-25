@@ -423,6 +423,11 @@ class DatabricksSource(BaseTabularSource):
             return value.isoformat()
         return str(value)
 
+    def _automatic_supports_keyset(self) -> bool:
+        # Databricks builds inline (parameter-less) queries; AUTOMATIC uses OFFSET
+        # paging through _fetch_one_page rather than keyset WHERE clauses.
+        return False
+
     # ── Databricks pagination (inline LIMIT/OFFSET) ──────────────────────
 
     def _fetch_one_page(

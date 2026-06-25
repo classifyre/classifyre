@@ -1,162 +1,131 @@
 ---
 title: Graph
-description: How the knowledge graph works — the most important tool in the investigation workspace for exploring entity relationships interactively.
+description: The visual heart of a case — explore how assets and findings connect, see which evidence supports which hypothesis, and trace relationships across your data.
 ---
 
 # Graph
 
-The knowledge graph is the **primary visual investigation tool** in a case
-workspace. It renders entities (assets and findings) as nodes in a
-force-directed layout, with edges representing relationships detected across
-your data. Evidence overlay, hypothesis colouring, and three interaction
-modes let you navigate complex relationships.
+The knowledge graph is the **visual investigation tool** at the centre of a case.
+It draws your assets and findings as connected nodes, with the relationships
+between them as links, so you can *see* how things relate instead of reading down
+a table. It's where a tangle of findings becomes a picture you can reason about.
 
 ```mermaid
 graph TD
-    subgraph Nodes
-        Asset["Asset Node<br/>Document, file, record"]
-        Finding["Finding Node<br/>Detector signal"]
-    end
+    Asset1["Asset<br/>report.pdf"]
+    Finding["Finding<br/>API key detected"]
+    Asset2["Asset<br/>user record"]
+    Asset3["Asset<br/>export file"]
 
-    subgraph Edges
-        Contains["CONTAINS"]
-        References["REFERENCES"]
-        OWNS["OWNS"]
-        ACCESSED["ACCESSED"]
-        SENT_TO["SENT_TO"]
-        EXECUTED["EXECUTED"]
-        Manual["MANUAL (custom)"]
-    end
-
-    Asset --> Contains --> Finding
-    Asset --> References --> Asset
-    Asset --> OWNS --> Asset
-    Asset --> ACCESSED --> Asset
-    Asset --> SENT_TO --> Asset
-    Finding --> EXECUTED --> Asset
+    Asset1 -- "contains" --> Finding
+    Asset1 -- "references" --> Asset2
+    Asset2 -- "exported to" --> Asset3
 ```
 
-## Node types
+---
 
-| Type | Visual | Description |
-|---|---|---|
-| **Asset** | Rectangle with asset-type icon | A document, file, database record, or other source entity |
-| **Finding** | Coloured circle with category code | A detector signal (SECRETS, PII, YARA, etc.) — circle colour encodes severity |
+## What's on the graph
 
-## Edge types
-
-Edges have an **origin** that determines how they were created:
-
-| Origin | Description |
+| Node | Represents |
 |---|---|
-| **SOURCE_DERIVED** | Extracted from source metadata during ingestion (e.g. a Confluence page hierarchy) |
-| **INFERRED** | Computed by the graph engine based on shared properties (e.g. same asset referenced in two places) |
-| **MANUAL** | Created by the investigator via the UI context menu or API |
+| **Asset** | A document, file, record, or other item from a source — shown with its type icon |
+| **Finding** | A signal a detector raised — shown as a coloured dot, where the colour is its severity |
 
-Relation types include: `CONTAINS`, `REFERENCES`, `OWNS`, `ACCESSED`,
-`READS`, `WRITES`, `GENERATED_FROM`, `EXPORTED_TO`, `ATTACHED_TO`,
-`SENT_TO`, `EXECUTED`, `MENTIONS`, plus custom relation types.
+Nodes are joined by **relationships** — "contains," "references," "owns,"
+"accessed," "sent to," and more. Each relationship comes from one of three
+places, so you always know how sure to be of it:
 
-## Interaction modes
+| Where it came from | Meaning |
+|---|---|
+| **From the source** | Discovered in the source itself during scanning (e.g. a page hierarchy) |
+| **Inferred** | Worked out by Classifyre from things the items share (e.g. the same value in two places) |
+| **Manual** | Drawn by you, to capture a connection you know about |
+
+---
+
+## Exploring
+
+The graph has three simple modes for working with it:
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> Select
-    Select --> Connect: Click connect tool
-    Select --> Path: Click path tool
-    Connect --> Select: Escape / click select
-    Path --> Select: Escape / click select
+    [*] --> Explore
+    Explore --> Connect: Connect tool
+    Explore --> FindPath: Find-path tool
+    Connect --> Explore
+    FindPath --> Explore
 ```
 
 | Mode | What it does |
 |---|---|
-| **Select** | Click a node to inspect it (detail panel opens). Click an edge to see its properties. Drag nodes to reposition (pins them). Background drag to pan. |
-| **Connect** | Click a source node, then a target node — creates a manual edge between them with a chosen relation type. |
-| **Find Path** | Click two nodes — BFS computes the shortest path through the visible graph and highlights it in acid green. |
+| **Explore** | Click a node to inspect it, drag to rearrange, and pan around the canvas. |
+| **Connect** | Click one node, then another, to draw a relationship between them. |
+| **Find path** | Pick two nodes and the graph highlights the shortest chain of relationships linking them. |
 
-## Visual indicators
+You can also **expand** the graph outward from any node to pull in its related
+items, growing the picture as your investigation widens.
 
-Nodes and edges carry a rich set of visual indicators:
+---
 
-- **Evidence ring** — Nodes that are attached as evidence get an acid-green
-  outer ring.
-- **Hypothesis dots** — Small coloured dots on the node perimeter show which
-  hypotheses this node is linked to, with the hypothesis colour.
-- **Cross-hypothesis ring** — A dashed purple ring appears when a node is
-  linked to multiple hypotheses.
-- **Collapsed findings** — Asset nodes with many findings show a "**+N**"
-  chip; clicking it collapses/expands the findings.
-- **Path highlight** — Edges on the shortest path between two selected nodes
-  are rendered in acid green.
-- **Edge labels** — Relation type text rendered at the midpoint of each edge.
-- **Arrow markers** — Directional arrows on edges (colour-coded by type).
+## Visual cues
 
-## Pivot queries
+The graph encodes a lot at a glance:
 
-The graph supports **Palantir-style pivot questions** — named queries that
-expand the graph around a selected node:
+- **Evidence ring** — items attached as evidence are circled, so case evidence
+  stands out from surrounding context.
+- **Hypothesis dots** — small coloured marks show which
+  [hypotheses](/flow/investigations/cases/hypothesis/) a node is linked to, in
+  each hypothesis's colour.
+- **Cross-hypothesis marker** — a node tied to more than one hypothesis is
+  flagged, so contested evidence is easy to spot.
+- **Grouped findings** — an asset with many findings shows a compact "+N" badge
+  you can expand when you want the detail.
+- **Highlighted path** — the chain between two nodes you're tracing is picked out
+  clearly.
 
-| Pivot | Traversal |
+---
+
+## Asking questions of the graph
+
+Rather than clicking around manually, you can ask the graph **focused questions**
+that expand it along meaningful relationships:
+
+| Question | Shows you |
 |---|---|
-| **Who touched** | Incoming ACCESSED / READS / EXECUTED / WRITES |
-| **Upstream lineage** | Incoming GENERATED_FROM / READS / OWNS |
-| **Downstream lineage** | Outgoing GENERATED_FROM / EXPORTED_TO / WRITES |
-| **Access** | Both-direction OWNS / ACCESSED / READS / WRITES |
-| **Emails** | Both-direction ATTACHED_TO / SENT_TO / MENTIONS |
-| **Similar findings** | Both-direction CONTAINS |
+| **Who touched this?** | Who or what accessed, read, or ran the item |
+| **Where did it come from?** | The upstream lineage that produced it |
+| **Where did it go?** | The downstream lineage it fed into |
+| **Who has access?** | Ownership and access relationships |
+| **Email trail** | Who it was sent to or mentioned with |
+| **Similar findings** | Other items carrying the same kind of signal |
 
-## Context menu
+These turn the graph into an investigative interview: ask a question, and the
+relevant relationships light up.
 
-Right-clicking a node or edge opens a context menu:
+---
 
-**Node menu:**
-- Add/remove evidence
-- Attach/unlink finding
-- Link to hypothesis (with quick stance buttons for each hypothesis)
-- Connect from here (switches to connect mode)
-- Find path to (switches to path mode)
-- Collapse/expand findings
-- Load related entities (expand graph)
-- Review unattached findings
-- Release pin
-- Open asset/finding in detail view
+## Working directly on the graph
 
-**Edge menu:**
-- Rename relation type (manual edges only)
-- Delete edge (manual edges only)
-- Read-only notice for SOURCE_DERIVED / INFERRED edges
+Right-click any node or relationship to act on it without leaving the graph — add
+or remove evidence, attach a finding, link a node to a hypothesis (for or
+against), draw or trace a connection, expand to related items, or open the item's
+full detail. Relationships you drew yourself can be renamed or deleted;
+relationships that came from the source or were inferred are read-only, so the
+underlying truth isn't accidentally rewritten.
 
-## Sidebar panels
+---
 
-| Panel | Content |
+## Side panels
+
+A few panels keep the big picture in view while you work:
+
+| Panel | Helps you |
 |---|---|
-| **Hypothesis legend** | All hypotheses with colour dot, status badge, confidence, for/against counts. Focus toggle highlights that hypothesis's linked nodes. "New hypothesis" button. |
-| **Highlight filters** | Multi-select filters by source and detector type. Dims non-matching nodes/edges. |
-| **Edge type filters** | Toggle visibility per edge relation type. |
-| **Graph legend & stats** | Visual legend (node shapes, colours) + live counts: assets, findings, evidence items, edges. |
+| **Hypotheses** | See every hypothesis with its verdict, confidence, and for/against count — and spotlight the evidence linked to one |
+| **Highlight filters** | Dim everything except the sources or detectors you care about |
+| **Relationship filters** | Show or hide specific kinds of connection |
+| **Legend & stats** | A key to the shapes and colours, plus live counts of assets, findings, evidence, and links |
 
-## API
-
-`GET /cases/:id/graph` returns the evidence neighbourhood for a case:
-
-```json
-{
-  "nodes": [
-    { "id": "ast_...", "type": "asset", "label": "report.pdf", "severity": "critical" },
-    { "id": "fnd_...", "type": "finding", "label": "API key detected", "severity": "critical" }
-  ],
-  "edges": [
-    { "id": "e_...", "source": "ast_...", "target": "fnd_...",
-      "relationType": "CONTAINS", "origin": "SOURCE_DERIVED" }
-  ]
-}
-```
-
-Graph expansion is done via `POST /graph/expand` (recursive traversal from a
-seed entity) and `POST /graph/pivot` (named pivot questions).
-
-The graph UI uses a custom `useForceLayout` hook wrapping d3-force for
-physics simulation, and `usePanZoom` for SVG pan and zoom. New nodes are
-positioned using `seedPosition` — near their connected neighbour or jittered
-near the canvas centre.
+Together they let you move from a wide view of the whole case down to the single
+relationship that cracks it.

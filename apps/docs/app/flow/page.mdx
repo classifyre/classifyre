@@ -1,198 +1,135 @@
 ---
 title: Flow
-description: End-to-end lifecycle from source creation to findings — how scanning works behind the scenes.
+description: What happens when you scan a source — the journey from a scan to findings, the statuses you'll see, and what repeat scans do.
 ---
 
 # Flow
 
-End-to-end lifecycle from source creation to findings.
-Each stage has its own status machine and transitions that are reflected in the UI.
-
----
-
-## Entity model
-
-The core entities and their relationships:
+This is the **journey of a scan**: what happens between pressing "scan" and
+seeing findings, the statuses you'll see along the way, and how Classifyre keeps
+results accurate as the same source is scanned again and again.
 
 ```mermaid
-graph TD
-    Source["Source<br/>A connection to an external system<br/>(Confluence, Jira, S3, ...)"]
-    Runner["Runner<br/>A single scan execution<br/>(one run = one Runner)"]
-    Asset["Asset<br/>An individual item extracted<br/>from the source (table, file, document)"]
-    RunnerAsset["RunnerAsset<br/>Tracks per-asset progress<br/>within a specific run"]
-    Finding["Finding<br/>A signal produced by a<br/>detector on an asset"]
-
-    Source -- "has many" --> Runner
-    Source -- "has many" --> Asset
-    Runner -- "tracks progress via" --> RunnerAsset
-    RunnerAsset -- "references" --> Asset
-    Asset -- "has many" --> Finding
+graph LR
+    Source["Source"] --> Scan["Scan run"]
+    Scan --> Assets["Assets<br/>items + metadata"]
+    Assets --> Detect["Detectors"]
+    Detect --> Findings["Findings"]
+    Findings --> Next["Investigations"]
 ```
 
-Each source can have multiple runners (scan runs), each runner tracks its
-progress through runner assets, and every runner asset maps to one asset in
-the database. Findings belong to both an asset and a source.
+It's the connective tissue between [Sources](/sources/),
+[Detectors](/detectors/), and [Investigations](/flow/investigations/).
 
 ---
 
-## Source lifecycle
+## A source and its scans
 
-A source starts as a configuration and transitions through run statuses:
+A **source** is a connection you've configured; a **scan** is one run against it.
+A source can be scanned many times — manually or on a schedule — and each run is
+recorded so you can see its progress and history.
+
+At any moment a source shows a simple status reflecting its most recent run:
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> PENDING: Source created
-    PENDING --> RUNNING: Scan triggered
-    RUNNING --> COMPLETED: All assets processed
-    RUNNING --> WARNING: Some assets failed
-    RUNNING --> ERROR: Runner crashed
-    COMPLETED --> [*]
-    WARNING --> [*]
-    ERROR --> [*]
-
-    note right of RUNNING
-        Runner runs locally or
-        on Kubernetes
-    end note
+    [*] --> Pending: Source created
+    Pending --> Running: Scan triggered
+    Running --> Completed: Finished cleanly
+    Running --> Warning: Finished, some items failed
+    Running --> Error: Run failed
+    Completed --> [*]
+    Warning --> [*]
+    Error --> [*]
 ```
 
-- **PENDING** — source exists but has not been scanned yet, or its last run
-  is finished
-- **RUNNING** — a runner is actively executing for this source. Only one run
-  can be active per source at a time
-- **COMPLETED** — the last run finished with zero asset errors
-- **WARNING** — the last run finished but some assets had processing errors
-- **ERROR** — the last run terminated abnormally
+| Status | What it means |
+|---|---|
+| **Pending** | The source exists but isn't scanning right now (never scanned, or its last run finished). |
+| **Running** | A scan is in progress. Only one scan runs per source at a time. |
+| **Completed** | The last scan finished and every item processed cleanly. |
+| **Warning** | The last scan finished, but some items couldn't be processed (check the run logs). |
+| **Error** | The last scan failed partway through. |
 
 ---
 
-## Scan run lifecycle
+## What happens during a scan
 
-When a scan is triggered (manually or via schedule), it moves through four
-phases visible in the UI:
+When a scan runs, it moves through four phases you can watch in the app:
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> Triggered: Scan started
-    Triggered --> Discovering: Exploring source content
-    Discovering --> Scanning: Analysing content
-    Scanning --> Completing: Comparing with previous scan
+    [*] --> Triggered: Queued, then starts
+    Triggered --> Discovering: Listing what's in the source
+    Discovering --> Scanning: Reading & analysing content
+    Scanning --> Completing: Wrapping up
     Completing --> [*]
-
-    state Triggered {
-        [*] --> Queued
-        Queued --> Running
-    }
-
-    state Completing {
-        [*] --> Completed: All assets processed
-        Completed --> Warning: Some assets had errors
-        Completed --> Error: Run failed
-        Warning --> [*]
-        Error --> [*]
-    }
-
-    note right of Triggered
-        A run starts as queued
-        and begins when a slot
-        becomes available
-    end note
 ```
 
-| Phase | What happens |
+| Phase | What's happening |
 |---|---|
-| **Triggered** | The scan is queued and starts when capacity allows. You'll see this in the Scans page as "pending" or "running". |
-| **Discovering** | The runner lists all content in the source — every page, file, or record. The Scans detail page shows progress: "134 of 500 assets scanned". |
-| **Scanning** | Each asset is processed: content is extracted and detectors (secrets, PII, YARA, etc.) run against it. Findings start appearing in the UI. |
-| **Completing** | The run wraps up. Assets that no longer exist in the source are marked as deleted. Findings that disappeared in this run are automatically resolved. |
+| **Triggered** | The scan is queued and starts as soon as there's capacity. |
+| **Discovering** | The source is listed — every page, file, or record — so progress can be shown ("134 of 500 scanned"). |
+| **Scanning** | Each item is read as an [asset](/sources/assets-and-metadata/), its content extracted, and [detectors](/detectors/) run over it. Findings start appearing. |
+| **Completing** | The run wraps up: items that have disappeared from the source are reconciled, and findings are brought up to date (see below). |
 
-At the end, the source shows one of three terminal statuses:
-
-- **Completed** — everything processed successfully
-- **Warning** — finished but some assets had errors (check the run logs)
-- **Error** — the run failed partway through
+How *much* of a source a scan reads, and in what order, is governed by its
+[sampling strategy](/sources/sampling/).
 
 ---
 
-## Asset ingestion and diffing
+## What repeat scans do
 
-When the CLI sends a batch of assets, the API diffs them against existing
-records for the same source:
-
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> NEW: Hash not seen before
-    [*] --> UPDATED: Hash exists, checksum differs
-    [*] --> UNCHANGED: Hash + checksum match
-    NEW --> [*]
-    UPDATED --> [*]
-    UNCHANGED --> [*]
-
-    state NEW {
-        [*] --> Finding: DETECTED (OPEN)
-    }
-    state UPDATED {
-        [*] --> Finding: RE_DETECTED
-    }
-    state UNCHANGED {
-        [*] --> Finding: lastDetectedAt bumped
-    }
-```
-
-**During finalization** (full scans only), assets not in the seen set:
+Classifyre remembers what it saw last time, so a second scan doesn't start from
+scratch or pile up duplicates. Every item is compared to the previous run and
+sorted into one of four buckets:
 
 ```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> DELETED: Not in seenHashes
-    DELETED --> Finding: Auto-RESOLVED
-    note right of DELETED
-        Only for full scans
-        (sampling strategy = ALL)
-    end note
+graph LR
+    Item["An item in this scan"] --> New["New<br/>first time seen"]
+    Item --> Updated["Updated<br/>changed since last time"]
+    Item --> Unchanged["Unchanged<br/>identical to last time"]
+    Gone["An item that's gone"] --> Deleted["Deleted<br/>no longer in the source"]
 ```
+
+| Outcome | What Classifyre does |
+|---|---|
+| **New** | Reads it and records any findings as freshly detected. |
+| **Updated** | Re-reads it and refreshes its findings. |
+| **Unchanged** | Notes it's still there, without redoing the work. |
+| **Deleted** | Marks it gone and **auto-resolves** the findings that came from it. |
+
+This is what makes results trustworthy over time: the same issue is **tracked**,
+not re-reported, and issues that genuinely go away are closed automatically.
 
 ---
 
-## Finding lifecycle
+## Findings stay up to date
 
-Findings persist across scans and track their own state machine:
+Because items are reconciled each run, **findings persist and update** rather than
+duplicate. A finding that's still there is kept; one that's been fixed at the
+source is automatically resolved; one that comes back is reopened.
 
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> OPEN: First detection (DETECTED)
-    OPEN --> RESOLVED: Fixed (manual or auto)
-    OPEN --> FALSE_POSITIVE: Reviewed, incorrect
-    OPEN --> IGNORED: Accepted risk
-    RESOLVED --> OPEN: Re-appeared in scan (RE_OPENED)
+> Your own decisions are always respected. If you've marked a finding as a false
+> positive, ignored, or resolved, a later scan won't silently overturn that.
 
-    note right of OPEN
-        Re-detected in subsequent
-        scans → RE_DETECTED event
-    end note
-```
+The full anatomy of a finding — its fields, severity, confidence, and lifecycle —
+lives in **[Findings & Results](/detectors/findings/)**.
 
-### History events
+---
 
-Each status change is recorded as a history entry:
+## What happens to findings next
 
-| Event | When it fires |
-|---|---|
-| **DETECTED** | First time a finding appears |
-| **RE_DETECTED** | Finding still present in a later scan |
-| **RE_OPENED** | A previously resolved finding reappears |
-| **RESOLVED** | Finding no longer present (auto), or manually marked |
-| **STATUS_CHANGED** | User manually changed the status |
-| **SEVERITY_CHANGED** | User manually changed the severity |
+Producing findings is where this lifecycle ends and the **investigation** layer
+begins. From here, findings are watched, connected, and worked:
 
-### Auto-resolution
-
-During finalization, findings that were present in a previous run but are
-absent in the current scan are automatically resolved. Manual overrides
-(FALSE_POSITIVE, IGNORED, RESOLVED) are respected and never overwritten.
-
-
+- **[Investigations](/flow/investigations/)** — the full picture of how findings
+  become inquiries, fingerprints, cases, and hypotheses.
+- **[Inquiries](/flow/investigations/inquiry/)** — standing questions that keep
+  surfacing matching findings.
+- **[Fingerprints](/flow/investigations/fingerprints/)** — duplicate and
+  similarity detection across assets.
+- **[Autopilot](/flow/investigations/autopilot/)** — AI agents that act on new
+  findings automatically after every scan.

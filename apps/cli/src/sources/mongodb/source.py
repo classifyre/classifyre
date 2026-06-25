@@ -407,6 +407,14 @@ class MongoDBSource(BaseSource):
         if strategy == SamplingStrategy.ALL:
             return list(collection.find({}).limit(rows_per_page))
 
+        if strategy == SamplingStrategy.AUTOMATIC:
+            # Page forward through the collection each run; wrap when exhausted.
+            key = f"collection:{collection_ref.database}.{collection_ref.collection}"
+            offset = self.automatic_offset(key)
+            documents = list(collection.find({}).skip(offset).limit(rows_per_page))
+            self.record_automatic_offset(key, prev_offset=offset, fetched=len(documents))
+            return documents
+
         if strategy == SamplingStrategy.RANDOM:
             return self._sample_random_documents(collection, rows_per_page)
 
