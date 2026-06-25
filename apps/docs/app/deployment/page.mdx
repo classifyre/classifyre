@@ -83,6 +83,81 @@ Our recommended setup for production workloads, designed for high availability, 
 
 ---
 
+## Platform components
+
+However you deploy it, Classifyre is a distributed, decoupled platform. It
+separates the **Core Classifyre Stack** (the application services, in green) from
+the **External Infrastructure** it relies on (in grey) — which you can bring your
+own instances of.
+
+```mermaid
+graph TD
+    %% Core Classifyre Stack
+    Web["Web UI"]
+    API["API and Orchestrator"]
+    CLI["CLI Runner"]
+
+    %% External Infrastructure
+    DB["Database (PostgreSQL)"]
+    S3["Object Storage (S3)"]
+    Sources["External Sources"]
+
+    Web --> API
+    API -- "Reads / writes state" --> DB
+    API -- "Spawns scan job" --> CLI
+    CLI -- "Pulls data" --> Sources
+    CLI -- "Streams findings" --> API
+    API -- "Logs and artifacts" --> S3
+
+    style Web fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style API fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+    style CLI fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
+
+    style DB fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+    style S3 fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+    style Sources fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+```
+
+### Core Classifyre Stack
+
+These primary services form the core of the application:
+
+#### 1. Web UI (Frontend)
+- **Role:** The user-facing frontend.
+- **Responsibilities:**
+  - Configuring and managing data sources.
+  - Enabling, disabling, and adjusting settings for detectors and classifiers.
+  - Inspecting scan runs, execution logs, and classified findings.
+  - Triggering scans manually or defining automated schedules.
+
+#### 2. API and Orchestrator
+- **Role:** The control plane and orchestrator.
+- **Responsibilities:**
+  - Exposing the APIs that power the Web UI.
+  - Coordinating runner lifecycles, states, and jobs.
+  - Spawning CLI execution runs (locally or as Kubernetes Jobs).
+  - Receiving batched findings from active CLI scanners.
+  - Fetching run artifacts and logs from storage.
+
+#### 3. CLI Runner
+- **Role:** The ephemeral execution worker where extraction and detection happen.
+- **Responsibilities:**
+  - Ingesting documents from target external sources.
+  - Parsing text and structural metadata.
+  - Running detectors (secrets, PII, custom LLM models) against parsed content.
+  - Streaming findings back to the API in batches.
+
+### External Infrastructure
+
+Classifyre relies on standard external components for persistence, storage, and
+ingestion. You can bring your own instances of each:
+
+- **[PostgreSQL Database](/deployment/database/):** Stores all system metadata, configurations, schedules, logs, and findings. Classifyre supports **embedded** database pods for quick evaluations or **external** instances (such as AWS RDS, GCP Cloud SQL, or CloudNativePG) for production.
+- **[S3 Object Storage](/deployment/storage/):** An **external** and **optional** component used to persist long-term runner execution logs and developer sandbox uploads. If disabled, logs are streamed live but not saved.
+- **[External Data Sources](/sources/):** The target systems containing unstructured data (e.g., AWS S3, Confluence, Slack, Google Drive) that Classifyre scans to identify security and compliance findings.
+
+---
+
 ## Infrastructure Configuration
 
 To configure external storage, database options, and other deployment operations, see the dedicated reference guides:
