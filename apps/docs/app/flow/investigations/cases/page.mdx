@@ -1,23 +1,25 @@
 ---
 title: Cases
-description: How investigation cases work — the workspace for organising evidence, hypotheses, and conclusions.
+description: A case is the workspace where an investigation happens — collecting evidence, weighing hypotheses, and reaching a conclusion.
 ---
 
 # Cases
 
-A case is a structured investigation workspace. It collects **evidence**
-(snapshotted assets with their findings), organises **hypotheses** through
-threaded discussions, and produces a **conclusion**.
+A case is a structured **investigation workspace**. It collects **evidence**
+(snapshotted assets with their findings), organises **hypotheses** as threaded
+discussions, and works toward a written **conclusion**. Where findings are raw
+signals, a case is the place you actually figure out what happened and what to do
+about it.
 
 ```mermaid
 graph TD
-    Case["Case Workspace"]
+    Case["Case workspace"]
     Evidence["Evidence<br/>Snapshotted assets"]
-    CaseFinding["Case Findings<br/>Findings attached to evidence"]
-    Threads["Threads<br/>Hypotheses & Discussions"]
+    CaseFinding["Case findings<br/>Findings attached to evidence"]
+    Threads["Threads<br/>Hypotheses & discussions"]
     Timeline["Timeline<br/>Activity log"]
-    Graph["Knowledge Graph<br/>Entity relationships"]
-    Overview["Case File<br/>Conclusion, linked inquiries"]
+    Graph["Knowledge graph<br/>Entity relationships"]
+    Overview["Case file<br/>Conclusion & linked inquiries"]
 
     Case --> Evidence
     Case --> Threads
@@ -28,82 +30,100 @@ graph TD
     CaseFinding --> Threads
 ```
 
-## Workspace tabs
+---
 
-| Tab | Description |
+## The workspace
+
+A case is organised into a few views, each for a different part of the work:
+
+| View | What you do there |
 |---|---|
-| **Graph** | Interactive knowledge graph — force-directed layout with entity nodes, evidence rings, hypothesis colouring, and three interaction modes (select, connect, find path) |
-| **Evidence** | Table of snapshotted assets with nested findings. Inline note editing, attach/detach, sort and search |
-| **Threads** | Hypothesis and discussion threads. Create hypotheses with verdict/confidence, link evidence with stance (SUPPORTS/CONTRADICTS/NEUTRAL), add notes |
-| **Timeline** | Cursor-paginated unified activity feed. 20+ event types grouped by day with category filters |
-| **Case file** | Conclusion editor, linked inquiries panel, recent activity summary, close/reopen actions |
+| **[Graph](/flow/investigations/cases/graph/)** | Explore how assets and findings connect, visually |
+| **Evidence** | Review the snapshotted assets and their findings; add notes; attach or detach items |
+| **[Threads](/flow/investigations/cases/hypothesis/)** | Propose hypotheses, link the evidence for and against them, and discuss |
+| **[Timeline](/flow/investigations/cases/timeline/)** | See everything that has happened in the case, in order |
+| **Case file** | Write the conclusion, manage linked inquiries, and close or reopen the case |
+
+---
 
 ## Status lifecycle
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> OPEN: Created
-    OPEN --> IN_PROGRESS: Investigation started
-    IN_PROGRESS --> CLOSED: Conclusion reached
-    CLOSED --> OPEN: Reopened
-    IN_PROGRESS --> ARCHIVED: Archived
-    OPEN --> ARCHIVED: Archived
-    ARCHIVED --> [*]
+    [*] --> Open: Created
+    Open --> InProgress: Investigation started
+    InProgress --> Closed: Conclusion reached
+    Closed --> Open: Reopened
+    InProgress --> Archived: Archived
+    Open --> Archived: Archived
+    Archived --> [*]
 ```
 
 | Status | Meaning |
 |---|---|
-| **OPEN** | Case created, awaiting action |
-| **IN_PROGRESS** | Actively being investigated |
-| **CLOSED** | Conclusion written, investigation complete |
-| **ARCHIVED** | No longer active, read-only |
+| **Open** | Created, awaiting action |
+| **In progress** | Actively being investigated |
+| **Closed** | Conclusion written, investigation complete |
+| **Archived** | No longer active, kept for the record |
 
-## Creating a case
+---
 
-Cases can be created in three ways:
+## Starting a case
 
-1. **From an inquiry** — Navigate to an inquiry detail page and click "Open
-   new case". The inquiry is pre-linked and its current matches are pulled
-   as initial evidence.
-2. **From a fingerprint cluster** — In
+There are three ways to open a case, depending on where the work begins:
+
+1. **From an inquiry** — open a case straight from an
+   [inquiry](/flow/investigations/inquiry/); it's pre-linked and its current
+   matches come in as starting evidence.
+2. **From a fingerprint cluster** — in
    [Fingerprints](/flow/investigations/fingerprints/), turn a duplicate or
-   similarity cluster straight into a case; its members come in as evidence.
-3. **Directly** — Use the "New case" button on the investigations page.
-   Optionally select one or more driving inquiries and choose which of their
-   matches to include as initial evidence.
+   similarity cluster into a case; its members come in as evidence.
+3. **From scratch** — start a blank case and, optionally, link one or more
+   inquiries to seed it with their matches.
 
-When creating from the form, the `POST /cases` endpoint creates the case and
-optionally links inquiries. Then `POST /cases/:id/pull` is called for each
-selected inquiry to copy matching findings into the case. The UI shows
-granular toast messages for partial success or failure during this process.
+---
 
-## Evidence management
+## Working the evidence
 
-Evidence is an asset snapshotted into a case. Each evidence row can hold
-multiple **case findings** (individual detector signals). Key operations:
+**Evidence** is an asset captured into the case, together with the findings on
+it. As you investigate you can:
 
-- **Attach** — Navigate to `/investigations/[id]/evidence/add?assetId=...`
-  to browse the findings table and attach selected findings as evidence.
-  Already-attached findings are excluded from the picker.
-- **Inline notes** — Each evidence row and finding supports a writable note
-  field (auto-saved on blur).
-- **Remove** — Detach evidence or individual findings from the case.
-- **Pull from inquiry** — One-click pull of all current matches from a
-  linked driving inquiry.
+- **Pull in matches** from a linked inquiry in one click.
+- **Add notes** to any piece of evidence or any finding, to capture your
+  reasoning.
+- **Attach or detach** individual findings as the picture changes.
 
-## AI mode
+Evidence is a snapshot, so a case keeps a stable record of what you were looking
+at — even as later scans change the underlying data.
 
-Each case has an AI mode setting that controls whether the
-[Autopilot](/flow/investigations/autopilot/) case agent can autonomously operate
-on this case, or only observe it. See
+---
+
+## Letting Autopilot help
+
+Each case has an **AI mode** that controls whether the
+[Autopilot](/flow/investigations/autopilot/) case agent can act on it on its
+own, or only observe and propose. You can freeze a sensitive case to
+observe-only while letting Autopilot manage the rest — see
 [Steering & Fine-Tuning](/flow/investigations/autopilot/steering/) for how
-observe-only mode works at the instance, source, detector, and case level.
+observe-only works at the instance, source, detector, and case level.
+
+---
 
 ## Closing a case
 
-Closing a case requires a written conclusion. The "Close case" action:
+Closing a case asks for a written **conclusion** — the answer the investigation
+reached. When you close it, its linked inquiries are archived (so they stop
+feeding it new matches), the case is marked closed, and the conclusion is
+recorded in the [timeline](/flow/investigations/cases/timeline/). You can always
+reopen it later if something changes.
 
-1. Archives all linked inquiries (prevents further match updates).
-2. Sets the case status to CLOSED.
-3. Records the conclusion in the timeline.
+---
+
+## Go deeper
+
+| Page | |
+|---|---|
+| [Hypothesis & Threads](/flow/investigations/cases/hypothesis/) | Propose explanations and test them against evidence |
+| [Timeline](/flow/investigations/cases/timeline/) | The complete activity log of a case |
+| [Graph](/flow/investigations/cases/graph/) | The visual investigation tool |
