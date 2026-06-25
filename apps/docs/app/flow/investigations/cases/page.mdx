@@ -61,12 +61,15 @@ stateDiagram-v2
 
 ## Creating a case
 
-Cases can be created in two ways:
+Cases can be created in three ways:
 
 1. **From an inquiry** — Navigate to an inquiry detail page and click "Open
    new case". The inquiry is pre-linked and its current matches are pulled
    as initial evidence.
-2. **Directly** — Use the "New case" button on the investigations page.
+2. **From a fingerprint cluster** — In
+   [Fingerprints](/flow/investigations/fingerprints/), turn a duplicate or
+   similarity cluster straight into a case; its members come in as evidence.
+3. **Directly** — Use the "New case" button on the investigations page.
    Optionally select one or more driving inquiries and choose which of their
    matches to include as initial evidence.
 
@@ -91,8 +94,11 @@ multiple **case findings** (individual detector signals). Key operations:
 
 ## AI mode
 
-Each case has an AI mode setting (INHERIT / ACTIVE / PASSIVE) that controls
-whether the autopilot case agent can autonomously operate on this case.
+Each case has an AI mode setting that controls whether the
+[Autopilot](/flow/investigations/autopilot/) case agent can autonomously operate
+on this case, or only observe it. See
+[Steering & Fine-Tuning](/flow/investigations/autopilot/steering/) for how
+observe-only mode works at the instance, source, detector, and case level.
 
 ## Closing a case
 
