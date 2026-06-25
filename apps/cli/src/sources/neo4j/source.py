@@ -392,6 +392,14 @@ class Neo4jSource(BaseSource):
         strategy = sampling.strategy
         rows = int(sampling.rows_per_page or 100)
 
+        if strategy == SamplingStrategy.AUTOMATIC:
+            # Page forward through this label's nodes each run; wrap when exhausted.
+            key = f"label:{ref.label}"
+            offset = self.automatic_offset(key)
+            page = self._fetch_nodes_page(ref, skip=offset, limit=rows)
+            self.record_automatic_offset(key, prev_offset=offset, fetched=len(page))
+            return page
+
         if strategy == SamplingStrategy.RANDOM:
             cypher = (
                 f"MATCH (n:{_escape_label(ref.label)}) "

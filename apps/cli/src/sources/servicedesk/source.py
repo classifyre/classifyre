@@ -204,6 +204,11 @@ class ServiceDeskSource(BaseSource):
         if sampling.strategy == SamplingStrategy.ALL:
             return requests
 
+        if sampling.strategy == SamplingStrategy.AUTOMATIC:
+            # Newest-first stable order; window advances each run and wraps around.
+            sorted_requests = sorted(requests, key=self._request_sort_timestamp, reverse=True)
+            return self.automatic_window(sorted_requests, key="requests")
+
         limit = int(sampling.rows_per_page or 100)
         if limit >= len(requests):
             return requests

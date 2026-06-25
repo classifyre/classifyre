@@ -471,7 +471,7 @@ export class SourceAssetsController {
     @Param('sourceId') sourceId: string,
     @Body() finalizeDto: FinalizeIngestRunDto,
   ) {
-    const { runnerId, seenHashes } = finalizeDto;
+    const { runnerId, seenHashes, samplingCursor } = finalizeDto;
     if (!runnerId) {
       throw new BadRequestException('runnerId is required');
     }
@@ -486,10 +486,17 @@ export class SourceAssetsController {
 
     // Derive whether this was a full scan from the source's sampling strategy.
     // Only strategy=ALL guarantees every asset was visited, so only then can
-    // absence imply deletion.
+    // absence imply deletion. AUTOMATIC ingests one incremental slice per run,
+    // so (like RANDOM/LATEST) absence never implies deletion.
     const config = source.config as Record<string, any> | null;
     const samplingStrategy = config?.sampling?.strategy as string | undefined;
     const isFullScan = samplingStrategy === 'ALL';
+
+    // Persist the AUTOMATIC sampling cursor so the next run resumes where this
+    // one stopped. Sent only by AUTOMATIC runs; left untouched otherwise.
+    if (samplingCursor !== undefined) {
+      await this.sourceService.updateSamplingCursor(sourceId, samplingCursor);
+    }
 
     return this.assetService.finalizeIngestRun(
       sourceId,

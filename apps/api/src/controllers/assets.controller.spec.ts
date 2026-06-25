@@ -15,6 +15,7 @@ describe('SourceAssetsController', () => {
   };
   const sourceService = {
     source: jest.fn(),
+    updateSamplingCursor: jest.fn(),
   };
   const validationService = {
     validateOutput: jest.fn(),
@@ -70,6 +71,56 @@ describe('SourceAssetsController', () => {
       seenHashes: ['h1'],
     });
 
+    expect(assetService.finalizeIngestRun).toHaveBeenCalledWith(
+      'source-1',
+      'runner-1',
+      ['h1'],
+      false,
+    );
+    expect(sourceService.updateSamplingCursor).not.toHaveBeenCalled();
+  });
+
+  it('treats ALL sampling as a full scan (enables deletion)', async () => {
+    sourceService.source.mockResolvedValue({
+      id: 'source-1',
+      type: 'POSTGRESQL',
+      config: { sampling: { strategy: 'ALL' } },
+    });
+    assetService.finalizeIngestRun.mockResolvedValue({ deleted: 3 });
+
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-1',
+      seenHashes: ['h1'],
+    });
+
+    expect(assetService.finalizeIngestRun).toHaveBeenCalledWith(
+      'source-1',
+      'runner-1',
+      ['h1'],
+      true,
+    );
+  });
+
+  it('persists the AUTOMATIC sampling cursor and is not a full scan', async () => {
+    sourceService.source.mockResolvedValue({
+      id: 'source-1',
+      type: 'POSTGRESQL',
+      config: { sampling: { strategy: 'AUTOMATIC' } },
+    });
+    assetService.finalizeIngestRun.mockResolvedValue({ deleted: 0 });
+
+    const cursor = { tables: { 'db_#_users': { pk: [42] } } };
+    await controller.finalizeIngest('source-1', {
+      runnerId: 'runner-1',
+      seenHashes: ['h1'],
+      samplingCursor: cursor,
+    });
+
+    expect(sourceService.updateSamplingCursor).toHaveBeenCalledWith(
+      'source-1',
+      cursor,
+    );
+    // AUTOMATIC ingests one slice per run → absence never implies deletion.
     expect(assetService.finalizeIngestRun).toHaveBeenCalledWith(
       'source-1',
       'runner-1',

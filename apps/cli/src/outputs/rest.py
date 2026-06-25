@@ -127,6 +127,11 @@ class FinalizeIngestRunRequest(BaseModel):
 
     runner_id: str = Field(serialization_alias="runnerId")
     seen_hashes: list[str] = Field(serialization_alias="seenHashes")
+    # AUTOMATIC sampling cursor to persist on the source for the next run.
+    # Omitted (None) for other strategies so the stored cursor is left untouched.
+    sampling_cursor: dict[str, Any] | None = Field(
+        None, serialization_alias="samplingCursor"
+    )
 
 
 class UpdateRunnerStatusRequest(BaseModel):
@@ -165,6 +170,11 @@ class RestOutputSink:
         self.session.mount("https://", adapter)
         self._runner_id = context.runner_id
         self._seen_hashes: set[str] = set()
+        self._sampling_cursor: dict[str, Any] | None = None
+
+    def set_sampling_cursor(self, cursor: dict[str, Any] | None) -> None:
+        """Record the AUTOMATIC sampling cursor to persist on finalize."""
+        self._sampling_cursor = cursor
 
     async def start(self) -> None:
         if not self.context.source_id:
@@ -244,11 +254,12 @@ class RestOutputSink:
         payload = FinalizeIngestRunRequest(
             runner_id=runner_id,
             seen_hashes=sorted(self._seen_hashes),
+            sampling_cursor=self._sampling_cursor,
         )
         self._request_json(
             "POST",
             f"/sources/{source_id}/assets/finalize",
-            payload.model_dump(mode="json", by_alias=True),
+            payload.model_dump(mode="json", by_alias=True, exclude_none=True),
         )
 
         status_payload = UpdateRunnerStatusRequest(status="COMPLETED")

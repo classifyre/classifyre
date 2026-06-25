@@ -1,6 +1,30 @@
 import { normalizeSourceConfig } from './source-config-normalizer';
 
 describe('normalizeSourceConfig sampling', () => {
+  it('accepts the AUTOMATIC strategy', () => {
+    const normalized = normalizeSourceConfig('POSTGRESQL', {
+      type: 'POSTGRESQL',
+      required: { host: 'db.local', port: 5432 },
+      sampling: { strategy: 'AUTOMATIC' },
+    });
+
+    expect((normalized.sampling as Record<string, unknown>)?.strategy).toBe(
+      'AUTOMATIC',
+    );
+  });
+
+  it('defaults to AUTOMATIC when no strategy is provided', () => {
+    const normalized = normalizeSourceConfig('POSTGRESQL', {
+      type: 'POSTGRESQL',
+      required: { host: 'db.local', port: 5432 },
+      sampling: {},
+    });
+
+    expect((normalized.sampling as Record<string, unknown>)?.strategy).toBe(
+      'AUTOMATIC',
+    );
+  });
+
   it('strips fetch_all_until_first_success from sampling', () => {
     const normalized = normalizeSourceConfig('POSTGRESQL', {
       type: 'POSTGRESQL',

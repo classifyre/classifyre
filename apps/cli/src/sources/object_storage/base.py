@@ -271,6 +271,11 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
         materialized = list(refs)
 
+        if strategy == SamplingStrategy.AUTOMATIC:
+            # Newest-first stable order; window advances each run and wraps around.
+            materialized.sort(key=lambda ref: ref.last_modified, reverse=True)
+            return self.automatic_window(materialized, key="objects")
+
         if strategy == SamplingStrategy.RANDOM:
             if limit >= len(materialized):
                 return materialized

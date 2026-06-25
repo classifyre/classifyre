@@ -332,11 +332,19 @@ class SnowflakeSource(BaseTabularSource):
 
     # ── Override _fetch_sample_rows for dict normalization ────────────────
 
+    def _automatic_supports_keyset(self) -> bool:
+        # Snowflake builds inline (parameter-less) queries and normalises rows via
+        # _fetch_one_page; route AUTOMATIC through OFFSET paging instead of keyset.
+        return False
+
     def _fetch_sample_rows(
         self, table_ref: TableRef
     ) -> tuple[list[tuple[Any, ...]], list[str]] | None:
-        columns = self._available_columns(table_ref)
         sampling = self._sampling()
+        if sampling.strategy == SamplingStrategy.AUTOMATIC:
+            return self._automatic_fetch(table_ref)
+
+        columns = self._available_columns(table_ref)
         query, params = self._build_sampling_query(table_ref, columns)
 
         if sampling.strategy == SamplingStrategy.ALL:
