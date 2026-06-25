@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsArray, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class FinalizeIngestRunDto {
   @ApiProperty({
@@ -16,4 +16,16 @@ export class FinalizeIngestRunDto {
   })
   @IsArray()
   seenHashes: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Opaque, source-defined AUTOMATIC sampling cursor to persist on the ' +
+      'source for the next run. Omitted for non-AUTOMATIC strategies so the ' +
+      'stored cursor is left unchanged.',
+    type: 'object',
+    additionalProperties: true,
+  })
+  @IsOptional()
+  @IsObject()
+  samplingCursor?: Record<string, unknown>;
 }

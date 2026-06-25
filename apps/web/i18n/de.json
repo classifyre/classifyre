@@ -399,6 +399,8 @@
     },
     "sampling": {
       "title": "Stichprobenauswahl",
+      "strategyAutomatic": "Automatisch",
+      "hintAutomatic": "jeder Lauf neu",
       "strategyLatest": "Neueste",
       "hintLatest": "neueste zuerst",
       "strategyRandom": "Zufällig",
@@ -416,6 +418,7 @@
       "orderByDesc": "Spalte für Datumsreihenfolge (automatisch erkannt, wenn leer)",
       "rowsPerPage": "Zeilen pro Seite",
       "rowsPerPageDesc": "Datenbanken: Stichprobengröße (RANDOM/LATEST) oder Batchgröße (ALL). Dateien: Zeilen/Rows pro Detektorseite.",
+      "hintAutomatic2": "Erfasst bei jedem Lauf einen neuen Datenausschnitt und fährt fort, bis alles abgedeckt ist, und beginnt dann von vorne — empfohlen",
       "hintRandom2": "Wählt bei jedem Lauf eine zufällige Teilmenge aus",
       "hintLatest2": "Ruft die zuletzt geänderten Elemente zuerst ab",
       "hintAll2": "Scannt jedes Element — bei großen Quellen mit Bedacht verwenden"

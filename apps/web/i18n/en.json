@@ -399,6 +399,8 @@
     },
     "sampling": {
       "title": "Sampling",
+      "strategyAutomatic": "Automatic",
+      "hintAutomatic": "new each run",
       "strategyLatest": "Latest",
       "hintLatest": "newest first",
       "strategyRandom": "Random",
@@ -416,6 +418,7 @@
       "orderByDesc": "Column for date ordering (auto-detected if blank)",
       "rowsPerPage": "Rows per page",
       "rowsPerPageDesc": "Databases: sample size (RANDOM/LATEST) or batch size (ALL). Files: rows/lines per detector page.",
+      "hintAutomatic2": "Ingests a new slice of data each run and keeps going until everything is covered, then starts over — recommended",
       "hintRandom2": "Picks a random subset of items each run",
       "hintLatest2": "Fetches the most recently modified items first",
       "hintAll2": "Scans every item — use with care on large sources"

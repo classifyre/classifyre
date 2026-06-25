@@ -193,19 +193,8 @@ class JiraSource(BaseSource):
             return f"{query} ORDER BY updated DESC"
         return query
 
-    def _sample_issues(self, issues: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        sampling = self.config.sampling
-        if sampling.strategy == SamplingStrategy.ALL:
-            return issues
-
-        limit = int(sampling.rows_per_page or 100)
-        if limit >= len(issues):
-            return issues
-
-        if sampling.strategy == SamplingStrategy.RANDOM:
-            return deterministic_sample(issues, limit)
-
-        sorted_issues = sorted(
+    def _sorted_issues(self, issues: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return sorted(
             issues,
             key=lambda issue: parse_datetime(
                 str(
@@ -216,7 +205,24 @@ class JiraSource(BaseSource):
             ),
             reverse=True,
         )
-        return sorted_issues[:limit]
+
+    def _sample_issues(self, issues: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        sampling = self.config.sampling
+        if sampling.strategy == SamplingStrategy.ALL:
+            return issues
+
+        if sampling.strategy == SamplingStrategy.AUTOMATIC:
+            # Newest-first stable order; window advances each run and wraps around.
+            return self.automatic_window(self._sorted_issues(issues), key="issues")
+
+        limit = int(sampling.rows_per_page or 100)
+        if limit >= len(issues):
+            return issues
+
+        if sampling.strategy == SamplingStrategy.RANDOM:
+            return deterministic_sample(issues, limit)
+
+        return self._sorted_issues(issues)[:limit]
 
     def _extract_issue_assets(self, issue: dict[str, Any]) -> list[SingleAssetScanResults]:
         fields = issue.get("fields", {})

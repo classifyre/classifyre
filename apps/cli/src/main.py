@@ -366,6 +366,12 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             len(all_stubs),
                         )
 
+                    # Persist the advanced AUTOMATIC sampling cursor (no-op for
+                    # other strategies, which return None). Only on the normal
+                    # completion path — a timed-out run must not advance it.
+                    if hasattr(sink, "set_sampling_cursor"):
+                        sink.set_sampling_cursor(source.current_sampling_cursor())
+
                     await sink.finish()
                     logger.info(
                         "Extraction completed: %s assets in %s batches",

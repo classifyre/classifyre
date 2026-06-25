@@ -85,9 +85,10 @@ class SlackChannelType(StrEnum):
 
 class SamplingStrategy(StrEnum):
     """
-    Sampling strategy: RANDOM samples items randomly, LATEST prioritises the most recently modified/created items, ALL scans every item with no limit
+    Sampling strategy. AUTOMATIC (recommended default) incrementally ingests a new slice of not-yet-seen data on every run, remembering its position between runs and wrapping around to re-scan from the start once everything has been covered — eventually ingesting everything at a bounded cost per run. RANDOM samples items randomly. LATEST prioritises the most recently modified/created items. ALL scans every item with no limit.
     """
 
+    AUTOMATIC = 'AUTOMATIC'
     RANDOM = 'RANDOM'
     LATEST = 'LATEST'
     ALL = 'ALL'
@@ -95,7 +96,7 @@ class SamplingStrategy(StrEnum):
 
 class SamplingConfig(BaseModel):
     """
-    Controls how content is extracted from each source. For tabular sources rows_per_page controls both sample size for RANDOM/LATEST and pagination batch size for ALL.
+    Controls how content is extracted from each source. For tabular sources rows_per_page controls both sample size for AUTOMATIC/RANDOM/LATEST and pagination batch size for ALL.
     """
 
     model_config = ConfigDict(
@@ -124,7 +125,7 @@ class SamplingConfig(BaseModel):
     )
     rows_per_page: int | None = Field(
         100,
-        description='Tabular sources only. Number of rows per sample (RANDOM/LATEST) or per pagination batch (ALL). Controls memory usage during large table scans.',
+        description='Tabular sources only. Number of rows per sample (AUTOMATIC/RANDOM/LATEST) or per pagination batch (ALL). For AUTOMATIC this is the size of the incremental slice ingested each run. Controls memory usage during large table scans.',
         ge=10,
         le=10000,
     )

@@ -1026,6 +1026,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         runnerId,
         outputRestUrl,
         hasSuccessfulRuns,
+        this.encodeSamplingCursor(source),
       );
       const { stdout, stderr, exitCode } = await this.executeCli(
         command,
@@ -1066,6 +1067,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       (chunk) => this.appendLog(runnerId, chunk, 'combined'),
       ({ jobName, namespace }) =>
         this.persistKubernetesExecutionIdentity(runnerId, jobName, namespace),
+      this.encodeSamplingCursor(source),
     );
     const output = result.output || '';
     if (await this.shouldSkipRunnerFinalTransition(runnerId, result.exitCode)) {
@@ -1257,16 +1259,24 @@ export class CliRunnerService implements OnApplicationBootstrap {
     runnerId: string,
     outputRestUrl: string,
     hasSuccessfulRuns: boolean,
+    samplingCursorB64?: string,
   ): string {
     const escapedCliPath = this.shellEscape(cliPath);
     const escapedVenvPython = this.shellEscape(
       path.join(venvPath, 'bin/python'),
     );
+    // Inject the AUTOMATIC sampling cursor (base64-encoded JSON) so extraction
+    // resumes where the previous run stopped. Absent on the first run / for
+    // non-AUTOMATIC sampling.
+    const samplingCursorEnv = samplingCursorB64
+      ? `CLASSIFYRE_SAMPLING_CURSOR=${this.shellEscape(samplingCursorB64)} `
+      : '';
     // Keep startup lightweight: core deps are preinstalled in the image, and optional
     // detector groups are installed lazily by the CLI on first use.
     return (
       `cd ${escapedCliPath} && ` +
       `CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN=${hasSuccessfulRuns ? '1' : '0'} ` +
+      samplingCursorEnv +
       `uv run --locked --python ${escapedVenvPython} ` +
       `python -m src.main extract ${this.shellEscape(recipeFile)} ` +
       `--output-type rest ` +
@@ -1276,6 +1286,22 @@ export class CliRunnerService implements OnApplicationBootstrap {
       `--runner-id ${this.shellEscape(runnerId)} ` +
       `--managed-runner`
     );
+  }
+
+  /**
+   * Base64-encode a source's persisted AUTOMATIC sampling cursor for transport
+   * to the CLI via the CLASSIFYRE_SAMPLING_CURSOR env var. Returns undefined
+   * when there is no cursor to pass (first run / non-AUTOMATIC sampling).
+   */
+  private encodeSamplingCursor(source: any): string | undefined {
+    const cursor = source?.samplingCursor;
+    if (!cursor || typeof cursor !== 'object') {
+      return undefined;
+    }
+    if (Object.keys(cursor).length === 0) {
+      return undefined;
+    }
+    return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64');
   }
 
   private buildCliTestCommand(

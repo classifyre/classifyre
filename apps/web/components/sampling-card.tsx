@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Database, Shuffle, Clock, Infinity } from "lucide-react";
+import { Database, Shuffle, Clock, Infinity, RefreshCw } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
@@ -17,7 +17,7 @@ import { cn } from "@workspace/ui/lib/utils";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-export type SamplingStrategy = "RANDOM" | "LATEST" | "ALL";
+export type SamplingStrategy = "AUTOMATIC" | "RANDOM" | "LATEST" | "ALL";
 
 export type SamplingValue = {
   strategy: SamplingStrategy;
@@ -56,6 +56,12 @@ export function SamplingCard({
     hint: string;
     Icon: React.ElementType;
   }[] = [
+    {
+      value: "AUTOMATIC",
+      label: t("sources.sampling.strategyAutomatic"),
+      hint: t("sources.sampling.hintAutomatic"),
+      Icon: RefreshCw,
+    },
     {
       value: "LATEST",
       label: t("sources.sampling.strategyLatest"),
@@ -276,6 +282,7 @@ export function SamplingCard({
 
         {/* ── Strategy hint ──────────────────────────────────────────────────── */}
         <p className="text-[11px] text-muted-foreground font-mono text-center py-1">
+          {value.strategy === "AUTOMATIC" && t("sources.sampling.hintAutomatic2")}
           {value.strategy === "RANDOM" && t("sources.sampling.hintRandom2")}
           {value.strategy === "LATEST" && t("sources.sampling.hintLatest2")}
           {value.strategy === "ALL" && t("sources.sampling.hintAll2")}
@@ -297,7 +304,7 @@ export function defaultSamplingValue(sampling?: {
   include_column_names?: boolean;
 }): SamplingValue {
   return {
-    strategy: (sampling?.strategy as SamplingStrategy) ?? "RANDOM",
+    strategy: (sampling?.strategy as SamplingStrategy) ?? "AUTOMATIC",
     enable_ocr: sampling?.enable_ocr ?? false,
     enable_transcription: sampling?.enable_transcription ?? false,
     order_by_column: sampling?.order_by_column,

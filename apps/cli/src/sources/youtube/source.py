@@ -247,6 +247,9 @@ class YouTubeSource(BaseSource):
             channel_ids = random.sample(channel_ids, sample_size)
         elif strategy == SamplingStrategy.LATEST and limit is not None:
             channel_ids = channel_ids[:limit]
+        elif strategy == SamplingStrategy.AUTOMATIC and channel_ids:
+            # Newest-first channel listing; window advances each run and wraps.
+            channel_ids = self.automatic_window(channel_ids, key="videos")
 
         # Explicit videos are always included, in addition to sampled channel videos.
         ordered: list[str] = []

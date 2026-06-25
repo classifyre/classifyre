@@ -48,6 +48,22 @@ describe('SourceService', () => {
     return { service, prisma, maskedConfigCryptoService, runnerLogStorage };
   }
 
+  it('persists the AUTOMATIC sampling cursor on the source', async () => {
+    const { service, prisma } = createService();
+    prisma.source.update.mockImplementation(({ data }: any) => ({
+      id: 'source-1',
+      ...data,
+    }));
+
+    const cursor = { tables: { 'db_#_users': { pk: [7] } } };
+    await service.updateSamplingCursor('source-1', cursor);
+
+    expect(prisma.source.update).toHaveBeenCalledWith({
+      where: { id: 'source-1' },
+      data: { samplingCursor: cursor },
+    });
+  });
+
   it('encrypts masked config when creating a source', async () => {
     const { service, prisma } = createService();
     prisma.source.create.mockImplementation(({ data }: any) => ({
