@@ -1,203 +1,119 @@
 ---
 title: Autopilot
-description: How AI autopilot agents work — autonomous investigation agents for inquiries and cases.
+sidebarTitle: Overview
+description: Autopilot is Classifyre's AI control center — a team of agents that turn raw findings into managed investigations, on their own, after every scan.
 ---
 
 # Autopilot
 
-The autopilot system runs **AI agents** that operate autonomously on the
-investigation pipeline. Two specialised agents — the **Inquiry Agent** and
-the **Case Agent** — monitor findings, decide whether to create or update
-inquiries and cases, and execute those decisions without manual intervention.
+Most scanners hand you a findings table and wish you luck. **Autopilot** is the
+team of AI agents that picks that table up and does the work: it opens
+**inquiries**, builds **cases**, drafts **hypotheses**, tunes your **sources**,
+and even writes new **detectors** — automatically, after every scan, and with a
+written reason for every move.
+
+You watch and steer it from one place in the app: the **Harness** panel. Think
+of Harness as mission control, and Autopilot as the crew flying the mission.
+
+> **Autopilot, not copilot.** A copilot waits for you to type a prompt.
+> Autopilot does not wait. It wakes on its own after a scan finishes, recalls
+> what it has learned about *your* instance, and moves the investigation forward
+> — so the work is already done (or proposed) by the time you next log in.
+
+---
+
+## The big picture
 
 ```mermaid
 graph TD
-    Findings["New Findings"]
-    Sources["Sources"]
+    Scan["A scan finishes<br/>New findings land"]
+    Brief["System Brief<br/>What Autopilot knows about your instance"]
 
-    subgraph "Inquiry Agent"
-        IA["Inquiry Agent<br/>Decides: create/enrich inquiries"]
+    subgraph Crew["The Autopilot crew"]
+        direction LR
+        Inquiry["Inquiry agent<br/>Keeps watch"]
+        Case["Case agent<br/>Builds investigations"]
+        Config["Config agent<br/>Tunes sources"]
+        Detector["Detector agent<br/>Writes new detectors"]
+        Dream["Dream agent<br/>Learns & tidies up"]
     end
 
-    subgraph "Case Agent"
-        CA["Case Agent<br/>Decides: create/update cases"]
-    end
+    Work["Inquiries · Cases · Hypotheses<br/>Tuned sources · New detectors"]
+    Log["Flight Recorder<br/>Every action, with a reason"]
 
-    Inquiries["Inquiries"]
-    Cases["Cases"]
-    Threads["Hypothesis Threads"]
-    Evidence["Evidence"]
-
-    Sources --> IA
-    Findings --> IA
-    IA --> Inquiries
-    Inquiries --> CA
-    Findings --> CA
-    CA --> Cases
-    CA --> Threads
-    CA --> Evidence
+    Scan --> Brief
+    Brief --> Crew
+    Crew --> Work
+    Crew --> Log
+    Work --> Brief
 ```
 
-## Decision pipeline
+Everything flows around the **System Brief** — a living summary of your instance
+that every agent reads before it acts, and that the crew keeps up to date as it
+learns. That is what stops Autopilot from feeling like a generic chatbot: it
+always works from *your* glossary, *your* past decisions, and *your* current
+state.
 
-Both agents follow the same pipeline:
+---
 
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> GatherContext: Fetch findings, inquiries, cases
-    GatherContext --> RecallMemory: Query agent memory
-    RecallMemory --> Decide: LLM with structured schema
-    Decide --> Apply: Execute decisions
-    Apply --> PersistMemory: Write memory entries
-    PersistMemory --> [*]
+## What Autopilot does for you
 
-    note right of Decide
-        LLM returns typed actions
-        via JSON schema enforcement
-    end note
-```
-
-1. **Gather context** — Fetch relevant findings, inquiries, cases, and
-   archived items from the database.
-2. **Recall memory** — Query the agent's long-term memory for glossary
-   definitions, decision precedents, and the topic-to-inquiry map.
-3. **Decide** — Call the LLM with a structured output schema to produce a
-   list of actions.
-4. **Apply** — Execute the decisions via the `DecisionApplierService`.
-5. **Persist memory** — Write new memory entries from the cycle for future
-   reference.
-
-## Inquiry Agent
-
-The Inquiry Agent monitors findings and decides on inquiry management:
-
-| Action | Description |
+| Job | What it means in practice |
 |---|---|
-| `CREATE_INQUIRY` | Create a new inquiry with generated matchers for a topic |
-| `UPDATE_INQUIRY` | Update an existing inquiry's matchers |
-| `ENRICH_INQUIRY_MATCHERS` | Union new matcher criteria into existing inquiry |
-| `SIGNAL_CASE_READY` | Flag that an inquiry has enough signal to warrant a case |
-| `NO_ACTION` | Nothing needs to change |
+| **Keeps watch** | Turns recurring findings into standing **inquiries** so the same issue is tracked, not re-discovered every scan. |
+| **Builds investigations** | Opens **cases**, groups related evidence, and drafts **hypotheses** for your team to confirm or reject. |
+| **Wakes up silent sources** | Spots a source that ingests data but produces no findings, looks at the data, and switches on the detectors that fit it. |
+| **Writes new detectors** | When nothing on the shelf catches an important signal, it authors, tests, and deploys a new custom detector — then checks whether it worked. |
+| **Learns your domain** | Remembers your terminology and decisions so it gets sharper over time instead of starting from scratch. |
+| **Explains itself** | Records every action — and every deliberate *non*-action — with a plain-English rationale you can read later. |
 
-The agent is controlled by instance settings:
+---
 
-| Setting | Purpose |
+## Who's on the crew?
+
+Autopilot is not one big model — it's five focused agents, each with one job.
+Keeping them separate is what makes the work predictable and easy to steer.
+
+| Agent | Its one job |
 |---|---|
-| `autopilotInquiryEnabled` | Master toggle |
-| `autopilotInquiryDesired` | Operator guidance on what to investigate |
-| `autopilotInquirySearchable` | What data/topics are worth matching |
+| **Inquiry** | Keeps the set of standing questions healthy — creates, enriches, and de-duplicates inquiries. |
+| **Case** | Builds and maintains investigation cases: evidence, hypotheses, links, and status. |
+| **Config** | Tunes each source's detectors and sampling to catch more and waste less. |
+| **Detector** | Authors brand-new custom detectors when existing ones miss something. |
+| **Dream** | Runs on a quiet schedule to consolidate memory and refresh the System Brief. |
 
-## Case Agent
+Read on in **[Meet the Agents](/flow/investigations/autopilot/agents/)** for what
+each one actually changes.
 
-The Case Agent monitors inquiries and findings, and decides on case
-management. It has two top-level actions, one with many sub-operations:
+---
 
-### `CREATE_CASE`
-Creates a new case automatically, including:
-- Setting title, description, severity, and driving inquiries
-- Pulling selected matches as initial evidence
+## You are always in control
 
-### `UPDATE_CASE`
-Applies one or more sub-operations on an existing case:
+Autopilot is built to be trusted, which means it is built to be *reined in*.
 
-| Sub-operation | Description |
+- **Off by default.** Every agent is disabled until you switch it on. Nothing
+  runs without your say-so.
+- **Observe-only mode.** Flip the whole instance — or a single source, detector,
+  or case — to *observe-only* and Autopilot will *propose* without touching
+  anything.
+- **Steer it.** Point it at what matters with a one-line instruction, or kick off
+  a run manually whenever you like.
+- **Everything is logged.** The **Flight Recorder** keeps a complete, readable
+  record of what each agent did and why.
+
+> New to this? Start with **[How a Cycle Runs](/flow/investigations/autopilot/cycle/)**
+> to see what happens from "a scan finishes" to "the work is done," then visit
+> **[Steering & Fine-Tuning](/flow/investigations/autopilot/steering/)** to make
+> it your own.
+
+---
+
+## Where to go next
+
+| Page | What you'll learn |
 |---|---|
-| `ADD_HYPOTHESIS` | Propose a new hypothesis thread |
-| `UPDATE_HYPOTHESIS` | Change status, confidence, or statement |
-| `ADD_EVIDENCE` | Attach an asset as evidence |
-| `ATTACH_FINDINGS` | Attach findings to evidence |
-| `ADD_NOTE` | Add a note to a case or thread |
-| `ADD_THREAD_ENTRY` | Add a statement to an existing thread |
-| `CREATE_EDGE` | Create a manual graph edge |
-| `REMOVE_EDGE` | Remove a graph edge |
-| `LINK_SUPPORT` | Link evidence/finding to a hypothesis |
-| `CHANGE_STATUS` | Change case status (e.g. close when resolved) |
-| `LINK_INQUIRY` | Link an inquiry to the case |
-
-### `NO_ACTION`
-Nothing needs to change.
-
-```mermaid
-graph LR
-    subgraph CaseAgentActions["Case Agent Actions"]
-        direction TB
-        Create["CREATE_CASE"]
-        Update["UPDATE_CASE"]
-        None["NO_ACTION"]
-    end
-
-    Update --> ADD_HYPOTHESIS
-    Update --> UPDATE_HYPOTHESIS
-    Update --> ADD_EVIDENCE
-    Update --> ATTACH_FINDINGS
-    Update --> ADD_NOTE
-    Update --> ADD_THREAD_ENTRY
-    Update --> CREATE_EDGE
-    Update --> REMOVE_EDGE
-    Update --> LINK_SUPPORT
-    Update --> CHANGE_STATUS
-    Update --> LINK_INQUIRY
-```
-
-## Memory system
-
-The agent memory is a persistent store of three kinds:
-
-| Kind | Purpose |
-|---|---|
-| **Glossary** | Domain-specific term definitions |
-| **Precedents** | Past decision patterns and their outcomes |
-| **Topic Map** | Mapping of topics to existing inquiries |
-
-Memory entries have:
-- **Key** — Unique identifier
-- **Content** — Free-text value
-- **Weight** — Multiplier for relevance scoring (higher = more important)
-- **Tags** — Categorisation tags
-
-The memory can be viewed and edited in the Autopilot panel under the
-"Memory" tab, with search and inline editing.
-
-## Flight recorder
-
-The Autopilot panel includes a **flight recorder** that shows all autopilot
-run cycles:
-
-```mermaid
-graph LR
-    subgraph FlightRecorder["Flight Recorder View"]
-        LeftRail["Left rail<br/>Run cycles with status dots"]
-        RightPane["Right pane<br/>Run detail"]
-    end
-
-    subgraph RunDetail["Run Detail"]
-        Header["Header<br/>status + instruction"]
-        Decisions["Decision cards<br/>outcome + rationale + payload"]
-        Logs["Execution logs<br/>Business / Technical views"]
-    end
-
-    LeftRail --> RightPane
-    RightPane --> Header
-    RightPane --> Decisions
-    RightPane --> Logs
-```
-
-- **Left rail** — Lists all autopilot cycles with status dots (success,
-  failure, running), summaries, and timestamps.
-- **Decision cards** — Each decision shows its outcome badge (applied /
-  observe-only / failed), action label, rationale text, and expandable
-  JSON payload.
-- **Execution logs** — Dual-channel view: **Business narrative** (plain
-  English summary) and **Technical logs** (terminal-style rendering with
-  expandable JSON, level-coloured output).
-- **Live polling** — While a cycle is running, the view auto-polls for
-  updates.
-
-## Manual runs
-
-A dialog allows manual triggering of an autopilot cycle:
-
-- **General mode** — Optional instruction, agent selector (Both / Inquiry
-  only / Case only), scope selector (all sources or a specific source).
-- **Case-focused mode** — Simplified UI scoped to one specific case.
+| **[Meet the Agents](/flow/investigations/autopilot/agents/)** | What each of the five agents does, and what it changes. |
+| **[How a Cycle Runs](/flow/investigations/autopilot/cycle/)** | What wakes Autopilot, and the steps a single run goes through. |
+| **[Memory & System Brief](/flow/investigations/autopilot/memory/)** | How Autopilot remembers your domain and stays grounded. |
+| **[Steering & Fine-Tuning](/flow/investigations/autopilot/steering/)** | Every knob: toggles, guidance, observe-only, schedules, and more. |
+| **[Flight Recorder & Audit](/flow/investigations/autopilot/flight-recorder/)** | How to read exactly what Autopilot did and why. |
