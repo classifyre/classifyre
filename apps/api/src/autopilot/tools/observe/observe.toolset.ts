@@ -29,7 +29,37 @@ export class ObserveToolset {
       {
         name: 'findings.search',
         description:
-          'List open findings in scope, grouped by detector + finding type with bounded samples. Defaults to the current run/source scope.',
+          'List open findings in scope, grouped by detector + finding type with bounded samples. Defaults to the current run/source scope. Pass customDetectorKey to isolate the findings one custom detector produced (use it to verify a detector you authored).',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            sourceId: {
+              type: 'string',
+              description: 'Optional source id; defaults to the run scope.',
+            },
+            customDetectorKey: {
+              type: 'string',
+              description:
+                'Optional: only findings from this custom detector key.',
+            },
+          },
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: async (input, tc) => {
+          const sourceId =
+            (input.sourceId as string | undefined) ?? tc.ctx.sourceId;
+          return this.search.summarizeNewFindings(
+            sourceId,
+            tc.ctx.manual ? null : tc.ctx.runnerId,
+            (input.customDetectorKey as string | undefined) ?? null,
+          );
+        },
+      },
+      {
+        name: 'assets.profile',
+        description:
+          'Aggregate shape of the ingested assets in scope: asset/source kinds, the most common metadata fields, and whether any finding exists yet. Use this to bootstrap detection on a source that has produced no findings (cold start).',
         inputSchema: {
           type: 'object',
           properties: {
@@ -44,7 +74,31 @@ export class ObserveToolset {
         handler: async (input, tc) => {
           const sourceId =
             (input.sourceId as string | undefined) ?? tc.ctx.sourceId;
-          return this.search.summarizeNewFindings(
+          return this.search.assetMetadataProfile(
+            sourceId,
+            tc.ctx.manual ? null : tc.ctx.runnerId,
+          );
+        },
+      },
+      {
+        name: 'assets.sample',
+        description:
+          'Bounded, redacted sample of raw assets in scope — name, kind and a preview of each asset’s metadata fields. The concrete material to hypothesise a detector from when there are no findings to learn from.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            sourceId: {
+              type: 'string',
+              description: 'Optional source id; defaults to the run scope.',
+            },
+          },
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: async (input, tc) => {
+          const sourceId =
+            (input.sourceId as string | undefined) ?? tc.ctx.sourceId;
+          return this.search.sampleAssets(
             sourceId,
             tc.ctx.manual ? null : tc.ctx.runnerId,
           );
@@ -148,10 +202,7 @@ export class ObserveToolset {
               MAX_GLOSSARY_ENTRIES,
             ),
             this.memory.recall(
-              [
-                AgentMemoryKind.TOPIC_INQUIRY_MAP,
-                AgentMemoryKind.DECISION_PRECEDENT,
-              ],
+              [AgentMemoryKind.ENTITY_MAP, AgentMemoryKind.DECISION_PRECEDENT],
               terms,
             ),
           ]);

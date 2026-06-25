@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CaseActivityType, Prisma } from '@prisma/client';
+import { CaseActivityType, CaseThreadKind, Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { GraphService } from './graph.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
@@ -35,7 +35,11 @@ import { GraphResponseDto } from './dto/graph.dto';
 type CaseRow = Prisma.CaseGetPayload<{
   include: {
     _count: {
-      select: { evidence: true; hypotheses: true; inquiryLinks: true };
+      select: {
+        evidence: true;
+        threads: { where: { kind: 'HYPOTHESIS' } };
+        inquiryLinks: true;
+      };
     };
   };
 }>;
@@ -43,8 +47,15 @@ type EvidenceRow = Prisma.CaseEvidenceGetPayload<{
   include: { findings: true };
 }>;
 
+// Hypotheses are CaseThreads of kind HYPOTHESIS; count those for the DTO.
 const countSelect = {
-  _count: { select: { evidence: true, hypotheses: true, inquiryLinks: true } },
+  _count: {
+    select: {
+      evidence: true,
+      threads: { where: { kind: CaseThreadKind.HYPOTHESIS } },
+      inquiryLinks: true,
+    },
+  },
 } satisfies Prisma.CaseInclude;
 
 /** The investigation workspace: owns evidence, findings, hypotheses (via services) and the graph. */
@@ -328,10 +339,6 @@ export class CasesService {
         'Evidence must be an asset. Use POST /cases/:id/evidence/:evidenceId/findings to attach findings.',
       );
     }
-    const hypothesisIds = dto.hypothesisIds ?? [];
-    if (hypothesisIds.length > 0)
-      await this.assertHypothesesInCase(caseId, hypothesisIds);
-
     const asset = await this.prisma.asset.findUnique({
       where: { id: dto.entityId },
       select: { name: true, assetType: true, sourceType: true },
@@ -360,8 +367,6 @@ export class CasesService {
       update: { note: dto.note ?? undefined, ...snapshot },
       include: { findings: true },
     });
-    if (hypothesisIds.length > 0)
-      await this.linkSupport(hypothesisIds, 'evidence', evidence.id);
     await this.graph.inferEdgesForAsset(dto.entityId);
     await this.activity.record(
       caseId,
@@ -680,37 +685,6 @@ export class CasesService {
     if (!found) throw new NotFoundException(`Case with ID ${id} not found`);
   }
 
-  private async assertHypothesesInCase(
-    caseId: string,
-    hypothesisIds: string[],
-  ): Promise<void> {
-    const found = await this.prisma.hypothesis.findMany({
-      where: { id: { in: hypothesisIds }, caseId },
-      select: { id: true },
-    });
-    if (found.length !== hypothesisIds.length) {
-      throw new BadRequestException(
-        'One or more hypothesisIds do not belong to this case.',
-      );
-    }
-  }
-
-  private async linkSupport(
-    hypothesisIds: string[],
-    targetType: 'evidence' | 'finding',
-    targetId: string,
-  ): Promise<void> {
-    await this.prisma.hypothesisSupport.createMany({
-      data: hypothesisIds.map((hypothesisId) => ({
-        hypothesisId,
-        targetType,
-        targetId,
-        stance: 'NEUTRAL' as const,
-      })),
-      skipDuplicates: true,
-    });
-  }
-
   /** Upsert asset evidence (snapshotting display metadata) and return its id. */
   private async ensureAssetEvidence(
     caseId: string,
@@ -755,7 +729,7 @@ export class CasesService {
       createdBy: row.createdBy,
       conclusion: row.conclusion,
       evidenceCount: row._count.evidence,
-      hypothesisCount: row._count.hypotheses,
+      hypothesisCount: row._count.threads,
       inquiryCount: row._count.inquiryLinks,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

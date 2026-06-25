@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { AgentDecisionAction, Prisma } from '@prisma/client';
+import { AgentDecisionAction, Prisma, TriggerType } from '@prisma/client';
 import { PrismaService } from '../../../prisma.service';
 import { ValidationService } from '../../../validation.service';
 import { MaskedConfigCryptoService } from '../../../masked-config-crypto.service';
+import { CliRunnerService } from '../../../cli-runner/cli-runner.service';
 import { DecisionApplierService } from '../../decision-applier.service';
+import { AI_ACTOR } from '../../autopilot.constants';
 import type { Tool, ToolContext, ToolGate } from '../tool.types';
 
 /** Config sub-keys the autopilot may change. Base connection is excluded. */
@@ -31,6 +33,7 @@ export class ConfigToolset {
     private readonly validation: ValidationService,
     private readonly masked: MaskedConfigCryptoService,
     private readonly applier: DecisionApplierService,
+    private readonly cliRunner: CliRunnerService,
   ) {}
 
   private sourceGate = async (
@@ -42,6 +45,23 @@ export class ConfigToolset {
       sourceId,
       tc.ctx.settings.autopilotConfigEnabled,
     );
+    return { mode, entityType: 'source', entityId: sourceId };
+  };
+
+  /**
+   * Gate for the re-scan tool. A re-scan applies whatever detection changes the
+   * config or detector-author agent just made, so either of those switches being
+   * on counts as "the relevant autopilot agent is enabled".
+   */
+  private rescanGate = async (
+    input: Record<string, unknown>,
+    tc: ToolContext,
+  ): Promise<ToolGate> => {
+    const sourceId = typeof input.sourceId === 'string' ? input.sourceId : '';
+    const enabled =
+      tc.ctx.settings.autopilotConfigEnabled ||
+      tc.ctx.settings.autopilotDetectorEnabled;
+    const mode = await this.applier.sourceGate(sourceId, enabled);
     return { mode, entityType: 'source', entityId: sourceId };
   };
 
@@ -204,6 +224,63 @@ export class ConfigToolset {
             data: { config: encrypted as Prisma.InputJsonValue },
           });
           return { ok: true, changedKeys: Object.keys(patch) };
+        },
+      },
+      {
+        name: 'sources.rescan',
+        description:
+          'Re-scan a source so detection changes (a new/updated custom detector, or retuned built-in detectors) actually run on its assets and produce real findings. Scans are asynchronous: a later autopilot cycle, fired automatically when the scan completes, will see the resulting findings — record what you changed as pending-verification in memory so that cycle can evaluate it. Returns immediately. Does nothing if this run is itself a verification re-scan, or if a scan is already in progress.',
+        inputSchema: {
+          type: 'object',
+          properties: { sourceId: { type: 'string' } },
+          required: ['sourceId'],
+          additionalProperties: false,
+        },
+        sideEffect: 'mutate',
+        domain: 'source',
+        decisionAction: AgentDecisionAction.TRIGGER_SCAN,
+        resolveGate: this.rescanGate,
+        handler: async (input, tc) => {
+          const sourceId = String(input.sourceId);
+
+          // Depth-1 loop guard: never re-scan from inside a cycle that was
+          // itself triggered by an autopilot re-scan, or the author→rescan→
+          // verify chain would never terminate.
+          if (tc.ctx.runnerId) {
+            const triggering = await this.prisma.runner.findUnique({
+              where: { id: tc.ctx.runnerId },
+              select: { triggerType: true },
+            });
+            if (triggering?.triggerType === TriggerType.AUTOPILOT) {
+              return {
+                skipped:
+                  'this cycle is already a verification re-scan; not re-scanning again',
+              };
+            }
+          }
+
+          try {
+            const runner = await this.cliRunner.startRun(
+              sourceId,
+              TriggerType.AUTOPILOT,
+              AI_ACTOR,
+            );
+            return {
+              ok: true,
+              runnerId: runner.id,
+              message:
+                'Re-scan started. A follow-up autopilot cycle will evaluate the resulting findings.',
+            };
+          } catch (error) {
+            // startRun rejects when a scan is already running for the source —
+            // surface that to the model rather than failing the whole call.
+            return {
+              skipped:
+                error instanceof Error
+                  ? error.message
+                  : 're-scan could not be started',
+            };
+          }
         },
       },
     ];

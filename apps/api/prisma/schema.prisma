@@ -516,6 +516,9 @@ enum TriggerType {
   SCHEDULED
   WEBHOOK
   API
+  // The investigation autopilot re-scanned a source to verify a detection
+  // change it just made. Tagged so the resulting cycle never re-scans again.
+  AUTOPILOT
 }
 
 enum NotificationType {
@@ -878,7 +881,6 @@ model Case {
 
   evidence     CaseEvidence[]
   findings     CaseFinding[]
-  hypotheses   Hypothesis[]
   notes        CaseNote[]
   inquiryLinks CaseInquiry[]
   threads      CaseThread[]
@@ -988,43 +990,6 @@ model CaseFinding {
   @@map("case_findings")
 }
 
-model Hypothesis {
-  id         String           @id @default(uuid())
-  caseId     String           @map("case_id")
-  statement  String           @db.Text
-  status     HypothesisStatus @default(PROPOSED)
-  confidence Decimal?         @db.Decimal(3, 2)
-  color      String?          @map("color")
-  createdBy  String?          @map("created_by")
-  createdAt  DateTime         @default(now()) @map("created_at")
-  updatedAt  DateTime         @updatedAt @map("updated_at")
-
-  investigation Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  support       HypothesisSupport[]
-
-  @@index([caseId])
-  @@map("case_hypotheses")
-}
-
-// Polymorphic link between a hypothesis and either a piece of case evidence or a
-// case finding.  targetType: "evidence" → case_evidence.id; "finding" → case_findings.id
-model HypothesisSupport {
-  id           String         @id @default(uuid())
-  hypothesisId String         @map("hypothesis_id")
-  targetType   String         @map("target_type")
-  targetId     String         @map("target_id")
-  stance       EvidenceStance @default(SUPPORTS)
-  weight       Decimal?       @db.Decimal(3, 2)
-  note         String?        @db.Text
-  createdAt    DateTime       @default(now()) @map("created_at")
-
-  hypothesis Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
-
-  @@unique([hypothesisId, targetType, targetId])
-  @@index([hypothesisId])
-  @@index([targetType, targetId])
-  @@map("hypothesis_support")
-}
 
 model CaseNote {
   id        String   @id @default(uuid())
@@ -1213,8 +1178,6 @@ enum AgentDecisionOutcome {
 enum AgentMemoryKind {
   GLOSSARY
   DECISION_PRECEDENT
-  // Legacy: topic→inquiry mapping. ENTITY_MAP generalizes it (topic→any entity).
-  TOPIC_INQUIRY_MAP
   // Topic → any entity (inquiry/case/source/detector) mapping for dedupe.
   ENTITY_MAP
   // Per-source learned facts: typical finding mix, false-positive patterns,

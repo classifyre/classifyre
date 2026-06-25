@@ -56,6 +56,8 @@ export type {
   AgentActivityItemDto,
   AgentActivityListResponseDto,
   AgentSystemBriefDto,
+  BriefMemoryEntryDto,
+  BriefSetupItemDto,
   AutopilotStatsDto,
   HarnessToolDto,
   HarnessMissionDto,

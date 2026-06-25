@@ -143,15 +143,6 @@ export class AddEvidenceDto {
   @IsString()
   entityId!: string;
 
-  @ApiPropertyOptional({
-    description: 'Hypothesis UUIDs to link this evidence to (optional)',
-    type: [String],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  hypothesisIds?: string[];
-
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
