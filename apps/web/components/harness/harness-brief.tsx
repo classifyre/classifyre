@@ -16,6 +16,7 @@ import {
   Loader2,
   Pencil,
 } from "lucide-react";
+import Markdown from "react-markdown";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
 import { formatRelative } from "@/lib/date";
@@ -133,8 +134,10 @@ export function HarnessBrief() {
             </div>
           </div>
         ) : (
-          <article className="whitespace-pre-wrap rounded-[6px] border-2 border-border bg-card p-5 font-serif text-[15px] leading-relaxed shadow-[2px_2px_0_var(--color-border)]">
-            {brief?.content?.trim() || (
+          <article className="brief-prose rounded-[6px] border-2 border-border bg-card p-5 font-serif text-[15px] leading-relaxed shadow-[2px_2px_0_var(--color-border)]">
+            {brief?.content?.trim() ? (
+              <Markdown>{brief.content.trim()}</Markdown>
+            ) : (
               <span className="text-muted-foreground">
                 {t("harness.brief.overviewEmpty")}
               </span>
