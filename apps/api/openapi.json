@@ -3714,7 +3714,7 @@
         ]
       },
       "put": {
-        "description": "Update any combination of name, provider, model, API key (plaintext — stored encrypted), base URL, and context size. Pass apiKey as an empty string to clear a stored key.",
+        "description": "Update any combination of name, provider, model, API key (plaintext \u2014 stored encrypted), base URL, and context size. Pass apiKey as an empty string to clear a stored key.",
         "operationId": "AiProviderConfigController_update",
         "parameters": [
           {
@@ -4919,7 +4919,7 @@
             }
           }
         },
-        "summary": "Update an inquiry (matchers change → matches recomputed)",
+        "summary": "Update an inquiry (matchers change \u2192 matches recomputed)",
         "tags": [
           "inquiries"
         ]
@@ -5464,7 +5464,7 @@
             }
           }
         },
-        "summary": "[Deprecated] List hypotheses — use GET /cases/:caseId/threads?kind=HYPOTHESIS",
+        "summary": "[Deprecated] List hypotheses \u2014 use GET /cases/:caseId/threads?kind=HYPOTHESIS",
         "tags": [
           "hypotheses"
         ]
@@ -5503,7 +5503,7 @@
             }
           }
         },
-        "summary": "[Deprecated] Create hypothesis — use POST /cases/:caseId/threads",
+        "summary": "[Deprecated] Create hypothesis \u2014 use POST /cases/:caseId/threads",
         "tags": [
           "hypotheses"
         ]
@@ -5544,7 +5544,7 @@
             }
           }
         },
-        "summary": "[Deprecated] Update hypothesis — use PATCH /threads/:id",
+        "summary": "[Deprecated] Update hypothesis \u2014 use PATCH /threads/:id",
         "tags": [
           "hypotheses"
         ]
@@ -5566,7 +5566,7 @@
             "description": ""
           }
         },
-        "summary": "[Deprecated] Delete hypothesis — use DELETE /threads/:id",
+        "summary": "[Deprecated] Delete hypothesis \u2014 use DELETE /threads/:id",
         "tags": [
           "hypotheses"
         ]
@@ -5607,7 +5607,7 @@
             }
           }
         },
-        "summary": "[Deprecated] Link support — use POST /threads/:id/support",
+        "summary": "[Deprecated] Link support \u2014 use POST /threads/:id/support",
         "tags": [
           "hypotheses"
         ]
@@ -5646,7 +5646,7 @@
             }
           }
         },
-        "summary": "[Deprecated] Unlink support — use DELETE /threads/:id/support/:linkId",
+        "summary": "[Deprecated] Unlink support \u2014 use DELETE /threads/:id/support/:linkId",
         "tags": [
           "hypotheses"
         ]
@@ -6623,7 +6623,7 @@
     },
     "/sandbox/runs": {
       "post": {
-        "description": "Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, …) and run one\nor more detectors against its extracted text.\n\n**`detectors`** is a JSON string containing an array of detector config objects.\nEach object has the shape:\n```json\n{ \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } }\n```\n\n### Detector types & sample configs\n\n| Type | What it finds |\n|------|---------------|\n| `SECRETS` | API keys, tokens, private keys |\n| `PII` | Emails, SSNs, credit cards, phone numbers |\n| `YARA` | Custom YARA rule matches |\n| `BROKEN_LINKS` | Unreachable URLs in text |\n| `CUSTOM` | User-defined pipelines (REGEX, GLiNER2, HuggingFace transformers) |\n\n**Minimal — secrets only (all patterns):**\n```json\n[{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}]\n```\n\n**PII with specific patterns:**\n```json\n[{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}]\n```\n\n**Secrets + PII combined:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}}\n]\n```\n\n**Full scan — all detectors:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},\n  {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}}\n]\n```",
+        "description": "Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, \u2026) and run one\nor more detectors against its extracted text.\n\n**`detectors`** is a JSON string containing an array of detector config objects.\nEach object has the shape:\n```json\n{ \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } }\n```\n\n### Detector types & sample configs\n\n| Type | What it finds |\n|------|---------------|\n| `SECRETS` | API keys, tokens, private keys |\n| `PII` | Emails, SSNs, credit cards, phone numbers |\n| `YARA` | Custom YARA rule matches |\n| `BROKEN_LINKS` | Unreachable URLs in text |\n| `CUSTOM` | User-defined pipelines (REGEX, GLiNER2, HuggingFace transformers) |\n\n**Minimal \u2014 secrets only (all patterns):**\n```json\n[{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}]\n```\n\n**PII with specific patterns:**\n```json\n[{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}]\n```\n\n**Secrets + PII combined:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}}\n]\n```\n\n**Full scan \u2014 all detectors:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},\n  {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}}\n]\n```",
         "operationId": "SandboxController_createRun",
         "parameters": [],
         "requestBody": {
@@ -6664,7 +6664,7 @@
             }
           },
           "409": {
-            "description": "Conflict — a run with the same file content already exists"
+            "description": "Conflict \u2014 a run with the same file content already exists"
           }
         },
         "summary": "Upload a file and run detectors on it",
@@ -6903,7 +6903,7 @@
     },
     "/sandbox/runs/{id}/rerun": {
       "post": {
-        "description": "Re-scans the SAME run's already-uploaded file with a different set of\ndetectors and appends the new findings to the run. No new run is created and the\nfile is reused from storage — no re-upload, never S3.",
+        "description": "Re-scans the SAME run's already-uploaded file with a different set of\ndetectors and appends the new findings to the run. No new run is created and the\nfile is reused from storage \u2014 no re-upload, never S3.",
         "operationId": "SandboxController_rerunRun",
         "parameters": [
           {
@@ -7023,7 +7023,7 @@
             }
           }
         },
-        "summary": "Trigger a dream cycle now (memory consolidation — dedupe, prune noise, distill notes)",
+        "summary": "Trigger a dream cycle now (memory consolidation \u2014 dedupe, prune noise, distill notes)",
         "tags": [
           "autopilot"
         ]
@@ -7192,7 +7192,7 @@
             }
           }
         },
-        "summary": "Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time",
+        "summary": "Cross-run activity feed (the business timeline) \u2014 server-side filter by kind, action, outcome, entity, text and time",
         "tags": [
           "autopilot"
         ]
@@ -7214,7 +7214,7 @@
             }
           }
         },
-        "summary": "The harness capability map — every registered tool (read/mutate, domain) and the missions that use them",
+        "summary": "The harness capability map \u2014 every registered tool (read/mutate, domain) and the missions that use them",
         "tags": [
           "autopilot"
         ]
@@ -7285,7 +7285,7 @@
             }
           }
         },
-        "summary": "Retune one agent — toggle it, edit its goal/iterations, or reassign its built-in tools",
+        "summary": "Retune one agent \u2014 toggle it, edit its goal/iterations, or reassign its built-in tools",
         "tags": [
           "autopilot"
         ]
@@ -7624,7 +7624,7 @@
             }
           }
         },
-        "summary": "Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output)",
+        "summary": "Execution log of a run \u2014 filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output)",
         "tags": [
           "autopilot"
         ]
@@ -10787,7 +10787,7 @@
           },
           "value": {
             "type": "string",
-            "description": "Specific entity value (span text) — required for NER fine-tuning. Omit for classification."
+            "description": "Specific entity value (span text) \u2014 required for NER fine-tuning. Omit for classification."
           },
           "accepted": {
             "type": "boolean",
@@ -11862,7 +11862,7 @@
           },
           "autopilotConfigEnabled": {
             "type": "boolean",
-            "description": "When true, the config-tuning agent may change editable source config (detectors, sampling, optional, resources) — never the base connection.",
+            "description": "When true, the config-tuning agent may change editable source config (detectors, sampling, optional, resources) \u2014 never the base connection.",
             "example": false
           },
           "autopilotConfigGuidance": {
@@ -12764,7 +12764,7 @@
         "properties": {
           "entityType": {
             "type": "string",
-            "description": "Entity kind — must be \"asset\""
+            "description": "Entity kind \u2014 must be \"asset\""
           },
           "entityId": {
             "type": "string",
@@ -12872,7 +12872,7 @@
         "properties": {
           "conclusion": {
             "type": "string",
-            "description": "Final conclusion — required to close the case"
+            "description": "Final conclusion \u2014 required to close the case"
           },
           "closedBy": {
             "type": "string"
@@ -14323,7 +14323,7 @@
           },
           "fromHash": {
             "type": "string",
-            "description": "Source asset hash (alternative to fromId — API resolves to UUID)"
+            "description": "Source asset hash (alternative to fromId \u2014 API resolves to UUID)"
           },
           "toType": {
             "type": "string",
@@ -14335,7 +14335,7 @@
           },
           "toHash": {
             "type": "string",
-            "description": "Target asset hash (alternative to toId — API resolves to UUID)"
+            "description": "Target asset hash (alternative to toId \u2014 API resolves to UUID)"
           },
           "relationType": {
             "type": "string",
@@ -14436,7 +14436,7 @@
           },
           "relationType": {
             "type": "string",
-            "description": "Relation type — free-form string (e.g. \"READS\", \"SENT_TO\", \"my custom link\")"
+            "description": "Relation type \u2014 free-form string (e.g. \"READS\", \"SENT_TO\", \"my custom link\")"
           },
           "confidence": {
             "type": "number",
@@ -14783,7 +14783,7 @@
           },
           "findingsByDetector": {
             "type": "object",
-            "description": "Finding counts per detector: { [detectorType]: { total, critical?, high?, … } }"
+            "description": "Finding counts per detector: { [detectorType]: { total, critical?, high?, \u2026 } }"
           }
         },
         "required": [
@@ -15742,7 +15742,7 @@
           },
           "agentKinds": {
             "type": "array",
-            "description": "Which agents to run. Pipeline agents (INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR) run in canonical order as one chained cycle; DREAM (memory consolidation, steered by instruction) and DUPLICATES (fingerprint consolidation, deterministic — instruction ignored) run as their own jobs. Omit to run the full pipeline. Forced to [CASE] when caseId is set.",
+            "description": "Which agents to run. Pipeline agents (INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR) run in canonical order as one chained cycle; DREAM (memory consolidation, steered by instruction) and DUPLICATES (fingerprint consolidation, deterministic \u2014 instruction ignored) run as their own jobs. Omit to run the full pipeline. Forced to [CASE] when caseId is set.",
             "items": {
               "type": "string",
               "enum": [
@@ -15757,7 +15757,7 @@
           },
           "caseId": {
             "type": "string",
-            "description": "Focus the case agent on ONE case: it receives the full case detail (hypotheses, evidence, findings, edges) and can connect/disconnect edges, build evidence paths and create/update hypotheses with supporting evidence — steered by the instruction."
+            "description": "Focus the case agent on ONE case: it receives the full case detail (hypotheses, evidence, findings, edges) and can connect/disconnect edges, build evidence paths and create/update hypotheses with supporting evidence \u2014 steered by the instruction."
           }
         }
       },
@@ -15766,7 +15766,7 @@
         "properties": {
           "cycleKey": {
             "type": "string",
-            "description": "Cycle identity — runs will carry this cycleKey"
+            "description": "Cycle identity \u2014 runs will carry this cycleKey"
           },
           "enqueued": {
             "type": "boolean"
@@ -15987,7 +15987,7 @@
           "domain": {
             "type": "string",
             "nullable": true,
-            "description": "Domain gated for OBSERVE_ONLY (inquiry/case/source/…)"
+            "description": "Domain gated for OBSERVE_ONLY (inquiry/case/source/\u2026)"
           },
           "source": {
             "type": "string",
@@ -16163,7 +16163,7 @@
           "maxIterations": {
             "type": "number",
             "nullable": true,
-            "description": "Iteration budget override (1–50); null resets to default"
+            "description": "Iteration budget override (1\u201350); null resets to default"
           },
           "toolNames": {
             "nullable": true,
@@ -16180,11 +16180,39 @@
         "properties": {
           "content": {
             "type": "string",
-            "description": "Model-authored narrative of the whole system"
+            "description": "Model-authored overview narrative (the only free-form, editable slot)."
           },
           "facts": {
             "type": "object",
-            "description": "Structured snapshot (source/detector counts, finding landscape, …)"
+            "description": "Structured snapshot (source/detector counts, finding landscape, \u2026)"
+          },
+          "glossary": {
+            "description": "Glossary terms, composed from agent memory (read-only).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BriefMemoryEntryDto"
+            }
+          },
+          "topics": {
+            "description": "Topic \u2192 entity/inquiry maps, composed from memory (read-only).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BriefMemoryEntryDto"
+            }
+          },
+          "gaps": {
+            "description": "What's been tried / known gaps (detector insights, precedents).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BriefMemoryEntryDto"
+            }
+          },
+          "setup": {
+            "description": "Server-derived setup checklist for standing up the instance.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BriefSetupItemDto"
+            }
           },
           "version": {
             "type": "number"
@@ -16202,7 +16230,11 @@
         "required": [
           "content",
           "facts",
-          "version"
+          "version",
+          "glossary",
+          "topics",
+          "gaps",
+          "setup"
         ]
       },
       "UpdateSystemBriefDto": {
@@ -16536,7 +16568,7 @@
           },
           "payload": {
             "type": "object",
-            "description": "Structured detail — raw model output, prompt sizes, errors",
+            "description": "Structured detail \u2014 raw model output, prompt sizes, errors",
             "nullable": true
           },
           "createdAt": {
@@ -16606,7 +16638,7 @@
           },
           "weight": {
             "type": "number",
-            "description": "Reinforcement counter — higher = recalled first"
+            "description": "Reinforcement counter \u2014 higher = recalled first"
           },
           "createdAt": {
             "format": "date-time",
@@ -17313,6 +17345,50 @@
           "value",
           "valueHash",
           "assets"
+        ]
+      },
+      "BriefMemoryEntryDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "content",
+          "weight"
+        ]
+      },
+      "BriefSetupItemDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "todo",
+              "info"
+            ],
+            "description": "ok = satisfied, todo = action recommended, info = neutral"
+          },
+          "label": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "label",
+          "detail"
         ]
       }
     }

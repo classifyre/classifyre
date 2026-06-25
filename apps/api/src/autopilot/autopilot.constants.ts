@@ -41,3 +41,11 @@ export const MAX_RECALLED_MEMORIES = 30;
 // Duplicate/cluster context handed to the inquiry/case agents per cycle.
 export const MAX_DUPLICATE_CLUSTERS = 15;
 export const MAX_DUPLICATE_PAIRS = 20;
+// Asset observation (cold-start signal): how much raw asset shape the harness
+// may inspect when a source has produced no findings yet.
+export const MAX_ASSET_SAMPLES = 25;
+export const MAX_ASSET_METADATA_PREVIEW_KEYS = 12;
+export const MAX_ASSET_METADATA_PREVIEW_LENGTH = 80;
+export const MAX_ASSET_TYPE_BUCKETS = 15;
+export const MAX_ASSET_METADATA_KEY_BUCKETS = 25;
+export const ASSET_PROFILE_SCAN_LIMIT = 5000;

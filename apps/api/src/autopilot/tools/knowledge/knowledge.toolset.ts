@@ -130,7 +130,7 @@ export class KnowledgeToolset {
       {
         name: 'system_brief.get',
         description:
-          'Read the current system brief (holistic summary of sources, detectors, finding landscape, what has been tried and known gaps).',
+          'Read the current system brief overview narrative (the durable framing). Coverage facts, glossary, topics, gaps and the setup checklist are composed automatically and are not editable here.',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -142,7 +142,7 @@ export class KnowledgeToolset {
       {
         name: 'system_brief.update',
         description:
-          "Rewrite the system brief narrative. Provide the full updated 'content'. The structured snapshot is refreshed automatically.",
+          "Set the system-brief OVERVIEW only — a short, stable 2–4 sentence framing of what this instance is for and its posture. Provide it as 'content'. Do NOT restate coverage counts, glossary, topics or gaps; those sections are composed automatically.",
         inputSchema: {
           type: 'object',
           properties: { content: { type: 'string' } },

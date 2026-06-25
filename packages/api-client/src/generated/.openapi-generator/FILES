@@ -44,6 +44,8 @@ docs/AttachFindingsDto.md
 docs/AttachFindingsResponseDto.md
 docs/AutopilotApi.md
 docs/AutopilotStatsDto.md
+docs/BriefMemoryEntryDto.md
+docs/BriefSetupItemDto.md
 docs/BulkIngestAssetsDto.md
 docs/BulkIngestEdgesDto.md
 docs/BulkIngestEdgesResponseDto.md
@@ -328,6 +330,8 @@ src/models/AssistantControllerRespondRequestMessagesInner.ts
 src/models/AttachFindingsDto.ts
 src/models/AttachFindingsResponseDto.ts
 src/models/AutopilotStatsDto.ts
+src/models/BriefMemoryEntryDto.ts
+src/models/BriefSetupItemDto.ts
 src/models/BulkIngestAssetsDto.ts
 src/models/BulkIngestEdgesDto.ts
 src/models/BulkIngestEdgesResponseDto.ts
