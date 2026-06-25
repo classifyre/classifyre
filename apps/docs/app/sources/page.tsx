@@ -62,6 +62,12 @@ export default function SourcesPage() {
       description:
         "Confirm a source connects before scanning, then automate scans on a recurring schedule.",
     },
+    {
+      href: "/sources/assets-and-metadata",
+      title: "Assets & Metadata",
+      description:
+        "What a scan produces — assets, their kinds and change status, the metadata attached to each, and how it feeds detectors.",
+    },
   ];
 
   const catalogEntries: SourceCatalogEntry[] = sources

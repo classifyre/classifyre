@@ -5,4 +5,5 @@ export default {
   sampling: "Sampling Strategies",
   "content-extraction": "OCR & Transcription",
   testing: "Testing & Scheduling",
+  "assets-and-metadata": "Assets & Metadata",
 };
