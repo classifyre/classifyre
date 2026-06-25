@@ -569,10 +569,27 @@ class PowerBISource(BaseSource):
                 return parsed
         return None
 
+    def _ordered_refs_for_automatic(
+        self, refs: list[PowerBIAssetRef], order_field: str
+    ) -> list[PowerBIAssetRef]:
+        values = [self._sampling_sort_datetime(ref, order_field) for ref in refs]
+        scored: list[tuple[bool, datetime, PowerBIAssetRef]] = []
+        for ref, parsed in zip(refs, values, strict=False):
+            effective = parsed or ref.updated_at
+            scored.append((parsed is not None, effective, ref))
+        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        return [item[2] for item in scored]
+
     def _sample_refs(self, refs: list[PowerBIAssetRef]) -> list[PowerBIAssetRef]:
         sampling = self._sampling()
         if sampling.strategy == SamplingStrategy.ALL:
             return refs
+
+        if sampling.strategy == SamplingStrategy.AUTOMATIC:
+            # Newest-first stable order; window advances each run and wraps around.
+            order_field = sampling.order_by_column or "modifiedDateTime"
+            ordered = self._ordered_refs_for_automatic(refs, order_field)
+            return self.automatic_window(ordered, key="refs")
 
         if sampling.strategy == SamplingStrategy.RANDOM:
             limit = int(sampling.rows_per_page or 100)

@@ -318,43 +318,72 @@ class SlackSource(BaseSource):
         ingestion_options = self._ingestion_options()
         time_range_options = self._time_range_options()
         sampling = self.config.sampling
-        max_total: int | None = None if sampling.strategy == SamplingStrategy.ALL else 100
+        strategy = sampling.strategy
+        is_automatic = strategy == SamplingStrategy.AUTOMATIC
+        if strategy == SamplingStrategy.ALL:
+            max_total: int | None = None
+        elif is_automatic:
+            max_total = int(sampling.rows_per_page or 100)
+        else:
+            max_total = 100
         oldest = self._normalize_ts(time_range_options.oldest)
         latest = self._normalize_ts(time_range_options.latest)
         batch_size = min(int(ingestion_options.batch_size or 200), 200)
 
-        while True:
-            if self._aborted:
-                break
+        # AUTOMATIC resumes from Slack's own pagination cursor saved last run,
+        # ingesting the next slice each run and wrapping when the channel is
+        # exhausted.
+        cursor_key = f"channel:{channel_id}"
+        if is_automatic:
+            saved = self._sampling_cursor.get(cursor_key)
+            if isinstance(saved, str) and saved:
+                cursor = saved
 
-            payload_data: dict[str, Any] = {
-                "channel": channel_id,
-                "limit": batch_size,
-            }
+        resume_cursor: str | None = None
+        exhausted = False
+        try:
+            while True:
+                if self._aborted:
+                    break
 
-            if cursor:
-                payload_data["cursor"] = cursor
-            if oldest:
-                payload_data["oldest"] = oldest
-            if latest:
-                payload_data["latest"] = latest
+                payload_data: dict[str, Any] = {
+                    "channel": channel_id,
+                    "limit": batch_size,
+                }
 
-            payload = self._request("post", "conversations.history", data=payload_data)
-            messages = payload.get("messages", [])
+                if cursor:
+                    payload_data["cursor"] = cursor
+                if oldest:
+                    payload_data["oldest"] = oldest
+                if latest:
+                    payload_data["latest"] = latest
 
-            if not messages:
-                break
+                payload = self._request("post", "conversations.history", data=payload_data)
+                messages = payload.get("messages", [])
 
-            for message in messages:
-                yield message
-                fetched += 1
+                if not messages:
+                    exhausted = True
+                    break
+
+                for message in messages:
+                    yield message
+                    fetched += 1
+                    if max_total and fetched >= max_total and not is_automatic:
+                        return
+
+                cursor = payload.get("response_metadata", {}).get("next_cursor")
+                has_more = payload.get("has_more", False)
+                if not has_more or not cursor:
+                    exhausted = True
+                    break
                 if max_total and fetched >= max_total:
-                    return
-
-            cursor = payload.get("response_metadata", {}).get("next_cursor")
-            has_more = payload.get("has_more", False)
-            if not has_more or not cursor:
-                break
+                    # Reached this run's slice; remember where to resume next run.
+                    resume_cursor = cursor
+                    break
+        finally:
+            if is_automatic:
+                # Reset (wrap) when exhausted, else persist Slack's resume token.
+                self._record_cursor_key(cursor_key, None if exhausted else resume_cursor)
 
     def _message_to_asset(
         self,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-_VALID_SAMPLING_STRATEGIES = {"RANDOM", "LATEST", "ALL"}
+_VALID_SAMPLING_STRATEGIES = {"AUTOMATIC", "RANDOM", "LATEST", "ALL"}
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -130,7 +130,7 @@ def normalize_source_recipe(
         _normalize_sampling_strategy(sampling.get("strategy")),
         _normalize_sampling_strategy(optional_sampling.get("strategy")),
         _normalize_sampling_strategy(optional_sampling.get("mode")),
-        "RANDOM",
+        "AUTOMATIC",
     )
 
     sampling["strategy"] = strategy
