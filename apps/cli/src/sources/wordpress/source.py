@@ -110,9 +110,11 @@ class WordPressSource(BaseSource):
         pending_batch: list[SingleAssetScanResults] = []
         content_options = self._content_options()
         sampling = self.config.sampling
+        # AUTOMATIC advances a per-content-type page cursor inside
+        # _stream_content_type, so it must not be capped by a shared limit here.
         limit: int | None = (
             None
-            if sampling.strategy == SamplingStrategy.ALL
+            if sampling.strategy in (SamplingStrategy.ALL, SamplingStrategy.AUTOMATIC)
             else int(sampling.rows_per_page or 100)
         )
         total_items_extracted = 0
@@ -176,6 +178,11 @@ class WordPressSource(BaseSource):
     ) -> Generator[tuple[list[SingleAssetScanResults], int], None, None]:
         """Stream transformed assets for a content type while paginating the API."""
         endpoint = f"{self.api_base}/{content_type}"
+
+        if strategy == SamplingStrategy.AUTOMATIC:
+            yield from self._stream_content_type_automatic(content_type, endpoint)
+            return
+
         items_extracted = 0
         page = 1
         per_page = 100
@@ -252,6 +259,68 @@ class WordPressSource(BaseSource):
             except requests.exceptions.RequestException as e:
                 logger.error(f"Failed to fetch {content_type} page {page}: {e}")
                 break
+
+    def _stream_content_type_automatic(
+        self, content_type: str, endpoint: str
+    ) -> Generator[tuple[list[SingleAssetScanResults], int], None, None]:
+        """AUTOMATIC: fetch the next page (modified-desc) and advance the cursor.
+
+        Each run ingests one page of ``rows_per_page`` items (capped at the WP
+        API maximum of 100) per content type, remembering the page number so the
+        next run continues, and wrapping back to page 1 once the last page is
+        reached.
+        """
+        key = f"wp:{content_type}"
+        saved = self._sampling_cursor.get(key)
+        page = saved if isinstance(saved, int) and saved >= 1 else 1
+        per_page = max(1, min(int(self.config.sampling.rows_per_page or 100), 100))
+
+        params: dict[str, Any] = {
+            "per_page": per_page,
+            "page": page,
+            "_embed": "author,wp:term",
+            "orderby": "modified",
+            "order": "desc",
+        }
+        content_options = self._content_options()
+        if content_options.post_status:
+            params["status"] = ",".join(content_options.post_status)
+
+        try:
+            response = self.session.get(endpoint, params=params, timeout=30)
+            response.raise_for_status()
+            items = response.json()
+        except requests.exceptions.RequestException as e:
+            # A request past the final page wraps back to the start next run.
+            logger.error(f"Failed to fetch {content_type} page {page}: {e}")
+            self._record_cursor_key(key, 1)
+            return
+
+        if not items:
+            self._record_cursor_key(key, 1)
+            return
+
+        total_pages = int(response.headers.get("X-WP-TotalPages", 1))
+        page_assets: list[SingleAssetScanResults] = []
+        extracted = 0
+        for item in items:
+            if self._aborted:
+                break
+            try:
+                page_asset, image_assets = self._transform_item_to_assets(item, content_type)
+                self._add_asset_if_new(page_assets, page_asset)
+                for image_asset in image_assets:
+                    self._add_asset_if_new(page_assets, image_asset)
+                extracted += 1
+            except Exception as e:
+                logger.error(f"Failed to transform {content_type} item {item.get('id')}: {e}")
+                continue
+
+        if extracted > 0:
+            yield page_assets, extracted
+
+        next_page = 1 if (page >= total_pages or len(items) < per_page) else page + 1
+        self._record_cursor_key(key, next_page)
 
     def _fetch_content_type(
         self, content_type: str, limit: int | None

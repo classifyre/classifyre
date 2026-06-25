@@ -219,6 +219,46 @@ describe('CliRunnerService', () => {
     expect(command).toContain('--source-id');
     expect(command).toContain('--runner-id');
     expect(command).toContain('--managed-runner');
+    // No cursor passed → env var is absent.
+    expect(command).not.toContain('CLASSIFYRE_SAMPLING_CURSOR');
+  });
+
+  it('injects the AUTOMATIC sampling cursor env var when provided', () => {
+    const { service } = createService();
+    const cursorB64 = Buffer.from(
+      JSON.stringify({ tables: { 'db_#_users': { pk: [42] } } }),
+      'utf8',
+    ).toString('base64');
+    const command = (service as any).buildCliCommand(
+      '/tmp/cli',
+      '/tmp/cli/.venv',
+      '/tmp/recipe.json',
+      'source-1',
+      'runner-1',
+      'http://localhost:8000',
+      false,
+      cursorB64,
+    );
+
+    // The value is shell-escaped, so assert the env name and the (quote-free)
+    // base64 payload appear, rather than an exact unquoted match.
+    expect(command).toContain('CLASSIFYRE_SAMPLING_CURSOR=');
+    expect(command).toContain(cursorB64);
+  });
+
+  it('encodes a non-empty sampling cursor and skips empty/missing ones', () => {
+    const { service } = createService();
+    const cursor = { tables: { 'db_#_users': { pk: [1] } } };
+    const encoded = (service as any).encodeSamplingCursor({
+      samplingCursor: cursor,
+    });
+
+    expect(JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'))).toEqual(
+      cursor,
+    );
+    expect((service as any).encodeSamplingCursor({ samplingCursor: {} })).toBeUndefined();
+    expect((service as any).encodeSamplingCursor({ samplingCursor: null })).toBeUndefined();
+    expect((service as any).encodeSamplingCursor({})).toBeUndefined();
   });
 
   it('passes successful-run state into CLI execution context', async () => {

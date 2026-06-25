@@ -1,4 +1,9 @@
-const VALID_SAMPLING_STRATEGIES = new Set(['RANDOM', 'LATEST', 'ALL']);
+const VALID_SAMPLING_STRATEGIES = new Set([
+  'AUTOMATIC',
+  'RANDOM',
+  'LATEST',
+  'ALL',
+]);
 
 type JsonRecord = Record<string, unknown>;
 
@@ -211,7 +216,7 @@ function normalizeSampling(config: JsonRecord) {
     normalizeSamplingStrategy(sampling.strategy) ??
     normalizeSamplingStrategy(optionalSampling?.strategy) ??
     normalizeSamplingStrategy(optionalSampling?.mode) ??
-    'RANDOM';
+    'AUTOMATIC';
 
   sampling.strategy = strategy;
   delete sampling.limit;

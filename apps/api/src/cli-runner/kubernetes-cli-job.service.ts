@@ -65,6 +65,7 @@ export class KubernetesCliJobService {
     hasSuccessfulRuns?: boolean,
     onLogChunk?: CliJobLogHandler,
     onJobCreated?: CliJobCreatedHandler,
+    samplingCursorB64?: string,
   ): Promise<CliJobResult> {
     return this.runJob({
       runnerId,
@@ -73,6 +74,7 @@ export class KubernetesCliJobService {
       mode: 'extract',
       outputRestUrl,
       hasSuccessfulRuns,
+      samplingCursorB64,
       onLogChunk,
       onJobCreated,
     });
@@ -222,6 +224,7 @@ export class KubernetesCliJobService {
     recipe?: Record<string, unknown>;
     outputRestUrl?: string;
     hasSuccessfulRuns?: boolean;
+    samplingCursorB64?: string;
     sandboxFileExt?: string;
     sandboxDetectorsB64?: string;
     jobTrackingKey?: string;
@@ -403,6 +406,7 @@ export class KubernetesCliJobService {
       recipe?: Record<string, unknown>;
       outputRestUrl?: string;
       hasSuccessfulRuns?: boolean;
+      samplingCursorB64?: string;
       sandboxFileExt?: string;
       sandboxDetectorsB64?: string;
     },
@@ -487,6 +491,13 @@ export class KubernetesCliJobService {
       envMap.set('CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN', {
         name: 'CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN',
         value: params.hasSuccessfulRuns ? '1' : '0',
+      });
+    }
+    if (params.samplingCursorB64) {
+      // AUTOMATIC sampling cursor (base64 JSON) carried over from the prior run.
+      envMap.set('CLASSIFYRE_SAMPLING_CURSOR', {
+        name: 'CLASSIFYRE_SAMPLING_CURSOR',
+        value: params.samplingCursorB64,
       });
     }
     if (params.sandboxFileExt !== undefined) {

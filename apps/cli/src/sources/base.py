@@ -1,7 +1,11 @@
+import base64
+import json
+import logging
 import os
+import threading
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, Generator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
 from ..outputs.rest import IngestEdge
@@ -11,6 +15,10 @@ if TYPE_CHECKING:
 from ..utils.hashing import calculate_checksum, normalize_http_url
 from ..utils.validation import validate_output
 from .recipe_normalizer import normalize_source_recipe
+
+logger = logging.getLogger(__name__)
+
+_T = TypeVar("_T")
 
 
 class BaseSource(ABC):
@@ -26,6 +34,10 @@ class BaseSource(ABC):
     # Default batch size for streaming asset results
     BATCH_SIZE: int = 50
     HAS_SUCCESSFUL_RUN_ENV = "CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN"
+    # The API injects the saved AUTOMATIC sampling cursor here (base64-encoded
+    # JSON) before launching the CLI job. The recipe itself cannot carry it
+    # because every source schema sets ``additionalProperties: false``.
+    SAMPLING_CURSOR_ENV = "CLASSIFYRE_SAMPLING_CURSOR"
 
     def __init__(
         self,
@@ -42,6 +54,11 @@ class BaseSource(ABC):
             runner_id: Optional runner ID (for API runs)
         """
         normalized_recipe = normalize_source_recipe(recipe, recipe.get("type"))
+        # Cursor carried over from the previous run (AUTOMATIC strategy). Read
+        # before the override hook so subclasses can consult it there if needed.
+        self._sampling_cursor: dict[str, Any] = self._load_sampling_cursor()
+        self._next_sampling_cursor: dict[str, Any] | None = None
+        self._sampling_cursor_lock = threading.Lock()
         self._apply_initial_sampling_override(normalized_recipe)
         recipe.clear()
         recipe.update(normalized_recipe)
@@ -54,6 +71,108 @@ class BaseSource(ABC):
 
     def _apply_initial_sampling_override(self, recipe: dict[str, Any]) -> None:
         pass
+
+    # ── AUTOMATIC sampling cursor ────────────────────────────────────────
+    #
+    # AUTOMATIC sampling keeps a small, opaque, source-defined cursor in the
+    # API between runs. Each run reads the prior cursor (``sampling_cursor``),
+    # ingests the next slice of not-yet-seen data, then records the advanced
+    # cursor (``set_next_sampling_cursor``). The output sink persists it back to
+    # the API on finalize via ``current_sampling_cursor``. When a source has
+    # ingested everything it should reset the cursor so the next run wraps
+    # around and re-ingests from the start (data is not stale).
+
+    def _load_sampling_cursor(self) -> dict[str, Any]:
+        raw = os.environ.get(self.SAMPLING_CURSOR_ENV)
+        if not raw:
+            return {}
+        try:
+            decoded = base64.b64decode(raw).decode("utf-8")
+            data = json.loads(decoded)
+        except Exception as exc:
+            logger.warning("Ignoring malformed %s: %s", self.SAMPLING_CURSOR_ENV, exc)
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def sampling_cursor(self) -> dict[str, Any]:
+        """Return the cursor saved by the previous run (empty on first run)."""
+        return self._sampling_cursor
+
+    def set_next_sampling_cursor(self, cursor: dict[str, Any]) -> None:
+        """Record the advanced cursor to persist at the end of this run."""
+        self._next_sampling_cursor = cursor
+
+    def current_sampling_cursor(self) -> dict[str, Any] | None:
+        """Cursor to persist for the next run, or None to leave it unchanged.
+
+        Returns None unless this run advanced the cursor (i.e. AUTOMATIC
+        sampling actually ran), so non-AUTOMATIC runs never touch the stored
+        cursor.
+        """
+        return self._next_sampling_cursor
+
+    def sampling_window_size(self, default: int = 100) -> int:
+        """The per-run AUTOMATIC slice size (``rows_per_page``)."""
+        config = getattr(self, "config", None)
+        sampling = getattr(config, "sampling", None) if config is not None else None
+        size = getattr(sampling, "rows_per_page", None)
+        try:
+            return int(size) if size else default
+        except (TypeError, ValueError):
+            return default
+
+    def _record_cursor_key(self, key: str, value: Any) -> None:
+        """Thread-safely set ``key`` in the cursor to persist for the next run."""
+        with self._sampling_cursor_lock:
+            nxt = self._next_sampling_cursor if isinstance(self._next_sampling_cursor, dict) else {}
+            nxt = {**nxt, key: value}
+            self._next_sampling_cursor = nxt
+
+    def automatic_offset(self, key: str) -> int:
+        """Return the saved offset for a keyed AUTOMATIC DB cursor (0 on first run)."""
+        saved = self._sampling_cursor.get(key)
+        return saved if isinstance(saved, int) and saved >= 0 else 0
+
+    def record_automatic_offset(
+        self, key: str, *, prev_offset: int, fetched: int
+    ) -> None:
+        """Advance a keyed offset cursor; wrap to 0 once a page underfills.
+
+        Used by sources that page rows directly from the backing store
+        (``skip``/``OFFSET``) rather than materialising a full list.
+        """
+        size = self.sampling_window_size()
+        next_offset = 0 if fetched < size else prev_offset + fetched
+        self._record_cursor_key(key, next_offset)
+
+    def automatic_window(self, items: list[_T], *, key: str = "items") -> list[_T]:
+        """Return the next AUTOMATIC slice of a stably-ordered in-memory list.
+
+        Non-tabular sources fetch a list of item references, then call this to
+        ingest only the next ``rows_per_page`` window. A per-``key`` offset is
+        remembered between runs and wraps back to the start once the list has
+        been fully covered (data is not stale, so re-ingesting is desired).
+
+        Callers must pass the items in a **stable order** across runs (e.g. by
+        id or timestamp) so the cursor stays meaningful.
+        """
+        total = len(items)
+        if total == 0:
+            return []
+
+        saved = self._sampling_cursor.get(key)
+        offset = saved if isinstance(saved, int) and 0 <= saved < total else 0
+
+        size = self.sampling_window_size()
+        window = items[offset : offset + size]
+
+        next_offset = offset + len(window)
+        if next_offset >= total:
+            next_offset = 0  # wrap around on the next run
+
+        self._record_cursor_key(key, next_offset)
+
+        return window
 
     @staticmethod
     def _read_bool_env(name: str) -> bool | None:

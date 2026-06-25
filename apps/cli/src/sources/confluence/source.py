@@ -242,10 +242,23 @@ class ConfluenceSource(BaseSource):
                 params["labels"] = ",".join(str(v) for v in spaces_filter.labels)
         return self.client.iter_confluence_results("/wiki/api/v2/spaces", params=params)
 
+    def _sorted_page_refs(self, refs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return sorted(
+            refs,
+            key=lambda ref: parse_datetime(
+                str(ref.get("version_created_at") or ref.get("created_at") or "")
+            ),
+            reverse=True,
+        )
+
     def _sample_page_refs(self, refs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         sampling = self.config.sampling
         if sampling.strategy == SamplingStrategy.ALL:
             return refs
+
+        if sampling.strategy == SamplingStrategy.AUTOMATIC:
+            # Newest-first stable order; window advances each run and wraps around.
+            return self.automatic_window(self._sorted_page_refs(refs), key="pages")
 
         limit = int(sampling.rows_per_page or 100)
         if limit >= len(refs):
@@ -254,14 +267,7 @@ class ConfluenceSource(BaseSource):
         if sampling.strategy == SamplingStrategy.RANDOM:
             return deterministic_sample(refs, limit)
 
-        refs_sorted = sorted(
-            refs,
-            key=lambda ref: parse_datetime(
-                str(ref.get("version_created_at") or ref.get("created_at") or "")
-            ),
-            reverse=True,
-        )
-        return refs_sorted[:limit]
+        return self._sorted_page_refs(refs)[:limit]
 
     def _extract_page_assets(self, ref: dict[str, Any]) -> list[SingleAssetScanResults]:
         page_id = str(ref["page_id"])

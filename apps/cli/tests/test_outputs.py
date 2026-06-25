@@ -211,6 +211,33 @@ async def test_rest_output_managed_runner_flow(monkeypatch: pytest.MonkeyPatch) 
     assert fake_session.calls[1]["url"].endswith("/sources/source-1/assets/finalize")
     assert fake_session.calls[2]["url"].endswith("/runners/runner-1/status")
     assert fake_session.calls[2]["json"]["status"] == "COMPLETED"
+    # No AUTOMATIC cursor set → finalize omits samplingCursor entirely.
+    assert "samplingCursor" not in fake_session.calls[1]["json"]
+
+
+@pytest.mark.asyncio
+async def test_rest_output_finalize_includes_sampling_cursor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_session = _FakeSession(responses=[_FakeResponse({}), _FakeResponse({})])
+    monkeypatch.setattr("src.outputs.rest.requests.Session", lambda: fake_session)
+
+    context = OutputRuntimeContext(
+        source_id="source-1",
+        runner_id="runner-1",
+        managed_runner=True,
+        batch_size=20,
+    )
+    sink = RestOutputSink(context, base_url="http://localhost:8000", timeout_sec=30)
+
+    cursor = {"tables": {"db_#_users": {"pk": [42]}}}
+    sink.set_sampling_cursor(cursor)
+    await sink.start()
+    await sink.finish()
+
+    finalize_call = fake_session.calls[0]
+    assert finalize_call["url"].endswith("/sources/source-1/assets/finalize")
+    assert finalize_call["json"]["samplingCursor"] == cursor
 
 
 @pytest.mark.asyncio

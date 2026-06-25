@@ -200,6 +200,26 @@ export class SourceService {
     });
   }
 
+  /**
+   * Persist the opaque AUTOMATIC sampling cursor for a source. The value is
+   * source-defined and never interpreted here; it is injected into the next
+   * run so extraction resumes where it left off.
+   */
+  updateSamplingCursor(
+    sourceId: string,
+    samplingCursor: Record<string, unknown> | null | undefined,
+  ): Promise<Source> {
+    return this.prisma.source.update({
+      where: { id: sourceId },
+      data: {
+        samplingCursor:
+          samplingCursor === undefined
+            ? Prisma.DbNull
+            : (samplingCursor as Prisma.InputJsonValue),
+      },
+    });
+  }
+
   async deleteSource(where: Prisma.SourceWhereUniqueInput): Promise<Source> {
     const existing = await this.prisma.source.findUnique({
       where,
