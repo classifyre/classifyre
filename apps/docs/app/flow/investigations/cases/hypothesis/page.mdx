@@ -1,91 +1,92 @@
 ---
 title: Hypothesis & Threads
-description: How hypothesis threads work — organising investigation theories with evidence support and confidence tracking.
+description: Work a case like an analyst — propose competing explanations, link the evidence for and against each, and track where the truth is leaning.
 ---
 
 # Hypothesis & Threads
 
-Threads are the structured discussion system inside a case. They come in two
-flavours: **hypotheses** (investigation theories with verdict and confidence
-tracking) and **discussions** (free-form debrief notes).
+Inside a case, **threads** are where the thinking happens. They come in two
+kinds: **hypotheses** — explanations you're testing — and **discussions** —
+free-form notes and debrief. A hypothesis is the heart of it: you state a theory,
+then let the evidence confirm or kill it.
 
 ```mermaid
 graph TD
-    Thread["Thread<br/>HYPOTHESIS or DISCUSSION"]
-    Entry["Entry<br/>STATEMENT / STATUS_CHANGE /<br/>CONFIDENCE_CHANGE / NOTE"]
-    SupportLink["Support Link<br/>SUPPORTS / CONTRADICTS / NEUTRAL"]
-    Evidence["Evidence"]
-    CaseFinding["Case Finding"]
+    Thread["Thread<br/>Hypothesis or discussion"]
+    Entry["Entries<br/>statements & notes over time"]
+    Link["Support link<br/>supports / contradicts / neutral"]
+    Evidence["Evidence & findings"]
 
-    Thread -- "has" --> Entry
-    Thread -- "linked to" --> SupportLink
-    SupportLink -- "references" --> Evidence
-    SupportLink -- "references" --> CaseFinding
+    Thread -- "records" --> Entry
+    Thread -- "weighs" --> Link
+    Link -- "points at" --> Evidence
 ```
 
-## Hypothesis lifecycle
+---
+
+## How a hypothesis evolves
+
+A hypothesis starts as a proposal and moves as the evidence comes in:
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> PROPOSED: Hypothesis created
-    PROPOSED --> SUPPORTED: Evidence confirms
-    PROPOSED --> REFUTED: Evidence contradicts
-    PROPOSED --> INCONCLUSIVE: Mixed evidence
-    SUPPORTED --> INCONCLUSIVE: New evidence
-    REFUTED --> INCONCLUSIVE: New evidence
-    INCONCLUSIVE --> SUPPORTED: Further evidence
-    INCONCLUSIVE --> REFUTED: Further evidence
+    [*] --> Proposed: Stated, not yet tested
+    Proposed --> Supported: Evidence backs it
+    Proposed --> Refuted: Evidence contradicts it
+    Proposed --> Inconclusive: Mixed evidence
+    Supported --> Inconclusive: New evidence muddies it
+    Refuted --> Inconclusive: New evidence muddies it
+    Inconclusive --> Supported: Further evidence
+    Inconclusive --> Refuted: Further evidence
 ```
 
-| Status | Description |
+| Verdict | What it means |
 |---|---|
-| **PROPOSED** | Initial state — hypothesis stated but not yet tested |
-| **SUPPORTED** | Evidence consistently supports the hypothesis |
-| **REFUTED** | Evidence consistently contradicts the hypothesis |
-| **INCONCLUSIVE** | Mixed or insufficient evidence |
+| **Proposed** | Stated but not yet tested |
+| **Supported** | The evidence consistently backs it |
+| **Refuted** | The evidence consistently contradicts it |
+| **Inconclusive** | The evidence is mixed or insufficient |
 
-## Confidence scoring
+Because you can run several hypotheses side by side, a case becomes a set of
+competing explanations — and the evidence shows which one is winning.
 
-Each hypothesis carries a **confidence** score (0.0 – 1.0) that captures the
-investigator's certainty. The score is set manually via the UI confidence
-slider and is independent of the status — you can have a SUPPORTED hypothesis
-at 0.5 confidence or a REFUTED one at 0.9.
+---
 
-## Support links
+## Linking evidence: for and against
 
-Evidence and case findings can be linked to a hypothesis with a specific
+The power of a hypothesis comes from connecting it to evidence with a clear
 **stance**:
 
 | Stance | Meaning |
 |---|---|
-| **SUPPORTS** | This evidence/finding backs the hypothesis |
-| **CONTRADICTS** | This evidence/finding opposes the hypothesis |
-| **NEUTRAL** | Contextual but not directional |
+| **Supports** | This evidence backs the hypothesis |
+| **Contradicts** | This evidence argues against it |
+| **Neutral** | Relevant context, but not pointing either way |
 
-The threads panel in the UI shows a for/against count per hypothesis, and
-the linked items are rendered with colour-coded stances in the detail pane.
+Each hypothesis shows a running **for / against** count, so at a glance you can
+see how strongly the evidence leans — and which theory is holding up.
 
-## Thread entries
+---
 
-Thread entries form the audit trail of a hypothesis or discussion:
+## Confidence
 
-| Entry type | Description |
-|---|---|
-| **STATEMENT** | A free-form note or observation |
-| **STATUS_CHANGE** | Record of a verdict change (auto-generated) |
-| **CONFIDENCE_CHANGE** | Record of a confidence change (auto-generated) |
-| **NOTE** | A comment on the thread |
+Alongside the verdict, you can set a **confidence** level — your own certainty in
+the hypothesis. It's deliberately separate from the verdict: you might have a
+*supported* hypothesis you're only moderately sure of, or a *refuted* one you're
+very confident is wrong. Verdict captures *what the evidence says*; confidence
+captures *how sure you are*.
 
-Entries are cursor-paginated and recorded with an optional actor reference.
+---
 
-## UI layout
+## A record of the reasoning
 
-The threads UI has a two-panel layout:
+Every thread keeps a running history — the statements added, the verdict and
+confidence changes, and the notes along the way. That makes a hypothesis not just
+a conclusion but a **transparent line of reasoning** anyone can follow later,
+including which steps were taken by a teammate and which by
+[Autopilot](/flow/investigations/autopilot/).
 
-- **Left rail** — Lists all threads grouped by type (Hypotheses at top,
-  Discussions below). Each hypothesis shows its colour dot, verdict badge,
-  and for/against support counts.
-- **Detail pane** — The selected thread's detail: linked evidence with
-  stance, editable verdict (dropdown) and confidence (slider), colour
-  picker, entry history feed, and a note composer (Cmd+Enter to send).
+> Hypotheses and their evidence links are also drawn on the
+> [knowledge graph](/flow/investigations/cases/graph/), so you can *see* which
+> evidence supports which theory.

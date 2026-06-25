@@ -1,74 +1,59 @@
 ---
 title: Timeline
-description: How the case activity timeline works — a unified cursor-paginated feed of every meaningful event in a case.
+description: A complete, time-ordered record of everything that happened in a case — who did what, and when.
 ---
 
 # Timeline
 
-The timeline is a **unified activity feed** for a case. Every meaningful
-mutation — from case creation to evidence changes, thread updates, and status
-transitions — is recorded as an activity entry with a typed event, JSON
-payload, and optional actor reference.
+The timeline is a case's **complete activity log**. Every meaningful change —
+from the moment the case was created, through every piece of evidence added, every
+hypothesis updated, and the conclusion that closed it — is recorded in order. It's
+the case's memory, and its audit trail.
 
 ```mermaid
 graph LR
-    subgraph Sources
-        CaseActions["Case mutations<br/>create, update, close"]
-        EvidenceActions["Evidence mutations<br/>add, remove, note"]
-        ThreadActions["Thread mutations<br/>status, entry, support"]
-        GraphActions["Graph mutations<br/>edges added"]
-    end
+    Case["Case changes"]
+    Evidence["Evidence changes"]
+    Threads["Hypothesis & thread changes"]
+    Graph["Graph changes"]
+    Feed["Timeline<br/>one feed, grouped by day"]
 
-    subgraph Timeline
-        Activity["CaseActivity<br/>type + payload + actor"]
-        ActivityFeed["Cursor-paginated<br/>feed grouped by day"]
-    end
-
-    CaseActions --> Activity
-    EvidenceActions --> Activity
-    ThreadActions --> Activity
-    GraphActions --> Activity
-    Activity --> ActivityFeed
+    Case --> Feed
+    Evidence --> Feed
+    Threads --> Feed
+    Graph --> Feed
 ```
 
-## Activity types
+---
 
-| Category | Activity types |
+## What it records
+
+Everything that meaningfully changes a case shows up on the timeline:
+
+| Area | Events you'll see |
 |---|---|
-| **Case** | `CASE_CREATED`, `CASE_UPDATED`, `CASE_CLOSED`, `CASE_REOPENED`, `CASE_DELETED` |
-| **Inquiries** | `INQUIRY_LINKED`, `INQUIRY_UNLINKED`, `INQUIRY_PULLED` |
-| **Evidence** | `EVIDENCE_ADDED`, `EVIDENCE_REMOVED`, `EVIDENCE_NOTE_UPDATED`, `FINDING_ATTACHED`, `FINDING_DETACHED`, `FINDING_NOTE_UPDATED` |
-| **Threads** | `THREAD_CREATED`, `THREAD_STATUS_CHANGED`, `THREAD_CONFIDENCE_CHANGED`, `THREAD_ENTRY_ADDED`, `SUPPORT_LINKED`, `SUPPORT_UNLINKED` |
-| **Graph** | `MANUAL_EDGE_CREATED`, `MANUAL_EDGE_DELETED`, `MANUAL_EDGE_RENAMED` |
+| **Case** | Created, updated, closed, reopened |
+| **Inquiries** | Linked, unlinked, and matches pulled in |
+| **Evidence** | Assets and findings attached or removed, and notes edited |
+| **Hypotheses** | Threads created, verdicts and confidence changed, links and notes added |
+| **Graph** | Manual connections added, renamed, or removed |
 
-## UI features
+---
 
-- **Day grouping** — Events are grouped by calendar day with sticky date headers.
-- **Type-specific icons** — Each activity type has a dedicated icon and colour
-  mapped in the `ACTIVITY_TYPE_CONFIG` constant.
-- **Category filters** — Filter the feed by category: All / Case / Inquiries /
-  Evidence / Threads.
-- **Actor display** — Each event shows the acting user or an AI actor badge.
-- **Cursor pagination** — "Load older" button requests the next cursor-based
-  page. No page number navigation.
-- **Jump-to-day** — A compact day picker lets you skip to a specific date.
+## Reading the feed
 
-## API
+The timeline is built to scan quickly:
 
-`GET /cases/:caseId/timeline` returns the paginated timeline. The response
-uses cursor-based pagination (opaque cursor in the response body, passed via
-`?cursor=` query parameter).
+- **Grouped by day**, with clear date headers, so you can follow the
+  investigation as a story.
+- **Each event shows who did it** — a teammate, or an
+  [Autopilot](/flow/investigations/autopilot/) agent, clearly badged — so human
+  and AI work sit side by side in one trustworthy record.
+- **Filter by area** — focus on just evidence, just hypotheses, and so on.
+- **Jump to a date** to skip straight to a moment you care about, and **load
+  older** activity as you go back in time.
 
-```json
-{
-  "items": [
-    {
-      "type": "EVIDENCE_ADDED",
-      "payload": { "evidenceId": "...", "assetLabel": "..." },
-      "actor": { "type": "user", "id": "..." },
-      "createdAt": "2026-06-12T10:30:00Z"
-    }
-  ],
-  "nextCursor": "eyJpZCI6IjEyMyJ9"
-}
-```
+> Because both people *and* Autopilot act on the same case, the timeline is where
+> you confirm exactly what the AI did and when — the same "explain everything"
+> principle behind the [Autopilot flight
+> recorder](/flow/investigations/autopilot/flight-recorder/).

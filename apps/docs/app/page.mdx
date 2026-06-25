@@ -1,99 +1,110 @@
 ---
 title: Classifyre Docs
-description: Core documentation for setup, architecture, and deployment options.
+description: Classifyre turns the data scattered across the systems you already run into governed, actionable signal — and an AI autopilot turns those signals into real investigations.
 ---
 
-import { Separator } from "@workspace/ui/components"
+# Classifyre
 
-# Classifyre Docs
+Classifyre finds what matters in the data scattered across the systems you
+already run — and turns it into **investigations you can act on**. Connect a
+source, let detectors surface the evidence, and work the results like an
+analyst: standing questions, duplicate detection, cases, and hypotheses — with an
+**AI autopilot** doing the legwork in between.
 
-Classifyre turns messy, distributed source data into governed signals. Connect the systems you already run, detect what matters, classify content and findings, and label data for security, privacy, moderation, and operational workflows.
+It's an open-source investigation platform for your whole data estate:
+databases, lakehouses, collaboration tools, content platforms, and more.
 
+---
 
-##  Classifyre Component Architecture
+## What you can do with it
 
-The diagram below highlights the separation between the **Core Classifyre Stack** (colored in green) and the **External Infrastructure** (colored in gray):
+| | |
+|---|---|
+| **Connect what you already run** | Point Classifyre at databases, data lakes, storage buckets, collaboration tools, and content platforms — no data migration. |
+| **Detect what matters** | Ready-made detectors for secrets, PII, and security, plus custom detectors you build — from a simple rule to a full AI model. |
+| **See the same thing, everywhere** | Fingerprints connect duplicate and similar records across systems into a single picture. |
+| **Investigate, don't just list** | Turn findings into cases with evidence, competing hypotheses, and a clear conclusion. |
+| **Let AI do the legwork** | An autopilot opens inquiries, builds cases, and drafts hypotheses after every scan — explaining every move. |
+| **Run it your way** | Start on a laptop with Docker, scale to Kubernetes, keep your data in your own infrastructure. |
+
+---
+
+## How it all connects
+
+Classifyre is one connected pipeline — from the systems you connect, all the way
+to a resolved investigation:
 
 ```mermaid
-graph TD
-    %% Core Classifyre Stack Components (Vibrant Indigo)
-    Web["Web UI"]
-    API["API and Orchestrator"]
-    CLI["CLI Runner"]
+graph LR
+    Sources["Sources<br/>systems you connect"] --> Assets["Assets<br/>items + metadata"]
+    Assets --> Detectors["Detectors"]
+    Detectors --> Findings["Findings<br/>signals to act on"]
 
-    %% External Infrastructure (Slate Gray)
-    DB["Database (PostgreSQL)"]
-    S3["Object Storage (S3)"]
-    Sources["External Sources"]
+    Findings --> Inquiries["Inquiries<br/>standing questions"]
+    Findings --> Fingerprints["Fingerprints<br/>duplicates & similarity"]
 
-    %% Interactions
-    Web --> API
-    API -- "Reads / writes state" --> DB
-    API -- "Spawns scan job" --> CLI
-    CLI -- "Pulls data" --> Sources
-    CLI -- "Streams findings" --> API
-    API -- "Logs and Artifacts" --> S3
+    Inquiries --> Cases["Cases & hypotheses"]
+    Fingerprints --> Cases
 
-    %% Styling for visual differentiation
-    style Web fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
-    style API fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
-    style CLI fill:#b7ff00,stroke:#0a0a0a,stroke-width:2px,color:#0a0a0a
-
-    style DB fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
-    style S3 fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
-    style Sources fill:#475569,stroke:#334155,stroke-width:2px,color:#fff
+    Autopilot["Autopilot — AI agents that work the whole right-hand side"]
+    Autopilot -.-> Inquiries
+    Autopilot -.-> Fingerprints
+    Autopilot -.-> Cases
 ```
 
----
-
-
-Classifyre is designed as a distributed, decoupled platform. The system is split between the **Core Classifyre Stack** and **External Infrastructure** components:
-
-### Core Classifyre Stack
-
-These primary services form the core of the Classifyre application:
-
-#### 1. Web UI (Frontend)
-- **Role:** The user-facing frontend.
-- **Responsibilities:**
-  - Configuring and managing data sources.
-  - Enabling, disabling, and adjusting settings for detectors and classifiers.
-  - Inspecting scan runs, execution logs, and classified findings.
-  - Triggering scans manually or defining automated schedules.
-
-#### 2. API and Orchestrator
-- **Role:** The control plane and orchestrator.
-- **Responsibilities:**
-  - Exposing REST APIs and WebSocket endpoints to power the Web UI.
-  - Coordinating runner lifecycles, states, and jobs.
-  - Spawning CLI execution runs (locally or as Kubernetes Jobs).
-  - Receiving batched findings from active CLI scanners via REST endpoints.
-  - Fetching run artifacts and logs from storage.
-
-#### 3. CLI Runner
-- **Role:** The ephemeral execution worker where the extraction and detection takes place.
-- **Responsibilities:**
-  - Ingesting documents from target external sources.
-  - Executing extractors to parse text and structural metadata.
-  - Running detectors (secrets, PII, custom LLM models) against parsed text.
-  - Streaming NDJSON envelope findings back to the API in batches.
-
-### External Infrastructure
-
-Classifyre relies on standard external components for data persistence, storage, and ingestion. Users can configure and bring their own instances of these components:
-
-- **[PostgreSQL Database](/deployment/database/):** Stores all system metadata, configurations, schedules, logs, and findings. Classifyre supports **embedded** database pods for quick evaluations or **external** database instances (such as AWS RDS, GCP Cloud SQL, or CloudNativePG clusters) for production.
-- **[S3 Object Storage](/deployment/storage/):** An **external** and **optional** component used to persist long-term runner execution logs and developer sandbox uploads. If disabled, logs are streamed live but not saved.
-- **[External Data Sources](/sources/):** The target systems containing unstructured documents (e.g., AWS S3, Confluence, Slack, Google Drive) that Classifyre scans using its extractors and detectors to identify security and compliance findings.
+1. **[Sources](/sources/)** connect the systems you run and scan them into
+   **[assets](/sources/assets-and-metadata/)** with rich metadata.
+2. **[Detectors](/detectors/)** read each asset and raise
+   **[findings](/detectors/findings/)** — the signals worth acting on.
+3. **[Inquiries](/flow/investigations/inquiry/)** keep watch over findings, and
+   **[Fingerprints](/flow/investigations/fingerprints/)** connect the ones that
+   share identity.
+4. **[Cases](/flow/investigations/cases/)** organise evidence and
+   **[hypotheses](/flow/investigations/cases/hypothesis/)** into real
+   investigations.
+5. **[Autopilot](/flow/investigations/autopilot/)** does it for you, automatically,
+   after every scan — with a written reason for every action.
 
 ---
 
+## The building blocks
 
-<Separator className="my-8" />
+| Area | What it covers |
+|---|---|
+| **[Sources](/sources/)** | Connect systems, choose what to scan and how, and understand what a scan produces. |
+| **[Detectors](/detectors/)** | Pre-built packs and custom detectors, how they run, and the findings they yield. |
+| **[Investigations](/flow/investigations/)** | Inquiries, fingerprints, cases, and hypotheses — turning findings into answers. |
+| **[Autopilot](/flow/investigations/autopilot/)** | The AI agents that run investigations for you, and how to steer them. |
+| **[Settings](/settings/)** | AI providers, instance settings, and connecting your own tools. |
+| **[Deployment](/deployment/)** | Run Classifyre with Docker or Kubernetes, on your own infrastructure. |
 
-## Explore the Documentation
+---
 
-- **[Deployments](/deployment/):** Detailed installation and setup instructions using Docker All-in-One and Kubernetes Helm charts.
-- **[Sources Reference](/sources/):** Connection parameters, schemas, and examples for all supported integrations.
-- **[Detectors Reference](/detectors/):** Available detection engines (PII, secrets, regex, and ML models) to classify content.
-- **[MCP Server](/settings/mcp-server/):** Model Context Protocol integration configurations and capabilities.
+## Get started
+
+- **Try it** — stand up the whole platform with the
+  **[Docker All-in-One](/deployment/docker/)** guide.
+- **Go to production** — deploy the open-source core with the
+  **[Kubernetes Helm chart](/deployment/kubernetes/)**.
+- **Connect your first source** — see the **[Sources](/sources/)** guide.
+- **Understand the journey** — follow a scan from start to finish in
+  **[Flow](/flow/)**.
+
+---
+
+## Explore the documentation
+
+- **[Flow](/flow/):** The end-to-end lifecycle from a source scan to findings and
+  investigations.
+- **[Sources](/sources/):** How sources work, what to configure, and what a scan
+  produces.
+- **[Detectors](/detectors/):** Pre-built and custom detection, and the findings
+  it yields.
+- **[Investigations](/flow/investigations/):** Inquiries, fingerprints, cases,
+  hypotheses, and the AI autopilot.
+- **[Deployment](/deployment/):** Docker and Kubernetes installation, plus the
+  platform architecture.
+- **[Settings](/settings/):** AI providers, instance settings, and the
+  [MCP server](/settings/mcp-server/) integration.
+- **[Data Export](/data-export/)** and **[Notifications](/notifications/):**
+  Getting data out, and staying informed.
