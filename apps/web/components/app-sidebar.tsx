@@ -19,6 +19,7 @@ import {
 } from "@workspace/ui/components/sidebar";
 import { useTranslation } from "@/hooks/use-translation";
 import { VersionSidebarNotifier } from "./version-update-notifier";
+import { AiHealthSidebarWarning } from "./ai-health";
 import {
   LayoutDashboard,
   SearchCheck,
@@ -137,6 +138,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+          <AiHealthSidebarWarning />
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild

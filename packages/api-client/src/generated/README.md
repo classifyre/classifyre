@@ -276,6 +276,8 @@ All URIs are relative to *http://localhost*
 - [AttachFindingsDto](docs/AttachFindingsDto.md)
 - [AttachFindingsResponseDto](docs/AttachFindingsResponseDto.md)
 - [AutopilotStatsDto](docs/AutopilotStatsDto.md)
+- [BriefMemoryEntryDto](docs/BriefMemoryEntryDto.md)
+- [BriefSetupItemDto](docs/BriefSetupItemDto.md)
 - [BulkIngestAssetsDto](docs/BulkIngestAssetsDto.md)
 - [BulkIngestEdgesDto](docs/BulkIngestEdgesDto.md)
 - [BulkIngestEdgesResponseDto](docs/BulkIngestEdgesResponseDto.md)

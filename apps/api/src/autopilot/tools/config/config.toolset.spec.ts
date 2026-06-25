@@ -2,6 +2,7 @@ import { ConfigToolset } from './config.toolset';
 import type { PrismaService } from '../../../prisma.service';
 import type { ValidationService } from '../../../validation.service';
 import type { MaskedConfigCryptoService } from '../../../masked-config-crypto.service';
+import type { CliRunnerService } from '../../../cli-runner/cli-runner.service';
 import type { DecisionApplierService } from '../../decision-applier.service';
 import type { Tool, ToolContext } from '../tool.types';
 
@@ -15,6 +16,7 @@ describe('ConfigToolset — config.tune_source', () => {
 
   const mockPrisma = {
     source: { findUnique: jest.fn(), update: jest.fn() },
+    runner: { findUnique: jest.fn() },
   };
   const mockValidation = { validate: jest.fn((_t: string, c: unknown) => c) };
   const mockMasked = {
@@ -22,12 +24,14 @@ describe('ConfigToolset — config.tune_source', () => {
     encryptMaskedConfig: jest.fn((c: unknown) => c),
   };
   const mockApplier = { sourceGate: jest.fn() };
+  const mockCliRunner = { startRun: jest.fn() };
 
   const toolset = new ConfigToolset(
     mockPrisma as unknown as PrismaService,
     mockValidation as unknown as ValidationService,
     mockMasked as unknown as MaskedConfigCryptoService,
     mockApplier as unknown as DecisionApplierService,
+    mockCliRunner as unknown as CliRunnerService,
   );
   const tune = toolset
     .list()
@@ -93,5 +97,83 @@ describe('ConfigToolset — config.tune_source', () => {
     await expect(
       tune.handler({ sourceId: 'ghost', patch: { sampling: {} } }, tc),
     ).rejects.toThrow(/Unknown sourceId/);
+  });
+});
+
+describe('ConfigToolset — sources.rescan', () => {
+  const mockPrisma = {
+    source: { findUnique: jest.fn(), update: jest.fn() },
+    runner: { findUnique: jest.fn() },
+  };
+  const mockCliRunner = { startRun: jest.fn() };
+  const mockApplier = { sourceGate: jest.fn() };
+
+  const toolset = new ConfigToolset(
+    mockPrisma as unknown as PrismaService,
+    { validate: jest.fn() } as unknown as ValidationService,
+    {} as unknown as MaskedConfigCryptoService,
+    mockApplier as unknown as DecisionApplierService,
+    mockCliRunner as unknown as CliRunnerService,
+  );
+  const rescan = toolset
+    .list()
+    .find((t) => t.name === 'sources.rescan') as Tool;
+
+  const ctxWith = (runnerId: string | null): ToolContext =>
+    ({ ctx: { runnerId, run: { id: 'r1' } } }) as unknown as ToolContext;
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('starts an AUTOPILOT-tagged run when not a verification cycle', async () => {
+    mockPrisma.runner.findUnique.mockResolvedValue({ triggerType: 'MANUAL' });
+    mockCliRunner.startRun.mockResolvedValue({ id: 'run-new' });
+
+    const res = (await rescan.handler(
+      { sourceId: 's1' },
+      ctxWith('run-1'),
+    )) as {
+      ok?: boolean;
+      runnerId?: string;
+    };
+
+    expect(mockCliRunner.startRun).toHaveBeenCalledWith(
+      's1',
+      'AUTOPILOT',
+      expect.any(String),
+    );
+    expect(res.ok).toBe(true);
+    expect(res.runnerId).toBe('run-new');
+  });
+
+  it('suppresses the rescan when the current cycle is itself a verification run', async () => {
+    mockPrisma.runner.findUnique.mockResolvedValue({
+      triggerType: 'AUTOPILOT',
+    });
+
+    const res = (await rescan.handler(
+      { sourceId: 's1' },
+      ctxWith('run-ai'),
+    )) as {
+      skipped?: string;
+    };
+
+    expect(mockCliRunner.startRun).not.toHaveBeenCalled();
+    expect(res.skipped).toMatch(/verification/i);
+  });
+
+  it('returns a graceful skip when a scan is already running', async () => {
+    mockPrisma.runner.findUnique.mockResolvedValue({ triggerType: 'MANUAL' });
+    mockCliRunner.startRun.mockRejectedValue(
+      new Error('scan already in progress'),
+    );
+
+    const res = (await rescan.handler(
+      { sourceId: 's1' },
+      ctxWith('run-1'),
+    )) as {
+      skipped?: string;
+    };
+
+    expect(res.skipped).toMatch(/already in progress/i);
   });
 });

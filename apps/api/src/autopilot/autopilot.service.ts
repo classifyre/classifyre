@@ -550,16 +550,20 @@ export class AutopilotService {
 
   /** The living system brief — what the autopilot understands about the system. */
   async getSystemBrief(): Promise<AgentSystemBriefDto> {
-    const b = await this.brief.get();
+    const composed = await this.brief.compose();
     const row = await this.prisma.agentSystemBrief.findUnique({
       where: { id: 1 },
       select: { updatedAt: true },
     });
     return {
-      content: b.content,
-      facts: b.facts,
-      version: b.version,
-      updatedBy: b.updatedBy,
+      content: composed.overview,
+      facts: composed.facts,
+      glossary: composed.glossary,
+      topics: composed.topics,
+      gaps: composed.gaps,
+      setup: composed.setup,
+      version: composed.version,
+      updatedBy: composed.updatedBy,
       updatedAt: row?.updatedAt ?? null,
     };
   }

@@ -38,6 +38,8 @@ export * from './AssistantControllerRespondRequestMessagesInner';
 export * from './AttachFindingsDto';
 export * from './AttachFindingsResponseDto';
 export * from './AutopilotStatsDto';
+export * from './BriefMemoryEntryDto';
+export * from './BriefSetupItemDto';
 export * from './BulkIngestAssetsDto';
 export * from './BulkIngestEdgesDto';
 export * from './BulkIngestEdgesResponseDto';

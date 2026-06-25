@@ -21,10 +21,8 @@ export { CustomDetectorExtractionsController } from './custom-detector-extractio
 export { CustomDetectorTestsController } from './custom-detector-tests.controller';
 export { CasesController } from './cases.controller';
 export { InquiriesController } from './inquiries.controller';
-export { HypothesesController } from './hypotheses.controller';
 export {
   CaseTimelineController,
   CaseThreadsController,
-  HypothesisAliasController,
 } from './case-threads.controller';
 export { GraphController } from './graph.controller';

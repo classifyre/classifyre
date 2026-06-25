@@ -38,8 +38,6 @@ describe('CasesService', () => {
       delete: jest.fn(),
     },
     caseFinding: { upsert: jest.fn(), createMany: jest.fn() },
-    hypothesis: { findMany: jest.fn() },
-    hypothesisSupport: { createMany: jest.fn() },
     asset: { findUnique: jest.fn() },
     finding: { findUnique: jest.fn(), findMany: jest.fn() },
   };
@@ -59,7 +57,7 @@ describe('CasesService', () => {
     conclusion: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    _count: { evidence: 0, hypotheses: 0, inquiries: 0 },
+    _count: { evidence: 0, threads: 0, inquiries: 0 },
     ...over,
   });
 

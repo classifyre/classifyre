@@ -13,6 +13,21 @@
  */
 
 import { mapValues } from '../runtime';
+import type { BriefMemoryEntryDto } from './BriefMemoryEntryDto';
+import {
+    BriefMemoryEntryDtoFromJSON,
+    BriefMemoryEntryDtoFromJSONTyped,
+    BriefMemoryEntryDtoToJSON,
+    BriefMemoryEntryDtoToJSONTyped,
+} from './BriefMemoryEntryDto';
+import type { BriefSetupItemDto } from './BriefSetupItemDto';
+import {
+    BriefSetupItemDtoFromJSON,
+    BriefSetupItemDtoFromJSONTyped,
+    BriefSetupItemDtoToJSON,
+    BriefSetupItemDtoToJSONTyped,
+} from './BriefSetupItemDto';
+
 /**
  * 
  * @export
@@ -20,7 +35,7 @@ import { mapValues } from '../runtime';
  */
 export interface AgentSystemBriefDto {
     /**
-     * Model-authored narrative of the whole system
+     * Model-authored overview narrative (the only free-form, editable slot).
      * @type {string}
      * @memberof AgentSystemBriefDto
      */
@@ -31,6 +46,30 @@ export interface AgentSystemBriefDto {
      * @memberof AgentSystemBriefDto
      */
     facts: object;
+    /**
+     * Glossary terms, composed from agent memory (read-only).
+     * @type {Array<BriefMemoryEntryDto>}
+     * @memberof AgentSystemBriefDto
+     */
+    glossary: Array<BriefMemoryEntryDto>;
+    /**
+     * Topic → entity/inquiry maps, composed from memory (read-only).
+     * @type {Array<BriefMemoryEntryDto>}
+     * @memberof AgentSystemBriefDto
+     */
+    topics: Array<BriefMemoryEntryDto>;
+    /**
+     * What's been tried / known gaps (detector insights, precedents).
+     * @type {Array<BriefMemoryEntryDto>}
+     * @memberof AgentSystemBriefDto
+     */
+    gaps: Array<BriefMemoryEntryDto>;
+    /**
+     * Server-derived setup checklist for standing up the instance.
+     * @type {Array<BriefSetupItemDto>}
+     * @memberof AgentSystemBriefDto
+     */
+    setup: Array<BriefSetupItemDto>;
     /**
      * 
      * @type {number}
@@ -57,6 +96,10 @@ export interface AgentSystemBriefDto {
 export function instanceOfAgentSystemBriefDto(value: object): value is AgentSystemBriefDto {
     if (!('content' in value) || value['content'] === undefined) return false;
     if (!('facts' in value) || value['facts'] === undefined) return false;
+    if (!('glossary' in value) || value['glossary'] === undefined) return false;
+    if (!('topics' in value) || value['topics'] === undefined) return false;
+    if (!('gaps' in value) || value['gaps'] === undefined) return false;
+    if (!('setup' in value) || value['setup'] === undefined) return false;
     if (!('version' in value) || value['version'] === undefined) return false;
     return true;
 }
@@ -73,6 +116,10 @@ export function AgentSystemBriefDtoFromJSONTyped(json: any, ignoreDiscriminator:
         
         'content': json['content'],
         'facts': json['facts'],
+        'glossary': ((json['glossary'] as Array<any>).map(BriefMemoryEntryDtoFromJSON)),
+        'topics': ((json['topics'] as Array<any>).map(BriefMemoryEntryDtoFromJSON)),
+        'gaps': ((json['gaps'] as Array<any>).map(BriefMemoryEntryDtoFromJSON)),
+        'setup': ((json['setup'] as Array<any>).map(BriefSetupItemDtoFromJSON)),
         'version': json['version'],
         'updatedBy': json['updatedBy'] == null ? undefined : json['updatedBy'],
         'updatedAt': json['updatedAt'] == null ? undefined : (new Date(json['updatedAt'])),
@@ -92,6 +139,10 @@ export function AgentSystemBriefDtoToJSONTyped(value?: AgentSystemBriefDto | nul
         
         'content': value['content'],
         'facts': value['facts'],
+        'glossary': ((value['glossary'] as Array<any>).map(BriefMemoryEntryDtoToJSON)),
+        'topics': ((value['topics'] as Array<any>).map(BriefMemoryEntryDtoToJSON)),
+        'gaps': ((value['gaps'] as Array<any>).map(BriefMemoryEntryDtoToJSON)),
+        'setup': ((value['setup'] as Array<any>).map(BriefSetupItemDtoToJSON)),
         'version': value['version'],
         'updatedBy': value['updatedBy'],
         'updatedAt': value['updatedAt'] == null ? value['updatedAt'] : value['updatedAt'].toISOString(),

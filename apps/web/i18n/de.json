@@ -2517,7 +2517,18 @@
       "cancel": "Abbrechen",
       "saving": "Speichern…",
       "saved": "System-Briefing gespeichert",
-      "placeholder": "Beschreiben Sie das System: Quellen, Detektoren, was versucht wurde, bekannte Lücken…"
+      "placeholder": "Beschreiben Sie das System: Quellen, Detektoren, was versucht wurde, bekannte Lücken…",
+      "overview": "Übersicht",
+      "overviewEmpty": "Noch keine Übersicht",
+      "overviewDesc": "Eine kurze, dauerhafte Einordnung, die der Harness pflegt. Alles Weitere wird automatisch zusammengestellt.",
+      "coverage": "Abdeckung",
+      "glossary": "Glossar",
+      "topics": "Themen",
+      "gaps": "Versucht / bekannte Lücken",
+      "setup": "Einrichtung & nächste Schritte",
+      "composed": "Automatisch zusammengestellt",
+      "emptySection": "Noch nichts erfasst",
+      "weight": "×{{n}}"
     },
     "config": {
       "title": "Harness-Konfiguration",
@@ -2609,6 +2620,22 @@
       "confirmDelete": "Remove this MCP server?",
       "editTitle": "MCP-Server bearbeiten",
       "addTitle": "MCP-Server hinzufügen"
+    }
+  },
+  "aiHealth": {
+    "fix": "Beheben",
+    "fixInSettings": "In Einstellungen beheben",
+    "disabled": {
+      "title": "KI ist deaktiviert",
+      "desc": "Aktivieren Sie KI in den Einstellungen, um Assistent und Autopilot zu nutzen."
+    },
+    "not_configured": {
+      "title": "KI nicht konfiguriert",
+      "desc": "Fügen Sie einen KI-Anbieter hinzu und legen Sie ihn als Standard fest, um Assistent und Autopilot zu aktivieren."
+    },
+    "error": {
+      "title": "KI-Anbieter-Problem",
+      "desc": "Der Standard-KI-Anbieter hat eine Verbindungs-/Structured-Output-Prüfung nicht bestanden. Öffnen Sie die Einstellungen, um ihn erneut zu testen oder zu beheben."
     }
   }
 }

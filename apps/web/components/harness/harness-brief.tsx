@@ -1,10 +1,21 @@
 "use client";
 
 import * as React from "react";
-import { api, type AgentSystemBriefDto } from "@workspace/api-client";
-import { EmptyState } from "@workspace/ui/components/empty-state";
+import {
+  api,
+  type AgentSystemBriefDto,
+  type BriefMemoryEntryDto,
+  type BriefSetupItemDto,
+} from "@workspace/api-client";
 import { Badge, Button, Textarea } from "@workspace/ui/components";
-import { BookOpen, Loader2, Pencil } from "lucide-react";
+import {
+  BookOpen,
+  CheckCircle2,
+  CircleDashed,
+  Info,
+  Loader2,
+  Pencil,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/use-translation";
 import { formatRelative } from "@/lib/date";
@@ -63,83 +74,78 @@ export function HarnessBrief() {
     );
   }
 
-  if (editing) {
-    return (
-      <div className="space-y-3">
-        <Textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          rows={16}
-          maxLength={20000}
-          placeholder={t("harness.brief.placeholder")}
-          className="rounded-[6px] border-2 border-border font-serif text-[15px] leading-relaxed"
-        />
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setEditing(false)}>
-            {t("harness.brief.cancel")}
-          </Button>
-          <Button onClick={() => void saveBrief()} disabled={saving}>
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            {t("harness.brief.save")}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!brief || brief.version === 0) {
-    return (
-      <div className="flex flex-col items-center gap-4 py-4">
-        <EmptyState
-          icon={BookOpen}
-          title={t("harness.brief.empty")}
-          description={t("harness.brief.emptyDesc")}
-        />
-        <Button onClick={startEdit}>
-          <Pencil className="h-3.5 w-3.5" />
-          {t("harness.brief.create")}
-        </Button>
-      </div>
-    );
-  }
-
-  const facts = Object.entries(brief.facts ?? {}).filter(
+  const facts = Object.entries(brief?.facts ?? {}).filter(
     ([k]) => k !== "refreshedAt",
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <BookOpen className="h-4 w-4 text-[#d97706]" />
         <Badge variant="outline" className="font-mono text-[10px]">
-          {t("harness.brief.version", { n: brief.version })}
+          {t("harness.brief.version", { n: brief?.version ?? 0 })}
         </Badge>
-        {brief.updatedBy && (
+        {brief?.updatedBy && (
           <span className="font-mono text-[10px] text-muted-foreground">
             {t("harness.brief.updatedBy", { who: brief.updatedBy })}
           </span>
         )}
-        {brief.updatedAt && (
+        {brief?.updatedAt && (
           <span className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
             {formatRelative(brief.updatedAt)}
           </span>
         )}
-        <Button
-          size="sm"
-          variant="outline"
-          className="ml-auto"
-          onClick={startEdit}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-          {t("harness.brief.edit")}
-        </Button>
+        {!editing && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            onClick={startEdit}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            {t("harness.brief.edit")}
+          </Button>
+        )}
       </div>
 
+      {/* Overview — the only model-/operator-authored slot. */}
+      <Section title={t("harness.brief.overview")}>
+        {editing ? (
+          <div className="space-y-3">
+            <Textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={8}
+              maxLength={20000}
+              placeholder={t("harness.brief.placeholder")}
+              className="rounded-[6px] border-2 border-border font-serif text-[15px] leading-relaxed"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditing(false)}>
+                {t("harness.brief.cancel")}
+              </Button>
+              <Button onClick={() => void saveBrief()} disabled={saving}>
+                {saving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : null}
+                {t("harness.brief.save")}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <article className="whitespace-pre-wrap rounded-[6px] border-2 border-border bg-card p-5 font-serif text-[15px] leading-relaxed shadow-[2px_2px_0_var(--color-border)]">
+            {brief?.content?.trim() || (
+              <span className="text-muted-foreground">
+                {t("harness.brief.overviewEmpty")}
+              </span>
+            )}
+          </article>
+        )}
+      </Section>
+
+      {/* Coverage — live counts. */}
       {facts.length > 0 && (
-        <div>
-          <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-            {t("harness.brief.facts")}
-          </p>
+        <Section title={t("harness.brief.coverage")}>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {facts.map(([key, value]) => (
               <div
@@ -157,17 +163,115 @@ export function HarnessBrief() {
               </div>
             ))}
           </div>
-        </div>
+        </Section>
       )}
 
-      <div>
-        <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-          {t("harness.brief.narrative")}
-        </p>
-        <article className="whitespace-pre-wrap rounded-[6px] border-2 border-border bg-card p-5 font-serif text-[15px] leading-relaxed shadow-[2px_2px_0_var(--color-border)]">
-          {brief.content?.trim() || t("harness.brief.never")}
-        </article>
-      </div>
+      {/* Setup & next steps — the operator-facing checklist. */}
+      {brief && brief.setup.length > 0 && (
+        <Section title={t("harness.brief.setup")} composedLabel={t("harness.brief.composed")}>
+          <ul className="space-y-1.5">
+            {brief.setup.map((item, i) => (
+              <SetupRow key={i} item={item} />
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {/* Glossary / Topics / Gaps — composed from agent memory. */}
+      <MemorySection
+        title={t("harness.brief.glossary")}
+        composedLabel={t("harness.brief.composed")}
+        entries={brief?.glossary ?? []}
+      />
+      <MemorySection
+        title={t("harness.brief.topics")}
+        composedLabel={t("harness.brief.composed")}
+        entries={brief?.topics ?? []}
+      />
+      <MemorySection
+        title={t("harness.brief.gaps")}
+        composedLabel={t("harness.brief.composed")}
+        entries={brief?.gaps ?? []}
+      />
     </div>
+  );
+}
+
+function Section({
+  title,
+  composedLabel,
+  children,
+}: {
+  title: string;
+  composedLabel?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2">
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          {title}
+        </p>
+        {composedLabel && (
+          <Badge variant="outline" className="font-mono text-[9px]">
+            {composedLabel}
+          </Badge>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function MemorySection({
+  title,
+  composedLabel,
+  entries,
+}: {
+  title: string;
+  composedLabel: string;
+  entries: BriefMemoryEntryDto[];
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <Section title={title} composedLabel={composedLabel}>
+      <ul className="space-y-1.5">
+        {entries.map((e) => (
+          <li
+            key={e.key}
+            className="rounded-[4px] border-2 border-border bg-card px-3 py-2 text-sm shadow-[2px_2px_0_var(--color-border)]"
+          >
+            <span className="font-mono text-[12px] font-semibold">
+              {e.key}
+            </span>
+            <span className="text-muted-foreground"> — {e.content}</span>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+function SetupRow({ item }: { item: BriefSetupItemDto }) {
+  const Icon =
+    item.status === "ok"
+      ? CheckCircle2
+      : item.status === "todo"
+        ? CircleDashed
+        : Info;
+  const color =
+    item.status === "ok"
+      ? "text-emerald-600"
+      : item.status === "todo"
+        ? "text-[#d97706]"
+        : "text-muted-foreground";
+  return (
+    <li className="flex items-start gap-2 rounded-[4px] border-2 border-border bg-card px-3 py-2 text-sm shadow-[2px_2px_0_var(--color-border)]">
+      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${color}`} />
+      <span>
+        <span className="font-semibold">{item.label}</span>
+        <span className="text-muted-foreground"> — {item.detail}</span>
+      </span>
+    </li>
   );
 }
