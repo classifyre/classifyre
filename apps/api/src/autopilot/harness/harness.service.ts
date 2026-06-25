@@ -46,7 +46,7 @@ export class HarnessService {
       throw new Error(`No harness mission for agent kind ${ctx.run.agentKind}`);
     }
 
-    const briefText = this.brief.render(await this.brief.get());
+    const briefText = this.brief.render(await this.brief.compose());
     // Mission tools + any external MCP tools scoped to this mission kind.
     const allowedTools = [
       ...resolved.allowedTools,

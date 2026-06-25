@@ -142,6 +142,36 @@ export interface RecalledMemory {
   weight: number;
 }
 
+/**
+ * Bounded, redacted view of one ingested asset's shape — name, kind and the
+ * keys/preview of its metadata. Lets the harness reason about a source that has
+ * produced no findings yet (cold start) from the data's structure alone.
+ */
+export interface AssetSampleSummary {
+  id: string;
+  assetType: string;
+  sourceType: string;
+  name: string;
+  url: string | null;
+  metadataKeys: string[];
+  metadataPreview: Record<string, string>;
+}
+
+/**
+ * Aggregate metadata profile of a source's assets: what kinds of things were
+ * ingested and which metadata fields are common. The primary cold-start signal
+ * the CONFIG / DETECTOR_AUTHOR missions use when there are no findings to learn
+ * from.
+ */
+export interface AssetMetadataProfile {
+  scope: 'runner' | 'source' | 'instance';
+  totalAssets: number;
+  hasFindings: boolean;
+  assetTypes: Array<{ type: string; count: number }>;
+  sourceTypes: Array<{ type: string; count: number }>;
+  commonMetadataKeys: Array<{ type: string; count: number }>;
+}
+
 /** Shared, mutable state passed through pipeline steps and persisted in stepState. */
 export interface AgentContext {
   run: AgentRun;
@@ -183,7 +213,6 @@ export interface MemoryWrite {
   kind:
     | 'GLOSSARY'
     | 'DECISION_PRECEDENT'
-    | 'TOPIC_INQUIRY_MAP'
     | 'ENTITY_MAP'
     | 'SOURCE_PROFILE'
     | 'DETECTOR_INSIGHT'

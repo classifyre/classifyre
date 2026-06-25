@@ -8,6 +8,10 @@ Name | Type
 ------------ | -------------
 `content` | string
 `facts` | object
+`glossary` | [Array&lt;BriefMemoryEntryDto&gt;](BriefMemoryEntryDto.md)
+`topics` | [Array&lt;BriefMemoryEntryDto&gt;](BriefMemoryEntryDto.md)
+`gaps` | [Array&lt;BriefMemoryEntryDto&gt;](BriefMemoryEntryDto.md)
+`setup` | [Array&lt;BriefSetupItemDto&gt;](BriefSetupItemDto.md)
 `version` | number
 `updatedBy` | string
 `updatedAt` | Date
@@ -21,6 +25,10 @@ import type { AgentSystemBriefDto } from '@workspace/api-client'
 const example = {
   "content": null,
   "facts": null,
+  "glossary": null,
+  "topics": null,
+  "gaps": null,
+  "setup": null,
   "version": null,
   "updatedBy": null,
   "updatedAt": null,

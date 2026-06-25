@@ -58,7 +58,6 @@ import {
   InquiriesController,
   CaseThreadsController,
   CaseTimelineController,
-  HypothesisAliasController,
   GraphController,
 } from './controllers';
 
@@ -94,7 +93,6 @@ import {
     InquiriesController,
     CaseTimelineController,
     CaseThreadsController,
-    HypothesisAliasController,
     GraphController,
   ],
   providers: [

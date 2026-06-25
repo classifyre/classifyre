@@ -208,24 +208,6 @@ export class AgentMemoryService {
     }
   }
 
-  /** Record the canonical topic→inquiry mapping for a created/enriched inquiry. */
-  async rememberTopicInquiry(
-    topicKey: string,
-    inquiryId: string,
-    inquiryTitle: string,
-  ): Promise<void> {
-    await this.writeMany(
-      [
-        {
-          kind: 'TOPIC_INQUIRY_MAP',
-          key: topicKey,
-          content: `Inquiry "${inquiryTitle}" (${inquiryId}) covers topic "${topicKey}". Enrich it instead of creating a duplicate.`,
-        },
-      ],
-      { refType: 'inquiry', refId: inquiryId },
-    );
-  }
-
   private toRecalled(r: {
     kind: AgentMemoryKind;
     key: string;

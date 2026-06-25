@@ -21,6 +21,7 @@ import {api} from "@workspace/api-client";
 import {ThemeToggle} from "./theme-toggle";
 import {Tooltip, TooltipContent, TooltipTrigger,} from "@workspace/ui/components/tooltip";
 import {AssistantWorkflowTrigger} from "./assistant-workflow-provider";
+import {AiHealthProvider, AiHealthFixButton} from "./ai-health";
 import {LanguageSwitcher} from "./language-switcher";
 import {useTranslation} from "@/hooks/use-translation";
 import type {TranslationKey} from "@/i18n";
@@ -261,6 +262,7 @@ export function DashboardLayout({
     return (
         <ServerConfigContext.Provider value={serverConfig}>
             <SidebarProvider>
+                <AiHealthProvider>
                 <AppSidebar/>
                 <SidebarInset className="min-w-0 overflow-x-clip">
                     <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
@@ -335,6 +337,7 @@ export function DashboardLayout({
                             </Breadcrumb>
                         </div>
                         <div className="flex items-center gap-2">
+                            <AiHealthFixButton/>
                             {demoMode && (
                                 <Tooltip>
                                     <TooltipTrigger asChild>
@@ -374,6 +377,7 @@ export function DashboardLayout({
                         {children}
                     </div>
                 </SidebarInset>
+                </AiHealthProvider>
             </SidebarProvider>
         </ServerConfigContext.Provider>
     );
