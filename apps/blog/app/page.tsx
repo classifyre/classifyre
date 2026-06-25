@@ -27,25 +27,26 @@ import { getAllSourceDocs } from "@workspace/schemas/source-docs";
 
 import { normalizeSiteUrl, safeJsonLdStringify } from "@/lib/seo";
 import { AssistantDemo } from "@/components/assistant-demo";
+import { HarnessSimulation } from "@/components/harness-simulation";
 
 export const metadata: Metadata = {
   title: "The Open-Source Investigation Platform for Your Data",
   description:
-    "Classifyre turns raw findings into real investigations. Connect the systems you already run, detect what matters, and let an AI autopilot open inquiries, build cases, and draft hypotheses — with every decision explained.",
+    "Classifyre turns raw findings into real investigations. Connect the systems you already run, detect what matters, and let Harness AI — five autonomous agents — open inquiries, build cases, tune sources, and author detectors, with every decision explained.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     title: "Classifyre | Detect. Investigate. Resolve.",
     description:
-      "An open-source investigation platform: detectors surface evidence, inquiries keep watch, cases and hypotheses organize the work, and an AI autopilot does the legwork.",
+      "An open-source investigation platform: detectors surface evidence, and Harness AI — a five-agent autopilot — opens inquiries, builds cases, drafts hypotheses, and authors detectors with a full audit trail.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Classifyre | Detect. Investigate. Resolve.",
     description:
-      "Open-source core, an AI autopilot that acts instead of chats, custom detectors from regex to any model, and a clear path from laptop to enterprise.",
+      "Open-source core, Harness AI — autonomous agents that act instead of chat — custom detectors from regex to any model, and a clear path from laptop to enterprise.",
   },
 };
 
@@ -100,56 +101,67 @@ const investigationPillars = [
   },
 ] as const;
 
-const autopilotCycle = [
+const harnessMissions = [
   {
     step: "01",
-    title: "A scan completes",
-    description: "New findings land. Nobody has to remember to look at them.",
+    marker: "Inquiry",
+    title: "Keeps standing questions answered",
+    description:
+      "Matches fresh findings to your inquiries and dedupes the rest — so similar signals collapse into one monitor instead of a flood.",
+    tools: ["findings.search", "inquiries.enrich"],
   },
   {
     step: "02",
-    title: "Autopilot wakes",
+    marker: "Case",
+    title: "Builds the investigation",
     description:
-      "It recalls what it has learned about your instance: your glossary, your past decisions, which topics map to which inquiries.",
+      "Opens and enriches cases: drafts competing hypotheses, attaches evidence, and links findings into the case graph.",
+    tools: ["cases.create", "cases.add_hypothesis"],
   },
   {
     step: "03",
-    title: "Inquiries get answered",
+    marker: "Config",
+    title: "Wakes up silent sources",
     description:
-      "The inquiry agent opens new standing questions, matches fresh findings to existing ones, and surfaces what changed.",
+      "Profiles sources that ingest data but produce nothing, then enables the detectors that fit the data shape — no manual setup.",
+    tools: ["assets.profile", "config.tune_source"],
   },
   {
     step: "04",
-    title: "Cases get built",
+    marker: "Detector Author",
+    title: "Writes the detector you were missing",
     description:
-      "The case agent groups related evidence, opens or updates cases, and drafts hypotheses for your team to confirm or reject.",
+      "When findings slip through, it hypothesizes a detector, dry-runs it, ships it, and verifies the results on the next cycle.",
+    tools: ["detector.test", "detector.create"],
   },
   {
     step: "05",
-    title: "Every move is explained",
+    marker: "Dream",
+    title: "Consolidates what it learned",
     description:
-      "Each action — and each deliberate non-action — is recorded with a written rationale. A flight recorder, not a black box.",
+      "Curates long-lived memory and rewrites the system brief so every agent starts the next cycle grounded in today's reality.",
+    tools: ["memory.rewrite", "system_brief.update"],
   },
 ] as const;
 
-const autopilotControls = [
+const harnessControls = [
   {
     marker: "IT LEARNS",
-    title: "Teach it once, it remembers",
+    title: "A memory you can read",
     description:
-      "The autopilot builds a memory of your instance: business glossary, decision precedents, topic-to-inquiry mappings. You can inspect and edit every memory it holds.",
+      "Harness builds a memory of your instance — business glossary, decision precedents, topic-to-inquiry maps — composed into a system brief that grounds every agent. Inspect and edit any of it.",
   },
   {
     marker: "IT ACTS",
     title: "No prompt required",
     description:
-      "It creates and manages inquiries, cases, and hypotheses on its own after every scan. Want to point it somewhere? Steer it with a one-line instruction.",
+      "Five agents move the investigation forward on their own after every scan. Want to point them somewhere? Steer Harness with a one-line instruction.",
   },
   {
     marker: "YOU COMMAND",
     title: "Observe-only when you want it",
     description:
-      "Flip the whole instance — or a single case — into observe-only mode and the autopilot proposes without touching. Dual business and technical logs show exactly what it did and why.",
+      "Flip the whole instance — or a single case — into observe-only and Harness proposes without touching. Every action, human or AI, lands in one audit trail with a written rationale.",
   },
 ] as const;
 
@@ -463,7 +475,7 @@ export default function HomePage() {
     operatingSystem: "Docker, Kubernetes, Web",
     url: siteUrl,
     description:
-      "Classifyre is an open-source investigation platform: detectors surface evidence across modern source systems, and an AI autopilot opens inquiries, builds cases, and drafts hypotheses with a full audit trail.",
+      "Classifyre is an open-source investigation platform: detectors surface evidence across modern source systems, and Harness AI — a five-agent autopilot (inquiry, case, config, detector-author, and memory) — opens inquiries, builds cases, tunes sources, and authors detectors with a full audit trail.",
     offers: [
       {
         "@type": "Offer",
@@ -647,50 +659,112 @@ export default function HomePage() {
         </LandingSectionShell>
       </section>
 
-      {/* ── Autopilot ────────────────────────────────────────────────────── */}
-      <section aria-labelledby="autopilot-title">
+      {/* ── Harness AI ───────────────────────────────────────────────────── */}
+      <section aria-labelledby="harness-title">
         <LandingSectionShell tone="signal">
-          <div className="space-y-8">
+          <div className="space-y-10">
             <div className="space-y-3">
+              <Marker label="Harness AI" inverted />
               <h2
-                id="autopilot-title"
+                id="harness-title"
                 className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
               >
-                Autopilot,{" "}
+                Meet Harness AI — autopilot,{" "}
                 <span className="inline-block bg-accent px-[0.14em] text-black">
                   not copilot
                 </span>
               </h2>
               <p className="max-w-3xl text-primary-foreground/72">
-                A copilot waits for you to type a prompt. Classifyre&apos;s
-                autopilot doesn&apos;t wait. It wakes after every scan, recalls
-                what it has learned about your instance, and moves the
-                investigation forward on its own — opening inquiries, building
-                cases, drafting hypotheses.
+                A copilot waits for you to type a prompt. Harness AI doesn&apos;t
+                wait. It&apos;s a team of five specialized agents that wake after
+                every scan, recall what they&apos;ve learned about your instance,
+                and move the investigation forward on their own — deduping
+                findings, building cases, tuning sources, even authoring the
+                detectors you were missing. Every move is explained.
               </p>
             </div>
 
-            <ol className="grid gap-3 md:grid-cols-5">
-              {autopilotCycle.map((stage) => (
-                <li
-                  key={stage.step}
-                  className="relative border border-primary-foreground/25 bg-primary-foreground/5 p-4"
-                >
-                  <span className="font-mono text-2xl font-black text-accent">
-                    {stage.step}
-                  </span>
-                  <p className="mt-2 text-sm font-bold uppercase tracking-[0.06em]">
-                    {stage.title}
-                  </p>
-                  <p className="mt-1.5 text-xs leading-5 text-primary-foreground/65">
-                    {stage.description}
-                  </p>
-                </li>
-              ))}
-            </ol>
+            {/* Five missions */}
+            <div className="space-y-3">
+              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary-foreground/55">
+                Five missions, one loop
+              </p>
+              <ol className="grid gap-3 md:grid-cols-5">
+                {harnessMissions.map((mission) => (
+                  <li
+                    key={mission.step}
+                    className="flex flex-col border border-primary-foreground/25 bg-primary-foreground/5 p-4"
+                  >
+                    <span className="font-mono text-2xl font-black text-accent">
+                      {mission.step}
+                    </span>
+                    <span className="mt-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent">
+                      {mission.marker}
+                    </span>
+                    <p className="mt-1 text-sm font-bold uppercase leading-snug tracking-[0.04em]">
+                      {mission.title}
+                    </p>
+                    <p className="mt-1.5 text-xs leading-5 text-primary-foreground/65">
+                      {mission.description}
+                    </p>
+                    <div className="mt-auto flex flex-wrap gap-1 pt-3">
+                      {mission.tools.map((tool) => (
+                        <span
+                          key={tool}
+                          className="border border-primary-foreground/20 bg-primary-foreground/5 px-1.5 py-0.5 font-mono text-[10px] text-primary-foreground/70"
+                        >
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
 
+            {/* How it works + flight recorder */}
+            <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+              <div className="flex flex-col gap-4">
+                <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em] sm:text-3xl">
+                  A flight recorder, not a black box
+                </h3>
+                <p className="text-base leading-7 text-primary-foreground/72">
+                  Each agent runs a resumable reason → act loop: it reads the
+                  live system brief, calls real tools, and writes back what it
+                  did and why. Watch one cycle play out — every decision is
+                  audited, and every deliberate non-action is recorded too.
+                </p>
+                <ul className="space-y-2 text-sm leading-6 text-primary-foreground/72">
+                  <li className="border-l-2 border-accent pl-3">
+                    <span className="font-bold text-primary-foreground">
+                      Grounded in facts.
+                    </span>{" "}
+                    A server-composed system brief — live counts plus learned
+                    memory — keeps every agent on the same page.
+                  </li>
+                  <li className="border-l-2 border-accent pl-3">
+                    <span className="font-bold text-primary-foreground">
+                      Idempotent &amp; resumable.
+                    </span>{" "}
+                    Runs persist mid-loop and resume without replaying work, so
+                    side effects never double-fire.
+                  </li>
+                  <li className="border-l-2 border-accent pl-3">
+                    <span className="font-bold text-primary-foreground">
+                      You stay in command.
+                    </span>{" "}
+                    Steer it with a one-line instruction, or flip observe-only
+                    and it proposes without touching a thing.
+                  </li>
+                </ul>
+              </div>
+
+              <HarnessSimulation />
+            </div>
+
+            {/* Controls */}
             <div className="grid gap-3 md:grid-cols-3">
-              {autopilotControls.map((control) => (
+              {harnessControls.map((control) => (
                 <div
                   key={control.marker}
                   className="border-2 border-primary-foreground/30 bg-primary-foreground/8 p-5"

@@ -1,20 +1,20 @@
 ---
 title: Inquiry
-description: How inquiries work — saved queries that continuously surface matching findings across your sources.
+description: Inquiries are saved questions over your findings — live monitors that keep surfacing matching findings scan after scan.
 ---
 
 # Inquiry
 
-An inquiry is a **saved question** over your findings. It continuously tracks
-how many findings match its criteria, surfacing new matches as they are
-discovered by scans. Think of it as a live monitor that answers one
-investigation question.
+An inquiry is a **saved question** over your findings. It continuously tracks how
+many findings match its criteria and surfaces new ones as scans discover them —
+a live monitor that answers a single investigation question, such as *"Are
+credentials leaking through CI logs?"*
 
 ```mermaid
 graph LR
-    Findings["All Findings"]
-    Matchers["Inquiry Matchers<br/>detectorTypes, findingTypes,<br/>regex, sources"]
-    Inquiry["Inquiry<br/>matchCount, newMatchCount"]
+    Findings["All findings"]
+    Matchers["Inquiry criteria<br/>sources, detectors, patterns"]
+    Inquiry["Inquiry<br/>live match count"]
     Case["Case"]
 
     Findings -- "filtered by" --> Matchers
@@ -22,87 +22,107 @@ graph LR
     Inquiry -- "drives" --> Case
 ```
 
-## Matcher model
+---
 
-An inquiry filters findings across four orthogonal dimensions. All
-non-empty dimensions must match (AND logic):
+## What an inquiry matches on
 
-| Dimension | Description |
+An inquiry narrows findings down across a few dimensions. You can use as many or
+as few as you like — whatever you fill in is combined, so a finding has to satisfy
+*all* of your chosen criteria to match.
+
+| Dimension | Narrows findings to… |
 |---|---|
-| **Sources** | `matchAllSources` or specific source IDs |
-| **Detector types** | `SECRETS`, `PII`, `YARA`, `BROKEN_LINKS`, `CODE_SECURITY`, `CUSTOM` |
-| **Custom detector keys** | Named custom detectors |
-| **Finding types** | Exact match on finding type |
-| **Finding type regex** | Regex pattern against finding type |
-| **Finding value regex** | Regex pattern against matched content |
+| **Sources** | All sources, or only the ones you pick |
+| **Detector types** | Specific detectors — Secrets, PII, security, custom, and so on |
+| **Custom detectors** | Specific custom detectors you've built |
+| **Finding types** | A particular kind of signal |
+| **Finding-type pattern** | Signal types matching a text pattern |
+| **Finding-value pattern** | Findings whose matched content fits a text pattern |
 
-## Create flow
+This lets an inquiry be as broad as *"any PII, anywhere"* or as precise as
+*"credit-card numbers found in the finance warehouse."*
+
+---
+
+## Creating an inquiry
+
+The inquiry form is a short, three-step wizard:
 
 ```mermaid
 stateDiagram-v2
     direction LR
     [*] --> Define: Name & question
-    Define --> Filters: Choose matchers
+    Define --> Filters: Choose criteria
     Filters --> Preview: Live match preview
-    Preview --> Created: Save inquiry
+    Preview --> Created: Save
     Created --> [*]
 
     note right of Preview
-        Shows matching finding
-        count + sample rows
+        Shows how many findings
+        match right now, with samples
     end note
 ```
 
-The inquiry form is a three-step wizard:
+1. **Define** — name the inquiry and write the question you're trying to answer.
+2. **Criteria** — choose the sources, detectors, finding types, and patterns that
+   define a match.
+3. **Preview** — see a live count of how many findings match right now, with a
+   few sample rows, so you can fine-tune before saving.
 
-1. **Define** — Name the inquiry and write the investigation question.
-2. **Filters** — Choose match-all or specific sources, pick detector types,
-   custom detectors, finding types (with search), and add regex patterns.
-3. **Preview** — See a live count of how many findings currently match, with
-   sample rows rendered in the matches table.
+The preview runs the same matching live, without saving — so you can experiment
+with the criteria until the count looks right.
 
-## Lifetime
+---
+
+## The life of an inquiry
 
 ```mermaid
 stateDiagram-v2
     direction LR
     [*] --> Active: Created
-    Active --> Archived: User archives
-    Active --> Deleted: User deletes
-    Archived --> Active: Unarchive
-    Archived --> Deleted: User deletes
+    Active --> Archived: Archived
+    Active --> Deleted: Deleted
+    Archived --> Active: Unarchived
+    Archived --> Deleted: Deleted
     Deleted --> [*]
-
-    state Active {
-        [*] --> MatchCountComputed
-        MatchCountComputed --> NewMatches: Scan adds findings
-        NewMatches --> MatchCountComputed: Re-scan
-        MatchCountComputed --> PulledToCase: Open case
-    end
 ```
 
-- **Active** — Continuously tracks matches. The `newMatchCount` badge
-  increments when new findings match after the last `markSeen`.
-- **Archived** — Hidden from default views but still exists. Can be
-  unarchived.
-- **Deleted** — Permanently removed. Linked cases lose the inquiry
-  relationship.
+| State | What it means |
+|---|---|
+| **Active** | Continuously tracking matches. A **"new matches"** badge appears when fresh findings match since you last looked. |
+| **Archived** | Hidden from default views but kept. You can bring it back at any time. |
+| **Deleted** | Permanently removed. Any cases it was driving simply lose the link. |
 
-## Re-scanning
+Because inquiries keep matching as new scans land, an active inquiry is a
+standing watch — set it once and it keeps answering its question over time. If
+you ever change its criteria or want a fresh result after a quiet spell, you can
+**re-run** it to recompute matches against all current findings.
 
-Calling `POST /inquiries/:id/rematch` recomputes matches against all current
-findings. This is useful if matchers were updated or you want to refresh
-after a long gap.
+---
 
-The `POST /inquiries/preview` endpoint provides the same computation but
-without saving — useful for testing matcher config in the creation form.
+## Driving cases
 
-## Linking to cases
+An inquiry can drive one or more [cases](/flow/investigations/cases/). When it's
+linked to a case:
 
-An inquiry can drive one or more cases. When linked:
+- The case shows it in its **"Driving inquiries"** panel.
+- A **"Pull matches"** action copies the inquiry's current matching findings into
+  the case as evidence.
+- Any **new matches** since the last pull are flagged in the case, so nothing
+  slips by while you work.
 
-- The case workspace shows the inquiry in the "Driving inquiries" panel.
-- A "Pull matches" action copies the inquiry's current matching findings
-  into the case as evidence (creating case-finding records).
-- New matches since the last pull are highlighted with an amber alert in
-  the case workspace.
+---
+
+## Inquiries vs Fingerprints
+
+Inquiries and [Fingerprints](/flow/investigations/fingerprints/) are two
+complementary ways to make sense of findings:
+
+- An **inquiry** groups findings by **rule** — *"show me everything matching
+  these criteria."*
+- **Fingerprints** group assets by **shared identity** — *"show me everything
+  that looks like the same entity."*
+
+Both feed [cases](/flow/investigations/cases/), and both can be maintained for
+you automatically by [Autopilot](/flow/investigations/autopilot/) — which keeps
+inquiries tidy and de-duplicated after every scan.
