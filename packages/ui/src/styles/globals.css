@@ -200,6 +200,98 @@
       transparent 100%
     );
   }
+
+  .brief-prose h1,
+  .brief-prose h2,
+  .brief-prose h3,
+  .brief-prose h4 {
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+  }
+
+  .brief-prose h1 { font-size: 1.5rem; }
+  .brief-prose h2 { font-size: 1.25rem; }
+  .brief-prose h3 { font-size: 1.1rem; }
+  .brief-prose h4 { font-size: 1rem; }
+
+  .brief-prose > :first-child { margin-top: 0; }
+
+  .brief-prose p {
+    margin-top: 0.75em;
+    margin-bottom: 0.75em;
+  }
+
+  .brief-prose ul,
+  .brief-prose ol {
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+    padding-left: 1.5em;
+  }
+
+  .brief-prose ul { list-style-type: disc; }
+  .brief-prose ol { list-style-type: decimal; }
+
+  .brief-prose li {
+    margin-top: 0.25em;
+    margin-bottom: 0.25em;
+  }
+
+  .brief-prose li > ul,
+  .brief-prose li > ol {
+    margin-top: 0.25em;
+    margin-bottom: 0.25em;
+  }
+
+  .brief-prose strong { font-weight: 700; }
+  .brief-prose em { font-style: italic; }
+
+  .brief-prose code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    padding: 0.15em 0.35em;
+    border-radius: 2px;
+    border: 1px solid var(--color-border);
+    background: var(--color-muted);
+  }
+
+  .brief-prose pre {
+    margin-top: 0.75em;
+    margin-bottom: 0.75em;
+    padding: 0.75em 1em;
+    border: 2px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-muted);
+    overflow-x: auto;
+  }
+
+  .brief-prose pre code {
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+
+  .brief-prose blockquote {
+    margin-top: 0.75em;
+    margin-bottom: 0.75em;
+    padding-left: 1em;
+    border-left: 3px solid var(--color-border);
+    color: var(--color-muted-foreground);
+  }
+
+  .brief-prose hr {
+    margin-top: 1.5em;
+    margin-bottom: 1.5em;
+    border: none;
+    border-top: 2px solid var(--color-border);
+  }
+
+  .brief-prose a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
 }
 
 @keyframes classifyre-marquee {
