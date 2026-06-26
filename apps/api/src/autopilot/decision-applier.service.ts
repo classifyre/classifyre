@@ -6,6 +6,7 @@ import {
   CaseThreadKind,
   EvidenceStance,
   HypothesisStatus,
+  InquiryStatus,
   Severity,
 } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
@@ -214,6 +215,58 @@ export class DecisionApplierService {
       },
       AI_ACTOR,
     );
+  }
+
+  /**
+   * Close a case with a written conclusion (the explanation). Reuses
+   * CasesService.close(), which also archives the case's linked inquiries.
+   */
+  async closeCaseCore(
+    caseId: string,
+    conclusion: string,
+  ): Promise<{ archivedInquiries: number }> {
+    if (!(await this.idExists('case', caseId)))
+      throw new Error('Unknown caseId');
+    if (!conclusion || conclusion.trim().length === 0)
+      throw new Error('A conclusion is required to close a case');
+    const result = await this.cases.close(caseId, {
+      conclusion,
+      closedBy: AI_ACTOR,
+    });
+    return { archivedInquiries: result.archivedInquiries };
+  }
+
+  /**
+   * Reopen a closed case (e.g. the issue recurred) and reactivate the inquiries
+   * that were archived when it closed, so monitoring resumes.
+   */
+  async reopenCaseCore(
+    caseId: string,
+    note: string,
+  ): Promise<{ reactivatedInquiries: number }> {
+    if (!(await this.idExists('case', caseId)))
+      throw new Error('Unknown caseId');
+    const result = await this.cases.reopen(caseId, {
+      note,
+      reopenedBy: AI_ACTOR,
+    });
+    return { reactivatedInquiries: result.reactivatedInquiries };
+  }
+
+  /**
+   * Archive or reactivate an inquiry. On reactivation we rematch so the revived
+   * monitor reflects current findings.
+   */
+  async setInquiryStatusCore(
+    inquiryId: string,
+    status: 'ACTIVE' | 'ARCHIVED',
+  ): Promise<void> {
+    if (!(await this.idExists('inquiry', inquiryId)))
+      throw new Error('Unknown inquiryId');
+    await this.inquiries.update(inquiryId, { status: InquiryStatus[status] });
+    if (status === 'ACTIVE') {
+      await this.inquiries.rematch(inquiryId);
+    }
   }
 
   /**

@@ -90,7 +90,11 @@ export async function runAgentLoop(
   ctx: AgentContext,
   mission: Mission,
   deps: AgentLoopDeps,
-  opts: { systemBrief?: string; allowedTools?: string[] } = {},
+  opts: {
+    systemBrief?: string;
+    allowedTools?: string[];
+    missionPrimer?: string;
+  } = {},
 ): Promise<AgentLoopResult> {
   const runId = ctx.run.id;
   const allowed = opts.allowedTools ?? mission.allowedTools;
@@ -100,6 +104,7 @@ export async function runAgentLoop(
     deps.registry,
     opts.systemBrief,
     allowed,
+    opts.missionPrimer,
   );
 
   while (!progress.done && progress.iteration < mission.maxIterations) {
@@ -186,6 +191,7 @@ function loadProgress(
   registry: ToolRegistry,
   systemBrief: string | undefined,
   allowed: string[],
+  missionPrimer: string | undefined,
 ): LoopProgress {
   const existing = ctx.state[PROGRESS_KEY] as LoopProgress | undefined;
   if (existing && Array.isArray(existing.messages)) return existing;
@@ -199,6 +205,7 @@ function loadProgress(
           registry,
           systemBrief,
           allowed,
+          missionPrimer,
         ),
       },
       { role: 'user', content: buildUserPrompt(ctx, mission) },
@@ -269,13 +276,18 @@ function buildSystemPrompt(
   registry: ToolRegistry,
   systemBrief: string | undefined,
   allowed: string[],
+  missionPrimer: string | undefined,
 ): string {
   const guidance = ctx.instruction
     ? `\n\nOperator instruction for this run:\n${ctx.instruction}`
     : '';
   const brief = systemBrief?.trim() ? `\n${systemBrief.trim()}\n` : '';
+  const primer = missionPrimer?.trim()
+    ? `\n## Detector type registry\n${missionPrimer.trim()}\n`
+    : '';
   return [
     mission.goal,
+    primer,
     brief,
     guidance,
     '\n## Tools you may call',
