@@ -11,8 +11,19 @@ const PIPELINE_REQUIREMENTS = [
   'REGEX → patterns{<name>:{pattern,...}} (≥1 pattern)',
   'GLINER2 → entities{<label>:{description}} and/or classification{<task>:{labels[]}}',
   'LLM → system_prompt + labels[] (and an aiProviderConfigId; never provider_runtime)',
-  'TEXT_CLASSIFICATION / FEATURE_EXTRACTION / OBJECT_DETECTION → model (HuggingFace id)',
+  'TEXT_CLASSIFICATION / IMAGE_CLASSIFICATION / FEATURE_EXTRACTION / OBJECT_DETECTION → model (HuggingFace id; IMAGE_CLASSIFICATION has a default)',
 ].join('; ');
+
+/** Pipeline engines the agent may author, used for the examples filter enum. */
+const PIPELINE_TYPES = [
+  'REGEX',
+  'GLINER2',
+  'LLM',
+  'TEXT_CLASSIFICATION',
+  'IMAGE_CLASSIFICATION',
+  'FEATURE_EXTRACTION',
+  'OBJECT_DETECTION',
+];
 
 /**
  * Detector-authoring tools. The autopilot can list, create, test, update,
@@ -69,15 +80,22 @@ export class DetectorToolset {
       {
         name: 'detector.examples',
         description:
-          'List worked example custom detectors (name, description, pipelineSchema) for every pipeline type. Consult these to author a valid pipelineSchema. ' +
+          'List worked example custom detectors (name, description, pipelineSchema) to copy when authoring a valid pipelineSchema. Pass `type` to return only examples for one engine (incl. candidate HuggingFace model ids); omit it for all types. ' +
           `Required fields per type: ${PIPELINE_REQUIREMENTS}.`,
         inputSchema: {
           type: 'object',
-          properties: {},
+          properties: {
+            type: { type: 'string', enum: PIPELINE_TYPES },
+          },
           additionalProperties: false,
         },
         sideEffect: 'read',
-        handler: () => Promise.resolve(this.detectors.listExamples()),
+        handler: (input) =>
+          Promise.resolve(
+            this.detectors.listExamples(
+              typeof input.type === 'string' ? input.type : undefined,
+            ),
+          ),
       },
       {
         name: 'detector.test',

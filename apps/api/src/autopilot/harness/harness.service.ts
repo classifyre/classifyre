@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { AgentKind } from '@prisma/client';
 import { AiClientService } from '../../ai';
+import { CustomDetectorsService } from '../../custom-detectors.service';
 import { AgentAuditService } from '../audit/agent-audit.service';
 import { AgentLoggerService } from '../audit/agent-logger.service';
 import { ToolRegistry } from '../tools/tool-registry.service';
@@ -32,6 +34,7 @@ export class HarnessService {
     private readonly brief: SystemBriefService,
     private readonly mcp: McpClientService,
     private readonly agentConfig: AgentConfigService,
+    private readonly detectors: CustomDetectorsService,
   ) {}
 
   /** True when the given AgentKind has a harness mission. */
@@ -52,6 +55,12 @@ export class HarnessService {
       ...resolved.allowedTools,
       ...this.mcp.toolNamesForKind(resolved.kind),
     ];
+    // The detector author sees the full engine menu (types + candidate models)
+    // up front so it stops defaulting to REGEX/GLINER2.
+    const missionPrimer =
+      resolved.kind === AgentKind.DETECTOR_AUTHOR
+        ? this.detectors.buildTypeRegistry()
+        : undefined;
 
     await runPipeline(
       ctx,
@@ -69,7 +78,7 @@ export class HarnessService {
                 audit: this.audit,
                 log: this.log,
               },
-              { systemBrief: briefText, allowedTools },
+              { systemBrief: briefText, allowedTools, missionPrimer },
             ),
         },
       ],

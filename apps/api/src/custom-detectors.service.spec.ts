@@ -582,4 +582,49 @@ describe('CustomDetectorsService', () => {
       service.parseTrainingExamplesUpload(payload, 'phishing_dataset.xlsx'),
     ).toThrow(/Unsupported file type/);
   });
+
+  describe('listExamples', () => {
+    it('returns every worked example when no type is given', () => {
+      const { service } = createService();
+      const all = service.listExamples();
+      expect(all.length).toBeGreaterThan(0);
+    });
+
+    it('filters examples to a single pipeline type', () => {
+      const { service } = createService();
+      const text = service.listExamples('TEXT_CLASSIFICATION');
+      expect(text.length).toBeGreaterThan(0);
+      expect(text.length).toBeLessThan(service.listExamples().length);
+      for (const example of text) {
+        const schema = example.pipelineSchema;
+        const inner = (schema.pipeline_schema ?? schema) as {
+          type?: string;
+        };
+        expect(inner.type).toBe('TEXT_CLASSIFICATION');
+      }
+    });
+  });
+
+  describe('buildTypeRegistry', () => {
+    it('lists every engine with when-to-use guidance and candidate models', () => {
+      const { service } = createService();
+      const registry = service.buildTypeRegistry();
+
+      for (const type of [
+        'REGEX',
+        'GLINER2',
+        'TEXT_CLASSIFICATION',
+        'IMAGE_CLASSIFICATION',
+        'OBJECT_DETECTION',
+        'FEATURE_EXTRACTION',
+        'LLM',
+      ]) {
+        expect(registry).toContain(type);
+      }
+      // Candidate HuggingFace model ids harvested from the templates.
+      expect(registry).toContain(
+        'mrm8488/bert-tiny-finetuned-sms-spam-detection',
+      );
+    });
+  });
 });

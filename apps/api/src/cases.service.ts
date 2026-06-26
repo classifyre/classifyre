@@ -228,6 +228,40 @@ export class CasesService {
     };
   }
 
+  /**
+   * Reopen a closed/archived case and reactivate the inquiries that were
+   * archived alongside it, so monitoring resumes. Symmetric with close().
+   */
+  async reopen(
+    id: string,
+    dto: { note?: string; reopenedBy?: string },
+  ): Promise<{ case: CaseResponseDto; reactivatedInquiries: number }> {
+    await this.ensureExists(id);
+    await this.prisma.case.update({
+      where: { id },
+      data: { status: 'OPEN' },
+    });
+    // Bring back the inquiries that were archived when this case closed.
+    const reactivated = await this.prisma.inquiry.updateMany({
+      where: { status: 'ARCHIVED', caseLinks: { some: { caseId: id } } },
+      data: { status: 'ACTIVE' },
+    });
+    await this.activity.record(
+      id,
+      CaseActivityType.CASE_UPDATED,
+      {
+        reopened: true,
+        reactivatedInquiries: reactivated.count,
+        note: dto.note,
+      },
+      dto.reopenedBy,
+    );
+    return {
+      case: (await this.findOne(id))!,
+      reactivatedInquiries: reactivated.count,
+    };
+  }
+
   async list(query: QueryCasesDto): Promise<CaseListResponseDto> {
     const skip = Math.max(0, Number(query.skip ?? 0) || 0);
     const limit = Math.min(Math.max(1, Number(query.limit ?? 50) || 50), 200);
