@@ -295,6 +295,33 @@ describe('CasesService', () => {
     expect(mockPrisma.case.update).not.toHaveBeenCalled();
   });
 
+  it('reopens a case and reactivates the inquiries archived with it', async () => {
+    mockPrisma.case.findUnique
+      // ensureExists
+      .mockResolvedValueOnce({ id: 'c1' })
+      // findOne at the end
+      .mockResolvedValueOnce({
+        ...caseRow({ status: 'OPEN' }),
+        evidence: [],
+        inquiryLinks: [],
+      });
+    mockPrisma.case.update.mockResolvedValue(caseRow({ status: 'OPEN' }));
+    mockPrisma.inquiry.updateMany.mockResolvedValue({ count: 2 });
+
+    const result = await service.reopen('c1', { note: 'It recurred.' });
+
+    expect(result.reactivatedInquiries).toBe(2);
+    expect(mockPrisma.case.update).toHaveBeenCalledWith({
+      where: { id: 'c1' },
+      data: { status: 'OPEN' },
+    });
+    expect(mockPrisma.inquiry.updateMany).toHaveBeenCalledWith({
+      where: { status: 'ARCHIVED', caseLinks: { some: { caseId: 'c1' } } },
+      data: { status: 'ACTIVE' },
+    });
+    expect(mockActivity.record).toHaveBeenCalled();
+  });
+
   it('throws NotFound for a missing case on update', async () => {
     mockPrisma.case.findUnique.mockResolvedValue(null);
     await expect(

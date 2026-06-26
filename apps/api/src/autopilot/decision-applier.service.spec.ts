@@ -17,13 +17,19 @@ describe('DecisionApplierService', () => {
     case: { findUnique: jest.fn() },
     caseThread: { findFirst: jest.fn() },
   };
-  const mockInquiries = { create: jest.fn(), update: jest.fn() };
+  const mockInquiries = {
+    create: jest.fn(),
+    update: jest.fn(),
+    rematch: jest.fn(),
+  };
   const mockCases = {
     create: jest.fn(),
     update: jest.fn(),
     addEvidence: jest.fn(),
     attachFindings: jest.fn(),
     linkInquiries: jest.fn(),
+    close: jest.fn(),
+    reopen: jest.fn(),
   };
   const mockThreads = {
     create: jest.fn(),
@@ -182,6 +188,64 @@ describe('DecisionApplierService', () => {
         findingIds: ['f1'],
         addedBy: AI_ACTOR,
       });
+    });
+  });
+
+  describe('close / reopen / inquiry status', () => {
+    it('closeCaseCore requires a non-empty conclusion', async () => {
+      mockSearch.existingIds.mockResolvedValue(new Set(['c1']));
+      await expect(service.closeCaseCore('c1', '   ')).rejects.toThrow(
+        /conclusion is required/,
+      );
+      expect(mockCases.close).not.toHaveBeenCalled();
+    });
+
+    it('closeCaseCore closes via CasesService as the AI actor', async () => {
+      mockSearch.existingIds.mockResolvedValue(new Set(['c1']));
+      mockCases.close.mockResolvedValue({ archivedInquiries: 2 });
+      const res = await service.closeCaseCore('c1', 'False positives.');
+      expect(res).toEqual({ archivedInquiries: 2 });
+      expect(mockCases.close).toHaveBeenCalledWith('c1', {
+        conclusion: 'False positives.',
+        closedBy: AI_ACTOR,
+      });
+    });
+
+    it('reopenCaseCore reopens via CasesService as the AI actor', async () => {
+      mockSearch.existingIds.mockResolvedValue(new Set(['c1']));
+      mockCases.reopen.mockResolvedValue({ reactivatedInquiries: 1 });
+      const res = await service.reopenCaseCore('c1', 'It recurred.');
+      expect(res).toEqual({ reactivatedInquiries: 1 });
+      expect(mockCases.reopen).toHaveBeenCalledWith('c1', {
+        note: 'It recurred.',
+        reopenedBy: AI_ACTOR,
+      });
+    });
+
+    it('setInquiryStatusCore archives without rematching', async () => {
+      mockSearch.existingIds.mockResolvedValue(new Set(['q1']));
+      await service.setInquiryStatusCore('q1', 'ARCHIVED');
+      expect(mockInquiries.update).toHaveBeenCalledWith('q1', {
+        status: 'ARCHIVED',
+      });
+      expect(mockInquiries.rematch).not.toHaveBeenCalled();
+    });
+
+    it('setInquiryStatusCore reactivates and rematches', async () => {
+      mockSearch.existingIds.mockResolvedValue(new Set(['q1']));
+      await service.setInquiryStatusCore('q1', 'ACTIVE');
+      expect(mockInquiries.update).toHaveBeenCalledWith('q1', {
+        status: 'ACTIVE',
+      });
+      expect(mockInquiries.rematch).toHaveBeenCalledWith('q1');
+    });
+
+    it('setInquiryStatusCore throws for an unknown inquiry', async () => {
+      mockSearch.existingIds.mockResolvedValue(new Set());
+      await expect(
+        service.setInquiryStatusCore('ghost', 'ARCHIVED'),
+      ).rejects.toThrow(/Unknown inquiryId/);
+      expect(mockInquiries.update).not.toHaveBeenCalled();
     });
   });
 });
