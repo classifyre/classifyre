@@ -40,6 +40,8 @@ const INVESTIGATION_INQUIRY_TOOLS = [
   'inquiries.create',
   'inquiries.update',
   'inquiries.enrich',
+  'inquiries.archive',
+  'inquiries.reactivate',
 ];
 
 const INVESTIGATION_CASE_TOOLS = [
@@ -55,6 +57,8 @@ const INVESTIGATION_CASE_TOOLS = [
   'cases.remove_edge',
   'cases.link_support',
   'cases.change_status',
+  'cases.close',
+  'cases.reopen',
   'cases.link_inquiry',
   // Fingerprints (asset similarity) — observe + act within an investigation.
   'fingerprints.similar_assets',
@@ -78,6 +82,11 @@ export const INQUIRY_MISSION: Mission = {
     '\nYour mission: review the new/open findings and keep the set of inquiries healthy.',
     'Avoid duplicates — prefer enriching an existing inquiry over creating a near-duplicate.',
     'Do not recreate intentionally archived inquiries. Use memory.search to recall precedents.',
+    '\nWIND DOWN: if an inquiry is matching only false positives/noise or its topic is resolved,',
+    'inquiries.archive it with a clear reason AND memory.write a DECISION_PRECEDENT recording why,',
+    'so it is not recreated. RECURRENCE: when an archived topic genuinely reappears (check',
+    'inquiries.archived), prefer inquiries.reactivate over creating a duplicate. Still never revive a',
+    'topic the operator archived/deleted (respect operator-deletion precedents).',
   ].join('\n'),
   allowedTools: [
     ...OBSERVE_TOOLS,
@@ -94,6 +103,12 @@ export const CASE_MISSION: Mission = {
     '\nYour mission: build and maintain investigation cases from inquiries with new matches.',
     'Create a case only when a coherent investigation is warranted; otherwise enrich an open case',
     'with hypotheses, evidence, attached findings, notes and links. Be conservative and specific.',
+    '\nWIND DOWN: review each open case against its thread/findings. If it no longer holds up —',
+    'false-positive findings, refuted hypotheses, or the issue is resolved — cases.close it with a',
+    'clear conclusion explaining why (this also archives its linked inquiries). Close only when the',
+    'evidence genuinely does not support the case, not merely because it is quiet.',
+    '\nRECURRENCE: scan cases.closed; if a closed case’s issue reappears, cases.reopen it (this',
+    'reactivates the inquiries archived with it) and add a note explaining what recurred.',
   ].join('\n'),
   allowedTools: [
     ...OBSERVE_TOOLS,
