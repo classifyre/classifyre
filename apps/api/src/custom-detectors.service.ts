@@ -1049,7 +1049,8 @@ export class CustomDetectorsService {
     return { deleted: true };
   }
 
-  listExamples(): CustomDetectorExampleDto[] {
+  /** Read the raw CUSTOM example templates, or [] if the schema file is absent. */
+  private loadCustomExampleRecords(): JsonRecord[] {
     const schemaPath = resolveSchemaFile(
       __dirname,
       'all_detectors_examples.json',
@@ -1057,22 +1058,124 @@ export class CustomDetectorsService {
     if (!fs.existsSync(schemaPath)) {
       return [];
     }
-
     const allExamples = JSON.parse(
       fs.readFileSync(schemaPath, 'utf8'),
     ) as Record<string, unknown>;
     const customExamples = allExamples.CUSTOM;
-    if (!Array.isArray(customExamples)) {
-      return [];
-    }
+    return Array.isArray(customExamples)
+      ? customExamples.map((raw) => asRecord(raw))
+      : [];
+  }
 
-    return customExamples
-      .map((raw) => asRecord(raw))
+  /** The inner pipeline schema ({type, model, ...}) carried by an example record. */
+  private examplePipelineSchema(example: JsonRecord): JsonRecord {
+    const config = asRecord(example.pipelineSchema ?? example.config);
+    // Templates nest the engine config under `pipeline_schema`; older shapes
+    // put the type fields directly on the config.
+    return asRecord(config.pipeline_schema ?? config);
+  }
+
+  /**
+   * Worked custom-detector example templates (name, description, full config).
+   * Pass `type` (REGEX | GLINER2 | LLM | *_CLASSIFICATION | FEATURE_EXTRACTION |
+   * OBJECT_DETECTION) to return only the examples for that pipeline engine.
+   */
+  listExamples(type?: string): CustomDetectorExampleDto[] {
+    const wanted = type?.trim().toUpperCase();
+    return this.loadCustomExampleRecords()
+      .filter((example) => {
+        if (!wanted) return true;
+        const schemaType =
+          asString(this.examplePipelineSchema(example).type)?.toUpperCase() ??
+          'GLINER2';
+        return schemaType === wanted;
+      })
       .map((example) => ({
         name: asString(example.name) ?? 'Custom Detector Example',
         description: asString(example.description) ?? 'Custom detector example',
         pipelineSchema: asRecord(example.pipelineSchema ?? example.config),
       }));
+  }
+
+  /** One-line "when to use" guidance per pipeline engine, in author order. */
+  private static readonly TYPE_GUIDANCE: ReadonlyArray<[string, string]> = [
+    [
+      'REGEX',
+      'fixed / structured tokens — IDs, keys, account or product codes',
+    ],
+    [
+      'GLINER2',
+      'zero-shot entities & categories with no labelled data (no training; dry-run only)',
+    ],
+    [
+      'TEXT_CLASSIFICATION',
+      'an off-the-shelf HF text classifier fits — spam, sentiment, toxicity, language, prompt-injection',
+    ],
+    [
+      'IMAGE_CLASSIFICATION',
+      'classify whole images — NSFW, scene or object category',
+    ],
+    [
+      'OBJECT_DETECTION',
+      'locate objects inside images — weapons, people, logos',
+    ],
+    [
+      'FEATURE_EXTRACTION',
+      'embeddings for similarity / clustering / retrieval',
+    ],
+    [
+      'LLM',
+      'nuanced judgement no smaller model captures (needs aiProviderConfigId; never provider_runtime)',
+    ],
+  ];
+
+  /**
+   * A compact registry of the available detector engines — derived from the
+   * example templates so it stays in sync — listing, per type, when to use it
+   * and the candidate models / example detectors harvested from the templates.
+   * Injected into the detector-author system prompt so every run sees the full
+   * menu (not just REGEX/GLINER2) without having to call detector.examples.
+   */
+  buildTypeRegistry(): string {
+    const examples = this.loadCustomExampleRecords();
+    const models = new Map<string, Set<string>>();
+    const names = new Map<string, Set<string>>();
+    for (const example of examples) {
+      const schema = this.examplePipelineSchema(example);
+      const type = asString(schema.type)?.toUpperCase() ?? 'GLINER2';
+      const name = asString(example.name);
+      if (name) {
+        if (!names.has(type)) names.set(type, new Set());
+        names.get(type)!.add(name);
+      }
+      // model is a HuggingFace id (string) or a {name, path} object (GLINER2).
+      const model =
+        asString(schema.model) ?? asString(asRecord(schema.model).name);
+      if (model) {
+        if (!models.has(type)) models.set(type, new Set());
+        models.get(type)!.add(model);
+      }
+    }
+
+    const lines = CustomDetectorsService.TYPE_GUIDANCE.map(([type, when]) => {
+      const modelList = Array.from(models.get(type) ?? []).slice(0, 4);
+      const detail =
+        modelList.length > 0
+          ? ` Models: ${modelList.join(', ')}.`
+          : (() => {
+              const nameList = Array.from(names.get(type) ?? []).slice(0, 3);
+              return nameList.length > 0
+                ? ` Examples: ${nameList.join('; ')}.`
+                : '';
+            })();
+      return `- ${type} — ${when}.${detail}`;
+    });
+
+    return [
+      'Available detector engines (pipeline_schema.type) — pick the simplest that fits;',
+      'detector.examples returns a full worked schema to copy (optionally filter by type):',
+      ...lines,
+    ].join('\n');
   }
 
   async assertActiveDetectorIds(ids: unknown): Promise<string[]> {

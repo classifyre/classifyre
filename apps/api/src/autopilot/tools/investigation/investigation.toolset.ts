@@ -47,6 +47,45 @@ export class InvestigationToolset {
     return { mode, entityType: 'case', entityId: caseId };
   };
 
+  /** An inquiry archive/reactivate tool: flips status, requires a reason. */
+  private inquiryStatusTool(
+    name: string,
+    description: string,
+    status: 'ACTIVE' | 'ARCHIVED',
+  ): Tool {
+    return {
+      name,
+      description,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          inquiryId: { type: 'string' },
+          reason: { type: 'string', minLength: 1 },
+        },
+        required: ['inquiryId', 'reason'],
+        additionalProperties: false,
+      },
+      sideEffect: 'mutate',
+      domain: 'inquiry',
+      decisionAction: AgentDecisionAction.UPDATE_INQUIRY,
+      resolveGate: async (input, tc) => ({
+        mode: await this.applier.inquiryGate(
+          typeof input.inquiryId === 'string' ? input.inquiryId : '',
+          tc.ctx.settings.autopilotInquiryEnabled,
+        ),
+        entityType: 'inquiry',
+        entityId: typeof input.inquiryId === 'string' ? input.inquiryId : '',
+      }),
+      handler: async (input) => {
+        await this.applier.setInquiryStatusCore(
+          String(input.inquiryId),
+          status,
+        );
+        return { ok: true };
+      },
+    };
+  }
+
   /** A case-operation tool: builds the op from input and applies it. */
   private caseOpTool(
     name: string,
@@ -167,6 +206,16 @@ export class InvestigationToolset {
           return { ok: true };
         },
       },
+      this.inquiryStatusTool(
+        'inquiries.archive',
+        'Archive an inquiry that is noise / false-positive or whose topic is resolved. Records the reason; also memory.write a precedent so the topic is not blindly recreated.',
+        'ARCHIVED',
+      ),
+      this.inquiryStatusTool(
+        'inquiries.reactivate',
+        'Reactivate a previously archived inquiry when its topic genuinely recurs — prefer this over creating a duplicate. Rematches against current findings.',
+        'ACTIVE',
+      ),
       // ── Cases ───────────────────────────────────────────────────────────
       {
         name: 'cases.create',
@@ -226,6 +275,49 @@ export class InvestigationToolset {
           });
           return { ok: true };
         },
+      },
+      {
+        name: 'cases.close',
+        description:
+          "Close a case that no longer holds up (false-positive findings, refuted hypotheses, or a resolved issue). Requires a written conclusion explaining why; also archives the case's linked inquiries.",
+        inputSchema: {
+          type: 'object',
+          properties: {
+            caseId: { type: 'string' },
+            conclusion: { type: 'string', minLength: 1 },
+          },
+          required: ['caseId', 'conclusion'],
+          additionalProperties: false,
+        },
+        sideEffect: 'mutate',
+        domain: 'case',
+        decisionAction: AgentDecisionAction.CHANGE_STATUS,
+        resolveGate: this.caseGate,
+        handler: async (input) =>
+          this.applier.closeCaseCore(
+            String(input.caseId),
+            String(input.conclusion),
+          ),
+      },
+      {
+        name: 'cases.reopen',
+        description:
+          'Reopen a closed/archived case when its issue recurs. Reactivates the inquiries that were archived when it closed so monitoring resumes; requires a note explaining why.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            caseId: { type: 'string' },
+            note: { type: 'string', minLength: 1 },
+          },
+          required: ['caseId', 'note'],
+          additionalProperties: false,
+        },
+        sideEffect: 'mutate',
+        domain: 'case',
+        decisionAction: AgentDecisionAction.CHANGE_STATUS,
+        resolveGate: this.caseGate,
+        handler: async (input) =>
+          this.applier.reopenCaseCore(String(input.caseId), String(input.note)),
       },
       this.caseOpTool(
         'cases.add_hypothesis',
