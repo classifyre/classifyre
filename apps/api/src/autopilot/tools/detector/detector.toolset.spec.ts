@@ -146,7 +146,18 @@ describe('DetectorToolset', () => {
         tc,
       )) as unknown[];
       expect(out).toHaveLength(1);
-      expect(mockDetectors.listExamples).toHaveBeenCalled();
+      expect(mockDetectors.listExamples).toHaveBeenCalledWith(undefined);
+    });
+
+    it('passes the type filter through to listExamples', async () => {
+      mockDetectors.listExamples.mockReturnValue([]);
+      await byName('detector.examples').handler(
+        { type: 'TEXT_CLASSIFICATION' },
+        tc,
+      );
+      expect(mockDetectors.listExamples).toHaveBeenCalledWith(
+        'TEXT_CLASSIFICATION',
+      );
     });
   });
 });
