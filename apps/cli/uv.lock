@@ -642,7 +642,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.4.32.dev0"
+version = "0.4.32"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -1008,7 +1008,7 @@ youtube = [
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.4.32.dev0"
+version = "0.4.32"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
@@ -2074,15 +2074,15 @@ wheels = [
 
 [[package]]
 name = "google-auth"
-version = "2.55.0"
+version = "2.55.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
     { name = "pyasn1-modules" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/81/1c/70b23fc52b2bb3c70b379f3bd05c4a60ab3a873e30c6bd21c57e0154848a/google_auth-2.55.0.tar.gz", hash = "sha256:fcd3a130f575fa36403d38774af1c64a4fbfbca09215f0589d2372b5119697cb", size = 349379, upload-time = "2026-06-15T22:33:16.466Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a3/6f/f3f4ac177c67bbee8fe8e88f2ab4f36af88c44a096e165c5217accf6e5d3/google_auth-2.55.1.tar.gz", hash = "sha256:fb2d9b730f2c9b8d326ec8d7222f21aef2ead15bf0513793d6442485d87af0a1", size = 349527, upload-time = "2026-06-25T23:39:27.182Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/44/71/c0321dc6d63d99946da45f7c06299b934e4f7f7da5c4f14d101bcb39adf1/google_auth-2.55.0-py3-none-any.whl", hash = "sha256:a17cef9dedf98c4ebae2fb0c48c8f75952c877cbc2efe09f329ef16c2783d88a", size = 252400, upload-time = "2026-06-15T22:33:14.992Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/1d/f6d3ca1ad0725f2e08a1c6915640748a52de2e66596160a4d53b010cccf0/google_auth-2.55.1-py3-none-any.whl", hash = "sha256:eada68dfd52b3b81191827601e2a0c3fa12540c818534b630ddc5355769c3995", size = 252349, upload-time = "2026-06-25T23:38:52.946Z" },
 ]
 
 [[package]]
@@ -5186,14 +5186,14 @@ wheels = [
 
 [[package]]
 name = "smart-open"
-version = "7.6.1"
+version = "7.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c5/65/3ada667d32675399001bf022ad3d9f3989b57101351ebc71d6fbe2384634/smart_open-7.6.1.tar.gz", hash = "sha256:4347996e7ba21db7cd1e059632e0b30395407e4f6c660d2ddffc8f2a9ae5f990", size = 54754, upload-time = "2026-05-09T06:23:37.06Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/c6/22e7a2acd5d27941e85e0d7ede398da5abe2e4677d2265c924157247c32e/smart_open-7.7.1.tar.gz", hash = "sha256:9414ba5733e28309f29b28a303b0f1054ad23fe0275f1a1b600c80a724f4bd1a", size = 54952, upload-time = "2026-06-26T07:56:35.309Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/78/0f68b93564b8c6b6987a0696c582ba2591a381ab2f733a501909e949f241/smart_open-7.6.1-py3-none-any.whl", hash = "sha256:b4de6aebef023aca91cc9fb372052e1343ba3f152de215bd22391a663e3ddd21", size = 64845, upload-time = "2026-05-09T06:23:35.386Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/c5/14732c140fa0af0e59345949eaf9016c75ad3f076586f2413e3d3566a8da/smart_open-7.7.1-py3-none-any.whl", hash = "sha256:cb62dc45f519bf39b612564d326d2a17556f3a6056e3c3a86a07215d670d45bc", size = 65061, upload-time = "2026-06-26T07:56:33.685Z" },
 ]
 
 [[package]]
@@ -5393,7 +5393,7 @@ wheels = [
 
 [[package]]
 name = "tableauserverclient"
-version = "0.40"
+version = "0.41"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "defusedxml" },
@@ -5402,9 +5402,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d4/57/4e661856ceb051acf97998cb0e75ab5300aaa29cd36937c1eca18ea3921b/tableauserverclient-0.40.tar.gz", hash = "sha256:544f38b9d4b46846ebe98b668d249e303bc5e73403fd966513918a12ce59db02", size = 630725, upload-time = "2026-02-03T20:21:08.907Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6e/28/7a2263194b8aca4efb77705c1255370c0cb2dc94b3b62ed16e01d659a028/tableauserverclient-0.41.tar.gz", hash = "sha256:e491975b9f0e19467fb6423b814511a9f549c22bce78c868079a25fbe81a0e95", size = 639331, upload-time = "2026-06-25T23:41:19.292Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6b/70/580952c49ded142c48cfe3999d8b4ff657f412f1c9616fbcdb6d6b3a6cec/tableauserverclient-0.40-py3-none-any.whl", hash = "sha256:346e092ae8a5237309c0638107074f6d84312dca7ca73f16fd26ac75d1ebe2fc", size = 214090, upload-time = "2026-02-03T20:21:07.222Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/b6/3a91c755bf64c07f29a50bad69006a98606da122491894e047a475c81979/tableauserverclient-0.41-py3-none-any.whl", hash = "sha256:c1d5bed75d22899847f44c7ee0fdf9b12cf8f4a855c49d6100f2f6c6ea4fe2a3", size = 214856, upload-time = "2026-06-25T23:41:18.095Z" },
 ]
 
 [[package]]
