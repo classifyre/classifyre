@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { ConfigToolset } from './config.toolset';
 import type { PrismaService } from '../../../prisma.service';
 import type { ValidationService } from '../../../validation.service';
@@ -161,10 +162,10 @@ describe('ConfigToolset — sources.rescan', () => {
     expect(res.skipped).toMatch(/verification/i);
   });
 
-  it('returns a graceful skip when a scan is already running', async () => {
+  it('returns a graceful skip when a scan is already running (ConflictException)', async () => {
     mockPrisma.runner.findUnique.mockResolvedValue({ triggerType: 'MANUAL' });
     mockCliRunner.startRun.mockRejectedValue(
-      new Error('scan already in progress'),
+      new ConflictException('Source s1 already has a running scan'),
     );
 
     const res = (await rescan.handler(
@@ -174,6 +175,19 @@ describe('ConfigToolset — sources.rescan', () => {
       skipped?: string;
     };
 
-    expect(res.skipped).toMatch(/already in progress/i);
+    expect(res.skipped).toMatch(/already has a running scan/i);
+  });
+
+  it('propagates infrastructure errors so the dispatcher records FAILED', async () => {
+    mockPrisma.runner.findUnique.mockResolvedValue({ triggerType: 'MANUAL' });
+    const prismaError = new Error(
+      'Invalid input value for enum "TriggerType": "AUTOPILOT"',
+    );
+    prismaError.name = 'PrismaClientValidationError';
+    mockCliRunner.startRun.mockRejectedValue(prismaError);
+
+    await expect(
+      rescan.handler({ sourceId: 's1' }, ctxWith('run-1')),
+    ).rejects.toThrow(/TriggerType/);
   });
 });
