@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { AgentDecisionAction, Prisma, TriggerType } from '@prisma/client';
 import { PrismaService } from '../../../prisma.service';
 import { ValidationService } from '../../../validation.service';
@@ -272,14 +272,19 @@ export class ConfigToolset {
                 'Re-scan started. A follow-up autopilot cycle will evaluate the resulting findings.',
             };
           } catch (error) {
-            // startRun rejects when a scan is already running for the source —
-            // surface that to the model rather than failing the whole call.
-            return {
-              skipped:
-                error instanceof Error
-                  ? error.message
-                  : 're-scan could not be started',
-            };
+            // startRun throws ConflictException / NotFoundException when a scan
+            // is already running or the source doesn't exist — surface those to
+            // the model as a soft skip. Infrastructure errors (e.g. Prisma
+            // validation) must propagate so the dispatcher records FAILED.
+            if (error instanceof HttpException) {
+              return {
+                skipped:
+                  error instanceof Error
+                    ? error.message
+                    : 're-scan could not be started',
+              };
+            }
+            throw error;
           }
         },
       },
