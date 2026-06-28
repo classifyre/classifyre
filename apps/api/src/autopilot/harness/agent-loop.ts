@@ -142,10 +142,11 @@ export async function runAgentLoop(
         continue;
       }
       const dedupeKey = `loop:${progress.iteration}:${i}:${call.tool}`;
+      const cleanedInput = stripCallLevelKeys(call.input);
       const result = await deps.dispatcher.dispatch(
         { ctx, audit: deps.audit, log: deps.log },
         tool,
-        call.input,
+        cleanedInput,
         dedupeKey,
         call.rationale,
       );
@@ -321,4 +322,29 @@ function repairTurn(value: unknown): unknown {
   if (typeof v.thought !== 'string')
     v.thought = v.thought ? JSON.stringify(v.thought) : '';
   return v;
+}
+
+const CALL_LEVEL_KEYS = new Set(['tool', 'rationale']);
+
+/**
+ * Strip call-level keys that the model sometimes leaks into the tool input
+ * object (e.g. `rationale` or `tool`). These are siblings of `input` in the
+ * tool call schema, never valid tool input properties.
+ */
+function stripCallLevelKeys(input: unknown): unknown {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+  const obj = input as Record<string, unknown>;
+  let needsCopy = false;
+  for (const key of CALL_LEVEL_KEYS) {
+    if (key in obj) {
+      needsCopy = true;
+      break;
+    }
+  }
+  if (!needsCopy) return input;
+  const cleaned: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (!CALL_LEVEL_KEYS.has(k)) cleaned[k] = v;
+  }
+  return cleaned;
 }
