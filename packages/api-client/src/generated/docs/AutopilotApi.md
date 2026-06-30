@@ -702,7 +702,7 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'GLOSSARY' | 'DECISION_PRECEDENT' | 'TOPIC_INQUIRY_MAP' | 'ENTITY_MAP' | 'SOURCE_PROFILE' | 'DETECTOR_INSIGHT' | 'OPERATOR_DIRECTIVE' (optional)
+    // 'GLOSSARY' | 'DECISION_PRECEDENT' | 'ENTITY_MAP' | 'SOURCE_PROFILE' | 'DETECTOR_INSIGHT' | 'OPERATOR_DIRECTIVE' (optional)
     kind: kind_example,
     // string | Substring search over key and content (optional)
     search: search_example,
@@ -729,7 +729,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **kind** | `GLOSSARY`, `DECISION_PRECEDENT`, `TOPIC_INQUIRY_MAP`, `ENTITY_MAP`, `SOURCE_PROFILE`, `DETECTOR_INSIGHT`, `OPERATOR_DIRECTIVE` |  | [Optional] [Defaults to `undefined`] [Enum: GLOSSARY, DECISION_PRECEDENT, TOPIC_INQUIRY_MAP, ENTITY_MAP, SOURCE_PROFILE, DETECTOR_INSIGHT, OPERATOR_DIRECTIVE] |
+| **kind** | `GLOSSARY`, `DECISION_PRECEDENT`, `ENTITY_MAP`, `SOURCE_PROFILE`, `DETECTOR_INSIGHT`, `OPERATOR_DIRECTIVE` |  | [Optional] [Defaults to `undefined`] [Enum: GLOSSARY, DECISION_PRECEDENT, ENTITY_MAP, SOURCE_PROFILE, DETECTOR_INSIGHT, OPERATOR_DIRECTIVE] |
 | **search** | `string` | Substring search over key and content | [Optional] [Defaults to `undefined`] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **limit** | `number` |  | [Optional] [Defaults to `50`] |

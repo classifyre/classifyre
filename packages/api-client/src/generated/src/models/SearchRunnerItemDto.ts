@@ -157,7 +157,8 @@ export const SearchRunnerItemDtoTriggerTypeEnum = {
     Manual: 'MANUAL',
     Scheduled: 'SCHEDULED',
     Webhook: 'WEBHOOK',
-    Api: 'API'
+    Api: 'API',
+    Autopilot: 'AUTOPILOT'
 } as const;
 export type SearchRunnerItemDtoTriggerTypeEnum = typeof SearchRunnerItemDtoTriggerTypeEnum[keyof typeof SearchRunnerItemDtoTriggerTypeEnum];
 

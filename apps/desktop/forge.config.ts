@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const allResources = ['api', 'web', 'cli', 'prisma'];
+const allResources = ['api', 'web', 'cli', 'prisma', 'venv', 'jre'];
 const extraResource = allResources
   .map((name) => path.resolve(__dirname, 'resources', name))
   .filter((abs) => fs.existsSync(abs));
