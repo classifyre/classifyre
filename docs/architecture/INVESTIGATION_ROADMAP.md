@@ -1,6 +1,6 @@
 # Investigation Platform — Protocol Correction & Roadmap
 
-> Status: the MVP shipped in [PR #116](https://github.com/classifyre-com/classifyre/pull/116)
+> Status: the MVP shipped in [PR #116](https://github.com/classifyre/classifyre/pull/116)
 > (cases, evidence, generic edges, recursive-CTE graph, hypotheses, Cytoscape explorer).
 > This document corrects a **conceptual flaw** in that MVP and lays out the full roadmap.
 
