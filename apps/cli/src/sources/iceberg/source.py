@@ -82,9 +82,7 @@ class IcebergSource(BaseSparkSource):
             )
             conf[f"spark.sql.catalog.{name}.io-impl"] = "org.apache.iceberg.aws.s3.S3FileIO"
         elif ctype == "SQL":
-            conf[f"spark.sql.catalog.{name}.catalog-impl"] = (
-                "org.apache.iceberg.jdbc.JdbcCatalog"
-            )
+            conf[f"spark.sql.catalog.{name}.catalog-impl"] = "org.apache.iceberg.jdbc.JdbcCatalog"
             if required.catalog_uri:
                 conf[f"spark.sql.catalog.{name}.uri"] = required.catalog_uri
 
@@ -105,8 +103,10 @@ class IcebergSource(BaseSparkSource):
 
     def _resolve_databases(self) -> list[str]:
         scope = self._scope()
-        if scope is not None and getattr(scope, "namespace", None) and not getattr(
-            scope, "include_all_namespaces", False
+        if (
+            scope is not None
+            and getattr(scope, "namespace", None)
+            and not getattr(scope, "include_all_namespaces", False)
         ):
             return [scope.namespace]
         if scope is not None and getattr(scope, "include_all_namespaces", False):
@@ -115,11 +115,7 @@ class IcebergSource(BaseSparkSource):
                 cursor.execute(f"SHOW NAMESPACES IN `{self.CATALOG}`")
                 rows = cursor.fetchall()
             return [row[-1] for row in rows if row and isinstance(row[-1], str)]
-        if scope is not None and getattr(scope, "namespace", None):
-            return [scope.namespace]
-        raise ValueError(
-            "Iceberg requires optional.scope.namespace or include_all_namespaces=true"
-        )
+        raise ValueError("Iceberg requires optional.scope.namespace or include_all_namespaces=true")
 
     # ── Asset metadata extras (best-effort via Iceberg metadata tables) ──
 

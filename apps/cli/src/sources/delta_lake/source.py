@@ -53,9 +53,7 @@ class DeltaLakeSource(BaseSparkSource):
     def _extra_spark_conf(self) -> dict[str, str]:
         conf: dict[str, str] = {
             "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
-            "spark.sql.catalog.spark_catalog": (
-                "org.apache.spark.sql.delta.catalog.DeltaCatalog"
-            ),
+            "spark.sql.catalog.spark_catalog": ("org.apache.spark.sql.delta.catalog.DeltaCatalog"),
         }
         conf.update(_storage_conf(self.config))
         return conf
@@ -72,7 +70,7 @@ class DeltaLakeSource(BaseSparkSource):
             getattr(scope, "database", None) or getattr(scope, "include_all_databases", False)
         ):
             tables.extend(super()._iter_tables())
-        for path in (getattr(scope, "table_paths", None) or []):
+        for path in getattr(scope, "table_paths", None) or []:
             tables.append(TableRef(database="delta", schema=None, table=path, object_type="PATH"))
         return tables
 

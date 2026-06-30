@@ -184,8 +184,12 @@ class BaseSparkSource(BaseTabularSource):
     def _is_connection_alive(self, conn: Any) -> bool:
         try:
             return not conn.session.sparkContext._jsc.sc().isStopped()
-        except Exception:
+        except AttributeError:
+            # Spark Connect sessions have no sparkContext; assume alive and let
+            # the next SQL call surface any real connectivity failure.
             return True
+        except Exception:
+            return False
 
     def cleanup(self) -> None:
         super().cleanup()
@@ -241,8 +245,10 @@ class BaseSparkSource(BaseTabularSource):
     def _resolve_databases(self) -> list[str]:
         scope = self._scope()
         catalog = self._catalog()
-        if scope is not None and getattr(scope, "database", None) and not getattr(
-            scope, "include_all_databases", False
+        if (
+            scope is not None
+            and getattr(scope, "database", None)
+            and not getattr(scope, "include_all_databases", False)
         ):
             return [scope.database]
         if scope is not None and getattr(scope, "include_all_databases", False):

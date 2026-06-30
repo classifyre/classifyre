@@ -100,7 +100,9 @@ export class ProcessManager {
     if (app.isPackaged) {
       return path.join(process.resourcesPath, 'jre');
     }
-    return path.join(__dirname, '../../../cli/.jre-desktop');
+    // In dev mode point at resources/jre, which build-desktop.sh populates.
+    // If absent, javaEnv stays empty and JAVA_HOME falls back to the system PATH.
+    return path.join(__dirname, '../../resources/jre');
   }
 
   private getPrismaDir(): string {
