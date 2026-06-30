@@ -129,9 +129,7 @@ class FinalizeIngestRunRequest(BaseModel):
     seen_hashes: list[str] = Field(serialization_alias="seenHashes")
     # AUTOMATIC sampling cursor to persist on the source for the next run.
     # Omitted (None) for other strategies so the stored cursor is left untouched.
-    sampling_cursor: dict[str, Any] | None = Field(
-        None, serialization_alias="samplingCursor"
-    )
+    sampling_cursor: dict[str, Any] | None = Field(None, serialization_alias="samplingCursor")
 
 
 class UpdateRunnerStatusRequest(BaseModel):

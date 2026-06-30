@@ -161,12 +161,6 @@ All URIs are relative to *http://localhost*
 *GraphApi* | [**graphControllerUpdateEdge**](docs/GraphApi.md#graphcontrollerupdateedge) | **PATCH** /graph/edges/{id} | Rename an edge relation type
 *HealthApi* | [**healthControllerGetHealth**](docs/HealthApi.md#healthcontrollergethealth) | **GET** / | Health check
 *HealthApi* | [**healthControllerPing**](docs/HealthApi.md#healthcontrollerping) | **GET** /ping | Ping endpoint
-*HypothesesApi* | [**hypothesisAliasControllerCreate**](docs/HypothesesApi.md#hypothesisaliascontrollercreate) | **POST** /cases/{caseId}/hypotheses | [Deprecated] Create hypothesis — use POST /cases/:caseId/threads
-*HypothesesApi* | [**hypothesisAliasControllerLinkSupport**](docs/HypothesesApi.md#hypothesisaliascontrollerlinksupport) | **POST** /hypotheses/{id}/support | [Deprecated] Link support — use POST /threads/:id/support
-*HypothesesApi* | [**hypothesisAliasControllerList**](docs/HypothesesApi.md#hypothesisaliascontrollerlist) | **GET** /cases/{caseId}/hypotheses | [Deprecated] List hypotheses — use GET /cases/:caseId/threads?kind&#x3D;HYPOTHESIS
-*HypothesesApi* | [**hypothesisAliasControllerRemove**](docs/HypothesesApi.md#hypothesisaliascontrollerremove) | **DELETE** /hypotheses/{id} | [Deprecated] Delete hypothesis — use DELETE /threads/:id
-*HypothesesApi* | [**hypothesisAliasControllerUnlinkSupport**](docs/HypothesesApi.md#hypothesisaliascontrollerunlinksupport) | **DELETE** /hypotheses/{id}/support/{linkId} | [Deprecated] Unlink support — use DELETE /threads/:id/support/:linkId
-*HypothesesApi* | [**hypothesisAliasControllerUpdate**](docs/HypothesesApi.md#hypothesisaliascontrollerupdate) | **PATCH** /hypotheses/{id} | [Deprecated] Update hypothesis — use PATCH /threads/:id
 *InquiriesApi* | [**inquiriesControllerCreate**](docs/InquiriesApi.md#inquiriescontrollercreate) | **POST** /inquiries | Create an inquiry (a saved query) and seed its matches
 *InquiriesApi* | [**inquiriesControllerFindOne**](docs/InquiriesApi.md#inquiriescontrollerfindone) | **GET** /inquiries/{id} | Get an inquiry
 *InquiriesApi* | [**inquiriesControllerList**](docs/InquiriesApi.md#inquiriescontrollerlist) | **GET** /inquiries | List inquiries (with match counts)
@@ -304,7 +298,6 @@ All URIs are relative to *http://localhost*
 - [CreateCustomDetectorDto](docs/CreateCustomDetectorDto.md)
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
-- [CreateHypothesisDto](docs/CreateHypothesisDto.md)
 - [CreateInquiryDto](docs/CreateInquiryDto.md)
 - [CreateManualEdgeDto](docs/CreateManualEdgeDto.md)
 - [CreateMcpServerDto](docs/CreateMcpServerDto.md)
@@ -343,8 +336,6 @@ All URIs are relative to *http://localhost*
 - [HarnessToolDto](docs/HarnessToolDto.md)
 - [HarnessToolsResponseDto](docs/HarnessToolsResponseDto.md)
 - [HealthControllerGetHealth200Response](docs/HealthControllerGetHealth200Response.md)
-- [HypothesisResponseDto](docs/HypothesisResponseDto.md)
-- [HypothesisSupportLinkDto](docs/HypothesisSupportLinkDto.md)
 - [IngestEdgeDto](docs/IngestEdgeDto.md)
 - [InquiryLinkedCaseDto](docs/InquiryLinkedCaseDto.md)
 - [InquiryListResponseDto](docs/InquiryListResponseDto.md)
@@ -354,7 +345,6 @@ All URIs are relative to *http://localhost*
 - [InstanceSettingsResponseDto](docs/InstanceSettingsResponseDto.md)
 - [LatestRunnerSummaryDto](docs/LatestRunnerSummaryDto.md)
 - [LinkInquiriesDto](docs/LinkInquiriesDto.md)
-- [LinkSupportDto](docs/LinkSupportDto.md)
 - [LinkThreadSupportDto](docs/LinkThreadSupportDto.md)
 - [ListRunnersResponseDto](docs/ListRunnersResponseDto.md)
 - [LiveQueryResponseDto](docs/LiveQueryResponseDto.md)
@@ -472,7 +462,6 @@ All URIs are relative to *http://localhost*
 - [UpdateEdgeDto](docs/UpdateEdgeDto.md)
 - [UpdateEvidenceNoteDto](docs/UpdateEvidenceNoteDto.md)
 - [UpdateFindingDto](docs/UpdateFindingDto.md)
-- [UpdateHypothesisDto](docs/UpdateHypothesisDto.md)
 - [UpdateInquiryDto](docs/UpdateInquiryDto.md)
 - [UpdateInstanceSettingsDto](docs/UpdateInstanceSettingsDto.md)
 - [UpdateMcpServerDto](docs/UpdateMcpServerDto.md)

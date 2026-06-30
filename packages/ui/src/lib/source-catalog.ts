@@ -6,6 +6,7 @@ export type SourceCatalogCategory =
   | "DATABASES"
   | "GRAPH_DATABASES"
   | "WAREHOUSE_LAKEHOUSE"
+  | "STREAMING"
   | "WEB_AND_UGC"
   | "SOCIAL_MEDIA"
   | "COLLABORATION"
@@ -47,6 +48,10 @@ export const SOURCE_CATEGORY_META: Record<
     label: "Warehouse & Lakehouse",
     description: "Analytical compute platforms and catalog-first ingestion.",
   },
+  STREAMING: {
+    label: "Streaming",
+    description: "Event streams and message brokers sampled for content.",
+  },
   WEB_AND_UGC: {
     label: "Web & UGC",
     description: "Public-facing websites and user-generated content.",
@@ -74,6 +79,7 @@ export const SOURCE_CATEGORY_ORDER: SourceCatalogCategory[] = [
   "DATABASES",
   "GRAPH_DATABASES",
   "WAREHOUSE_LAKEHOUSE",
+  "STREAMING",
   "WEB_AND_UGC",
   "SOCIAL_MEDIA",
   "COLLABORATION",
@@ -229,6 +235,41 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     icon: CreateSourceDtoTypeEnum.Youtube,
     category: "SOCIAL_MEDIA",
     keywords: ["video", "social media", "ugc", "captions", "transcript", "channel"],
+  },
+  DELTA_LAKE: {
+    description:
+      "Scan Delta Lake tables via Spark — schema, partitions, history, and row sampling.",
+    icon: CreateSourceDtoTypeEnum.DeltaLake,
+    category: "WAREHOUSE_LAKEHOUSE",
+    keywords: ["lakehouse", "delta", "spark", "parquet", "tables"],
+  },
+  ICEBERG: {
+    description:
+      "Scan Apache Iceberg tables via Spark across REST, Hive, Glue, or SQL catalogs.",
+    icon: CreateSourceDtoTypeEnum.Iceberg,
+    category: "WAREHOUSE_LAKEHOUSE",
+    keywords: ["lakehouse", "iceberg", "catalog", "snapshots", "tables"],
+  },
+  HUDI: {
+    description:
+      "Scan Apache Hudi tables via Spark — table type, partitions, and row sampling.",
+    icon: CreateSourceDtoTypeEnum.Hudi,
+    category: "WAREHOUSE_LAKEHOUSE",
+    keywords: ["lakehouse", "hudi", "spark", "upsert", "tables"],
+  },
+  SPARK_CATALOG: {
+    description:
+      "Scan tables from a Spark cluster or Spark Connect endpoint's catalog.",
+    icon: CreateSourceDtoTypeEnum.SparkCatalog,
+    category: "WAREHOUSE_LAKEHOUSE",
+    keywords: ["spark", "spark connect", "catalog", "cluster", "tables"],
+  },
+  KAFKA: {
+    description:
+      "Discover Kafka topics and sample messages for detection.",
+    icon: CreateSourceDtoTypeEnum.Kafka,
+    category: "STREAMING",
+    keywords: ["kafka", "streaming", "events", "topics", "messages", "broker"],
   },
 };
 

@@ -666,7 +666,10 @@ class BaseTabularSource(BaseSource):
             else:
                 last_row = rows[-1]
                 next_state = {
-                    "pk": [self._json_safe_value(last_row[pk_indices[j]]) for j in range(len(pk_columns))]
+                    "pk": [
+                        self._json_safe_value(last_row[pk_indices[j]])
+                        for j in range(len(pk_columns))
+                    ]
                 }
                 if any(v is None for v in next_state["pk"]):
                     # Non-serialisable PK (e.g. binary) — fall back to a restart

@@ -2003,5 +2003,348 @@
         ]
       }
     }
+  ],
+  "DELTA_LAKE": [
+    {
+      "name": "Lakehouse discovery scan",
+      "description": "Discover Delta tables under a warehouse path with automatic incremental sampling",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "13 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "DELTA_LAKE",
+        "required": {
+          "warehouse_path": "s3a://lake/warehouse"
+        },
+        "masked": {
+          "s3_access_key_id": "your-access-key",
+          "s3_secret_access_key": "your-secret-key"
+        },
+        "optional": {
+          "connection": {
+            "metastore_uri": "thrift://metastore:9083",
+            "region": "us-east-1"
+          },
+          "scope": {
+            "include_all_databases": true
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "PII and secrets detection on Delta tables",
+      "description": "Run PII and secrets detectors across selected Delta tables",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "37 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "DELTA_LAKE",
+        "required": {
+          "warehouse_path": "file:///data/warehouse"
+        },
+        "optional": {
+          "scope": {
+            "table_paths": [
+              "file:///data/warehouse/customers",
+              "file:///data/warehouse/orders"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 30
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
+  "HUDI": [
+    {
+      "name": "Hudi warehouse discovery scan",
+      "description": "Discover Hudi tables under a warehouse path",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "13 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "HUDI",
+        "required": {
+          "warehouse_path": "s3a://lake/hudi"
+        },
+        "masked": {
+          "s3_access_key_id": "your-access-key",
+          "s3_secret_access_key": "your-secret-key"
+        },
+        "optional": {
+          "connection": {
+            "metastore_uri": "thrift://metastore:9083"
+          },
+          "scope": {
+            "include_all_databases": true
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Scan specific Hudi tables for PII",
+      "description": "Run PII detection over an explicit list of Hudi table locations",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "37 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "HUDI",
+        "required": {
+          "warehouse_path": "file:///data/hudi"
+        },
+        "optional": {
+          "scope": {
+            "table_paths": [
+              "file:///data/hudi/events"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 25
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
+  "SPARK_CATALOG": [
+    {
+      "name": "Spark Connect catalog discovery",
+      "description": "Discover tables from a Spark Connect endpoint's catalog",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "13 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SPARK_CATALOG",
+        "required": {
+          "connect_url": "sc://spark-connect:15002"
+        },
+        "masked": {
+          "token": "your-token"
+        },
+        "optional": {
+          "scope": {
+            "include_all_databases": true
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Classic Spark master, scoped database",
+      "description": "Scan a single database on a classic Spark cluster with secrets detection",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "37 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "SPARK_CATALOG",
+        "required": {
+          "connect_url": "spark://spark-master:7077"
+        },
+        "optional": {
+          "scope": {
+            "catalog": "spark_catalog",
+            "database": "analytics"
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 30
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
+  "ICEBERG": [
+    {
+      "name": "Iceberg REST catalog discovery",
+      "description": "Discover Iceberg tables via a REST catalog with automatic sampling",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "13 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "ICEBERG",
+        "required": {
+          "catalog_type": "REST",
+          "catalog_uri": "https://iceberg-rest:8181",
+          "warehouse": "s3://lake/iceberg"
+        },
+        "masked": {
+          "token": "your-bearer-token"
+        },
+        "optional": {
+          "scope": {
+            "include_all_namespaces": true
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Glue catalog PII scan",
+      "description": "Scan Iceberg tables registered in AWS Glue for PII",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "37 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "ICEBERG",
+        "required": {
+          "catalog_type": "GLUE",
+          "warehouse": "s3://lake/iceberg"
+        },
+        "masked": {
+          "aws_access_key_id": "your-access-key",
+          "aws_secret_access_key": "your-secret-key"
+        },
+        "optional": {
+          "scope": {
+            "namespace": "analytics"
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 30
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
+  "KAFKA": [
+    {
+      "name": "Topic discovery scan",
+      "description": "Discover Kafka topics and sample recent messages",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "13 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "KAFKA",
+        "required": {
+          "bootstrap_servers": "broker1:9092,broker2:9092"
+        },
+        "optional": {
+          "connection": {
+            "security_protocol": "PLAINTEXT"
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "SASL_SSL secrets detection",
+      "description": "Sample messages from selected topics over SASL_SSL and run secrets detection",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "37 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "KAFKA",
+        "required": {
+          "bootstrap_servers": "broker:9093"
+        },
+        "masked": {
+          "sasl_username": "your-username",
+          "sasl_password": "your-password"
+        },
+        "optional": {
+          "connection": {
+            "security_protocol": "SASL_SSL",
+            "sasl_mechanism": "SCRAM-SHA-256"
+          },
+          "scope": {
+            "include_topics": [
+              "payments",
+              "users"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 100
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          },
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    }
   ]
 }
