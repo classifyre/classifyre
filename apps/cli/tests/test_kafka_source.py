@@ -93,10 +93,7 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
 
 
 def _messages(count: int) -> list[_FakeMessage]:
-    return [
-        _FakeMessage(0, i, f"k{i}".encode(), f"value-{i}".encode())
-        for i in range(count)
-    ]
+    return [_FakeMessage(0, i, f"k{i}".encode(), f"value-{i}".encode()) for i in range(count)]
 
 
 @pytest.fixture

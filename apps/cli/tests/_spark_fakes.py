@@ -90,21 +90,29 @@ class FakeSparkSession:
         if "LIMIT 0" in upper:
             return FakeDataFrame(self.fields, [])
         if upper.startswith("DESCRIBE DETAIL"):
-            cols = [("numFiles", "long"), ("partitionColumns", "array"),
-                    ("minReaderVersion", "int")]
+            cols = [
+                ("numFiles", "long"),
+                ("partitionColumns", "array"),
+                ("minReaderVersion", "int"),
+            ]
             row = (
-                self.detail.get("numFiles"),
-                self.detail.get("partitionColumns"),
-                self.detail.get("minReaderVersion"),
-            ) if self.detail else (None, None, None)
+                (
+                    self.detail.get("numFiles"),
+                    self.detail.get("partitionColumns"),
+                    self.detail.get("minReaderVersion"),
+                )
+                if self.detail
+                else (None, None, None)
+            )
             return FakeDataFrame(cols, [row])
         if "DESCRIBE HISTORY" in upper:
             return FakeDataFrame([("count", "long")], [(self.history_count,)])
         if upper.startswith("SHOW TBLPROPERTIES"):
             return FakeDataFrame([("key", "string"), ("value", "string")], self.tblproperties)
         if upper.startswith("DESCRIBE TABLE EXTENDED"):
-            return FakeDataFrame([("col_name", "string"), ("data_type", "string")],
-                                 self.provider_rows)
+            return FakeDataFrame(
+                [("col_name", "string"), ("data_type", "string")], self.provider_rows
+            )
         if upper.startswith("SELECT"):
             return FakeDataFrame(self.fields, _slice_limit_offset(query, self.rows))
         return FakeDataFrame([], [])

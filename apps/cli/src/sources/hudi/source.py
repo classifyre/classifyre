@@ -50,12 +50,8 @@ class HudiSource(BaseSparkSource):
     def _extra_spark_conf(self) -> dict[str, str]:
         conf: dict[str, str] = {
             "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
-            "spark.sql.extensions": (
-                "org.apache.spark.sql.hudi.HoodieSparkSessionExtension"
-            ),
-            "spark.sql.catalog.spark_catalog": (
-                "org.apache.spark.sql.hudi.catalog.HoodieCatalog"
-            ),
+            "spark.sql.extensions": ("org.apache.spark.sql.hudi.HoodieSparkSessionExtension"),
+            "spark.sql.catalog.spark_catalog": ("org.apache.spark.sql.hudi.catalog.HoodieCatalog"),
         }
         conf.update(_storage_conf(self.config))
         return conf
@@ -70,7 +66,7 @@ class HudiSource(BaseSparkSource):
             getattr(scope, "database", None) or getattr(scope, "include_all_databases", False)
         ):
             tables.extend(super()._iter_tables())
-        for path in (getattr(scope, "table_paths", None) or []):
+        for path in getattr(scope, "table_paths", None) or []:
             tables.append(TableRef(database="hudi", schema=None, table=path, object_type="PATH"))
         return tables
 

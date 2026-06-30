@@ -279,8 +279,9 @@ class KafkaSource(BaseSource):
             consumer.close()
         return out
 
-    def _format_messages(self, topic: str, messages: list[dict[str, Any]],
-                         offset: int = 0) -> tuple[str, str]:
+    def _format_messages(
+        self, topic: str, messages: list[dict[str, Any]], offset: int = 0
+    ) -> tuple[str, str]:
         import json
 
         lines = [f"topic={topic}", f"sampled_messages={len(messages)}", ""]
@@ -294,7 +295,9 @@ class KafkaSource(BaseSource):
             for cont in value_lines[1:]:
                 lines.append(f"    {cont}")
             lines.append("")
-        raw = json.dumps({"topic": topic, "messages": messages, "offset": offset}, ensure_ascii=False)
+        raw = json.dumps(
+            {"topic": topic, "messages": messages, "offset": offset}, ensure_ascii=False
+        )
         return raw, "\n".join(lines).rstrip()
 
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
@@ -329,9 +332,7 @@ class KafkaSource(BaseSource):
         try:
             topics = self._list_topics()
             result["status"] = "SUCCESS"
-            result["message"] = (
-                f"Successfully connected to Kafka. Reachable topics: {len(topics)}."
-            )
+            result["message"] = f"Successfully connected to Kafka. Reachable topics: {len(topics)}."
         except Exception as exc:
             result["status"] = "FAILURE"
             result["message"] = f"Failed to connect to Kafka: {exc}"

@@ -245,7 +245,7 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
   },
   ICEBERG: {
     description:
-      "Scan Apache Iceberg tables via PyIceberg across REST, Hive, Glue, or SQL catalogs.",
+      "Scan Apache Iceberg tables via Spark across REST, Hive, Glue, or SQL catalogs.",
     icon: CreateSourceDtoTypeEnum.Iceberg,
     category: "WAREHOUSE_LAKEHOUSE",
     keywords: ["lakehouse", "iceberg", "catalog", "snapshots", "tables"],
