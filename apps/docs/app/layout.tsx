@@ -310,7 +310,7 @@ export default async function RootLayout({
             navbar={navbar}
             footer={footer}
             pageMap={pageMap}
-            docsRepositoryBase="https://github.com/classifyre-com/classifyre/tree/develop/apps/docs"
+            docsRepositoryBase="https://github.com/classifyre/classifyre/tree/develop/apps/docs"
             sidebar={{
               defaultMenuCollapseLevel: 2,
               defaultOpen: true,
