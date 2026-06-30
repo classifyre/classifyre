@@ -93,6 +93,16 @@ export class ProcessManager {
     return path.join(__dirname, '../../../cli/.venv');
   }
 
+  // Bundled Amazon Corretto JRE used by the Spark-backed lakehouse sources
+  // (pyspark). Staged into resources/jre by build-desktop.sh; normalized so
+  // that <jre>/bin/java exists on every platform.
+  private getJreHome(): string {
+    if (app.isPackaged) {
+      return path.join(process.resourcesPath, 'jre');
+    }
+    return path.join(__dirname, '../../../cli/.jre-desktop');
+  }
+
   private getPrismaDir(): string {
     if (app.isPackaged) {
       return path.join(process.resourcesPath, 'prisma');
@@ -113,9 +123,22 @@ export class ProcessManager {
     const cliPath = this.getCliPath();
     const venvPath = this.getVenvPath();
 
+    // Expose the bundled JRE to the CLI subprocess the API spawns (it inherits
+    // this env via `{ ...process.env }`), so pyspark's lakehouse sources find Java.
+    const baseEnv = getShellEnv();
+    const jreHome = this.getJreHome();
+    const jreBin = path.join(jreHome, 'bin');
+    const javaEnv = fs.existsSync(jreBin)
+      ? {
+          JAVA_HOME: jreHome,
+          PATH: `${jreBin}${path.delimiter}${baseEnv.PATH ?? ''}`,
+        }
+      : {};
+
     const child = spawn('node', [entryPath], {
       env: {
-        ...getShellEnv(),
+        ...baseEnv,
+        ...javaEnv,
         PORT: String(port),
         DATABASE_URL: databaseUrl,
         ENVIRONMENT: 'desktop',

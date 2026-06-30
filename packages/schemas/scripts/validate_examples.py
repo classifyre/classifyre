@@ -32,6 +32,11 @@ TYPE_TO_DEFINITION = {
     "NOTION": "NotionInput",
     "EMAIL": "EmailInput",
     "YOUTUBE": "YouTubeInput",
+    "DELTA_LAKE": "DeltaLakeInput",
+    "ICEBERG": "IcebergInput",
+    "HUDI": "HudiInput",
+    "SPARK_CATALOG": "SparkCatalogInput",
+    "KAFKA": "KafkaInput",
 }
 
 SCHEMAS_DIR = Path(__file__).parent.parent / "src" / "schemas"
