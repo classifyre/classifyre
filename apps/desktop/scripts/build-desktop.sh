@@ -52,32 +52,32 @@ cp "$MONOREPO_ROOT/apps/cli/uv.lock" "$RESOURCES/cli/uv.lock"
 cp -r "$MONOREPO_ROOT/apps/cli/.venv-desktop" "$RESOURCES/venv"
 
 # Bundle Amazon Corretto JDK for the Spark-backed lakehouse sources (pyspark).
-# Downloaded for the current host OS/arch; normalized so resources/jre/bin/java
-# exists on every platform. Java 21 is the latest LTS certified for Spark 4.x.
+# Java 21 is the latest LTS certified for Spark 4.x.
+# Windows desktop is x64-only (Corretto has no ARM64 Windows JDK).
 JAVA_VERSION="${JAVA_VERSION:-21}"
-case "$(uname -m)" in
-  x86_64|amd64) JARCH=x64 ;;
-  arm64|aarch64) JARCH=aarch64 ;;
-  *) echo "Unsupported arch $(uname -m) for JRE bundling" && exit 1 ;;
-esac
 case "$(uname -s)" in
-  Darwin) JOS=macos ;;
-  Linux) JOS=linux ;;
-  *) echo "Unsupported OS $(uname -s) for JRE bundling (build Windows separately)" && exit 1 ;;
+  Darwin)               JOS=macos   ; JARCH="$(uname -m | sed 's/x86_64/x64/')" ; JEXT=tar.gz ;;
+  Linux)                JOS=linux   ; JARCH="$(uname -m | sed 's/x86_64/x64/')" ; JEXT=tar.gz ;;
+  MINGW*|MSYS*|CYGWIN*) JOS=windows ; JARCH=x64                                 ; JEXT=zip    ;;
+  *) echo "Unsupported OS $(uname -s)" && exit 1 ;;
 esac
 JRE_TMP="$(mktemp -d)"
-JRE_URL="https://corretto.aws/downloads/latest/amazon-corretto-${JAVA_VERSION}-${JARCH}-${JOS}-jdk.tar.gz"
+JRE_URL="https://corretto.aws/downloads/latest/amazon-corretto-${JAVA_VERSION}-${JARCH}-${JOS}-jdk.${JEXT}"
 echo "Downloading Corretto: $JRE_URL"
-curl -fsSL "$JRE_URL" -o "$JRE_TMP/corretto.tar.gz"
-tar -xzf "$JRE_TMP/corretto.tar.gz" -C "$JRE_TMP"
-if [ "$JOS" = "macos" ]; then
-  JHOME="$(find "$JRE_TMP" -maxdepth 4 -type d -path '*/Contents/Home' | head -1)"
-else
-  JHOME="$(find "$JRE_TMP" -mindepth 1 -maxdepth 1 -type d -name 'amazon-corretto-*' | head -1)"
-fi
+curl -fsSL "$JRE_URL" -o "$JRE_TMP/corretto.${JEXT}"
+case "$JEXT" in
+  tar.gz) tar -xzf "$JRE_TMP/corretto.tar.gz" -C "$JRE_TMP" ;;
+  zip)    unzip -q  "$JRE_TMP/corretto.zip"    -d "$JRE_TMP" ;;
+esac
+case "$JOS" in
+  macos)   JHOME="$(find "$JRE_TMP" -maxdepth 4 -type d -path '*/Contents/Home' | head -1)" ;;
+  linux)   JHOME="$(find "$JRE_TMP" -mindepth 1 -maxdepth 1 -type d -name 'amazon-corretto-*' | head -1)" ;;
+  windows) JHOME="$(find "$JRE_TMP" -mindepth 1 -maxdepth 2 -type d -name 'jdk*' | head -1)" ;;
+esac
 [ -n "$JHOME" ] || { echo "Could not locate extracted Corretto home" && exit 1; }
 cp -R "$JHOME"/. "$RESOURCES/jre/"
-"$RESOURCES/jre/bin/java" -version
+JAVA_BIN="$RESOURCES/jre/bin/java$( [ "$JOS" = "windows" ] && echo .exe )"
+"$JAVA_BIN" -version
 rm -rf "$JRE_TMP"
 
 echo "=== Step 5: Package Electron ==="
