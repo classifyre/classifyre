@@ -31,6 +31,12 @@ export interface FinalizeIngestRunDto {
      * @memberof FinalizeIngestRunDto
      */
     seenHashes: Array<string>;
+    /**
+     * Opaque, source-defined AUTOMATIC sampling cursor to persist on the source for the next run. Omitted for non-AUTOMATIC strategies so the stored cursor is left unchanged.
+     * @type {{ [key: string]: any; }}
+     * @memberof FinalizeIngestRunDto
+     */
+    samplingCursor?: { [key: string]: any; };
 }
 
 /**
@@ -54,6 +60,7 @@ export function FinalizeIngestRunDtoFromJSONTyped(json: any, ignoreDiscriminator
         
         'runnerId': json['runnerId'],
         'seenHashes': json['seenHashes'],
+        'samplingCursor': json['samplingCursor'] == null ? undefined : json['samplingCursor'],
     };
 }
 
@@ -70,6 +77,7 @@ export function FinalizeIngestRunDtoToJSONTyped(value?: FinalizeIngestRunDto | n
         
         'runnerId': value['runnerId'],
         'seenHashes': value['seenHashes'],
+        'samplingCursor': value['samplingCursor'],
     };
 }
 

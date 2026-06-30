@@ -104,6 +104,11 @@ export const SearchRunnersFiltersInputDtoSourceTypeEnum = {
     Tableau: 'TABLEAU',
     Email: 'EMAIL',
     Youtube: 'YOUTUBE',
+    DeltaLake: 'DELTA_LAKE',
+    Iceberg: 'ICEBERG',
+    Hudi: 'HUDI',
+    SparkCatalog: 'SPARK_CATALOG',
+    Kafka: 'KAFKA',
     Custom: 'CUSTOM'
 } as const;
 export type SearchRunnersFiltersInputDtoSourceTypeEnum = typeof SearchRunnersFiltersInputDtoSourceTypeEnum[keyof typeof SearchRunnersFiltersInputDtoSourceTypeEnum];
@@ -127,7 +132,8 @@ export const SearchRunnersFiltersInputDtoTriggerTypeEnum = {
     Manual: 'MANUAL',
     Scheduled: 'SCHEDULED',
     Webhook: 'WEBHOOK',
-    Api: 'API'
+    Api: 'API',
+    Autopilot: 'AUTOPILOT'
 } as const;
 export type SearchRunnersFiltersInputDtoTriggerTypeEnum = typeof SearchRunnersFiltersInputDtoTriggerTypeEnum[keyof typeof SearchRunnersFiltersInputDtoTriggerTypeEnum];
 

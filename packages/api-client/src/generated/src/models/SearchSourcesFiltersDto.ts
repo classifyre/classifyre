@@ -74,6 +74,11 @@ export const SearchSourcesFiltersDtoTypeEnum = {
     Tableau: 'TABLEAU',
     Email: 'EMAIL',
     Youtube: 'YOUTUBE',
+    DeltaLake: 'DELTA_LAKE',
+    Iceberg: 'ICEBERG',
+    Hudi: 'HUDI',
+    SparkCatalog: 'SPARK_CATALOG',
+    Kafka: 'KAFKA',
     Custom: 'CUSTOM'
 } as const;
 export type SearchSourcesFiltersDtoTypeEnum = typeof SearchSourcesFiltersDtoTypeEnum[keyof typeof SearchSourcesFiltersDtoTypeEnum];

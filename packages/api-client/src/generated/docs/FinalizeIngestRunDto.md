@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `runnerId` | string
 `seenHashes` | Array&lt;string&gt;
+`samplingCursor` | { [key: string]: any; }
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { FinalizeIngestRunDto } from '@workspace/api-client'
 const example = {
   "runnerId": runner-123-abc,
   "seenHashes": ["hash-1","hash-2"],
+  "samplingCursor": null,
 } satisfies FinalizeIngestRunDto
 
 console.log(example)

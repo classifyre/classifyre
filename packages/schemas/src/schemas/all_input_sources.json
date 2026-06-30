@@ -71,6 +71,21 @@
     },
     {
       "$ref": "#/definitions/YouTubeInput"
+    },
+    {
+      "$ref": "#/definitions/DeltaLakeInput"
+    },
+    {
+      "$ref": "#/definitions/IcebergInput"
+    },
+    {
+      "$ref": "#/definitions/HudiInput"
+    },
+    {
+      "$ref": "#/definitions/SparkCatalogInput"
+    },
+    {
+      "$ref": "#/definitions/KafkaInput"
     }
   ],
   "x-asset-metadata": {
@@ -100,7 +115,7 @@
       },
       "image": {
         "type": "object",
-        "description": "Image dimensions (png, jpg, gif, webp, \u2026)",
+        "description": "Image dimensions (png, jpg, gif, webp, …)",
         "properties": {
           "image_width": {
             "type": "integer",
@@ -1435,6 +1450,141 @@
             "title"
           ]
         }
+      },
+      "DELTA_LAKE": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "format_version": {
+              "type": "integer",
+              "description": "Delta protocol/reader version"
+            },
+            "num_files": {
+              "type": "integer",
+              "description": "Number of data files"
+            },
+            "partition_columns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Partition column names"
+            },
+            "history_length": {
+              "type": "integer",
+              "description": "Number of commits in the table history"
+            }
+          }
+        }
+      },
+      "HUDI": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "table_type": {
+              "type": "string",
+              "description": "Hudi table type (COPY_ON_WRITE/MERGE_ON_READ)"
+            },
+            "partition_columns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Partition column names"
+            },
+            "latest_commit": {
+              "type": "string",
+              "description": "Latest commit/instant time on the timeline"
+            },
+            "num_files": {
+              "type": "integer",
+              "description": "Number of base files"
+            }
+          }
+        }
+      },
+      "SPARK_CATALOG": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "catalog": {
+              "type": "string",
+              "description": "Spark catalog name"
+            },
+            "provider": {
+              "type": "string",
+              "description": "Table provider/format (e.g. parquet, delta, iceberg)"
+            }
+          }
+        }
+      },
+      "ICEBERG": {
+        "table": {
+          "use": [
+            "tabularTable"
+          ],
+          "properties": {
+            "format_version": {
+              "type": "integer",
+              "description": "Iceberg format version"
+            },
+            "snapshot_id": {
+              "type": "string",
+              "description": "Current snapshot id"
+            },
+            "partition_spec": {
+              "type": "string",
+              "description": "Partition spec summary"
+            },
+            "sort_order": {
+              "type": "string",
+              "description": "Sort order summary"
+            },
+            "num_files": {
+              "type": "integer",
+              "description": "Number of data files in the current snapshot"
+            }
+          }
+        }
+      },
+      "KAFKA": {
+        "topic": {
+          "properties": {
+            "partition_count": {
+              "type": "integer",
+              "description": "Number of partitions"
+            },
+            "replication_factor": {
+              "type": "integer",
+              "description": "Replication factor"
+            },
+            "earliest_offset": {
+              "type": "integer",
+              "description": "Sum of earliest offsets across partitions"
+            },
+            "latest_offset": {
+              "type": "integer",
+              "description": "Sum of latest offsets across partitions"
+            },
+            "retention_ms": {
+              "type": "integer",
+              "description": "Topic retention in milliseconds"
+            },
+            "cleanup_policy": {
+              "type": "string",
+              "description": "Topic cleanup policy (delete/compact)"
+            }
+          },
+          "required": [
+            "partition_count"
+          ]
+        }
       }
     }
   },
@@ -1464,7 +1614,12 @@
         "SQLITE",
         "NOTION",
         "EMAIL",
-        "YOUTUBE"
+        "YOUTUBE",
+        "DELTA_LAKE",
+        "ICEBERG",
+        "HUDI",
+        "SPARK_CATALOG",
+        "KAFKA"
       ],
       "description": "Type of the asset or source"
     },
@@ -6238,6 +6393,747 @@
           "required": [
             "required",
             "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "IcebergCatalogType": {
+      "title": "IcebergCatalogType",
+      "type": "string",
+      "enum": [
+        "REST",
+        "HIVE",
+        "GLUE",
+        "SQL"
+      ],
+      "description": "PyIceberg catalog backend type"
+    },
+    "KafkaSecurityProtocol": {
+      "title": "KafkaSecurityProtocol",
+      "type": "string",
+      "enum": [
+        "PLAINTEXT",
+        "SSL",
+        "SASL_PLAINTEXT",
+        "SASL_SSL"
+      ],
+      "default": "PLAINTEXT",
+      "description": "Kafka client security protocol"
+    },
+    "KafkaSaslMechanism": {
+      "title": "KafkaSaslMechanism",
+      "type": "string",
+      "enum": [
+        "PLAIN",
+        "SCRAM-SHA-256",
+        "SCRAM-SHA-512"
+      ],
+      "default": "PLAIN",
+      "description": "SASL mechanism used when security_protocol is SASL_*"
+    },
+    "DeltaLakeRequired": {
+      "title": "DeltaLakeRequired",
+      "type": "object",
+      "properties": {
+        "warehouse_path": {
+          "type": "string",
+          "description": "Root storage location holding Delta tables (e.g. s3a://lake/warehouse, file:///data)",
+          "default": "file:///tmp/delta"
+        }
+      },
+      "required": [
+        "warehouse_path"
+      ],
+      "additionalProperties": false
+    },
+    "DeltaLakeMasked": {
+      "title": "DeltaLakeMasked",
+      "type": "object",
+      "description": "Optional object-store credentials for the warehouse location.",
+      "properties": {
+        "s3_access_key_id": {
+          "type": "string",
+          "description": "S3 access key id for object-store warehouses"
+        },
+        "s3_secret_access_key": {
+          "type": "string",
+          "description": "S3 secret access key"
+        },
+        "s3_session_token": {
+          "type": "string",
+          "description": "Optional S3 session token"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DeltaLakeOptionalConnection": {
+      "title": "DeltaLakeOptionalConnection",
+      "type": "object",
+      "description": "Delta Lake connection and storage options.",
+      "properties": {
+        "metastore_uri": {
+          "type": "string",
+          "description": "Hive Metastore thrift URI; enables catalog-based table discovery"
+        },
+        "endpoint_url": {
+          "type": "string",
+          "description": "Custom S3-compatible endpoint URL"
+        },
+        "region": {
+          "type": "string",
+          "description": "Object-store region"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DeltaLakeOptionalScope": {
+      "title": "DeltaLakeOptionalScope",
+      "type": "object",
+      "description": "Delta Lake database and table selection scope.",
+      "properties": {
+        "database": {
+          "type": "string",
+          "description": "Single database/namespace to scan (catalog mode)"
+        },
+        "include_all_databases": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scan all visible databases except excluded system databases"
+        },
+        "exclude_databases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Database denylist (exact names)",
+          "default": [
+            "information_schema",
+            "sys"
+          ]
+        },
+        "include_tables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional table allowlist. Accepted forms: table or database.table"
+        },
+        "table_limit": {
+          "type": "integer",
+          "description": "Optional cap on number of table assets per database",
+          "minimum": 1
+        },
+        "table_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Explicit Delta table locations to scan when no metastore is configured"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DeltaLakeOptional": {
+      "title": "DeltaLakeOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/DeltaLakeOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/DeltaLakeOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DeltaLakeInput": {
+      "title": "DeltaLakeInput",
+      "label": "Delta Lake",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "DELTA_LAKE"
+            },
+            "required": {
+              "$ref": "#/definitions/DeltaLakeRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/DeltaLakeMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/DeltaLakeOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "HudiRequired": {
+      "title": "HudiRequired",
+      "type": "object",
+      "properties": {
+        "warehouse_path": {
+          "type": "string",
+          "description": "Root storage location holding Hudi tables",
+          "default": "file:///tmp/hudi"
+        }
+      },
+      "required": [
+        "warehouse_path"
+      ],
+      "additionalProperties": false
+    },
+    "HudiMasked": {
+      "title": "HudiMasked",
+      "type": "object",
+      "description": "Optional object-store credentials for the warehouse location.",
+      "properties": {
+        "s3_access_key_id": {
+          "type": "string",
+          "description": "S3 access key id for object-store warehouses"
+        },
+        "s3_secret_access_key": {
+          "type": "string",
+          "description": "S3 secret access key"
+        },
+        "s3_session_token": {
+          "type": "string",
+          "description": "Optional S3 session token"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HudiOptionalConnection": {
+      "title": "HudiOptionalConnection",
+      "type": "object",
+      "description": "Hudi connection and storage options.",
+      "properties": {
+        "metastore_uri": {
+          "type": "string",
+          "description": "Hive Metastore thrift URI; enables catalog-based table discovery"
+        },
+        "endpoint_url": {
+          "type": "string",
+          "description": "Custom S3-compatible endpoint URL"
+        },
+        "region": {
+          "type": "string",
+          "description": "Object-store region"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HudiOptionalScope": {
+      "title": "HudiOptionalScope",
+      "type": "object",
+      "description": "Hudi database and table selection scope.",
+      "properties": {
+        "database": {
+          "type": "string",
+          "description": "Single database/namespace to scan (catalog mode)"
+        },
+        "include_all_databases": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scan all visible databases except excluded system databases"
+        },
+        "exclude_databases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Database denylist (exact names)",
+          "default": [
+            "information_schema",
+            "sys"
+          ]
+        },
+        "include_tables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional table allowlist. Accepted forms: table or database.table"
+        },
+        "table_limit": {
+          "type": "integer",
+          "description": "Optional cap on number of table assets per database",
+          "minimum": 1
+        },
+        "table_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Explicit Hudi table locations to scan when no metastore is configured"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HudiOptional": {
+      "title": "HudiOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/HudiOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/HudiOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HudiInput": {
+      "title": "HudiInput",
+      "label": "Apache Hudi",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "HUDI"
+            },
+            "required": {
+              "$ref": "#/definitions/HudiRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/HudiMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/HudiOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SparkCatalogRequired": {
+      "title": "SparkCatalogRequired",
+      "type": "object",
+      "properties": {
+        "connect_url": {
+          "type": "string",
+          "description": "Spark Connect endpoint (sc://host:15002) or classic master (spark://host:7077)",
+          "default": "sc://localhost:15002"
+        }
+      },
+      "required": [
+        "connect_url"
+      ],
+      "additionalProperties": false
+    },
+    "SparkCatalogMasked": {
+      "title": "SparkCatalogMasked",
+      "type": "object",
+      "description": "Optional Spark Connect authentication.",
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "Bearer token for Spark Connect authentication"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SparkCatalogOptionalScope": {
+      "title": "SparkCatalogOptionalScope",
+      "type": "object",
+      "description": "Spark catalog and table selection scope.",
+      "properties": {
+        "catalog": {
+          "type": "string",
+          "description": "Spark catalog name to scan (defaults to the session catalog)"
+        },
+        "database": {
+          "type": "string",
+          "description": "Single database/namespace to scan"
+        },
+        "include_all_databases": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scan all visible databases except excluded system databases"
+        },
+        "exclude_databases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Database denylist (exact names)",
+          "default": [
+            "information_schema",
+            "sys"
+          ]
+        },
+        "include_tables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional table allowlist. Accepted forms: table or database.table"
+        },
+        "table_limit": {
+          "type": "integer",
+          "description": "Optional cap on number of table assets per database",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "SparkCatalogOptional": {
+      "title": "SparkCatalogOptional",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/definitions/SparkCatalogOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SparkCatalogInput": {
+      "title": "SparkCatalogInput",
+      "label": "Spark Catalog",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "SPARK_CATALOG"
+            },
+            "required": {
+              "$ref": "#/definitions/SparkCatalogRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/SparkCatalogMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/SparkCatalogOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "IcebergRequired": {
+      "title": "IcebergRequired",
+      "type": "object",
+      "properties": {
+        "catalog_type": {
+          "$ref": "#/definitions/IcebergCatalogType"
+        },
+        "catalog_uri": {
+          "type": "string",
+          "description": "Catalog URI (REST endpoint, Hive metastore thrift URI, or SQL DSN). Not required for GLUE."
+        },
+        "warehouse": {
+          "type": "string",
+          "description": "Warehouse location root (e.g. s3://bucket/warehouse)"
+        }
+      },
+      "required": [
+        "catalog_type",
+        "warehouse"
+      ],
+      "additionalProperties": false
+    },
+    "IcebergMasked": {
+      "title": "IcebergMasked",
+      "type": "object",
+      "description": "Optional Iceberg catalog/storage credentials.",
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "Bearer token for a REST catalog"
+        },
+        "aws_access_key_id": {
+          "type": "string",
+          "description": "AWS access key id (Glue/S3)"
+        },
+        "aws_secret_access_key": {
+          "type": "string",
+          "description": "AWS secret access key (Glue/S3)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "IcebergOptionalScope": {
+      "title": "IcebergOptionalScope",
+      "type": "object",
+      "description": "Iceberg namespace and table selection scope.",
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "description": "Single namespace to scan (dotted form supported)"
+        },
+        "include_all_namespaces": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scan all visible namespaces"
+        },
+        "include_tables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional table allowlist. Accepted forms: table or namespace.table"
+        },
+        "table_limit": {
+          "type": "integer",
+          "description": "Optional cap on number of table assets per namespace",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "IcebergOptional": {
+      "title": "IcebergOptional",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/definitions/IcebergOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "IcebergInput": {
+      "title": "IcebergInput",
+      "label": "Apache Iceberg",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "ICEBERG"
+            },
+            "required": {
+              "$ref": "#/definitions/IcebergRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/IcebergMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/IcebergOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "KafkaRequired": {
+      "title": "KafkaRequired",
+      "type": "object",
+      "properties": {
+        "bootstrap_servers": {
+          "type": "string",
+          "description": "Comma-separated Kafka bootstrap servers (host:port)",
+          "default": "localhost:9092"
+        }
+      },
+      "required": [
+        "bootstrap_servers"
+      ],
+      "additionalProperties": false
+    },
+    "KafkaMasked": {
+      "title": "KafkaMasked",
+      "type": "object",
+      "description": "Optional SASL credentials.",
+      "properties": {
+        "sasl_username": {
+          "type": "string",
+          "description": "SASL username"
+        },
+        "sasl_password": {
+          "type": "string",
+          "description": "SASL password"
+        }
+      },
+      "additionalProperties": false
+    },
+    "KafkaOptionalConnection": {
+      "title": "KafkaOptionalConnection",
+      "type": "object",
+      "description": "Kafka client connection and security options.",
+      "properties": {
+        "security_protocol": {
+          "$ref": "#/definitions/KafkaSecurityProtocol"
+        },
+        "sasl_mechanism": {
+          "$ref": "#/definitions/KafkaSaslMechanism"
+        },
+        "ssl_ca": {
+          "type": "string",
+          "description": "PEM-encoded CA certificate for TLS verification"
+        },
+        "request_timeout_ms": {
+          "type": "integer",
+          "description": "Client request timeout in milliseconds",
+          "minimum": 1000,
+          "default": 30000
+        }
+      },
+      "additionalProperties": false
+    },
+    "KafkaOptionalScope": {
+      "title": "KafkaOptionalScope",
+      "type": "object",
+      "description": "Kafka topic selection scope.",
+      "properties": {
+        "include_topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional topic allowlist"
+        },
+        "exclude_topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Topic denylist"
+        },
+        "include_internal": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include internal topics (names starting with __)"
+        },
+        "topic_limit": {
+          "type": "integer",
+          "description": "Optional cap on number of topic assets",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "KafkaOptional": {
+      "title": "KafkaOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/KafkaOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/KafkaOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "KafkaInput": {
+      "title": "KafkaInput",
+      "label": "Apache Kafka",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "KAFKA"
+            },
+            "required": {
+              "$ref": "#/definitions/KafkaRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/KafkaMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/KafkaOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
             "sampling"
           ],
           "additionalProperties": false

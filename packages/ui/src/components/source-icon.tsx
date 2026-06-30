@@ -1,6 +1,8 @@
 import * as React from "react";
 import {
   siApachehive,
+  siApachekafka,
+  siApachespark,
   siBitbucket,
   siConfluence,
   siDatabricks,
@@ -29,6 +31,7 @@ import {
   Cloud,
   Database,
   Folder,
+  Layers,
   Mail,
   Monitor,
   Settings,
@@ -126,6 +129,11 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.Notion]: siNotion,
   [CreateSourceDtoTypeEnum.Email]: null,
   [CreateSourceDtoTypeEnum.Youtube]: siYoutube,
+  [CreateSourceDtoTypeEnum.DeltaLake]: null,
+  [CreateSourceDtoTypeEnum.Iceberg]: null,
+  [CreateSourceDtoTypeEnum.Hudi]: null,
+  [CreateSourceDtoTypeEnum.SparkCatalog]: siApachespark,
+  [CreateSourceDtoTypeEnum.Kafka]: siApachekafka,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -168,6 +176,11 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Notion]: createSimpleIconComponent(siNotion),
   [CreateSourceDtoTypeEnum.Email]: Mail,
   [CreateSourceDtoTypeEnum.Youtube]: createSimpleIconComponent(siYoutube),
+  [CreateSourceDtoTypeEnum.DeltaLake]: Layers,
+  [CreateSourceDtoTypeEnum.Iceberg]: Layers,
+  [CreateSourceDtoTypeEnum.Hudi]: Layers,
+  [CreateSourceDtoTypeEnum.SparkCatalog]: createSimpleIconComponent(siApachespark),
+  [CreateSourceDtoTypeEnum.Kafka]: createSimpleIconComponent(siApachekafka),
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =

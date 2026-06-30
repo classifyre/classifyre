@@ -8,7 +8,6 @@ Name | Type
 ------------ | -------------
 `entityType` | string
 `entityId` | string
-`hypothesisIds` | Array&lt;string&gt;
 `note` | string
 `addedBy` | string
 
@@ -21,7 +20,6 @@ import type { AddEvidenceDto } from '@workspace/api-client'
 const example = {
   "entityType": null,
   "entityId": null,
-  "hypothesisIds": null,
   "note": null,
   "addedBy": null,
 } satisfies AddEvidenceDto
