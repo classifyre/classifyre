@@ -144,7 +144,7 @@ const navbar = (
                 className="rounded-[4px] border-2 border-transparent hover:border-border"
             >
                 <a
-                    href="https://github.com/classifyre-com/classifyre"
+                    href="https://github.com/classifyre/classifyre"
                     target="_blank"
                     rel="noreferrer"
                     aria-label="Classifyre on GitHub"
@@ -211,7 +211,7 @@ const footer = (
                             <span>02</span>
                         </a>
                         <a
-                            href="https://github.com/classifyre-com/classifyre"
+                            href="https://github.com/classifyre/classifyre"
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center justify-between rounded-sm border border-white/20 bg-transparent px-3 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-white shadow-xs transition-all hover:bg-accent/10 hover:text-white"
@@ -311,7 +311,7 @@ export default async function RootLayout({
                 navbar={navbar}
                 footer={footer}
                 pageMap={pageMap}
-                docsRepositoryBase="https://github.com/classifyre-com/classifyre/tree/main/apps/blog"
+                docsRepositoryBase="https://github.com/classifyre/classifyre/tree/main/apps/blog"
                 sidebar={{
                     defaultMenuCollapseLevel: 2,
                     defaultOpen: true,
