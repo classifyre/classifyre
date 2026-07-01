@@ -2251,6 +2251,8 @@ export const JsonSchemaForm = React.forwardRef<
     HUDI: true,
     SPARK_CATALOG: true,
     KAFKA: false,
+    ELASTICSEARCH: false,
+    OPENSEARCH: false,
   };
   const isTabular =
     assistantSourceType && isIngestionSourceType(assistantSourceType)
