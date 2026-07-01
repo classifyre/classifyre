@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -141,38 +142,6 @@ async def test_kafka_fetch_content_samples_messages(_patch_kafka: _FakeKafkaModu
     assert "value-0" in text
 
 
-def _self_signed_cert_and_key() -> tuple[str, str]:
-    import datetime
-
-    from cryptography import x509
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import rsa
-    from cryptography.x509.oid import NameOID
-
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    subject = issuer = x509.Name(
-        [x509.NameAttribute(NameOID.COMMON_NAME, "kafka-test-client")]
-    )
-    now = datetime.datetime.now(datetime.UTC)
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(issuer)
-        .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(now)
-        .not_valid_after(now + datetime.timedelta(days=1))
-        .sign(key, hashes.SHA256())
-    )
-    cert_pem = cert.public_bytes(serialization.Encoding.PEM).decode()
-    key_pem = key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    ).decode()
-    return cert_pem, key_pem
-
-
 def test_kafka_sasl_credentials_wire_into_client_kwargs(
     _patch_kafka: _FakeKafkaModule,
 ) -> None:
@@ -193,16 +162,31 @@ def test_kafka_sasl_credentials_wire_into_client_kwargs(
     assert "ssl_context" not in kwargs
 
 
-def test_kafka_client_cert_auth_builds_ssl_context(_patch_kafka: _FakeKafkaModule) -> None:
-    cert_pem, key_pem = _self_signed_cert_and_key()
+def test_kafka_client_cert_auth_builds_ssl_context(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    loaded_chain: dict[str, str] = {}
+
+    class _FakeSSLContext:
+        def load_cert_chain(self, certfile: str, keyfile: str) -> None:
+            loaded_chain["certfile"] = Path(certfile).read_text()
+            loaded_chain["keyfile"] = Path(keyfile).read_text()
+
+    fake_context = _FakeSSLContext()
+    monkeypatch.setattr(
+        "src.sources.kafka.source.ssl_module.create_default_context",
+        lambda **_kwargs: fake_context,
+    )
+
     src = KafkaSource(
         _recipe(
             required={"auth_mode": "CLIENT_CERT", "bootstrap_servers": "broker:9094"},
-            masked={"ssl_certfile": cert_pem, "ssl_keyfile": key_pem},
-            optional={"connection": {"security_protocol": "SSL", "ssl_ca": cert_pem}},
+            masked={"ssl_certfile": "fake-cert-pem", "ssl_keyfile": "fake-key-pem"},
+            optional={"connection": {"security_protocol": "SSL", "ssl_ca": "fake-ca-pem"}},
         )
     )
     kwargs = src._client_kwargs()
     assert kwargs["security_protocol"] == "SSL"
-    assert "ssl_context" in kwargs
+    assert kwargs["ssl_context"] is fake_context
+    assert loaded_chain == {"certfile": "fake-cert-pem", "keyfile": "fake-key-pem"}
     assert "sasl_plain_username" not in kwargs
