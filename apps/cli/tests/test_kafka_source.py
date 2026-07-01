@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -84,7 +85,7 @@ class _FakeKafkaModule:
 def _recipe(**overrides: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
         "type": "KAFKA",
-        "required": {"bootstrap_servers": "broker:9092"},
+        "required": {"auth_mode": "NONE", "bootstrap_servers": "broker:9092"},
         "optional": {"connection": {"security_protocol": "PLAINTEXT"}},
         "sampling": {"strategy": "RANDOM", "rows_per_page": 10},
     }
@@ -139,3 +140,53 @@ async def test_kafka_fetch_content_samples_messages(_patch_kafka: _FakeKafkaModu
     # capped at rows_per_page (10), even though 12 messages are available
     assert text.count("message_") == 10
     assert "value-0" in text
+
+
+def test_kafka_sasl_credentials_wire_into_client_kwargs(
+    _patch_kafka: _FakeKafkaModule,
+) -> None:
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "SASL", "bootstrap_servers": "broker:9093"},
+            masked={"sasl_username": "avnadmin", "sasl_password": "secret"},
+            optional={
+                "connection": {"security_protocol": "SASL_SSL", "sasl_mechanism": "PLAIN"}
+            },
+        )
+    )
+    kwargs = src._client_kwargs()
+    assert kwargs["security_protocol"] == "SASL_SSL"
+    assert kwargs["sasl_mechanism"] == "PLAIN"
+    assert kwargs["sasl_plain_username"] == "avnadmin"
+    assert kwargs["sasl_plain_password"] == "secret"
+    assert "ssl_context" not in kwargs
+
+
+def test_kafka_client_cert_auth_builds_ssl_context(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    loaded_chain: dict[str, str] = {}
+
+    class _FakeSSLContext:
+        def load_cert_chain(self, certfile: str, keyfile: str) -> None:
+            loaded_chain["certfile"] = Path(certfile).read_text()
+            loaded_chain["keyfile"] = Path(keyfile).read_text()
+
+    fake_context = _FakeSSLContext()
+    monkeypatch.setattr(
+        "src.sources.kafka.source.ssl_module.create_default_context",
+        lambda **_kwargs: fake_context,
+    )
+
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "CLIENT_CERT", "bootstrap_servers": "broker:9094"},
+            masked={"ssl_certfile": "fake-cert-pem", "ssl_keyfile": "fake-key-pem"},
+            optional={"connection": {"security_protocol": "SSL", "ssl_ca": "fake-ca-pem"}},
+        )
+    )
+    kwargs = src._client_kwargs()
+    assert kwargs["security_protocol"] == "SSL"
+    assert kwargs["ssl_context"] is fake_context
+    assert loaded_chain == {"certfile": "fake-cert-pem", "keyfile": "fake-key-pem"}
+    assert "sasl_plain_username" not in kwargs

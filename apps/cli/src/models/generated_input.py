@@ -3491,25 +3491,68 @@ class IcebergInput(CoreInput):
     resources: ResourceOverrides | None = None
 
 
-class KafkaRequired(BaseModel):
+class NoAuthentication(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    auth_mode: Literal['NONE']
     bootstrap_servers: str = Field(
         ..., description='Comma-separated Kafka bootstrap servers (host:port)'
     )
 
 
-class KafkaMasked(BaseModel):
+class SASL(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['SASL']
+    bootstrap_servers: str = Field(
+        ..., description='Comma-separated Kafka bootstrap servers (host:port)'
+    )
+
+
+class ClientCertificateMTLS(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['CLIENT_CERT']
+    bootstrap_servers: str = Field(
+        ..., description='Comma-separated Kafka bootstrap servers (host:port)'
+    )
+
+
+class NoAuthentication1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class SASL1(BaseModel):
     """
-    Optional SASL credentials.
+    SASL username/password credentials.
     """
 
     model_config = ConfigDict(
         extra='forbid',
     )
-    sasl_username: str | None = Field(None, description='SASL username')
-    sasl_password: str | None = Field(None, description='SASL password')
+    sasl_username: str = Field(..., description='SASL username')
+    sasl_password: str = Field(..., description='SASL password')
+
+
+class ClientCertificateMTLS1(BaseModel):
+    """
+    mTLS client certificate credentials.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ssl_certfile: str = Field(
+        ..., description='PEM-encoded client certificate (access cert)'
+    )
+    ssl_keyfile: str = Field(
+        ..., description='PEM-encoded client private key (access key)'
+    )
 
 
 class KafkaOptionalConnection(BaseModel):
@@ -3523,7 +3566,8 @@ class KafkaOptionalConnection(BaseModel):
     security_protocol: KafkaSecurityProtocol | None = 'PLAINTEXT'
     sasl_mechanism: KafkaSaslMechanism | None = 'PLAIN'
     ssl_ca: str | None = Field(
-        None, description='PEM-encoded CA certificate for TLS verification'
+        None,
+        description="PEM-encoded CA certificate for TLS verification (optional for client-certificate auth; validates the broker's certificate)",
     )
     request_timeout_ms: int | None = Field(
         30000, description='Client request timeout in milliseconds', ge=1000
@@ -3562,8 +3606,12 @@ class KafkaInput(CoreInput):
     type: Literal['KAFKA'] | None = Field(
         None, description='Type of the asset or source'
     )
-    required: KafkaRequired
-    masked: KafkaMasked | None = None
+    required: NoAuthentication | SASL | ClientCertificateMTLS = Field(
+        ..., title='KafkaRequired'
+    )
+    masked: NoAuthentication1 | SASL1 | ClientCertificateMTLS1 | None = Field(
+        None, title='KafkaMasked'
+    )
     optional: KafkaOptional | None = None
     detectors: list[Detector] | None = Field(
         None, description='Detectors to run on ingested content'

@@ -2277,7 +2277,7 @@
   "KAFKA": [
     {
       "name": "Topic discovery scan",
-      "description": "Discover Kafka topics and sample recent messages",
+      "description": "Discover Kafka topics and sample recent messages on a local, unauthenticated broker",
       "schedule": {
         "enabled": true,
         "preset": "weekday_business",
@@ -2287,6 +2287,7 @@
       "config": {
         "type": "KAFKA",
         "required": {
+          "auth_mode": "NONE",
           "bootstrap_servers": "broker1:9092,broker2:9092"
         },
         "optional": {
@@ -2312,6 +2313,7 @@
       "config": {
         "type": "KAFKA",
         "required": {
+          "auth_mode": "SASL",
           "bootstrap_servers": "broker:9093"
         },
         "masked": {
@@ -2339,6 +2341,78 @@
             "type": "SECRETS",
             "enabled": true
           },
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Managed Kafka (Aiven/Confluent Cloud) with CA cert",
+      "description": "Connect to a managed SASL_SSL Kafka service (e.g. Aiven, Confluent Cloud) using a broker-issued CA certificate for TLS verification",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "5 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "KAFKA",
+        "required": {
+          "auth_mode": "SASL",
+          "bootstrap_servers": "kafka-example-1234.example-cloud.com:12345"
+        },
+        "masked": {
+          "sasl_username": "avnadmin",
+          "sasl_password": "your-service-password"
+        },
+        "optional": {
+          "connection": {
+            "security_protocol": "SASL_SSL",
+            "sasl_mechanism": "PLAIN",
+            "ssl_ca": "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM\nGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNjAxMDEwMDAwMDBaFw0zNjAx\nMDEwMDAwMDBaMEUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEw\nHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwggEiMA0GCSqGSIb3DQEB\nAQUAA4IBDwAwggEKAoIBAQDFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF\nAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF\n-----END CERTIFICATE-----\n"
+          },
+          "scope": {
+            "include_internal": false
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    },
+    {
+      "name": "Mutual TLS (client certificate) authentication",
+      "description": "Authenticate to a Kafka broker using a client certificate and private key instead of SASL — no username/password required",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "45 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "KAFKA",
+        "required": {
+          "auth_mode": "CLIENT_CERT",
+          "bootstrap_servers": "broker.internal:9094"
+        },
+        "masked": {
+          "ssl_certfile": "-----BEGIN CERTIFICATE-----\nMIIDCTCCAfGgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwFDESMBAGA1UEAwwJY2xpZW50LWNhMB4XDTI2MDEwMTAwMDAwMFoXDTI3MDEw\nMTAwMDAwMFowFDESMBAGA1UEAwwJY2xpZW50LWNhMIIBIjANBgkqhkiG9w0BAQEF\n-----END CERTIFICATE-----\n",
+          "ssl_keyfile": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDFAKEFAKEFAKEF\nAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF\n-----END PRIVATE KEY-----\n"
+        },
+        "optional": {
+          "connection": {
+            "security_protocol": "SSL",
+            "ssl_ca": "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM\n-----END CERTIFICATE-----\n"
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 50
+        },
+        "detectors": [
           {
             "type": "PII",
             "enabled": true
