@@ -95,7 +95,9 @@ export const UpdateSourceDtoTypeEnum = {
     Iceberg: 'ICEBERG',
     Hudi: 'HUDI',
     SparkCatalog: 'SPARK_CATALOG',
-    Kafka: 'KAFKA'
+    Kafka: 'KAFKA',
+    Elasticsearch: 'ELASTICSEARCH',
+    Opensearch: 'OPENSEARCH'
 } as const;
 export type UpdateSourceDtoTypeEnum = typeof UpdateSourceDtoTypeEnum[keyof typeof UpdateSourceDtoTypeEnum];
 

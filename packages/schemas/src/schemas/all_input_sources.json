@@ -86,6 +86,12 @@
     },
     {
       "$ref": "#/definitions/KafkaInput"
+    },
+    {
+      "$ref": "#/definitions/ElasticsearchInput"
+    },
+    {
+      "$ref": "#/definitions/OpenSearchInput"
     }
   ],
   "x-asset-metadata": {
@@ -1585,6 +1591,74 @@
             "partition_count"
           ]
         }
+      },
+      "ELASTICSEARCH": {
+        "index": {
+          "properties": {
+            "index_name": {
+              "type": "string",
+              "description": "Index name"
+            },
+            "health": {
+              "type": "string",
+              "description": "Index health (green/yellow/red)"
+            },
+            "doc_count": {
+              "type": "integer",
+              "description": "Number of documents in the index"
+            },
+            "store_size_bytes": {
+              "type": "integer",
+              "description": "Index store size in bytes"
+            },
+            "primary_shards": {
+              "type": "integer",
+              "description": "Number of primary shards"
+            },
+            "replica_shards": {
+              "type": "integer",
+              "description": "Number of replica shards"
+            }
+          },
+          "required": [
+            "index_name",
+            "doc_count"
+          ]
+        }
+      },
+      "OPENSEARCH": {
+        "index": {
+          "properties": {
+            "index_name": {
+              "type": "string",
+              "description": "Index name"
+            },
+            "health": {
+              "type": "string",
+              "description": "Index health (green/yellow/red)"
+            },
+            "doc_count": {
+              "type": "integer",
+              "description": "Number of documents in the index"
+            },
+            "store_size_bytes": {
+              "type": "integer",
+              "description": "Index store size in bytes"
+            },
+            "primary_shards": {
+              "type": "integer",
+              "description": "Number of primary shards"
+            },
+            "replica_shards": {
+              "type": "integer",
+              "description": "Number of replica shards"
+            }
+          },
+          "required": [
+            "index_name",
+            "doc_count"
+          ]
+        }
       }
     }
   },
@@ -1619,7 +1693,9 @@
         "ICEBERG",
         "HUDI",
         "SPARK_CATALOG",
-        "KAFKA"
+        "KAFKA",
+        "ELASTICSEARCH",
+        "OPENSEARCH"
       ],
       "description": "Type of the asset or source"
     },
@@ -7218,6 +7294,324 @@
             },
             "optional": {
               "$ref": "#/definitions/KafkaOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SearchEngineRequiredNone": {
+      "title": "No Authentication",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "NONE"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Base URL of the cluster (e.g. https://localhost:9200)"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "SearchEngineRequiredBasic": {
+      "title": "Basic (Username/Password)",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "BASIC"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Base URL of the cluster (e.g. https://localhost:9200)"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "SearchEngineRequiredApiKey": {
+      "title": "API Key (Bearer Token)",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "API_KEY"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Base URL of the cluster (e.g. https://localhost:9200)"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "SearchEngineMaskedNone": {
+      "title": "No Authentication",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "SearchEngineMaskedBasic": {
+      "title": "Basic (Username/Password)",
+      "type": "object",
+      "description": "Basic auth credentials.",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Basic auth username"
+        },
+        "password": {
+          "type": "string",
+          "description": "Basic auth password"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "SearchEngineMaskedApiKey": {
+      "title": "API Key (Bearer Token)",
+      "type": "object",
+      "description": "API key / bearer token credential.",
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "description": "API key or bearer token, sent as an Authorization header"
+        }
+      },
+      "required": [
+        "api_key"
+      ],
+      "additionalProperties": false
+    },
+    "SearchEngineOptionalConnection": {
+      "title": "SearchEngineOptionalConnection",
+      "type": "object",
+      "description": "Cluster connection controls.",
+      "properties": {
+        "verify_ssl": {
+          "type": "boolean",
+          "default": true,
+          "description": "TLS certificate verification toggle"
+        },
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 30,
+          "description": "Network timeout in seconds for cluster API calls"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SearchEngineOptionalScope": {
+      "title": "SearchEngineOptionalScope",
+      "type": "object",
+      "description": "Index selection scope.",
+      "properties": {
+        "include_indices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional index allowlist"
+        },
+        "exclude_indices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Index denylist"
+        },
+        "include_system_indices": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include system indices (names starting with .)"
+        },
+        "index_limit": {
+          "type": "integer",
+          "description": "Optional cap on number of index assets",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "ElasticsearchRequired": {
+      "title": "ElasticsearchRequired",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/SearchEngineRequiredNone"
+        },
+        {
+          "$ref": "#/definitions/SearchEngineRequiredBasic"
+        },
+        {
+          "$ref": "#/definitions/SearchEngineRequiredApiKey"
+        }
+      ]
+    },
+    "ElasticsearchMasked": {
+      "title": "ElasticsearchMasked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/SearchEngineMaskedNone"
+        },
+        {
+          "$ref": "#/definitions/SearchEngineMaskedBasic"
+        },
+        {
+          "$ref": "#/definitions/SearchEngineMaskedApiKey"
+        }
+      ]
+    },
+    "ElasticsearchOptional": {
+      "title": "ElasticsearchOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/SearchEngineOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/SearchEngineOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ElasticsearchInput": {
+      "title": "ElasticsearchInput",
+      "label": "Elasticsearch",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "ELASTICSEARCH"
+            },
+            "required": {
+              "$ref": "#/definitions/ElasticsearchRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/ElasticsearchMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/ElasticsearchOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "OpenSearchRequired": {
+      "title": "OpenSearchRequired",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/SearchEngineRequiredNone"
+        },
+        {
+          "$ref": "#/definitions/SearchEngineRequiredBasic"
+        },
+        {
+          "$ref": "#/definitions/SearchEngineRequiredApiKey"
+        }
+      ]
+    },
+    "OpenSearchMasked": {
+      "title": "OpenSearchMasked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/SearchEngineMaskedNone"
+        },
+        {
+          "$ref": "#/definitions/SearchEngineMaskedBasic"
+        },
+        {
+          "$ref": "#/definitions/SearchEngineMaskedApiKey"
+        }
+      ]
+    },
+    "OpenSearchOptional": {
+      "title": "OpenSearchOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/SearchEngineOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/SearchEngineOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpenSearchInput": {
+      "title": "OpenSearchInput",
+      "label": "OpenSearch",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "OPENSEARCH"
+            },
+            "required": {
+              "$ref": "#/definitions/OpenSearchRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/OpenSearchMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/OpenSearchOptional"
             },
             "detectors": {
               "$ref": "#/definitions/Detectors"

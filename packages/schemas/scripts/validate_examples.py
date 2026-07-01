@@ -37,6 +37,8 @@ TYPE_TO_DEFINITION = {
     "HUDI": "HudiInput",
     "SPARK_CATALOG": "SparkCatalogInput",
     "KAFKA": "KafkaInput",
+    "ELASTICSEARCH": "ElasticsearchInput",
+    "OPENSEARCH": "OpenSearchInput",
 }
 
 SCHEMAS_DIR = Path(__file__).parent.parent / "src" / "schemas"

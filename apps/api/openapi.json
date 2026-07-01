@@ -8136,7 +8136,9 @@
               "ICEBERG",
               "HUDI",
               "SPARK_CATALOG",
-              "KAFKA"
+              "KAFKA",
+              "ELASTICSEARCH",
+              "OPENSEARCH"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -8326,7 +8328,9 @@
               "ICEBERG",
               "HUDI",
               "SPARK_CATALOG",
-              "KAFKA"
+              "KAFKA",
+              "ELASTICSEARCH",
+              "OPENSEARCH"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
