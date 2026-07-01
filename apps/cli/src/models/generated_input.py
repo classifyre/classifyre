@@ -52,6 +52,7 @@ class AssetType(StrEnum):
     KAFKA = 'KAFKA'
     ELASTICSEARCH = 'ELASTICSEARCH'
     OPENSEARCH = 'OPENSEARCH'
+    MEILISEARCH = 'MEILISEARCH'
 
 
 class DetectorType(StrEnum):
@@ -357,6 +358,7 @@ class Type(StrEnum):
     KAFKA = 'KAFKA'
     ELASTICSEARCH = 'ELASTICSEARCH'
     OPENSEARCH = 'OPENSEARCH'
+    MEILISEARCH = 'MEILISEARCH'
 
 
 class YouTubeRequired(BaseModel):
@@ -2871,6 +2873,7 @@ class Type19(StrEnum):
     KAFKA = 'KAFKA'
     ELASTICSEARCH = 'ELASTICSEARCH'
     OPENSEARCH = 'OPENSEARCH'
+    MEILISEARCH = 'MEILISEARCH'
 
 
 class ConfluenceInput(CoreInput):
@@ -3790,6 +3793,94 @@ class OpenSearchInput(CoreInput):
     resources: ResourceOverrides | None = None
 
 
+class NoAuthentication4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['NONE']
+    url: AnyUrl = Field(
+        ...,
+        description='Base URL of the Meilisearch instance (e.g. http://localhost:7700)',
+    )
+
+
+class APIKeyBearerToken2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['API_KEY']
+    url: AnyUrl = Field(
+        ...,
+        description='Base URL of the Meilisearch instance (e.g. http://localhost:7700)',
+    )
+
+
+class NoAuthentication5(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class APIKeyBearerToken3(BaseModel):
+    """
+    Meilisearch API key or master key, sent as an Authorization: Bearer header. Meilisearch has no separate username/password authentication mode.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    api_key: str = Field(..., description='API key or master key')
+
+
+class MeilisearchOptionalScope(BaseModel):
+    """
+    Index selection scope.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_indices: list[str] | None = Field(
+        None, description='Optional index allowlist (matches index uid)'
+    )
+    exclude_indices: list[str] | None = Field(
+        None, description='Index denylist (matches index uid)'
+    )
+    index_limit: int | None = Field(
+        None, description='Optional cap on number of index assets', ge=1
+    )
+
+
+class MeilisearchOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: SearchEngineOptionalConnection | None = None
+    scope: MeilisearchOptionalScope | None = None
+
+
+class MeilisearchInput(CoreInput):
+    type: Literal['MEILISEARCH'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: NoAuthentication4 | APIKeyBearerToken2 = Field(
+        ..., title='MeilisearchRequired'
+    )
+    masked: NoAuthentication5 | APIKeyBearerToken3 | None = Field(
+        None, title='MeilisearchMasked'
+    )
+    optional: MeilisearchOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
 class YouTubeInput(CoreInput):
     type: Literal['YOUTUBE'] | None = Field(
         None, description='Type of the asset or source'
@@ -3840,6 +3931,7 @@ class SourceInput(
         | KafkaInput
         | ElasticsearchInput
         | OpenSearchInput
+        | MeilisearchInput
     ]
 ):
     root: (
@@ -3873,6 +3965,7 @@ class SourceInput(
         | KafkaInput
         | ElasticsearchInput
         | OpenSearchInput
+        | MeilisearchInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

@@ -181,20 +181,72 @@ class SearchEngineSourceMixin:
             yield batch
 
     # ── Document sampling ────────────────────────────────────────────────
+    #
+    # Strategy handling mirrors MongoDB's per-collection document sampling
+    # (``mongodb/source.py:_sample_collection_documents``): AUTOMATIC pages
+    # forward through the index each run using the generic offset cursor
+    # helpers on ``BaseSource`` (keyed per index, wraps to 0 once a page
+    # underfills); RANDOM uses a real random query rather than natural order;
+    # LATEST sorts by ``order_by_column`` when given, else falls back to
+    # reverse index order (no generic timestamp field is knowable ahead of
+    # time); ALL is only ever fetched one bounded page at a time here —
+    # ``fetch_content_pages`` does the true unbounded, batched full scan.
 
-    def _sample_documents(self, index_name: str, max_count: int) -> list[dict[str, Any]]:
+    def _execute_search(self, index_name: str, body: dict[str, Any]) -> list[dict[str, Any]]:
         session = self._session()
-        body: dict[str, Any] = {"size": max_count}
-        if self.config.sampling.strategy == SamplingStrategy.LATEST:
-            # Best-effort recency: no generic timestamp field is known ahead of
-            # time, so fall back to reverse insertion/doc order.
-            body["sort"] = [{"_doc": "desc"}]
         url = f"{self._base_url()}/{index_name}/_search"
         response = session.post(url, json=body, timeout=self._request_timeout())
         response.raise_for_status()
         data = response.json()
         hits = ((data.get("hits") or {}).get("hits")) or []
         return [hit.get("_source", {}) for hit in hits]
+
+    def _count_documents(self, index_name: str) -> int | None:
+        try:
+            session = self._session()
+            data = self._get(session, f"/{index_name}/_count")
+            return int(data.get("count"))
+        except Exception:
+            return None
+
+    def _order_by_field(self) -> str | None:
+        order = getattr(self.config.sampling, "order_by_column", None)
+        return order.strip() if isinstance(order, str) and order.strip() else None
+
+    def _latest_sort(self) -> list[dict[str, Any]]:
+        order_field = self._order_by_field()
+        if order_field:
+            return [{order_field: {"order": "desc", "unmapped_type": "date"}}]
+        # Best-effort recency: no generic timestamp field is known ahead of
+        # time, so fall back to reverse insertion/doc order.
+        return [{"_doc": "desc"}]
+
+    def _sample_documents(self, index_name: str, max_count: int) -> list[dict[str, Any]]:
+        strategy = self.config.sampling.strategy
+
+        if strategy == SamplingStrategy.AUTOMATIC:
+            key = f"index:{index_name}"
+            offset = self.automatic_offset(key)
+            docs = self._execute_search(
+                index_name, {"size": max_count, "from": offset, "sort": [{"_doc": "asc"}]}
+            )
+            self.record_automatic_offset(key, prev_offset=offset, fetched=len(docs))
+            return docs
+
+        if strategy == SamplingStrategy.RANDOM:
+            body = {
+                "size": max_count,
+                "query": {"function_score": {"query": {"match_all": {}}, "random_score": {}}},
+            }
+            return self._execute_search(index_name, body)
+
+        if strategy == SamplingStrategy.LATEST:
+            return self._execute_search(index_name, {"size": max_count, "sort": self._latest_sort()})
+
+        # ALL: bounded first page only; fetch_content_pages does the full scan.
+        return self._execute_search(
+            index_name, {"size": max_count, "from": 0, "sort": [{"_doc": "asc"}]}
+        )
 
     @staticmethod
     def _format_documents(
@@ -225,10 +277,43 @@ class SearchEngineSourceMixin:
         index_name = self._index_lookup.get(asset_id)
         if index_name is None:
             return
-        max_count = int(self.config.sampling.rows_per_page or 100)
-        docs = self._sample_documents(index_name, max_count)
-        for i, doc in enumerate(docs):
-            yield self._format_documents(index_name, [doc], offset=i)
+
+        sampling = self.config.sampling
+        max_count = int(sampling.rows_per_page or 100)
+
+        if sampling.strategy != SamplingStrategy.ALL:
+            docs = self._sample_documents(index_name, max_count)
+            for i, doc in enumerate(docs):
+                yield self._format_documents(index_name, [doc], offset=i)
+            return
+
+        total = self._count_documents(index_name)
+        total_batches = ((total + max_count - 1) // max_count) if total else None
+        if total is not None:
+            logger.info(
+                "Full scan %s: %d documents, %s batches of %d",
+                index_name,
+                total,
+                total_batches,
+                max_count,
+            )
+
+        offset = 0
+        page_num = 1
+        while not self._aborted:
+            if total_batches is not None:
+                logger.debug("%s batch %d/%d", index_name, page_num, total_batches)
+            docs = self._execute_search(
+                index_name, {"size": max_count, "from": offset, "sort": [{"_doc": "asc"}]}
+            )
+            if not docs:
+                break
+            for i, doc in enumerate(docs):
+                yield self._format_documents(index_name, [doc], offset=offset + i)
+            if len(docs) < max_count:
+                break
+            offset += len(docs)
+            page_num += 1
 
     # ── Plumbing ─────────────────────────────────────────────────────────
 

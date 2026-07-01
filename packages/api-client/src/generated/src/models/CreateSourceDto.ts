@@ -97,7 +97,8 @@ export const CreateSourceDtoTypeEnum = {
     SparkCatalog: 'SPARK_CATALOG',
     Kafka: 'KAFKA',
     Elasticsearch: 'ELASTICSEARCH',
-    Opensearch: 'OPENSEARCH'
+    Opensearch: 'OPENSEARCH',
+    Meilisearch: 'MEILISEARCH'
 } as const;
 export type CreateSourceDtoTypeEnum = typeof CreateSourceDtoTypeEnum[keyof typeof CreateSourceDtoTypeEnum];
 

@@ -39,6 +39,7 @@ TYPE_TO_DEFINITION = {
     "KAFKA": "KafkaInput",
     "ELASTICSEARCH": "ElasticsearchInput",
     "OPENSEARCH": "OpenSearchInput",
+    "MEILISEARCH": "MeilisearchInput",
 }
 
 SCHEMAS_DIR = Path(__file__).parent.parent / "src" / "schemas"
