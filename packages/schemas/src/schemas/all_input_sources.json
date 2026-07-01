@@ -6997,10 +6997,13 @@
         }
       ]
     },
-    "KafkaRequired": {
-      "title": "KafkaRequired",
+    "KafkaRequiredNone": {
+      "title": "No Authentication",
       "type": "object",
       "properties": {
+        "auth_mode": {
+          "const": "NONE"
+        },
         "bootstrap_servers": {
           "type": "string",
           "description": "Comma-separated Kafka bootstrap servers (host:port)",
@@ -7008,14 +7011,73 @@
         }
       },
       "required": [
+        "auth_mode",
         "bootstrap_servers"
       ],
       "additionalProperties": false
     },
-    "KafkaMasked": {
-      "title": "KafkaMasked",
+    "KafkaRequiredSasl": {
+      "title": "SASL",
       "type": "object",
-      "description": "Optional SASL credentials.",
+      "properties": {
+        "auth_mode": {
+          "const": "SASL"
+        },
+        "bootstrap_servers": {
+          "type": "string",
+          "description": "Comma-separated Kafka bootstrap servers (host:port)",
+          "default": "localhost:9092"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "bootstrap_servers"
+      ],
+      "additionalProperties": false
+    },
+    "KafkaRequiredClientCert": {
+      "title": "Client Certificate (mTLS)",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "CLIENT_CERT"
+        },
+        "bootstrap_servers": {
+          "type": "string",
+          "description": "Comma-separated Kafka bootstrap servers (host:port)",
+          "default": "localhost:9092"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "bootstrap_servers"
+      ],
+      "additionalProperties": false
+    },
+    "KafkaRequired": {
+      "title": "KafkaRequired",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/KafkaRequiredNone"
+        },
+        {
+          "$ref": "#/definitions/KafkaRequiredSasl"
+        },
+        {
+          "$ref": "#/definitions/KafkaRequiredClientCert"
+        }
+      ]
+    },
+    "KafkaMaskedNone": {
+      "title": "No Authentication",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "KafkaMaskedSasl": {
+      "title": "SASL",
+      "type": "object",
+      "description": "SASL username/password credentials.",
       "properties": {
         "sasl_username": {
           "type": "string",
@@ -7026,7 +7088,45 @@
           "description": "SASL password"
         }
       },
+      "required": [
+        "sasl_username",
+        "sasl_password"
+      ],
       "additionalProperties": false
+    },
+    "KafkaMaskedClientCert": {
+      "title": "Client Certificate (mTLS)",
+      "type": "object",
+      "description": "mTLS client certificate credentials.",
+      "properties": {
+        "ssl_certfile": {
+          "type": "string",
+          "description": "PEM-encoded client certificate (access cert)"
+        },
+        "ssl_keyfile": {
+          "type": "string",
+          "description": "PEM-encoded client private key (access key)"
+        }
+      },
+      "required": [
+        "ssl_certfile",
+        "ssl_keyfile"
+      ],
+      "additionalProperties": false
+    },
+    "KafkaMasked": {
+      "title": "KafkaMasked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/KafkaMaskedNone"
+        },
+        {
+          "$ref": "#/definitions/KafkaMaskedSasl"
+        },
+        {
+          "$ref": "#/definitions/KafkaMaskedClientCert"
+        }
+      ]
     },
     "KafkaOptionalConnection": {
       "title": "KafkaOptionalConnection",
@@ -7041,7 +7141,7 @@
         },
         "ssl_ca": {
           "type": "string",
-          "description": "PEM-encoded CA certificate for TLS verification"
+          "description": "PEM-encoded CA certificate for TLS verification (optional for client-certificate auth; validates the broker's certificate)"
         },
         "request_timeout_ms": {
           "type": "integer",

@@ -84,7 +84,7 @@ class _FakeKafkaModule:
 def _recipe(**overrides: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
         "type": "KAFKA",
-        "required": {"bootstrap_servers": "broker:9092"},
+        "required": {"auth_mode": "NONE", "bootstrap_servers": "broker:9092"},
         "optional": {"connection": {"security_protocol": "PLAINTEXT"}},
         "sampling": {"strategy": "RANDOM", "rows_per_page": 10},
     }
@@ -139,3 +139,70 @@ async def test_kafka_fetch_content_samples_messages(_patch_kafka: _FakeKafkaModu
     # capped at rows_per_page (10), even though 12 messages are available
     assert text.count("message_") == 10
     assert "value-0" in text
+
+
+def _self_signed_cert_and_key() -> tuple[str, str]:
+    import datetime
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = issuer = x509.Name(
+        [x509.NameAttribute(NameOID.COMMON_NAME, "kafka-test-client")]
+    )
+    now = datetime.datetime.now(datetime.UTC)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + datetime.timedelta(days=1))
+        .sign(key, hashes.SHA256())
+    )
+    cert_pem = cert.public_bytes(serialization.Encoding.PEM).decode()
+    key_pem = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode()
+    return cert_pem, key_pem
+
+
+def test_kafka_sasl_credentials_wire_into_client_kwargs(
+    _patch_kafka: _FakeKafkaModule,
+) -> None:
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "SASL", "bootstrap_servers": "broker:9093"},
+            masked={"sasl_username": "avnadmin", "sasl_password": "secret"},
+            optional={
+                "connection": {"security_protocol": "SASL_SSL", "sasl_mechanism": "PLAIN"}
+            },
+        )
+    )
+    kwargs = src._client_kwargs()
+    assert kwargs["security_protocol"] == "SASL_SSL"
+    assert kwargs["sasl_mechanism"] == "PLAIN"
+    assert kwargs["sasl_plain_username"] == "avnadmin"
+    assert kwargs["sasl_plain_password"] == "secret"
+    assert "ssl_context" not in kwargs
+
+
+def test_kafka_client_cert_auth_builds_ssl_context(_patch_kafka: _FakeKafkaModule) -> None:
+    cert_pem, key_pem = _self_signed_cert_and_key()
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "CLIENT_CERT", "bootstrap_servers": "broker:9094"},
+            masked={"ssl_certfile": cert_pem, "ssl_keyfile": key_pem},
+            optional={"connection": {"security_protocol": "SSL", "ssl_ca": cert_pem}},
+        )
+    )
+    kwargs = src._client_kwargs()
+    assert kwargs["security_protocol"] == "SSL"
+    assert "ssl_context" in kwargs
+    assert "sasl_plain_username" not in kwargs
