@@ -133,9 +133,7 @@ class BaseSource(ABC):
         saved = self._sampling_cursor.get(key)
         return saved if isinstance(saved, int) and saved >= 0 else 0
 
-    def record_automatic_offset(
-        self, key: str, *, prev_offset: int, fetched: int
-    ) -> None:
+    def record_automatic_offset(self, key: str, *, prev_offset: int, fetched: int) -> None:
         """Advance a keyed offset cursor; wrap to 0 once a page underfills.
 
         Used by sources that page rows directly from the backing store

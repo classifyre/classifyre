@@ -32,12 +32,6 @@ export interface AddEvidenceDto {
      */
     entityId: string;
     /**
-     * Hypothesis UUIDs to link this evidence to (optional)
-     * @type {Array<string>}
-     * @memberof AddEvidenceDto
-     */
-    hypothesisIds?: Array<string>;
-    /**
      * 
      * @type {string}
      * @memberof AddEvidenceDto
@@ -72,7 +66,6 @@ export function AddEvidenceDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         
         'entityType': json['entityType'],
         'entityId': json['entityId'],
-        'hypothesisIds': json['hypothesisIds'] == null ? undefined : json['hypothesisIds'],
         'note': json['note'] == null ? undefined : json['note'],
         'addedBy': json['addedBy'] == null ? undefined : json['addedBy'],
     };
@@ -91,7 +84,6 @@ export function AddEvidenceDtoToJSONTyped(value?: AddEvidenceDto | null, ignoreD
         
         'entityType': value['entityType'],
         'entityId': value['entityId'],
-        'hypothesisIds': value['hypothesisIds'],
         'note': value['note'],
         'addedBy': value['addedBy'],
     };

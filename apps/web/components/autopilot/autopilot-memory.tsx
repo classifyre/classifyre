@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { BookOpenText, Brain, Loader2, Map, Pencil, Plus, Scale, Search, Trash2 } from "lucide-react";
+import { BookOpenText, Brain, Eye, Loader2, Pencil, Plus, Scale, Search, Settings, Table2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, type AgentMemoryDto } from "@workspace/api-client";
 import {
@@ -25,7 +25,7 @@ import {
 import { useTranslation } from "@/hooks/use-translation";
 import { cn } from "@workspace/ui/lib/utils";
 
-type Kind = "GLOSSARY" | "DECISION_PRECEDENT" | "TOPIC_INQUIRY_MAP";
+type Kind = "GLOSSARY" | "DECISION_PRECEDENT" | "ENTITY_MAP" | "SOURCE_PROFILE" | "DETECTOR_INSIGHT" | "OPERATOR_DIRECTIVE";
 
 /**
  * The agent's long-term memory as an editable card catalog. The operator can
@@ -44,10 +44,13 @@ export function AutopilotMemory() {
 
   const KINDS: Array<{ value: Kind | "ALL"; label: string; icon: React.ReactNode }> = React.useMemo(
     () => [
-      { value: "ALL", label: t("investigations.autopilot.memory.filterAll"), icon: <Brain className="h-3 w-3" /> },
-      { value: "GLOSSARY", label: t("investigations.autopilot.memory.filterGlossary"), icon: <BookOpenText className="h-3 w-3" /> },
-      { value: "DECISION_PRECEDENT", label: t("investigations.autopilot.memory.filterPrecedents"), icon: <Scale className="h-3 w-3" /> },
-      { value: "TOPIC_INQUIRY_MAP", label: t("investigations.autopilot.memory.filterTopicMap"), icon: <Map className="h-3 w-3" /> },
+      { value: "ALL",                label: t("investigations.autopilot.memory.filterAll"),             icon: <Brain className="h-3 w-3" /> },
+      { value: "GLOSSARY",           label: t("investigations.autopilot.memory.filterGlossary"),         icon: <BookOpenText className="h-3 w-3" /> },
+      { value: "DECISION_PRECEDENT", label: t("investigations.autopilot.memory.filterPrecedents"),       icon: <Scale className="h-3 w-3" /> },
+      { value: "ENTITY_MAP",         label: t("investigations.autopilot.memory.filterEntityMap"),        icon: <Table2 className="h-3 w-3" /> },
+      { value: "SOURCE_PROFILE",     label: t("investigations.autopilot.memory.filterSourceProfile"),    icon: <Eye className="h-3 w-3" /> },
+      { value: "DETECTOR_INSIGHT",   label: t("investigations.autopilot.memory.filterDetectorInsight"),  icon: <Search className="h-3 w-3" /> },
+      { value: "OPERATOR_DIRECTIVE", label: t("investigations.autopilot.memory.filterOperatorDirective"),icon: <Settings className="h-3 w-3" /> },
     ],
     [t],
   );
@@ -55,9 +58,12 @@ export function AutopilotMemory() {
   const kindLabel = React.useCallback(
     (kind: string): string => {
       switch (kind) {
-        case "GLOSSARY": return t("investigations.autopilot.memory.kindGlossary");
+        case "GLOSSARY":           return t("investigations.autopilot.memory.kindGlossary");
         case "DECISION_PRECEDENT": return t("investigations.autopilot.memory.kindPrecedent");
-        case "TOPIC_INQUIRY_MAP": return t("investigations.autopilot.memory.kindTopicMap");
+        case "ENTITY_MAP":         return t("investigations.autopilot.memory.kindEntityMap");
+        case "SOURCE_PROFILE":     return t("investigations.autopilot.memory.kindSourceProfile");
+        case "DETECTOR_INSIGHT":   return t("investigations.autopilot.memory.kindDetectorInsight");
+        case "OPERATOR_DIRECTIVE": return t("investigations.autopilot.memory.kindOperatorDirective");
         default: return kind;
       }
     },
@@ -358,7 +364,10 @@ function MemoryAddDialog({
                 <SelectContent>
                   <SelectItem value="GLOSSARY">{t("investigations.autopilot.memory.kindGlossary")}</SelectItem>
                   <SelectItem value="DECISION_PRECEDENT">{t("investigations.autopilot.memory.kindPrecedent")}</SelectItem>
-                  <SelectItem value="TOPIC_INQUIRY_MAP">{t("investigations.autopilot.memory.kindTopicMap")}</SelectItem>
+                  <SelectItem value="ENTITY_MAP">{t("investigations.autopilot.memory.kindEntityMap")}</SelectItem>
+                  <SelectItem value="SOURCE_PROFILE">{t("investigations.autopilot.memory.kindSourceProfile")}</SelectItem>
+                  <SelectItem value="DETECTOR_INSIGHT">{t("investigations.autopilot.memory.kindDetectorInsight")}</SelectItem>
+                  <SelectItem value="OPERATOR_DIRECTIVE">{t("investigations.autopilot.memory.kindOperatorDirective")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

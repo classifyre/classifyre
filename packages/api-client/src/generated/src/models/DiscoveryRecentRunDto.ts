@@ -121,7 +121,8 @@ export const DiscoveryRecentRunDtoTriggerTypeEnum = {
     Manual: 'MANUAL',
     Scheduled: 'SCHEDULED',
     Webhook: 'WEBHOOK',
-    Api: 'API'
+    Api: 'API',
+    Autopilot: 'AUTOPILOT'
 } as const;
 export type DiscoveryRecentRunDtoTriggerTypeEnum = typeof DiscoveryRecentRunDtoTriggerTypeEnum[keyof typeof DiscoveryRecentRunDtoTriggerTypeEnum];
 

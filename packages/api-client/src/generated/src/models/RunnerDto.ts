@@ -169,7 +169,8 @@ export const RunnerDtoTriggerTypeEnum = {
     Manual: 'MANUAL',
     Scheduled: 'SCHEDULED',
     Webhook: 'WEBHOOK',
-    Api: 'API'
+    Api: 'API',
+    Autopilot: 'AUTOPILOT'
 } as const;
 export type RunnerDtoTriggerTypeEnum = typeof RunnerDtoTriggerTypeEnum[keyof typeof RunnerDtoTriggerTypeEnum];
 

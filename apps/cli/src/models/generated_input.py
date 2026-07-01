@@ -45,6 +45,11 @@ class AssetType(StrEnum):
     NOTION = 'NOTION'
     EMAIL = 'EMAIL'
     YOUTUBE = 'YOUTUBE'
+    DELTA_LAKE = 'DELTA_LAKE'
+    ICEBERG = 'ICEBERG'
+    HUDI = 'HUDI'
+    SPARK_CATALOG = 'SPARK_CATALOG'
+    KAFKA = 'KAFKA'
 
 
 class DetectorType(StrEnum):
@@ -343,6 +348,11 @@ class Type(StrEnum):
     NOTION = 'NOTION'
     EMAIL = 'EMAIL'
     YOUTUBE = 'YOUTUBE'
+    DELTA_LAKE = 'DELTA_LAKE'
+    ICEBERG = 'ICEBERG'
+    HUDI = 'HUDI'
+    SPARK_CATALOG = 'SPARK_CATALOG'
+    KAFKA = 'KAFKA'
 
 
 class YouTubeRequired(BaseModel):
@@ -2850,6 +2860,11 @@ class Type19(StrEnum):
     NOTION = 'NOTION'
     EMAIL = 'EMAIL'
     YOUTUBE = 'YOUTUBE'
+    DELTA_LAKE = 'DELTA_LAKE'
+    ICEBERG = 'ICEBERG'
+    HUDI = 'HUDI'
+    SPARK_CATALOG = 'SPARK_CATALOG'
+    KAFKA = 'KAFKA'
 
 
 class ConfluenceInput(CoreInput):
@@ -3093,6 +3108,474 @@ class NotionInput(CoreInput):
     resources: ResourceOverrides | None = None
 
 
+class IcebergCatalogType(StrEnum):
+    """
+    PyIceberg catalog backend type
+    """
+
+    REST = 'REST'
+    HIVE = 'HIVE'
+    GLUE = 'GLUE'
+    SQL = 'SQL'
+
+
+class KafkaSecurityProtocol(StrEnum):
+    """
+    Kafka client security protocol
+    """
+
+    PLAINTEXT = 'PLAINTEXT'
+    SSL = 'SSL'
+    SASL_PLAINTEXT = 'SASL_PLAINTEXT'
+    SASL_SSL = 'SASL_SSL'
+
+
+class KafkaSaslMechanism(StrEnum):
+    """
+    SASL mechanism used when security_protocol is SASL_*
+    """
+
+    PLAIN = 'PLAIN'
+    SCRAM_SHA_256 = 'SCRAM-SHA-256'
+    SCRAM_SHA_512 = 'SCRAM-SHA-512'
+
+
+class DeltaLakeRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    warehouse_path: str = Field(
+        ...,
+        description='Root storage location holding Delta tables (e.g. s3a://lake/warehouse, file:///data)',
+    )
+
+
+class DeltaLakeMasked(BaseModel):
+    """
+    Optional object-store credentials for the warehouse location.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    s3_access_key_id: str | None = Field(
+        None, description='S3 access key id for object-store warehouses'
+    )
+    s3_secret_access_key: str | None = Field(None, description='S3 secret access key')
+    s3_session_token: str | None = Field(None, description='Optional S3 session token')
+
+
+class DeltaLakeOptionalConnection(BaseModel):
+    """
+    Delta Lake connection and storage options.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    metastore_uri: str | None = Field(
+        None,
+        description='Hive Metastore thrift URI; enables catalog-based table discovery',
+    )
+    endpoint_url: str | None = Field(
+        None, description='Custom S3-compatible endpoint URL'
+    )
+    region: str | None = Field(None, description='Object-store region')
+
+
+class DeltaLakeOptionalScope(BaseModel):
+    """
+    Delta Lake database and table selection scope.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    database: str | None = Field(
+        None, description='Single database/namespace to scan (catalog mode)'
+    )
+    include_all_databases: bool | None = Field(
+        False, description='Scan all visible databases except excluded system databases'
+    )
+    exclude_databases: list[str] | None = Field(
+        ['information_schema', 'sys'], description='Database denylist (exact names)'
+    )
+    include_tables: list[str] | None = Field(
+        None,
+        description='Optional table allowlist. Accepted forms: table or database.table',
+    )
+    table_limit: int | None = Field(
+        None, description='Optional cap on number of table assets per database', ge=1
+    )
+    table_paths: list[str] | None = Field(
+        None,
+        description='Explicit Delta table locations to scan when no metastore is configured',
+    )
+
+
+class DeltaLakeOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: DeltaLakeOptionalConnection | None = None
+    scope: DeltaLakeOptionalScope | None = None
+
+
+class DeltaLakeInput(CoreInput):
+    type: Literal['DELTA_LAKE'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: DeltaLakeRequired
+    masked: DeltaLakeMasked | None = None
+    optional: DeltaLakeOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
+class HudiRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    warehouse_path: str = Field(
+        ..., description='Root storage location holding Hudi tables'
+    )
+
+
+class HudiMasked(BaseModel):
+    """
+    Optional object-store credentials for the warehouse location.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    s3_access_key_id: str | None = Field(
+        None, description='S3 access key id for object-store warehouses'
+    )
+    s3_secret_access_key: str | None = Field(None, description='S3 secret access key')
+    s3_session_token: str | None = Field(None, description='Optional S3 session token')
+
+
+class HudiOptionalConnection(BaseModel):
+    """
+    Hudi connection and storage options.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    metastore_uri: str | None = Field(
+        None,
+        description='Hive Metastore thrift URI; enables catalog-based table discovery',
+    )
+    endpoint_url: str | None = Field(
+        None, description='Custom S3-compatible endpoint URL'
+    )
+    region: str | None = Field(None, description='Object-store region')
+
+
+class HudiOptionalScope(BaseModel):
+    """
+    Hudi database and table selection scope.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    database: str | None = Field(
+        None, description='Single database/namespace to scan (catalog mode)'
+    )
+    include_all_databases: bool | None = Field(
+        False, description='Scan all visible databases except excluded system databases'
+    )
+    exclude_databases: list[str] | None = Field(
+        ['information_schema', 'sys'], description='Database denylist (exact names)'
+    )
+    include_tables: list[str] | None = Field(
+        None,
+        description='Optional table allowlist. Accepted forms: table or database.table',
+    )
+    table_limit: int | None = Field(
+        None, description='Optional cap on number of table assets per database', ge=1
+    )
+    table_paths: list[str] | None = Field(
+        None,
+        description='Explicit Hudi table locations to scan when no metastore is configured',
+    )
+
+
+class HudiOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: HudiOptionalConnection | None = None
+    scope: HudiOptionalScope | None = None
+
+
+class HudiInput(CoreInput):
+    type: Literal['HUDI'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: HudiRequired
+    masked: HudiMasked | None = None
+    optional: HudiOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
+class SparkCatalogRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connect_url: str = Field(
+        ...,
+        description='Spark Connect endpoint (sc://host:15002) or classic master (spark://host:7077)',
+    )
+
+
+class SparkCatalogMasked(BaseModel):
+    """
+    Optional Spark Connect authentication.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    token: str | None = Field(
+        None, description='Bearer token for Spark Connect authentication'
+    )
+
+
+class SparkCatalogOptionalScope(BaseModel):
+    """
+    Spark catalog and table selection scope.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    catalog: str | None = Field(
+        None, description='Spark catalog name to scan (defaults to the session catalog)'
+    )
+    database: str | None = Field(None, description='Single database/namespace to scan')
+    include_all_databases: bool | None = Field(
+        False, description='Scan all visible databases except excluded system databases'
+    )
+    exclude_databases: list[str] | None = Field(
+        ['information_schema', 'sys'], description='Database denylist (exact names)'
+    )
+    include_tables: list[str] | None = Field(
+        None,
+        description='Optional table allowlist. Accepted forms: table or database.table',
+    )
+    table_limit: int | None = Field(
+        None, description='Optional cap on number of table assets per database', ge=1
+    )
+
+
+class SparkCatalogOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    scope: SparkCatalogOptionalScope | None = None
+
+
+class SparkCatalogInput(CoreInput):
+    type: Literal['SPARK_CATALOG'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: SparkCatalogRequired
+    masked: SparkCatalogMasked | None = None
+    optional: SparkCatalogOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
+class IcebergRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    catalog_type: IcebergCatalogType
+    catalog_uri: str | None = Field(
+        None,
+        description='Catalog URI (REST endpoint, Hive metastore thrift URI, or SQL DSN). Not required for GLUE.',
+    )
+    warehouse: str = Field(
+        ..., description='Warehouse location root (e.g. s3://bucket/warehouse)'
+    )
+
+
+class IcebergMasked(BaseModel):
+    """
+    Optional Iceberg catalog/storage credentials.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    token: str | None = Field(None, description='Bearer token for a REST catalog')
+    aws_access_key_id: str | None = Field(
+        None, description='AWS access key id (Glue/S3)'
+    )
+    aws_secret_access_key: str | None = Field(
+        None, description='AWS secret access key (Glue/S3)'
+    )
+
+
+class IcebergOptionalScope(BaseModel):
+    """
+    Iceberg namespace and table selection scope.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    namespace: str | None = Field(
+        None, description='Single namespace to scan (dotted form supported)'
+    )
+    include_all_namespaces: bool | None = Field(
+        False, description='Scan all visible namespaces'
+    )
+    include_tables: list[str] | None = Field(
+        None,
+        description='Optional table allowlist. Accepted forms: table or namespace.table',
+    )
+    table_limit: int | None = Field(
+        None, description='Optional cap on number of table assets per namespace', ge=1
+    )
+
+
+class IcebergOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    scope: IcebergOptionalScope | None = None
+
+
+class IcebergInput(CoreInput):
+    type: Literal['ICEBERG'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: IcebergRequired
+    masked: IcebergMasked | None = None
+    optional: IcebergOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
+class KafkaRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    bootstrap_servers: str = Field(
+        ..., description='Comma-separated Kafka bootstrap servers (host:port)'
+    )
+
+
+class KafkaMasked(BaseModel):
+    """
+    Optional SASL credentials.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    sasl_username: str | None = Field(None, description='SASL username')
+    sasl_password: str | None = Field(None, description='SASL password')
+
+
+class KafkaOptionalConnection(BaseModel):
+    """
+    Kafka client connection and security options.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    security_protocol: KafkaSecurityProtocol | None = 'PLAINTEXT'
+    sasl_mechanism: KafkaSaslMechanism | None = 'PLAIN'
+    ssl_ca: str | None = Field(
+        None, description='PEM-encoded CA certificate for TLS verification'
+    )
+    request_timeout_ms: int | None = Field(
+        30000, description='Client request timeout in milliseconds', ge=1000
+    )
+
+
+class KafkaOptionalScope(BaseModel):
+    """
+    Kafka topic selection scope.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_topics: list[str] | None = Field(
+        None, description='Optional topic allowlist'
+    )
+    exclude_topics: list[str] | None = Field(None, description='Topic denylist')
+    include_internal: bool | None = Field(
+        False, description='Include internal topics (names starting with __)'
+    )
+    topic_limit: int | None = Field(
+        None, description='Optional cap on number of topic assets', ge=1
+    )
+
+
+class KafkaOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: KafkaOptionalConnection | None = None
+    scope: KafkaOptionalScope | None = None
+
+
+class KafkaInput(CoreInput):
+    type: Literal['KAFKA'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: KafkaRequired
+    masked: KafkaMasked | None = None
+    optional: KafkaOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
 class YouTubeInput(CoreInput):
     type: Literal['YOUTUBE'] | None = Field(
         None, description='Type of the asset or source'
@@ -3136,6 +3619,11 @@ class SourceInput(
         | NotionInput
         | EmailInput
         | YouTubeInput
+        | DeltaLakeInput
+        | IcebergInput
+        | HudiInput
+        | SparkCatalogInput
+        | KafkaInput
     ]
 ):
     root: (
@@ -3162,6 +3650,11 @@ class SourceInput(
         | NotionInput
         | EmailInput
         | YouTubeInput
+        | DeltaLakeInput
+        | IcebergInput
+        | HudiInput
+        | SparkCatalogInput
+        | KafkaInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',
