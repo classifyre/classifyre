@@ -285,6 +285,13 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     category: "DATABASES",
     keywords: ["search", "index", "full-text", "lucene", "opensearch"],
   },
+  MEILISEARCH: {
+    description:
+      "Discover Meilisearch indexes and sample documents for detection.",
+    icon: CreateSourceDtoTypeEnum.Meilisearch,
+    category: "DATABASES",
+    keywords: ["search", "index", "full-text", "meilisearch"],
+  },
 };
 
 export function resolveSourceCatalogMeta(

@@ -92,6 +92,9 @@
     },
     {
       "$ref": "#/definitions/OpenSearchInput"
+    },
+    {
+      "$ref": "#/definitions/MeilisearchInput"
     }
   ],
   "x-asset-metadata": {
@@ -1659,6 +1662,32 @@
             "doc_count"
           ]
         }
+      },
+      "MEILISEARCH": {
+        "index": {
+          "properties": {
+            "index_name": {
+              "type": "string",
+              "description": "Index uid"
+            },
+            "doc_count": {
+              "type": "integer",
+              "description": "Number of documents in the index"
+            },
+            "primary_key": {
+              "type": "string",
+              "description": "Primary key attribute name"
+            },
+            "is_indexing": {
+              "type": "boolean",
+              "description": "Whether the index has an indexing operation in progress"
+            }
+          },
+          "required": [
+            "index_name",
+            "doc_count"
+          ]
+        }
       }
     }
   },
@@ -1695,7 +1724,8 @@
         "SPARK_CATALOG",
         "KAFKA",
         "ELASTICSEARCH",
-        "OPENSEARCH"
+        "OPENSEARCH",
+        "MEILISEARCH"
       ],
       "description": "Type of the asset or source"
     },
@@ -7612,6 +7642,170 @@
             },
             "optional": {
               "$ref": "#/definitions/OpenSearchOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MeilisearchRequiredNone": {
+      "title": "No Authentication",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "NONE"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Base URL of the Meilisearch instance (e.g. http://localhost:7700)"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "MeilisearchRequiredApiKey": {
+      "title": "API Key (Bearer Token)",
+      "type": "object",
+      "properties": {
+        "auth_mode": {
+          "const": "API_KEY"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Base URL of the Meilisearch instance (e.g. http://localhost:7700)"
+        }
+      },
+      "required": [
+        "auth_mode",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "MeilisearchRequired": {
+      "title": "MeilisearchRequired",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/MeilisearchRequiredNone"
+        },
+        {
+          "$ref": "#/definitions/MeilisearchRequiredApiKey"
+        }
+      ]
+    },
+    "MeilisearchMaskedNone": {
+      "title": "No Authentication",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "MeilisearchMaskedApiKey": {
+      "title": "API Key (Bearer Token)",
+      "type": "object",
+      "description": "Meilisearch API key or master key, sent as an Authorization: Bearer header. Meilisearch has no separate username/password authentication mode.",
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "description": "API key or master key"
+        }
+      },
+      "required": [
+        "api_key"
+      ],
+      "additionalProperties": false
+    },
+    "MeilisearchMasked": {
+      "title": "MeilisearchMasked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/MeilisearchMaskedNone"
+        },
+        {
+          "$ref": "#/definitions/MeilisearchMaskedApiKey"
+        }
+      ]
+    },
+    "MeilisearchOptionalScope": {
+      "title": "MeilisearchOptionalScope",
+      "type": "object",
+      "description": "Index selection scope.",
+      "properties": {
+        "include_indices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional index allowlist (matches index uid)"
+        },
+        "exclude_indices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Index denylist (matches index uid)"
+        },
+        "index_limit": {
+          "type": "integer",
+          "description": "Optional cap on number of index assets",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "MeilisearchOptional": {
+      "title": "MeilisearchOptional",
+      "type": "object",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/SearchEngineOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/MeilisearchOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MeilisearchInput": {
+      "title": "MeilisearchInput",
+      "label": "Meilisearch",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "MEILISEARCH"
+            },
+            "required": {
+              "$ref": "#/definitions/MeilisearchRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/MeilisearchMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/MeilisearchOptional"
             },
             "detectors": {
               "$ref": "#/definitions/Detectors"

@@ -13,6 +13,7 @@ import {
   siGooglesheets,
   siGoogleslides,
   siJira,
+  siMeilisearch,
   siMongodb,
   siMysql,
   siNeo4j,
@@ -138,6 +139,7 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.Kafka]: siApachekafka,
   [CreateSourceDtoTypeEnum.Elasticsearch]: siElasticsearch,
   [CreateSourceDtoTypeEnum.Opensearch]: siOpensearch,
+  [CreateSourceDtoTypeEnum.Meilisearch]: siMeilisearch,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -187,6 +189,7 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Kafka]: createSimpleIconComponent(siApachekafka),
   [CreateSourceDtoTypeEnum.Elasticsearch]: createSimpleIconComponent(siElasticsearch),
   [CreateSourceDtoTypeEnum.Opensearch]: createSimpleIconComponent(siOpensearch),
+  [CreateSourceDtoTypeEnum.Meilisearch]: createSimpleIconComponent(siMeilisearch),
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =

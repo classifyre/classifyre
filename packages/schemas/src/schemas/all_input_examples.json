@@ -2630,5 +2630,104 @@
         }
       }
     }
+  ],
+  "MEILISEARCH": [
+    {
+      "name": "Local dev instance scan",
+      "description": "Discover indexes and sample documents on a local, unauthenticated Meilisearch instance",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "30 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MEILISEARCH",
+        "required": {
+          "auth_mode": "NONE",
+          "url": "http://localhost:7700"
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Master key secrets detection",
+      "description": "Full scan of selected indexes using an API/master key and run secrets detection",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "15 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MEILISEARCH",
+        "required": {
+          "auth_mode": "API_KEY",
+          "url": "https://search.internal.example.com:7700"
+        },
+        "masked": {
+          "api_key": "your-master-or-api-key"
+        },
+        "optional": {
+          "scope": {
+            "include_indices": [
+              "products",
+              "customers"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "ALL",
+          "rows_per_page": 100
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          },
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Meilisearch Cloud incremental scan",
+      "description": "Incrementally ingest a random sample of documents from a Meilisearch Cloud project on each run",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "45 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MEILISEARCH",
+        "required": {
+          "auth_mode": "API_KEY",
+          "url": "https://ms-example123.meilisearch.io"
+        },
+        "masked": {
+          "api_key": "your-api-key"
+        },
+        "optional": {
+          "connection": {
+            "verify_ssl": true
+          },
+          "scope": {
+            "exclude_indices": [
+              "internal_logs"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 50
+        }
+      }
+    }
   ]
 }

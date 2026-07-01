@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 from typing import Any
 
 import pytest
@@ -52,7 +54,7 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
 
 @pytest.fixture
 def _patch_requests(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    calls: dict[str, Any] = {}
+    calls: dict[str, Any] = {"search_bodies": []}
 
     def fake_get(self: requests.Session, url: str, **_kwargs: Any) -> _FakeResponse:
         calls["auth"] = self.auth
@@ -62,12 +64,18 @@ def _patch_requests(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             return _FakeResponse(_INDICES)
         if url.endswith("/_cluster/health"):
             return _FakeResponse({"status": "yellow"})
+        if url.endswith("/_count"):
+            return _FakeResponse({"count": len(_DOCS)})
         raise AssertionError(f"unexpected GET {url}")
 
     def fake_post(_self: requests.Session, _url: str, **kwargs: Any) -> _FakeResponse:
-        calls["search_body"] = kwargs.get("json")
-        size = (kwargs.get("json") or {}).get("size", len(_DOCS))
-        hits = [{"_source": doc} for doc in _DOCS[:size]]
+        body = kwargs.get("json") or {}
+        calls["search_bodies"].append(body)
+        calls["search_body"] = body
+        size = body.get("size", len(_DOCS))
+        offset = body.get("from", 0)
+        page = _DOCS[offset : offset + size]
+        hits = [{"_source": doc} for doc in page]
         return _FakeResponse({"hits": {"hits": hits}})
 
     monkeypatch.setattr(requests.Session, "get", fake_get)
@@ -135,3 +143,86 @@ def test_opensearch_api_key_auth_sets_authorization_header(
     )
     src.test_connection()
     assert _patch_requests["headers"]["Authorization"] == "ApiKey my-key"
+
+
+# ── Sampling strategies ──────────────────────────────────────────────────
+
+
+def test_opensearch_random_strategy_uses_random_score_query(
+    _patch_requests: dict[str, Any],
+) -> None:
+    src = OpenSearchSource(_recipe(sampling={"strategy": "RANDOM", "rows_per_page": 10}))
+    src._sample_documents("logs-app", 10)
+    body = _patch_requests["search_body"]
+    assert "random_score" in body["query"]["function_score"]
+    assert "from" not in body
+    assert "sort" not in body
+
+
+def test_opensearch_latest_strategy_sorts_by_order_by_column(
+    _patch_requests: dict[str, Any],
+) -> None:
+    src = OpenSearchSource(
+        _recipe(
+            sampling={
+                "strategy": "LATEST",
+                "rows_per_page": 10,
+                "order_by_column": "updated_at",
+            }
+        )
+    )
+    src._sample_documents("logs-app", 10)
+    body = _patch_requests["search_body"]
+    assert body["sort"] == [{"updated_at": {"order": "desc", "unmapped_type": "date"}}]
+
+
+def test_opensearch_latest_strategy_falls_back_to_doc_sort(
+    _patch_requests: dict[str, Any],
+) -> None:
+    src = OpenSearchSource(_recipe(sampling={"strategy": "LATEST", "rows_per_page": 10}))
+    src._sample_documents("logs-app", 10)
+    body = _patch_requests["search_body"]
+    assert body["sort"] == [{"_doc": "desc"}]
+
+
+def test_opensearch_automatic_strategy_starts_at_offset_zero(
+    _patch_requests: dict[str, Any],
+) -> None:
+    src = OpenSearchSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
+    docs = src._sample_documents("logs-app", 10)
+    body = _patch_requests["search_body"]
+    assert body["from"] == 0
+    assert body["size"] == 10
+    assert len(docs) == 10
+    assert src.current_sampling_cursor() == {"index:logs-app": 10}
+
+
+def test_opensearch_automatic_strategy_resumes_and_wraps_on_underfill(
+    _patch_requests: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    saved_cursor = base64.b64encode(json.dumps({"index:logs-app": 10}).encode()).decode()
+    monkeypatch.setenv("CLASSIFYRE_SAMPLING_CURSOR", saved_cursor)
+
+    src = OpenSearchSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
+    docs = src._sample_documents("logs-app", 10)
+    body = _patch_requests["search_body"]
+    assert body["from"] == 10
+    assert len(docs) == 2
+    assert src.current_sampling_cursor() == {"index:logs-app": 0}
+
+
+async def test_opensearch_all_strategy_batches_and_stops_on_underfill(
+    _patch_requests: dict[str, Any],
+) -> None:
+    src = OpenSearchSource(_recipe(sampling={"strategy": "ALL", "rows_per_page": 10}))
+    assets = [a async for batch in src.extract_raw() for a in batch]
+    pages = [p async for p in src.fetch_content_pages(assets[0].hash)]
+
+    assert len(pages) == 12
+
+    bodies = _patch_requests["search_bodies"]
+    assert len(bodies) == 2
+    assert bodies[0]["from"] == 0
+    assert bodies[0]["size"] == 10
+    assert bodies[1]["from"] == 10
+    assert bodies[1]["size"] == 10

@@ -2253,6 +2253,7 @@ export const JsonSchemaForm = React.forwardRef<
     KAFKA: false,
     ELASTICSEARCH: false,
     OPENSEARCH: false,
+    MEILISEARCH: false,
   };
   const isTabular =
     assistantSourceType && isIngestionSourceType(assistantSourceType)

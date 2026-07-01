@@ -8138,7 +8138,8 @@
               "SPARK_CATALOG",
               "KAFKA",
               "ELASTICSEARCH",
-              "OPENSEARCH"
+              "OPENSEARCH",
+              "MEILISEARCH"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -8330,7 +8331,8 @@
               "SPARK_CATALOG",
               "KAFKA",
               "ELASTICSEARCH",
-              "OPENSEARCH"
+              "OPENSEARCH",
+              "MEILISEARCH"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
