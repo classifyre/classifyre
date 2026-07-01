@@ -63,3 +63,6 @@ dmypy.json
 
 # Local training artifacts
 checkpoints/
+
+# Spark local warehouse (created during dev/testing of lakehouse sources)
+spark-warehouse/

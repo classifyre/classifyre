@@ -39,7 +39,7 @@ function useVersionCheck() {
     async function checkLatestRelease() {
       try {
         const response = await fetch(
-          "https://api.github.com/repos/classifyre-com/classifyre/releases/latest",
+          "https://api.github.com/repos/classifyre/classifyre/releases/latest",
           { cache: "no-store" },
         );
         if (!response.ok) return;

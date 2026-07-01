@@ -1,13 +1,14 @@
 <div align="center">
   <img src=".github/assets/classifyre_icon.png" alt="Classifyre" width="96" />
 
-  # Classifyre — Open-Source Investigation Platform
+  # Classifyre
+ ## Open-Source Investigation Platform
 
   **Detect. Investigate. Resolve.**
 
-  [![CI](https://img.shields.io/github/actions/workflow/status/classifyre-com/classifyre/ci.yml?branch=develop&style=flat-square&label=CI&logo=github)](https://github.com/classifyre-com/classifyre/actions/workflows/ci.yml)
-  [![Release](https://img.shields.io/github/v/release/classifyre-com/classifyre?sort=semver&style=flat-square&label=release)](https://github.com/classifyre-com/classifyre/releases/latest)
-  [![License](https://img.shields.io/github/license/classifyre-com/classifyre?style=flat-square)](LICENSE)
+  [![CI](https://img.shields.io/github/actions/workflow/status/classifyre/classifyre/ci.yml?branch=develop&style=flat-square&label=CI&logo=github)](https://github.com/classifyre/classifyre/actions/workflows/ci.yml)
+  [![Release](https://img.shields.io/github/v/release/classifyre/classifyre?sort=semver&style=flat-square&label=release)](https://github.com/classifyre/classifyre/releases/latest)
+  [![License](https://img.shields.io/github/license/classifyre/classifyre?style=flat-square)](LICENSE)
   [![Docker Pulls](https://img.shields.io/docker/pulls/classifyre/all-in-one?style=flat-square&logo=docker&label=docker%20pulls)](https://hub.docker.com/r/classifyre/all-in-one)
   [![Docs](https://img.shields.io/badge/docs-classifyre.com-1f6feb?style=flat-square)](https://docs.classifyre.com/)
 
