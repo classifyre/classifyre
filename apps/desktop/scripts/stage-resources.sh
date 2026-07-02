@@ -185,6 +185,24 @@ PYEOF
 
   cp -R "$MONOREPO_ROOT/apps/cli/.venv-desktop" "$RESOURCES/venv"
 
+  # codesign rejects symlinks whose destination is an absolute build-machine
+  # path ("invalid destination for symbolic link in bundle"), which breaks the
+  # macOS signature seal. The venv's bin/python* point at the standalone CPython
+  # by absolute path, so rewrite them to bundle-relative links: inside the .app
+  # both live under Contents/Resources (venv/ and python/), so venv/bin/python3
+  # -> ../../python/bin/python3 resolves within the sealed bundle. (Windows venvs
+  # ship a real python.exe, not symlinks, so this no-ops there.) python-env.ts
+  # still re-points these at runtime after the read-only-bundle relocation.
+  VENV_BIN="$RESOURCES/venv/bin"
+  if [ -L "$VENV_BIN/python3" ] || [ -L "$VENV_BIN/python" ]; then
+    ln -sf ../../python/bin/python3 "$VENV_BIN/python3"
+    ln -sf python3 "$VENV_BIN/python"
+    for alias in "$VENV_BIN"/python3.*; do
+      [ -L "$alias" ] && ln -sf python3 "$alias"
+    done
+    echo "Rewrote venv python symlinks to bundle-relative paths for codesign"
+  fi
+
   # A populated base venv is >1GB even without pyspark; an empty scaffold means
   # the sync silently missed the target env. Fail loudly rather than ship broken.
   VENV_SIZE_KB="$(du -sk "$RESOURCES/venv" | cut -f1)"
