@@ -27,8 +27,14 @@ async function main(): Promise<void> {
   const app = await electron.launch({
     executablePath: appPath,
     // Linux CI (and some hardened distros) blocks Chromium's SUID/userns
-    // sandbox for apps launched from arbitrary paths — disable it for the test.
-    args: process.platform === 'linux' ? ['--no-sandbox'] : [],
+    // sandbox for apps launched from arbitrary paths — disable it. Under xvfb
+    // there is no real GPU, so Chromium's GPU process fails to initialize and
+    // the app can exit before opening a window ("Exiting GPU process due to
+    // errors during initialization"); disable GPU/SHM so a window renders.
+    args:
+      process.platform === 'linux'
+        ? ['--no-sandbox', '--disable-gpu', '--disable-software-rasterizer', '--disable-dev-shm-usage']
+        : [],
     timeout: 120_000,
     env: {
       ...process.env,
