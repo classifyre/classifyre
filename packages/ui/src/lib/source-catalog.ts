@@ -271,6 +271,27 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     category: "STREAMING",
     keywords: ["kafka", "streaming", "events", "topics", "messages", "broker"],
   },
+  ELASTICSEARCH: {
+    description:
+      "Discover Elasticsearch indices and sample documents for detection.",
+    icon: CreateSourceDtoTypeEnum.Elasticsearch,
+    category: "DATABASES",
+    keywords: ["search", "index", "full-text", "lucene", "elastic"],
+  },
+  OPENSEARCH: {
+    description:
+      "Discover OpenSearch indices and sample documents for detection.",
+    icon: CreateSourceDtoTypeEnum.Opensearch,
+    category: "DATABASES",
+    keywords: ["search", "index", "full-text", "lucene", "opensearch"],
+  },
+  MEILISEARCH: {
+    description:
+      "Discover Meilisearch indexes and sample documents for detection.",
+    icon: CreateSourceDtoTypeEnum.Meilisearch,
+    category: "DATABASES",
+    keywords: ["search", "index", "full-text", "meilisearch"],
+  },
 };
 
 export function resolveSourceCatalogMeta(

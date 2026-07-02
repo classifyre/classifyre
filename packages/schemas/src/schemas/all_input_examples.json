@@ -2420,5 +2420,314 @@
         ]
       }
     }
+  ],
+  "ELASTICSEARCH": [
+    {
+      "name": "Local dev cluster scan",
+      "description": "Discover indices and sample documents on a local, unauthenticated Elasticsearch cluster",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "15 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "ELASTICSEARCH",
+        "required": {
+          "auth_mode": "NONE",
+          "url": "http://localhost:9200"
+        },
+        "optional": {
+          "scope": {
+            "include_system_indices": false
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Basic auth secrets detection",
+      "description": "Sample documents from selected indices using basic auth and run secrets detection",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "40 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "ELASTICSEARCH",
+        "required": {
+          "auth_mode": "BASIC",
+          "url": "https://es.internal.example.com:9200"
+        },
+        "masked": {
+          "username": "elastic",
+          "password": "your-password"
+        },
+        "optional": {
+          "connection": {
+            "verify_ssl": true
+          },
+          "scope": {
+            "include_indices": [
+              "orders",
+              "customers"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 100
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          },
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Elastic Cloud with API key",
+      "description": "Connect to an Elastic Cloud deployment using an API key (bearer token) instead of a username/password",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "10 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "ELASTICSEARCH",
+        "required": {
+          "auth_mode": "API_KEY",
+          "url": "https://my-deployment.es.us-east-1.aws.found.io:9243"
+        },
+        "masked": {
+          "api_key": "your-base64-encoded-api-key"
+        },
+        "optional": {
+          "scope": {
+            "exclude_indices": [
+              ".kibana*"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    }
+  ],
+  "OPENSEARCH": [
+    {
+      "name": "Local dev cluster scan",
+      "description": "Discover indices and sample documents on a local, unauthenticated OpenSearch cluster",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "20 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "OPENSEARCH",
+        "required": {
+          "auth_mode": "NONE",
+          "url": "http://localhost:9200"
+        },
+        "optional": {
+          "scope": {
+            "include_system_indices": false
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Basic auth secrets detection",
+      "description": "Sample documents from selected indices using basic auth and run secrets detection",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "50 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "OPENSEARCH",
+        "required": {
+          "auth_mode": "BASIC",
+          "url": "https://opensearch.internal.example.com:9200"
+        },
+        "masked": {
+          "username": "admin",
+          "password": "your-password"
+        },
+        "optional": {
+          "connection": {
+            "verify_ssl": true
+          },
+          "scope": {
+            "include_indices": [
+              "logs-app",
+              "logs-infra"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 100
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          },
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "AWS OpenSearch Service with API key",
+      "description": "Connect to a managed AWS OpenSearch Service domain using an API key (bearer token)",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "25 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "OPENSEARCH",
+        "required": {
+          "auth_mode": "API_KEY",
+          "url": "https://search-my-domain-abc123.us-east-1.es.amazonaws.com"
+        },
+        "masked": {
+          "api_key": "your-api-key"
+        },
+        "optional": {
+          "scope": {
+            "exclude_indices": [
+              ".opensearch-*"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    }
+  ],
+  "MEILISEARCH": [
+    {
+      "name": "Local dev instance scan",
+      "description": "Discover indexes and sample documents on a local, unauthenticated Meilisearch instance",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "30 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MEILISEARCH",
+        "required": {
+          "auth_mode": "NONE",
+          "url": "http://localhost:7700"
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Master key secrets detection",
+      "description": "Full scan of selected indexes using an API/master key and run secrets detection",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "15 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MEILISEARCH",
+        "required": {
+          "auth_mode": "API_KEY",
+          "url": "https://search.internal.example.com:7700"
+        },
+        "masked": {
+          "api_key": "your-master-or-api-key"
+        },
+        "optional": {
+          "scope": {
+            "include_indices": [
+              "products",
+              "customers"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "ALL",
+          "rows_per_page": 100
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          },
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Meilisearch Cloud incremental scan",
+      "description": "Incrementally ingest a random sample of documents from a Meilisearch Cloud project on each run",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "45 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MEILISEARCH",
+        "required": {
+          "auth_mode": "API_KEY",
+          "url": "https://ms-example123.meilisearch.io"
+        },
+        "masked": {
+          "api_key": "your-api-key"
+        },
+        "optional": {
+          "connection": {
+            "verify_ssl": true
+          },
+          "scope": {
+            "exclude_indices": [
+              "internal_logs"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 50
+        }
+      }
+    }
   ]
 }

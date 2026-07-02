@@ -6,16 +6,19 @@ import {
   siBitbucket,
   siConfluence,
   siDatabricks,
+  siElasticsearch,
   siGithub,
   siGoogledocs,
   siGoogledrive,
   siGooglesheets,
   siGoogleslides,
   siJira,
+  siMeilisearch,
   siMongodb,
   siMysql,
   siNeo4j,
   siNotion,
+  siOpensearch,
   siPostgresql,
   siSnowflake,
   siWordpress,
@@ -134,6 +137,9 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.Hudi]: null,
   [CreateSourceDtoTypeEnum.SparkCatalog]: siApachespark,
   [CreateSourceDtoTypeEnum.Kafka]: siApachekafka,
+  [CreateSourceDtoTypeEnum.Elasticsearch]: siElasticsearch,
+  [CreateSourceDtoTypeEnum.Opensearch]: siOpensearch,
+  [CreateSourceDtoTypeEnum.Meilisearch]: siMeilisearch,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -181,6 +187,9 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Hudi]: Layers,
   [CreateSourceDtoTypeEnum.SparkCatalog]: createSimpleIconComponent(siApachespark),
   [CreateSourceDtoTypeEnum.Kafka]: createSimpleIconComponent(siApachekafka),
+  [CreateSourceDtoTypeEnum.Elasticsearch]: createSimpleIconComponent(siElasticsearch),
+  [CreateSourceDtoTypeEnum.Opensearch]: createSimpleIconComponent(siOpensearch),
+  [CreateSourceDtoTypeEnum.Meilisearch]: createSimpleIconComponent(siMeilisearch),
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =
