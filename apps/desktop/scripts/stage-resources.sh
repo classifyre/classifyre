@@ -182,8 +182,13 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
   # Bundle the uv binary inside the venv so it lands on PATH at runtime: the API
   # spawns the CLI via `uv run`, and optional groups self-install via `uv sync`.
   # The build host's arch matches this per-platform bundle, so its uv is correct.
-  cp "$(command -v uv)" .venv-desktop/bin/uv
-  chmod +x .venv-desktop/bin/uv
+  # Windows venvs use Scripts/ (and a .exe); POSIX venvs use bin/.
+  if [ "$IS_WINDOWS" = "1" ]; then
+    cp "$(command -v uv)" ".venv-desktop/Scripts/uv.exe"
+  else
+    cp "$(command -v uv)" ".venv-desktop/bin/uv"
+    chmod +x ".venv-desktop/bin/uv"
+  fi
 
   # Seed uv_sync.py's group-accumulation state with every group we baked. Without
   # this the first runtime `uv sync --group delta-lake` would PRUNE all the other
