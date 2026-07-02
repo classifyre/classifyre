@@ -1,7 +1,37 @@
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import { createRequire } from 'module';
 import { getAvailablePort } from './port-manager.js';
+
+const nodeRequire = createRequire(import.meta.url);
+
+// The bundled PostgreSQL binaries link against ICU/OpenSSL shipped alongside
+// them in the platform package's native/lib (e.g. libicuuc.so.60), but that
+// directory isn't on the OS's default dynamic-loader path, so initdb aborts
+// with "error while loading shared libraries: libicuuc.so.60: cannot open
+// shared object file". macOS resolves its own libs via rpath and Windows via
+// the bin dir, so this only needs fixing for Linux. Point LD_LIBRARY_PATH at
+// the bundled lib dir before embedded-postgres spawns initdb (it inherits
+// process.env).
+function ensureBundledLibsOnLoaderPath(): void {
+  if (process.platform !== 'linux') return;
+  const pkgByPlatform: Record<string, string> = {
+    'linux-x64': '@embedded-postgres/linux-x64',
+    'linux-arm64': '@embedded-postgres/linux-arm64',
+  };
+  const pkg = pkgByPlatform[`${process.platform}-${process.arch}`];
+  if (!pkg) return;
+  let libDir: string;
+  try {
+    libDir = path.join(path.dirname(nodeRequire.resolve(`${pkg}/package.json`)), 'native', 'lib');
+  } catch {
+    return;
+  }
+  if (!fs.existsSync(libDir)) return;
+  const existing = process.env['LD_LIBRARY_PATH'];
+  process.env['LD_LIBRARY_PATH'] = existing ? `${libDir}${path.delimiter}${existing}` : libDir;
+}
 
 type EmbeddedPostgresInstance = {
   initialise: () => Promise<void>;
@@ -29,6 +59,8 @@ export class PostgresManager {
 
   async start(): Promise<void> {
     if (this.running) return;
+
+    ensureBundledLibsOnLoaderPath();
 
     // Prefer the configured port; if busy, fall forward to any free port so a
     // port collision never blocks startup.
