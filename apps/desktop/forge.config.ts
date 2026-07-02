@@ -66,6 +66,8 @@ const config: ForgeConfig = {
     // Windows → Classifyre-<version> Setup.exe (Squirrel installer)
     new MakerSquirrel({
       name: 'Classifyre',
+      // Squirrel's NuGet packaging requires an author; package.json has none.
+      authors: 'Classifyre',
       setupIcon: path.resolve(__dirname, 'build/icon.ico'),
       iconUrl:
         'https://raw.githubusercontent.com/classifyre/classifyre/main/apps/desktop/build/icon.ico',
