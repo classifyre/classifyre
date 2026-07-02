@@ -4,8 +4,6 @@ import fs from 'fs';
 import { createRequire } from 'module';
 import { getAvailablePort } from './port-manager.js';
 
-const nodeRequire = createRequire(import.meta.url);
-
 // The bundled PostgreSQL binaries link against ICU/OpenSSL shipped alongside
 // them in the platform package's native/lib (e.g. libicuuc.so.60), but that
 // directory isn't on the OS's default dynamic-loader path, so initdb aborts
@@ -24,14 +22,17 @@ function ensureBundledLibsOnLoaderPath(): void {
   if (!pkg) return;
   let libDir: string;
   try {
-    // Resolve the platform package RELATIVE TO embedded-postgres. Under bun's
-    // isolated (pnpm-style) store the @embedded-postgres/* packages live in
-    // embedded-postgres's own node_modules and are not reachable from the app
-    // root, so resolving from the app would throw and we'd never set the path.
-    const epPkgJson = nodeRequire.resolve('embedded-postgres/package.json');
-    const reqFromEp = createRequire(epPkgJson);
-    const platformPkgJson = reqFromEp.resolve(`${pkg}/package.json`);
-    libDir = path.join(path.dirname(platformPkgJson), 'native', 'lib');
+    // Seed require resolution from the real app directory. import.meta.url is
+    // rewritten by vite to a base that cannot resolve the externalized
+    // embedded-postgres, whereas app.getAppPath() is a genuine runtime path.
+    // Resolve embedded-postgres's main entry, then resolve the platform package
+    // RELATIVE TO it — under bun's isolated store the @embedded-postgres/*
+    // packages live only inside embedded-postgres's own node_modules. The
+    // package's native/lib sits next to its dist/ entry.
+    const reqFromApp = createRequire(path.join(app.getAppPath(), 'index.js'));
+    const embeddedPgMain = reqFromApp.resolve('embedded-postgres');
+    const platformMain = createRequire(embeddedPgMain).resolve(pkg);
+    libDir = path.join(path.dirname(platformMain), '..', 'native', 'lib');
   } catch (err) {
     console.warn('Could not locate bundled PG libs for LD_LIBRARY_PATH:', err);
     return;
