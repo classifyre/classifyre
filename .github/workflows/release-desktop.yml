@@ -126,7 +126,16 @@ jobs:
         run: bash apps/desktop/scripts/stage-resources.sh
 
       - name: Package Electron app
-        run: bun run --cwd apps/desktop build
+        shell: bash
+        run: |
+          # macOS signs every file in the bundle (thousands, incl. the bundled
+          # venv/JRE) via concurrent `codesign` spawns. The runner's default soft
+          # limit of 256 open files triggers `spawn codesign EMFILE`, so raise it.
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            ulimit -n 65536 2>/dev/null || ulimit -n 10240 2>/dev/null || true
+            echo "open-file limit: $(ulimit -n)"
+          fi
+          bun run --cwd apps/desktop build
 
       # Fallback for builds without signing secrets: Apple Silicon refuses to
       # launch completely unsigned binaries, so ad-hoc sign them.
