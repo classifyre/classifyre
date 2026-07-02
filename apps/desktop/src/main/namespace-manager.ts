@@ -11,7 +11,17 @@ export interface Namespace {
   remoteUrl?: string;
   createdAt: string;
   lastOpenedAt: string;
+  /** Fixed API port; undefined = allocate dynamically on open. */
+  apiPort?: number;
+  /** Advanced: cap on concurrent scans (passed to the API as MAX_PARALLEL_SCANS). */
+  maxParallelScans?: number;
+  /** Advanced: Node heap limit for the API process, in MB. */
+  memoryLimitMb?: number;
 }
+
+export type NamespaceUpdate = Partial<
+  Pick<Namespace, 'name' | 'remoteUrl' | 'apiPort' | 'maxParallelScans' | 'memoryLimitMb'>
+>;
 
 export class NamespaceManager {
   private filePath: string;
@@ -82,6 +92,42 @@ export class NamespaceManager {
   delete(id: string): void {
     this.namespaces = this.namespaces.filter((n) => n.id !== id);
     this.save();
+  }
+
+  update(id: string, patch: NamespaceUpdate): Namespace {
+    const ns = this.namespaces.find((n) => n.id === id);
+    if (!ns) throw new Error(`Namespace ${id} not found`);
+
+    if (patch.name !== undefined) {
+      const name = patch.name.trim();
+      if (!name) throw new Error('Name cannot be empty');
+      ns.name = name;
+    }
+    if (patch.remoteUrl !== undefined && ns.type === 'remote') {
+      const parsed = new URL(patch.remoteUrl);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        throw new Error(`Unsupported protocol: ${parsed.protocol}`);
+      }
+      ns.remoteUrl = patch.remoteUrl;
+    }
+    for (const key of ['apiPort', 'maxParallelScans', 'memoryLimitMb'] as const) {
+      if (!(key in patch)) continue;
+      const value = patch[key];
+      if (value === undefined || value === null || value === 0) {
+        delete ns[key];
+      } else {
+        if (!Number.isInteger(value) || value < 0) {
+          throw new Error(`Invalid value for ${key}: ${value}`);
+        }
+        if (key === 'apiPort' && (value < 1024 || value > 65535)) {
+          throw new Error('API port must be between 1024 and 65535');
+        }
+        ns[key] = value;
+      }
+    }
+
+    this.save();
+    return ns;
   }
 
   get(id: string): Namespace | undefined {

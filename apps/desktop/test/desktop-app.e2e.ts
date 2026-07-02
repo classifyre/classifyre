@@ -157,15 +157,16 @@ test('namespace selector shows with Classifyre branding', async () => {
   // Logo is visible
   await selector.locator('.logo img').waitFor({ state: 'visible', timeout: 5_000 });
 
-  // Input and create button
-  await selector.locator('#new-name').waitFor({ state: 'visible', timeout: 5_000 });
-  await selector.locator('#create-btn').waitFor({ state: 'visible', timeout: 5_000 });
+  // Empty state shows the create chooser inline
+  await selector.locator('#choose-local').waitFor({ state: 'visible', timeout: 5_000 });
 });
 
 test('can create a workspace', async () => {
   const selector = await findSelectorPage();
 
-  await selector.locator('#new-name').waitFor({ state: 'visible', timeout: 10_000 });
+  await selector.locator('#choose-local').waitFor({ state: 'visible', timeout: 10_000 });
+  await selector.click('#choose-local');
+  await selector.locator('#new-name').waitFor({ state: 'visible', timeout: 5_000 });
   await selector.fill('#new-name', 'E2E Test Workspace');
   await selector.click('#create-btn');
 
@@ -176,9 +177,10 @@ test('can create a workspace', async () => {
 test('can open workspace and see web UI with sidebar', async () => {
   const selector = await findSelectorPage();
 
-  const openBtn = selector.locator('[data-action="open"]').first();
-  await openBtn.waitFor({ state: 'visible', timeout: 5_000 });
-  await openBtn.click();
+  // The whole card is clickable and opens the workspace.
+  const card = selector.locator('.namespace-item').first();
+  await card.waitFor({ state: 'visible', timeout: 5_000 });
+  await card.click();
 
   // In the tabbed architecture, a new WebContentsView is created for the namespace.
   // Playwright sees it as a new "window". Wait for it.

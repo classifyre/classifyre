@@ -7,7 +7,7 @@ type EmbeddedPostgresInstance = {
   initialise: () => Promise<void>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
-  getPgClient: () => {
+  getPgClient: (database?: string) => {
     connect: () => Promise<void>;
     query: (sql: string) => Promise<{ rows: unknown[] }>;
     end: () => Promise<void>;
@@ -17,18 +17,22 @@ type EmbeddedPostgresInstance = {
 export class PostgresManager {
   private pg: EmbeddedPostgresInstance | null = null;
   private port = 0;
+  private preferredPort = 54320;
   private running = false;
   private dataDir: string;
 
-  constructor() {
+  constructor(preferredPort?: number) {
     const base = process.env['CLASSIFYRE_DATA_DIR'] || app.getPath('userData');
     this.dataDir = path.join(base, 'pgdata');
+    if (preferredPort) this.preferredPort = preferredPort;
   }
 
   async start(): Promise<void> {
     if (this.running) return;
 
-    this.port = await getAvailablePort(54320);
+    // Prefer the configured port; if busy, fall forward to any free port so a
+    // port collision never blocks startup.
+    this.port = await getAvailablePort(this.preferredPort);
 
     const { default: EmbeddedPostgres } = await import('embedded-postgres');
     this.pg = new EmbeddedPostgres({
@@ -72,10 +76,26 @@ export class PostgresManager {
       throw new Error(`Invalid schema name: ${schemaName}`);
     }
 
-    const client = this.pg.getPgClient();
+    // Schemas live in the app database, not the default `postgres` database.
+    const client = this.pg.getPgClient('classifyre');
     await client.connect();
     try {
       await client.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
+    } finally {
+      await client.end();
+    }
+  }
+
+  async dropSchema(schemaName: string): Promise<void> {
+    if (!this.pg) throw new Error('PostgreSQL not started');
+    if (!/^[a-z0-9_]+$/.test(schemaName)) {
+      throw new Error(`Invalid schema name: ${schemaName}`);
+    }
+
+    const client = this.pg.getPgClient('classifyre');
+    await client.connect();
+    try {
+      await client.query(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`);
     } finally {
       await client.end();
     }

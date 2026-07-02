@@ -5,8 +5,13 @@ import fs from 'fs';
 import http from 'http';
 import os from 'os';
 import treeKill from 'tree-kill';
+import { ensurePythonRuntime } from './python-env.js';
 
-function getShellPath(): string {
+// In dev mode we inherit the developer's login-shell PATH so locally installed
+// tooling (uv, java, node) is visible. In packaged mode we never touch the
+// user's shell: everything the app needs is bundled, and the PATH is built
+// from the bundled resources plus standard system directories only.
+function getDevShellPath(): string {
   const shells = ['/bin/zsh', '/bin/bash'];
   for (const shell of shells) {
     try {
@@ -20,7 +25,7 @@ function getShellPath(): string {
   }
 
   const home = os.homedir();
-  const extras = [
+  return [
     `${home}/.bun/bin`,
     `${home}/.local/bin`,
     '/opt/homebrew/bin',
@@ -29,39 +34,36 @@ function getShellPath(): string {
     '/bin',
     '/usr/sbin',
     '/sbin',
-  ];
+  ].join(':');
+}
 
-  const nvmDir = path.join(home, '.nvm/versions/node');
-  if (fs.existsSync(nvmDir)) {
-    try {
-      const versions = fs.readdirSync(nvmDir).filter((v) => v.startsWith('v')).sort().reverse();
-      if (versions[0]) {
-        extras.unshift(path.join(nvmDir, versions[0], 'bin'));
-      }
-    } catch { /* ignore */ }
+function getSystemPath(): string {
+  if (process.platform === 'win32') {
+    return process.env['PATH'] ?? '';
   }
-
-  return extras.join(':');
+  return ['/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(':');
 }
 
 let cachedEnv: Record<string, string> | null = null;
 
-function getShellEnv(): Record<string, string> {
+function getBaseEnv(): Record<string, string> {
   if (cachedEnv) return cachedEnv;
-  cachedEnv = { ...process.env, PATH: getShellPath() } as Record<string, string>;
+  if (app.isPackaged) {
+    cachedEnv = {
+      ...process.env,
+      PATH: getSystemPath(),
+    } as Record<string, string>;
+    // The packaged app must not run child processes as Node accidentally.
+    delete cachedEnv['ELECTRON_RUN_AS_NODE'];
+  } else {
+    cachedEnv = { ...process.env, PATH: getDevShellPath() } as Record<string, string>;
+  }
   return cachedEnv;
 }
 
-function findBun(): string {
-  const candidates = [
-    path.join(os.homedir(), '.bun/bin/bun'),
-    '/usr/local/bin/bun',
-    '/opt/homebrew/bin/bun',
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
-  }
-  return 'bun';
+export interface ApiRuntimeOptions {
+  maxParallelScans?: number;
+  memoryLimitMb?: number;
 }
 
 interface ManagedProcess {
@@ -71,6 +73,22 @@ interface ManagedProcess {
 
 export class ProcessManager {
   private processes = new Map<string, ManagedProcess>();
+  private venvPathOverride: string | null = null;
+  private venvPrepared = false;
+
+  // Rewires the bundled Python venv for this machine. Lazy: runs on the first
+  // workspace open (covered by the loading indicator) rather than at app
+  // startup — the first-launch copy can move gigabytes.
+  private prepareVenv(): void {
+    if (this.venvPrepared) return;
+    this.venvPrepared = true;
+    try {
+      const venvPath = ensurePythonRuntime();
+      if (venvPath) this.venvPathOverride = venvPath;
+    } catch (err) {
+      console.error('Failed to prepare Python runtime:', err);
+    }
+  }
 
   private getApiEntryPath(): string {
     if (app.isPackaged) {
@@ -87,39 +105,62 @@ export class ProcessManager {
   }
 
   private getVenvPath(): string {
+    if (this.venvPathOverride) return this.venvPathOverride;
     if (app.isPackaged) {
       return path.join(process.resourcesPath, 'venv');
     }
     return path.join(__dirname, '../../../cli/.venv');
   }
 
-  // Bundled Amazon Corretto JRE used by the Spark-backed lakehouse sources
-  // (pyspark). Staged into resources/jre by build-desktop.sh; normalized so
-  // that <jre>/bin/java exists on every platform.
+  // Bundled jlink-minimized Corretto runtime used by the Spark-backed
+  // lakehouse sources (pyspark). Staged into resources/jre by
+  // scripts/stage-resources.sh so that <jre>/bin/java exists on every platform.
   private getJreHome(): string {
     if (app.isPackaged) {
       return path.join(process.resourcesPath, 'jre');
     }
-    // In dev mode point at resources/jre, which build-desktop.sh populates.
+    // In dev mode point at resources/jre, which stage-resources.sh populates.
     // If absent, javaEnv stays empty and JAVA_HOME falls back to the system PATH.
     return path.join(__dirname, '../../resources/jre');
   }
 
   private getPrismaDir(): string {
     if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'prisma');
+      // Staged inside the api tree so `prisma generate` at build time and
+      // `prisma migrate deploy` at runtime share one schema location.
+      return path.join(process.resourcesPath, 'api', 'prisma');
     }
     return path.join(__dirname, '../../../api/prisma');
+  }
+
+  private getApiDir(): string {
+    if (app.isPackaged) {
+      return path.join(process.resourcesPath, 'api');
+    }
+    return path.join(__dirname, '../../../api');
+  }
+
+  // Runs a script with Electron's embedded Node.js so the packaged app never
+  // depends on a system-wide node installation.
+  private nodeSpawnEnv(extra: Record<string, string>): Record<string, string> {
+    return {
+      ...getBaseEnv(),
+      ...extra,
+      ELECTRON_RUN_AS_NODE: '1',
+    };
   }
 
   async startApi(
     namespaceId: string,
     port: number,
     databaseUrl: string,
+    options: ApiRuntimeOptions = {},
   ): Promise<void> {
     if (this.processes.has(namespaceId)) {
       return;
     }
+
+    this.prepareVenv();
 
     const entryPath = this.getApiEntryPath();
     const cliPath = this.getCliPath();
@@ -127,20 +168,32 @@ export class ProcessManager {
 
     // Expose the bundled JRE to the CLI subprocess the API spawns (it inherits
     // this env via `{ ...process.env }`), so pyspark's lakehouse sources find Java.
-    const baseEnv = getShellEnv();
+    const baseEnv = getBaseEnv();
     const jreHome = this.getJreHome();
     const jreBin = path.join(jreHome, 'bin');
     const javaEnv = fs.existsSync(jreBin)
       ? {
           JAVA_HOME: jreHome,
-          PATH: `${jreBin}${path.delimiter}${baseEnv.PATH ?? ''}`,
+          PATH: `${jreBin}${path.delimiter}${baseEnv['PATH'] ?? ''}`,
         }
       : {};
 
-    const child = spawn('node', [entryPath], {
+    const venvBin = path.join(venvPath, process.platform === 'win32' ? 'Scripts' : 'bin');
+    const pathWithVenv = fs.existsSync(venvBin)
+      ? `${venvBin}${path.delimiter}${(javaEnv as { PATH?: string }).PATH ?? baseEnv['PATH'] ?? ''}`
+      : (javaEnv as { PATH?: string }).PATH ?? baseEnv['PATH'] ?? '';
+
+    const nodeArgs: string[] = [];
+    if (options.memoryLimitMb && options.memoryLimitMb > 0) {
+      nodeArgs.push(`--max-old-space-size=${Math.floor(options.memoryLimitMb)}`);
+    }
+
+    const child = spawn(process.execPath, [...nodeArgs, entryPath], {
       env: {
         ...baseEnv,
         ...javaEnv,
+        PATH: pathWithVenv,
+        ELECTRON_RUN_AS_NODE: '1',
         PORT: String(port),
         DATABASE_URL: databaseUrl,
         ENVIRONMENT: 'desktop',
@@ -148,7 +201,10 @@ export class ProcessManager {
         VENV_PATH: venvPath,
         CORS_ORIGIN: '*',
         CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS: '0',
-        NODE_ENV: 'development',
+        NODE_ENV: app.isPackaged ? 'production' : 'development',
+        ...(options.maxParallelScans && options.maxParallelScans > 0
+          ? { MAX_PARALLEL_SCANS: String(Math.floor(options.maxParallelScans)) }
+          : {}),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -168,33 +224,50 @@ export class ProcessManager {
 
     this.processes.set(namespaceId, { child, port });
 
-    await this.waitForReady(port);
+    try {
+      await this.waitForReady(port);
+    } catch (err) {
+      await this.stopApi(namespaceId);
+      throw err;
+    }
   }
 
-  private getApiDir(): string {
-    if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'api');
+  // Locates the Prisma CLI bundled with the API's node_modules; runs offline
+  // with Electron's Node — no bun, no npx, no network.
+  private getPrismaCliPath(): string {
+    const candidates = [
+      path.join(this.getApiDir(), 'node_modules', 'prisma', 'build', 'index.js'),
+      // Dev fallback: hoisted install at the monorepo root.
+      path.join(__dirname, '../../../../node_modules/prisma/build/index.js'),
+    ];
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) return candidate;
     }
-    return path.join(__dirname, '../../../api');
+    throw new Error(
+      `Prisma CLI not found (looked in: ${candidates.join(', ')}). ` +
+        'The desktop bundle must include api/node_modules/prisma.',
+    );
   }
 
   async runMigrations(databaseUrl: string): Promise<void> {
     const prismaSchemaPath = path.join(this.getPrismaDir(), 'schema.prisma');
     const apiDir = this.getApiDir();
+    const prismaCli = this.getPrismaCliPath();
 
     console.log(`[migrations] Running in ${apiDir} with schema ${prismaSchemaPath}`);
 
     return new Promise((resolve, reject) => {
-      const bun = findBun();
       const child = spawn(
-        bun,
-        ['x', 'prisma', 'migrate', 'deploy', '--schema', prismaSchemaPath],
+        process.execPath,
+        [prismaCli, 'migrate', 'deploy', '--schema', prismaSchemaPath],
         {
           cwd: apiDir,
-          env: {
-            ...getShellEnv(),
+          env: this.nodeSpawnEnv({
             DATABASE_URL: databaseUrl,
-          },
+            // Prisma CLI must not try to download engines at runtime.
+            PRISMA_CLI_TELEMETRY_INFORMATION: 'disabled',
+            CHECKPOINT_DISABLE: '1',
+          }),
           stdio: ['ignore', 'pipe', 'pipe'],
         },
       );
@@ -218,7 +291,7 @@ export class ProcessManager {
 
   private waitForReady(
     port: number,
-    timeoutMs = 30_000,
+    timeoutMs = 60_000,
     intervalMs = 500,
   ): Promise<void> {
     const start = Date.now();
