@@ -50,6 +50,9 @@ class AssetType(StrEnum):
     HUDI = 'HUDI'
     SPARK_CATALOG = 'SPARK_CATALOG'
     KAFKA = 'KAFKA'
+    ELASTICSEARCH = 'ELASTICSEARCH'
+    OPENSEARCH = 'OPENSEARCH'
+    MEILISEARCH = 'MEILISEARCH'
 
 
 class DetectorType(StrEnum):
@@ -353,6 +356,9 @@ class Type(StrEnum):
     HUDI = 'HUDI'
     SPARK_CATALOG = 'SPARK_CATALOG'
     KAFKA = 'KAFKA'
+    ELASTICSEARCH = 'ELASTICSEARCH'
+    OPENSEARCH = 'OPENSEARCH'
+    MEILISEARCH = 'MEILISEARCH'
 
 
 class YouTubeRequired(BaseModel):
@@ -2865,6 +2871,9 @@ class Type19(StrEnum):
     HUDI = 'HUDI'
     SPARK_CATALOG = 'SPARK_CATALOG'
     KAFKA = 'KAFKA'
+    ELASTICSEARCH = 'ELASTICSEARCH'
+    OPENSEARCH = 'OPENSEARCH'
+    MEILISEARCH = 'MEILISEARCH'
 
 
 class ConfluenceInput(CoreInput):
@@ -3491,25 +3500,68 @@ class IcebergInput(CoreInput):
     resources: ResourceOverrides | None = None
 
 
-class KafkaRequired(BaseModel):
+class NoAuthentication(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    auth_mode: Literal['NONE']
     bootstrap_servers: str = Field(
         ..., description='Comma-separated Kafka bootstrap servers (host:port)'
     )
 
 
-class KafkaMasked(BaseModel):
+class SASL(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['SASL']
+    bootstrap_servers: str = Field(
+        ..., description='Comma-separated Kafka bootstrap servers (host:port)'
+    )
+
+
+class ClientCertificateMTLS(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['CLIENT_CERT']
+    bootstrap_servers: str = Field(
+        ..., description='Comma-separated Kafka bootstrap servers (host:port)'
+    )
+
+
+class NoAuthentication1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class SASL1(BaseModel):
     """
-    Optional SASL credentials.
+    SASL username/password credentials.
     """
 
     model_config = ConfigDict(
         extra='forbid',
     )
-    sasl_username: str | None = Field(None, description='SASL username')
-    sasl_password: str | None = Field(None, description='SASL password')
+    sasl_username: str = Field(..., description='SASL username')
+    sasl_password: str = Field(..., description='SASL password')
+
+
+class ClientCertificateMTLS1(BaseModel):
+    """
+    mTLS client certificate credentials.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ssl_certfile: str = Field(
+        ..., description='PEM-encoded client certificate (access cert)'
+    )
+    ssl_keyfile: str = Field(
+        ..., description='PEM-encoded client private key (access key)'
+    )
 
 
 class KafkaOptionalConnection(BaseModel):
@@ -3523,7 +3575,8 @@ class KafkaOptionalConnection(BaseModel):
     security_protocol: KafkaSecurityProtocol | None = 'PLAINTEXT'
     sasl_mechanism: KafkaSaslMechanism | None = 'PLAIN'
     ssl_ca: str | None = Field(
-        None, description='PEM-encoded CA certificate for TLS verification'
+        None,
+        description="PEM-encoded CA certificate for TLS verification (optional for client-certificate auth; validates the broker's certificate)",
     )
     request_timeout_ms: int | None = Field(
         30000, description='Client request timeout in milliseconds', ge=1000
@@ -3562,9 +3615,261 @@ class KafkaInput(CoreInput):
     type: Literal['KAFKA'] | None = Field(
         None, description='Type of the asset or source'
     )
-    required: KafkaRequired
-    masked: KafkaMasked | None = None
+    required: NoAuthentication | SASL | ClientCertificateMTLS = Field(
+        ..., title='KafkaRequired'
+    )
+    masked: NoAuthentication1 | SASL1 | ClientCertificateMTLS1 | None = Field(
+        None, title='KafkaMasked'
+    )
     optional: KafkaOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
+class NoAuthentication2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['NONE']
+    url: AnyUrl = Field(
+        ..., description='Base URL of the cluster (e.g. https://localhost:9200)'
+    )
+
+
+class BasicUsernamePassword(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['BASIC']
+    url: AnyUrl = Field(
+        ..., description='Base URL of the cluster (e.g. https://localhost:9200)'
+    )
+
+
+class APIKeyBearerToken(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['API_KEY']
+    url: AnyUrl = Field(
+        ..., description='Base URL of the cluster (e.g. https://localhost:9200)'
+    )
+
+
+class NoAuthentication3(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class BasicUsernamePassword1(BaseModel):
+    """
+    Basic auth credentials.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    username: str = Field(..., description='Basic auth username')
+    password: str = Field(..., description='Basic auth password')
+
+
+class APIKeyBearerToken1(BaseModel):
+    """
+    API key / bearer token credential.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    api_key: str = Field(
+        ..., description='API key or bearer token, sent as an Authorization header'
+    )
+
+
+class SearchEngineOptionalConnection(BaseModel):
+    """
+    Cluster connection controls.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    verify_ssl: bool | None = Field(
+        True, description='TLS certificate verification toggle'
+    )
+    request_timeout_seconds: float | None = Field(
+        30,
+        description='Network timeout in seconds for cluster API calls',
+        ge=1.0,
+        le=300.0,
+    )
+
+
+class SearchEngineOptionalScope(BaseModel):
+    """
+    Index selection scope.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_indices: list[str] | None = Field(
+        None, description='Optional index allowlist'
+    )
+    exclude_indices: list[str] | None = Field(None, description='Index denylist')
+    include_system_indices: bool | None = Field(
+        False, description='Include system indices (names starting with .)'
+    )
+    index_limit: int | None = Field(
+        None, description='Optional cap on number of index assets', ge=1
+    )
+
+
+class ElasticsearchOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: SearchEngineOptionalConnection | None = None
+    scope: SearchEngineOptionalScope | None = None
+
+
+class ElasticsearchInput(CoreInput):
+    type: Literal['ELASTICSEARCH'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: NoAuthentication2 | BasicUsernamePassword | APIKeyBearerToken = Field(
+        ..., title='ElasticsearchRequired'
+    )
+    masked: NoAuthentication3 | BasicUsernamePassword1 | APIKeyBearerToken1 | None = (
+        Field(None, title='ElasticsearchMasked')
+    )
+    optional: ElasticsearchOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
+class OpenSearchOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: SearchEngineOptionalConnection | None = None
+    scope: SearchEngineOptionalScope | None = None
+
+
+class OpenSearchInput(CoreInput):
+    type: Literal['OPENSEARCH'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: NoAuthentication2 | BasicUsernamePassword | APIKeyBearerToken = Field(
+        ..., title='OpenSearchRequired'
+    )
+    masked: NoAuthentication3 | BasicUsernamePassword1 | APIKeyBearerToken1 | None = (
+        Field(None, title='OpenSearchMasked')
+    )
+    optional: OpenSearchOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
+class NoAuthentication4(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['NONE']
+    url: AnyUrl = Field(
+        ...,
+        description='Base URL of the Meilisearch instance (e.g. http://localhost:7700)',
+    )
+
+
+class APIKeyBearerToken2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['API_KEY']
+    url: AnyUrl = Field(
+        ...,
+        description='Base URL of the Meilisearch instance (e.g. http://localhost:7700)',
+    )
+
+
+class NoAuthentication5(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class APIKeyBearerToken3(BaseModel):
+    """
+    Meilisearch API key or master key, sent as an Authorization: Bearer header. Meilisearch has no separate username/password authentication mode.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    api_key: str = Field(..., description='API key or master key')
+
+
+class MeilisearchOptionalScope(BaseModel):
+    """
+    Index selection scope.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_indices: list[str] | None = Field(
+        None, description='Optional index allowlist (matches index uid)'
+    )
+    exclude_indices: list[str] | None = Field(
+        None, description='Index denylist (matches index uid)'
+    )
+    index_limit: int | None = Field(
+        None, description='Optional cap on number of index assets', ge=1
+    )
+
+
+class MeilisearchOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    connection: SearchEngineOptionalConnection | None = None
+    scope: MeilisearchOptionalScope | None = None
+
+
+class MeilisearchInput(CoreInput):
+    type: Literal['MEILISEARCH'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: NoAuthentication4 | APIKeyBearerToken2 = Field(
+        ..., title='MeilisearchRequired'
+    )
+    masked: NoAuthentication5 | APIKeyBearerToken3 | None = Field(
+        None, title='MeilisearchMasked'
+    )
+    optional: MeilisearchOptional | None = None
     detectors: list[Detector] | None = Field(
         None, description='Detectors to run on ingested content'
     )
@@ -3624,6 +3929,9 @@ class SourceInput(
         | HudiInput
         | SparkCatalogInput
         | KafkaInput
+        | ElasticsearchInput
+        | OpenSearchInput
+        | MeilisearchInput
     ]
 ):
     root: (
@@ -3655,6 +3963,9 @@ class SourceInput(
         | HudiInput
         | SparkCatalogInput
         | KafkaInput
+        | ElasticsearchInput
+        | OpenSearchInput
+        | MeilisearchInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

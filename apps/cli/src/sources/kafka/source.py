@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import ssl as ssl_module
+import tempfile
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any
@@ -67,6 +68,7 @@ class KafkaSource(BaseSource):
     def _client_kwargs(self) -> dict[str, Any]:
         kwargs: dict[str, Any] = {"bootstrap_servers": self._bootstrap_servers()}
         connection = self._connection()
+        ssl_ca = getattr(connection, "ssl_ca", None) if connection is not None else None
         if connection is not None:
             protocol = getattr(connection, "security_protocol", None)
             if protocol is not None:
@@ -80,16 +82,33 @@ class KafkaSource(BaseSource):
                 )
             if getattr(connection, "request_timeout_ms", None):
                 kwargs["request_timeout_ms"] = int(connection.request_timeout_ms)
-            if getattr(connection, "ssl_ca", None):
-                context = ssl_module.create_default_context(cadata=connection.ssl_ca)
-                kwargs["ssl_context"] = context
         masked = self.config.masked
-        if masked is not None:
-            if getattr(masked, "sasl_username", None):
-                kwargs["sasl_plain_username"] = masked.sasl_username
-            if getattr(masked, "sasl_password", None):
-                kwargs["sasl_plain_password"] = masked.sasl_password
+        if getattr(masked, "sasl_username", None):
+            kwargs["sasl_plain_username"] = masked.sasl_username
+        if getattr(masked, "sasl_password", None):
+            kwargs["sasl_plain_password"] = masked.sasl_password
+        ssl_certfile = getattr(masked, "ssl_certfile", None)
+        ssl_keyfile = getattr(masked, "ssl_keyfile", None)
+        if ssl_ca or ssl_certfile:
+            context = ssl_module.create_default_context(cadata=ssl_ca)
+            if ssl_certfile and ssl_keyfile:
+                self._load_client_cert_chain(context, ssl_certfile, ssl_keyfile)
+            kwargs["ssl_context"] = context
         return kwargs
+
+    @staticmethod
+    def _load_client_cert_chain(
+        context: ssl_module.SSLContext, certfile: str, keyfile: str
+    ) -> None:
+        with (
+            tempfile.NamedTemporaryFile("w", suffix=".pem") as cert_tmp,
+            tempfile.NamedTemporaryFile("w", suffix=".pem") as key_tmp,
+        ):
+            cert_tmp.write(certfile)
+            cert_tmp.flush()
+            key_tmp.write(keyfile)
+            key_tmp.flush()
+            context.load_cert_chain(certfile=cert_tmp.name, keyfile=key_tmp.name)
 
     def _make_consumer(self, **extra: Any) -> Any:
         kwargs = {**self._client_kwargs(), "enable_auto_commit": False, **extra}

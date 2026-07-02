@@ -1923,17 +1923,18 @@ function SchemaField({
     );
   }
 
+  const isCertField = name.toLowerCase().includes("ssl_ca");
   const isPassword =
-    forceMasked ||
-    (autoDetectSensitiveFields &&
-      (name.toLowerCase().includes("password") ||
-        name.toLowerCase().includes("token") ||
-        name.toLowerCase().includes("secret") ||
-        name.toLowerCase().includes("key") ||
-        name.toLowerCase().includes("ssl_ca")));
+    !isCertField &&
+    (forceMasked ||
+      (autoDetectSensitiveFields &&
+        (name.toLowerCase().includes("password") ||
+          name.toLowerCase().includes("token") ||
+          name.toLowerCase().includes("secret") ||
+          name.toLowerCase().includes("key"))));
   const isUrl =
     normalizedSchema.format === "uri" || name.toLowerCase().includes("url");
-  const isLongField = isLongText(normalizedSchema);
+  const isLongField = isCertField || isLongText(normalizedSchema);
 
   return (
     <FormField
@@ -2250,6 +2251,9 @@ export const JsonSchemaForm = React.forwardRef<
     HUDI: true,
     SPARK_CATALOG: true,
     KAFKA: false,
+    ELASTICSEARCH: false,
+    OPENSEARCH: false,
+    MEILISEARCH: false,
   };
   const isTabular =
     assistantSourceType && isIngestionSourceType(assistantSourceType)
