@@ -32,7 +32,6 @@ export default defineConfig({
       external: [
         'embedded-postgres',
         /^@embedded-postgres\//,
-        'electron-updater',
         'tree-kill',
         'get-port',
       ],
