@@ -201,5 +201,23 @@
   <div class="tabs" id="tabs"></div>
   <div class="update-badge" id="update-badge"></div>
   <div class="right-spacer"></div>
+  <script>
+    (function () {
+      var badge = document.getElementById('update-badge');
+      if (!badge || !window.electronAPI || !window.electronAPI.onUpdateStatus) return;
+      window.electronAPI.onUpdateStatus(function (s) {
+        if (s && s.status === 'available') {
+          badge.className = 'update-badge available';
+          badge.textContent = 'Update ' + s.version + ' available';
+          badge.title = 'Open the download page';
+          badge.onclick = function () { window.electronAPI.openDownloadPage(); };
+        } else {
+          badge.className = 'update-badge';
+          badge.textContent = '';
+          badge.onclick = null;
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

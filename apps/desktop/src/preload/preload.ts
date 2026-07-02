@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('namespace:create', name, remoteUrl),
   deleteNamespace: (id: string) =>
     ipcRenderer.invoke('namespace:delete', id),
+  updateNamespace: (id: string, patch: Record<string, unknown>) =>
+    ipcRenderer.invoke('namespace:update', id, patch),
   openNamespace: (id: string) =>
     ipcRenderer.invoke('namespace:open', id),
   closeNamespace: (id: string) =>
@@ -41,10 +43,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('tabs:update', (_event, data) => cb(data));
   },
 
+  // Global settings
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  updateSettings: (patch: Record<string, unknown>) =>
+    ipcRenderer.invoke('settings:update', patch),
+
   // Update operations
   checkForUpdate: () => ipcRenderer.invoke('update:check'),
-  downloadUpdate: () => ipcRenderer.invoke('update:download'),
-  installUpdate: () => ipcRenderer.invoke('update:install'),
+  openDownloadPage: () => ipcRenderer.invoke('update:open-download-page'),
   onUpdateStatus: (cb: (data: unknown) => void) => {
     ipcRenderer.on('update:status', (_event, data) => cb(data));
   },
