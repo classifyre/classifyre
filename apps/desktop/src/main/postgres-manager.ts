@@ -24,13 +24,25 @@ function ensureBundledLibsOnLoaderPath(): void {
   if (!pkg) return;
   let libDir: string;
   try {
-    libDir = path.join(path.dirname(nodeRequire.resolve(`${pkg}/package.json`)), 'native', 'lib');
-  } catch {
+    // Resolve the platform package RELATIVE TO embedded-postgres. Under bun's
+    // isolated (pnpm-style) store the @embedded-postgres/* packages live in
+    // embedded-postgres's own node_modules and are not reachable from the app
+    // root, so resolving from the app would throw and we'd never set the path.
+    const epPkgJson = nodeRequire.resolve('embedded-postgres/package.json');
+    const reqFromEp = createRequire(epPkgJson);
+    const platformPkgJson = reqFromEp.resolve(`${pkg}/package.json`);
+    libDir = path.join(path.dirname(platformPkgJson), 'native', 'lib');
+  } catch (err) {
+    console.warn('Could not locate bundled PG libs for LD_LIBRARY_PATH:', err);
     return;
   }
-  if (!fs.existsSync(libDir)) return;
+  if (!fs.existsSync(libDir)) {
+    console.warn(`Bundled PG lib dir not found, skipping LD_LIBRARY_PATH: ${libDir}`);
+    return;
+  }
   const existing = process.env['LD_LIBRARY_PATH'];
   process.env['LD_LIBRARY_PATH'] = existing ? `${libDir}${path.delimiter}${existing}` : libDir;
+  console.log(`Added bundled PostgreSQL libs to LD_LIBRARY_PATH: ${libDir}`);
 }
 
 type EmbeddedPostgresInstance = {
