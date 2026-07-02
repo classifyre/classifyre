@@ -2277,7 +2277,7 @@
   "KAFKA": [
     {
       "name": "Topic discovery scan",
-      "description": "Discover Kafka topics and sample recent messages",
+      "description": "Discover Kafka topics and sample recent messages on a local, unauthenticated broker",
       "schedule": {
         "enabled": true,
         "preset": "weekday_business",
@@ -2287,6 +2287,7 @@
       "config": {
         "type": "KAFKA",
         "required": {
+          "auth_mode": "NONE",
           "bootstrap_servers": "broker1:9092,broker2:9092"
         },
         "optional": {
@@ -2312,6 +2313,7 @@
       "config": {
         "type": "KAFKA",
         "required": {
+          "auth_mode": "SASL",
           "bootstrap_servers": "broker:9093"
         },
         "masked": {
@@ -2344,6 +2346,387 @@
             "enabled": true
           }
         ]
+      }
+    },
+    {
+      "name": "Managed Kafka (Aiven/Confluent Cloud) with CA cert",
+      "description": "Connect to a managed SASL_SSL Kafka service (e.g. Aiven, Confluent Cloud) using a broker-issued CA certificate for TLS verification",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "5 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "KAFKA",
+        "required": {
+          "auth_mode": "SASL",
+          "bootstrap_servers": "kafka-example-1234.example-cloud.com:12345"
+        },
+        "masked": {
+          "sasl_username": "avnadmin",
+          "sasl_password": "your-service-password"
+        },
+        "optional": {
+          "connection": {
+            "security_protocol": "SASL_SSL",
+            "sasl_mechanism": "PLAIN",
+            "ssl_ca": "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM\nGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNjAxMDEwMDAwMDBaFw0zNjAx\nMDEwMDAwMDBaMEUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEw\nHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwggEiMA0GCSqGSIb3DQEB\nAQUAA4IBDwAwggEKAoIBAQDFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF\nAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF\n-----END CERTIFICATE-----\n"
+          },
+          "scope": {
+            "include_internal": false
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    },
+    {
+      "name": "Mutual TLS (client certificate) authentication",
+      "description": "Authenticate to a Kafka broker using a client certificate and private key instead of SASL — no username/password required",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "45 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "KAFKA",
+        "required": {
+          "auth_mode": "CLIENT_CERT",
+          "bootstrap_servers": "broker.internal:9094"
+        },
+        "masked": {
+          "ssl_certfile": "-----BEGIN CERTIFICATE-----\nMIIDCTCCAfGgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwFDESMBAGA1UEAwwJY2xpZW50LWNhMB4XDTI2MDEwMTAwMDAwMFoXDTI3MDEw\nMTAwMDAwMFowFDESMBAGA1UEAwwJY2xpZW50LWNhMIIBIjANBgkqhkiG9w0BAQEF\n-----END CERTIFICATE-----\n",
+          "ssl_keyfile": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDFAKEFAKEFAKEF\nAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF\n-----END PRIVATE KEY-----\n"
+        },
+        "optional": {
+          "connection": {
+            "security_protocol": "SSL",
+            "ssl_ca": "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM\n-----END CERTIFICATE-----\n"
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 50
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
+  "ELASTICSEARCH": [
+    {
+      "name": "Local dev cluster scan",
+      "description": "Discover indices and sample documents on a local, unauthenticated Elasticsearch cluster",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "15 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "ELASTICSEARCH",
+        "required": {
+          "auth_mode": "NONE",
+          "url": "http://localhost:9200"
+        },
+        "optional": {
+          "scope": {
+            "include_system_indices": false
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Basic auth secrets detection",
+      "description": "Sample documents from selected indices using basic auth and run secrets detection",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "40 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "ELASTICSEARCH",
+        "required": {
+          "auth_mode": "BASIC",
+          "url": "https://es.internal.example.com:9200"
+        },
+        "masked": {
+          "username": "elastic",
+          "password": "your-password"
+        },
+        "optional": {
+          "connection": {
+            "verify_ssl": true
+          },
+          "scope": {
+            "include_indices": [
+              "orders",
+              "customers"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 100
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          },
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Elastic Cloud with API key",
+      "description": "Connect to an Elastic Cloud deployment using an API key (bearer token) instead of a username/password",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "10 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "ELASTICSEARCH",
+        "required": {
+          "auth_mode": "API_KEY",
+          "url": "https://my-deployment.es.us-east-1.aws.found.io:9243"
+        },
+        "masked": {
+          "api_key": "your-base64-encoded-api-key"
+        },
+        "optional": {
+          "scope": {
+            "exclude_indices": [
+              ".kibana*"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    }
+  ],
+  "OPENSEARCH": [
+    {
+      "name": "Local dev cluster scan",
+      "description": "Discover indices and sample documents on a local, unauthenticated OpenSearch cluster",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "20 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "OPENSEARCH",
+        "required": {
+          "auth_mode": "NONE",
+          "url": "http://localhost:9200"
+        },
+        "optional": {
+          "scope": {
+            "include_system_indices": false
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Basic auth secrets detection",
+      "description": "Sample documents from selected indices using basic auth and run secrets detection",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "50 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "OPENSEARCH",
+        "required": {
+          "auth_mode": "BASIC",
+          "url": "https://opensearch.internal.example.com:9200"
+        },
+        "masked": {
+          "username": "admin",
+          "password": "your-password"
+        },
+        "optional": {
+          "connection": {
+            "verify_ssl": true
+          },
+          "scope": {
+            "include_indices": [
+              "logs-app",
+              "logs-infra"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 100
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          },
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "AWS OpenSearch Service with API key",
+      "description": "Connect to a managed AWS OpenSearch Service domain using an API key (bearer token)",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "25 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "OPENSEARCH",
+        "required": {
+          "auth_mode": "API_KEY",
+          "url": "https://search-my-domain-abc123.us-east-1.es.amazonaws.com"
+        },
+        "masked": {
+          "api_key": "your-api-key"
+        },
+        "optional": {
+          "scope": {
+            "exclude_indices": [
+              ".opensearch-*"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    }
+  ],
+  "MEILISEARCH": [
+    {
+      "name": "Local dev instance scan",
+      "description": "Discover indexes and sample documents on a local, unauthenticated Meilisearch instance",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "30 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MEILISEARCH",
+        "required": {
+          "auth_mode": "NONE",
+          "url": "http://localhost:7700"
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 50
+        }
+      }
+    },
+    {
+      "name": "Master key secrets detection",
+      "description": "Full scan of selected indexes using an API/master key and run secrets detection",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "15 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MEILISEARCH",
+        "required": {
+          "auth_mode": "API_KEY",
+          "url": "https://search.internal.example.com:7700"
+        },
+        "masked": {
+          "api_key": "your-master-or-api-key"
+        },
+        "optional": {
+          "scope": {
+            "include_indices": [
+              "products",
+              "customers"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "ALL",
+          "rows_per_page": 100
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          },
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Meilisearch Cloud incremental scan",
+      "description": "Incrementally ingest a random sample of documents from a Meilisearch Cloud project on each run",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_business",
+        "cron": "45 8 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "MEILISEARCH",
+        "required": {
+          "auth_mode": "API_KEY",
+          "url": "https://ms-example123.meilisearch.io"
+        },
+        "masked": {
+          "api_key": "your-api-key"
+        },
+        "optional": {
+          "connection": {
+            "verify_ssl": true
+          },
+          "scope": {
+            "exclude_indices": [
+              "internal_logs"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 50
+        }
       }
     }
   ]

@@ -47,14 +47,22 @@ class SparkCatalogSource(BaseSparkSource):
         return self.config.required.connect_url
 
     def _spark_remote(self) -> str | None:
-        url = self._connect_url()
+        # Users provide the full Spark Connect endpoint plus any options they need as
+        # `;key=value` pairs after `/;` — e.g. for Databricks:
+        #   sc://host:443/;x-databricks-cluster-id=<id>;use_ssl=true
+        # We only inject the token from the masked field so credentials aren't stored
+        # in the connect_url in plaintext. Whitespace is stripped defensively.
+        url = "".join(self._connect_url().split())
         if not url.startswith("sc://"):
             return None
         token = getattr(self.config.masked, "token", None) if self.config.masked else None
-        if token:
-            # Spark Connect params follow `/;` (e.g. sc://host:15002/;token=...).
-            return f"{url};token={token}" if "/;" in url else f"{url}/;token={token}"
-        return url
+        if not token:
+            return url
+        token = token.strip()
+        if "/;" in url:
+            # URL already carries an options segment; add token as another ;key=value.
+            return f"{url.rstrip(';')};token={token}"
+        return f"{url.rstrip('/')}/;token={token}"
 
     def _spark_master(self) -> str | None:
         url = self._connect_url()

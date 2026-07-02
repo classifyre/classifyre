@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-cli"
-version = "0.4.34"
+version = "0.4.35"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -207,7 +207,12 @@ spark = [
     # LTS) on the host; format JARs (Delta/Iceberg/Hudi) are resolved at runtime
     # via spark.jars.packages (see SPARK_* env vars). Pinned to the Spark 4.1
     # minor so the format-JAR coordinates below stay version-matched.
-    "pyspark>=4.1,<4.2",
+    #
+    # The `connect` extra pulls in pandas>=2.2, pyarrow, and grpcio, which the
+    # Spark Connect client (Spark Catalog via sc:// URLs) hard-requires at session
+    # build time. Classic/local Spark (Delta/Hudi/Iceberg) does not need them, but
+    # they share this group, so we ship the client deps once for all of them.
+    "pyspark[connect]>=4.1,<4.2",
 ]
 delta-lake = [
     { include-group = "spark" },
