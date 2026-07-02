@@ -31,6 +31,20 @@ case "$(uname -s)" in
   *)                    IS_WINDOWS=0 ;;
 esac
 
+# Native node.exe/prisma on Windows misread git-bash POSIX paths ("/d/a/...")
+# as drive-relative ("D:\d\a\..."), so the inline `node -e` staging scripts
+# below must be handed mixed-mode paths ("D:/a/..."). MSYS tools (cp/npm/bash)
+# accept POSIX paths fine, so only the node-facing variants are converted.
+to_node_path() {
+  if [ "$IS_WINDOWS" = "1" ]; then
+    cygpath -m "$1"
+  else
+    printf '%s' "$1"
+  fi
+}
+MONOREPO_ROOT_NODE="$(to_node_path "$MONOREPO_ROOT")"
+RESOURCES_NODE="$(to_node_path "$RESOURCES")"
+
 if [ "${SKIP_APP_BUILD:-0}" != "1" ]; then
   echo "=== Build API (incl. prisma generate) ==="
   cd "$MONOREPO_ROOT"
@@ -58,13 +72,13 @@ echo "Installing API production dependencies (standalone npm install)…"
 # from this tree at runtime. @workspace/schemas is vendored below instead.
 node -e "
   const fs = require('fs');
-  const pkg = JSON.parse(fs.readFileSync('$MONOREPO_ROOT/apps/api/package.json', 'utf8'));
+  const pkg = JSON.parse(fs.readFileSync('$MONOREPO_ROOT_NODE/apps/api/package.json', 'utf8'));
   const prismaVersion = (pkg.devDependencies && pkg.devDependencies.prisma) || pkg.dependencies.prisma;
   delete pkg.dependencies['@workspace/schemas'];
   pkg.dependencies.prisma = prismaVersion;
   delete pkg.devDependencies;
   delete pkg.scripts;
-  fs.writeFileSync('$RESOURCES/api/package.json', JSON.stringify(pkg, null, 2));
+  fs.writeFileSync('$RESOURCES_NODE/api/package.json', JSON.stringify(pkg, null, 2));
 "
 (cd "$RESOURCES/api" && npm install --omit=dev --no-audit --no-fund --loglevel=error)
 
@@ -73,6 +87,7 @@ node -e "
 # disabled for files inside node_modules), so we compile it for the bundle.
 echo "Vendoring @workspace/schemas (compiled to CommonJS)…"
 SCHEMAS_DEST="$RESOURCES/api/node_modules/@workspace/schemas"
+SCHEMAS_DEST_NODE="$(to_node_path "$SCHEMAS_DEST")"
 mkdir -p "$SCHEMAS_DEST"
 (cd "$MONOREPO_ROOT/packages/schemas" && bun x tsc src/*.ts \
   --outDir "$SCHEMAS_DEST/src" \
@@ -83,14 +98,14 @@ mkdir -p "$SCHEMAS_DEST/src/schemas"
 cp -R "$MONOREPO_ROOT/packages/schemas/src/schemas/." "$SCHEMAS_DEST/src/schemas/"
 node -e "
   const fs = require('fs');
-  const pkg = JSON.parse(fs.readFileSync('$MONOREPO_ROOT/packages/schemas/package.json', 'utf8'));
+  const pkg = JSON.parse(fs.readFileSync('$MONOREPO_ROOT_NODE/packages/schemas/package.json', 'utf8'));
   pkg.type = 'commonjs';
   for (const key of Object.keys(pkg.exports || {})) {
     if (typeof pkg.exports[key] === 'string') {
       pkg.exports[key] = pkg.exports[key].replace(/\.ts$/, '.js');
     }
   }
-  fs.writeFileSync('$SCHEMAS_DEST/package.json', JSON.stringify(pkg, null, 2));
+  fs.writeFileSync('$SCHEMAS_DEST_NODE/package.json', JSON.stringify(pkg, null, 2));
 "
 
 # Generate the Prisma client into the staged tree for this platform. The
@@ -98,14 +113,16 @@ node -e "
 # node_modules for the generated client output.
 echo "Generating Prisma client in staged tree…"
 cp -R "$MONOREPO_ROOT/apps/api/prisma" "$RESOURCES/api/prisma"
+# Run from the staged api dir with a relative --schema so native prisma on
+# Windows doesn't misread a POSIX absolute path.
 (cd "$RESOURCES/api" && node node_modules/prisma/build/index.js generate \
-  --schema "$RESOURCES/api/prisma/schema.prisma")
+  --schema prisma/schema.prisma)
 
 # Sanity checks: migration CLI + client + vendored schemas must be loadable.
 [ -f "$RESOURCES/api/node_modules/prisma/build/index.js" ] || { echo "prisma CLI missing in staged tree" >&2; exit 1; }
 node -e "
-  require('$RESOURCES/api/node_modules/@workspace/schemas/src/assistant.js');
-  require('$RESOURCES/api/node_modules/@prisma/client/package.json');
+  require('$RESOURCES_NODE/api/node_modules/@workspace/schemas/src/assistant.js');
+  require('$RESOURCES_NODE/api/node_modules/@prisma/client/package.json');
   console.log('Staged API tree sanity checks passed.');
 "
 
