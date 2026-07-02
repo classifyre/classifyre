@@ -146,13 +146,47 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
   cd "$MONOREPO_ROOT/apps/cli"
   rm -rf .venv-desktop
   uv venv --python "$PY_BIN" .venv-desktop
+
+  # Heavy lakehouse groups (pyspark ~476MB plus grpc/py4j) are NOT baked — they
+  # install on demand at first use of a Spark/Delta/Iceberg/Hudi source via the
+  # CLI's uv_sync path. Leaving them out trims the bundle by ~0.5GB uncompressed.
+  # Excluding `spark` alone is insufficient: delta-lake/hudi/iceberg/spark-catalog
+  # each pull pyspark transitively, so all five are dropped here and re-added at
+  # runtime. Keep this list in sync with apps/cli/src/utils/dependency_groups.py.
+  # --no-dev also drops ruff/mypy/pytest, which have no place in a shipped venv.
+  SPARK_GROUPS="spark delta-lake hudi iceberg spark-catalog"
+  NO_GROUP_ARGS=()
+  for g in $SPARK_GROUPS; do NO_GROUP_ARGS+=(--no-group "$g"); done
+
   # UV_PROJECT_ENVIRONMENT redirects the sync target — `uv sync --python`
   # alone only selects the interpreter version and would sync .venv instead.
-  UV_PROJECT_ENVIRONMENT=.venv-desktop uv sync --frozen --all-groups
+  UV_PROJECT_ENVIRONMENT=.venv-desktop uv sync --frozen --all-groups --no-dev "${NO_GROUP_ARGS[@]}"
+
+  # Bundle the uv binary inside the venv so it lands on PATH at runtime: the API
+  # spawns the CLI via `uv run`, and optional groups self-install via `uv sync`.
+  # The build host's arch matches this per-platform bundle, so its uv is correct.
+  cp "$(command -v uv)" .venv-desktop/bin/uv
+  chmod +x .venv-desktop/bin/uv
+
+  # Seed uv_sync.py's group-accumulation state with every group we baked. Without
+  # this the first runtime `uv sync --group delta-lake` would PRUNE all the other
+  # baked optional groups (torch, presidio, …), because `uv sync` removes groups
+  # not passed. Seeding makes each runtime sync re-pass the full baked set.
+  "$PY_BIN" - "$SPARK_GROUPS" <<'PYEOF'
+import json, sys, tomllib
+from pathlib import Path
+
+excluded = set(sys.argv[1].split()) | {"dev"}
+data = tomllib.loads(Path("pyproject.toml").read_text())
+baked = sorted(set(data.get("dependency-groups", {})) - excluded)
+Path(".venv-desktop/.classifyre-uv-sync-groups.json").write_text(json.dumps(baked))
+print(f"Seeded uv-sync state with {len(baked)} baked groups (spark groups install on demand)")
+PYEOF
+
   cp -R "$MONOREPO_ROOT/apps/cli/.venv-desktop" "$RESOURCES/venv"
 
-  # A pyspark-capable venv is >1GB; an empty scaffold means the sync silently
-  # missed the target env. Fail loudly instead of shipping a broken bundle.
+  # A populated base venv is >1GB even without pyspark; an empty scaffold means
+  # the sync silently missed the target env. Fail loudly rather than ship broken.
   VENV_SIZE_KB="$(du -sk "$RESOURCES/venv" | cut -f1)"
   if [ "$VENV_SIZE_KB" -lt 102400 ]; then
     echo "Staged venv is only ${VENV_SIZE_KB}KB — uv sync did not populate it" >&2
