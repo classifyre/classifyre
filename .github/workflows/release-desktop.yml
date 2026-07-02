@@ -32,8 +32,9 @@ jobs:
         include:
           - os: macos-latest
             platform: mac-arm64
-          - os: macos-15-intel
-            platform: mac-x64
+          # Intel-mac (x86_64) dropped: onnxruntime stopped shipping macOS
+          # x86_64 wheels at 1.27.0, so the CLI venv can no longer be staged
+          # on this target. Apple Silicon is the only supported mac build.
           - os: windows-latest
             platform: win-x64
           - os: ubuntu-latest
