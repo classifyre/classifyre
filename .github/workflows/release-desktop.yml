@@ -128,12 +128,15 @@ jobs:
       - name: Package Electron app
         shell: bash
         run: |
-          # macOS signs every file in the bundle (thousands, incl. the bundled
-          # venv/JRE) via concurrent `codesign` spawns. The runner's default soft
-          # limit of 256 open files triggers `spawn codesign EMFILE`, so raise it.
-          if [ "${{ runner.os }}" != "Windows" ]; then
-            ulimit -n 65536 2>/dev/null || ulimit -n 10240 2>/dev/null || true
-            echo "open-file limit: $(ulimit -n)"
+          # macOS signs every Mach-O in the bundle (~1000: 923 venv .so + JRE)
+          # via concurrent `codesign` spawns. This exhausts file descriptors and
+          # throws `spawn codesign EMFILE`. A high shell `ulimit -n` alone is not
+          # enough — macOS also caps opens at the kernel's kern.maxfilesperproc —
+          # so raise both the kernel limits and the soft limit before packaging.
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            sudo sysctl -w kern.maxfiles=1048576 kern.maxfilesperproc=1048576 || true
+            ulimit -n 1048576 2>/dev/null || ulimit -n 200000 2>/dev/null || ulimit -n 65536 || true
+            echo "open-file limit: $(ulimit -n); kern.maxfilesperproc: $(sysctl -n kern.maxfilesperproc)"
           fi
           bun run --cwd apps/desktop build
 
