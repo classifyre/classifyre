@@ -66,8 +66,24 @@ export class NamespaceRuntime {
       const databaseUrl = this.pg.getConnectionString(ns.schemaName);
       await this.processManager.runMigrations(databaseUrl);
 
-      apiPort = await getAvailablePort();
-      await this.processManager.startApi(namespaceId, apiPort, databaseUrl);
+      if (ns.apiPort) {
+        // A fixed port was configured (e.g. for MCP-server consumers that need
+        // a stable URL). Never silently reallocate — fail with a clear error.
+        const granted = await getAvailablePort(ns.apiPort);
+        if (granted !== ns.apiPort) {
+          throw new Error(
+            `Configured API port ${ns.apiPort} is already in use. ` +
+              'Free the port or change it in workspace settings.',
+          );
+        }
+        apiPort = ns.apiPort;
+      } else {
+        apiPort = await getAvailablePort();
+      }
+      await this.processManager.startApi(namespaceId, apiPort, databaseUrl, {
+        maxParallelScans: ns.maxParallelScans,
+        memoryLimitMb: ns.memoryLimitMb,
+      });
 
       view = this.createNamespaceView(ns, apiPort);
     }
