@@ -37,6 +37,18 @@ async function main(): Promise<void> {
     } as Record<string, string>,
   });
 
+  // Surface the app's own output. A silent "Windows: (none)" failure in CI
+  // means the main process died before opening a window; without these the
+  // cause is invisible, so stream main-process stdout/stderr and renderer logs.
+  const proc = app.process();
+  proc.stdout?.on('data', (d) => process.stdout.write(`[app stdout] ${d}`));
+  proc.stderr?.on('data', (d) => process.stderr.write(`[app stderr] ${d}`));
+  app.on('window', (win) => console.log(`[app] window opened: ${win.url()}`));
+  app.on('console', (msg) => console.log(`[app console] ${msg.type()}: ${msg.text()}`));
+  app.process().on('exit', (code, signal) =>
+    console.error(`[app] main process exited early: code=${code} signal=${signal}`),
+  );
+
   try {
     // The selector view shows up as a Playwright "window". Postgres must be
     // running before the main window is created, so a visible selector proves
