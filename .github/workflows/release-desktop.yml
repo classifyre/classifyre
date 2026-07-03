@@ -192,6 +192,16 @@ jobs:
             CLASSIFYRE_APP_PATH="$GITHUB_WORKSPACE/$BIN" npx tsx test/smoke.ts
           fi
 
+      # rpmbuild's default %install post-processing (brp-strip) runs `strip` on
+      # every binary in the payload and exits non-zero on the bundled standalone
+      # CPython (".dynstr not in segment") and the cross-arch *.bare prebuilds
+      # ("Unable to recognise the format"), which fails the rpm maker. Disable
+      # the brp-* post steps so the payload is packaged as-is (we don't want the
+      # relocatable CPython stripped anyway).
+      - name: Disable rpm binary post-processing (Linux)
+        if: runner.os == 'Linux'
+        run: printf '%%__os_install_post %%{nil}\n' > "$HOME/.rpmmacros"
+
       - name: Create distributables
         run: bun run --cwd apps/desktop make --skip-package
         env:
