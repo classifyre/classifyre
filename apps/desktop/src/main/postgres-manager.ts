@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { getAvailablePort } from './port-manager.js';
 
 // The bundled PostgreSQL binaries link against ICU/OpenSSL shipped alongside
@@ -42,9 +43,33 @@ async function ensureBundledLibsOnLoaderPath(): Promise<void> {
     console.warn(`Bundled PG lib dir not found, skipping LD_LIBRARY_PATH: ${libDir}`);
     return;
   }
+
+  // The bundled libs ship only their fully-versioned filename (e.g.
+  // libicuuc.so.60.2); the SONAME symlink the loader actually searches for
+  // (libicuuc.so.60) is dropped when npm packs the tarball, so initdb aborts
+  // with "libicuuc.so.60: cannot open shared object file" even with libDir on
+  // the path. Recreate the SONAME aliases in a writable shim dir (native/lib
+  // may be read-only inside the packaged app) and put it first on the path.
+  const dirs = [libDir];
+  try {
+    const shimDir = fs.mkdtempSync(path.join(os.tmpdir(), 'classifyre-pglibs-'));
+    for (const entry of fs.readdirSync(libDir)) {
+      const soname = entry.match(/^(.+\.so\.\d+)\.\d+$/)?.[1];
+      if (!soname) continue;
+      try {
+        fs.symlinkSync(path.join(libDir, entry), path.join(shimDir, soname));
+      } catch {
+        // alias already created for this SONAME — harmless
+      }
+    }
+    dirs.unshift(shimDir);
+  } catch (err) {
+    console.warn('Could not build PG lib SONAME shim (continuing):', err);
+  }
+
   const existing = process.env['LD_LIBRARY_PATH'];
-  process.env['LD_LIBRARY_PATH'] = existing ? `${libDir}${path.delimiter}${existing}` : libDir;
-  console.log(`Added bundled PostgreSQL libs to LD_LIBRARY_PATH: ${libDir}`);
+  process.env['LD_LIBRARY_PATH'] = [...dirs, existing].filter(Boolean).join(path.delimiter);
+  console.log(`Set LD_LIBRARY_PATH for bundled PostgreSQL libs: ${process.env['LD_LIBRARY_PATH']}`);
 }
 
 type EmbeddedPostgresInstance = {
