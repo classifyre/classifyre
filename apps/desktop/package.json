@@ -21,11 +21,8 @@
     "tree-kill": "^1.2.2"
   },
   "optionalDependencies": {
-    "@embedded-postgres/darwin-arm64": "18.4.0-beta.17",
-    "@embedded-postgres/darwin-x64": "18.4.0-beta.17",
     "@embedded-postgres/linux-arm64": "18.4.0-beta.17",
-    "@embedded-postgres/linux-x64": "18.4.0-beta.17",
-    "@embedded-postgres/windows-x64": "18.4.0-beta.17"
+    "@embedded-postgres/linux-x64": "18.4.0-beta.17"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.8.0",
