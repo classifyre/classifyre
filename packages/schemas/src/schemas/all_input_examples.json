@@ -2006,30 +2006,26 @@
   ],
   "DELTA_LAKE": [
     {
-      "name": "Lakehouse discovery scan",
-      "description": "Discover Delta tables under a warehouse path with automatic incremental sampling",
+      "name": "Delta warehouse discovery scan",
+      "description": "Auto-discover Delta tables under a warehouse prefix in an S3 bucket and sample rows for governance",
       "schedule": {
         "enabled": true,
-        "preset": "weekday_business",
-        "cron": "13 6 * * 1-5",
+        "preset": "nightly",
+        "cron": "23 1 * * *",
         "timezone": "UTC"
       },
       "config": {
         "type": "DELTA_LAKE",
         "required": {
-          "warehouse_path": "s3a://lake/warehouse"
+          "bucket": "your-lakehouse-bucket"
         },
         "masked": {
-          "s3_access_key_id": "your-access-key",
-          "s3_secret_access_key": "your-secret-key"
+          "aws_access_key_id": "your-access-key-id",
+          "aws_secret_access_key": "your-secret-access-key"
         },
         "optional": {
-          "connection": {
-            "metastore_uri": "thrift://metastore:9083",
-            "region": "us-east-1"
-          },
           "scope": {
-            "include_all_databases": true
+            "prefix": "warehouse/"
           }
         },
         "sampling": {
@@ -2039,29 +2035,37 @@
       }
     },
     {
-      "name": "PII and secrets detection on Delta tables",
-      "description": "Run PII and secrets detectors across selected Delta tables",
+      "name": "MinIO Delta tables PII scan",
+      "description": "Scan specific Delta tables on a MinIO (S3-compatible) endpoint for PII and secrets",
       "schedule": {
         "enabled": true,
-        "preset": "weekday_business",
-        "cron": "37 8 * * 1-5",
+        "preset": "weekday_morning",
+        "cron": "41 6 * * 1-5",
         "timezone": "UTC"
       },
       "config": {
         "type": "DELTA_LAKE",
         "required": {
-          "warehouse_path": "file:///data/warehouse"
+          "bucket": "your-lakehouse-bucket"
+        },
+        "masked": {
+          "aws_access_key_id": "your-minio-access-key",
+          "aws_secret_access_key": "your-minio-secret-key"
         },
         "optional": {
+          "connection": {
+            "endpoint_url": "https://minio.your-company.internal:9000",
+            "region_name": "us-east-1"
+          },
           "scope": {
             "table_paths": [
-              "file:///data/warehouse/customers",
-              "file:///data/warehouse/orders"
+              "warehouse/sales/orders",
+              "warehouse/crm/customers"
             ]
           }
         },
         "sampling": {
-          "strategy": "RANDOM",
+          "strategy": "AUTOMATIC",
           "rows_per_page": 30
         },
         "detectors": [
@@ -2069,135 +2073,6 @@
             "type": "PII",
             "enabled": true
           },
-          {
-            "type": "SECRETS",
-            "enabled": true
-          }
-        ]
-      }
-    }
-  ],
-  "HUDI": [
-    {
-      "name": "Hudi warehouse discovery scan",
-      "description": "Discover Hudi tables under a warehouse path",
-      "schedule": {
-        "enabled": true,
-        "preset": "weekday_business",
-        "cron": "13 6 * * 1-5",
-        "timezone": "UTC"
-      },
-      "config": {
-        "type": "HUDI",
-        "required": {
-          "warehouse_path": "s3a://lake/hudi"
-        },
-        "masked": {
-          "s3_access_key_id": "your-access-key",
-          "s3_secret_access_key": "your-secret-key"
-        },
-        "optional": {
-          "connection": {
-            "metastore_uri": "thrift://metastore:9083"
-          },
-          "scope": {
-            "include_all_databases": true
-          }
-        },
-        "sampling": {
-          "strategy": "AUTOMATIC",
-          "rows_per_page": 50
-        }
-      }
-    },
-    {
-      "name": "Scan specific Hudi tables for PII",
-      "description": "Run PII detection over an explicit list of Hudi table locations",
-      "schedule": {
-        "enabled": true,
-        "preset": "weekday_business",
-        "cron": "37 8 * * 1-5",
-        "timezone": "UTC"
-      },
-      "config": {
-        "type": "HUDI",
-        "required": {
-          "warehouse_path": "file:///data/hudi"
-        },
-        "optional": {
-          "scope": {
-            "table_paths": [
-              "file:///data/hudi/events"
-            ]
-          }
-        },
-        "sampling": {
-          "strategy": "RANDOM",
-          "rows_per_page": 25
-        },
-        "detectors": [
-          {
-            "type": "PII",
-            "enabled": true
-          }
-        ]
-      }
-    }
-  ],
-  "SPARK_CATALOG": [
-    {
-      "name": "Spark Connect catalog discovery",
-      "description": "Discover tables from a Spark Connect endpoint's catalog",
-      "schedule": {
-        "enabled": true,
-        "preset": "weekday_business",
-        "cron": "13 6 * * 1-5",
-        "timezone": "UTC"
-      },
-      "config": {
-        "type": "SPARK_CATALOG",
-        "required": {
-          "connect_url": "sc://spark-connect:15002"
-        },
-        "masked": {
-          "token": "your-token"
-        },
-        "optional": {
-          "scope": {
-            "include_all_databases": true
-          }
-        },
-        "sampling": {
-          "strategy": "AUTOMATIC",
-          "rows_per_page": 50
-        }
-      }
-    },
-    {
-      "name": "Classic Spark master, scoped database",
-      "description": "Scan a single database on a classic Spark cluster with secrets detection",
-      "schedule": {
-        "enabled": true,
-        "preset": "weekday_business",
-        "cron": "37 8 * * 1-5",
-        "timezone": "UTC"
-      },
-      "config": {
-        "type": "SPARK_CATALOG",
-        "required": {
-          "connect_url": "spark://spark-master:7077"
-        },
-        "optional": {
-          "scope": {
-            "catalog": "spark_catalog",
-            "database": "analytics"
-          }
-        },
-        "sampling": {
-          "strategy": "RANDOM",
-          "rows_per_page": 30
-        },
-        "detectors": [
           {
             "type": "SECRETS",
             "enabled": true
@@ -2208,27 +2083,26 @@
   ],
   "ICEBERG": [
     {
-      "name": "Iceberg REST catalog discovery",
-      "description": "Discover Iceberg tables via a REST catalog with automatic sampling",
+      "name": "Iceberg warehouse discovery scan",
+      "description": "Auto-discover Iceberg tables under a warehouse prefix in an S3 bucket — no catalog service or Spark required",
       "schedule": {
         "enabled": true,
-        "preset": "weekday_business",
-        "cron": "13 6 * * 1-5",
+        "preset": "nightly",
+        "cron": "37 2 * * *",
         "timezone": "UTC"
       },
       "config": {
         "type": "ICEBERG",
         "required": {
-          "catalog_type": "REST",
-          "catalog_uri": "https://iceberg-rest:8181",
-          "warehouse": "s3://lake/iceberg"
+          "bucket": "your-lakehouse-bucket"
         },
         "masked": {
-          "token": "your-bearer-token"
+          "aws_access_key_id": "your-access-key-id",
+          "aws_secret_access_key": "your-secret-access-key"
         },
         "optional": {
           "scope": {
-            "include_all_namespaces": true
+            "prefix": "warehouse/"
           }
         },
         "sampling": {
@@ -2238,31 +2112,36 @@
       }
     },
     {
-      "name": "Glue catalog PII scan",
-      "description": "Scan Iceberg tables registered in AWS Glue for PII",
+      "name": "MinIO Iceberg tables PII scan",
+      "description": "Scan specific Iceberg tables on a MinIO (S3-compatible) endpoint for PII exposure",
       "schedule": {
         "enabled": true,
-        "preset": "weekday_business",
-        "cron": "37 8 * * 1-5",
+        "preset": "weekday_morning",
+        "cron": "19 7 * * 1-5",
         "timezone": "UTC"
       },
       "config": {
         "type": "ICEBERG",
         "required": {
-          "catalog_type": "GLUE",
-          "warehouse": "s3://lake/iceberg"
+          "bucket": "your-lakehouse-bucket"
         },
         "masked": {
-          "aws_access_key_id": "your-access-key",
-          "aws_secret_access_key": "your-secret-key"
+          "aws_access_key_id": "your-minio-access-key",
+          "aws_secret_access_key": "your-minio-secret-key"
         },
         "optional": {
+          "connection": {
+            "endpoint_url": "https://minio.your-company.internal:9000",
+            "region_name": "us-east-1"
+          },
           "scope": {
-            "namespace": "analytics"
+            "table_paths": [
+              "warehouse/analytics/events"
+            ]
           }
         },
         "sampling": {
-          "strategy": "RANDOM",
+          "strategy": "AUTOMATIC",
           "rows_per_page": 30
         },
         "detectors": [

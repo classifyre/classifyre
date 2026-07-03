@@ -12,11 +12,9 @@ set -euo pipefail
 #   resources/python/  — standalone CPython (python-build-standalone via uv)
 #   resources/venv/    — pre-baked venv (re-pointed at first app launch)
 #   resources/prisma/  — Prisma schema + migrations
-#   resources/jre/     — jlink-minimized Corretto runtime for pyspark
 #
 # Env toggles:
 #   SKIP_APP_BUILD=1  — skip rebuilding API/web (reuse existing dist/out)
-#   SKIP_JRE=1        — skip Java download/jlink (dev iteration)
 #   SKIP_PYTHON=1     — skip Python/venv baking (dev iteration)
 #   PYTHON_VERSION    — standalone CPython version (default 3.12)
 
@@ -164,20 +162,12 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
   rm -rf .venv-desktop
   uv venv --python "$PY_BIN" .venv-desktop
 
-  # Heavy lakehouse groups (pyspark ~476MB plus grpc/py4j) are NOT baked — they
-  # install on demand at first use of a Spark/Delta/Iceberg/Hudi source via the
-  # CLI's uv_sync path. Leaving them out trims the bundle by ~0.5GB uncompressed.
-  # Excluding `spark` alone is insufficient: delta-lake/hudi/iceberg/spark-catalog
-  # each pull pyspark transitively, so all five are dropped here and re-added at
-  # runtime. Keep this list in sync with apps/cli/src/utils/dependency_groups.py.
-  # --no-dev also drops ruff/mypy/pytest, which have no place in a shipped venv.
-  SPARK_GROUPS="spark delta-lake hudi iceberg spark-catalog"
-  NO_GROUP_ARGS=()
-  for g in $SPARK_GROUPS; do NO_GROUP_ARGS+=(--no-group "$g"); done
-
+  # All optional groups are baked — the lakehouse sources are JVM-free now
+  # (pyiceberg/deltalake/duckdb) and small enough to ship. --no-dev drops
+  # ruff/mypy/pytest, which have no place in a shipped venv.
   # UV_PROJECT_ENVIRONMENT redirects the sync target — `uv sync --python`
   # alone only selects the interpreter version and would sync .venv instead.
-  UV_PROJECT_ENVIRONMENT=.venv-desktop uv sync --frozen --all-groups --no-dev "${NO_GROUP_ARGS[@]}"
+  UV_PROJECT_ENVIRONMENT=.venv-desktop uv sync --frozen --all-groups --no-dev
 
   # Bundle the uv binary inside the venv so it lands on PATH at runtime: the API
   # spawns the CLI via `uv run`, and optional groups self-install via `uv sync`.
@@ -194,15 +184,14 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
   # this the first runtime `uv sync --group delta-lake` would PRUNE all the other
   # baked optional groups (torch, presidio, …), because `uv sync` removes groups
   # not passed. Seeding makes each runtime sync re-pass the full baked set.
-  "$PY_BIN" - "$SPARK_GROUPS" <<'PYEOF'
-import json, sys, tomllib
+  "$PY_BIN" - <<'PYEOF'
+import json, tomllib
 from pathlib import Path
 
-excluded = set(sys.argv[1].split()) | {"dev"}
 data = tomllib.loads(Path("pyproject.toml").read_text())
-baked = sorted(set(data.get("dependency-groups", {})) - excluded)
+baked = sorted(set(data.get("dependency-groups", {})) - {"dev"})
 Path(".venv-desktop/.classifyre-uv-sync-groups.json").write_text(json.dumps(baked))
-print(f"Seeded uv-sync state with {len(baked)} baked groups (spark groups install on demand)")
+print(f"Seeded uv-sync state with {len(baked)} baked groups")
 PYEOF
 
   cp -R "$MONOREPO_ROOT/apps/cli/.venv-desktop" "$RESOURCES/venv"
@@ -225,19 +214,13 @@ PYEOF
     echo "Rewrote venv python symlinks to bundle-relative paths for codesign"
   fi
 
-  # A populated base venv is >1GB even without pyspark; an empty scaffold means
-  # the sync silently missed the target env. Fail loudly rather than ship broken.
+  # A populated base venv is >1GB; an empty scaffold means the sync silently
+  # missed the target env. Fail loudly rather than ship broken.
   VENV_SIZE_KB="$(du -sk "$RESOURCES/venv" | cut -f1)"
   if [ "$VENV_SIZE_KB" -lt 102400 ]; then
     echo "Staged venv is only ${VENV_SIZE_KB}KB — uv sync did not populate it" >&2
     exit 1
   fi
-fi
-
-# --- Minimized JRE --------------------------------------------------------------
-if [ "${SKIP_JRE:-0}" != "1" ]; then
-  echo "=== Bundle minimized JRE ==="
-  bash "$SCRIPT_DIR/fetch-jre.sh" "$RESOURCES/jre"
 fi
 
 echo "=== Resources staged ==="

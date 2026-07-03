@@ -112,18 +112,6 @@ export class ProcessManager {
     return path.join(__dirname, '../../../cli/.venv');
   }
 
-  // Bundled jlink-minimized Corretto runtime used by the Spark-backed
-  // lakehouse sources (pyspark). Staged into resources/jre by
-  // scripts/stage-resources.sh so that <jre>/bin/java exists on every platform.
-  private getJreHome(): string {
-    if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'jre');
-    }
-    // In dev mode point at resources/jre, which stage-resources.sh populates.
-    // If absent, javaEnv stays empty and JAVA_HOME falls back to the system PATH.
-    return path.join(__dirname, '../../resources/jre');
-  }
-
   private getPrismaDir(): string {
     if (app.isPackaged) {
       // Staged inside the api tree so `prisma generate` at build time and
@@ -166,22 +154,12 @@ export class ProcessManager {
     const cliPath = this.getCliPath();
     const venvPath = this.getVenvPath();
 
-    // Expose the bundled JRE to the CLI subprocess the API spawns (it inherits
-    // this env via `{ ...process.env }`), so pyspark's lakehouse sources find Java.
     const baseEnv = getBaseEnv();
-    const jreHome = this.getJreHome();
-    const jreBin = path.join(jreHome, 'bin');
-    const javaEnv = fs.existsSync(jreBin)
-      ? {
-          JAVA_HOME: jreHome,
-          PATH: `${jreBin}${path.delimiter}${baseEnv['PATH'] ?? ''}`,
-        }
-      : {};
 
     const venvBin = path.join(venvPath, process.platform === 'win32' ? 'Scripts' : 'bin');
     const pathWithVenv = fs.existsSync(venvBin)
-      ? `${venvBin}${path.delimiter}${(javaEnv as { PATH?: string }).PATH ?? baseEnv['PATH'] ?? ''}`
-      : (javaEnv as { PATH?: string }).PATH ?? baseEnv['PATH'] ?? '';
+      ? `${venvBin}${path.delimiter}${baseEnv['PATH'] ?? ''}`
+      : baseEnv['PATH'] ?? '';
 
     const nodeArgs: string[] = [];
     if (options.memoryLimitMb && options.memoryLimitMb > 0) {
@@ -191,7 +169,6 @@ export class ProcessManager {
     const child = spawn(process.execPath, [...nodeArgs, entryPath], {
       env: {
         ...baseEnv,
-        ...javaEnv,
         PATH: pathWithVenv,
         ELECTRON_RUN_AS_NODE: '1',
         PORT: String(port),

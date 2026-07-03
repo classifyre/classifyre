@@ -1,85 +1,138 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import pytest
 
+from src.models.generated_input import SamplingStrategy
 from src.sources.kafka.source import KafkaSource
 
-# ── kafka-python fakes ───────────────────────────────────────────────────
+# ── confluent-kafka fakes ────────────────────────────────────────────────
 
 
-@dataclass(frozen=True)
 class _TopicPartition:
-    topic: str
-    partition: int
+    def __init__(self, topic: str, partition: int, offset: int = -1001) -> None:
+        self.topic = topic
+        self.partition = partition
+        self.offset = offset
+
+
+class _KafkaError:
+    _PARTITION_EOF = -191
 
 
 class _FakeMessage:
     def __init__(self, partition: int, offset: int, key: bytes, value: bytes) -> None:
-        self.partition = partition
-        self.offset = offset
-        self.key = key
-        self.value = value
+        self._partition = partition
+        self._offset = offset
+        self._key = key
+        self._value = value
+
+    def error(self) -> None:
+        return None
+
+    def partition(self) -> int:
+        return self._partition
+
+    def offset(self) -> int:
+        return self._offset
+
+    def key(self) -> bytes:
+        return self._key
+
+    def value(self) -> bytes:
+        return self._value
+
+
+class _PartitionMetadata:
+    def __init__(self) -> None:
+        self.replicas = [0, 1, 2]
+
+
+class _TopicMetadata:
+    def __init__(self) -> None:
+        self.partitions = {0: _PartitionMetadata()}
+
+
+class _ClusterMetadata:
+    def __init__(self, topics: list[str]) -> None:
+        self.topics = {t: _TopicMetadata() for t in topics}
 
 
 class _FakeConsumer:
-    def __init__(self, topics: list[str], messages: list[_FakeMessage], **_kwargs: Any) -> None:
-        self._topics = topics
-        self._messages = messages
+    def __init__(self, module: _FakeKafkaModule, conf: dict[str, Any]) -> None:
+        self._module = module
+        self.conf = conf
+        self.assigned: list[_TopicPartition] = []
+        self._consumed = False
 
-    def topics(self) -> set[str]:
-        return set(self._topics)
+    def list_topics(self, topic: str | None = None, timeout: float = 0) -> _ClusterMetadata:
+        if topic is not None:
+            return _ClusterMetadata([topic] if topic in self._module.topic_names else [])
+        return _ClusterMetadata(self._module.topic_names)
 
-    def partitions_for_topic(self, _topic: str) -> set[int]:
-        return {0}
+    def get_watermark_offsets(self, _tp: _TopicPartition, timeout: float = 0) -> tuple[int, int]:
+        return (0, 100)
 
-    def assign(self, _tps: list[_TopicPartition]) -> None:
-        pass
+    def assign(self, tps: list[_TopicPartition]) -> None:
+        self.assigned = tps
+        self._module.last_assigned = tps
 
-    def seek(self, _tp: _TopicPartition, _offset: int) -> None:
-        pass
-
-    def seek_to_beginning(self, *_tps: _TopicPartition) -> None:
-        pass
-
-    def beginning_offsets(self, tps: list[_TopicPartition]) -> dict[_TopicPartition, int]:
-        return dict.fromkeys(tps, 0)
-
-    def end_offsets(self, tps: list[_TopicPartition]) -> dict[_TopicPartition, int]:
-        return dict.fromkeys(tps, 100)
-
-    def __iter__(self) -> Any:
-        return iter(self._messages)
+    def consume(self, num_messages: int, timeout: float = 0) -> list[_FakeMessage]:
+        if self._consumed:
+            return []
+        self._consumed = True
+        return self._module.messages[:num_messages]
 
     def close(self) -> None:
         pass
 
 
 class _FakeAdmin:
-    def describe_topics(self, _topics: list[str]) -> list[dict[str, Any]]:
-        return [{"partitions": [{"replicas": [0, 1, 2]}]}]
+    def __init__(self, conf: dict[str, Any]) -> None:
+        self.conf = conf
 
-    def describe_configs(self, _resources: list[Any]) -> list[Any]:
-        return []
+    def describe_configs(self, resources: list[Any]) -> dict[Any, Any]:
+        class _Entry:
+            def __init__(self, value: str) -> None:
+                self.value = value
 
-    def close(self) -> None:
-        pass
+        class _Future:
+            def result(self, timeout: float = 0) -> dict[str, Any]:
+                return {
+                    "retention.ms": _Entry("604800000"),
+                    "cleanup.policy": _Entry("delete"),
+                }
+
+        return {resource: _Future() for resource in resources}
+
+
+class _ConfigResource:
+    class Type:
+        TOPIC = 2
+
+    def __init__(self, _type: int, name: str) -> None:
+        self.name = name
 
 
 class _FakeKafkaModule:
+    """Serves both confluent_kafka and confluent_kafka.admin require calls."""
+
     def __init__(self, topics: list[str], messages: list[_FakeMessage]) -> None:
-        self._topics = topics
-        self._messages = messages
+        self.topic_names = topics
+        self.messages = messages
         self.TopicPartition = _TopicPartition
+        self.KafkaError = _KafkaError
+        self.ConfigResource = _ConfigResource
+        self.last_consumer_conf: dict[str, Any] | None = None
+        self.last_assigned: list[_TopicPartition] = []
 
-    def KafkaConsumer(self, **kwargs: Any) -> _FakeConsumer:  # noqa: N802
-        return _FakeConsumer(self._topics, self._messages, **kwargs)
+    def Consumer(self, conf: dict[str, Any]) -> _FakeConsumer:  # noqa: N802
+        self.last_consumer_conf = conf
+        return _FakeConsumer(self, conf)
 
-    def KafkaAdminClient(self, **_kwargs: Any) -> _FakeAdmin:  # noqa: N802
-        return _FakeAdmin()
+    def AdminClient(self, conf: dict[str, Any]) -> _FakeAdmin:  # noqa: N802
+        return _FakeAdmin(conf)
 
 
 def _recipe(**overrides: Any) -> dict[str, Any]:
@@ -129,6 +182,8 @@ async def test_kafka_extract_emits_topic_assets(_patch_kafka: _FakeKafkaModule) 
     assert meta["replication_factor"] == 3
     assert meta["earliest_offset"] == 0
     assert meta["latest_offset"] == 100
+    assert meta["retention_ms"] == 604800000
+    assert meta["cleanup_policy"] == "delete"
 
 
 async def test_kafka_fetch_content_samples_messages(_patch_kafka: _FakeKafkaModule) -> None:
@@ -142,42 +197,26 @@ async def test_kafka_fetch_content_samples_messages(_patch_kafka: _FakeKafkaModu
     assert "value-0" in text
 
 
-def test_kafka_sasl_credentials_wire_into_client_kwargs(
+def test_kafka_sasl_credentials_wire_into_client_config(
     _patch_kafka: _FakeKafkaModule,
 ) -> None:
     src = KafkaSource(
         _recipe(
             required={"auth_mode": "SASL", "bootstrap_servers": "broker:9093"},
             masked={"sasl_username": "avnadmin", "sasl_password": "secret"},
-            optional={
-                "connection": {"security_protocol": "SASL_SSL", "sasl_mechanism": "PLAIN"}
-            },
+            optional={"connection": {"security_protocol": "SASL_SSL", "sasl_mechanism": "PLAIN"}},
         )
     )
-    kwargs = src._client_kwargs()
-    assert kwargs["security_protocol"] == "SASL_SSL"
-    assert kwargs["sasl_mechanism"] == "PLAIN"
-    assert kwargs["sasl_plain_username"] == "avnadmin"
-    assert kwargs["sasl_plain_password"] == "secret"
-    assert "ssl_context" not in kwargs
+    conf = src._client_config()
+    assert conf["bootstrap.servers"] == "broker:9093"
+    assert conf["security.protocol"] == "SASL_SSL"
+    assert conf["sasl.mechanism"] == "PLAIN"
+    assert conf["sasl.username"] == "avnadmin"
+    assert conf["sasl.password"] == "secret"
+    assert "ssl.certificate.pem" not in conf
 
 
-def test_kafka_client_cert_auth_builds_ssl_context(
-    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    loaded_chain: dict[str, str] = {}
-
-    class _FakeSSLContext:
-        def load_cert_chain(self, certfile: str, keyfile: str) -> None:
-            loaded_chain["certfile"] = Path(certfile).read_text()
-            loaded_chain["keyfile"] = Path(keyfile).read_text()
-
-    fake_context = _FakeSSLContext()
-    monkeypatch.setattr(
-        "src.sources.kafka.source.ssl_module.create_default_context",
-        lambda **_kwargs: fake_context,
-    )
-
+def test_kafka_client_cert_auth_wires_pem_config(_patch_kafka: _FakeKafkaModule) -> None:
     src = KafkaSource(
         _recipe(
             required={"auth_mode": "CLIENT_CERT", "bootstrap_servers": "broker:9094"},
@@ -185,8 +224,28 @@ def test_kafka_client_cert_auth_builds_ssl_context(
             optional={"connection": {"security_protocol": "SSL", "ssl_ca": "fake-ca-pem"}},
         )
     )
-    kwargs = src._client_kwargs()
-    assert kwargs["security_protocol"] == "SSL"
-    assert kwargs["ssl_context"] is fake_context
-    assert loaded_chain == {"certfile": "fake-cert-pem", "keyfile": "fake-key-pem"}
-    assert "sasl_plain_username" not in kwargs
+    conf = src._client_config()
+    assert conf["security.protocol"] == "SSL"
+    assert conf["ssl.ca.pem"] == "fake-ca-pem"
+    assert conf["ssl.certificate.pem"] == "fake-cert-pem"
+    assert conf["ssl.key.pem"] == "fake-key-pem"
+    assert "sasl.username" not in conf
+
+
+def test_kafka_start_offsets_respect_sampling_strategy(
+    _patch_kafka: _FakeKafkaModule,
+) -> None:
+    src = KafkaSource(_recipe())
+    assert src._start_offset(SamplingStrategy.LATEST, 0, 100, 10) == 90
+    assert src._start_offset(SamplingStrategy.AUTOMATIC, 5, 100, 10) == 5
+    assert src._start_offset(SamplingStrategy.ALL, 5, 100, 10) == 5
+    random_offset = src._start_offset(SamplingStrategy.RANDOM, 0, 100, 10)
+    assert 0 <= random_offset <= 90
+
+
+def test_kafka_latest_strategy_assigns_tail_offsets(_patch_kafka: _FakeKafkaModule) -> None:
+    module = _patch_kafka
+    src = KafkaSource(_recipe(sampling={"strategy": "LATEST", "rows_per_page": 10}))
+    src._consume("payments", 10)
+    assert len(module.last_assigned) == 1
+    assert module.last_assigned[0].offset == 90
