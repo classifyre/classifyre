@@ -43,6 +43,9 @@ const linuxOptions = {
   homepage: 'https://github.com/classifyre/classifyre',
   categories: ['Utility'] as ['Utility'],
   icon: path.resolve(__dirname, 'build/icon.png'),
+  // rpmbuild aborts without a License tag ("License field must be present");
+  // this is a private/commercial app, so declare it proprietary.
+  license: 'Proprietary',
 };
 
 const config: ForgeConfig = {
