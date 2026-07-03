@@ -2,7 +2,31 @@ import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { pathToFileURL } from 'url';
 import { getAvailablePort } from './port-manager.js';
+
+// In a packaged app, `embedded-postgres` lives in a self-contained npm tree
+// staged at resources/pg/node_modules (the Forge Vite plugin ships nothing
+// from the app's own node_modules — only .vite/build + package.json go into
+// app.asar). In dev, the regular workspace install resolves it.
+function stagedPgNodeModules(): string | null {
+  if (!app.isPackaged) return null;
+  const dir = path.join(process.resourcesPath, 'pg', 'node_modules');
+  return fs.existsSync(dir) ? dir : null;
+}
+
+async function loadEmbeddedPostgres(): Promise<new (config: object) => object> {
+  const staged = stagedPgNodeModules();
+  if (staged) {
+    const entry = path.join(staged, 'embedded-postgres', 'dist', 'index.js');
+    const mod = (await import(/* @vite-ignore */ pathToFileURL(entry).href)) as {
+      default: new (config: object) => object;
+    };
+    return mod.default;
+  }
+  const mod = (await import('embedded-postgres')) as { default: new (config: object) => object };
+  return mod.default;
+}
 
 // The bundled PostgreSQL binaries link against ICU/OpenSSL shipped alongside
 // them in the platform package's native/lib (e.g. libicuuc.so.60), but that
@@ -13,11 +37,9 @@ import { getAvailablePort } from './port-manager.js';
 // the bundled lib dir before embedded-postgres spawns initdb (it inherits
 // process.env).
 //
-// The @embedded-postgres/<platform> packages are declared as direct optional
-// deps of this app so bun symlinks the platform-matching one into our
-// node_modules (they otherwise live only inside embedded-postgres's own
-// node_modules and aren't resolvable from here). The package's default export
-// gives absolute binary paths; native/lib sits next to native/bin.
+// In a packaged app the platform package sits in the staged resources/pg tree
+// (its native/lib next to native/bin). In dev, resolve it with a bare import —
+// bun links the platform-matching package where the workspace install put it.
 async function ensureBundledLibsOnLoaderPath(): Promise<void> {
   if (process.platform !== 'linux') return;
   const spec =
@@ -28,16 +50,21 @@ async function ensureBundledLibsOnLoaderPath(): Promise<void> {
         : null;
   if (!spec) return;
   let libDir: string;
-  try {
-    const mod = (await import(/* @vite-ignore */ spec)) as { initdb?: string };
-    if (!mod.initdb) {
-      console.warn(`Platform PG package ${spec} exposed no initdb path`);
+  const staged = stagedPgNodeModules();
+  if (staged) {
+    libDir = path.join(staged, spec, 'native', 'lib');
+  } else {
+    try {
+      const mod = (await import(/* @vite-ignore */ spec)) as { initdb?: string };
+      if (!mod.initdb) {
+        console.warn(`Platform PG package ${spec} exposed no initdb path`);
+        return;
+      }
+      libDir = path.join(path.dirname(mod.initdb), '..', 'lib');
+    } catch (err) {
+      console.warn('Could not locate bundled PG libs for LD_LIBRARY_PATH:', err);
       return;
     }
-    libDir = path.join(path.dirname(mod.initdb), '..', 'lib');
-  } catch (err) {
-    console.warn('Could not locate bundled PG libs for LD_LIBRARY_PATH:', err);
-    return;
   }
   if (!fs.existsSync(libDir)) {
     console.warn(`Bundled PG lib dir not found, skipping LD_LIBRARY_PATH: ${libDir}`);
@@ -89,6 +116,7 @@ export class PostgresManager {
   private preferredPort = 54320;
   private running = false;
   private dataDir: string;
+  private startPromise: Promise<void> | null = null;
 
   constructor(preferredPort?: number) {
     const base = process.env['CLASSIFYRE_DATA_DIR'] || app.getPath('userData');
@@ -96,16 +124,30 @@ export class PostgresManager {
     if (preferredPort) this.preferredPort = preferredPort;
   }
 
+  // Single-flight: concurrent callers (app boot + an early namespace:open)
+  // share one startup, and none observes "running" until the classifyre
+  // database exists — otherwise a fast createSchema() races ensureDatabase()
+  // and dies with 'database "classifyre" does not exist'.
   async start(): Promise<void> {
+    if (!this.startPromise) {
+      this.startPromise = this.doStart().catch((err: unknown) => {
+        this.startPromise = null; // allow retry after a failed boot
+        throw err;
+      });
+    }
+    return this.startPromise;
+  }
+
+  private async doStart(): Promise<void> {
     if (this.running) return;
 
-    ensureBundledLibsOnLoaderPath();
+    await ensureBundledLibsOnLoaderPath();
 
     // Prefer the configured port; if busy, fall forward to any free port so a
     // port collision never blocks startup.
     this.port = await getAvailablePort(this.preferredPort);
 
-    const { default: EmbeddedPostgres } = await import('embedded-postgres');
+    const EmbeddedPostgres = await loadEmbeddedPostgres();
     this.pg = new EmbeddedPostgres({
       databaseDir: this.dataDir,
       user: 'classifyre',
@@ -119,9 +161,8 @@ export class PostgresManager {
       await this.pg.initialise();
     }
     await this.pg.start();
-    this.running = true;
-
     await this.ensureDatabase();
+    this.running = true;
   }
 
   private async ensureDatabase(): Promise<void> {
@@ -196,5 +237,6 @@ export class PostgresManager {
     }
     this.running = false;
     this.pg = null;
+    this.startPromise = null;
   }
 }

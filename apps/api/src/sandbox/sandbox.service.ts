@@ -844,15 +844,20 @@ export class SandboxService {
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     const environment = process.env.ENVIRONMENT || 'development';
     const cliPath = this.getCliPath(environment);
-    const venvPath = path.join(cliPath, '.venv');
+    // Desktop relocates the venv out of the bundle; VENV_PATH points at it.
+    const venvPath = process.env.VENV_PATH
+      ? path.normalize(process.env.VENV_PATH)
+      : path.join(cliPath, '.venv');
 
     const escapedCliPath = this.shellEscape(cliPath);
     const escapedVenvPython = this.shellEscape(
-      path.join(venvPath, 'bin/python'),
+      process.platform === 'win32'
+        ? path.join(venvPath, 'Scripts', 'python.exe')
+        : path.join(venvPath, 'bin', 'python'),
     );
     const command =
       `cd ${escapedCliPath} && ` +
-      `uv run --locked --python ${escapedVenvPython} ` +
+      `uv run --locked --no-dev --python ${escapedVenvPython} ` +
       `python -m src.main sandbox ${this.shellEscape(tempFilePath)} --detectors-file ${this.shellEscape(detectorsFile)}`;
 
     return this.executeCliSync(command, runId);
