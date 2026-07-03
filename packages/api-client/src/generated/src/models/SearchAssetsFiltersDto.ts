@@ -99,9 +99,10 @@ export const SearchAssetsFiltersDtoSourceTypesEnum = {
     Youtube: 'YOUTUBE',
     DeltaLake: 'DELTA_LAKE',
     Iceberg: 'ICEBERG',
-    Hudi: 'HUDI',
-    SparkCatalog: 'SPARK_CATALOG',
     Kafka: 'KAFKA',
+    Elasticsearch: 'ELASTICSEARCH',
+    Opensearch: 'OPENSEARCH',
+    Meilisearch: 'MEILISEARCH',
     Custom: 'CUSTOM'
 } as const;
 export type SearchAssetsFiltersDtoSourceTypesEnum = typeof SearchAssetsFiltersDtoSourceTypesEnum[keyof typeof SearchAssetsFiltersDtoSourceTypesEnum];

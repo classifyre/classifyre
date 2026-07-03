@@ -6,7 +6,8 @@ import { ProcessManager } from './process-manager.js';
 import { NamespaceRuntime } from './namespace-runtime.js';
 import { registerIpcHandlers } from './ipc-handlers.js';
 import { registerAppProtocol } from './protocol-handler.js';
-import { AutoUpdater } from './auto-updater.js';
+import { SettingsManager } from './settings-manager.js';
+import { UpdateChecker } from './update-checker.js';
 
 // embedded-postgres registers an async-exit-hook that calls done() on process
 // exit, but Electron's quit path doesn't always provide the callback. Suppress
@@ -23,9 +24,10 @@ const isDev = !app.isPackaged;
 let mainWindow: BrowserWindow | null = null;
 let pg: PostgresManager;
 let namespaceManager: NamespaceManager;
+let settingsManager: SettingsManager;
 let processManager: ProcessManager;
 let runtime: NamespaceRuntime;
-let updater: AutoUpdater;
+let updateChecker: UpdateChecker;
 
 function getPreloadPath(): string {
   return path.join(__dirname, 'preload.js');
@@ -89,8 +91,10 @@ function createMainWindow(): BrowserWindow {
   runtime.setSelectorView(selectorView);
   runtime.showSelector();
 
-  updater.setTabBarView(tabBarView);
-  void updater.init().then(() => updater.checkForUpdates());
+  updateChecker.setTabBarView(tabBarView);
+  tabBarView.webContents.on('did-finish-load', () => {
+    void updateChecker.checkForUpdates();
+  });
 
   return win;
 }
@@ -106,7 +110,8 @@ app.on('ready', async () => {
     registerAppProtocol(webDir);
   }
 
-  pg = new PostgresManager();
+  settingsManager = new SettingsManager();
+  pg = new PostgresManager(settingsManager.get().postgresPort);
   namespaceManager = new NamespaceManager();
   processManager = new ProcessManager();
   runtime = new NamespaceRuntime(
@@ -117,8 +122,8 @@ app.on('ready', async () => {
     getPreloadPath(),
   );
 
-  updater = new AutoUpdater();
-  registerIpcHandlers(runtime, namespaceManager, updater);
+  updateChecker = new UpdateChecker();
+  registerIpcHandlers(runtime, namespaceManager, settingsManager, updateChecker, pg);
 
   try {
     await pg.start();

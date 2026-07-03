@@ -32,6 +32,9 @@ jobs:
         include:
           - os: macos-latest
             platform: mac-arm64
+          # Intel-mac (x86_64) dropped: onnxruntime stopped shipping macOS
+          # x86_64 wheels at 1.27.0, so the CLI venv can no longer be staged
+          # on this target. Apple Silicon is the only supported mac build.
           - os: windows-latest
             platform: win-x64
           - os: ubuntu-latest
@@ -41,6 +44,9 @@ jobs:
 
     name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
+
+    env:
+      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
 
     steps:
       - name: Checkout
@@ -70,47 +76,75 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      # --- macOS code signing & notarization (skipped when secrets are absent,
+      # e.g. fork PRs; the ad-hoc fallback below keeps those builds bootable).
+      - name: Import Apple signing certificate
+        if: runner.os == 'macOS' && env.HAS_APPLE_CERT == 'true'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Install Developer ID intermediate CA
+        if: runner.os == 'macOS' && env.HAS_APPLE_CERT == 'true'
+        run: |
+          curl -fsSL -o DeveloperIDG2CA.cer https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          sudo security import DeveloperIDG2CA.cer -k /Library/Keychains/System.keychain || true
+          rm DeveloperIDG2CA.cer
+
+      - name: Prepare notarization API key
+        if: runner.os == 'macOS' && env.HAS_APPLE_CERT == 'true'
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+        run: |
+          echo "$APPLE_API_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          {
+            echo "MACOS_SIGN=1"
+            echo "APPLE_API_KEY=$RUNNER_TEMP/AuthKey.p8"
+            echo "APPLE_API_KEY_ID=${{ secrets.APPLE_API_KEY_ID }}"
+            echo "APPLE_API_ISSUER_ID=${{ secrets.APPLE_API_ISSUER_ID }}"
+          } >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: Run postinstall (dylib symlinks)
         run: node apps/desktop/scripts/postinstall.js
 
-      - name: Generate Prisma client
-        run: bun run --cwd apps/api prisma:generate
-
-      - name: Build API
-        run: bun run --cwd apps/api build
-
-      - name: Build web (static export)
-        shell: bash
-        run: bash apps/desktop/scripts/desktop-web-build.sh
-
+      # Builds API + web and stages EVERYTHING the app bundles: api dist +
+      # production node_modules (incl. prisma CLI), web static export, Python
+      # CLI + standalone CPython + pre-baked venv, and prisma migrations.
+      # Same script as local `make stage`.
       - name: Stage resources
         shell: bash
-        run: |
-          RESOURCES="apps/desktop/resources"
-          mkdir -p "$RESOURCES"/{api,web,cli,prisma}
-
-          cp -r apps/api/dist "$RESOURCES/api/dist"
-          cp apps/api/package.json "$RESOURCES/api/package.json"
-          cp -r apps/api/prisma "$RESOURCES/prisma"
-
-          if [ -d apps/web/out ]; then
-            cp -r apps/web/out/* "$RESOURCES/web/"
-          fi
-
-          cp -r apps/cli/src "$RESOURCES/cli/src"
-          cp apps/cli/pyproject.toml "$RESOURCES/cli/pyproject.toml"
-          [ -f apps/cli/uv.lock ] && cp apps/cli/uv.lock "$RESOURCES/cli/uv.lock" || true
+        run: bash apps/desktop/scripts/stage-resources.sh
 
       - name: Package Electron app
-        run: bun run --cwd apps/desktop build
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          # macOS signs every Mach-O in the bundle (~1000 venv .so files)
+          # via concurrent `codesign` spawns. This exhausts file descriptors and
+          # throws `spawn codesign EMFILE`. A high shell `ulimit -n` alone is not
+          # enough — macOS also caps opens at the kernel's kern.maxfilesperproc —
+          # so raise both the kernel limits and the soft limit before packaging.
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            sudo sysctl -w kern.maxfiles=1048576 kern.maxfilesperproc=1048576 || true
+            ulimit -n 1048576 2>/dev/null || ulimit -n 200000 2>/dev/null || ulimit -n 65536 || true
+            echo "open-file limit: $(ulimit -n); kern.maxfilesperproc: $(sysctl -n kern.maxfilesperproc)"
+          fi
+          bun run --cwd apps/desktop build
 
-      - name: Ad-hoc codesign macOS app
-        if: runner.os == 'macOS'
+      # Fallback for builds without signing secrets: Apple Silicon refuses to
+      # launch completely unsigned binaries, so ad-hoc sign them.
+      - name: Ad-hoc codesign macOS app (unsigned builds only)
+        if: runner.os == 'macOS' && env.MACOS_SIGN != '1'
         shell: bash
         run: |
           APP=$(find apps/desktop/out -name '*.app' -type d | head -1)
@@ -118,15 +152,71 @@ jobs:
             echo "::error::No .app bundle found"
             exit 1
           fi
-          echo "Signing $APP"
+          echo "Ad-hoc signing $APP"
           codesign --deep --force --sign - "$APP"
           codesign --verify --deep "$APP"
-          echo "Signature valid"
+
+      - name: Verify signature and notarization
+        if: runner.os == 'macOS' && env.MACOS_SIGN == '1'
+        shell: bash
+        run: |
+          APP=$(find apps/desktop/out -name '*.app' -type d | head -1)
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          spctl --assess --type execute --verbose=2 "$APP"
+          echo "Signed and notarized OK"
+
+      - name: Smoke test packaged app
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            macOS)
+              BIN=$(find apps/desktop/out -path '*Classifyre.app/Contents/MacOS/classifyre-desktop' | head -1)
+              ;;
+            Windows)
+              BIN=$(find apps/desktop/out -name 'classifyre-desktop.exe' -not -path '*make*' | head -1)
+              ;;
+            Linux)
+              BIN=$(find apps/desktop/out -name 'classifyre-desktop' -type f -not -path '*make*' | head -1)
+              ;;
+          esac
+          if [ -z "$BIN" ]; then
+            echo "::error::Packaged binary not found"
+            exit 1
+          fi
+          echo "Smoke testing $BIN"
+          cd apps/desktop
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            sudo apt-get install -y xvfb
+            CLASSIFYRE_APP_PATH="$GITHUB_WORKSPACE/$BIN" xvfb-run -a npx tsx test/smoke.ts
+          else
+            CLASSIFYRE_APP_PATH="$GITHUB_WORKSPACE/$BIN" npx tsx test/smoke.ts
+          fi
+
+      # rpmbuild's default %install post-processing (brp-strip) runs `strip` on
+      # every binary in the payload and exits non-zero on the bundled standalone
+      # CPython (".dynstr not in segment") and the cross-arch *.bare prebuilds
+      # ("Unable to recognise the format"), which fails the rpm maker. Disable
+      # the brp-* post steps so the payload is packaged as-is (we don't want the
+      # relocatable CPython stripped anyway).
+      - name: Disable rpm binary post-processing (Linux)
+        if: runner.os == 'Linux'
+        run: printf '%%__os_install_post %%{nil}\n' > "$HOME/.rpmmacros"
 
       - name: Create distributables
         run: bun run --cwd apps/desktop make --skip-package
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Both mac jobs produce "Classifyre.dmg"; suffix the platform so the two
+      # DMGs don't overwrite each other in the GitHub release.
+      - name: Rename artifacts with platform suffix
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          find apps/desktop/out -type f -name '*.dmg' | while read -r f; do
+            base="${f%.dmg}"
+            mv "$f" "${base}-${{ matrix.platform }}.dmg"
+          done
 
       - name: Find artifacts
         id: artifacts
@@ -134,7 +224,7 @@ jobs:
         run: |
           OUTDIR="apps/desktop/out"
           echo "Files in make output:"
-          find "$OUTDIR" -type f \( -name '*.dmg' -o -name '*.deb' -o -name '*.zip' -o -name '*.nupkg' \) | tee /tmp/artifacts.txt
+          find "$OUTDIR" -type f \( -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name '*Setup.exe' \) | tee /tmp/artifacts.txt
           if [ ! -s /tmp/artifacts.txt ]; then
             echo "::error::No desktop artifacts found"
             exit 1
@@ -147,8 +237,8 @@ jobs:
           path: |
             apps/desktop/out/**/*.dmg
             apps/desktop/out/**/*.deb
-            apps/desktop/out/**/*.zip
-            apps/desktop/out/**/*.nupkg
+            apps/desktop/out/**/*.rpm
+            apps/desktop/out/**/*Setup.exe
           if-no-files-found: error
 
   upload-release:
@@ -175,6 +265,7 @@ jobs:
           files: |
             artifacts/**/*.dmg
             artifacts/**/*.deb
-            artifacts/**/*.zip
+            artifacts/**/*.rpm
+            artifacts/**/*Setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

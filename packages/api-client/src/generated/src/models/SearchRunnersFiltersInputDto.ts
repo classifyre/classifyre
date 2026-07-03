@@ -106,9 +106,10 @@ export const SearchRunnersFiltersInputDtoSourceTypeEnum = {
     Youtube: 'YOUTUBE',
     DeltaLake: 'DELTA_LAKE',
     Iceberg: 'ICEBERG',
-    Hudi: 'HUDI',
-    SparkCatalog: 'SPARK_CATALOG',
     Kafka: 'KAFKA',
+    Elasticsearch: 'ELASTICSEARCH',
+    Opensearch: 'OPENSEARCH',
+    Meilisearch: 'MEILISEARCH',
     Custom: 'CUSTOM'
 } as const;
 export type SearchRunnersFiltersInputDtoSourceTypeEnum = typeof SearchRunnersFiltersInputDtoSourceTypeEnum[keyof typeof SearchRunnersFiltersInputDtoSourceTypeEnum];

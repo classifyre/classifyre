@@ -1,25 +1,27 @@
 # Classifyre Desktop
 
-Electron app that bundles the full Classifyre stack (API, Web, CLI, PostgreSQL) into a single installable desktop application.
+Electron app that bundles the full Classifyre stack (API, Web, CLI, PostgreSQL, Python, Java) into a single installable desktop application with **zero external dependencies** — users install one artifact and run.
 
 ## Architecture
 
-The desktop app runs an **embedded PostgreSQL** instance and spawns per-workspace API servers. Each workspace (called a "namespace") gets its own database schema and API process.
+The desktop app runs an **embedded PostgreSQL** instance and spawns per-workspace API servers. Each workspace (called a "namespace") gets its own database schema and API process. All child processes run on Electron's own Node (`ELECTRON_RUN_AS_NODE`) and the bundled Python venv — nothing from the user's machine is required.
 
 ```
 ┌─────────────────────────────────────────┐
 │  Electron Main Process                  │
 │  ├─ PostgresManager   (embedded PG)     │
 │  ├─ NamespaceManager  (workspace CRUD)  │
+│  ├─ SettingsManager   (global settings) │
 │  ├─ ProcessManager    (API child procs) │
-│  └─ NamespaceRuntime  (tab/view mgmt)  │
+│  ├─ NamespaceRuntime  (tab/view mgmt)   │
+│  └─ python-env        (venv relocation) │
 ├─────────────────────────────────────────┤
 │  Tab Bar View    (WebContentsView)      │
 ├─────────────────────────────────────────┤
 │  Content Views   (one per open tab)     │
-│  ├─ Local: static Next.js + API proxy   │
+│  ├─ Local: static Next.js + local API   │
 │  └─ Remote: external URL in sandboxed   │
-│            webview                       │
+│            webview                      │
 └─────────────────────────────────────────┘
 ```
 
@@ -29,13 +31,15 @@ The desktop app runs an **embedded PostgreSQL** instance and spawns per-workspac
 |------|---------|
 | `src/main/index.ts` | App entry point, window creation, lifecycle |
 | `src/main/postgres-manager.ts` | Embedded PostgreSQL lifecycle (start/stop/schema) |
-| `src/main/process-manager.ts` | Spawn/kill per-namespace NestJS API processes |
-| `src/main/namespace-manager.ts` | Workspace CRUD, persisted to `namespaces.json` |
+| `src/main/process-manager.ts` | Spawn/kill per-namespace NestJS API processes; Prisma migrations |
+| `src/main/namespace-manager.ts` | Workspace CRUD + settings, persisted to `namespaces.json` |
+| `src/main/settings-manager.ts` | App-wide settings (database port), persisted to `settings.json` |
+| `src/main/python-env.ts` | Makes the bundled Python venv relocatable on first launch |
 | `src/main/namespace-runtime.ts` | Tab management, view layout, IPC coordination |
-| `src/main/auto-updater.ts` | GitHub Releases-based auto-update via electron-updater |
+| `src/main/update-checker.ts` | GitHub Releases version check (badge → download page) |
 | `src/main/protocol-handler.ts` | Custom `app://` protocol for serving static web files |
 | `src/preload/preload.ts` | Context bridge exposing `electronAPI` to renderers |
-| `src/renderer/namespace-selector/` | Workspace picker UI |
+| `src/renderer/namespace-selector/` | Workspace picker UI + settings dialog |
 | `src/renderer/tab-bar/` | Browser-style tab strip |
 
 ### Data storage
@@ -43,16 +47,25 @@ The desktop app runs an **embedded PostgreSQL** instance and spawns per-workspac
 All data is stored under the Electron `userData` directory (or `CLASSIFYRE_DATA_DIR` if set):
 
 - `pgdata/` — PostgreSQL data directory
-- `namespaces.json` — workspace definitions
-- `.pg-password` — auto-generated PostgreSQL password (mode 0600)
+- `namespaces.json` — workspace definitions and per-workspace settings
+- `settings.json` — app-wide settings (preferred database port)
+- `python-runtime/` — relocated Python venv (only when the install dir is read-only)
+
+### Workspace settings
+
+Each workspace card has a gear icon opening the settings dialog:
+
+- **Name** — rename the workspace (schema name stays stable)
+- **API port** — fixed backend port for MCP-server or other consumers that need a stable URL; empty = automatic. If the fixed port is busy, opening fails with a clear error instead of silently moving.
+- **Advanced** — max parallel scans (`MAX_PARALLEL_SCANS`), API memory limit (Node `--max-old-space-size`)
+- **Database port** (app-wide) — preferred embedded-Postgres port; if busy the next free port is used
 
 ## Development
 
-### Prerequisites
+### Prerequisites (development only)
 
-- Node.js >= 22
-- Bun (package manager)
-- The API and Web apps must be buildable from the monorepo root
+- Node.js >= 22, Bun, `uv` (for Python staging), `make` optional
+- End users need none of these — everything is bundled.
 
 ### Running in dev mode
 
@@ -64,74 +77,119 @@ bun install
 cd apps/web && bun dev
 
 # Start the desktop app
-cd apps/desktop && bun dev
+cd apps/desktop && bun dev   # or: make dev
 ```
 
 In dev mode:
 - The namespace selector is served by Vite HMR
 - Local namespaces connect to `http://localhost:3000` (Next.js dev server)
-- The API is spawned from `apps/api/dist/` (run `bun --filter api build` first)
+- The API is spawned from `apps/api/dist/` (run `bun --filter @classifyre/api build` first)
 
-### Building
+## Building installers
 
 ```bash
-# Package the app (no installer)
-bun run build
+cd apps/desktop
 
-# Create platform-specific installers
-bun run make
+make all        # full from-scratch build: deps + stage + installers
+make stage      # build API/web + stage resources (python, venv, …)
+make dist       # create installers from staged resources
+make package    # package app only (no installers)
+make clean      # remove build output and staged resources
+
+# Fast iteration — skip the slow bits you don't need:
+SKIP_PYTHON=1 make stage
 ```
 
-### Testing
+Installers land in `out/make/`:
+
+| Platform | Artifact |
+|----------|----------|
+| macOS (arm64 / x64) | `.dmg` |
+| Windows x64 | `Classifyre-<version> Setup.exe` |
+| Linux (amd64 / arm64) | `.deb` + `.rpm` |
+
+### What gets bundled (`resources/`, staged by `scripts/stage-resources.sh`)
+
+| Directory | Contents |
+|-----------|----------|
+| `api/` | NestJS API dist + standalone production node_modules (npm install; includes the Prisma CLI, generated client, schema + migrations, and a compiled `@workspace/schemas`) |
+| `web/` | Next.js static export |
+| `cli/` | Python CLI source + pyproject.toml + uv.lock |
+| `python/` | Standalone CPython (python-build-standalone via uv) |
+| `venv/` | Pre-baked venv — re-pointed to the bundled CPython on first app launch |
+
+## macOS signing & notarization
+
+### Local/unsigned builds (no Apple Developer account)
+
+`make all` produces an **unsigned** `.dmg`. This is fine for local testing:
+
+- An app you built on the same machine launches normally (no quarantine flag).
+- A **downloaded** unsigned build triggers Gatekeeper. Users can bypass with right-click → Open, or:
 
 ```bash
-# Unit/integration tests
-bun test
+xattr -cr /Applications/Classifyre.app
+```
 
-# E2E tests (requires Playwright)
-bun test:e2e
+CI additionally ad-hoc signs (`codesign --sign -`), which Apple Silicon requires for the binary to launch at all.
+
+### Signed builds (Developer ID + notarization)
+
+Signing and notarization are wired in `forge.config.ts` and activate from env vars — no config changes needed. Requires the "Developer ID Application" certificate in the keychain and an App Store Connect API key (`.p8`):
+
+```bash
+export MACOS_SIGN=1                                   # sign with the keychain's Developer ID identity
+export APPLE_API_KEY="$HOME/apple-csr/AuthKey_XXXXXXXXXX.p8"   # \
+export APPLE_API_KEY_ID="XXXXXXXXXX"                           #  > notarization (App Store Connect API key)
+export APPLE_API_ISSUER_ID="00000000-0000-0000-0000-000000000000"  # /
+make dist
+```
+
+Optionally pin the identity with `APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"` (implies `MACOS_SIGN=1`). Verify the result:
+
+```bash
+codesign --verify --deep --strict Classifyre.app
+spctl --assess --type execute --verbose=2 Classifyre.app   # "accepted, source=Notarized Developer ID"
+```
+
+### CI secrets
+
+`release-desktop.yml` signs + notarizes automatically when these repository secrets exist (mac jobs fall back to ad-hoc signing when they don't, e.g. on forks):
+
+| Secret | Contents |
+|--------|----------|
+| `APPLE_CERTIFICATE_BASE64` | base64 of the Developer ID Application `.p12` |
+| `APPLE_CERTIFICATE_PASSWORD` | password for the `.p12` |
+| `APPLE_TEAM_ID` | Apple Developer team id |
+| `APPLE_API_KEY_BASE64` | base64 of the App Store Connect `AuthKey_*.p8` |
+| `APPLE_API_KEY_ID` | the API key id |
+| `APPLE_API_ISSUER_ID` | the API issuer id |
+
+## Testing
+
+```bash
+make test    # namespace lifecycle test
+make e2e     # Playwright end-to-end tests (needs web dev server on :3000)
+
+# Smoke-test a packaged build (used by CI on all platforms):
+CLASSIFYRE_APP_PATH=out/Classifyre-darwin-arm64/Classifyre.app/Contents/MacOS/classifyre-desktop \
+  npx tsx test/smoke.ts
 ```
 
 ## Release workflow
 
-The GitHub Actions workflow `.github/workflows/release-desktop.yml` builds platform artifacts automatically.
-
-### Triggers
-
-- **GitHub Release**: creating a release triggers builds for all platforms
-- **Manual dispatch**: run with a tag name for ad-hoc builds
-
-### Build matrix
+`.github/workflows/release-desktop.yml` builds all platforms and uploads artifacts to the GitHub release for the given tag.
 
 | Platform | Runner | Artifact |
 |----------|--------|----------|
 | macOS arm64 | `macos-latest` | `.dmg` |
-| macOS x64 | `macos-13` | `.dmg` |
-| Windows x64 | `windows-latest` | `.exe` (Squirrel) |
-| Linux x64 | `ubuntu-latest` | `.deb` |
+| macOS x64 | `macos-15-intel` | `.dmg` |
+| Windows x64 | `windows-latest` | `Setup.exe` |
+| Linux amd64 | `ubuntu-latest` | `.deb` + `.rpm` |
+| Linux arm64 | `ubuntu-24.04-arm` | `.deb` + `.rpm` |
 
-### Build steps (CI)
+Each job stages resources with the same `stage-resources.sh` as local builds, packages, ad-hoc signs (macOS), **smoke-tests the packaged binary** (boots the app, waits for the workspace selector — which requires embedded PostgreSQL to have started), then creates and uploads installers.
 
-1. Install dependencies (`bun install --frozen-lockfile`)
-2. Run postinstall (dylib symlinks for embedded-postgres)
-3. Generate Prisma client
-4. Build API (`apps/api/dist/`)
-5. Build web as static export (`apps/web/out/`)
-6. Stage resources into `apps/desktop/resources/`
-7. Run `electron-forge make`
-8. Upload artifacts to the GitHub Release
+## Updates
 
-### Auto-updates
-
-The app uses `electron-updater` with GitHub Releases as the update source. Configuration is in `dev-app-update.yml`. Updates are checked on launch and surfaced via a badge in the tab bar.
-
-## Bundled resources
-
-The packaged app includes these in `extraResource`:
-
-| Directory | Contents |
-|-----------|----------|
-| `resources/api/` | NestJS API dist + package.json |
-| `resources/web/` | Next.js static export |
-| `resources/cli/` | Python CLI source + pyproject.toml |
-| `resources/prisma/` | Prisma schema + migrations |
+The app checks GitHub Releases on launch and shows an "Update available" badge in the tab bar; clicking opens the download page. Full in-app auto-update is deferred until code signing is in place (unsigned macOS apps cannot self-update).

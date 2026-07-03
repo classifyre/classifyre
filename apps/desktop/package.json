@@ -1,7 +1,7 @@
 {
   "name": "classifyre-desktop",
   "productName": "Classifyre",
-  "version": "0.4.36",
+  "version": "0.4.37",
   "private": true,
   "description": "Classifyre Desktop — Electron app with embedded PostgreSQL",
   "main": ".vite/build/index.js",
@@ -16,15 +16,19 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "electron-updater": "^6.3.0",
     "embedded-postgres": "18.4.0-beta.17",
     "get-port": "^7.1.0",
     "tree-kill": "^1.2.2"
+  },
+  "optionalDependencies": {
+    "@embedded-postgres/linux-arm64": "18.4.0-beta.17",
+    "@embedded-postgres/linux-x64": "18.4.0-beta.17"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.8.0",
     "@electron-forge/maker-deb": "^7.8.0",
     "@electron-forge/maker-dmg": "^7.8.0",
+    "@electron-forge/maker-rpm": "^7.8.0",
     "@electron-forge/maker-squirrel": "^7.8.0",
     "@electron-forge/maker-zip": "^7.11.2",
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.0",

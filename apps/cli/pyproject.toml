@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-cli"
-version = "0.4.36"
+version = "0.4.37"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -51,6 +51,8 @@ dev = [
     "datamodel-code-generator>=0.57.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=0.24.0",
+    # Real SQL engine for the lakehouse source tests (sampling over Parquet).
+    "duckdb>=1.1.0",
 ]
 privacy = [
     "presidio-analyzer>=2.2.362",
@@ -134,6 +136,9 @@ file-processing = [
     "openpyxl>=3.1.5",
     "chardet>=7.4.3",
     "pyarrow>=18.0.0",
+    # Table layer: Iceberg metadata resolution + SQL over Parquet without Spark.
+    "pyiceberg>=0.9.0",
+    "duckdb>=1.1.0",
 ]
 transcription = [
     # CPU audio/video transcription. faster-whisper decodes media via bundled
@@ -202,37 +207,23 @@ youtube = [
     "yt-dlp>=2025.1.0",
     "youtube-transcript-api>=1.0.0",
 ]
-spark = [
-    # Shared PySpark runtime for the lakehouse sources. Requires a JDK (Java 21
-    # LTS) on the host; format JARs (Delta/Iceberg/Hudi) are resolved at runtime
-    # via spark.jars.packages (see SPARK_* env vars). Pinned to the Spark 4.1
-    # minor so the format-JAR coordinates below stay version-matched.
-    #
-    # The `connect` extra pulls in pandas>=2.2, pyarrow, and grpcio, which the
-    # Spark Connect client (Spark Catalog via sc:// URLs) hard-requires at session
-    # build time. Classic/local Spark (Delta/Hudi/Iceberg) does not need them, but
-    # they share this group, so we ship the client deps once for all of them.
-    "pyspark[connect]>=4.1,<4.2",
-]
 delta-lake = [
-    { include-group = "spark" },
-    "delta-spark>=4.0",
-]
-hudi = [
-    # Hudi Spark integration ships as Maven JARs configured via
-    # SPARK_JARS_PACKAGES; only the shared PySpark runtime is needed here.
-    { include-group = "spark" },
-]
-spark-catalog = [
-    { include-group = "spark" },
+    # Pure-Python/Rust Delta reader (delta-rs) — no Spark, no JVM. Table metadata
+    # and data-file lists come from deltalake; rows are sampled through DuckDB
+    # (file-processing group) over the table's Parquet files.
+    { include-group = "file-processing" },
+    "deltalake>=0.25.0",
+    "boto3>=1.43.10,<2.0.0",
 ]
 iceberg = [
-    # Inspected through Spark (iceberg-spark-runtime JARs via SPARK_JARS_PACKAGES),
-    # sharing the JVM the other lakehouse sources already require.
-    { include-group = "spark" },
+    # PyIceberg resolves table metadata and finds Parquet files without Spark;
+    # DuckDB (file-processing group) samples rows from those files.
+    { include-group = "file-processing" },
+    "boto3>=1.43.10,<2.0.0",
 ]
 kafka = [
-    "kafka-python>=2.0",
+    # librdkafka-based client (bundled wheels, no JVM).
+    "confluent-kafka>=2.5.0",
 ]
 otel = [
     "opentelemetry-sdk>=1.42.0",
@@ -353,6 +344,12 @@ module = [
     "re2.*",
     "faster_whisper",
     "faster_whisper.*",
+    "pyiceberg.*",
+    "deltalake.*",
+    "duckdb.*",
+    "confluent_kafka.*",
+    "boto3.*",
+    "botocore.*",
 ]
 ignore_missing_imports = true
 

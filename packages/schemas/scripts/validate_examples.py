@@ -34,8 +34,6 @@ TYPE_TO_DEFINITION = {
     "YOUTUBE": "YouTubeInput",
     "DELTA_LAKE": "DeltaLakeInput",
     "ICEBERG": "IcebergInput",
-    "HUDI": "HudiInput",
-    "SPARK_CATALOG": "SparkCatalogInput",
     "KAFKA": "KafkaInput",
     "ELASTICSEARCH": "ElasticsearchInput",
     "OPENSEARCH": "OpenSearchInput",

@@ -6,10 +6,6 @@ ARG S6_OVERLAY_VERSION=3.2.2.0
 ARG PG_MAJOR=18
 ARG UV_VERSION=0.10.2
 ARG BUN_VERSION=1.3.10
-# Amazon Corretto (OpenJDK distribution, GPLv2+CE) for the Spark-backed lakehouse
-# sources (Delta Lake, Iceberg, Hudi, Spark Catalog). Java 21 is the latest LTS
-# certified for Spark 4.x.
-ARG JAVA_VERSION=21
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-bin
 
 # ── Pre-built artifacts injected from CI via --build-context ──────────────────
@@ -158,7 +154,6 @@ CMD ["node", "dist/src/main.js"]
 # ── cli-final: Python CLI ─────────────────────────────────────────────────────
 FROM python:${PYTHON_VERSION} AS cli-final
 ARG TARGETARCH
-ARG JAVA_VERSION
 COPY --from=uv-bin /uv /uvx /usr/local/bin/
 COPY --from=cli-builder /app/apps/cli/.venv /app/apps/cli/.venv
 COPY --from=cli-builder /app/apps/cli/src /app/apps/cli/src
@@ -170,25 +165,12 @@ COPY --from=api-builder /repo/packages/schemas/node_modules /app/packages/schema
 ENV UV_LINK_MODE=copy \
     UV_CACHE_DIR=/cache/uv \
     CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1 \
-    JAVA_HOME=/opt/java \
-    PATH="/opt/java/bin:/app/apps/cli/.venv/bin:${PATH}"
+    PATH="/app/apps/cli/.venv/bin:${PATH}"
 # libgl1 + libglib2.0-0 required by opencv-python (pulled in by rapidocr-onnxruntime for docling OCR).
-# Amazon Corretto JDK is required by the Spark-backed lakehouse sources (pyspark).
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends libgl1 libglib2.0-0 curl ca-certificates; \
-    case "${TARGETARCH:-amd64}" in \
-      amd64) corretto_arch="x64" ;; \
-      arm64) corretto_arch="aarch64" ;; \
-      *) echo "Unsupported TARGETARCH: ${TARGETARCH}" && exit 1 ;; \
-    esac; \
-    mkdir -p /opt/java; \
-    curl -fsSL "https://corretto.aws/downloads/latest/amazon-corretto-${JAVA_VERSION}-${corretto_arch}-linux-jdk.tar.gz" -o /tmp/corretto.tar.gz; \
-    tar -xzf /tmp/corretto.tar.gz -C /opt/java --strip-components=1; \
-    rm -f /tmp/corretto.tar.gz; \
-    apt-get purge -y --auto-remove curl; \
-    rm -rf /var/lib/apt/lists/*; \
-    /opt/java/bin/java -version
+    apt-get install -y --no-install-recommends libgl1 libglib2.0-0 ca-certificates; \
+    rm -rf /var/lib/apt/lists/*
 # Match uid 10001 from helm podSecurityContext so uv sync can modify the venv at runtime
 RUN groupadd -g 10001 classifyre && useradd -u 10001 -g 10001 -r classifyre \
     && chown -R 10001:10001 /app
@@ -202,14 +184,12 @@ ARG TARGETARCH
 ARG NODE_VERSION
 ARG S6_OVERLAY_VERSION
 ARG PG_MAJOR
-ARG JAVA_VERSION
 
 ENV DEBIAN_FRONTEND=noninteractive \
     NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     HOME=/root \
-    PATH=/opt/java/bin:/command:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-    JAVA_HOME=/opt/java \
+    PATH=/command:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     PG_MAJOR=${PG_MAJOR} \
     PGDATA=/var/lib/postgresql/data \
     PGPORT=5432 \
@@ -268,19 +248,6 @@ RUN set -eux; \
     tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz; \
     tar -C / -Jxpf /tmp/s6-overlay-arch.tar.xz; \
     rm -f /tmp/s6-overlay-noarch.tar.xz /tmp/s6-overlay-arch.tar.xz
-
-# Amazon Corretto JDK for the Spark-backed lakehouse sources (pyspark).
-RUN set -eux; \
-    case "${TARGETARCH}" in \
-      amd64) corretto_arch="x64" ;; \
-      arm64) corretto_arch="aarch64" ;; \
-      *) echo "Unsupported TARGETARCH: ${TARGETARCH}" && exit 1 ;; \
-    esac; \
-    mkdir -p /opt/java; \
-    curl -fsSL "https://corretto.aws/downloads/latest/amazon-corretto-${JAVA_VERSION}-${corretto_arch}-linux-jdk.tar.gz" -o /tmp/corretto.tar.gz; \
-    tar -xzf /tmp/corretto.tar.gz -C /opt/java --strip-components=1; \
-    rm -f /tmp/corretto.tar.gz; \
-    /opt/java/bin/java -version
 
 WORKDIR /app
 
