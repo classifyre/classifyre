@@ -1220,8 +1220,20 @@ export class CliRunnerService implements OnApplicationBootstrap {
   }
 
   private getVenvPath(environment: string): string {
+    // Desktop (and any custom deployment) passes the venv location explicitly —
+    // there the venv does NOT live at <cli>/.venv (it's relocated to a
+    // writable per-user dir at first launch).
+    if (process.env.VENV_PATH) {
+      return path.normalize(process.env.VENV_PATH);
+    }
     const cliPath = this.getCliPath(environment);
     return path.join(cliPath, '.venv');
+  }
+
+  private getVenvPython(venvPath: string): string {
+    return process.platform === 'win32'
+      ? path.join(venvPath, 'Scripts', 'python.exe')
+      : path.join(venvPath, 'bin', 'python');
   }
 
   private async createTempRecipeFile(recipe: any): Promise<string> {
@@ -1262,9 +1274,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
     samplingCursorB64?: string,
   ): string {
     const escapedCliPath = this.shellEscape(cliPath);
-    const escapedVenvPython = this.shellEscape(
-      path.join(venvPath, 'bin/python'),
-    );
+    const escapedVenvPython = this.shellEscape(this.getVenvPython(venvPath));
     // Inject the AUTOMATIC sampling cursor (base64-encoded JSON) so extraction
     // resumes where the previous run stopped. Absent on the first run / for
     // non-AUTOMATIC sampling.
@@ -1277,7 +1287,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       `cd ${escapedCliPath} && ` +
       `CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN=${hasSuccessfulRuns ? '1' : '0'} ` +
       samplingCursorEnv +
-      `uv run --locked --python ${escapedVenvPython} ` +
+      `uv run --locked --no-dev --python ${escapedVenvPython} ` +
       `python -m src.main extract ${this.shellEscape(recipeFile)} ` +
       `--output-type rest ` +
       `--output-rest-url ${this.shellEscape(outputRestUrl)} ` +
@@ -1310,12 +1320,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
     recipeFile: string,
   ): string {
     const escapedCliPath = this.shellEscape(cliPath);
-    const escapedVenvPython = this.shellEscape(
-      path.join(venvPath, 'bin/python'),
-    );
+    const escapedVenvPython = this.shellEscape(this.getVenvPython(venvPath));
     return (
       `cd ${escapedCliPath} && ` +
-      `uv run --locked --python ${escapedVenvPython} ` +
+      `uv run --locked --no-dev --python ${escapedVenvPython} ` +
       `python -m src.main test ${this.shellEscape(recipeFile)}`
     );
   }
