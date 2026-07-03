@@ -165,6 +165,12 @@ jobs:
           spctl --assess --type execute --verbose=2 "$APP"
           echo "Signed and notarized OK"
 
+      # The packaged app MUST run from outside the repo checkout: Node walks up
+      # parent directories looking for node_modules, so a binary launched from
+      # apps/desktop/out/ can silently resolve modules from the workspace
+      # install — masking "module not shipped in the bundle" bugs that then
+      # crash on every real user machine (this exact false positive shipped a
+      # mac build whose asar had no embedded-postgres).
       - name: Smoke test packaged app
         shell: bash
         run: |
@@ -183,14 +189,34 @@ jobs:
             echo "::error::Packaged binary not found"
             exit 1
           fi
-          echo "Smoke testing $BIN"
+          case "${{ runner.os }}" in
+            macOS)   PKG_DIR=$(dirname "$(dirname "$(dirname "$(dirname "$BIN")")")") ;; # …/<platform-dir>/Classifyre.app/Contents/MacOS/bin
+            *)       PKG_DIR=$(dirname "$BIN") ;;
+          esac
+          SMOKE_DIR="$RUNNER_TEMP/classifyre-smoke-app"
+          rm -rf "$SMOKE_DIR"
+          mkdir -p "$SMOKE_DIR"
+          cp -R "$PKG_DIR/." "$SMOKE_DIR/"
+          REL_BIN="${BIN#"$PKG_DIR"/}"
+          SMOKE_BIN="$SMOKE_DIR/$REL_BIN"
+          echo "Smoke testing $SMOKE_BIN (copied outside the workspace)"
           cd apps/desktop
           if [ "${{ runner.os }}" = "Linux" ]; then
             sudo apt-get install -y xvfb
-            CLASSIFYRE_APP_PATH="$GITHUB_WORKSPACE/$BIN" xvfb-run -a npx tsx test/smoke.ts
+            CLASSIFYRE_APP_PATH="$SMOKE_BIN" xvfb-run -a npx tsx test/smoke.ts
+            CLASSIFYRE_APP_PATH="$SMOKE_BIN" xvfb-run -a npx tsx test/deep-smoke.ts
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            CLASSIFYRE_APP_PATH="$SMOKE_BIN" npx tsx test/smoke.ts
+            # Deep smoke: creates a workspace and waits for the API — proves
+            # prisma migrate, the staged api node_modules, and the Python venv
+            # relocation all work in the packaged bundle.
+            CLASSIFYRE_APP_PATH="$SMOKE_BIN" npx tsx test/deep-smoke.ts
           else
-            CLASSIFYRE_APP_PATH="$GITHUB_WORKSPACE/$BIN" npx tsx test/smoke.ts
+            # Windows: embedded PG cannot run under the CI admin account, so
+            # only the boot-diagnostic smoke runs (it self-skips on that).
+            CLASSIFYRE_APP_PATH="$SMOKE_BIN" npx tsx test/smoke.ts
           fi
+          rm -rf "$SMOKE_DIR"
 
       # rpmbuild's default %install post-processing (brp-strip) runs `strip` on
       # every binary in the payload and exits non-zero on the bundled standalone
@@ -224,7 +250,7 @@ jobs:
         run: |
           OUTDIR="apps/desktop/out"
           echo "Files in make output:"
-          find "$OUTDIR" -type f \( -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name '*Setup.exe' \) | tee /tmp/artifacts.txt
+          find "$OUTDIR" -type f \( -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name '*.zip' \) | tee /tmp/artifacts.txt
           if [ ! -s /tmp/artifacts.txt ]; then
             echo "::error::No desktop artifacts found"
             exit 1
@@ -238,7 +264,7 @@ jobs:
             apps/desktop/out/**/*.dmg
             apps/desktop/out/**/*.deb
             apps/desktop/out/**/*.rpm
-            apps/desktop/out/**/*Setup.exe
+            apps/desktop/out/**/*.zip
           if-no-files-found: error
 
   upload-release:
@@ -266,6 +292,6 @@ jobs:
             artifacts/**/*.dmg
             artifacts/**/*.deb
             artifacts/**/*.rpm
-            artifacts/**/*Setup.exe
+            artifacts/**/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

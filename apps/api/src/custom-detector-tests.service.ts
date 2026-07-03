@@ -283,10 +283,17 @@ export class CustomDetectorTestsService {
           JSON.stringify([detectorEntry], null, 2),
         );
         const cliPath = this.getCliPath();
-        const venvPython = path.join(cliPath, '.venv', 'bin', 'python');
+        // Desktop relocates the venv out of the bundle; VENV_PATH points at it.
+        const venvPath = process.env.VENV_PATH
+          ? path.normalize(process.env.VENV_PATH)
+          : path.join(cliPath, '.venv');
+        const venvPython =
+          process.platform === 'win32'
+            ? path.join(venvPath, 'Scripts', 'python.exe')
+            : path.join(venvPath, 'bin', 'python');
         const command =
           `cd ${shellEscape(cliPath)} && ` +
-          `uv run --locked --python ${shellEscape(venvPython)} ` +
+          `uv run --locked --no-dev --python ${shellEscape(venvPython)} ` +
           `python -m src.main sandbox ${shellEscape(textFile)} --detectors-file ${shellEscape(detectorsFile)}`;
 
         // Allow up to 3 min: first run installs optional dep groups + loads

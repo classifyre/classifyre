@@ -1,6 +1,6 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerDMG } from '@electron-forge/maker-dmg';
-import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const allResources = ['api', 'web', 'cli', 'venv', 'python'];
+const allResources = ['api', 'web', 'pg', 'venv', 'python', 'pyapp'];
 const extraResource = allResources
   .map((name) => path.resolve(__dirname, 'resources', name))
   .filter((abs) => fs.existsSync(abs));
@@ -66,16 +66,12 @@ const config: ForgeConfig = {
       icon: path.resolve(__dirname, 'build/icon.icns'),
       format: 'ULFO',
     }),
-    // Windows → Classifyre-<version> Setup.exe (Squirrel installer)
-    new MakerSquirrel({
-      name: 'Classifyre',
-      // Squirrel's NuGet packaging requires an author; package.json has none.
-      authors: 'Classifyre',
-      setupIcon: path.resolve(__dirname, 'build/icon.ico'),
-      iconUrl:
-        'https://raw.githubusercontent.com/classifyre/classifyre/main/apps/desktop/build/icon.ico',
-      noMsi: true,
-    }),
+    // Windows → portable zip. Squirrel was dropped deliberately: its
+    // single-threaded LZMA spent ~3.5h compressing the multi-GB bundle into a
+    // -full.nupkg, and the release upload only shipped the 539 KB Setup.exe
+    // bootstrapper stub — which cannot install anything without its sibling
+    // nupkg — so users got a broken installer. A zip is self-contained.
+    new MakerZIP({}, ['win32']),
     // Linux → .deb (Debian/Ubuntu) and .rpm (Fedora/RHEL)
     new MakerDeb({ options: linuxOptions }),
     new MakerRpm({ options: linuxOptions }),

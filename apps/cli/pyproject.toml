@@ -399,3 +399,14 @@ markers = [
 
 [tool.uv]
 package = true
+# Every platform we ship (desktop bundles + CI) must resolve to versions with
+# usable wheels. Without this, uv happily locks versions that are missing a
+# platform — e.g. deltalake 1.6.1 published no win_amd64 wheel, which broke the
+# Windows desktop venv bake ("can't be installed because it doesn't have a
+# source distribution or wheel for the current platform").
+required-environments = [
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
