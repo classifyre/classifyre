@@ -1,7 +1,6 @@
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
-import { createRequire } from 'module';
 import { getAvailablePort } from './port-manager.js';
 
 // The bundled PostgreSQL binaries link against ICU/OpenSSL shipped alongside
@@ -12,27 +11,29 @@ import { getAvailablePort } from './port-manager.js';
 // the bin dir, so this only needs fixing for Linux. Point LD_LIBRARY_PATH at
 // the bundled lib dir before embedded-postgres spawns initdb (it inherits
 // process.env).
-function ensureBundledLibsOnLoaderPath(): void {
+//
+// The @embedded-postgres/<platform> packages are declared as direct optional
+// deps of this app so bun symlinks the platform-matching one into our
+// node_modules (they otherwise live only inside embedded-postgres's own
+// node_modules and aren't resolvable from here). The package's default export
+// gives absolute binary paths; native/lib sits next to native/bin.
+async function ensureBundledLibsOnLoaderPath(): Promise<void> {
   if (process.platform !== 'linux') return;
-  const pkgByPlatform: Record<string, string> = {
-    'linux-x64': '@embedded-postgres/linux-x64',
-    'linux-arm64': '@embedded-postgres/linux-arm64',
-  };
-  const pkg = pkgByPlatform[`${process.platform}-${process.arch}`];
-  if (!pkg) return;
+  const spec =
+    process.arch === 'arm64'
+      ? '@embedded-postgres/linux-arm64'
+      : process.arch === 'x64'
+        ? '@embedded-postgres/linux-x64'
+        : null;
+  if (!spec) return;
   let libDir: string;
   try {
-    // Seed require resolution from the real app directory. import.meta.url is
-    // rewritten by vite to a base that cannot resolve the externalized
-    // embedded-postgres, whereas app.getAppPath() is a genuine runtime path.
-    // Resolve embedded-postgres's main entry, then resolve the platform package
-    // RELATIVE TO it — under bun's isolated store the @embedded-postgres/*
-    // packages live only inside embedded-postgres's own node_modules. The
-    // package's native/lib sits next to its dist/ entry.
-    const reqFromApp = createRequire(path.join(app.getAppPath(), 'index.js'));
-    const embeddedPgMain = reqFromApp.resolve('embedded-postgres');
-    const platformMain = createRequire(embeddedPgMain).resolve(pkg);
-    libDir = path.join(path.dirname(platformMain), '..', 'native', 'lib');
+    const mod = (await import(/* @vite-ignore */ spec)) as { initdb?: string };
+    if (!mod.initdb) {
+      console.warn(`Platform PG package ${spec} exposed no initdb path`);
+      return;
+    }
+    libDir = path.join(path.dirname(mod.initdb), '..', 'lib');
   } catch (err) {
     console.warn('Could not locate bundled PG libs for LD_LIBRARY_PATH:', err);
     return;
