@@ -699,7 +699,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.4.37"
+version = "0.4.38.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -1129,7 +1129,7 @@ youtube = [
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.4.37"
+version = "0.4.38.dev0"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
@@ -1500,15 +1500,15 @@ wheels = [
 
 [[package]]
 name = "doclang"
-version = "0.7.1"
+version = "0.7.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "lxml" },
     { name = "typer", version = "0.24.2", source = { registry = "https://pypi.org/simple" } },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/54/91dc2b332799f743e89fb72610236e8fc876eef2c8a2a4602582e0367019/doclang-0.7.1.tar.gz", hash = "sha256:aa2391b08751e311033b614b11dbeb3cd236f71772fe3db5722f4871361bd11d", size = 30560, upload-time = "2026-07-02T12:01:52.516Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/16/91/64ada5d5699e63e6c2c803a85d35a2fb2ee0ceea8e100e513047d56741f4/doclang-0.7.2.tar.gz", hash = "sha256:89c17a168ef9443c2f814284bae3ea3dbf2f1910e79d4fd6cbdde04aa7c06d40", size = 30593, upload-time = "2026-07-03T13:39:17.461Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/51/e0e77c183123c4447d9f853397a960692de1c813eb36e1b1ace211b58a25/doclang-0.7.1-py3-none-any.whl", hash = "sha256:79e7179a1cc6a837347ee496469ac9e0882ee917d2c45533d501d4025f787bce", size = 31318, upload-time = "2026-07-02T12:01:51.535Z" },
+    { url = "https://files.pythonhosted.org/packages/ed/81/0bcdae48110bd5cc3ce078a53b351ec31af1e9f2db1a01574708a51a7983/doclang-0.7.2-py3-none-any.whl", hash = "sha256:fa4414931122c6b9d18a8b1fd6cec3d0dd22dad4efec495ab4461240a8cdf7ed", size = 31317, upload-time = "2026-07-03T13:39:16.48Z" },
 ]
 
 [[package]]
