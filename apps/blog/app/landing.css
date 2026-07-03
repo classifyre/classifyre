@@ -1,0 +1,359 @@
+/* Landing-page-only styles: the "case file" visual language.
+   Everything is driven by the theme tokens in @workspace/ui/globals.css
+   so both light and dark mode work without per-theme overrides. */
+
+.font-hero {
+  font-family: var(--font-hero), var(--font-serif), sans-serif;
+}
+
+/* ── In-view reveal ─────────────────────────────────────────────── */
+
+.cl-reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
+  transition-delay: var(--cl-delay, 0ms);
+}
+
+.cl-reveal[data-inview="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Evidence tags ──────────────────────────────────────────────── */
+
+.cl-tag-tilt-l {
+  transform: rotate(-1.6deg);
+}
+
+.cl-tag-tilt-r {
+  transform: rotate(1.4deg);
+}
+
+/* ── Marching ants (active dashed borders / strokes) ────────────── */
+
+@keyframes cl-ants {
+  to {
+    stroke-dashoffset: -26;
+  }
+}
+
+.cl-ants {
+  animation: cl-ants 1.4s linear infinite;
+}
+
+/* ── Hero ───────────────────────────────────────────────────────── */
+
+@keyframes cl-ring-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cl-rotate-slow {
+  animation: cl-ring-rotate 46s linear infinite;
+  transform-origin: center;
+}
+
+.cl-rotate-slower {
+  animation: cl-ring-rotate 90s linear infinite reverse;
+  transform-origin: center;
+}
+
+@keyframes cl-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  94% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes cl-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(2.2) rotate(-14deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.92) rotate(-8deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-8deg);
+  }
+}
+
+.cl-stamp {
+  animation: cl-stamp 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  animation-delay: var(--cl-delay, 400ms);
+}
+
+/* ── Pipeline story (scroll narrative) ──────────────────────────── */
+
+.cl-pipe-node rect,
+.cl-pipe-node text {
+  transition:
+    fill 0.45s ease,
+    stroke 0.45s ease,
+    opacity 0.45s ease;
+}
+
+.cl-pipe-node[data-state="idle"] {
+  opacity: 0.38;
+}
+
+.cl-pipe-node[data-state="visited"] {
+  opacity: 0.85;
+}
+
+.cl-pipe-node[data-state="visited"] .cl-pipe-box {
+  stroke: var(--color-accent);
+}
+
+.cl-pipe-node[data-state="active"] {
+  opacity: 1;
+}
+
+.cl-pipe-node[data-state="active"] .cl-pipe-box {
+  fill: var(--color-accent);
+  stroke: var(--color-accent);
+}
+
+.cl-pipe-node[data-state="active"] .cl-pipe-label,
+.cl-pipe-node[data-state="active"] .cl-pipe-sub {
+  fill: #0a0a0a;
+}
+
+.cl-pipe-edge {
+  transition: opacity 0.45s ease, stroke 0.45s ease;
+  opacity: 0.25;
+}
+
+.cl-pipe-edge[data-state="visited"] {
+  opacity: 0.7;
+}
+
+.cl-pipe-edge[data-state="active"] {
+  opacity: 1;
+  stroke: var(--color-accent);
+  stroke-dasharray: 6 8;
+  animation: cl-ants 0.9s linear infinite;
+}
+
+.cl-pipe-autopilot {
+  transition: opacity 0.45s ease;
+  opacity: 0.3;
+}
+
+.cl-pipe-autopilot[data-state="active"] {
+  opacity: 1;
+}
+
+.cl-pipe-autopilot[data-state="active"] .cl-pipe-bracket {
+  stroke: var(--color-accent);
+  animation: cl-ants 1.2s linear infinite;
+}
+
+.cl-pipe-autopilot[data-state="active"] .cl-pipe-ap-label {
+  fill: var(--color-accent);
+}
+
+/* Step cards light up when active */
+.cl-step {
+  transition:
+    opacity 0.4s ease,
+    border-color 0.4s ease,
+    box-shadow 0.4s ease;
+  opacity: 0.55;
+}
+
+.cl-step[data-active="true"] {
+  opacity: 1;
+  border-color: var(--color-accent);
+  box-shadow: 6px 6px 0 0 var(--color-accent);
+}
+
+/* ── Case graph animation ───────────────────────────────────────── */
+
+@keyframes cl-draw {
+  from {
+    stroke-dashoffset: var(--cl-len, 300);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes cl-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes cl-pulse-ring {
+  0% {
+    r: 20;
+    opacity: 0.9;
+  }
+  100% {
+    r: 34;
+    opacity: 0;
+  }
+}
+
+.cl-cg [data-anim] {
+  opacity: 0;
+}
+
+.cl-cg[data-inview="true"] [data-anim="draw"] {
+  opacity: 1;
+  stroke-dasharray: var(--cl-len, 300);
+  stroke-dashoffset: var(--cl-len, 300);
+  animation: cl-draw 0.7s ease forwards;
+  animation-delay: var(--cl-delay, 0ms);
+}
+
+.cl-cg[data-inview="true"] [data-anim="pop"] {
+  animation: cl-pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+  animation-delay: var(--cl-delay, 0ms);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.cl-cg[data-inview="true"] [data-anim="fade"] {
+  animation: cl-fade 0.5s ease forwards;
+  animation-delay: var(--cl-delay, 0ms);
+}
+
+.cl-cg[data-inview="true"] [data-anim="stamp"] {
+  animation: cl-stamp 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+  animation-delay: var(--cl-delay, 0ms);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.cl-cg[data-inview="true"] .cl-cg-pulse {
+  animation: cl-pulse-ring 1.8s ease-out infinite;
+  animation-delay: 2.4s;
+}
+
+@keyframes cl-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Harness mission ring ───────────────────────────────────────── */
+
+@keyframes cl-mission-glow {
+  0%,
+  16%,
+  100% {
+    opacity: 0.45;
+  }
+  4%,
+  12% {
+    opacity: 1;
+  }
+}
+
+.cl-mission {
+  opacity: 0.45;
+  animation: cl-mission-glow 12.5s linear infinite;
+  animation-delay: var(--cl-delay, 0s);
+}
+
+.cl-mission .cl-mission-dot {
+  transition: fill 0.3s ease;
+}
+
+@keyframes cl-mission-dot-glow {
+  0%,
+  16%,
+  100% {
+    fill: transparent;
+  }
+  4%,
+  12% {
+    fill: var(--color-accent);
+  }
+}
+
+.cl-mission .cl-mission-dot {
+  animation: cl-mission-dot-glow 12.5s linear infinite;
+  animation-delay: var(--cl-delay, 0s);
+}
+
+@keyframes cl-mission-text-glow {
+  0%,
+  16%,
+  100% {
+    fill: currentColor;
+  }
+  4%,
+  12% {
+    fill: #0a0a0a;
+  }
+}
+
+.cl-mission .cl-mission-num {
+  animation: cl-mission-text-glow 12.5s linear infinite;
+  animation-delay: var(--cl-delay, 0s);
+}
+
+/* ── Paw prints ─────────────────────────────────────────────────── */
+
+.cl-paw {
+  opacity: 0;
+  animation: cl-fade 0.4s ease forwards;
+  animation-delay: var(--cl-delay, 0ms);
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .cl-ants,
+  .cl-rotate-slow,
+  .cl-rotate-slower,
+  .cl-stamp,
+  .cl-mission,
+  .cl-mission .cl-mission-dot,
+  .cl-mission .cl-mission-num,
+  .cl-pipe-edge[data-state="active"],
+  .cl-pipe-autopilot[data-state="active"] .cl-pipe-bracket,
+  .cl-cg[data-inview="true"] .cl-cg-pulse {
+    animation: none;
+  }
+
+  .cl-mission {
+    opacity: 1;
+  }
+
+  .cl-cg [data-anim] {
+    opacity: 1;
+    animation: none;
+  }
+}

@@ -1,7 +1,7 @@
 # Classifyre Desktop build entry points.
 #
 #   make deps      Install JS dependencies + fix native dylib symlinks
-#   make stage     Build API/web and stage all bundled resources (python, venv, JRE…)
+#   make stage     Build API/web and stage all bundled resources (python, venv…)
 #   make package   Package the Electron app (no installers)
 #   make dist      Create platform installers (dmg / Setup.exe / deb+rpm)
 #   make all       deps + stage + dist — a full from-scratch release build
@@ -11,7 +11,7 @@
 #   make clean     Remove build output and staged resources
 #
 # Useful env toggles (see scripts/stage-resources.sh):
-#   SKIP_JRE=1 SKIP_PYTHON=1 SKIP_APP_BUILD=1 make stage   # fast dev iteration
+#   SKIP_PYTHON=1 SKIP_APP_BUILD=1 make stage   # fast dev iteration
 
 .PHONY: all deps stage package dist dev test e2e clean
 

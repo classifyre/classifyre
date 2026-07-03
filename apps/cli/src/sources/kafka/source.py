@@ -1,15 +1,22 @@
 """Apache Kafka source — discovers topics and samples messages.
 
-Uses a lightweight ``kafka-python`` consumer/admin client (no Spark). Each topic
+Uses ``confluent-kafka`` (librdkafka, bundled wheels — no JVM). Each topic
 becomes one ``topic`` asset with partition/offset/retention metadata; message
 samples are streamed as content for detectors.
+
+Sampling strategies map to consumer positioning:
+
+* ``LATEST``    — start near the tail of each partition (newest messages).
+* ``RANDOM``    — start at a random offset within each partition.
+* ``AUTOMATIC`` / ``ALL`` — start at the earliest retained offset.
+
+All strategies read up to ``sampling.rows_per_page`` messages per topic.
 """
 
 from __future__ import annotations
 
 import logging
-import ssl as ssl_module
-import tempfile
+import random
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any
@@ -27,6 +34,8 @@ from ..dependencies import require_module
 
 logger = logging.getLogger(__name__)
 
+_CONSUME_TIMEOUT_SECONDS = 5.0
+
 
 class KafkaSource(BaseSource):
     source_type = "kafka"
@@ -42,10 +51,10 @@ class KafkaSource(BaseSource):
         self.config = KafkaInput.model_validate(recipe)
         self.runner_id = runner_id or "local-run"
         self._kafka = require_module(
-            module_name="kafka",
+            module_name="confluent_kafka",
             source_name="Apache Kafka",
             uv_groups=["kafka"],
-            detail="kafka-python is required for the Kafka connector.",
+            detail="confluent-kafka is required for the Kafka connector.",
         )
         self._topic_lookup: dict[str, str] = {}
 
@@ -65,64 +74,79 @@ class KafkaSource(BaseSource):
     def _bootstrap_servers(self) -> list[str]:
         return [s.strip() for s in self.config.required.bootstrap_servers.split(",") if s.strip()]
 
-    def _client_kwargs(self) -> dict[str, Any]:
-        kwargs: dict[str, Any] = {"bootstrap_servers": self._bootstrap_servers()}
+    def _request_timeout_seconds(self) -> float:
         connection = self._connection()
-        ssl_ca = getattr(connection, "ssl_ca", None) if connection is not None else None
+        timeout_ms = getattr(connection, "request_timeout_ms", None) if connection else None
+        return int(timeout_ms) / 1000.0 if timeout_ms else 30.0
+
+    def _client_config(self) -> dict[str, Any]:
+        conf: dict[str, Any] = {
+            "bootstrap.servers": ",".join(self._bootstrap_servers()),
+            # Log via callbacks instead of stderr noise.
+            "logger": logger,
+        }
+        connection = self._connection()
         if connection is not None:
             protocol = getattr(connection, "security_protocol", None)
             if protocol is not None:
-                kwargs["security_protocol"] = (
+                conf["security.protocol"] = (
                     protocol.value if hasattr(protocol, "value") else str(protocol)
                 )
             mechanism = getattr(connection, "sasl_mechanism", None)
             if mechanism is not None:
-                kwargs["sasl_mechanism"] = (
+                conf["sasl.mechanism"] = (
                     mechanism.value if hasattr(mechanism, "value") else str(mechanism)
                 )
             if getattr(connection, "request_timeout_ms", None):
-                kwargs["request_timeout_ms"] = int(connection.request_timeout_ms)
+                conf["socket.timeout.ms"] = int(connection.request_timeout_ms)
+            ssl_ca = getattr(connection, "ssl_ca", None)
+            if ssl_ca:
+                conf["ssl.ca.pem"] = ssl_ca
+
         masked = self.config.masked
         if getattr(masked, "sasl_username", None):
-            kwargs["sasl_plain_username"] = masked.sasl_username
+            conf["sasl.username"] = masked.sasl_username
         if getattr(masked, "sasl_password", None):
-            kwargs["sasl_plain_password"] = masked.sasl_password
+            conf["sasl.password"] = masked.sasl_password
         ssl_certfile = getattr(masked, "ssl_certfile", None)
         ssl_keyfile = getattr(masked, "ssl_keyfile", None)
-        if ssl_ca or ssl_certfile:
-            context = ssl_module.create_default_context(cadata=ssl_ca)
-            if ssl_certfile and ssl_keyfile:
-                self._load_client_cert_chain(context, ssl_certfile, ssl_keyfile)
-            kwargs["ssl_context"] = context
-        return kwargs
+        if ssl_certfile:
+            conf["ssl.certificate.pem"] = ssl_certfile
+        if ssl_keyfile:
+            conf["ssl.key.pem"] = ssl_keyfile
+        return conf
 
-    @staticmethod
-    def _load_client_cert_chain(
-        context: ssl_module.SSLContext, certfile: str, keyfile: str
-    ) -> None:
-        with (
-            tempfile.NamedTemporaryFile("w", suffix=".pem") as cert_tmp,
-            tempfile.NamedTemporaryFile("w", suffix=".pem") as key_tmp,
-        ):
-            cert_tmp.write(certfile)
-            cert_tmp.flush()
-            key_tmp.write(keyfile)
-            key_tmp.flush()
-            context.load_cert_chain(certfile=cert_tmp.name, keyfile=key_tmp.name)
-
-    def _make_consumer(self, **extra: Any) -> Any:
-        kwargs = {**self._client_kwargs(), "enable_auto_commit": False, **extra}
-        return self._kafka.KafkaConsumer(**kwargs)
+    def _make_consumer(self) -> Any:
+        conf = {
+            **self._client_config(),
+            "group.id": f"classifyre-scan-{self.runner_id}",
+            "enable.auto.commit": False,
+            "auto.offset.reset": "earliest",
+        }
+        return self._kafka.Consumer(conf)
 
     def _make_admin(self) -> Any:
-        return self._kafka.KafkaAdminClient(**self._client_kwargs())
+        admin_module = require_module(
+            module_name="confluent_kafka.admin",
+            source_name="Apache Kafka",
+            uv_groups=["kafka"],
+            detail="confluent-kafka is required for the Kafka connector.",
+        )
+        return admin_module.AdminClient(self._client_config())
+
+    def _cluster_metadata(self, consumer: Any, topic: str | None = None) -> Any:
+        timeout = self._request_timeout_seconds()
+        if topic is None:
+            return consumer.list_topics(timeout=timeout)
+        return consumer.list_topics(topic, timeout=timeout)
 
     # ── Topic discovery ──────────────────────────────────────────────────
 
     def _list_topics(self) -> list[str]:
         consumer = self._make_consumer()
         try:
-            topics = sorted(consumer.topics() or [])
+            metadata = self._cluster_metadata(consumer)
+            topics = sorted(metadata.topics.keys())
         finally:
             consumer.close()
         scope = self._scope()
@@ -150,15 +174,31 @@ class KafkaSource(BaseSource):
     def _topic_metadata(self, topic: str) -> dict[str, Any]:
         consumer = self._make_consumer()
         meta: dict[str, Any] = {}
+        timeout = self._request_timeout_seconds()
         try:
-            partitions = consumer.partitions_for_topic(topic) or set()
+            metadata = self._cluster_metadata(consumer, topic)
+            topic_meta = metadata.topics.get(topic)
+            partitions = dict(topic_meta.partitions) if topic_meta is not None else {}
             meta["partition_count"] = len(partitions)
-            tps = [self._kafka.TopicPartition(topic, p) for p in partitions]
-            if tps:
-                begin = consumer.beginning_offsets(tps)
-                end = consumer.end_offsets(tps)
-                meta["earliest_offset"] = int(sum(begin.values()))
-                meta["latest_offset"] = int(sum(end.values()))
+            replicas = [len(p.replicas or []) for p in partitions.values()]
+            if replicas:
+                meta["replication_factor"] = min(replicas)
+            earliest = 0
+            latest = 0
+            for partition_id in partitions:
+                try:
+                    low, high = consumer.get_watermark_offsets(
+                        self._kafka.TopicPartition(topic, partition_id),
+                        timeout=timeout,
+                    )
+                except Exception as exc:
+                    logger.debug("Watermark lookup failed for %s[%s]: %s", topic, partition_id, exc)
+                    continue
+                earliest += int(low)
+                latest += int(high)
+            if partitions:
+                meta["earliest_offset"] = earliest
+                meta["latest_offset"] = latest
         finally:
             consumer.close()
         meta.update(self._admin_topic_metadata(topic))
@@ -168,46 +208,38 @@ class KafkaSource(BaseSource):
         meta: dict[str, Any] = {}
         try:
             admin = self._make_admin()
+            configs = self._describe_topic_configs(admin, topic)
         except Exception as exc:
             logger.debug("Kafka admin unavailable: %s", exc)
             return meta
-        try:
-            described = admin.describe_topics([topic])
-            for entry in described or []:
-                parts = entry.get("partitions") or []
-                if parts:
-                    replicas = parts[0].get("replicas") or []
-                    meta["replication_factor"] = len(replicas)
-            configs = self._describe_topic_configs(admin, topic)
-            if "retention.ms" in configs:
-                try:
-                    meta["retention_ms"] = int(configs["retention.ms"])
-                except (TypeError, ValueError):
-                    pass
-            if "cleanup.policy" in configs:
-                meta["cleanup_policy"] = configs["cleanup.policy"]
-        except Exception as exc:
-            logger.debug("Kafka topic describe failed for %s: %s", topic, exc)
-        finally:
+        if "retention.ms" in configs:
             try:
-                admin.close()
-            except Exception:
+                meta["retention_ms"] = int(configs["retention.ms"])
+            except (TypeError, ValueError):
                 pass
+        if "cleanup.policy" in configs:
+            meta["cleanup_policy"] = configs["cleanup.policy"]
         return meta
 
     def _describe_topic_configs(self, admin: Any, topic: str) -> dict[str, str]:
         try:
-            from kafka.admin import ConfigResource, ConfigResourceType
-
-            resource = ConfigResource(ConfigResourceType.TOPIC, topic)
-            result = admin.describe_configs([resource])
+            admin_module = require_module(
+                module_name="confluent_kafka.admin",
+                source_name="Apache Kafka",
+                uv_groups=["kafka"],
+            )
+            resource = admin_module.ConfigResource(admin_module.ConfigResource.Type.TOPIC, topic)
+            futures = admin.describe_configs([resource])
             configs: dict[str, str] = {}
-            for response in result or []:
-                for entry in getattr(response, "resources", []) or []:
-                    for config in entry[4]:
-                        configs[config[0]] = config[1]
+            for future in futures.values():
+                entries = future.result(timeout=self._request_timeout_seconds())
+                for name, entry in entries.items():
+                    value = getattr(entry, "value", None)
+                    if value is not None:
+                        configs[str(name)] = str(value)
             return configs
-        except Exception:
+        except Exception as exc:
+            logger.debug("Kafka topic describe failed for %s: %s", topic, exc)
             return {}
 
     # ── Asset ────────────────────────────────────────────────────────────
@@ -264,36 +296,65 @@ class KafkaSource(BaseSource):
                 return f"<{len(bytes(value))} bytes>"
         return str(value)
 
+    def _start_offset(self, strategy: SamplingStrategy, low: int, high: int, per: int) -> int:
+        """Pick the partition start offset for the configured sampling strategy."""
+        if strategy == SamplingStrategy.LATEST:
+            return max(low, high - per)
+        if strategy == SamplingStrategy.RANDOM:
+            return random.randint(low, max(low, high - per))
+        # AUTOMATIC / ALL: read from the earliest retained offset.
+        return low
+
     def _consume(self, topic: str, max_count: int) -> list[dict[str, Any]]:
-        sampling = self._sampling()
-        consumer = self._make_consumer(consumer_timeout_ms=5000)
+        strategy = self._sampling().strategy
+        consumer = self._make_consumer()
+        timeout = self._request_timeout_seconds()
         out: list[dict[str, Any]] = []
         try:
-            partitions = consumer.partitions_for_topic(topic) or set()
-            tps = [self._kafka.TopicPartition(topic, p) for p in partitions]
-            if not tps:
+            metadata = self._cluster_metadata(consumer, topic)
+            topic_meta = metadata.topics.get(topic)
+            partition_ids = sorted(topic_meta.partitions.keys()) if topic_meta else []
+            if not partition_ids:
                 return out
-            consumer.assign(tps)
-            if sampling.strategy == SamplingStrategy.LATEST:
-                end = consumer.end_offsets(tps)
-                per = max(1, max_count // max(1, len(tps)))
-                begin = consumer.beginning_offsets(tps)
-                for tp in tps:
-                    target = max(begin.get(tp, 0), end.get(tp, 0) - per)
-                    consumer.seek(tp, target)
-            else:
-                consumer.seek_to_beginning(*tps)
-            for message in consumer:
-                out.append(
-                    {
-                        "partition": message.partition,
-                        "offset": message.offset,
-                        "key": self._decode(message.key),
-                        "value": self._decode(message.value),
-                    }
-                )
-                if len(out) >= max_count:
+            per = max(1, max_count // len(partition_ids))
+            assignments = []
+            for partition_id in partition_ids:
+                tp = self._kafka.TopicPartition(topic, partition_id)
+                try:
+                    low, high = consumer.get_watermark_offsets(tp, timeout=timeout)
+                except Exception as exc:
+                    logger.debug("Watermark lookup failed for %s[%s]: %s", topic, partition_id, exc)
+                    continue
+                if high <= low:
+                    continue  # empty partition
+                tp.offset = self._start_offset(strategy, int(low), int(high), per)
+                assignments.append(tp)
+            if not assignments:
+                return out
+            consumer.assign(assignments)
+
+            deadline = _CONSUME_TIMEOUT_SECONDS
+            while len(out) < max_count:
+                messages = consumer.consume(num_messages=max_count - len(out), timeout=deadline)
+                if not messages:
                     break
+                for message in messages:
+                    error = message.error()
+                    if error is not None:
+                        if error.code() == self._kafka.KafkaError._PARTITION_EOF:
+                            continue
+                        logger.debug("Kafka consume error on %s: %s", topic, error)
+                        continue
+                    out.append(
+                        {
+                            "partition": message.partition(),
+                            "offset": message.offset(),
+                            "key": self._decode(message.key()),
+                            "value": self._decode(message.value()),
+                        }
+                    )
+                    if len(out) >= max_count:
+                        break
         finally:
             consumer.close()
         return out

@@ -54,11 +54,13 @@ def _pyproject_dependency_groups() -> dict[str, list[str]]:
 
 
 def _ast_require_module_groups(path: Path) -> set[str]:
-    """Return every uv_groups string found in require_module(...) calls in *path*.
+    """Return every uv_groups string found in dependency-loading calls in *path*.
 
     Handles both the keyword form  require_module(..., uv_groups=["x"])
     and the positional form         require_module("mod", "name", ["x"])
-    where uv_groups is the 3rd parameter (index 2).
+    where uv_groups is the 3rd parameter (index 2), plus the shared
+    build_s3_client(..., uv_groups=["x"]) helper (which wraps require_module
+    for S3-compatible storage access).
     """
     module_ast = ast.parse(path.read_text(encoding="utf-8"))
     groups: set[str] = set()
@@ -66,7 +68,7 @@ def _ast_require_module_groups(path: Path) -> set[str]:
         if not isinstance(node, ast.Call):
             continue
         func_name = node.func.id if isinstance(node.func, ast.Name) else None
-        if func_name != "require_module":
+        if func_name not in ("require_module", "build_s3_client"):
             continue
 
         # Keyword form: uv_groups=[...]
