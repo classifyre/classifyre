@@ -8,9 +8,11 @@ set -euo pipefail
 # Layout produced:
 #   resources/api/     — compiled NestJS API + production node_modules (incl. prisma CLI)
 #   resources/web/     — Next.js static export
-#   resources/cli/     — Python CLI source + pyproject/uv.lock
+#   resources/pg/      — embedded-postgres npm tree (main app loads it from here)
+#   resources/pyapp/   — Python CLI (apps/cli) + schemas (packages/schemas),
+#                        preserving the monorepo-relative editable-dep layout
 #   resources/python/  — standalone CPython (python-build-standalone via uv)
-#   resources/venv/    — pre-baked venv (re-pointed at first app launch)
+#   resources/venv/    — pre-baked BASE venv (optional groups install on demand)
 #   resources/prisma/  — Prisma schema + migrations
 #
 # Env toggles:
@@ -55,7 +57,7 @@ fi
 
 echo "=== Stage artifacts into resources/ ==="
 rm -rf "$RESOURCES"
-mkdir -p "$RESOURCES"/{api,web,cli}
+mkdir -p "$RESOURCES"/{api,web}
 
 # --- API: dist + standalone production install --------------------------------
 # The monorepo uses bun's isolated (pnpm-style) store: apps/api/node_modules
@@ -111,6 +113,10 @@ node -e "
 # node_modules for the generated client output.
 echo "Generating Prisma client in staged tree…"
 cp -R "$MONOREPO_ROOT/apps/api/prisma" "$RESOURCES/api/prisma"
+# Prisma 7 requires datasource.url via prisma.config.ts for `migrate deploy`
+# (the runtime migration step) — without it the packaged app fails to open any
+# workspace with "The datasource.url property is required".
+cp "$MONOREPO_ROOT/apps/api/prisma.config.ts" "$RESOURCES/api/prisma.config.ts"
 # Run from the staged api dir with a relative --schema so native prisma on
 # Windows doesn't misread a POSIX absolute path.
 (cd "$RESOURCES/api" && node node_modules/prisma/build/index.js generate \
@@ -124,6 +130,37 @@ node -e "
   console.log('Staged API tree sanity checks passed.');
 "
 
+# --- Embedded PostgreSQL runtime ----------------------------------------------
+# The Electron Forge Vite plugin packages ONLY .vite/build + package.json into
+# app.asar — the app's node_modules never ship. `embedded-postgres` is
+# externalized in vite.main.config.ts (it wraps native PG binaries), so in a
+# packaged app it must be loaded from a staged tree instead. A real npm install
+# (not bun's symlinked store) produces a self-contained tree, installs only the
+# platform-matching @embedded-postgres/* package, and runs its postinstall
+# (hydrate-symlinks.js), which restores the SONAME symlinks npm-pack strips.
+echo "=== Stage embedded PostgreSQL node modules ==="
+mkdir -p "$RESOURCES/pg"
+node -e "
+  const fs = require('fs');
+  const desktopPkg = JSON.parse(fs.readFileSync('$(to_node_path "$DESKTOP_DIR")/package.json', 'utf8'));
+  const pkg = {
+    name: 'classifyre-desktop-pg',
+    private: true,
+    dependencies: { 'embedded-postgres': desktopPkg.dependencies['embedded-postgres'] },
+  };
+  fs.writeFileSync('$RESOURCES_NODE/pg/package.json', JSON.stringify(pkg, null, 2));
+"
+(cd "$RESOURCES/pg" && npm install --omit=dev --no-audit --no-fund --loglevel=error)
+node -e "
+  const { pathToFileURL } = require('url');
+  import(pathToFileURL('$RESOURCES_NODE/pg/node_modules/embedded-postgres/dist/index.js').href)
+    .then((m) => {
+      if (typeof m.default !== 'function') throw new Error('unexpected export shape');
+      console.log('Staged embedded-postgres tree loads OK.');
+    })
+    .catch((err) => { console.error('Staged embedded-postgres tree is broken:', err); process.exit(1); });
+"
+
 # --- Web static export --------------------------------------------------------
 if [ ! -d "$MONOREPO_ROOT/apps/web/out" ]; then
   echo "apps/web/out missing — run without SKIP_APP_BUILD or build web first" >&2
@@ -132,9 +169,22 @@ fi
 cp -R "$MONOREPO_ROOT/apps/web/out/." "$RESOURCES/web/"
 
 # --- Python CLI source ----------------------------------------------------------
-cp -R "$MONOREPO_ROOT/apps/cli/src" "$RESOURCES/cli/src"
-cp "$MONOREPO_ROOT/apps/cli/pyproject.toml" "$RESOURCES/cli/pyproject.toml"
-cp "$MONOREPO_ROOT/apps/cli/uv.lock" "$RESOURCES/cli/uv.lock"
+# Staged as pyapp/apps/cli + pyapp/packages/schemas so the CLI pyproject's
+# editable path dependency (classifyre-schemas = ../../packages/schemas) keeps
+# the exact relative layout uv.lock was resolved against. Runtime `uv sync`
+# (on-demand optional groups) re-verifies the whole project, so that path must
+# exist inside the bundle.
+CLI_DEST="$RESOURCES/pyapp/apps/cli"
+SCHEMAS_PY_DEST="$RESOURCES/pyapp/packages/schemas"
+mkdir -p "$CLI_DEST" "$SCHEMAS_PY_DEST"
+cp -R "$MONOREPO_ROOT/apps/cli/src" "$CLI_DEST/src"
+cp "$MONOREPO_ROOT/apps/cli/pyproject.toml" "$CLI_DEST/pyproject.toml"
+cp "$MONOREPO_ROOT/apps/cli/uv.lock" "$CLI_DEST/uv.lock"
+cp "$MONOREPO_ROOT/apps/cli/README.md" "$CLI_DEST/README.md" 2>/dev/null || true
+cp -R "$MONOREPO_ROOT/packages/schemas/src" "$SCHEMAS_PY_DEST/src"
+cp "$MONOREPO_ROOT/packages/schemas/pyproject.toml" "$SCHEMAS_PY_DEST/pyproject.toml"
+cp "$MONOREPO_ROOT/packages/schemas/uv.lock" "$SCHEMAS_PY_DEST/uv.lock" 2>/dev/null || true
+cp "$MONOREPO_ROOT/packages/schemas/README.md" "$SCHEMAS_PY_DEST/README.md" 2>/dev/null || true
 
 # --- Standalone CPython + pre-baked venv --------------------------------------
 if [ "${SKIP_PYTHON:-0}" != "1" ]; then
@@ -162,12 +212,14 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
   rm -rf .venv-desktop
   uv venv --python "$PY_BIN" .venv-desktop
 
-  # All optional groups are baked — the lakehouse sources are JVM-free now
-  # (pyiceberg/deltalake/duckdb) and small enough to ship. --no-dev drops
-  # ruff/mypy/pytest, which have no place in a shipped venv.
+  # Only the BASE dependencies are baked. Optional detector/source groups
+  # (torch, presidio, transformers, … — multiple GB) install on demand at
+  # runtime through the CLI's uv_sync machinery, exactly like the server
+  # deployment; baking them all made the installers ~800 MB-1 GB compressed.
+  # --no-dev drops ruff/mypy/pytest, which have no place in a shipped venv.
   # UV_PROJECT_ENVIRONMENT redirects the sync target — `uv sync --python`
   # alone only selects the interpreter version and would sync .venv instead.
-  UV_PROJECT_ENVIRONMENT=.venv-desktop uv sync --frozen --all-groups --no-dev
+  UV_PROJECT_ENVIRONMENT=.venv-desktop uv sync --frozen --no-dev
 
   # Bundle the uv binary inside the venv so it lands on PATH at runtime: the API
   # spawns the CLI via `uv run`, and optional groups self-install via `uv sync`.
@@ -180,20 +232,9 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
     chmod +x ".venv-desktop/bin/uv"
   fi
 
-  # Seed uv_sync.py's group-accumulation state with every group we baked. Without
-  # this the first runtime `uv sync --group delta-lake` would PRUNE all the other
-  # baked optional groups (torch, presidio, …), because `uv sync` removes groups
-  # not passed. Seeding makes each runtime sync re-pass the full baked set.
-  "$PY_BIN" - <<'PYEOF'
-import json, tomllib
-from pathlib import Path
-
-data = tomllib.loads(Path("pyproject.toml").read_text())
-baked = sorted(set(data.get("dependency-groups", {})) - {"dev"})
-Path(".venv-desktop/.classifyre-uv-sync-groups.json").write_text(json.dumps(baked))
-print(f"Seeded uv-sync state with {len(baked)} baked groups")
-PYEOF
-
+  # No optional groups are baked, so uv_sync.py's group-accumulation state
+  # starts empty — the first runtime `uv sync --group X` installs exactly that
+  # group on top of the base deps and records it.
   cp -R "$MONOREPO_ROOT/apps/cli/.venv-desktop" "$RESOURCES/venv"
 
   # codesign rejects symlinks whose destination is an absolute build-machine
@@ -214,10 +255,11 @@ PYEOF
     echo "Rewrote venv python symlinks to bundle-relative paths for codesign"
   fi
 
-  # A populated base venv is >1GB; an empty scaffold means the sync silently
-  # missed the target env. Fail loudly rather than ship broken.
+  # A populated base venv (spacy + en_core_web_sm + lxml + pydantic…) is well
+  # over 50MB; an empty scaffold (<10MB) means the sync silently missed the
+  # target env. Fail loudly rather than ship broken.
   VENV_SIZE_KB="$(du -sk "$RESOURCES/venv" | cut -f1)"
-  if [ "$VENV_SIZE_KB" -lt 102400 ]; then
+  if [ "$VENV_SIZE_KB" -lt 51200 ]; then
     echo "Staged venv is only ${VENV_SIZE_KB}KB — uv sync did not populate it" >&2
     exit 1
   fi

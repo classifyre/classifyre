@@ -105,7 +105,7 @@ Installers land in `out/make/`:
 | Platform | Artifact |
 |----------|----------|
 | macOS (arm64 / x64) | `.dmg` |
-| Windows x64 | `Classifyre-<version> Setup.exe` |
+| Windows x64 | `Classifyre-win32-x64-<version>.zip` (portable) |
 | Linux (amd64 / arm64) | `.deb` + `.rpm` |
 
 ### What gets bundled (`resources/`, staged by `scripts/stage-resources.sh`)
@@ -184,7 +184,7 @@ CLASSIFYRE_APP_PATH=out/Classifyre-darwin-arm64/Classifyre.app/Contents/MacOS/cl
 |----------|--------|----------|
 | macOS arm64 | `macos-latest` | `.dmg` |
 | macOS x64 | `macos-15-intel` | `.dmg` |
-| Windows x64 | `windows-latest` | `Setup.exe` |
+| Windows x64 | `windows-latest` | `.zip` (portable) |
 | Linux amd64 | `ubuntu-latest` | `.deb` + `.rpm` |
 | Linux arm64 | `ubuntu-24.04-arm` | `.deb` + `.rpm` |
 

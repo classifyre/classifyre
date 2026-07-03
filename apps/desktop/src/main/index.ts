@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView } from 'electron';
+import { app, BrowserWindow, WebContentsView, dialog } from 'electron';
 import path from 'path';
 import { PostgresManager } from './postgres-manager.js';
 import { NamespaceManager } from './namespace-manager.js';
@@ -130,6 +130,12 @@ app.on('ready', async () => {
     console.log(`Embedded PostgreSQL started on port ${pg.getPort()}`);
   } catch (err) {
     console.error('Failed to start embedded PostgreSQL:', err);
+    // Surface the failure — a silent exit looks like a crash and gives users
+    // nothing to report.
+    dialog.showErrorBox(
+      'Classifyre could not start',
+      `The embedded PostgreSQL database failed to start.\n\n${err instanceof Error ? err.message : String(err)}`,
+    );
     app.quit();
     return;
   }
