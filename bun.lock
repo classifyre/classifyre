@@ -17,7 +17,7 @@
     },
     "apps/api": {
       "name": "@classifyre/api",
-      "version": "0.4.35-SNAPSHOT",
+      "version": "0.4.37-SNAPSHOT",
       "dependencies": {
         "@anthropic-ai/sdk": "^0.101.0",
         "@aws-sdk/client-s3": "^3.1032.0",
@@ -98,7 +98,7 @@
     },
     "apps/blog": {
       "name": "@classifyre/blog",
-      "version": "0.4.35-SNAPSHOT",
+      "version": "0.4.37-SNAPSHOT",
       "dependencies": {
         "@workspace/schemas": "workspace:*",
         "@workspace/ui": "workspace:*",
@@ -127,11 +127,11 @@
     },
     "apps/cli": {
       "name": "@classifyre/cli",
-      "version": "0.4.35-SNAPSHOT",
+      "version": "0.4.37-SNAPSHOT",
     },
     "apps/desktop": {
       "name": "classifyre-desktop",
-      "version": "0.4.35-SNAPSHOT",
+      "version": "0.4.37-SNAPSHOT",
       "dependencies": {
         "embedded-postgres": "18.4.0-beta.17",
         "get-port": "^7.1.0",
@@ -158,10 +158,17 @@
         "typescript-eslint": "^8.61.1",
         "vite": "^6.3.0",
       },
+      "optionalDependencies": {
+        "@embedded-postgres/darwin-arm64": "18.4.0-beta.17",
+        "@embedded-postgres/darwin-x64": "18.4.0-beta.17",
+        "@embedded-postgres/linux-arm64": "18.4.0-beta.17",
+        "@embedded-postgres/linux-x64": "18.4.0-beta.17",
+        "@embedded-postgres/windows-x64": "18.4.0-beta.17",
+      },
     },
     "apps/docs": {
       "name": "@classifyre/docs",
-      "version": "0.4.35-SNAPSHOT",
+      "version": "0.4.37-SNAPSHOT",
       "dependencies": {
         "@theguild/remark-mermaid": "^0.3.0",
         "@workspace/schemas": "workspace:*",
@@ -199,7 +206,7 @@
     },
     "apps/web": {
       "name": "@classifyre/web",
-      "version": "0.4.35-SNAPSHOT",
+      "version": "0.4.37-SNAPSHOT",
       "dependencies": {
         "@hookform/resolvers": "^5.2.2",
         "@monaco-editor/react": "^4.7.0",
@@ -251,7 +258,7 @@
     },
     "packages/api-client": {
       "name": "@workspace/api-client",
-      "version": "0.4.35-SNAPSHOT",
+      "version": "0.4.37-SNAPSHOT",
       "devDependencies": {
         "@openapitools/openapi-generator-cli": "2.34.0",
         "@types/node": "^25.5.2",
@@ -260,7 +267,7 @@
     },
     "packages/devops": {
       "name": "@workspace/devops",
-      "version": "0.4.35-SNAPSHOT",
+      "version": "0.4.37-SNAPSHOT",
     },
     "packages/eslint-config": {
       "name": "@workspace/eslint-config",
@@ -284,7 +291,7 @@
     },
     "packages/schemas": {
       "name": "@workspace/schemas",
-      "version": "0.4.35-SNAPSHOT",
+      "version": "0.4.37-SNAPSHOT",
       "dependencies": {
         "zod": "^4.3.6",
       },
