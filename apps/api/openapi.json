@@ -1172,9 +1172,10 @@
                   "YOUTUBE",
                   "DELTA_LAKE",
                   "ICEBERG",
-                  "HUDI",
-                  "SPARK_CATALOG",
                   "KAFKA",
+                  "ELASTICSEARCH",
+                  "OPENSEARCH",
+                  "MEILISEARCH",
                   "CUSTOM"
                 ]
               }
@@ -1520,9 +1521,10 @@
                   "YOUTUBE",
                   "DELTA_LAKE",
                   "ICEBERG",
-                  "HUDI",
-                  "SPARK_CATALOG",
                   "KAFKA",
+                  "ELASTICSEARCH",
+                  "OPENSEARCH",
+                  "MEILISEARCH",
                   "CUSTOM"
                 ]
               }
@@ -1890,9 +1892,10 @@
                   "YOUTUBE",
                   "DELTA_LAKE",
                   "ICEBERG",
-                  "HUDI",
-                  "SPARK_CATALOG",
                   "KAFKA",
+                  "ELASTICSEARCH",
+                  "OPENSEARCH",
+                  "MEILISEARCH",
                   "CUSTOM"
                 ]
               }
@@ -8134,8 +8137,6 @@
               "YOUTUBE",
               "DELTA_LAKE",
               "ICEBERG",
-              "HUDI",
-              "SPARK_CATALOG",
               "KAFKA",
               "ELASTICSEARCH",
               "OPENSEARCH",
@@ -8327,8 +8328,6 @@
               "YOUTUBE",
               "DELTA_LAKE",
               "ICEBERG",
-              "HUDI",
-              "SPARK_CATALOG",
               "KAFKA",
               "ELASTICSEARCH",
               "OPENSEARCH",
@@ -8461,9 +8460,10 @@
                 "YOUTUBE",
                 "DELTA_LAKE",
                 "ICEBERG",
-                "HUDI",
-                "SPARK_CATALOG",
                 "KAFKA",
+                "ELASTICSEARCH",
+                "OPENSEARCH",
+                "MEILISEARCH",
                 "CUSTOM"
               ]
             }
@@ -8774,9 +8774,10 @@
               "YOUTUBE",
               "DELTA_LAKE",
               "ICEBERG",
-              "HUDI",
-              "SPARK_CATALOG",
               "KAFKA",
+              "ELASTICSEARCH",
+              "OPENSEARCH",
+              "MEILISEARCH",
               "CUSTOM"
             ]
           },
@@ -8916,9 +8917,10 @@
                 "YOUTUBE",
                 "DELTA_LAKE",
                 "ICEBERG",
-                "HUDI",
-                "SPARK_CATALOG",
                 "KAFKA",
+                "ELASTICSEARCH",
+                "OPENSEARCH",
+                "MEILISEARCH",
                 "CUSTOM"
               ]
             }
@@ -9687,9 +9689,10 @@
               "YOUTUBE",
               "DELTA_LAKE",
               "ICEBERG",
-              "HUDI",
-              "SPARK_CATALOG",
               "KAFKA",
+              "ELASTICSEARCH",
+              "OPENSEARCH",
+              "MEILISEARCH",
               "CUSTOM"
             ]
           }
@@ -14687,9 +14690,10 @@
                 "YOUTUBE",
                 "DELTA_LAKE",
                 "ICEBERG",
-                "HUDI",
-                "SPARK_CATALOG",
                 "KAFKA",
+                "ELASTICSEARCH",
+                "OPENSEARCH",
+                "MEILISEARCH",
                 "CUSTOM"
               ]
             }

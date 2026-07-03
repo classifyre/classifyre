@@ -79,12 +79,6 @@
       "$ref": "#/definitions/IcebergInput"
     },
     {
-      "$ref": "#/definitions/HudiInput"
-    },
-    {
-      "$ref": "#/definitions/SparkCatalogInput"
-    },
-    {
       "$ref": "#/definitions/KafkaInput"
     },
     {
@@ -1488,51 +1482,6 @@
           }
         }
       },
-      "HUDI": {
-        "table": {
-          "use": [
-            "tabularTable"
-          ],
-          "properties": {
-            "table_type": {
-              "type": "string",
-              "description": "Hudi table type (COPY_ON_WRITE/MERGE_ON_READ)"
-            },
-            "partition_columns": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Partition column names"
-            },
-            "latest_commit": {
-              "type": "string",
-              "description": "Latest commit/instant time on the timeline"
-            },
-            "num_files": {
-              "type": "integer",
-              "description": "Number of base files"
-            }
-          }
-        }
-      },
-      "SPARK_CATALOG": {
-        "table": {
-          "use": [
-            "tabularTable"
-          ],
-          "properties": {
-            "catalog": {
-              "type": "string",
-              "description": "Spark catalog name"
-            },
-            "provider": {
-              "type": "string",
-              "description": "Table provider/format (e.g. parquet, delta, iceberg)"
-            }
-          }
-        }
-      },
       "ICEBERG": {
         "table": {
           "use": [
@@ -1720,8 +1669,6 @@
         "YOUTUBE",
         "DELTA_LAKE",
         "ICEBERG",
-        "HUDI",
-        "SPARK_CATALOG",
         "KAFKA",
         "ELASTICSEARCH",
         "OPENSEARCH",
@@ -6505,17 +6452,6 @@
         }
       ]
     },
-    "IcebergCatalogType": {
-      "title": "IcebergCatalogType",
-      "type": "string",
-      "enum": [
-        "REST",
-        "HIVE",
-        "GLUE",
-        "SQL"
-      ],
-      "description": "PyIceberg catalog backend type"
-    },
     "KafkaSecurityProtocol": {
       "title": "KafkaSecurityProtocol",
       "type": "string",
@@ -6543,100 +6479,36 @@
       "title": "DeltaLakeRequired",
       "type": "object",
       "properties": {
-        "warehouse_path": {
+        "bucket": {
           "type": "string",
-          "description": "Root storage location holding Delta tables (e.g. s3a://lake/warehouse, file:///data)",
-          "default": "file:///tmp/delta"
+          "description": "Bucket holding the tables — AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
         }
       },
       "required": [
-        "warehouse_path"
+        "bucket"
       ],
-      "additionalProperties": false
-    },
-    "DeltaLakeMasked": {
-      "title": "DeltaLakeMasked",
-      "type": "object",
-      "description": "Optional object-store credentials for the warehouse location.",
-      "properties": {
-        "s3_access_key_id": {
-          "type": "string",
-          "description": "S3 access key id for object-store warehouses"
-        },
-        "s3_secret_access_key": {
-          "type": "string",
-          "description": "S3 secret access key"
-        },
-        "s3_session_token": {
-          "type": "string",
-          "description": "Optional S3 session token"
-        }
-      },
-      "additionalProperties": false
-    },
-    "DeltaLakeOptionalConnection": {
-      "title": "DeltaLakeOptionalConnection",
-      "type": "object",
-      "description": "Delta Lake connection and storage options.",
-      "properties": {
-        "metastore_uri": {
-          "type": "string",
-          "description": "Hive Metastore thrift URI; enables catalog-based table discovery"
-        },
-        "endpoint_url": {
-          "type": "string",
-          "description": "Custom S3-compatible endpoint URL"
-        },
-        "region": {
-          "type": "string",
-          "description": "Object-store region"
-        }
-      },
       "additionalProperties": false
     },
     "DeltaLakeOptionalScope": {
       "title": "DeltaLakeOptionalScope",
       "type": "object",
-      "description": "Delta Lake database and table selection scope.",
+      "description": "Delta Lake table selection scope within the bucket.",
       "properties": {
-        "database": {
+        "prefix": {
           "type": "string",
-          "description": "Single database/namespace to scan (catalog mode)"
-        },
-        "include_all_databases": {
-          "type": "boolean",
-          "default": false,
-          "description": "Scan all visible databases except excluded system databases"
-        },
-        "exclude_databases": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Database denylist (exact names)",
-          "default": [
-            "information_schema",
-            "sys"
-          ]
-        },
-        "include_tables": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Optional table allowlist. Accepted forms: table or database.table"
-        },
-        "table_limit": {
-          "type": "integer",
-          "description": "Optional cap on number of table assets per database",
-          "minimum": 1
+          "description": "Key prefix to search for Delta Lake tables (e.g. warehouse/). Tables are auto-discovered by their _delta_log/ directory."
         },
         "table_paths": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Explicit Delta table locations to scan when no metastore is configured"
+          "description": "Explicit Delta Lake table root keys or s3:// URIs. When set, auto-discovery under prefix is skipped."
+        },
+        "table_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of table assets"
         }
       },
       "additionalProperties": false
@@ -6646,7 +6518,7 @@
       "type": "object",
       "properties": {
         "connection": {
-          "$ref": "#/definitions/DeltaLakeOptionalConnection"
+          "$ref": "#/definitions/LakehouseStorageConnection"
         },
         "scope": {
           "$ref": "#/definitions/DeltaLakeOptionalScope"
@@ -6671,292 +6543,10 @@
               "$ref": "#/definitions/DeltaLakeRequired"
             },
             "masked": {
-              "$ref": "#/definitions/DeltaLakeMasked"
+              "$ref": "#/definitions/S3CompatibleStorageMasked"
             },
             "optional": {
               "$ref": "#/definitions/DeltaLakeOptional"
-            },
-            "detectors": {
-              "$ref": "#/definitions/Detectors"
-            },
-            "custom_detectors": {
-              "$ref": "#/definitions/CustomDetectorSelections"
-            },
-            "sampling": {
-              "$ref": "#/definitions/SamplingConfig"
-            },
-            "resources": {
-              "$ref": "#/definitions/ResourceOverrides"
-            }
-          },
-          "required": [
-            "required",
-            "sampling"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
-    "HudiRequired": {
-      "title": "HudiRequired",
-      "type": "object",
-      "properties": {
-        "warehouse_path": {
-          "type": "string",
-          "description": "Root storage location holding Hudi tables",
-          "default": "file:///tmp/hudi"
-        }
-      },
-      "required": [
-        "warehouse_path"
-      ],
-      "additionalProperties": false
-    },
-    "HudiMasked": {
-      "title": "HudiMasked",
-      "type": "object",
-      "description": "Optional object-store credentials for the warehouse location.",
-      "properties": {
-        "s3_access_key_id": {
-          "type": "string",
-          "description": "S3 access key id for object-store warehouses"
-        },
-        "s3_secret_access_key": {
-          "type": "string",
-          "description": "S3 secret access key"
-        },
-        "s3_session_token": {
-          "type": "string",
-          "description": "Optional S3 session token"
-        }
-      },
-      "additionalProperties": false
-    },
-    "HudiOptionalConnection": {
-      "title": "HudiOptionalConnection",
-      "type": "object",
-      "description": "Hudi connection and storage options.",
-      "properties": {
-        "metastore_uri": {
-          "type": "string",
-          "description": "Hive Metastore thrift URI; enables catalog-based table discovery"
-        },
-        "endpoint_url": {
-          "type": "string",
-          "description": "Custom S3-compatible endpoint URL"
-        },
-        "region": {
-          "type": "string",
-          "description": "Object-store region"
-        }
-      },
-      "additionalProperties": false
-    },
-    "HudiOptionalScope": {
-      "title": "HudiOptionalScope",
-      "type": "object",
-      "description": "Hudi database and table selection scope.",
-      "properties": {
-        "database": {
-          "type": "string",
-          "description": "Single database/namespace to scan (catalog mode)"
-        },
-        "include_all_databases": {
-          "type": "boolean",
-          "default": false,
-          "description": "Scan all visible databases except excluded system databases"
-        },
-        "exclude_databases": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Database denylist (exact names)",
-          "default": [
-            "information_schema",
-            "sys"
-          ]
-        },
-        "include_tables": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Optional table allowlist. Accepted forms: table or database.table"
-        },
-        "table_limit": {
-          "type": "integer",
-          "description": "Optional cap on number of table assets per database",
-          "minimum": 1
-        },
-        "table_paths": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Explicit Hudi table locations to scan when no metastore is configured"
-        }
-      },
-      "additionalProperties": false
-    },
-    "HudiOptional": {
-      "title": "HudiOptional",
-      "type": "object",
-      "properties": {
-        "connection": {
-          "$ref": "#/definitions/HudiOptionalConnection"
-        },
-        "scope": {
-          "$ref": "#/definitions/HudiOptionalScope"
-        }
-      },
-      "additionalProperties": false
-    },
-    "HudiInput": {
-      "title": "HudiInput",
-      "label": "Apache Hudi",
-      "allOf": [
-        {
-          "$ref": "#/definitions/CoreInput"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "type": {
-              "const": "HUDI"
-            },
-            "required": {
-              "$ref": "#/definitions/HudiRequired"
-            },
-            "masked": {
-              "$ref": "#/definitions/HudiMasked"
-            },
-            "optional": {
-              "$ref": "#/definitions/HudiOptional"
-            },
-            "detectors": {
-              "$ref": "#/definitions/Detectors"
-            },
-            "custom_detectors": {
-              "$ref": "#/definitions/CustomDetectorSelections"
-            },
-            "sampling": {
-              "$ref": "#/definitions/SamplingConfig"
-            },
-            "resources": {
-              "$ref": "#/definitions/ResourceOverrides"
-            }
-          },
-          "required": [
-            "required",
-            "sampling"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
-    "SparkCatalogRequired": {
-      "title": "SparkCatalogRequired",
-      "type": "object",
-      "properties": {
-        "connect_url": {
-          "type": "string",
-          "description": "Spark Connect endpoint (sc://host:15002) or classic master (spark://host:7077)",
-          "default": "sc://localhost:15002"
-        }
-      },
-      "required": [
-        "connect_url"
-      ],
-      "additionalProperties": false
-    },
-    "SparkCatalogMasked": {
-      "title": "SparkCatalogMasked",
-      "type": "object",
-      "description": "Optional Spark Connect authentication.",
-      "properties": {
-        "token": {
-          "type": "string",
-          "description": "Bearer token for Spark Connect authentication"
-        }
-      },
-      "additionalProperties": false
-    },
-    "SparkCatalogOptionalScope": {
-      "title": "SparkCatalogOptionalScope",
-      "type": "object",
-      "description": "Spark catalog and table selection scope.",
-      "properties": {
-        "catalog": {
-          "type": "string",
-          "description": "Spark catalog name to scan (defaults to the session catalog)"
-        },
-        "database": {
-          "type": "string",
-          "description": "Single database/namespace to scan"
-        },
-        "include_all_databases": {
-          "type": "boolean",
-          "default": false,
-          "description": "Scan all visible databases except excluded system databases"
-        },
-        "exclude_databases": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Database denylist (exact names)",
-          "default": [
-            "information_schema",
-            "sys"
-          ]
-        },
-        "include_tables": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Optional table allowlist. Accepted forms: table or database.table"
-        },
-        "table_limit": {
-          "type": "integer",
-          "description": "Optional cap on number of table assets per database",
-          "minimum": 1
-        }
-      },
-      "additionalProperties": false
-    },
-    "SparkCatalogOptional": {
-      "title": "SparkCatalogOptional",
-      "type": "object",
-      "properties": {
-        "scope": {
-          "$ref": "#/definitions/SparkCatalogOptionalScope"
-        }
-      },
-      "additionalProperties": false
-    },
-    "SparkCatalogInput": {
-      "title": "SparkCatalogInput",
-      "label": "Spark Catalog",
-      "allOf": [
-        {
-          "$ref": "#/definitions/CoreInput"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "type": {
-              "const": "SPARK_CATALOG"
-            },
-            "required": {
-              "$ref": "#/definitions/SparkCatalogRequired"
-            },
-            "masked": {
-              "$ref": "#/definitions/SparkCatalogMasked"
-            },
-            "optional": {
-              "$ref": "#/definitions/SparkCatalogOptional"
             },
             "detectors": {
               "$ref": "#/definitions/Detectors"
@@ -6983,77 +6573,23 @@
       "title": "IcebergRequired",
       "type": "object",
       "properties": {
-        "catalog_type": {
-          "$ref": "#/definitions/IcebergCatalogType"
-        },
-        "catalog_uri": {
+        "bucket": {
           "type": "string",
-          "description": "Catalog URI (REST endpoint, Hive metastore thrift URI, or SQL DSN). Not required for GLUE."
-        },
-        "warehouse": {
-          "type": "string",
-          "description": "Warehouse location root (e.g. s3://bucket/warehouse)"
+          "description": "Bucket holding the tables — AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
         }
       },
       "required": [
-        "catalog_type",
-        "warehouse"
+        "bucket"
       ],
-      "additionalProperties": false
-    },
-    "IcebergMasked": {
-      "title": "IcebergMasked",
-      "type": "object",
-      "description": "Optional Iceberg catalog/storage credentials.",
-      "properties": {
-        "token": {
-          "type": "string",
-          "description": "Bearer token for a REST catalog"
-        },
-        "aws_access_key_id": {
-          "type": "string",
-          "description": "AWS access key id (Glue/S3)"
-        },
-        "aws_secret_access_key": {
-          "type": "string",
-          "description": "AWS secret access key (Glue/S3)"
-        }
-      },
-      "additionalProperties": false
-    },
-    "IcebergOptionalScope": {
-      "title": "IcebergOptionalScope",
-      "type": "object",
-      "description": "Iceberg namespace and table selection scope.",
-      "properties": {
-        "namespace": {
-          "type": "string",
-          "description": "Single namespace to scan (dotted form supported)"
-        },
-        "include_all_namespaces": {
-          "type": "boolean",
-          "default": false,
-          "description": "Scan all visible namespaces"
-        },
-        "include_tables": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Optional table allowlist. Accepted forms: table or namespace.table"
-        },
-        "table_limit": {
-          "type": "integer",
-          "description": "Optional cap on number of table assets per namespace",
-          "minimum": 1
-        }
-      },
       "additionalProperties": false
     },
     "IcebergOptional": {
       "title": "IcebergOptional",
       "type": "object",
       "properties": {
+        "connection": {
+          "$ref": "#/definitions/LakehouseStorageConnection"
+        },
         "scope": {
           "$ref": "#/definitions/IcebergOptionalScope"
         }
@@ -7077,7 +6613,7 @@
               "$ref": "#/definitions/IcebergRequired"
             },
             "masked": {
-              "$ref": "#/definitions/IcebergMasked"
+              "$ref": "#/definitions/S3CompatibleStorageMasked"
             },
             "optional": {
               "$ref": "#/definitions/IcebergOptional"
@@ -7827,6 +7363,66 @@
           "additionalProperties": false
         }
       ]
+    },
+    "LakehouseStorageConnection": {
+      "title": "LakehouseStorageConnection",
+      "type": "object",
+      "description": "S3-compatible storage connection options (AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, ...). Mirrors the S3 Compatible Storage source connection settings.",
+      "properties": {
+        "region_name": {
+          "type": "string",
+          "description": "Region (recommended for AWS; required by some S3-compatible providers)"
+        },
+        "endpoint_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Custom endpoint URL for MinIO/R2/B2/Garage and other S3-compatible providers"
+        },
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 30,
+          "description": "Network timeout in seconds for storage list/read operations"
+        },
+        "max_keys_per_page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 1000,
+          "description": "Maximum objects requested per provider list API call during table discovery"
+        },
+        "verify_ssl": {
+          "type": "boolean",
+          "default": true,
+          "description": "TLS certificate verification toggle"
+        }
+      },
+      "additionalProperties": false
+    },
+    "IcebergOptionalScope": {
+      "title": "IcebergOptionalScope",
+      "type": "object",
+      "description": "Apache Iceberg table selection scope within the bucket.",
+      "properties": {
+        "prefix": {
+          "type": "string",
+          "description": "Key prefix to search for Apache Iceberg tables (e.g. warehouse/). Tables are auto-discovered by their metadata/ directory."
+        },
+        "table_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Explicit Apache Iceberg table root keys or s3:// URIs. When set, auto-discovery under prefix is skipped."
+        },
+        "table_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional cap on number of table assets"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

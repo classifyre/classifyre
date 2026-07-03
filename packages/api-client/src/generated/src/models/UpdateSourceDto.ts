@@ -93,8 +93,6 @@ export const UpdateSourceDtoTypeEnum = {
     Youtube: 'YOUTUBE',
     DeltaLake: 'DELTA_LAKE',
     Iceberg: 'ICEBERG',
-    Hudi: 'HUDI',
-    SparkCatalog: 'SPARK_CATALOG',
     Kafka: 'KAFKA',
     Elasticsearch: 'ELASTICSEARCH',
     Opensearch: 'OPENSEARCH',

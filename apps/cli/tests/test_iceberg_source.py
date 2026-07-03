@@ -1,95 +1,175 @@
 from __future__ import annotations
 
-from typing import Any
+from pathlib import Path
+from typing import Any, ClassVar
 
+import duckdb
 import pytest
 
 from src.sources.iceberg.source import IcebergSource
-from tests._spark_fakes import FakeSparkSession
+from tests._lakehouse_fakes import FakeS3Client, write_parquet
 
 
 def _recipe(**overrides: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
         "type": "ICEBERG",
-        "required": {
-            "catalog_type": "REST",
-            "catalog_uri": "https://rest:8181",
-            "warehouse": "s3://lake/iceberg",
+        "required": {"bucket": "lake"},
+        "masked": {
+            "aws_access_key_id": "key",
+            "aws_secret_access_key": "secret",
         },
-        "optional": {"scope": {"include_all_namespaces": True}},
+        "optional": {"scope": {"prefix": "warehouse/"}},
         "sampling": {"strategy": "RANDOM", "rows_per_page": 10},
     }
     base.update(overrides)
     return base
 
 
-@pytest.fixture(autouse=True)
-def _patch_require(monkeypatch: pytest.MonkeyPatch) -> None:
+class FakeIcebergTable:
+    def __init__(self, files: list[str]) -> None:
+        self._files = files
+        self.metadata = type("M", (), {"format_version": 2})()
+
+    def scan(self) -> Any:
+        files = self._files
+
+        class _Task:
+            def __init__(self, path: str) -> None:
+                self.file = type("F", (), {"file_path": path})()
+
+        class _Scan:
+            def plan_files(self) -> list[_Task]:
+                return [_Task(f) for f in files]
+
+        return _Scan()
+
+    def schema(self) -> Any:
+        class _Field:
+            def __init__(self, name: str, field_type: str) -> None:
+                self.name = name
+                self.field_type = field_type
+
+        class _Schema:
+            fields: ClassVar = [_Field("id", "long"), _Field("email", "string")]
+
+        return _Schema()
+
+    def current_snapshot(self) -> Any:
+        return type(
+            "S",
+            (),
+            {
+                "snapshot_id": 12345,
+                "summary": {"total-records": "12", "total-data-files": "1"},
+            },
+        )()
+
+    def spec(self) -> str:
+        return "[]"
+
+    def sort_order(self) -> str:
+        return "[]"
+
+
+_KEYS = [
+    "warehouse/analytics/events/metadata/00001-aaa.metadata.json",
+    "warehouse/analytics/events/metadata/00002-bbb.metadata.json",
+    "warehouse/analytics/events/metadata/snap-1.avro",
+    "warehouse/analytics/events/data/part-0.parquet",
+    "warehouse/plain/notes.txt",
+]
+
+
+def _build(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    recipe: dict[str, Any] | None = None,
+) -> IcebergSource:
+    parquet = write_parquet(tmp_path / "events" / "part-0.parquet", rows=12)
+    handle = FakeIcebergTable([parquet.as_posix()])
+
+    monkeypatch.setattr(
+        "src.sources.lakehouse_base.build_s3_client",
+        lambda **_kw: FakeS3Client(_KEYS),
+    )
     monkeypatch.setattr(
         "src.sources.iceberg.source.require_module",
-        lambda **_kwargs: object(),
+        lambda **kwargs: duckdb if kwargs.get("module_name") == "duckdb" else object(),
     )
 
-
-def _build(session: FakeSparkSession, recipe: dict[str, Any] | None = None) -> IcebergSource:
     src = IcebergSource(recipe or _recipe())
-    src._session = lambda: session  # type: ignore[method-assign]
+    src._open_table = lambda _root: handle  # type: ignore[method-assign]
     return src
 
 
-def _session_with_tables() -> FakeSparkSession:
-    return FakeSparkSession(
-        databases=["analytics"],
-        tables={"analytics": ["customers"]},
-        fields=[("id", "long"), ("email", "string")],
-        rows=[(i, f"user{i}@example.com") for i in range(12)],
+def test_iceberg_discovers_table_roots_from_metadata_marker(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    src = _build(monkeypatch, tmp_path)
+    tables = src._list_tables_for_database("lake")
+    assert [t.table for t in tables] == ["warehouse/analytics/events"]
+
+
+def test_iceberg_latest_metadata_key_picks_highest_version(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    src = _build(monkeypatch, tmp_path)
+    key = src._latest_metadata_key("warehouse/analytics/events")
+    assert key == "warehouse/analytics/events/metadata/00002-bbb.metadata.json"
+
+
+def test_iceberg_pyiceberg_properties_wire_s3_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    recipe = _recipe(
+        optional={
+            "connection": {"endpoint_url": "http://minio:9000", "region_name": "eu-west-1"},
+            "scope": {"prefix": "warehouse/"},
+        }
     )
+    src = _build(monkeypatch, tmp_path, recipe=recipe)
+    properties = src._pyiceberg_properties()
+    assert properties["s3.endpoint"] == "http://minio:9000"
+    assert properties["s3.region"] == "eu-west-1"
+    assert properties["s3.access-key-id"] == "key"
+    assert properties["s3.secret-access-key"] == "secret"
 
 
-def test_iceberg_configures_rest_catalog() -> None:
-    src = IcebergSource(_recipe(masked={"token": "abc"}))
-    conf = src._extra_spark_conf()
-    assert conf["spark.sql.catalog.iceberg_catalog"] == "org.apache.iceberg.spark.SparkCatalog"
-    assert conf["spark.sql.catalog.iceberg_catalog.type"] == "rest"
-    assert conf["spark.sql.catalog.iceberg_catalog.uri"] == "https://rest:8181"
-    assert conf["spark.sql.catalog.iceberg_catalog.token"] == "abc"
-
-
-def test_iceberg_glue_catalog_impl() -> None:
-    src = IcebergSource(
-        _recipe(required={"catalog_type": "GLUE", "warehouse": "s3://lake/iceberg"})
-    )
-    conf = src._extra_spark_conf()
-    assert (
-        conf["spark.sql.catalog.iceberg_catalog.catalog-impl"]
-        == "org.apache.iceberg.aws.glue.GlueCatalog"
-    )
-
-
-def test_iceberg_test_connection_success() -> None:
-    src = _build(FakeSparkSession())
-    assert src.test_connection()["status"] == "SUCCESS"
-
-
-async def test_iceberg_extract_emits_table_assets() -> None:
-    src = _build(_session_with_tables())
+async def test_iceberg_extract_emits_table_assets_with_metadata(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    src = _build(monkeypatch, tmp_path)
     assets = [a async for batch in src.extract_raw() for a in batch]
     assert len(assets) == 1
     asset = assets[0]
     assert asset.asset_kind == "table"
-    assert asset.name == "analytics.customers"
     meta = asset.metadata
-    assert meta["database"] == "analytics"
-    assert meta["table_name"] == "customers"
-    assert meta["table_type"] == "TABLE"
-    assert {c["name"] for c in meta["columns"]} == {"id", "email"}
+    assert meta["database"] == "lake"
+    assert meta["table_name"] == "warehouse/analytics/events"
+    assert [c["name"] for c in meta["columns"]] == ["id", "email"]
+    assert meta["format_version"] == 2
+    assert meta["snapshot_id"] == "12345"
+    assert meta["num_files"] == 1
+    assert meta["row_count"] == 12
 
 
-async def test_iceberg_all_strategy_streams_rows() -> None:
-    session = _session_with_tables()
-    src = _build(session, _recipe(sampling={"strategy": "ALL", "rows_per_page": 10}))
-    [a async for batch in src.extract_raw() for a in batch]
-    asset_hash = next(iter(src._table_lookup))
-    pages = [page async for page in src.fetch_content_pages(asset_hash)]
-    assert len(pages) == 12
-    assert not any("OFFSET" in q for q in session.queries)
+async def test_iceberg_fetch_content_samples_rows_via_duckdb(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    src = _build(monkeypatch, tmp_path)
+    assets = [a async for batch in src.extract_raw() for a in batch]
+    result = await src.fetch_content(assets[0].hash)
+    assert result is not None
+    _raw, text = result
+    # capped at rows_per_page (10), even though 12 rows exist
+    assert text.count("row_") == 10
+    assert "@example.com" in text
+
+
+def test_iceberg_test_connection_reports_discovered_tables(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    src = _build(monkeypatch, tmp_path)
+    result = src.test_connection()
+    assert result["status"] == "SUCCESS"
+    assert "Discovered tables: 1" in result["message"]

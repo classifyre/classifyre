@@ -20,25 +20,97 @@
       <div class="loading">Loading workspaces…</div>
     </div>
 
-    <div class="create-section">
-      <input
-        type="text"
-        id="new-name"
-        placeholder="Workspace name"
-        maxlength="64"
-        autocomplete="off"
-      />
-      <button id="create-btn" class="btn btn-primary">Create Local</button>
+    <div id="new-workspace-section" class="new-workspace-section hidden">
+      <button id="new-workspace-btn" class="btn btn-primary btn-wide">＋ New workspace</button>
+
+      <div id="create-chooser" class="create-panel hidden">
+        <button class="choice-card" id="choose-local">
+          <span class="choice-title">Create local</span>
+          <span class="choice-desc">Runs fully on this computer with its own database</span>
+        </button>
+        <button class="choice-card" id="choose-remote">
+          <span class="choice-title">Connect to remote</span>
+          <span class="choice-desc">Open an existing Classifyre server by URL</span>
+        </button>
+        <button class="btn btn-ghost" id="create-cancel">Cancel</button>
+      </div>
+
+      <div id="create-local-form" class="create-panel hidden">
+        <div class="create-section">
+          <input type="text" id="new-name" placeholder="Workspace name" maxlength="64" autocomplete="off" />
+          <button id="create-btn" class="btn btn-primary">Create</button>
+        </div>
+        <button class="btn btn-ghost" id="local-back">Back</button>
+      </div>
+
+      <div id="create-remote-form" class="create-panel hidden">
+        <div class="create-section">
+          <input type="url" id="remote-url" placeholder="Remote URL (e.g. https://demo.classifyre.com)" autocomplete="off" />
+          <button id="connect-btn" class="btn btn-primary">Connect</button>
+        </div>
+        <button class="btn btn-ghost" id="remote-back">Back</button>
+      </div>
     </div>
 
-    <div class="create-section" style="margin-top: 8px;">
-      <input
-        type="url"
-        id="remote-url"
-        placeholder="Remote URL (e.g. https://demo.classifyre.com)"
-        autocomplete="off"
-      />
-      <button id="connect-btn" class="btn btn-primary">Connect</button>
+    <div id="settings-overlay" class="modal-overlay hidden">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="modal-header">
+          <div class="modal-title" id="settings-title">Workspace settings</div>
+          <button class="modal-close" id="settings-close" aria-label="Close">×</button>
+        </div>
+
+        <div class="modal-body">
+          <label class="field">
+            <span class="field-label">Name</span>
+            <input type="text" id="settings-name" maxlength="64" autocomplete="off" />
+          </label>
+
+          <label class="field" id="settings-remote-url-field">
+            <span class="field-label">Remote URL</span>
+            <input type="url" id="settings-remote-url" autocomplete="off" />
+          </label>
+
+          <div id="settings-local-fields">
+            <label class="field">
+              <span class="field-label">API port</span>
+              <input type="number" id="settings-api-port" min="1024" max="65535" placeholder="auto" />
+              <span class="field-hint">Fixed port for the backend API — set one if an MCP server or other tool needs a stable URL. Leave empty for automatic.</span>
+            </label>
+
+            <details class="advanced">
+              <summary>Advanced</summary>
+              <label class="field">
+                <span class="field-label">Max parallel scans</span>
+                <input type="number" id="settings-max-scans" min="1" max="64" placeholder="default" />
+              </label>
+              <label class="field">
+                <span class="field-label">API memory limit (MB)</span>
+                <input type="number" id="settings-memory" min="256" max="32768" step="256" placeholder="default" />
+              </label>
+            </details>
+          </div>
+
+          <div class="global-section" id="settings-global-section">
+            <div class="global-heading">Application (all workspaces)</div>
+            <label class="field">
+              <span class="field-label">Database port</span>
+              <input type="number" id="settings-db-port" min="1024" max="65535" />
+              <span class="field-hint">Preferred port for the embedded database. If busy, the next free port is used automatically. Applies after restarting the app.</span>
+            </label>
+          </div>
+
+          <div class="settings-error hidden" id="settings-error"></div>
+          <div class="settings-hint hidden" id="settings-restart-hint">This workspace is open — changes apply the next time it starts.</div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-danger" id="settings-delete">Delete workspace</button>
+          <div class="modal-footer-right">
+            <button class="btn btn-ghost" id="settings-cancel">Cancel</button>
+            <button class="btn btn-primary" id="settings-save">Save</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

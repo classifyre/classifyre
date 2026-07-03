@@ -243,8 +243,8 @@ const footer = (
                                 Evaluate
                             </div>
                             <p className="mt-2 text-white/78">
-                                One Docker command. One public port. Immediate product
-                                validation.
+                                One download. The full desktop app for macOS, Windows, and
+                                Linux — everything on your machine.
                             </p>
                         </div>
                         <div className="border border-white/20 px-4 py-3">

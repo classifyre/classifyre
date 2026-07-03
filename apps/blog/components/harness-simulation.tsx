@@ -158,7 +158,7 @@ function OutcomeChip({ outcome }: { outcome: HarnessOutcome }) {
         "inline-flex shrink-0 items-center border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em]",
         outcome === "APPLIED" && "border-accent bg-accent text-black",
         outcome === "DEDUPED" &&
-          "border-primary-foreground/40 bg-primary-foreground/10 text-primary-foreground/80",
+          "border-white/40 bg-white/10 text-white/80",
         outcome === "OBSERVE-ONLY" && "border-[#a855f7] bg-[#a855f7]/20 text-[#d8b4fe]",
       )}
     >
@@ -201,21 +201,21 @@ export function HarnessSimulation() {
   const iteration = Math.min(count, HARNESS_EVENTS.length);
 
   return (
-    <div className="flex h-[500px] flex-col border-2 border-primary-foreground/30 bg-black">
+    <div className="flex h-[500px] flex-col border-2 border-white/30 bg-black">
       {/* Recorder header */}
-      <div className="flex items-center justify-between gap-3 border-b-2 border-primary-foreground/25 bg-primary-foreground/5 px-4 py-3">
+      <div className="flex items-center justify-between gap-3 border-b-2 border-white/25 bg-white/5 px-4 py-3">
         <div className="flex items-center gap-2">
           <span
             className={cn(
               "inline-block h-2.5 w-2.5 rounded-full",
-              isRunning ? "animate-pulse bg-accent" : "bg-primary-foreground/40",
+              isRunning ? "animate-pulse bg-accent" : "bg-white/40",
             )}
           />
-          <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-primary-foreground/80">
+          <span className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-white/80">
             {isRunning ? "Scan complete — harness awake" : "Cycle complete"}
           </span>
         </div>
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-primary-foreground/45">
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
           {iteration} / {HARNESS_EVENTS.length} decisions
         </span>
       </div>
@@ -231,24 +231,24 @@ export function HarnessSimulation() {
           return (
             <li
               key={event.id}
-              className="animate-in fade-in-0 slide-in-from-bottom-1 border-b border-primary-foreground/10 py-3 duration-300 last:border-b-0"
+              className="animate-in fade-in-0 slide-in-from-bottom-1 border-b border-white/10 py-3 duration-300 last:border-b-0"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1 border border-accent bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-accent">
                   <span className="text-accent/70">{meta.index}</span>
                   {event.agent}
                 </span>
-                <span className="font-mono text-[11px] text-primary-foreground/55">
+                <span className="font-mono text-[11px] text-white/55">
                   {event.tool}()
                 </span>
                 <span className="ml-auto">
                   <OutcomeChip outcome={event.outcome} />
                 </span>
               </div>
-              <p className="mt-1.5 text-sm leading-6 text-primary-foreground">
+              <p className="mt-1.5 text-sm leading-6 text-white">
                 {event.action}
               </p>
-              <p className="mt-1 border-l-2 border-primary-foreground/20 pl-2 text-xs italic leading-5 text-primary-foreground/55">
+              <p className="mt-1 border-l-2 border-white/20 pl-2 text-xs italic leading-5 text-white/55">
                 {event.rationale}
               </p>
             </li>
@@ -257,8 +257,8 @@ export function HarnessSimulation() {
       </ol>
 
       {/* Recorder footer */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t-2 border-primary-foreground/25 bg-primary-foreground/5 px-4 py-3">
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-primary-foreground/45">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t-2 border-white/25 bg-white/5 px-4 py-3">
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
           {isRunning
             ? "Recording — every action logged with a rationale"
             : "Flip to observe-only and it proposes without touching"}
@@ -267,7 +267,7 @@ export function HarnessSimulation() {
           <button
             type="button"
             onClick={() => setCount(0)}
-            className="border border-primary-foreground/30 bg-primary-foreground/5 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-primary-foreground/80 transition-colors hover:bg-primary-foreground/15"
+            className="border border-white/30 bg-white/5 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white/80 transition-colors hover:bg-white/15"
           >
             Replay
           </button>
