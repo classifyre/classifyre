@@ -39,12 +39,16 @@ import {
   AgentRunDto,
   AgentRunListResponseDto,
   AgentSystemBriefDto,
+  AgentUsageBucketDto,
+  AgentUsageResponseDto,
+  AgentUsageTotalsDto,
   AutopilotStatsDto,
   CreateAgentMemoryDto,
   QueryAgentActivityDto,
   QueryAgentLogsDto,
   QueryAgentMemoryDto,
   QueryAgentRunsDto,
+  QueryAgentUsageDto,
   TriggerAutopilotDto,
   TriggerAutopilotResponseDto,
   UpdateAgentMemoryDto,
@@ -582,6 +586,7 @@ export class AutopilotService {
       brief,
       lastRun,
       byKind,
+      usage24h,
     ] = await Promise.all([
       this.prisma.agentRun.count(),
       this.prisma.agentRun.count({ where: { createdAt: { gte: since24h } } }),
@@ -603,6 +608,10 @@ export class AutopilotService {
         select: { createdAt: true },
       }),
       this.prisma.agentRun.groupBy({ by: ['agentKind'], _count: true }),
+      this.prisma.agentRun.aggregate({
+        where: { createdAt: { gte: since24h } },
+        _sum: { inputTokens: true, outputTokens: true, costUsd: true },
+      }),
     ]);
 
     const runsByKind: Record<string, number> = {};
@@ -619,6 +628,107 @@ export class AutopilotService {
       briefVersion: brief?.version ?? 0,
       lastActivityAt: lastRun?.createdAt ?? null,
       runsByKind,
+      tokensLast24h:
+        (usage24h._sum.inputTokens ?? 0) + (usage24h._sum.outputTokens ?? 0),
+      costLast24h:
+        usage24h._sum.costUsd != null ? Number(usage24h._sum.costUsd) : null,
+    };
+  }
+
+  /**
+   * Per-day, per-agent LLM token/cost aggregation for the harness usage
+   * charts. Days are UTC; range defaults to the last 30 days.
+   */
+  async getUsage(query: QueryAgentUsageDto): Promise<AgentUsageResponseDto> {
+    const until = parseDate(query.until) ?? new Date();
+    const since =
+      parseDate(query.since) ??
+      new Date(until.getTime() - 30 * 24 * 3600 * 1000);
+
+    const kindFilter = query.agentKind
+      ? Prisma.sql`AND agent_kind = ${query.agentKind}::"AgentKind"`
+      : Prisma.empty;
+
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        day: string;
+        agent_kind: AgentKind;
+        runs: number;
+        input_tokens: bigint;
+        output_tokens: bigint;
+        cost_usd: number | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        to_char(date_trunc('day', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day,
+        agent_kind,
+        COUNT(*)::int AS runs,
+        COALESCE(SUM(input_tokens), 0)::bigint AS input_tokens,
+        COALESCE(SUM(output_tokens), 0)::bigint AS output_tokens,
+        SUM(cost_usd)::float8 AS cost_usd
+      FROM agent_runs
+      WHERE created_at >= ${since} AND created_at <= ${until}
+        ${kindFilter}
+      GROUP BY 1, 2
+      ORDER BY 1 ASC, 2 ASC
+    `);
+
+    const durationWhere: Prisma.AgentRunWhereInput = {
+      createdAt: { gte: since, lte: until },
+      startedAt: { not: null },
+      finishedAt: { not: null },
+      ...(query.agentKind ? { agentKind: query.agentKind } : {}),
+    };
+    const [finished, settings] = await Promise.all([
+      this.prisma.agentRun.findMany({
+        where: durationWhere,
+        select: { startedAt: true, finishedAt: true },
+        take: 5000,
+      }),
+      this.prisma.instanceSettings.findUnique({
+        where: { id: 1 },
+        select: {
+          aiProviderConfig: {
+            select: { inputCostPerMTok: true, outputCostPerMTok: true },
+          },
+        },
+      }),
+    ]);
+    const durations = finished
+      .map((r) => (r.finishedAt?.getTime() ?? 0) - (r.startedAt?.getTime() ?? 0))
+      .filter((d) => d > 0);
+    const avgDurationMs =
+      durations.length > 0
+        ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+        : null;
+
+    const buckets: AgentUsageBucketDto[] = rows.map((r) => ({
+      date: r.day,
+      agentKind: r.agent_kind,
+      runs: Number(r.runs),
+      inputTokens: Number(r.input_tokens),
+      outputTokens: Number(r.output_tokens),
+      costUsd: r.cost_usd != null ? Number(r.cost_usd) : null,
+    }));
+
+    const totals: AgentUsageTotalsDto = {
+      runs: buckets.reduce((a, b) => a + b.runs, 0),
+      inputTokens: buckets.reduce((a, b) => a + b.inputTokens, 0),
+      outputTokens: buckets.reduce((a, b) => a + b.outputTokens, 0),
+      costUsd: buckets.some((b) => b.costUsd != null)
+        ? buckets.reduce((a, b) => a + (b.costUsd ?? 0), 0)
+        : null,
+      avgDurationMs,
+    };
+
+    const pricing = settings?.aiProviderConfig;
+    return {
+      buckets,
+      totals,
+      pricingConfigured:
+        pricing != null &&
+        (pricing.inputCostPerMTok != null ||
+          pricing.outputCostPerMTok != null),
     };
   }
 
@@ -638,6 +748,14 @@ export class AutopilotService {
     run: Prisma.AgentRunGetPayload<object>,
     decisionCount: number,
   ): AgentRunDto {
+    // Wall-clock duration; an in-flight run measures up to "now".
+    const durationEnd =
+      run.finishedAt ??
+      (run.status === AgentRunStatus.RUNNING ? new Date() : null);
+    const durationMs =
+      run.startedAt && durationEnd
+        ? Math.max(0, durationEnd.getTime() - run.startedAt.getTime())
+        : null;
     return {
       id: run.id,
       agentKind: run.agentKind,
@@ -651,6 +769,10 @@ export class AutopilotService {
       error: run.error,
       summary: run.summary,
       decisionCount,
+      inputTokens: run.inputTokens,
+      outputTokens: run.outputTokens,
+      costUsd: run.costUsd != null ? Number(run.costUsd) : null,
+      durationMs,
       startedAt: run.startedAt,
       finishedAt: run.finishedAt,
       createdAt: run.createdAt,
@@ -671,6 +793,13 @@ export class AutopilotService {
       createdAt: d.createdAt,
     };
   }
+}
+
+/** Parse an optional ISO timestamp; invalid or absent values become null. */
+function parseDate(value?: string): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 /** Build a Prisma DateTime filter from optional ISO bounds (ignores invalid). */

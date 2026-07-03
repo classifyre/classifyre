@@ -138,6 +138,13 @@ export const CONFIG_MISSION: Mission = {
     'describing what you changed and what you expect — a later cycle confirms whether it helped. First',
     'check memory for your own prior "pending-verification" notes and judge the new finding landscape',
     'against them. If this run is itself a verification re-scan, do NOT re-scan again.',
+    '\nFINGERPRINTS: you also own the correlation (fingerprint/duplicate) tuning. Check',
+    'duplicates.summary; if clusters look wrong — obvious duplicates missed, or unrelated assets',
+    'lumped together — inspect the shared values behind them (fingerprints.value_occurrences,',
+    'fingerprints.similar_assets) and make ONE targeted fingerprints.tune_config change: adjust',
+    'label weights, the related/duplicate thresholds, or add an exclusion for a noisy label.',
+    'Record a memory note of what you tuned and why, tagged "pending-verification", and judge the',
+    'next cycle’s clusters against it.',
   ].join('\n'),
   allowedTools: [
     'findings.search',
@@ -148,7 +155,9 @@ export const CONFIG_MISSION: Mission = {
     'system_brief.get',
     'config.tune_source',
     'sources.rescan',
-    // Correlation/fingerprints config is tunable here too.
+    // Correlation/fingerprints config is tunable here too — observe cluster
+    // quality first (duplicates.summary), then tune.
+    'duplicates.summary',
     'fingerprints.value_occurrences',
     'fingerprints.similar_assets',
     'fingerprints.tune_config',

@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   Activity,
+  BarChart3,
   BookOpen,
   Bot,
   Brain,
@@ -26,10 +27,12 @@ import { HarnessAgents } from "./harness-agents";
 import { HarnessTools } from "./harness-tools";
 import { HarnessBrief } from "./harness-brief";
 import { HarnessConfig } from "./harness-config";
+import { HarnessUsage, formatCost, formatTokens } from "./harness-usage";
 
 type View =
   | "activity"
   | "runs"
+  | "usage"
   | "agents"
   | "tools"
   | "memory"
@@ -77,6 +80,7 @@ export function HarnessShell() {
   const tabs: { value: View; label: string; icon: LucideIcon }[] = [
     { value: "activity", label: t("harness.nav.activity"), icon: Activity },
     { value: "runs", label: t("harness.nav.runs"), icon: Workflow },
+    { value: "usage", label: t("harness.nav.usage"), icon: BarChart3 },
     { value: "agents", label: t("harness.nav.agents"), icon: Users },
     { value: "tools", label: t("harness.nav.tools"), icon: Wrench },
     { value: "memory", label: t("harness.nav.memory"), icon: Brain },
@@ -141,6 +145,7 @@ export function HarnessShell() {
         {view === "runs" && (
           <AutopilotActivity key={`runs-${epoch}`} focusRunId={focusRunId} />
         )}
+        {view === "usage" && <HarnessUsage />}
         {view === "agents" && <HarnessAgents />}
         {view === "tools" && <HarnessTools />}
         {view === "memory" && <AutopilotMemory />}
@@ -175,6 +180,18 @@ function StatStrip({ stats }: { stats: AutopilotStatsDto | null }) {
     { label: t("harness.stats.failed"), value: stats?.decisionsFailed ?? "—" },
     { label: t("harness.stats.memory"), value: stats?.memoryCount ?? "—" },
     {
+      label: t("harness.stats.tokens24h"),
+      value: stats ? formatTokens(stats.tokensLast24h) : "—",
+    },
+    ...(stats?.costLast24h != null
+      ? [
+          {
+            label: t("harness.stats.cost24h"),
+            value: formatCost(stats.costLast24h),
+          },
+        ]
+      : []),
+    {
       label: t("harness.stats.brief"),
       value: stats ? stats.briefVersion : "—",
     },
@@ -186,7 +203,7 @@ function StatStrip({ stats }: { stats: AutopilotStatsDto | null }) {
     },
   ];
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
       {cells.map((cell, i) => (
         <div
           key={i}

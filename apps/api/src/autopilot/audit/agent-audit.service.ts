@@ -115,6 +115,45 @@ export class AgentAuditService {
     });
   }
 
+  /**
+   * Persist the run's cumulative LLM token consumption (absolute totals, not
+   * increments — the loop tracks them in its resumable progress, so a resumed
+   * attempt never double-counts). When the instance's default AI provider has
+   * per-MTok prices configured, the estimated cost is derived and stored with
+   * the tokens so later price changes never rewrite history.
+   */
+  async saveUsage(
+    runId: string,
+    inputTokens: number,
+    outputTokens: number,
+  ): Promise<void> {
+    const settings = await this.prisma.instanceSettings.findUnique({
+      where: { id: 1 },
+      select: {
+        aiProviderConfig: {
+          select: { inputCostPerMTok: true, outputCostPerMTok: true },
+        },
+      },
+    });
+    const pricing = settings?.aiProviderConfig;
+    const priced =
+      pricing != null &&
+      (pricing.inputCostPerMTok != null || pricing.outputCostPerMTok != null);
+    const costUsd = priced
+      ? (inputTokens / 1_000_000) * Number(pricing.inputCostPerMTok ?? 0) +
+        (outputTokens / 1_000_000) * Number(pricing.outputCostPerMTok ?? 0)
+      : null;
+
+    await this.prisma.agentRun.update({
+      where: { id: runId },
+      data: {
+        inputTokens,
+        outputTokens,
+        costUsd: costUsd != null ? costUsd.toFixed(6) : null,
+      },
+    });
+  }
+
   async complete(runId: string, summary: string): Promise<void> {
     await this.prisma.agentRun.update({
       where: { id: runId },

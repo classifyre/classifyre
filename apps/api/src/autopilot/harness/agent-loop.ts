@@ -54,6 +54,9 @@ interface LoopProgress {
   messages: AiMessage[];
   iteration: number;
   toolCalls: number;
+  /** LLM token consumption of this run so far (summed over every model call). */
+  inputTokens: number;
+  outputTokens: number;
   applied: number;
   skippedObserveOnly: number;
   failed: number;
@@ -113,11 +116,19 @@ export async function runAgentLoop(
     }
     progress.iteration++;
 
-    const { content: turn, raw } = await deps.ai.completeJson<LoopTurn>(
+    const {
+      content: turn,
+      raw,
+      usage,
+    } = await deps.ai.completeJson<LoopTurn>(
       progress.messages,
       loopTurnSchema,
       { temperature: 0.2, repair: repairTurn },
     );
+    if (usage) {
+      progress.inputTokens = (progress.inputTokens ?? 0) + usage.inputTokens;
+      progress.outputTokens = (progress.outputTokens ?? 0) + usage.outputTokens;
+    }
 
     await deps.log.business(runId, `Thinking: ${turn.thought}`);
     progress.messages.push({ role: 'assistant', content: raw ?? '' });
@@ -212,6 +223,8 @@ function loadProgress(
     ],
     iteration: 0,
     toolCalls: 0,
+    inputTokens: 0,
+    outputTokens: 0,
     applied: 0,
     skippedObserveOnly: 0,
     failed: 0,
@@ -230,6 +243,13 @@ async function persist(
 ): Promise<void> {
   ctx.state[PROGRESS_KEY] = progress;
   await audit.saveStep(ctx.run.id, 'reason-act', ctx.state);
+  // Mirror the running token totals onto the run row (absolute values, so a
+  // resumed run never double-counts) and refresh the derived cost estimate.
+  await audit.saveUsage(
+    ctx.run.id,
+    progress.inputTokens ?? 0,
+    progress.outputTokens ?? 0,
+  );
 }
 
 function tallyResult(

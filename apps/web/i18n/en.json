@@ -1714,7 +1714,13 @@
       "OPENAI_COMPATIBLE": "OpenAI-Compatible",
       "CLAUDE": "Claude (Anthropic)",
       "GEMINI": "Gemini (Google)"
-    }
+    },
+    "tokenCosts": "Token costs (optional)",
+    "inputCost": "USD per 1M input tokens",
+    "inputCostPlaceholder": "e.g. 3.00",
+    "outputCost": "USD per 1M output tokens",
+    "outputCostPlaceholder": "e.g. 15.00",
+    "tokenCostsDesc": "Used to estimate autopilot run costs and power the harness usage charts."
   },
   "csvExport": {
     "label": "Download CSV",
@@ -2047,7 +2053,11 @@
           "UPDATE_CLUSTER": "Update cluster",
           "NO_ACTION": "No action"
         },
-        "loadMore": "Load {{count}} more"
+        "loadMore": "Load {{count}} more",
+        "labelTokens": "tokens",
+        "tokensIn": "in",
+        "tokensOut": "out",
+        "labelDuration": "Duration"
       },
       "runDialog": {
         "titleGeneral": "Run autopilot now",
@@ -2431,6 +2441,8 @@
       "skipped": "Observe-only",
       "failed": "Failed",
       "memory": "Memories",
+      "tokens24h": "Tokens · 24h",
+      "cost24h": "Cost · 24h",
       "brief": "Brief v",
       "lastActivity": "Last activity",
       "never": "never",
@@ -2439,6 +2451,7 @@
     "nav": {
       "activity": "Activity",
       "runs": "Runs",
+      "usage": "Usage",
       "agents": "Agents",
       "tools": "Tools",
       "memory": "Memory",
@@ -2630,6 +2643,28 @@
       "confirmDelete": "Remove this MCP server?",
       "editTitle": "Edit MCP server",
       "addTitle": "Add MCP server"
+    },
+    "usage": {
+      "filters": {
+        "allAgents": "All agents",
+        "range7": "Last 7 days",
+        "range30": "Last 30 days",
+        "range90": "Last 90 days"
+      },
+      "kpi": {
+        "runs": "Runs",
+        "inputTokens": "Input tokens",
+        "outputTokens": "Output tokens",
+        "avgDuration": "Avg run time",
+        "cost": "Est. cost"
+      },
+      "tokensPerDay": "Tokens per day",
+      "tokensByAgent": "Tokens by agent",
+      "costPerDay": "Estimated cost per day (USD)",
+      "seriesInput": "Input",
+      "seriesOutput": "Output",
+      "empty": "No agent runs in this period yet.",
+      "noPricing": "Add token prices to your AI provider (Settings → AI providers) to see cost estimates."
     }
   },
   "aiHealth": {

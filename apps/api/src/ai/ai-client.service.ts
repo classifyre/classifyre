@@ -15,8 +15,10 @@ import { normalizeAgainstSchema } from './schema-validate';
 import type {
   AiCompletionOptions,
   AiMessage,
+  AiProviderResult,
   AiProviderRuntimeConfig,
   AiResponse,
+  AiUsage,
   JsonSchema,
 } from './types';
 
@@ -48,13 +50,18 @@ export class AiClientService {
   ): Promise<AiResponse<string>> {
     const config = await this.getRuntimeConfig(options.configId);
     const provider = createProvider(config.provider);
-    const raw = await this.completeWithBackoff(
+    const result = await this.completeWithBackoff(
       provider,
       messages,
       config,
       options,
     );
-    return { content: raw, model: config.model, provider: config.provider };
+    return {
+      content: result.text,
+      model: config.model,
+      provider: config.provider,
+      usage: result.usage,
+    };
   }
 
   /**
@@ -88,16 +95,21 @@ export class AiClientService {
     let currentMessages = baseMessages;
     let lastError: unknown;
     const failedAttempts: AiSchemaAttempt[] = [];
+    // Every attempt costs tokens — accumulate across the whole retry loop so
+    // callers can attribute the true consumption of this response.
+    let totalUsage: AiUsage | null = null;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       let raw = '';
       try {
-        raw = await this.completeWithBackoff(
+        const result = await this.completeWithBackoff(
           provider,
           currentMessages,
           config,
           providerOptions,
         );
+        raw = result.text;
+        totalUsage = addUsage(totalUsage, result.usage);
 
         let parsed = extractJson(raw) as T;
         if (options.repair) parsed = options.repair(parsed) as T;
@@ -108,6 +120,7 @@ export class AiClientService {
           model: config.model,
           provider: config.provider,
           raw,
+          usage: totalUsage,
         };
       } catch (err) {
         // Never retry provider-level errors — surface immediately so callers
@@ -165,7 +178,7 @@ export class AiClientService {
     messages: AiMessage[],
     config: AiProviderRuntimeConfig,
     options: AiCompletionOptions,
-  ): Promise<string> {
+  ): Promise<AiProviderResult> {
     const retries = options.rateLimitRetries ?? 3;
     const delaysMs = [60_000, 120_000, 240_000];
 
@@ -206,6 +219,15 @@ export class AiClientService {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Sum two usage reports; null + null stays null (provider reports nothing). */
+function addUsage(total: AiUsage | null, next: AiUsage | null): AiUsage | null {
+  if (!next) return total;
+  return {
+    inputTokens: (total?.inputTokens ?? 0) + next.inputTokens,
+    outputTokens: (total?.outputTokens ?? 0) + next.outputTokens,
+  };
+}
 
 /**
  * Prepend or merge a JSON hint into the system message so every provider
