@@ -141,6 +141,46 @@ function patchScriptShebangs(venvPath: string): void {
   }
 }
 
+// The baked venv installs classifyre-cli and classifyre-schemas as EDITABLE
+// packages, so their site-packages .pth files contain absolute paths into the
+// BUILD machine's checkout — dead on a user machine ("import schemas" would
+// fail every scan). Re-point them at the bundled pyapp tree. Runtime `uv sync`
+// would rewrite them the same way, but imports must work before any sync runs.
+function patchEditablePths(venvPath: string): void {
+  const pyappRoot = path.join(process.resourcesPath, 'pyapp');
+  const targets: Record<string, string> = {
+    _editable_impl_classifyre_cli: path.join(pyappRoot, 'apps', 'cli'),
+    _editable_impl_classifyre_schemas: path.join(pyappRoot, 'packages', 'schemas', 'src'),
+  };
+
+  const sitePackagesDirs: string[] = [];
+  const posixLib = path.join(venvPath, 'lib');
+  if (fs.existsSync(posixLib)) {
+    for (const entry of fs.readdirSync(posixLib)) {
+      const sp = path.join(posixLib, entry, 'site-packages');
+      if (/^python\d/.test(entry) && fs.existsSync(sp)) sitePackagesDirs.push(sp);
+    }
+  }
+  const winLib = path.join(venvPath, 'Lib', 'site-packages');
+  if (fs.existsSync(winLib)) sitePackagesDirs.push(winLib);
+
+  for (const sp of sitePackagesDirs) {
+    for (const entry of fs.readdirSync(sp)) {
+      if (!entry.endsWith('.pth')) continue;
+      const stem = entry.slice(0, -'.pth'.length);
+      const target = targets[stem];
+      if (!target) continue;
+      const file = path.join(sp, entry);
+      try {
+        fs.writeFileSync(file, `${target}\n`);
+        console.log(`[python-env] Re-pointed ${entry} -> ${target}`);
+      } catch (err) {
+        console.warn(`[python-env] Could not patch ${file}:`, err);
+      }
+    }
+  }
+}
+
 function markerPath(): string {
   return path.join(app.getPath('userData'), 'python-runtime.json');
 }
@@ -197,6 +237,7 @@ export function ensurePythonRuntime(): string | null {
     patchPyvenvCfg(resourcesVenv, pythonHome);
     repointVenvSymlinks(resourcesVenv, pythonHome);
     patchScriptShebangs(resourcesVenv);
+    patchEditablePths(resourcesVenv);
     writeMarker({ version, pythonHome, venvPath: resourcesVenv });
     console.log(`[python-env] Patched bundled venv in place: ${resourcesVenv}`);
     return resourcesVenv;
@@ -216,6 +257,7 @@ export function ensurePythonRuntime(): string | null {
   patchPyvenvCfg(userVenv, userPython);
   repointVenvSymlinks(userVenv, userPython);
   patchScriptShebangs(userVenv);
+  patchEditablePths(userVenv);
   writeMarker({ version, pythonHome: userPython, venvPath: userVenv });
   return userVenv;
 }

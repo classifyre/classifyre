@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import http from 'http';
 import os from 'os';
+import crypto from 'crypto';
 import treeKill from 'tree-kill';
 import { ensurePythonRuntime } from './python-env.js';
 
@@ -61,6 +62,32 @@ function getBaseEnv(): Record<string, string> {
   return cachedEnv;
 }
 
+// The API refuses to boot with NODE_ENV=production unless a masked-config
+// encryption key is set (it encrypts source credentials at rest). Desktop has
+// no deployment config, so generate a random 32-byte key once per install and
+// persist it in userData — it must stay stable or previously saved source
+// credentials become undecryptable.
+let cachedMaskedConfigKey: string | null = null;
+
+function getMaskedConfigKey(): string {
+  if (cachedMaskedConfigKey) return cachedMaskedConfigKey;
+  const keyFile = path.join(app.getPath('userData'), 'masked-config.key');
+  try {
+    const existing = fs.readFileSync(keyFile, 'utf-8').trim();
+    if (existing) {
+      cachedMaskedConfigKey = existing;
+      return existing;
+    }
+  } catch {
+    // first run — generate below
+  }
+  const key = `base64:${crypto.randomBytes(32).toString('base64')}`;
+  fs.mkdirSync(path.dirname(keyFile), { recursive: true });
+  fs.writeFileSync(keyFile, `${key}\n`, { mode: 0o600 });
+  cachedMaskedConfigKey = key;
+  return key;
+}
+
 export interface ApiRuntimeOptions {
   maxParallelScans?: number;
   memoryLimitMb?: number;
@@ -99,7 +126,9 @@ export class ProcessManager {
 
   private getCliPath(): string {
     if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'cli');
+      // pyapp mirrors the monorepo layout (apps/cli + packages/schemas) so the
+      // CLI pyproject's relative editable dep stays valid for runtime uv sync.
+      return path.join(process.resourcesPath, 'pyapp', 'apps', 'cli');
     }
     return path.join(__dirname, '../../../cli');
   }
@@ -176,8 +205,14 @@ export class ProcessManager {
         ENVIRONMENT: 'desktop',
         CLI_PATH: cliPath,
         VENV_PATH: venvPath,
+        // Pin uv's project environment to the (possibly relocated) venv so
+        // `uv run` / on-demand `uv sync --group X` target it instead of
+        // creating .venv inside the read-only bundled CLI directory. Only the
+        // base deps are baked; optional detector/source groups install on
+        // first use, so auto-install must stay enabled (it defaults to on).
+        UV_PROJECT_ENVIRONMENT: venvPath,
+        CLASSIFYRE_MASKED_CONFIG_KEY: getMaskedConfigKey(),
         CORS_ORIGIN: '*',
-        CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS: '0',
         NODE_ENV: app.isPackaged ? 'production' : 'development',
         ...(options.maxParallelScans && options.maxParallelScans > 0
           ? { MAX_PARALLEL_SCANS: String(Math.floor(options.maxParallelScans)) }
