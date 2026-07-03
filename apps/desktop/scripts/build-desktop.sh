@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Full desktop build pipeline:
 #   1. Stage all bundled artifacts into apps/desktop/resources/
-#      (API, web static export, Python CLI + venv + interpreter, prisma, JRE)
+#      (API, web static export, Python CLI + venv + interpreter, prisma)
 #   2. Package Electron + create installers via Forge
 #
 # Prefer `make` in apps/desktop for day-to-day use; this script is what

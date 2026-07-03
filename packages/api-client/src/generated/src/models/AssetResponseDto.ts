@@ -100,9 +100,10 @@ export const AssetResponseDtoSourceTypeEnum = {
     Youtube: 'YOUTUBE',
     DeltaLake: 'DELTA_LAKE',
     Iceberg: 'ICEBERG',
-    Hudi: 'HUDI',
-    SparkCatalog: 'SPARK_CATALOG',
     Kafka: 'KAFKA',
+    Elasticsearch: 'ELASTICSEARCH',
+    Opensearch: 'OPENSEARCH',
+    Meilisearch: 'MEILISEARCH',
     Custom: 'CUSTOM'
 } as const;
 export type AssetResponseDtoSourceTypeEnum = typeof AssetResponseDtoSourceTypeEnum[keyof typeof AssetResponseDtoSourceTypeEnum];

@@ -2248,8 +2248,6 @@ export const JsonSchemaForm = React.forwardRef<
     YOUTUBE: false,
     DELTA_LAKE: true,
     ICEBERG: true,
-    HUDI: true,
-    SPARK_CATALOG: true,
     KAFKA: false,
     ELASTICSEARCH: false,
     OPENSEARCH: false,

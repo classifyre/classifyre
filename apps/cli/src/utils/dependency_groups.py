@@ -47,8 +47,6 @@ SOURCE_TYPE_GROUPS: dict[str, set[str]] = {
     "EMAIL": {"email"},
     "YOUTUBE": {"youtube"},
     "DELTA_LAKE": {"delta-lake"},
-    "HUDI": {"hudi"},
-    "SPARK_CATALOG": {"spark-catalog"},
     "ICEBERG": {"iceberg"},
     "KAFKA": {"kafka"},
 }

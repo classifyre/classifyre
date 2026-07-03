@@ -238,31 +238,17 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
   },
   DELTA_LAKE: {
     description:
-      "Scan Delta Lake tables via Spark — schema, partitions, history, and row sampling.",
+      "Scan Delta Lake tables in S3-compatible storage — schema, versions, and row sampling, no Spark required.",
     icon: CreateSourceDtoTypeEnum.DeltaLake,
     category: "WAREHOUSE_LAKEHOUSE",
-    keywords: ["lakehouse", "delta", "spark", "parquet", "tables"],
+    keywords: ["lakehouse", "delta", "parquet", "tables", "s3"],
   },
   ICEBERG: {
     description:
-      "Scan Apache Iceberg tables via Spark across REST, Hive, Glue, or SQL catalogs.",
+      "Scan Apache Iceberg tables in S3-compatible storage — schema, snapshots, and row sampling, no Spark required.",
     icon: CreateSourceDtoTypeEnum.Iceberg,
     category: "WAREHOUSE_LAKEHOUSE",
-    keywords: ["lakehouse", "iceberg", "catalog", "snapshots", "tables"],
-  },
-  HUDI: {
-    description:
-      "Scan Apache Hudi tables via Spark — table type, partitions, and row sampling.",
-    icon: CreateSourceDtoTypeEnum.Hudi,
-    category: "WAREHOUSE_LAKEHOUSE",
-    keywords: ["lakehouse", "hudi", "spark", "upsert", "tables"],
-  },
-  SPARK_CATALOG: {
-    description:
-      "Scan tables from a Spark cluster or Spark Connect endpoint's catalog.",
-    icon: CreateSourceDtoTypeEnum.SparkCatalog,
-    category: "WAREHOUSE_LAKEHOUSE",
-    keywords: ["spark", "spark connect", "catalog", "cluster", "tables"],
+    keywords: ["lakehouse", "iceberg", "snapshots", "tables", "s3"],
   },
   KAFKA: {
     description:
