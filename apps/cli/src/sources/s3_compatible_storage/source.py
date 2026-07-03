@@ -6,8 +6,8 @@ from typing import Any
 from urllib.parse import quote
 
 from ...models.generated_input import S3CompatibleStorageInput
-from ..dependencies import require_module
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
+from ..s3_client import build_s3_client
 
 logger = logging.getLogger(__name__)
 
@@ -24,48 +24,17 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
         return bucket
 
     def _build_client(self) -> Any:
-        boto3 = require_module(
-            module_name="boto3",
+        return build_s3_client(
             source_name="S3 Compatible Storage",
             uv_groups=["s3-compatible-storage"],
-            detail="S3-compatible storage requires boto3.",
+            region_name=self._string_or_none(self._connection_option("region_name")),
+            endpoint_url=self._string_or_none(self._connection_option("endpoint_url")),
+            aws_access_key_id=self._masked_value("aws_access_key_id"),
+            aws_secret_access_key=self._masked_value("aws_secret_access_key"),
+            aws_session_token=self._masked_value("aws_session_token"),
+            verify_ssl=self._verify_ssl(),
+            request_timeout_seconds=self._request_timeout_seconds(),
         )
-
-        kwargs: dict[str, Any] = {}
-        region_name = self._string_or_none(self._connection_option("region_name"))
-        endpoint_url = self._string_or_none(self._connection_option("endpoint_url"))
-        aws_access_key_id = self._masked_value("aws_access_key_id")
-        aws_secret_access_key = self._masked_value("aws_secret_access_key")
-        aws_session_token = self._masked_value("aws_session_token")
-
-        if region_name:
-            kwargs["region_name"] = region_name
-        if endpoint_url:
-            kwargs["endpoint_url"] = endpoint_url
-        if aws_access_key_id and aws_secret_access_key:
-            kwargs["aws_access_key_id"] = aws_access_key_id
-            kwargs["aws_secret_access_key"] = aws_secret_access_key
-            if aws_session_token:
-                kwargs["aws_session_token"] = aws_session_token
-
-        kwargs["verify"] = self._verify_ssl()
-
-        try:
-            botocore_config = require_module(
-                module_name="botocore.config",
-                source_name="S3 Compatible Storage",
-                uv_groups=["s3-compatible-storage"],
-                detail="S3-compatible storage uses botocore timeout configuration.",
-            )
-            timeout = int(self._request_timeout_seconds())
-            kwargs["config"] = botocore_config.Config(
-                connect_timeout=timeout,
-                read_timeout=timeout,
-            )
-        except Exception:
-            logger.debug("Could not initialize botocore timeout configuration; using defaults")
-
-        return boto3.client("s3", **kwargs)
 
     def _client(self) -> Any:
         if self._cached_client is None:

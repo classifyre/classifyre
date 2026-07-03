@@ -4,7 +4,7 @@ Electron app that bundles the full Classifyre stack (API, Web, CLI, PostgreSQL, 
 
 ## Architecture
 
-The desktop app runs an **embedded PostgreSQL** instance and spawns per-workspace API servers. Each workspace (called a "namespace") gets its own database schema and API process. All child processes run on Electron's own Node (`ELECTRON_RUN_AS_NODE`), the bundled Python venv, and the bundled JRE — nothing from the user's machine is required.
+The desktop app runs an **embedded PostgreSQL** instance and spawns per-workspace API servers. Each workspace (called a "namespace") gets its own database schema and API process. All child processes run on Electron's own Node (`ELECTRON_RUN_AS_NODE`) and the bundled Python venv — nothing from the user's machine is required.
 
 ```
 ┌─────────────────────────────────────────┐
@@ -91,13 +91,13 @@ In dev mode:
 cd apps/desktop
 
 make all        # full from-scratch build: deps + stage + installers
-make stage      # build API/web + stage resources (python, venv, JRE, …)
+make stage      # build API/web + stage resources (python, venv, …)
 make dist       # create installers from staged resources
 make package    # package app only (no installers)
 make clean      # remove build output and staged resources
 
 # Fast iteration — skip the slow bits you don't need:
-SKIP_JRE=1 SKIP_PYTHON=1 make stage
+SKIP_PYTHON=1 make stage
 ```
 
 Installers land in `out/make/`:
@@ -117,7 +117,6 @@ Installers land in `out/make/`:
 | `cli/` | Python CLI source + pyproject.toml + uv.lock |
 | `python/` | Standalone CPython (python-build-standalone via uv) |
 | `venv/` | Pre-baked venv — re-pointed to the bundled CPython on first app launch |
-| `jre/` | jlink-minimized Amazon Corretto 21 runtime (for pyspark sources) |
 
 ## macOS signing & notarization
 

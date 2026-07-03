@@ -120,8 +120,8 @@ jobs:
 
       # Builds API + web and stages EVERYTHING the app bundles: api dist +
       # production node_modules (incl. prisma CLI), web static export, Python
-      # CLI + standalone CPython + pre-baked venv, prisma migrations, and the
-      # jlink-minimized Corretto JRE. Same script as local `make stage`.
+      # CLI + standalone CPython + pre-baked venv, and prisma migrations.
+      # Same script as local `make stage`.
       - name: Stage resources
         shell: bash
         run: bash apps/desktop/scripts/stage-resources.sh
@@ -129,7 +129,7 @@ jobs:
       - name: Package Electron app
         shell: bash
         run: |
-          # macOS signs every Mach-O in the bundle (~1000: 923 venv .so + JRE)
+          # macOS signs every Mach-O in the bundle (~1000 venv .so files)
           # via concurrent `codesign` spawns. This exhausts file descriptors and
           # throws `spawn codesign EMFILE`. A high shell `ulimit -n` alone is not
           # enough — macOS also caps opens at the kernel's kern.maxfilesperproc —
