@@ -80,6 +80,7 @@ All URIs are relative to *http://localhost*
 *AutopilotApi* | [**autopilotControllerGetStats**](docs/AutopilotApi.md#autopilotcontrollergetstats) | **GET** /autopilot/stats | Mission-control counters (runs, decisions, memory, brief version)
 *AutopilotApi* | [**autopilotControllerGetSystemBrief**](docs/AutopilotApi.md#autopilotcontrollergetsystembrief) | **GET** /autopilot/system-brief | The living system brief the autopilot maintains and injects
 *AutopilotApi* | [**autopilotControllerGetTools**](docs/AutopilotApi.md#autopilotcontrollergettools) | **GET** /autopilot/tools | The harness capability map — every registered tool (read/mutate, domain) and the missions that use them
+*AutopilotApi* | [**autopilotControllerGetUsage**](docs/AutopilotApi.md#autopilotcontrollergetusage) | **GET** /autopilot/usage | LLM token/cost usage per day and agent (for the harness usage charts) — filter by agent kind and time range
 *AutopilotApi* | [**autopilotControllerListActivity**](docs/AutopilotApi.md#autopilotcontrollerlistactivity) | **GET** /autopilot/activity | Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time
 *AutopilotApi* | [**autopilotControllerListLogs**](docs/AutopilotApi.md#autopilotcontrollerlistlogs) | **GET** /autopilot/runs/{id}/logs | Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output)
 *AutopilotApi* | [**autopilotControllerListMemory**](docs/AutopilotApi.md#autopilotcontrollerlistmemory) | **GET** /autopilot/memory | List the agent memory (glossary, precedents, topic map)
@@ -249,6 +250,9 @@ All URIs are relative to *http://localhost*
 - [AgentRunDto](docs/AgentRunDto.md)
 - [AgentRunListResponseDto](docs/AgentRunListResponseDto.md)
 - [AgentSystemBriefDto](docs/AgentSystemBriefDto.md)
+- [AgentUsageBucketDto](docs/AgentUsageBucketDto.md)
+- [AgentUsageResponseDto](docs/AgentUsageResponseDto.md)
+- [AgentUsageTotalsDto](docs/AgentUsageTotalsDto.md)
 - [AiCompleteRequestDto](docs/AiCompleteRequestDto.md)
 - [AiCompleteResponseDto](docs/AiCompleteResponseDto.md)
 - [AiMessageDto](docs/AiMessageDto.md)

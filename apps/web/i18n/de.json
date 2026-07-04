@@ -1714,7 +1714,13 @@
       "OPENAI_COMPATIBLE": "OpenAI-kompatibel",
       "CLAUDE": "Claude (Anthropic)",
       "GEMINI": "Gemini (Google)"
-    }
+    },
+    "tokenCosts": "Token-Kosten (optional)",
+    "inputCost": "USD pro 1 Mio. Input-Tokens",
+    "inputCostPlaceholder": "z. B. 3.00",
+    "outputCost": "USD pro 1 Mio. Output-Tokens",
+    "outputCostPlaceholder": "z. B. 15.00",
+    "tokenCostsDesc": "Wird zur Kostenschätzung von Autopilot-Läufen und für die Verbrauchs-Diagramme genutzt."
   },
   "csvExport": {
     "label": "CSV herunterladen",
@@ -2047,7 +2053,11 @@
           "UPDATE_CLUSTER": "Cluster aktualisieren",
           "NO_ACTION": "Keine Aktion"
         },
-        "loadMore": "{{count}} weitere laden"
+        "loadMore": "{{count}} weitere laden",
+        "labelTokens": "Tokens",
+        "tokensIn": "ein",
+        "tokensOut": "aus",
+        "labelDuration": "Dauer"
       },
       "runDialog": {
         "titleGeneral": "Autopilot jetzt starten",
@@ -2431,6 +2441,8 @@
       "skipped": "Nur Beobachtung",
       "failed": "Fehlgeschlagen",
       "memory": "Erinnerungen",
+      "tokens24h": "Tokens · 24h",
+      "cost24h": "Kosten · 24h",
       "brief": "Briefing v",
       "lastActivity": "Letzte Aktivität",
       "never": "nie",
@@ -2439,6 +2451,7 @@
     "nav": {
       "activity": "Aktivität",
       "runs": "Läufe",
+      "usage": "Verbrauch",
       "agents": "Agenten",
       "tools": "Werkzeuge",
       "memory": "Gedächtnis",
@@ -2630,6 +2643,28 @@
       "confirmDelete": "Remove this MCP server?",
       "editTitle": "MCP-Server bearbeiten",
       "addTitle": "MCP-Server hinzufügen"
+    },
+    "usage": {
+      "filters": {
+        "allAgents": "Alle Agenten",
+        "range7": "Letzte 7 Tage",
+        "range30": "Letzte 30 Tage",
+        "range90": "Letzte 90 Tage"
+      },
+      "kpi": {
+        "runs": "Läufe",
+        "inputTokens": "Input-Tokens",
+        "outputTokens": "Output-Tokens",
+        "avgDuration": "Ø Laufzeit",
+        "cost": "Gesch. Kosten"
+      },
+      "tokensPerDay": "Tokens pro Tag",
+      "tokensByAgent": "Tokens pro Agent",
+      "costPerDay": "Geschätzte Kosten pro Tag (USD)",
+      "seriesInput": "Input",
+      "seriesOutput": "Output",
+      "empty": "Noch keine Agentenläufe in diesem Zeitraum.",
+      "noPricing": "Hinterlege Token-Preise beim KI-Anbieter (Einstellungen → KI-Anbieter), um Kostenschätzungen zu sehen."
     }
   },
   "aiHealth": {

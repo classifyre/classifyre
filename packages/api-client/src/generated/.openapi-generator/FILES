@@ -20,6 +20,9 @@ docs/AgentRunDetailDto.md
 docs/AgentRunDto.md
 docs/AgentRunListResponseDto.md
 docs/AgentSystemBriefDto.md
+docs/AgentUsageBucketDto.md
+docs/AgentUsageResponseDto.md
+docs/AgentUsageTotalsDto.md
 docs/AiCompleteRequestDto.md
 docs/AiCompleteResponseDto.md
 docs/AiMessageDto.md
@@ -302,6 +305,9 @@ src/models/AgentRunDetailDto.ts
 src/models/AgentRunDto.ts
 src/models/AgentRunListResponseDto.ts
 src/models/AgentSystemBriefDto.ts
+src/models/AgentUsageBucketDto.ts
+src/models/AgentUsageResponseDto.ts
+src/models/AgentUsageTotalsDto.ts
 src/models/AiCompleteRequestDto.ts
 src/models/AiCompleteResponseDto.ts
 src/models/AiMessageDto.ts

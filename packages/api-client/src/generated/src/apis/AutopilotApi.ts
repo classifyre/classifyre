@@ -25,6 +25,7 @@ import type {
   AgentRunDto,
   AgentRunListResponseDto,
   AgentSystemBriefDto,
+  AgentUsageResponseDto,
   AutopilotStatsDto,
   CreateAgentMemoryDto,
   CreateMcpServerDto,
@@ -59,6 +60,8 @@ import {
     AgentRunListResponseDtoToJSON,
     AgentSystemBriefDtoFromJSON,
     AgentSystemBriefDtoToJSON,
+    AgentUsageResponseDtoFromJSON,
+    AgentUsageResponseDtoToJSON,
     AutopilotStatsDtoFromJSON,
     AutopilotStatsDtoToJSON,
     CreateAgentMemoryDtoFromJSON,
@@ -99,6 +102,12 @@ export interface AutopilotControllerDeleteMemoryRequest {
 
 export interface AutopilotControllerGetRunRequest {
     id: string;
+}
+
+export interface AutopilotControllerGetUsageRequest {
+    agentKind?: AutopilotControllerGetUsageAgentKindEnum;
+    since?: string;
+    until?: string;
 }
 
 export interface AutopilotControllerListActivityRequest {
@@ -446,6 +455,47 @@ export class AutopilotApi extends runtime.BaseAPI {
      */
     async autopilotControllerGetTools(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HarnessToolsResponseDto> {
         const response = await this.autopilotControllerGetToolsRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * LLM token/cost usage per day and agent (for the harness usage charts) — filter by agent kind and time range
+     */
+    async autopilotControllerGetUsageRaw(requestParameters: AutopilotControllerGetUsageRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentUsageResponseDto>> {
+        const queryParameters: any = {};
+
+        if (requestParameters['agentKind'] != null) {
+            queryParameters['agentKind'] = requestParameters['agentKind'];
+        }
+
+        if (requestParameters['since'] != null) {
+            queryParameters['since'] = requestParameters['since'];
+        }
+
+        if (requestParameters['until'] != null) {
+            queryParameters['until'] = requestParameters['until'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/autopilot/usage`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AgentUsageResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * LLM token/cost usage per day and agent (for the harness usage charts) — filter by agent kind and time range
+     */
+    async autopilotControllerGetUsage(requestParameters: AutopilotControllerGetUsageRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentUsageResponseDto> {
+        const response = await this.autopilotControllerGetUsageRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -1134,6 +1184,18 @@ export class AutopilotApi extends runtime.BaseAPI {
 
 }
 
+/**
+ * @export
+ */
+export const AutopilotControllerGetUsageAgentKindEnum = {
+    Inquiry: 'INQUIRY',
+    Case: 'CASE',
+    Dream: 'DREAM',
+    Duplicates: 'DUPLICATES',
+    Config: 'CONFIG',
+    DetectorAuthor: 'DETECTOR_AUTHOR'
+} as const;
+export type AutopilotControllerGetUsageAgentKindEnum = typeof AutopilotControllerGetUsageAgentKindEnum[keyof typeof AutopilotControllerGetUsageAgentKindEnum];
 /**
  * @export
  */

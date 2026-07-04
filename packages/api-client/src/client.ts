@@ -64,6 +64,9 @@ export type {
   HarnessToolsResponseDto,
   AgentConfigDto,
   AgentConfigListResponseDto,
+  AgentUsageBucketDto,
+  AgentUsageResponseDto,
+  AgentUsageTotalsDto,
   UpdateAgentConfigDto,
   UpdateSystemBriefDto,
   McpServerResponseDto,
@@ -160,6 +163,7 @@ export {
   AutopilotControllerListActivityAgentKindEnum,
   AutopilotControllerListActivityActionEnum,
   AutopilotControllerListActivityOutcomeEnum,
+  AutopilotControllerGetUsageAgentKindEnum,
 } from "./generated/src/apis/AutopilotApi";
 export {
   CreateMcpServerDtoTransportEnum,

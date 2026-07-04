@@ -13,6 +13,8 @@ Name | Type
 `baseUrl` | string
 `contextSize` | number
 `supportsVision` | boolean
+`inputCostPerMTok` | number
+`outputCostPerMTok` | number
 
 ## Example
 
@@ -28,6 +30,8 @@ const example = {
   "baseUrl": https://openrouter.ai/api/v1,
   "contextSize": 200000,
   "supportsVision": false,
+  "inputCostPerMTok": 3,
+  "outputCostPerMTok": 15,
 } satisfies CreateAiProviderConfigDto
 
 console.log(example)

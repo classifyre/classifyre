@@ -27,6 +27,8 @@ import { Badge } from "@workspace/ui/components/badge";
 import { TechnicalLogViewer } from "@/components/technical-log-viewer";
 import { Button } from "@workspace/ui/components/button";
 import { EmptyState } from "@workspace/ui/components/empty-state";
+import { formatCost, formatTokens } from "@/components/harness/harness-usage";
+import { useFormatDuration } from "@/hooks/use-format-duration";
 import { useTranslation } from "@/hooks/use-translation";
 import { cn } from "@workspace/ui/lib/utils";
 import { formatRelative } from "@/lib/date";
@@ -70,6 +72,7 @@ export function AutopilotActivity({
   focusRunId?: string;
 } = {}) {
   const { t } = useTranslation();
+  const formatDuration = useFormatDuration();
   const [runs, setRuns] = React.useState<AgentRunDto[]>([]);
   const [total, setTotal] = React.useState(0);
   const [limit, setLimit] = React.useState(RUNS_PAGE);
@@ -250,6 +253,10 @@ export function AutopilotActivity({
                 </p>
                 <p className="mt-1 font-mono text-[10px] tabular-nums text-muted-foreground/70">
                   {formatRelative(run.createdAt)} · {t("investigations.autopilot.activity.decisionCount", { count: run.decisionCount })}
+                  {run.inputTokens + run.outputTokens > 0
+                    ? ` · ${formatTokens(run.inputTokens + run.outputTokens)} ${t("investigations.autopilot.activity.labelTokens")}`
+                    : ""}
+                  {run.costUsd != null ? ` · ${formatCost(run.costUsd)}` : ""}
                 </p>
               </button>
             </li>
@@ -294,6 +301,30 @@ export function AutopilotActivity({
                 {detail.attempts > 1 ? ` · ${t("investigations.autopilot.activity.labelAttempt", { count: detail.attempts })}` : ""}
               </span>
             </div>
+            {(detail.inputTokens + detail.outputTokens > 0 ||
+              detail.durationMs != null) && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] tabular-nums text-muted-foreground">
+                {detail.durationMs != null && (
+                  <span>
+                    {t("investigations.autopilot.activity.labelDuration")}{" "}
+                    {formatDuration(detail.durationMs)}
+                  </span>
+                )}
+                {detail.inputTokens + detail.outputTokens > 0 && (
+                  <span>
+                    {formatTokens(detail.inputTokens)}{" "}
+                    {t("investigations.autopilot.activity.tokensIn")} ·{" "}
+                    {formatTokens(detail.outputTokens)}{" "}
+                    {t("investigations.autopilot.activity.tokensOut")}
+                  </span>
+                )}
+                {detail.costUsd != null && (
+                  <span className="text-[#d97706]">
+                    {formatCost(detail.costUsd)}
+                  </span>
+                )}
+              </div>
+            )}
             {detail.instruction && (
               <blockquote className="mt-2 border-l-2 border-[#d97706] bg-[#d97706]/5 px-3 py-2 text-sm italic">
                 <Megaphone className="mr-1.5 inline h-3.5 w-3.5 text-[#d97706]" />
