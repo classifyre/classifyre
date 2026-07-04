@@ -44,6 +44,9 @@ jobs:
 
     name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
+    # Hard ceiling for the whole job. Without it a stalled Apple notarization
+    # once kept the mac job "in progress" for 5+ hours.
+    timeout-minutes: 180
 
     env:
       HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
@@ -128,6 +131,10 @@ jobs:
 
       - name: Package Electron app
         shell: bash
+        # Signing + notarization normally finish well under an hour; the step
+        # bound turns "notarytool hung on Apple's notary service" into a fast,
+        # rerunnable failure instead of a runner burning for hours.
+        timeout-minutes: 150
         run: |
           # macOS signs every Mach-O in the bundle (~1000 venv .so files)
           # via concurrent `codesign` spawns. This exhausts file descriptors and
@@ -139,7 +146,25 @@ jobs:
             ulimit -n 1048576 2>/dev/null || ulimit -n 200000 2>/dev/null || ulimit -n 65536 || true
             echo "open-file limit: $(ulimit -n); kern.maxfilesperproc: $(sysctl -n kern.maxfilesperproc)"
           fi
-          bun run --cwd apps/desktop build
+          # Bound each packaging attempt and retry once: notarytool's long-poll
+          # against appstoreconnect.apple.com flakes on GitHub's mac runners
+          # ("The Internet connection appears to be offline") and can also stall
+          # indefinitely. gtimeout (coreutils, preinstalled) kills a wedged
+          # attempt; a second attempt re-signs and re-submits from scratch.
+          BOUND=""
+          if [ "${{ runner.os }}" = "macOS" ] && command -v gtimeout >/dev/null; then
+            BOUND="gtimeout 4200"
+          fi
+          for attempt in 1 2; do
+            echo "=== Packaging attempt $attempt ==="
+            if $BOUND bun run --cwd apps/desktop build; then
+              exit 0
+            fi
+            echo "::warning::Packaging attempt $attempt failed (notarization flake?); retrying"
+            rm -rf apps/desktop/out
+          done
+          echo "::error::Packaging failed after 2 attempts"
+          exit 1
 
       # Fallback for builds without signing secrets: Apple Silicon refuses to
       # launch completely unsigned binaries, so ad-hoc sign them.
@@ -173,6 +198,7 @@ jobs:
       # mac build whose asar had no embedded-postgres).
       - name: Smoke test packaged app
         shell: bash
+        timeout-minutes: 30
         run: |
           case "${{ runner.os }}" in
             macOS)
@@ -229,6 +255,7 @@ jobs:
         run: printf '%%__os_install_post %%{nil}\n' > "$HOME/.rpmmacros"
 
       - name: Create distributables
+        timeout-minutes: 60
         run: bun run --cwd apps/desktop make --skip-package
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

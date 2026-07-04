@@ -25,6 +25,7 @@ import {
   AgentRunDto,
   AgentRunListResponseDto,
   AgentSystemBriefDto,
+  AgentUsageResponseDto,
   AutopilotStatsDto,
   CreateAgentMemoryDto,
   HarnessToolsResponseDto,
@@ -34,6 +35,7 @@ import {
   QueryAgentLogsDto,
   QueryAgentMemoryDto,
   QueryAgentRunsDto,
+  QueryAgentUsageDto,
   TriggerAutopilotDto,
   TriggerAutopilotResponseDto,
   UpdateAgentMemoryDto,
@@ -76,6 +78,16 @@ export class AutopilotController {
   @ApiResponse({ status: 200, type: AutopilotStatsDto })
   getStats(): Promise<AutopilotStatsDto> {
     return this.autopilot.getStats();
+  }
+
+  @Get('usage')
+  @ApiOperation({
+    summary:
+      'LLM token/cost usage per day and agent (for the harness usage charts) — filter by agent kind and time range',
+  })
+  @ApiResponse({ status: 200, type: AgentUsageResponseDto })
+  getUsage(@Query() query: QueryAgentUsageDto): Promise<AgentUsageResponseDto> {
+    return this.autopilot.getUsage(query);
   }
 
   @Get('activity')

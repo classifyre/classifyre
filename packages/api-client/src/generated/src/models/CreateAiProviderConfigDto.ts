@@ -61,6 +61,18 @@ export interface CreateAiProviderConfigDto {
      * @memberof CreateAiProviderConfigDto
      */
     supportsVision?: boolean;
+    /**
+     * Optional cost in USD per 1M input tokens (enables cost estimates on autopilot runs).
+     * @type {number}
+     * @memberof CreateAiProviderConfigDto
+     */
+    inputCostPerMTok?: number | null;
+    /**
+     * Optional cost in USD per 1M output tokens (enables cost estimates on autopilot runs).
+     * @type {number}
+     * @memberof CreateAiProviderConfigDto
+     */
+    outputCostPerMTok?: number | null;
 }
 
 
@@ -101,6 +113,8 @@ export function CreateAiProviderConfigDtoFromJSONTyped(json: any, ignoreDiscrimi
         'baseUrl': json['baseUrl'] == null ? undefined : json['baseUrl'],
         'contextSize': json['contextSize'] == null ? undefined : json['contextSize'],
         'supportsVision': json['supportsVision'] == null ? undefined : json['supportsVision'],
+        'inputCostPerMTok': json['inputCostPerMTok'] == null ? undefined : json['inputCostPerMTok'],
+        'outputCostPerMTok': json['outputCostPerMTok'] == null ? undefined : json['outputCostPerMTok'],
     };
 }
 
@@ -122,6 +136,8 @@ export function CreateAiProviderConfigDtoToJSONTyped(value?: CreateAiProviderCon
         'baseUrl': value['baseUrl'],
         'contextSize': value['contextSize'],
         'supportsVision': value['supportsVision'],
+        'inputCostPerMTok': value['inputCostPerMTok'],
+        'outputCostPerMTok': value['outputCostPerMTok'],
     };
 }
 

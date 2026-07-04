@@ -441,6 +441,10 @@ model AiProviderConfig {
   baseUrl     String?        @map("base_url")
   contextSize Int?           @map("context_size")
   supportsVision Boolean     @default(false) @map("supports_vision")
+  // Optional pricing in USD per 1M tokens — enables cost estimates on
+  // autopilot runs and the harness usage charts. Null = unknown/not billed.
+  inputCostPerMTok  Decimal? @map("input_cost_per_mtok") @db.Decimal(10, 4)
+  outputCostPerMTok Decimal? @map("output_cost_per_mtok") @db.Decimal(10, 4)
   createdAt   DateTime       @default(now()) @map("created_at")
   updatedAt   DateTime       @updatedAt @map("updated_at")
 
@@ -1299,6 +1303,12 @@ model AgentRun {
   attempts    Int            @default(0)
   error       String?        @db.Text
   summary     String?        @db.Text
+  // LLM token consumption of this run (all iterations/attempts summed) and the
+  // estimated cost derived from the provider's configured per-MTok prices at
+  // the time the tokens were recorded. costUsd stays null when no pricing set.
+  inputTokens  Int           @default(0) @map("input_tokens")
+  outputTokens Int           @default(0) @map("output_tokens")
+  costUsd      Decimal?      @map("cost_usd") @db.Decimal(14, 6)
   startedAt   DateTime?      @map("started_at")
   finishedAt  DateTime?      @map("finished_at")
   createdAt   DateTime       @default(now()) @map("created_at")

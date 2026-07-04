@@ -13,6 +13,7 @@ import {
 import type {
   AiCompletionOptions,
   AiMessage,
+  AiProviderResult,
   AiProviderRuntimeConfig,
   IAiProvider,
 } from '../types';
@@ -25,7 +26,7 @@ export class OpenAiProvider implements IAiProvider {
     messages: AiMessage[],
     config: AiProviderRuntimeConfig,
     options: AiCompletionOptions,
-  ): Promise<string> {
+  ): Promise<AiProviderResult> {
     const client = new OpenAI({
       apiKey: config.apiKey,
       baseURL: config.baseUrl ?? undefined,
@@ -80,7 +81,15 @@ export class OpenAiProvider implements IAiProvider {
         completion = await request();
       }
 
-      return completion.choices[0]?.message?.content ?? '';
+      return {
+        text: completion.choices[0]?.message?.content ?? '',
+        usage: completion.usage
+          ? {
+              inputTokens: completion.usage.prompt_tokens ?? 0,
+              outputTokens: completion.usage.completion_tokens ?? 0,
+            }
+          : null,
+      };
     } catch (err) {
       throw mapOpenAiError(err);
     }

@@ -16,6 +16,8 @@ Name | Type
 `briefVersion` | number
 `lastActivityAt` | Date
 `runsByKind` | { [key: string]: number; }
+`tokensLast24h` | number
+`costLast24h` | number
 
 ## Example
 
@@ -34,6 +36,8 @@ const example = {
   "briefVersion": null,
   "lastActivityAt": null,
   "runsByKind": null,
+  "tokensLast24h": null,
+  "costLast24h": null,
 } satisfies AutopilotStatsDto
 
 console.log(example)
