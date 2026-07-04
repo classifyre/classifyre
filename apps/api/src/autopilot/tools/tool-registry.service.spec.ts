@@ -42,6 +42,7 @@ describe('ToolRegistry', () => {
       {} as CustomDetectorsService,
       {} as CustomDetectorTestsService,
       {} as DecisionApplierService,
+      {} as AgentSearchService,
     ),
     new FingerprintsToolset(
       {} as PrismaService,
@@ -61,6 +62,7 @@ describe('ToolRegistry', () => {
     expect(registry.get('sources.get_config')).toBeDefined();
     expect(registry.get('detector.create')).toBeDefined();
     expect(registry.get('detectors.list')).toBeDefined();
+    expect(registry.get('detectors.precision')).toBeDefined();
     expect(registry.get('fingerprints.similar_assets')).toBeDefined();
     expect(registry.get('cases.from_cluster')).toBeDefined();
     expect(registry.get('fingerprints.tune_config')).toBeDefined();
