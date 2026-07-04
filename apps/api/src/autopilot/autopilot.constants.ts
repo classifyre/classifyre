@@ -49,3 +49,16 @@ export const MAX_ASSET_METADATA_PREVIEW_LENGTH = 80;
 export const MAX_ASSET_TYPE_BUCKETS = 15;
 export const MAX_ASSET_METADATA_KEY_BUCKETS = 25;
 export const ASSET_PROFILE_SCAN_LIMIT = 5000;
+
+// ── Detector precision signal (operator dismissals → false-positive rate) ─────
+/**
+ * Below this many operator-triaged findings the false-positive rate is too
+ * small a sample to trust — the detector is reported "unproven" rather than
+ * judged noisy or clean, so the author neither retires a promising detector on
+ * one dismissal nor trusts a clean streak of two.
+ */
+export const MIN_FEEDBACK_FOR_PRECISION = 5;
+/** At/above this dismissal rate (with enough samples) a detector is "noisy". */
+export const NOISY_FALSE_POSITIVE_RATE = 0.5;
+/** At/below this dismissal rate (with enough samples) a detector is "clean". */
+export const CLEAN_FALSE_POSITIVE_RATE = 0.2;

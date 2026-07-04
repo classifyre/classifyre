@@ -3,6 +3,7 @@ import { AgentDecisionAction, AiManagementMode } from '@prisma/client';
 import { CustomDetectorsService } from '../../../custom-detectors.service';
 import { CustomDetectorTestsService } from '../../../custom-detector-tests.service';
 import { DecisionApplierService } from '../../decision-applier.service';
+import { AgentSearchService } from '../../search/agent-search.service';
 import type { Tool, ToolContext, ToolGate } from '../tool.types';
 
 /** One-line per-type required-field rules, surfaced to the model so it stops
@@ -38,6 +39,7 @@ export class DetectorToolset {
     private readonly detectors: CustomDetectorsService,
     private readonly tests: CustomDetectorTestsService,
     private readonly applier: DecisionApplierService,
+    private readonly search: AgentSearchService,
   ) {}
 
   private detectorGate = async (
@@ -76,6 +78,27 @@ export class DetectorToolset {
               (d.pipelineSchema as { type?: string } | null)?.type ?? null,
           }));
         },
+      },
+      {
+        name: 'detectors.precision',
+        description:
+          'Measured precision per active custom detector, from operator triage (not narrative). Each row: openFindings, dismissed (FALSE_POSITIVE+IGNORED), confirmed (RESOLVED), reviewed, falsePositiveRate (dismissed/reviewed, null if never reviewed) and a sample-aware verdict (noisy | mixed | clean | unproven). Consult this before authoring or retiring a detector: a "noisy" detector should be retuned/deactivated, and never re-author a concept operators keep dismissing. Pass customDetectorKey to score just one detector you authored.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            customDetectorKey: {
+              type: 'string',
+              description:
+                'Optional: score only this custom detector key; omit for all.',
+            },
+          },
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: (input) =>
+          this.search.customDetectorPrecision(
+            (input.customDetectorKey as string | undefined) ?? null,
+          ),
       },
       {
         name: 'detector.examples',
