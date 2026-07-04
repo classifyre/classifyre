@@ -30,29 +30,52 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Computes the build matrix. The optional `only` input (workflow_dispatch)
+  # narrows a retry to a single platform — rebuilding all four to retry one
+  # failed mac notarization wastes ~45 runner-minutes per attempt. The
+  # release-triggered path (workflow_call, no `only`) builds everything.
+  # (A job-level `if` can't see the matrix context, hence this planning job.)
+  plan:
+    name: Plan build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        env:
+          ONLY: ${{ inputs.only }}
+        run: |
+          # Pinned mac image (not macos-latest): release builds sign +
+          # notarize, and image rollovers have broken that before.
+          # Intel-mac (x86_64) dropped: onnxruntime stopped shipping macOS
+          # x86_64 wheels at 1.27.0, so the CLI venv can no longer be staged
+          # on that target. Apple Silicon is the only supported mac build.
+          ALL='[
+            {"os":"macos-15","platform":"mac-arm64"},
+            {"os":"windows-latest","platform":"win-x64"},
+            {"os":"ubuntu-latest","platform":"linux-amd64"},
+            {"os":"ubuntu-24.04-arm","platform":"linux-arm64"}
+          ]'
+          if [ -n "${ONLY:-}" ]; then
+            MATRIX=$(echo "$ALL" | jq -c --arg p "$ONLY" '[.[] | select(.platform == $p)]')
+          else
+            MATRIX=$(echo "$ALL" | jq -c .)
+          fi
+          if [ "$(echo "$MATRIX" | jq length)" -eq 0 ]; then
+            echo "::error::Unknown platform '$ONLY' (expected mac-arm64 | win-x64 | linux-amd64 | linux-arm64)"
+            exit 1
+          fi
+          echo "Building: $(echo "$MATRIX" | jq -r '[.[].platform] | join(", ")')"
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: plan
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Pinned (not macos-latest): release builds sign + notarize, and
-          # image rollovers have broken that before. Bump deliberately.
-          - os: macos-15
-            platform: mac-arm64
-          # Intel-mac (x86_64) dropped: onnxruntime stopped shipping macOS
-          # x86_64 wheels at 1.27.0, so the CLI venv can no longer be staged
-          # on this target. Apple Silicon is the only supported mac build.
-          - os: windows-latest
-            platform: win-x64
-          - os: ubuntu-latest
-            platform: linux-amd64
-          - os: ubuntu-24.04-arm
-            platform: linux-arm64
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
 
     name: Build (${{ matrix.platform }})
-    # `only` (workflow_dispatch) narrows a retry to one platform; empty (and
-    # workflow_call from release.yml) builds everything.
-    if: inputs.only == '' || inputs.only == null || inputs.only == matrix.platform
     runs-on: ${{ matrix.os }}
     # Hard ceiling for the whole job. Without it a stalled Apple notarization
     # once kept the mac job "in progress" for 5+ hours. Typical green mac run
