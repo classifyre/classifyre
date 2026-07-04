@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsEnum,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUrl,
@@ -74,6 +75,22 @@ export class AiProviderConfigResponseDto {
   })
   supportsVision: boolean;
 
+  @ApiProperty({
+    description:
+      'Cost in USD per 1M input tokens. Null when pricing is not configured.',
+    example: 3,
+    nullable: true,
+  })
+  inputCostPerMTok: number | null;
+
+  @ApiProperty({
+    description:
+      'Cost in USD per 1M output tokens. Null when pricing is not configured.',
+    example: 15,
+    nullable: true,
+  })
+  outputCostPerMTok: number | null;
+
   @ApiProperty()
   createdAt: Date;
 
@@ -141,6 +158,28 @@ export class CreateAiProviderConfigDto {
   @IsOptional()
   @IsBoolean()
   supportsVision?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Optional cost in USD per 1M input tokens (enables cost estimates on autopilot runs).',
+    example: 3,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  inputCostPerMTok?: number | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Optional cost in USD per 1M output tokens (enables cost estimates on autopilot runs).',
+    example: 15,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  outputCostPerMTok?: number | null;
 }
 
 export class UpdateAiProviderConfigDto {
@@ -206,6 +245,28 @@ export class UpdateAiProviderConfigDto {
   @IsOptional()
   @IsBoolean()
   supportsVision?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Cost in USD per 1M input tokens. Pass null to clear the price.',
+    example: 3,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  inputCostPerMTok?: number | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Cost in USD per 1M output tokens. Pass null to clear the price.',
+    example: 15,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  outputCostPerMTok?: number | null;
 }
 
 export class AiProviderConfigTestResultDto {

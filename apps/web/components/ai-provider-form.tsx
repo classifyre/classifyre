@@ -21,6 +21,7 @@ import {
 } from "@workspace/ui/components";
 import {
   CheckCircle2,
+  Coins,
   KeyRound,
   Loader2,
   Save,
@@ -48,6 +49,8 @@ type Draft = {
   baseUrl: string;
   contextSize: string;
   supportsVision: boolean;
+  inputCostPerMTok: string;
+  outputCostPerMTok: string;
 };
 
 function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
@@ -60,6 +63,8 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
       baseUrl: "",
       contextSize: "",
       supportsVision: false,
+      inputCostPerMTok: "",
+      outputCostPerMTok: "",
     };
   }
   return {
@@ -70,6 +75,10 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
     baseUrl: config.baseUrl ?? "",
     contextSize: config.contextSize != null ? String(config.contextSize) : "",
     supportsVision: config.supportsVision ?? false,
+    inputCostPerMTok:
+      config.inputCostPerMTok != null ? String(config.inputCostPerMTok) : "",
+    outputCostPerMTok:
+      config.outputCostPerMTok != null ? String(config.outputCostPerMTok) : "",
   };
 }
 
@@ -80,9 +89,19 @@ function parseContextSize(value: string): number | undefined {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
+/** Empty → null (clear the stored price); invalid/negative → undefined (skip). */
+function parseCost(value: string): number | null | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const n = Number.parseFloat(trimmed);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
 function buildCreatePayload(draft: Draft): CreateAiProviderConfigDto {
   const isOpenAi =
     draft.provider === AiProviderConfigResponseDtoProviderEnum.OpenaiCompatible;
+  const inputCost = parseCost(draft.inputCostPerMTok);
+  const outputCost = parseCost(draft.outputCostPerMTok);
   return {
     name: draft.name.trim(),
     provider: draft.provider,
@@ -95,12 +114,18 @@ function buildCreatePayload(draft: Draft): CreateAiProviderConfigDto {
       ? { contextSize: parseContextSize(draft.contextSize) }
       : {}),
     supportsVision: draft.supportsVision,
+    ...(typeof inputCost === "number" ? { inputCostPerMTok: inputCost } : {}),
+    ...(typeof outputCost === "number"
+      ? { outputCostPerMTok: outputCost }
+      : {}),
   };
 }
 
 function buildUpdatePayload(draft: Draft): UpdateAiProviderConfigDto {
   const isOpenAi =
     draft.provider === AiProviderConfigResponseDtoProviderEnum.OpenaiCompatible;
+  const inputCost = parseCost(draft.inputCostPerMTok);
+  const outputCost = parseCost(draft.outputCostPerMTok);
   return {
     name: draft.name.trim(),
     provider: draft.provider,
@@ -111,6 +136,8 @@ function buildUpdatePayload(draft: Draft): UpdateAiProviderConfigDto {
       ? { contextSize: parseContextSize(draft.contextSize) }
       : {}),
     supportsVision: draft.supportsVision,
+    ...(inputCost !== undefined ? { inputCostPerMTok: inputCost } : {}),
+    ...(outputCost !== undefined ? { outputCostPerMTok: outputCost } : {}),
   };
 }
 
@@ -323,6 +350,56 @@ export function AiProviderForm({ config, onSaved, onCancel }: AiProviderFormProp
             setDraft((prev) => ({ ...prev, contextSize: e.target.value }))
           }
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs font-mono uppercase tracking-[0.12em]">
+          <Coins className="mr-1.5 inline h-3.5 w-3.5" />
+          {t("aiProvider.tokenCosts")}
+        </Label>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Input
+              className="h-10 rounded-[4px] border-2 border-border font-mono text-sm"
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder={t("aiProvider.inputCostPlaceholder")}
+              value={draft.inputCostPerMTok}
+              onChange={(e) =>
+                setDraft((prev) => ({
+                  ...prev,
+                  inputCostPerMTok: e.target.value,
+                }))
+              }
+            />
+            <p className="text-[11px] text-muted-foreground">
+              {t("aiProvider.inputCost")}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Input
+              className="h-10 rounded-[4px] border-2 border-border font-mono text-sm"
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder={t("aiProvider.outputCostPlaceholder")}
+              value={draft.outputCostPerMTok}
+              onChange={(e) =>
+                setDraft((prev) => ({
+                  ...prev,
+                  outputCostPerMTok: e.target.value,
+                }))
+              }
+            />
+            <p className="text-[11px] text-muted-foreground">
+              {t("aiProvider.outputCost")}
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {t("aiProvider.tokenCostsDesc")}
+        </p>
       </div>
 
       <div className="flex items-start justify-between gap-4 rounded-[4px] border-2 border-border px-3 py-3">

@@ -267,6 +267,26 @@ export class AgentRunDto {
   @ApiProperty()
   decisionCount!: number;
 
+  @ApiProperty({ description: 'LLM input (prompt) tokens consumed by the run' })
+  inputTokens!: number;
+
+  @ApiProperty({ description: 'LLM output (completion) tokens produced' })
+  outputTokens!: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Estimated cost in USD (provider per-MTok prices at recording time). Null when no pricing is configured.',
+  })
+  costUsd!: number | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Wall-clock duration in ms (running runs measure up to now). Null before the run starts.',
+  })
+  durationMs!: number | null;
+
   @ApiPropertyOptional({ nullable: true })
   startedAt!: Date | null;
 
@@ -787,4 +807,98 @@ export class AutopilotStatsDto {
     additionalProperties: { type: 'number' },
   })
   runsByKind!: Record<string, number>;
+
+  @ApiProperty({
+    description:
+      'LLM tokens (in + out) consumed by autopilot runs in the last 24h. Scoped to the harness — assistant chat and LLM detectors are not metered here.',
+  })
+  tokensLast24h!: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Estimated autopilot LLM cost (USD) of the last 24h. Null when no run carries pricing.',
+  })
+  costLast24h!: number | null;
+}
+
+// ── Token usage aggregation (harness usage charts) ──────────────────────────────
+
+export class QueryAgentUsageDto {
+  @ApiPropertyOptional({ enum: AgentKind })
+  @IsOptional()
+  @IsEnum(AgentKind)
+  agentKind?: AgentKind;
+
+  @ApiPropertyOptional({
+    description: 'ISO lower bound for run creation (default: 30 days ago)',
+  })
+  @IsOptional()
+  @IsString()
+  since?: string;
+
+  @ApiPropertyOptional({ description: 'ISO upper bound for run creation' })
+  @IsOptional()
+  @IsString()
+  until?: string;
+}
+
+export class AgentUsageBucketDto {
+  @ApiProperty({ description: 'UTC day, formatted YYYY-MM-DD' })
+  date!: string;
+
+  @ApiProperty({ enum: AgentKind })
+  agentKind!: AgentKind;
+
+  @ApiProperty({ description: 'Runs created that day' })
+  runs!: number;
+
+  @ApiProperty()
+  inputTokens!: number;
+
+  @ApiProperty()
+  outputTokens!: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Estimated cost (USD); null when no run that day was priced',
+  })
+  costUsd!: number | null;
+}
+
+export class AgentUsageTotalsDto {
+  @ApiProperty()
+  runs!: number;
+
+  @ApiProperty()
+  inputTokens!: number;
+
+  @ApiProperty()
+  outputTokens!: number;
+
+  @ApiPropertyOptional({ nullable: true })
+  costUsd!: number | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Mean wall-clock duration (ms) of finished runs in range',
+  })
+  avgDurationMs!: number | null;
+}
+
+export class AgentUsageResponseDto {
+  @ApiProperty({
+    type: [AgentUsageBucketDto],
+    description: 'Per-day, per-agent token/cost buckets (UTC days, ascending)',
+  })
+  buckets!: AgentUsageBucketDto[];
+
+  @ApiProperty({ type: AgentUsageTotalsDto })
+  totals!: AgentUsageTotalsDto;
+
+  @ApiProperty({
+    description:
+      'True when the default AI provider has per-MTok prices configured (cost charts are meaningful)',
+  })
+  pricingConfigured!: boolean;
 }

@@ -6,20 +6,28 @@ import {
   AiRateLimitError,
   AiSchemaError,
 } from './errors';
-import type { AiProviderRuntimeConfig } from './types';
+import type { AiProviderResult, AiProviderRuntimeConfig } from './types';
 import { AiProviderConfigService } from '../ai-provider-config.service';
 
 // ── Mock provider factory ────────────────────────────────────────────────────
 
+// Tests may resolve a plain string (no usage metadata) or a full
+// AiProviderResult; the factory normalizes to what the real interface returns.
 const mockProviderComplete = jest.fn<
-  Promise<string>,
+  Promise<string | AiProviderResult>,
   [unknown, AiProviderRuntimeConfig, unknown]
 >();
 
 jest.mock('./providers', () => ({
   createProvider: () => ({
-    complete: (...args: Parameters<typeof mockProviderComplete>) =>
-      mockProviderComplete(...args),
+    complete: async (
+      ...args: Parameters<typeof mockProviderComplete>
+    ): Promise<AiProviderResult> => {
+      const result = await mockProviderComplete(...args);
+      return typeof result === 'string'
+        ? { text: result, usage: null }
+        : result;
+    },
   }),
 }));
 
@@ -75,6 +83,20 @@ describe('AiClientService', () => {
       expect(result.content).toBe('Hello world');
       expect(result.model).toBe('claude-sonnet-4-5');
       expect(result.provider).toBe('CLAUDE');
+      expect(result.usage).toBeNull();
+    });
+
+    it('passes through provider-reported token usage', async () => {
+      mockProviderComplete.mockResolvedValueOnce({
+        text: 'Hello',
+        usage: { inputTokens: 12, outputTokens: 3 },
+      });
+
+      const result = await service.completeText([
+        { role: 'user', content: 'Say hello' },
+      ]);
+
+      expect(result.usage).toEqual({ inputTokens: 12, outputTokens: 3 });
     });
 
     it('throws AiConfigError when no default provider is selected', async () => {
@@ -215,6 +237,25 @@ describe('AiClientService', () => {
 
       expect(result.content.name).toBe('retry');
       expect(mockProviderComplete).toHaveBeenCalledTimes(2);
+    });
+
+    it('accumulates token usage across failed and successful attempts', async () => {
+      mockProviderComplete
+        .mockResolvedValueOnce({
+          text: 'not json at all',
+          usage: { inputTokens: 100, outputTokens: 10 },
+        })
+        .mockResolvedValueOnce({
+          text: '{"name":"retry","value":7}',
+          usage: { inputTokens: 120, outputTokens: 15 },
+        });
+
+      const result = await service.completeJson<{
+        name: string;
+        value: number;
+      }>([{ role: 'user', content: 'Go' }], simpleSchema, { maxRetries: 1 });
+
+      expect(result.usage).toEqual({ inputTokens: 220, outputTokens: 25 });
     });
 
     it('retry turn includes bad output as assistant + correction user message', async () => {
