@@ -17,11 +17,15 @@ import {
   MAX_FINDINGS_PER_INQUIRY,
   MAX_SAMPLE_VALUES_PER_GROUP,
   MAX_SAMPLE_VALUE_LENGTH,
+  MIN_FEEDBACK_FOR_PRECISION,
+  NOISY_FALSE_POSITIVE_RATE,
+  CLEAN_FALSE_POSITIVE_RATE,
 } from '../autopilot.constants';
 import type {
   AssetMetadataProfile,
   AssetSampleSummary,
   CaseSummary,
+  DetectorPrecisionSummary,
   DuplicateSummary,
   FindingGroupSummary,
   FocusedCaseDetail,
@@ -108,6 +112,98 @@ export class AgentSearchService {
     return [...groups.values()]
       .sort((a, b) => b.count - a.count)
       .slice(0, MAX_FINDING_GROUPS);
+  }
+
+  /**
+   * Measured precision per ACTIVE custom detector, from operator triage.
+   *
+   * Every time an operator dismisses (FALSE_POSITIVE / IGNORED) or confirms
+   * (RESOLVED) a custom-detector finding it is appended to CustomDetectorFeedback
+   * — a durable log that survives re-scans (which rewrite the findings
+   * themselves). We fold that log into a per-detector false-positive rate so the
+   * DETECTOR_AUTHOR judges a detector on real dismissals rather than narrative.
+   * Sorted noisiest-first; pass a key to score just one detector you authored.
+   */
+  async customDetectorPrecision(
+    customDetectorKey?: string | null,
+  ): Promise<DetectorPrecisionSummary[]> {
+    const detectors = await this.prisma.customDetector.findMany({
+      where: {
+        isActive: true,
+        ...(customDetectorKey ? { key: customDetectorKey } : {}),
+      },
+      select: { key: true, name: true },
+    });
+    if (detectors.length === 0) return [];
+
+    const keys = detectors.map((d) => d.key);
+    const [feedback, openFindings] = await Promise.all([
+      // Cumulative operator triage — the durable dismissal signal.
+      this.prisma.customDetectorFeedback.groupBy({
+        by: ['customDetectorKey', 'status'],
+        where: { customDetectorKey: { in: keys } },
+        _count: true,
+      }),
+      // Current untriaged volume, so a rate is read against what is still open.
+      this.prisma.finding.groupBy({
+        by: ['customDetectorKey'],
+        where: { customDetectorKey: { in: keys }, status: 'OPEN' },
+        _count: true,
+      }),
+    ]);
+
+    const openByKey = new Map<string, number>();
+    for (const row of openFindings) {
+      if (row.customDetectorKey) {
+        openByKey.set(row.customDetectorKey, row._count);
+      }
+    }
+
+    const dismissedByKey = new Map<string, number>();
+    const confirmedByKey = new Map<string, number>();
+    for (const row of feedback) {
+      const target =
+        row.status === 'FALSE_POSITIVE' || row.status === 'IGNORED'
+          ? dismissedByKey
+          : row.status === 'RESOLVED'
+            ? confirmedByKey
+            : null;
+      if (target) {
+        target.set(
+          row.customDetectorKey,
+          (target.get(row.customDetectorKey) ?? 0) + row._count,
+        );
+      }
+    }
+
+    return detectors
+      .map((d) => {
+        const dismissed = dismissedByKey.get(d.key) ?? 0;
+        const confirmed = confirmedByKey.get(d.key) ?? 0;
+        const reviewed = dismissed + confirmed;
+        const falsePositiveRate =
+          reviewed > 0 ? Math.round((dismissed / reviewed) * 100) / 100 : null;
+        return {
+          customDetectorKey: d.key,
+          customDetectorName: d.name,
+          openFindings: openByKey.get(d.key) ?? 0,
+          dismissed,
+          confirmed,
+          reviewed,
+          falsePositiveRate,
+          verdict: classifyPrecision(reviewed, falsePositiveRate),
+        };
+      })
+      .sort((a, b) => {
+        // Best-evidenced first, then noisiest — surface actionable, well-
+        // supported precision problems above small-sample (unproven) noise.
+        const aProven = a.reviewed >= MIN_FEEDBACK_FOR_PRECISION;
+        const bProven = b.reviewed >= MIN_FEEDBACK_FOR_PRECISION;
+        if (aProven !== bProven) return aProven ? -1 : 1;
+        const ra = a.falsePositiveRate ?? -1;
+        const rb = b.falsePositiveRate ?? -1;
+        return rb !== ra ? rb - ra : b.reviewed - a.reviewed;
+      });
   }
 
   /**
@@ -565,6 +661,21 @@ export class AgentSearchService {
 
 function truncate(value: string, max: number): string {
   return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
+/**
+ * Coarse, sample-aware label for a detector's false-positive rate. Too few
+ * operator reviews → "unproven" (do not judge on one dismissal); otherwise
+ * "noisy" / "clean" at the thresholds, "mixed" in between.
+ */
+function classifyPrecision(
+  reviewed: number,
+  rate: number | null,
+): DetectorPrecisionSummary['verdict'] {
+  if (rate === null || reviewed < MIN_FEEDBACK_FOR_PRECISION) return 'unproven';
+  if (rate >= NOISY_FALSE_POSITIVE_RATE) return 'noisy';
+  if (rate <= CLEAN_FALSE_POSITIVE_RATE) return 'clean';
+  return 'mixed';
 }
 
 function bump(map: Map<string, number>, key: string): void {

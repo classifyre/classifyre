@@ -41,12 +41,24 @@ export interface AiCompletionOptions {
   rateLimitRetries?: number;
 }
 
+/** Token consumption reported by the provider for one or more requests. */
+export interface AiUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export interface AiResponse<T = string> {
   content: T;
   model: string;
   provider: AiProviderType;
   /** Raw provider output the content was parsed from (set by completeJson). */
   raw?: string;
+  /**
+   * Total token consumption across every provider request made to produce
+   * this response (including failed JSON attempts that were retried).
+   * Null when the provider did not report usage.
+   */
+  usage: AiUsage | null;
 }
 
 export type AiProviderType = 'OPENAI_COMPATIBLE' | 'CLAUDE' | 'GEMINI';
@@ -61,15 +73,22 @@ export interface AiProviderRuntimeConfig {
   supportsVision: boolean;
 }
 
+/** One provider request's result: the raw text plus reported token usage. */
+export interface AiProviderResult {
+  text: string;
+  /** Null when the provider response carried no usage metadata. */
+  usage: AiUsage | null;
+}
+
 /** Internal interface every provider must implement. */
 export interface IAiProvider {
   /**
-   * Generate a text completion. Returns the raw string from the provider.
-   * Throws typed AiError subclasses on failure.
+   * Generate a text completion. Returns the raw string from the provider
+   * plus its reported token usage. Throws typed AiError subclasses on failure.
    */
   complete(
     messages: AiMessage[],
     config: AiProviderRuntimeConfig,
     options: AiCompletionOptions,
-  ): Promise<string>;
+  ): Promise<AiProviderResult>;
 }

@@ -17,6 +17,7 @@ import {
 import type {
   AiCompletionOptions,
   AiMessage,
+  AiProviderResult,
   AiProviderRuntimeConfig,
   IAiProvider,
 } from '../types';
@@ -26,7 +27,7 @@ export class ClaudeProvider implements IAiProvider {
     messages: AiMessage[],
     config: AiProviderRuntimeConfig,
     options: AiCompletionOptions,
-  ): Promise<string> {
+  ): Promise<AiProviderResult> {
     const client = new Anthropic({
       apiKey: config.apiKey,
       timeout: 30 * 60 * 1000,
@@ -63,7 +64,15 @@ export class ClaudeProvider implements IAiProvider {
       const textBlock = response.content.find(
         (b): b is TextBlock => b.type === 'text',
       );
-      return textBlock?.text ?? '';
+      return {
+        text: textBlock?.text ?? '',
+        usage: response.usage
+          ? {
+              inputTokens: response.usage.input_tokens ?? 0,
+              outputTokens: response.usage.output_tokens ?? 0,
+            }
+          : null,
+      };
     } catch (err) {
       throw mapClaudeError(err);
     }

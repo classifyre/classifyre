@@ -12,6 +12,7 @@ All URIs are relative to *http://localhost*
 | [**autopilotControllerGetStats**](AutopilotApi.md#autopilotcontrollergetstats) | **GET** /autopilot/stats | Mission-control counters (runs, decisions, memory, brief version) |
 | [**autopilotControllerGetSystemBrief**](AutopilotApi.md#autopilotcontrollergetsystembrief) | **GET** /autopilot/system-brief | The living system brief the autopilot maintains and injects |
 | [**autopilotControllerGetTools**](AutopilotApi.md#autopilotcontrollergettools) | **GET** /autopilot/tools | The harness capability map — every registered tool (read/mutate, domain) and the missions that use them |
+| [**autopilotControllerGetUsage**](AutopilotApi.md#autopilotcontrollergetusage) | **GET** /autopilot/usage | LLM token/cost usage per day and agent (for the harness usage charts) — filter by agent kind and time range |
 | [**autopilotControllerListActivity**](AutopilotApi.md#autopilotcontrollerlistactivity) | **GET** /autopilot/activity | Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time |
 | [**autopilotControllerListLogs**](AutopilotApi.md#autopilotcontrollerlistlogs) | **GET** /autopilot/runs/{id}/logs | Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output) |
 | [**autopilotControllerListMemory**](AutopilotApi.md#autopilotcontrollerlistmemory) | **GET** /autopilot/memory | List the agent memory (glossary, precedents, topic map) |
@@ -500,6 +501,77 @@ This endpoint does not need any parameter.
 ### Return type
 
 [**HarnessToolsResponseDto**](HarnessToolsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## autopilotControllerGetUsage
+
+> AgentUsageResponseDto autopilotControllerGetUsage(agentKind, since, until)
+
+LLM token/cost usage per day and agent (for the harness usage charts) — filter by agent kind and time range
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { AutopilotControllerGetUsageRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' (optional)
+    agentKind: agentKind_example,
+    // string | ISO lower bound for run creation (default: 30 days ago) (optional)
+    since: since_example,
+    // string | ISO upper bound for run creation (optional)
+    until: until_example,
+  } satisfies AutopilotControllerGetUsageRequest;
+
+  try {
+    const data = await api.autopilotControllerGetUsage(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR] |
+| **since** | `string` | ISO lower bound for run creation (default: 30 days ago) | [Optional] [Defaults to `undefined`] |
+| **until** | `string` | ISO upper bound for run creation | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**AgentUsageResponseDto**](AgentUsageResponseDto.md)
 
 ### Authorization
 
