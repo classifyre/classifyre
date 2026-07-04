@@ -27,6 +27,7 @@ import { HarnessAgents } from "./harness-agents";
 import { HarnessTools } from "./harness-tools";
 import { HarnessBrief } from "./harness-brief";
 import { HarnessConfig } from "./harness-config";
+import { HarnessStatTile } from "./harness-stat-tile";
 import { HarnessUsage, formatCost, formatTokens } from "./harness-usage";
 
 type View =
@@ -205,27 +206,13 @@ function StatStrip({ stats }: { stats: AutopilotStatsDto | null }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
       {cells.map((cell, i) => (
-        <div
+        <HarnessStatTile
           key={i}
-          className={cn(
-            "rounded-[4px] border-2 px-3 py-2",
-            cell.accent
-              ? "border-emerald-500/50 bg-emerald-500/[0.06]"
-              : "border-border bg-card",
-          )}
-        >
-          <div className="flex items-center gap-1.5">
-            {cell.accent && (
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-            )}
-            <p className="font-serif text-xl font-black tabular-nums leading-none">
-              {cell.value}
-            </p>
-          </div>
-          <p className="mt-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
-            {cell.label}
-          </p>
-        </div>
+          label={cell.label}
+          value={cell.value}
+          accent={cell.accent ? "emerald" : "none"}
+          pulse={cell.accent}
+        />
       ))}
     </div>
   );

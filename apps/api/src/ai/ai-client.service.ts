@@ -151,6 +151,7 @@ export class AiClientService {
       `Failed to produce valid JSON after ${maxRetries + 1} attempt(s).`,
       lastError,
       failedAttempts,
+      totalUsage,
     );
   }
 

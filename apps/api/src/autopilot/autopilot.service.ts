@@ -649,42 +649,40 @@ export class AutopilotService {
       ? Prisma.sql`AND agent_kind = ${query.agentKind}::"AgentKind"`
       : Prisma.empty;
 
-    const rows = await this.prisma.$queryRaw<
-      Array<{
-        day: string;
-        agent_kind: AgentKind;
-        runs: number;
-        input_tokens: bigint;
-        output_tokens: bigint;
-        cost_usd: number | null;
-      }>
-    >(Prisma.sql`
-      SELECT
-        to_char(date_trunc('day', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day,
-        agent_kind,
-        COUNT(*)::int AS runs,
-        COALESCE(SUM(input_tokens), 0)::bigint AS input_tokens,
-        COALESCE(SUM(output_tokens), 0)::bigint AS output_tokens,
-        SUM(cost_usd)::float8 AS cost_usd
-      FROM agent_runs
-      WHERE created_at >= ${since} AND created_at <= ${until}
-        ${kindFilter}
-      GROUP BY 1, 2
-      ORDER BY 1 ASC, 2 ASC
-    `);
-
-    const durationWhere: Prisma.AgentRunWhereInput = {
-      createdAt: { gte: since, lte: until },
-      startedAt: { not: null },
-      finishedAt: { not: null },
-      ...(query.agentKind ? { agentKind: query.agentKind } : {}),
-    };
-    const [finished, settings] = await Promise.all([
-      this.prisma.agentRun.findMany({
-        where: durationWhere,
-        select: { startedAt: true, finishedAt: true },
-        take: 5000,
-      }),
+    const [rows, avgRows, settings] = await Promise.all([
+      this.prisma.$queryRaw<
+        Array<{
+          day: string;
+          agent_kind: AgentKind;
+          runs: number;
+          input_tokens: bigint;
+          output_tokens: bigint;
+          cost_usd: number | null;
+        }>
+        // created_at is a naive timestamp already storing UTC, so truncate it
+        // directly — an AT TIME ZONE conversion would re-render the day in the
+        // DB session timezone and shift buckets off the UI's UTC day keys.
+      >(Prisma.sql`
+        SELECT
+          to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day,
+          agent_kind,
+          COUNT(*)::int AS runs,
+          COALESCE(SUM(input_tokens), 0)::bigint AS input_tokens,
+          COALESCE(SUM(output_tokens), 0)::bigint AS output_tokens,
+          SUM(cost_usd)::float8 AS cost_usd
+        FROM agent_runs
+        WHERE created_at >= ${since} AND created_at <= ${until}
+          ${kindFilter}
+        GROUP BY 1, 2
+        ORDER BY 1 ASC, 2 ASC
+      `),
+      this.prisma.$queryRaw<Array<{ avg_ms: number | null }>>(Prisma.sql`
+        SELECT AVG(EXTRACT(EPOCH FROM (finished_at - started_at)) * 1000)::float8 AS avg_ms
+        FROM agent_runs
+        WHERE created_at >= ${since} AND created_at <= ${until}
+          AND started_at IS NOT NULL AND finished_at > started_at
+          ${kindFilter}
+      `),
       this.prisma.instanceSettings.findUnique({
         where: { id: 1 },
         select: {
@@ -694,13 +692,8 @@ export class AutopilotService {
         },
       }),
     ]);
-    const durations = finished
-      .map((r) => (r.finishedAt?.getTime() ?? 0) - (r.startedAt?.getTime() ?? 0))
-      .filter((d) => d > 0);
-    const avgDurationMs =
-      durations.length > 0
-        ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
-        : null;
+    const avgMs = avgRows[0]?.avg_ms;
+    const avgDurationMs = avgMs != null ? Math.round(Number(avgMs)) : null;
 
     const buckets: AgentUsageBucketDto[] = rows.map((r) => ({
       date: r.day,
@@ -727,8 +720,7 @@ export class AutopilotService {
       totals,
       pricingConfigured:
         pricing != null &&
-        (pricing.inputCostPerMTok != null ||
-          pricing.outputCostPerMTok != null),
+        (pricing.inputCostPerMTok != null || pricing.outputCostPerMTok != null),
     };
   }
 
@@ -808,13 +800,9 @@ function dateRange(
   until?: string,
 ): Prisma.DateTimeFilter | undefined {
   const filter: Prisma.DateTimeFilter = {};
-  if (since) {
-    const d = new Date(since);
-    if (!Number.isNaN(d.getTime())) filter.gte = d;
-  }
-  if (until) {
-    const d = new Date(until);
-    if (!Number.isNaN(d.getTime())) filter.lte = d;
-  }
+  const gte = parseDate(since);
+  if (gte) filter.gte = gte;
+  const lte = parseDate(until);
+  if (lte) filter.lte = lte;
   return Object.keys(filter).length > 0 ? filter : undefined;
 }

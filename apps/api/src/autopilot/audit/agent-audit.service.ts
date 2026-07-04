@@ -81,6 +81,9 @@ export class AgentAuditService {
           status: AgentRunStatus.RUNNING,
           attempts: { increment: 1 },
           startedAt: existing.startedAt ?? new Date(),
+          // Clear the previous attempt's end mark so a resumed run measures
+          // its duration up to "now" again instead of freezing at the failure.
+          finishedAt: null,
           error: null,
         },
       });
@@ -118,31 +121,48 @@ export class AgentAuditService {
   /**
    * Persist the run's cumulative LLM token consumption (absolute totals, not
    * increments — the loop tracks them in its resumable progress, so a resumed
-   * attempt never double-counts). When the instance's default AI provider has
-   * per-MTok prices configured, the estimated cost is derived and stored with
-   * the tokens so later price changes never rewrite history.
+   * attempt never double-counts). Cost is estimated incrementally: only the
+   * tokens ADDED since the last save are priced, at the default provider's
+   * current per-MTok prices, so a mid-run price change never re-prices tokens
+   * that were already recorded.
    */
   async saveUsage(
     runId: string,
     inputTokens: number,
     outputTokens: number,
   ): Promise<void> {
-    const settings = await this.prisma.instanceSettings.findUnique({
-      where: { id: 1 },
-      select: {
-        aiProviderConfig: {
-          select: { inputCostPerMTok: true, outputCostPerMTok: true },
+    const [settings, run] = await Promise.all([
+      this.prisma.instanceSettings.findUnique({
+        where: { id: 1 },
+        select: {
+          aiProviderConfig: {
+            select: { inputCostPerMTok: true, outputCostPerMTok: true },
+          },
         },
-      },
-    });
+      }),
+      this.prisma.agentRun.findUnique({
+        where: { id: runId },
+        select: { inputTokens: true, outputTokens: true, costUsd: true },
+      }),
+    ]);
+    if (!run) return; // run row gone (retention cleanup) — nothing to record
+
     const pricing = settings?.aiProviderConfig;
     const priced =
       pricing != null &&
       (pricing.inputCostPerMTok != null || pricing.outputCostPerMTok != null);
-    const costUsd = priced
-      ? (inputTokens / 1_000_000) * Number(pricing.inputCostPerMTok ?? 0) +
-        (outputTokens / 1_000_000) * Number(pricing.outputCostPerMTok ?? 0)
+    const addedInput = Math.max(0, inputTokens - run.inputTokens);
+    const addedOutput = Math.max(0, outputTokens - run.outputTokens);
+    const addedCost = priced
+      ? (addedInput / 1_000_000) * Number(pricing.inputCostPerMTok ?? 0) +
+        (addedOutput / 1_000_000) * Number(pricing.outputCostPerMTok ?? 0)
       : null;
+    const costUsd =
+      addedCost != null
+        ? Number(run.costUsd ?? 0) + addedCost
+        : run.costUsd != null
+          ? Number(run.costUsd)
+          : null;
 
     await this.prisma.agentRun.update({
       where: { id: runId },

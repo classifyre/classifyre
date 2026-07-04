@@ -808,13 +808,16 @@ export class AutopilotStatsDto {
   })
   runsByKind!: Record<string, number>;
 
-  @ApiProperty({ description: 'LLM tokens (in + out) consumed in the last 24h' })
+  @ApiProperty({
+    description:
+      'LLM tokens (in + out) consumed by autopilot runs in the last 24h. Scoped to the harness — assistant chat and LLM detectors are not metered here.',
+  })
   tokensLast24h!: number;
 
   @ApiPropertyOptional({
     nullable: true,
     description:
-      'Estimated LLM cost (USD) of the last 24h. Null when no run carries pricing.',
+      'Estimated autopilot LLM cost (USD) of the last 24h. Null when no run carries pricing.',
   })
   costLast24h!: number | null;
 }

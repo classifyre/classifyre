@@ -18,6 +18,10 @@ Name | Type
 `error` | string
 `summary` | string
 `decisionCount` | number
+`inputTokens` | number
+`outputTokens` | number
+`costUsd` | number
+`durationMs` | number
 `startedAt` | Date
 `finishedAt` | Date
 `createdAt` | Date
@@ -42,6 +46,10 @@ const example = {
   "error": null,
   "summary": null,
   "decisionCount": null,
+  "inputTokens": null,
+  "outputTokens": null,
+  "costUsd": null,
+  "durationMs": null,
   "startedAt": null,
   "finishedAt": null,
   "createdAt": null,

@@ -6853,6 +6853,63 @@
         ]
       }
     },
+    "/autopilot/usage": {
+      "get": {
+        "operationId": "AutopilotController_getUsage",
+        "parameters": [
+          {
+            "name": "agentKind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INQUIRY",
+                "CASE",
+                "DREAM",
+                "DUPLICATES",
+                "CONFIG",
+                "DETECTOR_AUTHOR"
+              ]
+            }
+          },
+          {
+            "name": "since",
+            "required": false,
+            "in": "query",
+            "description": "ISO lower bound for run creation (default: 30 days ago)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "required": false,
+            "in": "query",
+            "description": "ISO upper bound for run creation",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentUsageResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "LLM token/cost usage per day and agent (for the harness usage charts) — filter by agent kind and time range",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
     "/autopilot/activity": {
       "get": {
         "operationId": "AutopilotController_listActivity",
@@ -12057,6 +12114,18 @@
             "description": "Whether the provider/model accepts image/PDF (vision) input. When true, detectors using this credential send rendered file images to the model instead of extracted text.",
             "example": false
           },
+          "inputCostPerMTok": {
+            "type": "number",
+            "description": "Cost in USD per 1M input tokens. Null when pricing is not configured.",
+            "example": 3,
+            "nullable": true
+          },
+          "outputCostPerMTok": {
+            "type": "number",
+            "description": "Cost in USD per 1M output tokens. Null when pricing is not configured.",
+            "example": 15,
+            "nullable": true
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -12076,6 +12145,8 @@
           "baseUrl",
           "contextSize",
           "supportsVision",
+          "inputCostPerMTok",
+          "outputCostPerMTok",
           "createdAt",
           "updatedAt"
         ]
@@ -12121,6 +12192,18 @@
             "type": "boolean",
             "description": "Whether the provider/model accepts image/PDF (vision) input. Defaults to false.",
             "example": false
+          },
+          "inputCostPerMTok": {
+            "type": "number",
+            "description": "Optional cost in USD per 1M input tokens (enables cost estimates on autopilot runs).",
+            "example": 3,
+            "nullable": true
+          },
+          "outputCostPerMTok": {
+            "type": "number",
+            "description": "Optional cost in USD per 1M output tokens (enables cost estimates on autopilot runs).",
+            "example": 15,
+            "nullable": true
           }
         },
         "required": [
@@ -12169,6 +12252,18 @@
             "type": "boolean",
             "description": "Whether the provider/model accepts image/PDF (vision) input. Defaults to false.",
             "example": false
+          },
+          "inputCostPerMTok": {
+            "type": "number",
+            "description": "Cost in USD per 1M input tokens. Pass null to clear the price.",
+            "example": 3,
+            "nullable": true
+          },
+          "outputCostPerMTok": {
+            "type": "number",
+            "description": "Cost in USD per 1M output tokens. Pass null to clear the price.",
+            "example": 15,
+            "nullable": true
           }
         }
       },
@@ -15465,6 +15560,15 @@
             "additionalProperties": {
               "type": "number"
             }
+          },
+          "tokensLast24h": {
+            "type": "number",
+            "description": "LLM tokens (in + out) consumed by autopilot runs in the last 24h. Scoped to the harness — assistant chat and LLM detectors are not metered here."
+          },
+          "costLast24h": {
+            "type": "number",
+            "nullable": true,
+            "description": "Estimated autopilot LLM cost (USD) of the last 24h. Null when no run carries pricing."
           }
         },
         "required": [
@@ -15476,7 +15580,102 @@
           "decisionsFailed",
           "memoryCount",
           "briefVersion",
-          "runsByKind"
+          "runsByKind",
+          "tokensLast24h"
+        ]
+      },
+      "AgentUsageBucketDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "UTC day, formatted YYYY-MM-DD"
+          },
+          "agentKind": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE",
+              "DREAM",
+              "DUPLICATES",
+              "CONFIG",
+              "DETECTOR_AUTHOR"
+            ]
+          },
+          "runs": {
+            "type": "number",
+            "description": "Runs created that day"
+          },
+          "inputTokens": {
+            "type": "number"
+          },
+          "outputTokens": {
+            "type": "number"
+          },
+          "costUsd": {
+            "type": "number",
+            "nullable": true,
+            "description": "Estimated cost (USD); null when no run that day was priced"
+          }
+        },
+        "required": [
+          "date",
+          "agentKind",
+          "runs",
+          "inputTokens",
+          "outputTokens"
+        ]
+      },
+      "AgentUsageTotalsDto": {
+        "type": "object",
+        "properties": {
+          "runs": {
+            "type": "number"
+          },
+          "inputTokens": {
+            "type": "number"
+          },
+          "outputTokens": {
+            "type": "number"
+          },
+          "costUsd": {
+            "type": "number",
+            "nullable": true
+          },
+          "avgDurationMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mean wall-clock duration (ms) of finished runs in range"
+          }
+        },
+        "required": [
+          "runs",
+          "inputTokens",
+          "outputTokens"
+        ]
+      },
+      "AgentUsageResponseDto": {
+        "type": "object",
+        "properties": {
+          "buckets": {
+            "description": "Per-day, per-agent token/cost buckets (UTC days, ascending)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentUsageBucketDto"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/AgentUsageTotalsDto"
+          },
+          "pricingConfigured": {
+            "type": "boolean",
+            "description": "True when the default AI provider has per-MTok prices configured (cost charts are meaningful)"
+          }
+        },
+        "required": [
+          "buckets",
+          "totals",
+          "pricingConfigured"
         ]
       },
       "AgentActivityItemDto": {
@@ -15998,6 +16197,24 @@
           "decisionCount": {
             "type": "number"
           },
+          "inputTokens": {
+            "type": "number",
+            "description": "LLM input (prompt) tokens consumed by the run"
+          },
+          "outputTokens": {
+            "type": "number",
+            "description": "LLM output (completion) tokens produced"
+          },
+          "costUsd": {
+            "type": "number",
+            "nullable": true,
+            "description": "Estimated cost in USD (provider per-MTok prices at recording time). Null when no pricing is configured."
+          },
+          "durationMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "Wall-clock duration in ms (running runs measure up to now). Null before the run starts."
+          },
           "startedAt": {
             "format": "date-time",
             "type": "string",
@@ -16020,6 +16237,8 @@
           "trigger",
           "attempts",
           "decisionCount",
+          "inputTokens",
+          "outputTokens",
           "createdAt"
         ]
       },
@@ -16194,6 +16413,24 @@
           "decisionCount": {
             "type": "number"
           },
+          "inputTokens": {
+            "type": "number",
+            "description": "LLM input (prompt) tokens consumed by the run"
+          },
+          "outputTokens": {
+            "type": "number",
+            "description": "LLM output (completion) tokens produced"
+          },
+          "costUsd": {
+            "type": "number",
+            "nullable": true,
+            "description": "Estimated cost in USD (provider per-MTok prices at recording time). Null when no pricing is configured."
+          },
+          "durationMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "Wall-clock duration in ms (running runs measure up to now). Null before the run starts."
+          },
           "startedAt": {
             "format": "date-time",
             "type": "string",
@@ -16222,6 +16459,8 @@
           "trigger",
           "attempts",
           "decisionCount",
+          "inputTokens",
+          "outputTokens",
           "createdAt",
           "decisions"
         ]
