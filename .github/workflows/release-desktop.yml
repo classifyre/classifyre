@@ -45,8 +45,10 @@ jobs:
     name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     # Hard ceiling for the whole job. Without it a stalled Apple notarization
-    # once kept the mac job "in progress" for 5+ hours.
-    timeout-minutes: 180
+    # once kept the mac job "in progress" for 5+ hours. Typical green mac run
+    # is ~90 min; the ceiling only exists for the pathological case (bounded
+    # notarize retries can add up to ~2h on top of staging + signing).
+    timeout-minutes: 240
 
     env:
       HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
@@ -129,12 +131,12 @@ jobs:
         shell: bash
         run: bash apps/desktop/scripts/stage-resources.sh
 
+      # Packaging only copies + signs here — notarization happens in the
+      # dedicated step below. Keeping notarytool out of Forge means a notary
+      # retry never repeats the expensive deep-sign.
       - name: Package Electron app
         shell: bash
-        # Signing + notarization normally finish well under an hour; the step
-        # bound turns "notarytool hung on Apple's notary service" into a fast,
-        # rerunnable failure instead of a runner burning for hours.
-        timeout-minutes: 150
+        timeout-minutes: 60
         run: |
           # macOS signs every Mach-O in the bundle (~1000 venv .so files)
           # via concurrent `codesign` spawns. This exhausts file descriptors and
@@ -146,24 +148,59 @@ jobs:
             ulimit -n 1048576 2>/dev/null || ulimit -n 200000 2>/dev/null || ulimit -n 65536 || true
             echo "open-file limit: $(ulimit -n); kern.maxfilesperproc: $(sysctl -n kern.maxfilesperproc)"
           fi
-          # Bound each packaging attempt and retry once: notarytool's long-poll
-          # against appstoreconnect.apple.com flakes on GitHub's mac runners
-          # ("The Internet connection appears to be offline") and can also stall
-          # indefinitely. gtimeout (coreutils, preinstalled) kills a wedged
-          # attempt; a second attempt re-signs and re-submits from scratch.
-          BOUND=""
-          if [ "${{ runner.os }}" = "macOS" ] && command -v gtimeout >/dev/null; then
-            BOUND="gtimeout 4200"
+          bun run --cwd apps/desktop build
+
+      # Notarization is driven directly (not via Forge/@electron/notarize)
+      # because their `notarytool submit --wait` has NO timeout — Apple's
+      # long-poll hung CI runs for 2.5-5 h (run #35 cleanup killed an orphan
+      # notarytool after 150 min). Doing it here gives: a native --timeout,
+      # cheap retries (re-upload only — the deep-sign is not repeated),
+      # visible per-attempt progress, and `notarytool log` output when Apple
+      # actually rejects something.
+      - name: Notarize and staple (macOS)
+        if: runner.os == 'macOS' && env.MACOS_SIGN == '1'
+        shell: bash
+        timeout-minutes: 140
+        run: |
+          APP=$(find apps/desktop/out -name 'Classifyre.app' -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::No .app bundle found to notarize"
+            exit 1
           fi
-          for attempt in 1 2; do
-            echo "=== Packaging attempt $attempt ==="
-            if $BOUND bun run --cwd apps/desktop build; then
+          ZIP="$RUNNER_TEMP/classifyre-notarize.zip"
+          echo "Zipping $APP for notarization…"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+          du -h "$ZIP"
+
+          KEYCHAIN_ARGS=(--key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID")
+          for attempt in 1 2 3; do
+            echo "=== Notarization attempt $attempt ==="
+            set +e
+            xcrun notarytool submit "$ZIP" "${KEYCHAIN_ARGS[@]}" \
+              --wait --timeout 40m --output-format json > /tmp/notary.json
+            rc=$?
+            set -e
+            cat /tmp/notary.json || true
+            STATUS=$(jq -r '.status // empty' /tmp/notary.json 2>/dev/null || true)
+            SUBMISSION_ID=$(jq -r '.id // empty' /tmp/notary.json 2>/dev/null || true)
+            if [ "$STATUS" = "Accepted" ]; then
+              echo "Notarization accepted (submission $SUBMISSION_ID); stapling…"
+              xcrun stapler staple "$APP"
+              xcrun stapler validate "$APP"
               exit 0
             fi
-            echo "::warning::Packaging attempt $attempt failed (notarization flake?); retrying"
-            rm -rf apps/desktop/out
+            if [ "$STATUS" = "Invalid" ] || [ "$STATUS" = "Rejected" ]; then
+              # A real verdict from Apple — retrying won't change it. Surface why.
+              echo "::error::Notarization $STATUS (submission $SUBMISSION_ID)"
+              xcrun notarytool log "$SUBMISSION_ID" "${KEYCHAIN_ARGS[@]}" || true
+              exit 1
+            fi
+            # rc != 0 with no verdict → upload/poll flake or 40m timeout while
+            # Apple was still scanning. A resubmission is safe (and often fast:
+            # Apple caches scan results by content hash).
+            echo "::warning::Attempt $attempt inconclusive (rc=$rc, status='$STATUS'); retrying"
           done
-          echo "::error::Packaging failed after 2 attempts"
+          echo "::error::Notarization did not complete after 3 attempts"
           exit 1
 
       # Fallback for builds without signing secrets: Apple Silicon refuses to
